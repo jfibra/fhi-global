@@ -1,0 +1,11 @@
+import { NextResponse } from "next/server"
+import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
+
+export async function POST(request: Request) {
+  if (hasServerSupabaseEnv()) {
+    const supabase = await createClient()
+    await supabase.auth.signOut()
+  }
+
+  return NextResponse.redirect(new URL("/", request.url))
+}
