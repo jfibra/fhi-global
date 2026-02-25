@@ -29,7 +29,7 @@ export function HomeLoginUI() {
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#d6b357]/60 to-transparent" />
 
         <div className="relative z-10">
-          <Image src="/FHI_Branding_White.png" alt="FHI Global" width={160} height={48} className="object-contain" />
+          <Image src="/FHI_Branding_White.png" alt="FHI Global" width={160} height={48} className="object-contain h-auto" />
         </div>
 
         <div className="relative z-10 max-w-lg">
@@ -81,7 +81,7 @@ export function HomeLoginUI() {
       <div className="flex-1 flex items-center justify-center px-6 py-12 lg:px-12">
         <div className="w-full max-w-md">
           <div className="mb-10 lg:hidden flex justify-center">
-            <Image src="/FHI_Branding_White.png" alt="FHI Global" width={140} height={42} className="object-contain" />
+            <Image src="/FHI_Branding_White.png" alt="FHI Global" width={140} height={42} className="object-contain h-auto" />
           </div>
 
           <div className="bg-white/5 lg:bg-white border border-white/10 lg:border-[#e8eaed] rounded-3xl p-8 lg:p-10 lg:shadow-[0_8px_40px_-8px_rgba(0,31,63,0.12)] backdrop-blur-sm lg:backdrop-blur-none">
