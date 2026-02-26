@@ -2,9 +2,11 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
+import { createPageMetadata } from "@/lib/seo"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { SocialShare } from "@/components/social-share"
 import { ProjectGallery } from "@/components/public/project-gallery"
 import { AmenitiesGrid, NearbyPlaces } from "@/components/public/amenities-grid"
 import {
@@ -24,15 +26,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!data) return { title: "Project Not Found" }
   const title = data.meta_title ?? `${data.name} | FHI Global`
   const description = data.meta_description ?? `Discover ${data.name} – a premium real estate project in Dubai.`
-  return {
+
+  return createPageMetadata({
     title,
     description,
-    openGraph: {
-      title,
-      description,
-      images: data.main_image ? [data.main_image] : [],
-    },
-  }
+    imageUrl: data.main_image,
+  })
 }
 
 const STATUS_STYLES: Record<string, { label: string; bg: string; text: string; border: string }> = {
@@ -183,6 +182,12 @@ export default async function ProjectDetailPage({ params }: Props) {
                   View Units
                 </a>
               </div>
+
+              <SocialShare
+                title={`${project.name} | FHI Global`}
+                text={`Discover ${project.name} on FHI Global.`}
+                variant="dark"
+              />
             </div>
           </div>
         </div>

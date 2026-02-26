@@ -1,3 +1,11 @@
+import type { Metadata } from "next"
+import { createPageMetadata } from "@/lib/seo"
+
+export const metadata: Metadata = createPageMetadata({
+  title: "Account Inactive | FHI Global",
+  description: "Your account is currently inactive.",
+})
+
 export default function AccountInactivePage() {
   return (
     <div className="min-h-screen bg-[#f4f6f9] flex items-center justify-center px-4">

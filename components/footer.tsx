@@ -35,17 +35,16 @@ function TwitterXIcon() {
   )
 }
 
-const COMPANY_LINKS  = [
-  { label: "About Us",        href: "/about" },
-  { label: "Our Team",        href: "/team" },
-  { label: "Careers",         href: "/careers" },
-  { label: "News & Media",    href: "/news" },
-  { label: "Partner With Us", href: "/partners" },
+const COMPANY_LINKS = [
+  { label: "Contact Us", href: "/contact" },
+  { label: "Developers", href: "/developers" },
+  { label: "Projects", href: "/projects" },
 ]
-const DEVELOPER_LINKS = [
-  { label: "All Developers",        href: "/developers" },
-  { label: "Register as Developer", href: "/developers/register" },
-  { label: "Developer Dashboard",   href: "/dashboard/developer" },
+
+const ACCOUNT_LINKS = [
+  { label: "Login", href: "/login" },
+  { label: "Create Account", href: "/register" },
+  { label: "Dashboard", href: "/dashboard" },
 ]
 const PROJECT_LINKS = [
   { label: "All Projects",    href: "/projects" },
@@ -59,33 +58,90 @@ export function Footer() {
   const year = new Date().getFullYear()
 
   return (
-    <footer className="relative bg-[#001428] text-white/70">
+    <footer className="relative bg-[#001428] text-white/70 overflow-hidden">
+      {/* Background image */}
+      <div className="absolute inset-0 pointer-events-none select-none">
+        <img
+          src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x800/9.png"
+          alt=""
+          className="w-full h-full object-cover object-center"
+          aria-hidden="true"
+        />
+        <div className="absolute inset-0 bg-[#001428]/95" />
+      </div>
+
       {/* Gold top accent strip */}
-      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#d6b357]/65 to-transparent" />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12">
+      <div className="relative z-10">
+        <div className="h-[2px] bg-gradient-to-r from-transparent via-[#d6b357]/65 to-transparent" />
+      </div>
+
+      {/* Pre-footer CTA band */}
+      <div className="relative z-10 border-b border-white/[0.06]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-[#d6b357] mb-1">
+                Ready to find your next investment?
+              </p>
+              <h3 className="font-['Space_Grotesk'] text-2xl md:text-3xl font-bold text-white leading-snug">
+                Browse Dubai&apos;s Finest Properties
+              </h3>
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <Link
+                href="/projects"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#d6b357] to-[#f0d890] text-[#001f3f] rounded-full font-bold text-sm hover:translate-y-[-1px] hover:shadow-[0_8px_20px_rgba(214,179,87,0.35)] transition-all duration-300"
+              >
+                View Projects
+              </Link>
+              <Link
+                href="/contact"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-white/8 border border-white/15 text-white rounded-full font-semibold text-sm hover:bg-white/12 transition-all duration-200"
+              >
+                Contact Us
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main footer content */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8">
-          {/* Brand column */}
+
+          {/* ── Brand column ──────────────────────────────── */}
           <div className="lg:col-span-2 space-y-6">
-            <Image
-              src="/FHI_Branding_White.png"
-              alt="FHI Global"
-              width={130}
-              height={40}
-              className="object-contain h-9 w-auto"
-            />
-            <p className="text-sm leading-relaxed text-white/50 max-w-xs">
-              Dubai&apos;s premier real estate portal — connecting investors with the finest developments from the most trusted developers.
+            <Link href="/" className="inline-block">
+              <Image
+                src="/FHI_Branding_White.png"
+                alt="FHI Global"
+                width={130}
+                height={40}
+                className="object-contain h-9 w-auto"
+              />
+            </Link>
+
+            <p className="text-sm leading-relaxed text-white/45 max-w-xs">
+              Dubai&apos;s premier real estate portal — connecting investors
+              with the finest developments from the most trusted developers.
             </p>
 
-            <div className="space-y-3">
-              <a href="tel:+97143001234" className="flex items-center gap-3 text-sm hover:text-[#d6b357] transition-colors duration-200 group">
-                <div className="w-8 h-8 rounded-full bg-white/8 group-hover:bg-[#d6b357]/15 flex items-center justify-center transition-colors">
+            {/* Contact details */}
+            <div className="space-y-2.5">
+              <a
+                href="tel:+97143001234"
+                className="flex items-center gap-3 text-sm hover:text-[#d6b357] transition-colors duration-200 group"
+              >
+                <div className="w-8 h-8 rounded-full bg-white/8 group-hover:bg-[#d6b357]/15 flex items-center justify-center transition-colors shrink-0">
                   <Phone className="w-3.5 h-3.5 text-[#d6b357]" />
                 </div>
                 +971 4 300 1234
               </a>
-              <a href="mailto:info@fhiglobal.com" className="flex items-center gap-3 text-sm hover:text-[#d6b357] transition-colors duration-200 group">
-                <div className="w-8 h-8 rounded-full bg-white/8 group-hover:bg-[#d6b357]/15 flex items-center justify-center transition-colors">
+              <a
+                href="mailto:info@fhiglobal.com"
+                className="flex items-center gap-3 text-sm hover:text-[#d6b357] transition-colors duration-200 group"
+              >
+                <div className="w-8 h-8 rounded-full bg-white/8 group-hover:bg-[#d6b357]/15 flex items-center justify-center transition-colors shrink-0">
                   <Mail className="w-3.5 h-3.5 text-[#d6b357]" />
                 </div>
                 info@fhiglobal.com
@@ -94,12 +150,14 @@ export function Footer() {
                 <div className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center shrink-0 mt-0.5">
                   <MapPin className="w-3.5 h-3.5 text-[#d6b357]" />
                 </div>
-                <span className="text-white/45">Office 2301, Burj Al Salam,<br />Sheikh Zayed Road, Dubai, UAE</span>
+                <span className="text-white/40 text-sm leading-snug">
+                  Level 12, DIFC Gate Building,<br />Dubai, UAE
+                </span>
               </div>
             </div>
 
             {/* Social icons */}
-            <div className="flex items-center gap-1.5 pt-1">
+            <div className="flex items-center gap-2 pt-1">
               {[
                 { label: "Facebook",  href: "#", Icon: FacebookIcon },
                 { label: "Instagram", href: "#", Icon: InstagramIcon },
@@ -118,15 +176,19 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Company */}
+          {/* ── Company ───────────────────────────────────── */}
           <div>
             <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white mb-5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357]" /> Company
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357]" />
+              Company
             </h4>
             <ul className="space-y-3">
               {COMPANY_LINKS.map(({ label, href }) => (
                 <li key={label}>
-                  <Link href={href} className="text-sm text-white/50 hover:text-[#d6b357] transition-colors duration-200">
+                  <Link
+                    href={href}
+                    className="text-sm text-white/45 hover:text-[#d6b357] transition-colors duration-200 hover:translate-x-0.5 inline-block"
+                  >
                     {label}
                   </Link>
                 </li>
@@ -134,15 +196,19 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Developers */}
+          {/* ── Account ───────────────────────────────────── */}
           <div>
             <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white mb-5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357]" /> Developers
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357]" />
+              Account
             </h4>
             <ul className="space-y-3">
-              {DEVELOPER_LINKS.map(({ label, href }) => (
+              {ACCOUNT_LINKS.map(({ label, href }) => (
                 <li key={label}>
-                  <Link href={href} className="text-sm text-white/50 hover:text-[#d6b357] transition-colors duration-200">
+                  <Link
+                    href={href}
+                    className="text-sm text-white/45 hover:text-[#d6b357] transition-colors duration-200 hover:translate-x-0.5 inline-block"
+                  >
                     {label}
                   </Link>
                 </li>
@@ -150,15 +216,19 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Projects */}
+          {/* ── Projects ──────────────────────────────────── */}
           <div>
             <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white mb-5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357]" /> Projects
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357]" />
+              Projects
             </h4>
             <ul className="space-y-3">
               {PROJECT_LINKS.map(({ label, href }) => (
                 <li key={label}>
-                  <Link href={href} className="text-sm text-white/50 hover:text-[#d6b357] transition-colors duration-200">
+                  <Link
+                    href={href}
+                    className="text-sm text-white/45 hover:text-[#d6b357] transition-colors duration-200 hover:translate-x-0.5 inline-block"
+                  >
                     {label}
                   </Link>
                 </li>
@@ -169,18 +239,22 @@ export function Footer() {
       </div>
 
       {/* Bottom bar */}
-      <div className="border-t border-white/8">
+      <div className="relative z-10 border-t border-white/[0.06]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-white/30">
-            © {year} FHI Global Real Estate. All rights reserved.
+          <p className="text-xs text-white/25">
+            © {year} FHI Global Real Estate LLC. All rights reserved. RERA Licensed.
           </p>
           <div className="flex items-center gap-5">
             {[
-              { label: "Privacy Policy", href: "/privacy" },
+              { label: "Privacy Policy",  href: "/privacy" },
               { label: "Terms of Service", href: "/terms" },
-              { label: "Cookie Policy", href: "/cookies" },
+              { label: "Cookie Policy",   href: "/cookies" },
             ].map(({ label, href }) => (
-              <Link key={label} href={href} className="text-xs text-white/30 hover:text-[#d6b357] transition-colors">
+              <Link
+                key={label}
+                href={href}
+                className="text-xs text-white/25 hover:text-[#d6b357] transition-colors"
+              >
                 {label}
               </Link>
             ))}

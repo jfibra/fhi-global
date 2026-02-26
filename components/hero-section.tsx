@@ -45,11 +45,11 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
       {/* Background image with overlay */}
       <div className="absolute inset-0">
         <img
-          src="/hero.jpg"
+          src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/1.png"
           alt="Dubai skyline"
           className="w-full h-full object-cover object-center"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#001428]/80 via-[#001f3f]/75 to-[#001428]/90" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#001428]/82 via-[#001f3f]/78 to-[#001428]/92" />
         <div
           className="absolute inset-0 opacity-[0.04]"
           style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }}

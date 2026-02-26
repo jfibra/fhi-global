@@ -5,7 +5,7 @@ import { updateSession } from "@/lib/supabase/middleware"
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const isDashboardRoute = pathname.startsWith("/dashboard")
-  const isLoginRoute = pathname === "/"
+  const isLoginRoute = pathname === "/login"
 
   const { supabase, response, user, missingEnv } = await updateSession(request)
 
@@ -89,5 +89,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/dashboard/:path*", "/account-inactive"],
+  matcher: ["/login", "/dashboard/:path*", "/account-inactive"],
 }
