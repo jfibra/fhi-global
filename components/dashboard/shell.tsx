@@ -219,7 +219,7 @@ export function DashboardShell({
         <div className="shrink-0 px-5 pt-6 pb-4">
           {/* Logo row */}
           <div className="flex items-center justify-between mb-5">
-            <Image src="/FHI_Branding_White.png" alt="FHI Global" width={110} height={32} className="object-contain" />
+            <Image src="/FHI_Branding_White.png" alt="FHI Global" width={110} height={32} className="object-contain h-auto" />
             <button
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden w-7 h-7 flex items-center justify-center rounded-xl bg-white/8 hover:bg-white/15 text-white/50 hover:text-white transition-all"
