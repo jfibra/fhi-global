@@ -2,10 +2,12 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
+import { createPageMetadata } from "@/lib/seo"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { ProjectCard, type ProjectCardData } from "@/components/project-card"
+import { SocialShare } from "@/components/social-share"
 import { Building2, Globe, Phone, Mail, MapPin, Star, CheckCircle2, ArrowLeft } from "lucide-react"
 
 export const dynamic = "force-dynamic"
@@ -15,16 +17,15 @@ type Props = { params: Promise<{ slug: string }> }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const supabase = await createClient()
-  const { data } = await supabase.from("developers").select("name, description").eq("slug", slug).single()
+  const { data } = await supabase.from("developers").select("name, description, logo_url").eq("slug", slug).single()
   if (!data) return { title: "Developer Not Found" }
-  return {
+
+  return createPageMetadata({
     title: `${data.name} | FHI Global Developers`,
     description: data.description ?? `Explore projects by ${data.name} on FHI Global.`,
-    openGraph: {
-      title: `${data.name} | FHI Global`,
-      description: data.description ?? undefined,
-    },
-  }
+    openGraphTitle: `${data.name} | FHI Global`,
+    imageUrl: data.logo_url,
+  })
 }
 
 export default async function DeveloperDetailPage({ params }: Props) {
@@ -144,6 +145,14 @@ export default async function DeveloperDetailPage({ params }: Props) {
               )}
             </div>
           </div>
+
+          <div className="mt-6">
+            <SocialShare
+              title={`${developer.name} | FHI Global`}
+              text={`Explore projects by ${developer.name} on FHI Global.`}
+              variant="dark"
+            />
+          </div>
         </div>
       </section>
 
@@ -170,7 +179,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
               </div>
               <h2 className="font-['Space_Grotesk'] text-2xl font-bold text-[#0d1117] leading-tight">
                 Projects by{" "}
-                <span className="italic font-normal text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">{developer.name}</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">{developer.name}</span>
               </h2>
             </div>
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#e8eaed] rounded-full shadow-sm">

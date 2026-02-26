@@ -4,20 +4,18 @@ import Link from "next/link"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { createPageMetadata } from "@/lib/seo"
 import {
   Building2, TrendingUp, Users, Globe, Award, Shield,
   CheckCircle2, MapPin, ArrowRight, Star, Zap, Heart
 } from "lucide-react"
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "About FHI Global | Dubai Real Estate Excellence",
-  description: "Learn about FHI Global — Dubai's trusted real estate platform connecting buyers with the finest residential and commercial developments.",
-  openGraph: {
-    title: "About FHI Global | Dubai Real Estate Excellence",
-    description: "Dubai's trusted real estate platform connecting buyers with the finest developments.",
-    type: "website",
-  },
-}
+  description:
+    "Learn about FHI Global — Dubai's trusted real estate platform connecting buyers with the finest residential and commercial developments.",
+  openGraphDescription: "Dubai's trusted real estate platform connecting buyers with the finest developments.",
+})
 
 const STATS = [
   { icon: Building2, value: "100+",  label: "Verified Developers" },
@@ -98,7 +96,17 @@ export default function AboutPage() {
       <Header />
 
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="relative bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] pt-20 pb-24 overflow-hidden">
+      <section className="relative pt-20 pb-24 overflow-hidden">
+        {/* Background */}
+        <div className="absolute inset-0">
+          <img
+            src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/2.png"
+            alt=""
+            className="w-full h-full object-cover object-center"
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f]/88 via-[#002a52]/85 to-[#001428]/92" />
+        </div>
         <div
           className="absolute inset-0 opacity-[0.05]"
           style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }}
@@ -118,7 +126,7 @@ export default function AboutPage() {
             style={{ textShadow: "0 2px 30px rgba(0,0,0,0.4)" }}
           >
             We Are{" "}
-            <span className="italic font-normal text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">
               FHI Global
             </span>
           </h1>
@@ -161,7 +169,18 @@ export default function AboutPage() {
       </section>
 
       {/* ── Our Story ─────────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <section className="relative py-20 overflow-hidden">
+        {/* Background */}
+        <div className="absolute inset-0">
+          <img
+            src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x800/5.png"
+            alt=""
+            className="w-full h-full object-cover object-center"
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 bg-white/90" />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
             <div className="inline-flex items-center px-3 py-1.5 bg-white border border-[#e5e5e5] rounded-full text-xs font-semibold uppercase tracking-wider mb-5 shadow-sm">
@@ -169,7 +188,7 @@ export default function AboutPage() {
             </div>
             <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold text-[#0d1117] leading-tight tracking-tight mb-6">
               A Decade of{" "}
-              <span className="italic font-normal text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
                 Building Trust
               </span>
             </h2>
@@ -208,10 +227,11 @@ export default function AboutPage() {
             </div>
           </div>
         </div>
+        </div>
       </section>
 
       {/* ── Values ────────────────────────────────────────────── */}
-      <section className="bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] py-20 relative overflow-hidden">
+      <section className="relative bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] py-20 overflow-hidden">
         <div
           className="absolute inset-0 opacity-[0.04]"
           style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }}
@@ -249,14 +269,15 @@ export default function AboutPage() {
       </section>
 
       {/* ── Awards & Recognition ──────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
           <div className="inline-flex items-center px-3 py-1.5 bg-white border border-[#e5e5e5] rounded-full text-xs font-semibold uppercase tracking-wider mb-5 shadow-sm">
             <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2" /> Recognition
           </div>
           <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold text-[#0d1117] leading-tight tracking-tight">
             Industry{" "}
-            <span className="italic font-normal text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
               Awards
             </span>
           </h2>
@@ -283,18 +304,29 @@ export default function AboutPage() {
             </div>
           ))}
         </div>
+        </div>
       </section>
 
       {/* ── Leadership Team ───────────────────────────────────── */}
-      <section className="bg-[#f5f3ef] py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative py-20 overflow-hidden">
+        {/* Background */}
+        <div className="absolute inset-0">
+          <img
+            src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x800/6.png"
+            alt=""
+            className="w-full h-full object-cover object-center"
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 bg-[#f5f3ef]/88" />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
             <div className="inline-flex items-center px-3 py-1.5 bg-white border border-[#e5e5e5] rounded-full text-xs font-semibold uppercase tracking-wider mb-5 shadow-sm">
               <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2" /> Leadership
             </div>
             <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold text-[#0d1117] leading-tight tracking-tight">
               Meet the{" "}
-              <span className="italic font-normal text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
                 Team
               </span>
             </h2>
@@ -332,7 +364,7 @@ export default function AboutPage() {
               </div>
               <h2 className="font-['Space_Grotesk'] text-3xl md:text-4xl font-bold text-[#0d1117] leading-tight mb-4">
                 Preferred by Dubai&apos;s{" "}
-                <span className="italic font-normal text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
                   Best Developers
                 </span>
               </h2>
@@ -368,6 +400,16 @@ export default function AboutPage() {
       {/* ── CTA ───────────────────────────────────────────────── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
         <div className="relative bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] rounded-[40px] overflow-hidden p-1">
+          {/* Background */}
+          <div className="absolute inset-0">
+            <img
+              src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/8.png"
+              alt=""
+              className="w-full h-full object-cover object-center"
+              aria-hidden="true"
+            />
+            <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f]/92 via-[#002a52]/88 to-[#001428]/95" />
+          </div>
           <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
           <div className="absolute top-[-80px] left-[-80px] w-[400px] h-[400px] rounded-full opacity-30 blur-[120px] bg-[radial-gradient(circle,#d6b357,transparent)]" />
           <div className="relative bg-white/5 rounded-[38px] backdrop-blur-sm p-14 md:p-20 text-center">
@@ -380,7 +422,7 @@ export default function AboutPage() {
               style={{ textShadow: "0 2px 20px rgba(0,0,0,0.3)" }}
             >
               Ready to{" "}
-              <span className="italic font-normal text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">
                 Get Started?
               </span>
             </h2>

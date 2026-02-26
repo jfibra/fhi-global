@@ -50,7 +50,7 @@ export default function StyleGuide() {
           </div>
           <h1 className="font-['Space_Grotesk'] text-5xl md:text-7xl leading-[1.1] font-bold tracking-tight mb-6">
             Everything is <br />
-            <span className="italic font-normal bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
               Built with Intention.
             </span>
           </h1>

@@ -1,5 +1,7 @@
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
+import { createPageMetadata } from "@/lib/seo"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -7,10 +9,10 @@ import { RegisterUI } from "@/app/register/register-ui"
 
 export const dynamic = "force-dynamic"
 
-export const metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "Create Account | FHI Global",
-  description: "Create your FHI Global account to access Dubai's leading real estate CRM platform.",
-}
+  description: "Create your FHI Global account.",
+})
 
 export default async function RegisterPage() {
   // If already logged in, redirect to dashboard

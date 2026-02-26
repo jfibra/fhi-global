@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
+import { createPageMetadata } from "@/lib/seo"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -10,15 +11,10 @@ import { Suspense } from "react"
 
 export const dynamic = "force-dynamic"
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "Real Estate Projects in Dubai | FHI Global",
   description: "Browse premium off-plan and ready residential projects from top Dubai developers.",
-  openGraph: {
-    title: "Real Estate Projects in Dubai | FHI Global",
-    description: "Browse premium off-plan and ready residential projects from top Dubai developers.",
-    type: "website",
-  },
-}
+})
 
 type SearchParams = Promise<{
   q?: string
@@ -66,7 +62,17 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
       <Header />
 
       {/* Page Hero */}
-      <section className="bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] pt-16 pb-16 relative overflow-hidden">
+      <section className="relative pt-16 pb-16 overflow-hidden">
+        {/* Background */}
+        <div className="absolute inset-0">
+          <img
+            src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/5.png"
+            alt=""
+            className="w-full h-full object-cover object-center"
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f]/88 via-[#002a52]/85 to-[#001428]/92" />
+        </div>
         <div
           className="absolute inset-0 opacity-[0.05]"
           style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }}

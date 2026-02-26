@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
+import { DEFAULT_PREVIEW_IMAGE_URL } from "@/lib/seo"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -10,26 +11,34 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] })
 const _spaceGrotesk = Space_Grotesk({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "FHI Global — Dubai Real Estate CRM",
-  description:
-    "Internal platform for managing Dubai developers, property projects, sales records, and agent commission tracking.",
+  title: {
+    default: "FHI Global — Dubai Real Estate",
+    template: "%s | FHI Global",
+  },
+  description: "Discover premium property projects in Dubai from verified developers.",
   generator: "v0.app",
+  manifest: "/site.webmanifest",
   icons: {
     icon: [
-      {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
-      {
-        url: "/icon.svg",
-        type: "image/svg+xml",
-      },
+      { url: "/favicon.ico" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/android-chrome-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/android-chrome-512x512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: "/apple-icon.png",
+    apple: "/apple-touch-icon.png",
+  },
+  openGraph: {
+    title: "FHI Global — Dubai Real Estate",
+    description: "Discover premium property projects in Dubai from verified developers.",
+    type: "website",
+    images: [{ url: DEFAULT_PREVIEW_IMAGE_URL }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "FHI Global — Dubai Real Estate",
+    description: "Discover premium property projects in Dubai from verified developers.",
+    images: [DEFAULT_PREVIEW_IMAGE_URL],
   },
 }
 

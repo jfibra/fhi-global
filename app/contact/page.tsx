@@ -4,20 +4,18 @@ import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { ContactForm } from "@/app/contact/contact-form"
+import { createPageMetadata } from "@/lib/seo"
 import {
   MapPin, Phone, Mail, Clock, Facebook, Instagram, Linkedin,
   Twitter, Building2, MessageSquare, Send
 } from "lucide-react"
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "Contact FHI Global | Get in Touch",
-  description: "Contact FHI Global's team in Dubai. Reach out for developer partnerships, agent onboarding, or any real estate inquiry.",
-  openGraph: {
-    title: "Contact FHI Global | Get in Touch",
-    description: "Reach out to FHI Global's Dubai team for any real estate inquiry.",
-    type: "website",
-  },
-}
+  description:
+    "Contact FHI Global's team in Dubai. Reach out for developer partnerships, agent onboarding, or any real estate inquiry.",
+  openGraphDescription: "Reach out to FHI Global's Dubai team for any real estate inquiry.",
+})
 
 const OFFICES = [
   {
@@ -68,7 +66,17 @@ export default function ContactPage() {
       <Header />
 
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="relative bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] pt-20 pb-24 overflow-hidden">
+      <section className="relative pt-20 pb-24 overflow-hidden">
+        {/* Background */}
+        <div className="absolute inset-0">
+          <img
+            src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/3.png"
+            alt=""
+            className="w-full h-full object-cover object-center"
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f]/88 via-[#002a52]/85 to-[#001428]/92" />
+        </div>
         <div
           className="absolute inset-0 opacity-[0.05]"
           style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }}
@@ -87,7 +95,7 @@ export default function ContactPage() {
             style={{ textShadow: "0 2px 30px rgba(0,0,0,0.4)" }}
           >
             Get In{" "}
-            <span className="italic font-normal text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">
               Touch
             </span>
           </h1>
@@ -197,15 +205,25 @@ export default function ContactPage() {
       </section>
 
       {/* ── Offices ───────────────────────────────────────────── */}
-      <section id="offices" className="bg-[#f5f3ef] py-16 scroll-mt-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="offices" className="relative py-16 scroll-mt-24 overflow-hidden">
+        {/* Background */}
+        <div className="absolute inset-0">
+          <img
+            src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x800/7.png"
+            alt=""
+            className="w-full h-full object-cover object-center"
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 bg-[#f5f3ef]/88" />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <div className="inline-flex items-center px-3 py-1.5 bg-white border border-[#e5e5e5] rounded-full text-xs font-semibold uppercase tracking-wider mb-5 shadow-sm">
               <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2" /> Our Offices
             </div>
             <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold text-[#0d1117] leading-tight tracking-tight">
               Find{" "}
-              <span className="italic font-normal text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
                 Us
               </span>
             </h2>
@@ -270,7 +288,7 @@ export default function ContactPage() {
               Book a Call
             </Link>
             <Link
-              href="/about"
+              href="/"
               className="inline-flex items-center gap-2 px-7 py-3.5 bg-white/10 border border-white/20 text-white rounded-full font-semibold text-sm hover:bg-white/15 transition-all"
             >
               Learn More

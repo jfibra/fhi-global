@@ -1,12 +1,19 @@
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { ensureProfileForUser, getDashboardRouteByRole, isInactiveProfile } from "@/lib/auth"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
+import { createPageMetadata } from "@/lib/seo"
 import { HomeLoginUI } from "@/app/home-login-ui"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 
 export const dynamic = "force-dynamic"
+
+export const metadata: Metadata = createPageMetadata({
+  title: "Login | FHI Global",
+  description: "Login to your FHI Global account.",
+})
 
 export default async function LoginPage() {
   if (!hasServerSupabaseEnv()) {

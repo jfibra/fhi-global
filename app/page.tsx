@@ -1,6 +1,7 @@
 ﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createPageMetadata } from "@/lib/seo";
 import { TopBar } from "@/components/topbar";
 import { Header } from "@/components/header";
 import { HeroSection } from "@/components/hero-section";
@@ -27,17 +28,13 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "FHI Global — Dubai Real Estate | Premium Property Projects",
   description:
     "Discover premium off-plan and ready properties from Dubai's top developers. Explore luxury apartments, villas, and penthouses.",
-  openGraph: {
-    title: "FHI Global — Dubai's Premier Real Estate Portal",
-    description:
-      "Discover premium off-plan and ready properties from Dubai's top developers.",
-    type: "website",
-  },
-};
+  openGraphTitle: "FHI Global — Dubai's Premier Real Estate Portal",
+  openGraphDescription: "Discover premium off-plan and ready properties from Dubai's top developers.",
+});
 
 const STATS = [
   {
@@ -210,7 +207,7 @@ export default async function HomePage() {
       {/* FEATURED DEVELOPERS                             */}
       {/* ─────────────────────────────────────────────── */}
       {developers && developers.length > 0 && (
-        <section className="relative py-24 overflow-hidden">
+        <section className="py-24 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Section header */}
             <div className="flex items-end justify-between mb-14">
@@ -221,7 +218,7 @@ export default async function HomePage() {
                 </div>
                 <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold tracking-tight">
                   Featured{" "}
-                  <span className="italic font-normal bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
                     Developers
                   </span>
                 </h2>
@@ -259,18 +256,8 @@ export default async function HomePage() {
       {/* FEATURED PROJECTS                               */}
       {/* ─────────────────────────────────────────────── */}
       {featuredProjects && featuredProjects.length > 0 && (
-        <section className="relative py-24 bg-[#f5f3ef] overflow-hidden">
-          <div
-            className="absolute inset-0 opacity-[0.025]"
-            style={{
-              backgroundImage:
-                "radial-gradient(circle, #001f3f 1px, transparent 1px)",
-              backgroundSize: "28px 28px",
-            }}
-          />
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/30 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/30 to-transparent" />
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="py-24 bg-[#f5f3ef]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-end justify-between mb-14">
               <div>
                 <div className="inline-flex items-center px-3 py-1.5 bg-white border border-[#e5e5e5] rounded-full text-xs font-semibold uppercase tracking-wider mb-5 shadow-sm">
@@ -279,7 +266,7 @@ export default async function HomePage() {
                 </div>
                 <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold tracking-tight">
                   Featured{" "}
-                  <span className="italic font-normal bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
                     Projects
                   </span>
                 </h2>
@@ -307,7 +294,16 @@ export default async function HomePage() {
       {/* WHY CHOOSE US                                   */}
       {/* ─────────────────────────────────────────────── */}
       <section className="relative py-24 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#fafafa] via-white to-[#fafafa]" />
+        {/* Background */}
+        <div className="absolute inset-0">
+          <img
+            src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x800/3.png"
+            alt=""
+            className="w-full h-full object-cover object-center"
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/92 via-white/88 to-white/92" />
+        </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="text-center max-w-2xl mx-auto mb-16">
@@ -317,7 +313,7 @@ export default async function HomePage() {
             </div>
             <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold tracking-tight mb-4">
               Your Trusted{" "}
-              <span className="italic font-normal bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
                 Real Estate Partner
               </span>
             </h2>
@@ -355,86 +351,19 @@ export default async function HomePage() {
       </section>
 
       {/* ─────────────────────────────────────────────── */}
-      {/* LATEST PROJECTS — dark                         */}
-      {/* ─────────────────────────────────────────────── */}
-      {latestProjects && latestProjects.length > 0 && (
-        <section className="relative bg-[#001428] overflow-hidden py-24">
-          <div
-            className="absolute inset-0 opacity-[0.04]"
-            style={{
-              backgroundImage:
-                "radial-gradient(circle, #fff 1px, transparent 1px)",
-              backgroundSize: "28px 28px",
-            }}
-          />
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/50 to-transparent" />
-          <div className="absolute top-[-100px] right-[-100px] w-[600px] h-[600px] rounded-full opacity-15 blur-[130px] bg-[radial-gradient(circle,#d6b357,transparent)] pointer-events-none" />
-          <div className="absolute bottom-[-80px] left-[-80px] w-[500px] h-[500px] rounded-full opacity-10 blur-[120px] bg-[radial-gradient(circle,#60a5fa,transparent)] pointer-events-none" />
-
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-end justify-between mb-14">
-              <div>
-                <div className="inline-flex items-center px-3 py-1.5 bg-white/10 border border-white/15 rounded-full text-xs font-semibold uppercase tracking-wider mb-5 text-white/70 backdrop-blur-sm">
-                  <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2 animate-pulse" />
-                  Just Added
-                </div>
-                <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold tracking-tight text-white">
-                  Latest{" "}
-                  <span className="italic font-normal bg-gradient-to-r from-[#d6b357] to-[#f0d890] bg-clip-text text-transparent">
-                    Projects
-                  </span>
-                </h2>
-              </div>
-              <Link
-                href="/projects"
-                className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 text-white font-semibold text-sm transition-all duration-300"
-              >
-                Browse All <ChevronRight className="w-4 h-4" />
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {latestProjects.map((p) => (
-                <ProjectCard
-                  key={p.id}
-                  project={p as unknown as ProjectCardData}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ─────────────────────────────────────────────── */}
-      {/* TRUST STRIP                                     */}
-      {/* ─────────────────────────────────────────────── */}
-      <section className="relative py-20 bg-white overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#e5e5e5] to-transparent" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {TRUST.map(({ icon: Icon, title, desc }) => (
-              <div
-                key={title}
-                className="group bg-white/40 backdrop-blur-2xl p-8 rounded-[32px] border border-white border-opacity-60 shadow-xl shadow-black/5 flex flex-col gap-4 hover:translate-y-[-4px] hover:shadow-2xl hover:shadow-[#001f3f]/8 transition-all duration-300"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f]/10 to-[#001f3f]/5 flex items-center justify-center shadow-sm group-hover:from-[#001f3f] group-hover:to-[#002a52] transition-all duration-300">
-                  <Icon className="w-5 h-5 text-[#001f3f] group-hover:text-[#d6b357] transition-colors duration-300" />
-                </div>
-                <div>
-                  <h4 className="font-['Space_Grotesk'] font-bold text-[#0d1117] text-base mb-2">
-                    {title}
-                  </h4>
-                  <p className="text-sm text-[#555] leading-relaxed">{desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────── */}
       {/* CALL TO ACTION                                  */}
       {/* ─────────────────────────────────────────────── */}
-      <section className="relative bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] overflow-hidden">
+      <section className="relative overflow-hidden">
+        {/* Background */}
+        <div className="absolute inset-0">
+          <img
+            src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/7.png"
+            alt=""
+            className="w-full h-full object-cover object-center"
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f]/92 via-[#002a52]/90 to-[#001428]/95" />
+        </div>
         <div
           className="absolute inset-0 opacity-[0.04]"
           style={{
@@ -457,7 +386,7 @@ export default async function HomePage() {
             <h2 className="font-['Space_Grotesk'] text-4xl md:text-6xl font-bold text-white leading-[1.1] mb-5 tracking-tight">
               Start Exploring
               <br />
-              <span className="italic font-normal bg-gradient-to-r from-[#d6b357] to-[#f0d890] bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[#d6b357] to-[#f0d890] bg-clip-text text-transparent">
                 Luxury Properties.
               </span>
             </h2>
