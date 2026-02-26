@@ -11,7 +11,7 @@ export default async function DeveloperDashboardPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) redirect("/")
+  if (!user) redirect("/login")
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -25,7 +25,7 @@ export default async function DeveloperDashboardPage() {
       metadata: Record<string, unknown> | null
     }>()
 
-  if (!profile) redirect("/")
+  if (!profile) redirect("/login")
 
   // Get the developer linked to this user
   const developerId = profile.metadata?.developer_id as string | undefined

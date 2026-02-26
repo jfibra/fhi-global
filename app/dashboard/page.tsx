@@ -11,13 +11,13 @@ export default async function DashboardIndexPage() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect("/")
+    redirect("/login")
   }
 
   const { profile } = await getProfileByUserId(supabase, user.id)
 
   if (!profile) {
-    redirect("/")
+    redirect("/login")
   }
 
   if (isInactiveProfile(profile)) {

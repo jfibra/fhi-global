@@ -16,7 +16,7 @@ export default async function DashboardLayout({
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect("/")
+    redirect("/login")
   }
 
   const { profile } = await ensureProfileForUser(supabase, {
@@ -27,7 +27,7 @@ export default async function DashboardLayout({
 
   if (!profile) {
     await supabase.auth.signOut()
-    redirect("/")
+    redirect("/login")
   }
 
   if (isInactiveProfile(profile)) {

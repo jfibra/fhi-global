@@ -1,14 +1,25 @@
 import { redirect } from "next/navigation"
-import { ensureProfileForUser, getDashboardRouteByRole, isInactiveProfile } from "@/lib/auth"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
-import { HomeLoginUI } from "@/app/home-login-ui"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { RegisterUI } from "@/app/register/register-ui"
 
 export const dynamic = "force-dynamic"
 
-export default async function LoginPage() {
+export const metadata = {
+  title: "Create Account | FHI Global",
+  description: "Create your FHI Global account to access Dubai's leading real estate CRM platform.",
+}
+
+export default async function RegisterPage() {
+  // If already logged in, redirect to dashboard
+  if (hasServerSupabaseEnv()) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) redirect("/dashboard")
+  }
+
   if (!hasServerSupabaseEnv()) {
     return (
       <>
@@ -27,32 +38,11 @@ export default async function LoginPage() {
     )
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (user) {
-    const { profile } = await ensureProfileForUser(supabase, {
-      id: user.id,
-      email: user.email,
-      user_metadata: user.user_metadata,
-    })
-
-    if (profile && isInactiveProfile(profile)) {
-      redirect("/account-inactive")
-    }
-
-    if (profile) {
-      redirect(getDashboardRouteByRole(profile.role))
-    }
-  }
-
   return (
     <>
       <TopBar />
       <Header />
-      <HomeLoginUI />
+      <RegisterUI />
       <Footer />
     </>
   )
