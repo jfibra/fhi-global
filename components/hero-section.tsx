@@ -45,7 +45,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
       {/* Background image with overlay */}
       <div className="absolute inset-0">
         <img
-          src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/1.png"
+          src="/hero.jpg"
           alt="Dubai skyline"
           className="w-full h-full object-cover object-center"
         />
