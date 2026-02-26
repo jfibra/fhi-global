@@ -1,18 +1,31 @@
-﻿import type { Metadata } from "next"
-import Link from "next/link"
-import { createClient } from "@/lib/supabase/server"
-import { TopBar } from "@/components/topbar"
-import { Header } from "@/components/header"
-import { HeroSection } from "@/components/hero-section"
-import { DeveloperCard, type DeveloperCardData } from "@/components/developer-card"
-import { ProjectCard, type ProjectCardData } from "@/components/project-card"
-import { Footer } from "@/components/footer"
+﻿import type { Metadata } from "next";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { TopBar } from "@/components/topbar";
+import { Header } from "@/components/header";
+import { HeroSection } from "@/components/hero-section";
 import {
-  Building2, TrendingUp, ShieldCheck, Star, ArrowRight, ChevronRight,
-  CheckCircle2, Users, Award, Globe, Zap, BadgeCheck,
-} from "lucide-react"
+  DeveloperCard,
+  type DeveloperCardData,
+} from "@/components/developer-card";
+import { ProjectCard, type ProjectCardData } from "@/components/project-card";
+import { Footer } from "@/components/footer";
+import {
+  Building2,
+  TrendingUp,
+  ShieldCheck,
+  Star,
+  ArrowRight,
+  ChevronRight,
+  CheckCircle2,
+  Users,
+  Award,
+  Globe,
+  Zap,
+  BadgeCheck,
+} from "lucide-react";
 
-export const dynamic = "force-dynamic"
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "FHI Global — Dubai Real Estate | Premium Property Projects",
@@ -20,35 +33,92 @@ export const metadata: Metadata = {
     "Discover premium off-plan and ready properties from Dubai's top developers. Explore luxury apartments, villas, and penthouses.",
   openGraph: {
     title: "FHI Global — Dubai's Premier Real Estate Portal",
-    description: "Discover premium off-plan and ready properties from Dubai's top developers.",
+    description:
+      "Discover premium off-plan and ready properties from Dubai's top developers.",
     type: "website",
   },
-}
+};
 
 const STATS = [
-  { icon: Building2,   label: "Active Projects",     value: "3,400+",  sub: "across all UAE" },
-  { icon: TrendingUp,  label: "Sales Volume (2024)", value: "AED 528B", sub: "year on year growth" },
-  { icon: Star,        label: "Avg. Rental ROI",     value: "6–8%",    sub: "industry-leading returns" },
-  { icon: ShieldCheck, label: "RERA Registered",     value: "100%",    sub: "fully compliant" },
-]
+  {
+    icon: Building2,
+    label: "Active Projects",
+    value: "3,400+",
+    sub: "across all UAE",
+  },
+  {
+    icon: TrendingUp,
+    label: "Sales Volume (2024)",
+    value: "AED 528B",
+    sub: "year on year growth",
+  },
+  {
+    icon: Star,
+    label: "Avg. Rental ROI",
+    value: "6–8%",
+    sub: "industry-leading returns",
+  },
+  {
+    icon: ShieldCheck,
+    label: "RERA Registered",
+    value: "100%",
+    sub: "fully compliant",
+  },
+];
 
 const WHY_US = [
-  { icon: ShieldCheck, title: "Verified Developers",  desc: "Every developer on our platform is vetted, RERA-registered, and financially screened." },
-  { icon: Award,       title: "Premium Listings",     desc: "Curated portfolio of the finest residential and investment projects in Dubai." },
-  { icon: TrendingUp,  title: "Strong ROI",           desc: "Dubai consistently delivers 6–8% rental yields — among the highest returns globally." },
-  { icon: Users,       title: "Expert Team",          desc: "Our multilingual agents guide you end-to-end, from search to handover." },
-  { icon: Globe,       title: "International Reach",  desc: "Serving investors from 50+ countries seeking Dubai real estate." },
-  { icon: Zap,         title: "Fast Transactions",    desc: "End-to-end support from first viewing to SPA signing — in record time." },
-]
+  {
+    icon: ShieldCheck,
+    title: "Verified Developers",
+    desc: "Every developer on our platform is vetted, RERA-registered, and financially screened.",
+  },
+  {
+    icon: Award,
+    title: "Premium Listings",
+    desc: "Curated portfolio of the finest residential and investment projects in Dubai.",
+  },
+  {
+    icon: TrendingUp,
+    title: "Strong ROI",
+    desc: "Dubai consistently delivers 6–8% rental yields — among the highest returns globally.",
+  },
+  {
+    icon: Users,
+    title: "Expert Team",
+    desc: "Our multilingual agents guide you end-to-end, from search to handover.",
+  },
+  {
+    icon: Globe,
+    title: "International Reach",
+    desc: "Serving investors from 50+ countries seeking Dubai real estate.",
+  },
+  {
+    icon: Zap,
+    title: "Fast Transactions",
+    desc: "End-to-end support from first viewing to SPA signing — in record time.",
+  },
+];
 
 const TRUST = [
-  { icon: ShieldCheck,  title: "RERA Licensed",         desc: "All our developers and listings comply with Dubai Land Department regulations." },
-  { icon: CheckCircle2, title: "Verified Listings",      desc: "Every project undergoes rigorous due diligence before appearing on our platform." },
-  { icon: Award,        title: "Award-Winning Service",  desc: "Recognized for excellence in real estate advisory and client satisfaction." },
-]
+  {
+    icon: ShieldCheck,
+    title: "RERA Licensed",
+    desc: "All our developers and listings comply with Dubai Land Department regulations.",
+  },
+  {
+    icon: CheckCircle2,
+    title: "Verified Listings",
+    desc: "Every project undergoes rigorous due diligence before appearing on our platform.",
+  },
+  {
+    icon: Award,
+    title: "Award-Winning Service",
+    desc: "Recognized for excellence in real estate advisory and client satisfaction.",
+  },
+];
 
 export default async function HomePage() {
-  const supabase = await createClient()
+  const supabase = await createClient();
 
   const [
     { data: developers },
@@ -65,7 +135,9 @@ export default async function HomePage() {
       .limit(8),
     supabase
       .from("projects")
-      .select("id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)")
+      .select(
+        "id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)"
+      )
       .eq("is_active", true)
       .eq("is_published", true)
       .eq("is_featured", true)
@@ -74,7 +146,9 @@ export default async function HomePage() {
       .limit(6),
     supabase
       .from("projects")
-      .select("id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)")
+      .select(
+        "id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)"
+      )
       .eq("is_active", true)
       .eq("is_published", true)
       .is("deleted_at", null)
@@ -86,10 +160,17 @@ export default async function HomePage() {
       .eq("is_active", true)
       .eq("is_published", true)
       .not("city", "is", null),
-  ])
+  ]);
 
-  const uniqueCities = [...new Set((allCities ?? []).map((r) => r.city).filter(Boolean) as string[])].sort()
-  const devOptions   = (developers ?? []).map((d) => ({ id: d.id, name: d.name }))
+  const uniqueCities = [
+    ...new Set(
+      (allCities ?? []).map((r) => r.city).filter(Boolean) as string[]
+    ),
+  ].sort();
+  const devOptions = (developers ?? []).map((d) => ({
+    id: d.id,
+    name: d.name,
+  }));
 
   return (
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
@@ -104,7 +185,7 @@ export default async function HomePage() {
       {/* ─────────────────────────────────────────────── */}
       {/* STATS BANNER                                    */}
       {/* ─────────────────────────────────────────────── */}
-      <section className="relative bg-gradient-to-r from-[#001f3f] to-[#002a52] overflow-hidden">
+      {/* <section className="relative bg-gradient-to-r from-[#001f3f] to-[#002a52] overflow-hidden">
         <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
         <div className="absolute inset-0 bg-gradient-to-r from-[#d6b357]/10 via-transparent to-[#d6b357]/5" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -123,7 +204,7 @@ export default async function HomePage() {
           </div>
         </div>
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/40 to-transparent" />
-      </section>
+      </section> */}
 
       {/* ─────────────────────────────────────────────── */}
       {/* FEATURED DEVELOPERS                             */}
@@ -155,12 +236,18 @@ export default async function HomePage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {developers.map((dev) => (
-                <DeveloperCard key={dev.id} developer={dev as DeveloperCardData} />
+                <DeveloperCard
+                  key={dev.id}
+                  developer={dev as DeveloperCardData}
+                />
               ))}
             </div>
 
             <div className="mt-8 sm:hidden text-center">
-              <Link href="/developers" className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-6 py-3 rounded-full font-semibold text-sm inline-flex items-center gap-2">
+              <Link
+                href="/developers"
+                className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-6 py-3 rounded-full font-semibold text-sm inline-flex items-center gap-2"
+              >
                 View All Developers <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
@@ -173,7 +260,14 @@ export default async function HomePage() {
       {/* ─────────────────────────────────────────────── */}
       {featuredProjects && featuredProjects.length > 0 && (
         <section className="relative py-24 bg-[#f5f3ef] overflow-hidden">
-          <div className="absolute inset-0 opacity-[0.025]" style={{ backgroundImage: "radial-gradient(circle, #001f3f 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+          <div
+            className="absolute inset-0 opacity-[0.025]"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, #001f3f 1px, transparent 1px)",
+              backgroundSize: "28px 28px",
+            }}
+          />
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/30 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/30 to-transparent" />
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -199,7 +293,10 @@ export default async function HomePage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {featuredProjects.map((p) => (
-                <ProjectCard key={p.id} project={p as unknown as ProjectCardData} />
+                <ProjectCard
+                  key={p.id}
+                  project={p as unknown as ProjectCardData}
+                />
               ))}
             </div>
           </div>
@@ -225,7 +322,9 @@ export default async function HomePage() {
               </span>
             </h2>
             <p className="text-[#6b7280] text-lg leading-relaxed">
-              We connect serious investors with the right developers and projects — backed by expertise, transparency, and a proven track record.
+              We connect serious investors with the right developers and
+              projects — backed by expertise, transparency, and a proven track
+              record.
             </p>
           </div>
 
@@ -239,11 +338,15 @@ export default async function HomePage() {
                   <Icon className="w-5 h-5 text-[#001f3f] group-hover:text-[#d6b357] transition-colors duration-300" />
                 </div>
                 <div>
-                  <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117] mb-2">{title}</h3>
+                  <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117] mb-2">
+                    {title}
+                  </h3>
                   <p className="text-sm text-[#555] leading-relaxed">{desc}</p>
                 </div>
                 <div className="mt-auto pt-2">
-                  <span className="text-xs font-mono text-[#d6b357] opacity-0 group-hover:opacity-100 transition-opacity duration-300">fhiglobal.com</span>
+                  <span className="text-xs font-mono text-[#d6b357] opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    fhiglobal.com
+                  </span>
                 </div>
               </div>
             ))}
@@ -256,7 +359,14 @@ export default async function HomePage() {
       {/* ─────────────────────────────────────────────── */}
       {latestProjects && latestProjects.length > 0 && (
         <section className="relative bg-[#001428] overflow-hidden py-24">
-          <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+          <div
+            className="absolute inset-0 opacity-[0.04]"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, #fff 1px, transparent 1px)",
+              backgroundSize: "28px 28px",
+            }}
+          />
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/50 to-transparent" />
           <div className="absolute top-[-100px] right-[-100px] w-[600px] h-[600px] rounded-full opacity-15 blur-[130px] bg-[radial-gradient(circle,#d6b357,transparent)] pointer-events-none" />
           <div className="absolute bottom-[-80px] left-[-80px] w-[500px] h-[500px] rounded-full opacity-10 blur-[120px] bg-[radial-gradient(circle,#60a5fa,transparent)] pointer-events-none" />
@@ -284,7 +394,10 @@ export default async function HomePage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {latestProjects.map((p) => (
-                <ProjectCard key={p.id} project={p as unknown as ProjectCardData} />
+                <ProjectCard
+                  key={p.id}
+                  project={p as unknown as ProjectCardData}
+                />
               ))}
             </div>
           </div>
@@ -307,7 +420,9 @@ export default async function HomePage() {
                   <Icon className="w-5 h-5 text-[#001f3f] group-hover:text-[#d6b357] transition-colors duration-300" />
                 </div>
                 <div>
-                  <h4 className="font-['Space_Grotesk'] font-bold text-[#0d1117] text-base mb-2">{title}</h4>
+                  <h4 className="font-['Space_Grotesk'] font-bold text-[#0d1117] text-base mb-2">
+                    {title}
+                  </h4>
                   <p className="text-sm text-[#555] leading-relaxed">{desc}</p>
                 </div>
               </div>
@@ -320,7 +435,14 @@ export default async function HomePage() {
       {/* CALL TO ACTION                                  */}
       {/* ─────────────────────────────────────────────── */}
       <section className="relative bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle, #fff 1px, transparent 1px)",
+            backgroundSize: "28px 28px",
+          }}
+        />
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/50 to-transparent" />
         <div className="absolute top-[-80px] left-[-80px] w-[500px] h-[500px] rounded-full opacity-25 blur-[120px] bg-[radial-gradient(circle,#d6b357,transparent)] pointer-events-none" />
         <div className="absolute bottom-[-60px] right-[-60px] w-[400px] h-[400px] rounded-full opacity-15 blur-[100px] bg-[radial-gradient(circle,#60a5fa,transparent)] pointer-events-none" />
@@ -333,13 +455,15 @@ export default async function HomePage() {
               Ready to Invest?
             </div>
             <h2 className="font-['Space_Grotesk'] text-4xl md:text-6xl font-bold text-white leading-[1.1] mb-5 tracking-tight">
-              Start Exploring<br />
+              Start Exploring
+              <br />
               <span className="italic font-normal bg-gradient-to-r from-[#d6b357] to-[#f0d890] bg-clip-text text-transparent">
                 Luxury Properties.
               </span>
             </h2>
             <p className="text-white/55 text-lg max-w-xl mx-auto mb-10 leading-relaxed">
-              Browse hundreds of premium developments — from off-plan launches to ready-to-move investments in Dubai&apos;s finest communities.
+              Browse hundreds of premium developments — from off-plan launches
+              to ready-to-move investments in Dubai&apos;s finest communities.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
@@ -361,5 +485,5 @@ export default async function HomePage() {
 
       <Footer />
     </div>
-  )
+  );
 }
