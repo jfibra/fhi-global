@@ -1,0 +1,167 @@
+"use client"
+
+import { useState } from "react"
+import {
+  Mail, Phone, Send, CheckCircle2, User, MessageSquare,
+  Building2, ArrowRight, Loader2
+} from "lucide-react"
+
+const SUBJECTS = [
+  "General Inquiry",
+  "Developer Partnership",
+  "Project Listing",
+  "Agent Onboarding",
+  "Technical Support",
+  "Press & Media",
+]
+
+export function ContactForm() {
+  const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle")
+  const [error, setError] = useState("")
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const form = e.currentTarget
+    const data = Object.fromEntries(new FormData(form))
+
+    if (!data.name || !data.email || !data.message) {
+      setError("Please fill in all required fields.")
+      return
+    }
+
+    setStatus("sending")
+    setError("")
+
+    // Simulate async send — replace with real API route or email service
+    await new Promise((r) => setTimeout(r, 1400))
+    setStatus("success")
+    form.reset()
+  }
+
+  if (status === "success") {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-16 h-16 rounded-full bg-[#d6b357]/15 border-2 border-[#d6b357]/30 flex items-center justify-center mb-6">
+          <CheckCircle2 className="w-8 h-8 text-[#d6b357]" />
+        </div>
+        <h3 className="font-['Space_Grotesk'] text-2xl font-bold text-white lg:text-[#0d1117] mb-2">Message Sent!</h3>
+        <p className="text-white/55 lg:text-[#6b7280] text-sm mb-6 max-w-sm">
+          Thank you for reaching out. Our team will get back to you within 24 hours.
+        </p>
+        <button
+          onClick={() => setStatus("idle")}
+          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#002a52] transition-colors"
+        >
+          Send Another Message <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Name + Email row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Full Name *</label>
+          <div className="relative">
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+            <input
+              name="name"
+              type="text"
+              placeholder="Ahmed Al Rashidi"
+              required
+              className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/8 transition-all"
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Email Address *</label>
+          <div className="relative">
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+            <input
+              name="email"
+              type="email"
+              placeholder="you@example.com"
+              required
+              className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/8 transition-all"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Phone + Company row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Phone</label>
+          <div className="relative">
+            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+            <input
+              name="phone"
+              type="tel"
+              placeholder="+971 50 000 0000"
+              className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/8 transition-all"
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Company</label>
+          <div className="relative">
+            <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+            <input
+              name="company"
+              type="text"
+              placeholder="Your Company"
+              className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/8 transition-all"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Subject */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Subject</label>
+        <div className="relative">
+          <MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+          <select
+            name="subject"
+            className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/8 transition-all appearance-none"
+          >
+            {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Message */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Message *</label>
+        <textarea
+          name="message"
+          rows={5}
+          required
+          placeholder="Tell us how we can help..."
+          className="w-full px-4 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/8 transition-all resize-none"
+        />
+      </div>
+
+      {error && (
+        <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
+      )}
+
+      <button
+        type="submit"
+        disabled={status === "sending"}
+        className="group relative w-full py-4 px-4 bg-[#001f3f] hover:bg-[#002a52] text-white text-sm font-semibold rounded-xl transition-all duration-300 disabled:opacity-60 shadow-[0_4px_16px_-2px_rgba(0,31,63,0.35)] hover:shadow-[0_6px_20px_-2px_rgba(0,31,63,0.45)] hover:-translate-y-0.5 overflow-hidden"
+      >
+        <span className="absolute inset-0 bg-gradient-to-r from-transparent via-[#d6b357]/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+        <span className="relative flex items-center justify-center gap-2">
+          {status === "sending" ? (
+            <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+          ) : (
+            <>Send Message <Send className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" /></>
+          )}
+        </span>
+      </button>
+    </form>
+  )
+}

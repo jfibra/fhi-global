@@ -16,7 +16,7 @@ export default async function DeveloperDashboardLayout({
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect("/")
+    redirect("/login")
   }
 
   const { data: profile } = await supabase
@@ -26,7 +26,7 @@ export default async function DeveloperDashboardLayout({
     .single<{ id: string; role: string | null; fullname: string | null; status: string | null; is_deleted: boolean | null }>()
 
   if (!profile) {
-    redirect("/")
+    redirect("/login")
   }
 
   const role = String(profile.role ?? "").toLowerCase().trim()

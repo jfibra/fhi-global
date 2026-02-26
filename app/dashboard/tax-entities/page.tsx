@@ -10,7 +10,7 @@ export default async function TaxEntitiesPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) redirect("/")
+  if (!user) redirect("/login")
 
   const { data: profile } = await supabase
     .from("profiles")

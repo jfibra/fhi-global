@@ -31,7 +31,7 @@ export default async function DashboardProfilePage() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect("/")
+    redirect("/login")
   }
 
   const { data: profile, error } = await supabase
