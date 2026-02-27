@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   LayoutDashboard, Users, Building2, UsersRound, Layers, Images,
   Settings, Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
-  UserCircle, Tag,
+  UserCircle, Tag, TrendingUp,
 } from "lucide-react"
 
 // ─── Base types ────────────────────────────────────────────────────────────────
@@ -104,6 +104,13 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
       },
       {
         type: "group",
+        label: "Sales Management",
+        items: [
+          { icon: TrendingUp, label: "Sales Reports", href: "/dashboard/sales" },
+        ],
+      },
+      {
+        type: "group",
         label: "Account",
         items: [
           { icon: UserCircle, label: "Profile",  href: "/dashboard/profile"  },
@@ -120,6 +127,20 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
       { type: "item", item: { icon: Layers,          label: "My Projects",   href: `${basePath}/projects`  } },
       { type: "item", item: { icon: Images,          label: "Media / Files", href: `${basePath}/media`     } },
       { type: "item", item: { icon: Settings,        label: "Settings",      href: "/dashboard/profile"    } },
+    ]
+  }
+
+  if (["team_leader", "unit_manager", "agent"].includes(normalizedRole)) {
+    return [
+      { type: "item", item: { icon: LayoutDashboard, label: "Overview", href: basePath } },
+      {
+        type: "group",
+        label: "Sales Management",
+        items: [
+          { icon: TrendingUp, label: "Sales Reports", href: "/dashboard/sales" },
+        ],
+      },
+      { type: "item", item: { icon: UserCircle, label: "Profile", href: "/dashboard/profile" } },
     ]
   }
 
