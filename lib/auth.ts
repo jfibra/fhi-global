@@ -39,6 +39,7 @@ const SHARED_DASHBOARD_PREFIXES = [
   "/dashboard/tax-entities",
   "/dashboard/purchase-categories",
   "/dashboard/purchases",
+  "/dashboard/sales",
 ]
 
 export function getDashboardRouteByRole(role?: string | null) {
