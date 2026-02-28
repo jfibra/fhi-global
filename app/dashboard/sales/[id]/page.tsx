@@ -1,6 +1,5 @@
 import { redirect, notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { fetchSaleById } from "@/lib/sales-service"
 import Link from "next/link"
 import {
   ArrowLeft,
@@ -13,6 +12,7 @@ import {
 import { DashboardShell } from "@/components/dashboard/shell"
 import { getRoleColor } from "@/components/dashboard/sidebar-config"
 import { roleToLabel } from "@/lib/auth"
+import { ValidationDiscussion } from "./validation-discussion"
 
 export const dynamic = "force-dynamic"
 
@@ -90,8 +90,10 @@ function SectionCard({
 export default async function SaleDetailPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
+  const { id } = await params
+
   const supabase = await createClient()
   const {
     data: { user },
@@ -106,9 +108,22 @@ export default async function SaleDetailPage({
     .single()
 
   const roleValue = String(profile?.role ?? "").toLowerCase().trim()
+  const isAdmin = roleValue === "admin"
   if (!profile || !ALLOWED_ROLES.includes(roleValue)) redirect("/dashboard")
 
-  const { data: sale, error } = await fetchSaleById(params.id)
+  const { data: sale, error } = await supabase
+    .from("sales_reports")
+    .select(`
+      *,
+      developers(name),
+      projects(name),
+      project_units(unit_type),
+      clients(first_name,middle_name,last_name,email,phone,age,gender,occupation,street,city,state_province,country),
+      profiles:agent_id(fullname),
+      sales_attachments(id)
+    `)
+    .eq("id", id)
+    .single()
 
   if (!sale || error) notFound()
 
@@ -121,7 +136,18 @@ export default async function SaleDetailPage({
     ? `${sale.clients.first_name} ${sale.clients.last_name}`
     : "—"
 
-  const clientFull = sale.clients as Record<string, string> | null
+  const attachmentsCount = Array.isArray(sale.sales_attachments) ? sale.sales_attachments.length : 0
+  const clientFull = sale.clients as {
+    email?: string | null
+    phone?: string | null
+    age?: number | null
+    gender?: string | null
+    occupation?: string | null
+    street?: string | null
+    city?: string | null
+    state_province?: string | null
+    country?: string | null
+  } | null
 
   return (
     <DashboardShell
@@ -226,13 +252,21 @@ export default async function SaleDetailPage({
             <DetailRow label="Attachments" value={
               <span className="inline-flex items-center gap-1.5">
                 <Paperclip className="w-3.5 h-3.5" />
-                {sale.attachments_count} file{sale.attachments_count !== 1 ? "s" : ""}
+                {attachmentsCount} file{attachmentsCount !== 1 ? "s" : ""}
               </span>
             } />
             <DetailRow label="Created" value={formatDate(sale.created_at)} />
             <DetailRow label="Updated" value={formatDate(sale.updated_at)} />
           </div>
         </div>
+
+        <ValidationDiscussion
+          saleId={sale.id}
+          currentUserId={profile.id}
+          currentRole={roleValue}
+          validationStatus={sale.validation_status}
+          isAdmin={isAdmin}
+        />
       </div>
     </DashboardShell>
   )

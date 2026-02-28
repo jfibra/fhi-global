@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { Eye, MoreHorizontal, Paperclip, Pencil } from "lucide-react"
-import type { SaleRecord } from "@/lib/sales-service"
+import { canManageSaleAttachmentsForRole, type SaleRecord } from "@/lib/sales-service"
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -26,6 +26,8 @@ export function SaleActions({
   onAttachments: () => void
 }) {
   const isAdmin = ["admin", "super_admin"].includes(currentRole)
+  const canEdit = isAdmin
+  const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, sale)
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -37,7 +39,7 @@ export function SaleActions({
       if (!triggerRef.current) return
       const rect = triggerRef.current.getBoundingClientRect()
       const menuWidth = 210
-      const estimatedMenuHeight = isAdmin ? 160 : 60
+      const estimatedMenuHeight = (canEdit || canManageAttachments) ? 160 : 60
       const viewportPadding = 8
       const placeBelow = rect.bottom + 8 + estimatedMenuHeight <= window.innerHeight - viewportPadding
       const top = placeBelow
@@ -56,7 +58,7 @@ export function SaleActions({
       window.removeEventListener("resize", computePosition)
       window.removeEventListener("scroll", computePosition, true)
     }
-  }, [open, isAdmin])
+  }, [open, canEdit, canManageAttachments])
 
   useEffect(() => {
     if (!open) return
@@ -99,8 +101,8 @@ export function SaleActions({
                 <Eye className="w-4 h-4 text-[#9ca3af]" /> View Sale
               </button>
 
-              {/* Edit Sale — admin only */}
-              {isAdmin && (
+              {/* Edit Sale */}
+              {canEdit && (
                 <button
                   type="button"
                   onClick={() => act(onEdit)}
@@ -110,8 +112,8 @@ export function SaleActions({
                 </button>
               )}
 
-              {/* Manage Attachments — admin only */}
-              {isAdmin && (
+              {/* Manage Attachments */}
+              {canManageAttachments && (
                 <button
                   type="button"
                   onClick={() => act(onAttachments)}

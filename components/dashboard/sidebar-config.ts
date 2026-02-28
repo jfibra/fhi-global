@@ -1,8 +1,8 @@
 import type { LucideIcon } from "lucide-react"
 import {
   LayoutDashboard, Users, Building2, UsersRound, Layers, Images,
-  Settings, Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
-  UserCircle, Tag, TrendingUp,
+  Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
+  Tag, TrendingUp, LifeBuoy,
 } from "lucide-react"
 
 // ─── Base types ────────────────────────────────────────────────────────────────
@@ -111,10 +111,9 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
       },
       {
         type: "group",
-        label: "Account",
+        label: "Support",
         items: [
-          { icon: UserCircle, label: "Profile",  href: "/dashboard/profile"  },
-          { icon: Settings,   label: "Settings", href: "/dashboard/settings" },
+          { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support" },
         ],
       },
     ]
@@ -126,7 +125,7 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
       { type: "item", item: { icon: Briefcase,       label: "Company Info",  href: `${basePath}/company`   } },
       { type: "item", item: { icon: Layers,          label: "My Projects",   href: `${basePath}/projects`  } },
       { type: "item", item: { icon: Images,          label: "Media / Files", href: `${basePath}/media`     } },
-      { type: "item", item: { icon: Settings,        label: "Settings",      href: "/dashboard/profile"    } },
+      { type: "item", item: { icon: LifeBuoy,        label: "Support Tickets", href: "/dashboard/support" } },
     ]
   }
 
@@ -140,13 +139,20 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
           { icon: TrendingUp, label: "Sales Reports", href: "/dashboard/sales" },
         ],
       },
-      { type: "item", item: { icon: UserCircle, label: "Profile", href: "/dashboard/profile" } },
+      {
+        type: "group",
+        label: "Support",
+        items: [
+          { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support" },
+        ],
+      },
     ]
   }
 
   // All other roles — flat overview only
   return [
     { type: "item", item: { icon: LayoutDashboard, label: "Overview", href: basePath } },
+    { type: "item", item: { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support" } },
   ]
 }
 

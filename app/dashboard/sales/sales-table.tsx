@@ -6,19 +6,26 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
+  History,
+  MessageSquare,
   Paperclip,
   Plus,
   RefreshCw,
   Search,
   TrendingUp,
+  X,
 } from "lucide-react"
 import { DashboardShell } from "@/components/dashboard/shell"
 import { getRoleColor } from "@/components/dashboard/sidebar-config"
 import { roleToLabel } from "@/lib/auth"
 import {
+  canEditSaleForRole,
+  canManageSaleAttachmentsForRole,
   fetchSales,
   fetchDevelopersForSale,
   fetchAgentsForSale,
+  updateSaleValidationStatus,
+  isAdminRole,
   type SaleRecord,
   type CommissionStatus,
   type ValidationStatus,
@@ -29,6 +36,7 @@ import { SaleActions } from "./sale-actions"
 import { SaleAttachmentsDialog } from "./sale-attachments-dialog"
 import { SaleFormDialog } from "./sale-form-dialog"
 import { SaleDetails } from "./sale-details"
+import { ValidationDiscussion, type DiscussionTab } from "./[id]/validation-discussion"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -209,11 +217,13 @@ export function SalesTable({
   const [detailSale, setDetailSale] = useState<SaleRecord | null>(null)
   const [showAttachments, setShowAttachments] = useState(false)
   const [attachmentSale, setAttachmentSale] = useState<SaleRecord | null>(null)
+  const [discussionTarget, setDiscussionTarget] = useState<{ sale: SaleRecord; tab: DiscussionTab } | null>(null)
 
   const [toasts, setToasts] = useState<Array<{ id: number; type: ToastType; text: string }>>([])
   const toastIdRef = useRef(0)
 
   const isManagement = ["admin", "super_admin"].includes(currentRole)
+  const isAdminUser = isAdminRole(currentRole)
 
   const addToast = (type: ToastType, text: string) => {
     const id = ++toastIdRef.current
@@ -273,9 +283,33 @@ export function SalesTable({
   }
 
   const openCreate = () => { setSelectedSale(null); setViewMode(false); setShowForm(true) }
-  const openEdit = (s: SaleRecord) => { setSelectedSale(s); setViewMode(false); setShowForm(true) }
+  const openEdit = (s: SaleRecord) => {
+    if (!canEditSaleForRole(currentRole, s)) {
+      addToast("error", "You can only edit sales that are Invalid Sale or Under Review")
+      return
+    }
+    setSelectedSale(s)
+    setViewMode(false)
+    setShowForm(true)
+  }
   const openView = (s: SaleRecord) => { setDetailSale(s); setShowDetails(true) }
-  const openAttachments = (s: SaleRecord) => { setAttachmentSale(s); setShowAttachments(true) }
+  const openAttachments = (s: SaleRecord) => {
+    setAttachmentSale(s)
+    setShowAttachments(true)
+  }
+
+  const openDiscussion = (sale: SaleRecord, tab: DiscussionTab = "discussion") => {
+    setDiscussionTarget({ sale, tab })
+  }
+  const closeDiscussion = () => setDiscussionTarget(null)
+
+  const handleValidationShortcut = async (sale: SaleRecord, nextStatus: ValidationStatus) => {
+    if (!isAdminUser) return
+    const { data, error } = await updateSaleValidationStatus(sale.id, nextStatus, currentUserId, currentRole)
+    if (error) { addToast("error", error); return }
+    setSales((prev) => prev.map((item) => (item.id === sale.id ? data! : item)))
+    addToast("success", `Validation set to ${STATUS_LABEL[nextStatus]}`)
+  }
 
   const onSaved = (sale: SaleRecord, isEdit: boolean) => {
     setShowForm(false)
@@ -524,13 +558,61 @@ export function SalesTable({
                         )}
                       </td>
                       <td className="px-4 py-3.5 pr-6 whitespace-nowrap">
-                        <SaleActions
-                          sale={sale}
-                          currentRole={currentRole}
-                          onView={() => openView(sale)}
-                          onEdit={() => openEdit(sale)}
-                          onAttachments={() => openAttachments(sale)}
-                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          {isAdminUser && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => void handleValidationShortcut(sale, "validated")}
+                                disabled={sale.validation_status === "validated"}
+                                className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                              >
+                                Validate Sale
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleValidationShortcut(sale, "invalid_sale")}
+                                disabled={sale.validation_status === "invalid_sale"}
+                                className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+                              >
+                                Invalid Sale
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleValidationShortcut(sale, "under_review")}
+                                disabled={sale.validation_status === "under_review"}
+                                className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 transition-colors"
+                              >
+                                Under Review
+                              </button>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => openDiscussion(sale)}
+                            title="Open validation discussion"
+                            className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#6b7280] hover:border-[#001f3f]/80 hover:text-[#001f3f] transition-colors"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </button>
+                          {isManagement && (
+                            <button
+                              type="button"
+                              onClick={() => openDiscussion(sale, "activity")}
+                              title="View activity history"
+                              className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#6b7280] hover:border-[#001f3f]/80 hover:text-[#001f3f] transition-colors"
+                            >
+                              <History className="w-4 h-4" />
+                            </button>
+                          )}
+                          <SaleActions
+                            sale={sale}
+                            currentRole={currentRole}
+                            onView={() => openView(sale)}
+                            onEdit={() => openEdit(sale)}
+                            onAttachments={() => openAttachments(sale)}
+                          />
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -603,6 +685,31 @@ export function SalesTable({
         onClose={() => { setShowAttachments(false); setAttachmentSale(null) }}
         onCountChange={handleCountChange}
       />
+
+      {discussionTarget && (
+        <div className="fixed inset-0 z-[120] flex items-start justify-center px-4 py-6">
+          <div className="absolute inset-0 bg-black/40" onClick={closeDiscussion} />
+          <div className="relative z-10 w-full max-w-3xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={closeDiscussion}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-white/80 text-[#374151] shadow-sm hover:bg-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <ValidationDiscussion
+              saleId={discussionTarget.sale.id}
+              currentUserId={currentUserId}
+              currentRole={currentRole}
+              validationStatus={discussionTarget.sale.validation_status}
+              isAdmin={isAdminUser}
+              initialTab={discussionTarget.tab}
+            />
+          </div>
+        </div>
+      )}
 
       <ToastStack
         toasts={toasts}
