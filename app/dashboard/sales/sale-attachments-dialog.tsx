@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react"
 import {
+  canManageSaleAttachmentsForRole,
   deleteSaleAttachment,
   fetchSaleAttachments,
   insertSaleAttachment,
@@ -57,6 +58,7 @@ export function SaleAttachmentsDialog({
   onCountChange: (id: string, count: number) => void
 }) {
   const isAdmin = ["admin", "super_admin"].includes(currentRole)
+  const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, sale)
   const [attachments, setAttachments] = useState<SaleAttachment[]>([])
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -83,6 +85,10 @@ export function SaleAttachmentsDialog({
 
   const uploadFile = async (file: File) => {
     if (!sale) return
+    if (!canManageAttachments) {
+      setUploadError("You can only manage attachments when validation is Invalid Sale or Under Review")
+      return
+    }
     setUploadError(null)
     setUploading(true)
     try {
@@ -107,6 +113,7 @@ export function SaleAttachmentsDialog({
         file_url:        json.url!,
         file_type:       json.file_type ?? null,
         uploaded_by:     currentUserId,
+        uploaded_role:   currentRole,
       })
 
       if (error) { setUploadError(error); return }
@@ -133,8 +140,12 @@ export function SaleAttachmentsDialog({
   }
 
   const handleDelete = async (attachment: SaleAttachment) => {
+    if (!canManageAttachments) {
+      setUploadError("You can only manage attachments when validation is Invalid Sale or Under Review")
+      return
+    }
     if (!window.confirm(`Remove "${attachment.file_name}"?`)) return
-    const { error } = await deleteSaleAttachment(attachment.id)
+    const { error } = await deleteSaleAttachment(attachment.id, currentUserId, currentRole)
     if (error) { setUploadError(error); return }
     const updated = attachments.filter((a) => a.id !== attachment.id)
     setAttachments(updated)
@@ -189,15 +200,25 @@ export function SaleAttachmentsDialog({
 
             {/* Drop zone */}
             <div
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+              onDragOver={(e) => {
+                if (!canManageAttachments) return
+                e.preventDefault()
+                setDragOver(true)
+              }}
               onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => void handleDrop(e)}
+              onDrop={(e) => {
+                if (!canManageAttachments) return
+                void handleDrop(e)
+              }}
               className={`flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border-2 border-dashed transition-all cursor-pointer ${
                 dragOver
                   ? "border-[#001f3f]/40 bg-[#001f3f]/4"
                   : "border-[#e5e5e5] hover:border-[#001f3f]/25 hover:bg-[#fafbfc]"
               }`}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                if (!canManageAttachments) return
+                fileInputRef.current?.click()
+              }}
             >
               {uploading ? (
                 <div className="flex items-center gap-2 text-sm text-[#6b7280]">
@@ -210,9 +231,13 @@ export function SaleAttachmentsDialog({
                     <Upload className="w-5 h-5 text-[#9ca3af]" />
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-semibold text-[#374151]">Click to upload or drag & drop</p>
-                    <p className="text-xs text-[#9ca3af] mt-0.5">PDF, Word, Excel, images — max 25 MB</p>
-                    <p className="text-xs text-[#9ca3af] mt-1 italic">e.g. Reservation Agreement, Receipt, Contract</p>
+                    <p className="text-sm font-semibold text-[#374151]">
+                      {canManageAttachments ? "Click to upload or drag & drop" : "Attachments are read-only for this validation status"}
+                    </p>
+                    <p className="text-xs text-[#9ca3af] mt-0.5">
+                      {canManageAttachments ? "PDF, Word, Excel, images — max 25 MB" : "Set validation to Invalid Sale or Under Review to manage files"}
+                    </p>
+                    {canManageAttachments && <p className="text-xs text-[#9ca3af] mt-1 italic">e.g. Reservation Agreement, Receipt, Contract</p>}
                   </div>
                 </>
               )}
@@ -273,8 +298,8 @@ export function SaleAttachmentsDialog({
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                       </button>
-                      {/* Trash — delete, admin only */}
-                      {isAdmin && (
+                      {/* Trash — delete for admins or review-stage owner roles */}
+                      {(isAdmin || canManageAttachments) && (
                         <button
                           type="button"
                           title="Delete attachment"

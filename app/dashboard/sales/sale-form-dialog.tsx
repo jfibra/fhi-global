@@ -6,7 +6,6 @@ import {
   Building2,
   Calendar,
   DollarSign,
-  ExternalLink,
   Eye,
   FileText,
   Layers,
@@ -18,10 +17,14 @@ import {
   Upload,
   User,
   X,
+  ExternalLink,
 } from "lucide-react"
 import {
+  canEditSaleForRole,
+  canManageSaleAttachmentsForRole,
   createSale,
   updateSale,
+  validateSaleFormData,
   fetchDevelopersForSale,
   fetchProjectsForDeveloper,
   fetchUnitsForProject,
@@ -127,7 +130,9 @@ export function SaleFormDialog({
   onError: (message: string) => void
 }) {
   const isEdit = Boolean(editSale)
-  const disabled = viewMode
+  const canEditCurrentSale = canEditSaleForRole(currentRole, editSale)
+  const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, editSale)
+  const disabled = viewMode || (isEdit && !canEditCurrentSale)
   const isAdmin = ["admin", "super_admin"].includes(currentRole)
 
   // ─── All state declarations (must precede derived values) ────────────────
@@ -153,6 +158,12 @@ export function SaleFormDialog({
 
   // ─── Tab configuration (derived after state) ─────────────────────────────
   type TabId = "property" | "client" | "contract" | "workflow" | "attachments"
+  const tabForErrorKey = (key: string): TabId => {
+    if (["developer_id", "project_id", "unit_information"].includes(key)) return "property"
+    if (key.startsWith("client.") || key === "client_address") return "client"
+    if (["contract_price", "reservation_date", "payment_plan", "payment_terms"].includes(key)) return "contract"
+    return "property"
+  }
   const allTabs: { id: TabId; label: string }[] = [
     { id: "property",    label: "Property" },
     { id: "client",      label: "Client" },
@@ -171,13 +182,19 @@ export function SaleFormDialog({
   // Populate form on open
   useEffect(() => {
     if (!open) return
+    if (editSale && !canEditSaleForRole(currentRole, editSale)) {
+      onError("You can only edit sales that are Invalid Sale or Under Review")
+      onClose()
+      return
+    }
     setErrors({})
-    setActiveTab("property")
     setPendingFiles([])
     setAttachments([])
     setAttError(null)
+
     if (editSale) {
-      setForm({
+      const client = editSale.clients
+      const prefilledForm: SaleFormData = {
         developer_id:      editSale.developer_id,
         project_id:        String(editSale.project_id),
         project_unit_id:   editSale.project_unit_id != null ? String(editSale.project_unit_id) : "",
@@ -185,18 +202,18 @@ export function SaleFormDialog({
         block_number:      editSale.block_number ?? "",
         lot_number:        editSale.lot_number ?? "",
         client: {
-          first_name:     (editSale.clients as Record<string, string>)?.first_name ?? "",
-          middle_name:    (editSale.clients as Record<string, string>)?.middle_name ?? "",
-          last_name:      (editSale.clients as Record<string, string>)?.last_name ?? "",
-          email:          (editSale.clients as Record<string, string>)?.email ?? "",
-          phone:          (editSale.clients as Record<string, string>)?.phone ?? "",
-          age:            (editSale.clients as Record<string, string>)?.age ?? "",
-          gender:         (editSale.clients as Record<string, string>)?.gender ?? "",
-          occupation:     (editSale.clients as Record<string, string>)?.occupation ?? "",
-          street:         (editSale.clients as Record<string, string>)?.street ?? "",
-          city:           (editSale.clients as Record<string, string>)?.city ?? "",
-          state_province: (editSale.clients as Record<string, string>)?.state_province ?? "",
-          country:        (editSale.clients as Record<string, string>)?.country ?? "",
+          first_name:     client?.first_name ?? "",
+          middle_name:    client?.middle_name ?? "",
+          last_name:      client?.last_name ?? "",
+          email:          client?.email ?? "",
+          phone:          client?.phone ?? "",
+          age:            client?.age != null ? String(client.age) : "",
+          gender:         client?.gender ?? "",
+          occupation:     client?.occupation ?? "",
+          street:         client?.street ?? "",
+          city:           client?.city ?? "",
+          state_province: client?.state_province ?? "",
+          country:        client?.country ?? "",
         },
         contract_price:     String(editSale.contract_price),
         reservation_date:   editSale.reservation_date ?? "",
@@ -207,7 +224,8 @@ export function SaleFormDialog({
         remarks:            editSale.remarks ?? "",
         commission_status:  editSale.commission_status,
         validation_status:  editSale.validation_status,
-      })
+      }
+      setForm(prefilledForm)
       // load projects/units for developer
       if (editSale.developer_id) {
         void fetchProjectsForDeveloper(editSale.developer_id).then(({ data }) => {
@@ -219,12 +237,16 @@ export function SaleFormDialog({
           if (data) setUnits(data)
         })
       }
+      const firstErrorKey = Object.keys(validateSaleFormData(prefilledForm))[0]
+      setActiveTab(firstErrorKey ? tabForErrorKey(firstErrorKey) : "property")
     } else {
       setForm(EMPTY_FORM)
       setProjects([])
       setUnits([])
+      const firstErrorKey = Object.keys(validateSaleFormData(EMPTY_FORM))[0]
+      setActiveTab(firstErrorKey ? tabForErrorKey(firstErrorKey) : "property")
     }
-  }, [open, editSale])
+  }, [open, editSale, currentRole, onClose, onError])
 
   // Load attachments when Attachments tab becomes active (edit mode only)
   useEffect(() => {
@@ -271,6 +293,10 @@ export function SaleFormDialog({
   }
 
   const uploadAttachmentFile = async (file: File, saleId: string) => {
+    if (!canManageAttachments) {
+      setAttError("You can only manage attachments when validation is Invalid Sale or Under Review")
+      return
+    }
     setAttError(null)
     setAttUploading(true)
     try {
@@ -286,6 +312,7 @@ export function SaleFormDialog({
         file_url:        json.url!,
         file_type:       json.file_type ?? null,
         uploaded_by:     currentUserId,
+        uploaded_role:   currentRole,
       })
       if (error) { setAttError(error); return }
       setAttachments((prev) => [data!, ...prev])
@@ -295,46 +322,68 @@ export function SaleFormDialog({
   }
 
   const handleDeleteAttachment = async (att: SaleAttachment) => {
-    if (!isAdmin) return
+    if (!canManageAttachments) {
+      setAttError("You can only manage attachments when validation is Invalid Sale or Under Review")
+      return
+    }
     if (!window.confirm(`Remove "${att.file_name}"?`)) return
-    const { error } = await deleteSaleAttachment(att.id)
+    const { error } = await deleteSaleAttachment(att.id, currentUserId, currentRole)
     if (error) { setAttError(error); return }
     setAttachments((prev) => prev.filter((a) => a.id !== att.id))
   }
 
   const set = <K extends keyof SaleFormData>(key: K, value: SaleFormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
-    setErrors((prev) => ({ ...prev, [key]: undefined }))
+    setErrors((prev) => ({
+      ...prev,
+      [key]: undefined,
+      ...(key === "project_unit_id" || key === "unit_number" || key === "block_number" || key === "lot_number"
+        ? { unit_information: undefined }
+        : {}),
+    }))
   }
 
   const setClient = (key: keyof typeof EMPTY_CLIENT, value: string) => {
     setForm((prev) => ({ ...prev, client: { ...prev.client, [key]: value } }))
-    setErrors((prev) => ({ ...prev, [`client.${key}`]: undefined }))
+    setErrors((prev) => ({
+      ...prev,
+      [`client.${key}`]: undefined,
+      ...(key === "street" || key === "city" || key === "state_province" || key === "country"
+        ? { client_address: undefined }
+        : {}),
+    }))
   }
 
-  const validate = () => {
-    const errs: Record<string, string> = {}
-    if (!form.developer_id)                   errs.developer_id = "Developer is required"
-    if (!form.project_id)                     errs.project_id = "Project is required"
-    if (!form.client.first_name.trim())       errs["client.first_name"] = "First name is required"
-    if (!form.client.last_name.trim())        errs["client.last_name"] = "Last name is required"
-    if (!form.contract_price || Number(form.contract_price) <= 0)
-      errs.contract_price = "Contract price must be greater than 0"
-    return errs
+  const validate = () => validateSaleFormData(form)
+  const focusInvalidField = (key: string) => {
+    if (typeof document === "undefined") return
+    setTimeout(() => {
+      const element = document.querySelector<HTMLElement>(`[data-error-key="${key}"]`)
+      if (!element) return
+      element.scrollIntoView({ behavior: "smooth", block: "center" })
+      element.focus()
+    }, 50)
   }
 
   const handleSubmit = async () => {
     const errs = validate()
-    if (Object.keys(errs).length > 0) { setErrors(errs); return }
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs)
+      const firstErrorKey = Object.keys(errs)[0]
+      const nextTab = tabForErrorKey(firstErrorKey)
+      setActiveTab(nextTab)
+      focusInvalidField(firstErrorKey)
+      return
+    }
 
     setSaving(true)
     try {
       if (isEdit && editSale) {
-        const { data, error } = await updateSale(editSale.id, form, currentUserId)
+        const { data, error } = await updateSale(editSale.id, form, currentUserId, currentRole)
         if (error) { onError(error); return }
         onSaved(data!, true)
       } else {
-        const { data, error } = await createSale(form, currentUserId)
+        const { data, error } = await createSale(form, currentUserId, currentRole)
         if (error) { onError(error); return }
         // Upload any staged files after sale is created
         if (pendingFiles.length > 0) {
@@ -443,6 +492,7 @@ export function SaleFormDialog({
                     onChange={(e) => void handleDeveloperChange(e.target.value)}
                     disabled={disabled}
                     className={sel("developer_id")}
+                    data-error-key="developer_id"
                   >
                     <option value="">Select developer…</option>
                     {developers.map((d) => (
@@ -459,6 +509,7 @@ export function SaleFormDialog({
                     onChange={(e) => void handleProjectChange(e.target.value)}
                     disabled={disabled || !form.developer_id}
                     className={sel("project_id")}
+                    data-error-key="project_id"
                   >
                     <option value="">
                       {loadingProjects ? "Loading projects…" : "Select project…"}
@@ -471,12 +522,13 @@ export function SaleFormDialog({
                 </div>
 
                 <div>
-                  <FieldLabel text="Project Unit" />
+                  <FieldLabel text="Project Unit" required />
                   <select
                     value={form.project_unit_id}
                     onChange={(e) => set("project_unit_id", e.target.value)}
                     disabled={disabled || !form.project_id}
                     className={sel("project_unit_id")}
+                    data-error-key="unit_information"
                   >
                     <option value="">
                       {loadingUnits ? "Loading units…" : "Select unit type…"}
@@ -487,6 +539,7 @@ export function SaleFormDialog({
                       </option>
                     ))}
                   </select>
+                  {errors.unit_information && <p className="text-xs text-rose-500 mt-1 ml-1">{errors.unit_information}</p>}
                 </div>
 
                 <div>
@@ -553,6 +606,7 @@ export function SaleFormDialog({
                       disabled={disabled}
                       placeholder="First name"
                       className={inp("client.first_name")}
+                      data-error-key="client.first_name"
                     />
                   </div>
                   {errors["client.first_name"] && <p className="text-xs text-rose-500 mt-1 ml-1">{errors["client.first_name"]}</p>}
@@ -584,6 +638,7 @@ export function SaleFormDialog({
                       disabled={disabled}
                       placeholder="Last name"
                       className={inp("client.last_name")}
+                      data-error-key="client.last_name"
                     />
                   </div>
                   {errors["client.last_name"] && <p className="text-xs text-rose-500 mt-1 ml-1">{errors["client.last_name"]}</p>}
@@ -605,7 +660,7 @@ export function SaleFormDialog({
                 </div>
 
                 <div>
-                  <FieldLabel text="Phone Number" />
+                  <FieldLabel text="Phone Number" required />
                   <div className="relative">
                     <Phone className={iconCls} />
                     <input
@@ -615,8 +670,10 @@ export function SaleFormDialog({
                       disabled={disabled}
                       placeholder="+971 50 000 0000"
                       className={inp("client.phone")}
+                      data-error-key="client.phone"
                     />
                   </div>
+                  {errors["client.phone"] && <p className="text-xs text-rose-500 mt-1 ml-1">{errors["client.phone"]}</p>}
                 </div>
 
                 <div>
@@ -665,7 +722,7 @@ export function SaleFormDialog({
               {/* Address */}
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <FieldLabel text="Street" />
+                  <FieldLabel text="Street" required />
                   <div className="relative">
                     <MapPin className={iconCls} />
                     <input
@@ -675,8 +732,10 @@ export function SaleFormDialog({
                       disabled={disabled}
                       placeholder="Street address"
                       className={inp("client.street")}
+                      data-error-key="client_address"
                     />
                   </div>
+                  {errors.client_address && <p className="text-xs text-rose-500 mt-1 ml-1">{errors.client_address}</p>}
                 </div>
                 <div>
                   <FieldLabel text="City" />
@@ -711,13 +770,14 @@ export function SaleFormDialog({
                       disabled={disabled}
                       placeholder="e.g. 2500000"
                       className={inp("contract_price")}
+                      data-error-key="contract_price"
                     />
                   </div>
                   {errors.contract_price && <p className="text-xs text-rose-500 mt-1 ml-1">{errors.contract_price}</p>}
                 </div>
 
                 <div>
-                  <FieldLabel text="Reservation Date" />
+                  <FieldLabel text="Reservation Date" required />
                   <div className="relative">
                     <Calendar className={iconCls} />
                     <input
@@ -726,8 +786,10 @@ export function SaleFormDialog({
                       onChange={(e) => set("reservation_date", e.target.value)}
                       disabled={disabled}
                       className={inp("reservation_date")}
+                      data-error-key="reservation_date"
                     />
                   </div>
+                  {errors.reservation_date && <p className="text-xs text-rose-500 mt-1 ml-1">{errors.reservation_date}</p>}
                 </div>
 
                 <div>
@@ -760,7 +822,7 @@ export function SaleFormDialog({
                 </div>
 
                 <div className="md:col-span-2">
-                  <FieldLabel text="Payment Plan" />
+                  <FieldLabel text="Payment Plan" required />
                   <input
                     type="text"
                     value={form.payment_plan}
@@ -768,19 +830,23 @@ export function SaleFormDialog({
                     disabled={disabled}
                     placeholder="e.g. 20/50/30"
                     className={inpNoIcon("payment_plan")}
+                    data-error-key="payment_plan"
                   />
+                  {errors.payment_plan && <p className="text-xs text-rose-500 mt-1 ml-1">{errors.payment_plan}</p>}
                 </div>
 
                 <div className="md:col-span-2">
-                  <FieldLabel text="Payment Terms" />
+                  <FieldLabel text="Payment Terms" required />
                   <textarea
                     value={form.payment_terms}
                     onChange={(e) => set("payment_terms", e.target.value)}
                     disabled={disabled}
                     placeholder="Describe payment terms…"
                     rows={2}
+                    data-error-key="payment_terms"
                     className={`w-full px-4 py-3 rounded-2xl border bg-white text-sm text-[#0d1117] placeholder:text-[#9ca3af] focus:outline-none focus:ring-4 focus:ring-[#001f3f]/5 transition-all disabled:bg-[#f8fafc] resize-none ${errors.payment_terms ? "border-rose-400" : "border-[#e5e5e5] focus:border-[#001f3f]"}`}
                   />
+                  {errors.payment_terms && <p className="text-xs text-rose-500 mt-1 ml-1">{errors.payment_terms}</p>}
                 </div>
 
                 <div className="md:col-span-2">
@@ -841,9 +907,14 @@ export function SaleFormDialog({
                   /* ── EDIT MODE: live upload to S3 ── */
                   <>
                     <div
-                      onDragOver={(e) => { e.preventDefault(); setAttDragOver(true) }}
+                      onDragOver={(e) => {
+                        if (!canManageAttachments) return
+                        e.preventDefault()
+                        setAttDragOver(true)
+                      }}
                       onDragLeave={() => setAttDragOver(false)}
                       onDrop={async (e) => {
+                        if (!canManageAttachments) return
                         e.preventDefault()
                         setAttDragOver(false)
                         const file = e.dataTransfer.files?.[0]
@@ -854,7 +925,10 @@ export function SaleFormDialog({
                           ? "border-[#001f3f]/40 bg-[#001f3f]/5"
                           : "border-[#e5e5e5] hover:border-[#001f3f]/25 hover:bg-[#fafbfc]"
                       }`}
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => {
+                        if (!canManageAttachments) return
+                        fileInputRef.current?.click()
+                      }}
                     >
                       {attUploading ? (
                         <div className="flex items-center gap-2 text-sm text-[#6b7280]">
@@ -867,8 +941,12 @@ export function SaleFormDialog({
                             <Upload className="w-5 h-5 text-[#9ca3af]" />
                           </div>
                           <div className="text-center">
-                            <p className="text-sm font-semibold text-[#374151]">Click to upload or drag & drop</p>
-                            <p className="text-xs text-[#9ca3af] mt-0.5">PDF, Word, Excel, images — max 25 MB</p>
+                            <p className="text-sm font-semibold text-[#374151]">
+                              {canManageAttachments ? "Click to upload or drag & drop" : "Attachments are read-only for this validation status"}
+                            </p>
+                            <p className="text-xs text-[#9ca3af] mt-0.5">
+                              {canManageAttachments ? "PDF, Word, Excel, images — max 25 MB" : "Set validation to Invalid Sale or Under Review to manage files"}
+                            </p>
                           </div>
                         </>
                       )}
@@ -912,7 +990,7 @@ export function SaleFormDialog({
                                 className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-sky-50 text-[#9ca3af] hover:text-sky-500 transition-all">
                                 <ExternalLink className="w-3.5 h-3.5" />
                               </button>
-                              {isAdmin && (
+                              {canManageAttachments && (
                                 <button type="button" title="Delete" onClick={() => void handleDeleteAttachment(att)}
                                   className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-rose-50 text-[#9ca3af] hover:text-rose-500 transition-all">
                                   <Trash2 className="w-3.5 h-3.5" />
