@@ -31,7 +31,7 @@ import { ProjectNearbyTab } from "./project-nearby-tab"
 import { ProjectSeoTab } from "./project-seo-tab"
 import { ProjectSettingsTab } from "./project-settings-tab"
 
-// ─── Portal ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Portal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -39,7 +39,7 @@ function Portal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body)
 }
 
-// ─── Toast ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type ToastVariant = "success" | "error"
 interface ToastMsg { id: number; variant: ToastVariant; message: string }
 
@@ -51,14 +51,14 @@ function ToastList({ toasts, remove }: { toasts: ToastMsg[]; remove: (id: number
           t.variant === "success" ? "bg-green-50 text-green-800 border border-green-100" : "bg-rose-50 text-rose-800 border border-rose-100"
         }`}>
           <span className="flex-1">{t.message}</span>
-          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
+          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
         </div>
       ))}
     </div>
   )
 }
 
-// ─── Confirm dialog ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Confirm dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
   return (
     <Portal>
@@ -76,7 +76,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onCo
   )
 }
 
-// ─── Tabs ──────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export type TabId = "data" | "overview" | "units" | "images" | "amenities" | "property_types" | "media" | "features" | "nearby" | "seo" | "settings"
 
 const TABS: { id: TabId; label: string }[] = [
@@ -93,7 +93,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "settings",        label: "Settings" },
 ]
 
-// ─── New Project Modal ─────────────────────────────────────────────────────────
+// â”€â”€â”€ New Project Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function NewProjectModal({
   developers,
   onClose,
@@ -144,7 +144,7 @@ function NewProjectModal({
       <div className="fixed inset-0 z-[55] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
         <div className="relative bg-white rounded-[28px] p-8 max-w-md w-full shadow-2xl border border-white/60">
-          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#001f3f] mb-6">New Project</h2>
+          <h2 className="font-['Outfit'] text-xl font-bold text-[#001f3f] mb-6">New Project</h2>
           <form onSubmit={submit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-[#6b7280] mb-1.5">Project Name *</label>
@@ -162,7 +162,7 @@ function NewProjectModal({
               <label className="block text-xs font-semibold text-[#6b7280] mb-1.5">Developer</label>
               <select value={developerId} onChange={(e) => setDevId(e.target.value)}
                 className="w-full border border-[#e5e5e5] rounded-xl px-4 py-2.5 text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#001f3f]/20 focus:border-[#001f3f] bg-white">
-                <option value="">— No developer —</option>
+                <option value="">â€” No developer â€”</option>
                 {developers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
@@ -183,7 +183,7 @@ function NewProjectModal({
               </button>
               <button type="submit" disabled={saving || !name.trim()}
                 className="flex-1 px-5 py-2.5 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50">
-                {saving ? "Creating…" : "Create Project"}
+                {saving ? "Creatingâ€¦" : "Create Project"}
               </button>
             </div>
           </form>
@@ -193,7 +193,7 @@ function NewProjectModal({
   )
 }
 
-// ─── Main Component ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function ProjectsClient({ currentRole, userId }: { currentRole: string; userId: string }) {
   const [projects, setProjects]     = useState<Project[]>([])
   const [total, setTotal]           = useState(0)
@@ -224,7 +224,7 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
 
   const PER_PAGE = 20
 
-  // ── Load list ──────────────────────────────────────────────────────────────
+  // â”€â”€ Load list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const loadList = useCallback(async () => {
     setLoading(true)
     const { data, total: t, error } = await fetchProjects({
@@ -240,12 +240,12 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
 
   useEffect(() => { void loadList() }, [loadList])
 
-  // ── Load developers for selects ────────────────────────────────────────────
+  // â”€â”€ Load developers for selects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     fetchDevelopersForSelect().then(({ data }) => setDevelopers(data))
   }, [])
 
-  // ── Select project ──────────────────────────────────────────────────────────
+  // â”€â”€ Select project â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleSelect = async (id: number) => {
     setLoadingProject(true)
     setActiveTab("overview")
@@ -255,14 +255,14 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
     setSelected(data)
   }
 
-  // ── Refresh selected ─────────────────────────────────────────────────────────
+  // â”€â”€ Refresh selected â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const refreshSelected = async () => {
     if (!selected) return
     const { data } = await fetchProject(selected.id)
     if (data) setSelected(data)
   }
 
-  // ── Publish toggle ───────────────────────────────────────────────────────────
+  // â”€â”€ Publish toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handlePublishToggle = async () => {
     if (!selected) return
     const next = !selected.is_published
@@ -273,7 +273,7 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
     setProjects((prev) => prev.map((p) => p.id === selected.id ? { ...p, is_published: next } : p))
   }
 
-  // ── Duplicate ────────────────────────────────────────────────────────────────
+  // â”€â”€ Duplicate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleDuplicate = () => {
     if (!selected) return
     setConfirm({
@@ -291,7 +291,7 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
     })
   }
 
-  // ── Delete ───────────────────────────────────────────────────────────────────
+  // â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleDelete = () => {
     if (!selected) return
     setConfirm({
@@ -307,7 +307,7 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
     })
   }
 
-  // ── Update field ─────────────────────────────────────────────────────────────
+  // â”€â”€ Update field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleUpdateProject = async (fields: Parameters<typeof updateProject>[1]) => {
     if (!selected) return
     const { error } = await updateProject(selected.id, fields)
@@ -321,12 +321,12 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
 
   return (
     <div className="flex h-full min-h-screen bg-[#f9fafb]">
-      {/* ── Sidebar ───────────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <aside className="w-[340px] flex-shrink-0 flex flex-col bg-white border-r border-[#f0f0f0] h-screen sticky top-0 overflow-hidden">
         {/* header */}
         <div className="px-5 pt-6 pb-4 border-b border-[#f0f0f0]">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="font-['Space_Grotesk'] text-xl font-bold text-[#001f3f]">Projects</h1>
+            <h1 className="font-['Outfit'] text-xl font-bold text-[#001f3f]">Projects</h1>
             <button onClick={() => setShowNew(true)}
               className="w-8 h-8 flex items-center justify-center rounded-full bg-[#001f3f] text-white hover:bg-[#001f3f]/80 transition-colors">
               <Plus className="w-4 h-4" />
@@ -387,18 +387,18 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
           <div className="flex items-center justify-between px-4 py-3 border-t border-[#f0f0f0] text-xs text-[#6b7280]">
             <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
               className="px-3 py-1.5 rounded-xl border border-[#e5e5e5] disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
-              ← Prev
+              â† Prev
             </button>
             <span>{page} / {totalPages}</span>
             <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}
               className="px-3 py-1.5 rounded-xl border border-[#e5e5e5] disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
-              Next →
+              Next â†’
             </button>
           </div>
         )}
       </aside>
 
-      {/* ── Main panel ──────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Main panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {!selected ? (
           <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
@@ -407,7 +407,7 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 21V7l9-4 9 4v14M12 21V13m-4 8v-5m8 5v-5" />
               </svg>
             </div>
-            <p className="text-[#374151] font-semibold text-lg font-['Space_Grotesk']">Select a project</p>
+            <p className="text-[#374151] font-semibold text-lg font-['Outfit']">Select a project</p>
             <p className="text-sm text-[#9ca3af] mt-1">Choose a project from the sidebar or create a new one</p>
             <button onClick={() => setShowNew(true)}
               className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
@@ -462,7 +462,7 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
         )}
       </main>
 
-      {/* ── Overlays ─────────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Overlays â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {showNew && (
         <NewProjectModal
           developers={developers}

@@ -30,7 +30,7 @@ import { PurchaseActions } from "./purchase-actions"
 import { PurchaseAttachmentsDialog } from "./purchase-attachments-dialog"
 import { PurchaseFormDialog } from "./purchase-form-dialog"
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type ToastType = "success" | "error"
 type SortField = "invoice_number" | "tax_month" | "total_actual_amount" | "created_at"
@@ -38,7 +38,7 @@ type SortDir = "asc" | "desc"
 
 const PER_PAGE_OPTIONS = [10, 20, 50] as const
 
-// ─── Toast Stack ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Toast Stack â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ToastStack({
   toasts,
@@ -59,33 +59,33 @@ function ToastStack({
           }`}
         >
           <span className="flex-1">{toast.text}</span>
-          <button type="button" onClick={() => remove(toast.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
+          <button type="button" onClick={() => remove(toast.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
         </div>
       ))}
     </div>
   )
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function formatDate(value: string) {
-  if (!value) return "—"
+  if (!value) return "â€”"
   const date = new Date(value)
   return Number.isNaN(date.getTime())
-    ? "—"
+    ? "â€”"
     : date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
 }
 
 function formatMonth(value: string) {
-  if (!value) return "—"
+  if (!value) return "â€”"
   const date = new Date(value)
   return Number.isNaN(date.getTime())
-    ? "—"
+    ? "â€”"
     : date.toLocaleDateString("en-US", { year: "numeric", month: "long" })
 }
 
 function formatAmount(value: number | null, currency = "AED") {
-  if (value == null) return "—"
+  if (value == null) return "â€”"
   return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -157,7 +157,7 @@ function SortableHead({
   )
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function PurchasesTable({
   currentUserId,
@@ -301,7 +301,7 @@ export function PurchasesTable({
               <ShoppingCart className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-[#0d1117]">
+              <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">
                 Purchases
               </h1>
               <p className="text-sm text-[#6b7280]">Manage VAT purchase records for Dubai accounting</p>
@@ -327,7 +327,7 @@ export function PurchasesTable({
                 type="text"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search invoice number or notes…"
+                placeholder="Search invoice number or notesâ€¦"
                 className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 placeholder:text-[#9ca3af]"
               />
             </div>
@@ -451,7 +451,7 @@ export function PurchasesTable({
                       className={`hover:bg-[#fcfdff] transition-colors ${purchase.deleted_at ? "opacity-60" : ""}`}
                     >
                       <td className="px-4 py-3.5 pl-6 whitespace-nowrap font-semibold text-[#0d1117]">
-                        {purchase.company_tax_entities?.registered_name ?? "—"}
+                        {purchase.company_tax_entities?.registered_name ?? "â€”"}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap font-mono text-xs text-[#374151]">
                         {purchase.invoice_number}
@@ -465,7 +465,7 @@ export function PurchasesTable({
                       <td className="px-4 py-3.5 whitespace-nowrap text-right font-mono text-xs text-[#374151]">
                         {purchase.gross_taxable != null
                           ? new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(purchase.gross_taxable)
-                          : "—"}
+                          : "â€”"}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-right font-mono text-sm font-semibold text-[#0d1117]">
                         {new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(purchase.total_actual_amount)}
@@ -474,10 +474,10 @@ export function PurchasesTable({
                         {purchase.currency_code}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-[#6b7280]">
-                        {purchase.purchase_categories?.category_name ?? <span className="text-[#9ca3af]">—</span>}
+                        {purchase.purchase_categories?.category_name ?? <span className="text-[#9ca3af]">â€”</span>}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-[#6b7280]">
-                        {purchase.profiles?.fullname ?? "—"}
+                        {purchase.profiles?.fullname ?? "â€”"}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap">
                         {purchase.attachments_count > 0 ? (
@@ -490,7 +490,7 @@ export function PurchasesTable({
                             {purchase.attachments_count}
                           </button>
                         ) : (
-                          <span className="text-[#9ca3af] text-xs">—</span>
+                          <span className="text-[#9ca3af] text-xs">â€”</span>
                         )}
                       </td>
                       <td className="px-4 py-3.5 pr-6 whitespace-nowrap">
@@ -512,7 +512,7 @@ export function PurchasesTable({
           {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-6 py-3.5 border-t border-[#f0f2f5] bg-white/40">
             <p className="text-xs text-[#9ca3af]">
-              Showing {total === 0 ? 0 : (page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
+              Showing {total === 0 ? 0 : (page - 1) * perPage + 1}â€“{Math.min(page * perPage, total)} of {total}
             </p>
             <div className="flex items-center gap-2">
               <select

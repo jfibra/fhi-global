@@ -13,7 +13,7 @@ import { roleToLabel } from "@/lib/auth"
 import { useAuth } from "@/context/auth-context"
 import { getSidebarNavSections, type NavItem, type NavSection } from "@/components/dashboard/sidebar-config"
 
-// ─── types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export interface DashboardShellProps {
   role: string
   roleLabel: string
@@ -27,7 +27,7 @@ export interface DashboardShellProps {
   children: React.ReactNode
 }
 
-// ─── role badge colors ─────────────────────────────────────────────────────────
+// â”€â”€â”€ role badge colors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ROLE_BADGE: Record<string, string> = {
   super_admin:    "bg-purple-500/20 text-purple-300 border-purple-500/30",
   admin:          "bg-sky-500/20 text-sky-300 border-sky-500/30",
@@ -59,7 +59,7 @@ export function DashboardShell({
   const effectiveRoleLabel = profile?.role ? roleToLabel(profile.role) : roleLabel
   const displayName = profile?.fullname || userName || user?.email || "User"
 
-  // Resolve sections: prop override → flat navItems override wrapped → auto from role
+  // Resolve sections: prop override â†’ flat navItems override wrapped â†’ auto from role
   const resolvedSections: NavSection[] = navSectionsProp
     ?? (navItems
       ? navItems.map(item => ({ type: "item" as const, item }))
@@ -68,7 +68,7 @@ export function DashboardShell({
 
   const badgeCls = ROLE_BADGE[effectiveRole] ?? "bg-white/10 text-white/60 border-white/20"
 
-  // ── Collapse state: keyed by group label, default open ────────────────────
+  // â”€â”€ Collapse state: keyed by group label, default open â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {}
     resolvedSections.forEach(section => {
@@ -95,7 +95,7 @@ export function DashboardShell({
     router.refresh()
   }
 
-  // ── Single nav item renderer ───────────────────────────────────────────────
+  // â”€â”€ Single nav item renderer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const renderNavItem = (item: NavItem, indented = false) => {
     const { icon: Icon, label, href, badge } = item
     const isActive = pathname === href
@@ -126,7 +126,7 @@ export function DashboardShell({
         >
           <Icon className={`w-3.5 h-3.5 transition-colors ${isActive ? "text-white" : "text-white/40 group-hover:text-white/70"}`} />
         </span>
-        <span className="flex-1 font-['Space_Grotesk']">{label}</span>
+        <span className="flex-1 font-['Outfit']">{label}</span>
         {badge != null && badge > 0 && (
           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-[#d6b357]/20 to-[#d6b357]/10 text-[#d6b357] border border-[#d6b357]/20">
             {badge}
@@ -143,7 +143,7 @@ export function DashboardShell({
           return renderNavItem(section.item)
         }
 
-        // ── Collapsible group ──────────────────────────────────────────────
+        // â”€â”€ Collapsible group â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         const { label, items } = section
         const isOpen = openGroups[label] ?? true
         const hasActiveChild = items.some(item => pathname === item.href)
@@ -170,7 +170,7 @@ export function DashboardShell({
               />
             </button>
 
-            {/* Collapsible items — CSS max-height transition */}
+            {/* Collapsible items â€” CSS max-height transition */}
             <div
               className="overflow-hidden transition-all duration-200 ease-in-out"
               style={{ maxHeight: isOpen ? `${items.length * 52}px` : "0px" }}
@@ -196,8 +196,8 @@ export function DashboardShell({
   return (
     <div className="flex h-screen bg-[#f4f6f9] font-sans overflow-hidden">
 
-      {/* ── Sidebar ───────────────────────────────────────────────────── */}
-      {/* Mobile overlay — backdrop blur */}
+      {/* â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* Mobile overlay â€” backdrop blur */}
       <div
         className={`fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden transition-opacity duration-300 ${
           sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
@@ -215,7 +215,7 @@ export function DashboardShell({
           style={{ background: `linear-gradient(to right, transparent, ${roleColor}, #d6b357, transparent)` }}
         />
 
-        {/* ── FIXED: Logo + role header ── */}
+        {/* â”€â”€ FIXED: Logo + role header â”€â”€ */}
         <div className="shrink-0 px-5 pt-6 pb-4">
           {/* Logo row */}
           <div className="flex items-center justify-between mb-5">
@@ -237,7 +237,7 @@ export function DashboardShell({
               {displayName.charAt(0).toUpperCase()}
             </div>
             <div className="overflow-hidden flex-1">
-              <p className="text-xs font-bold text-white font-['Space_Grotesk'] truncate">{displayName}</p>
+              <p className="text-xs font-bold text-white font-['Outfit'] truncate">{displayName}</p>
               <div className={`mt-0.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${badgeCls}`}>
                 <span className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: roleColor }} />
                 {effectiveRoleLabel}
@@ -252,7 +252,7 @@ export function DashboardShell({
           style={{ background: "linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)" }}
         />
 
-        {/* ── SCROLLABLE: Nav ── */}
+        {/* â”€â”€ SCROLLABLE: Nav â”€â”€ */}
         <NavLinks />
 
         {/* Gradient divider */}
@@ -261,7 +261,7 @@ export function DashboardShell({
           style={{ background: "linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)" }}
         />
 
-        {/* ── FIXED: Footer actions ── */}
+        {/* â”€â”€ FIXED: Footer actions â”€â”€ */}
         <div className="shrink-0 px-3 py-4 space-y-0.5">
           <Link
             href="/dashboard/profile"
@@ -270,7 +270,7 @@ export function DashboardShell({
             <span className="w-7 h-7 rounded-xl bg-white/5 group-hover:bg-white/10 flex items-center justify-center shrink-0 transition-all">
               <Settings className="w-3.5 h-3.5 text-white/40 group-hover:text-white/70" />
             </span>
-            <span className="font-['Space_Grotesk'] font-medium text-sm">Profile Settings</span>
+            <span className="font-['Outfit'] font-medium text-sm">Profile Settings</span>
           </Link>
           <button
             type="button"
@@ -280,12 +280,12 @@ export function DashboardShell({
             <span className="w-7 h-7 rounded-xl bg-white/5 group-hover:bg-rose-500/15 flex items-center justify-center shrink-0 transition-all">
               <LogOut className="w-3.5 h-3.5 text-white/40 group-hover:text-rose-400" />
             </span>
-            <span className="font-['Space_Grotesk'] font-medium text-sm">Sign Out</span>
+            <span className="font-['Outfit'] font-medium text-sm">Sign Out</span>
           </button>
         </div>
       </aside>
 
-      {/* ── Main content ──────────────────────────────────────────────── */}
+      {/* â”€â”€ Main content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* Top bar */}
@@ -298,7 +298,7 @@ export function DashboardShell({
           </button>
 
           <div className="flex-1 min-w-0">
-            <h1 className="font-['Space_Grotesk'] text-base font-bold text-[#0d1117] truncate">
+            <h1 className="font-['Outfit'] text-base font-bold text-[#0d1117] truncate">
               {effectiveRoleLabel} Dashboard
             </h1>
             <p className="text-[11px] text-[#9ca3af]">
@@ -329,7 +329,7 @@ export function DashboardShell({
   )
 }
 
-// ─── Shared sub-components ─────────────────────────────────────────────────────
+// â”€â”€â”€ Shared sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function StatCard({
   label,
@@ -359,11 +359,11 @@ export function StatCard({
         </div>
         {change && (
           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${changePositive ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500"}`}>
-            {changePositive ? "↑" : "↓"} {change}
+            {changePositive ? "â†‘" : "â†“"} {change}
           </span>
         )}
       </div>
-      <p className="text-2xl font-bold text-[#0d1117] font-['Space_Grotesk'] mb-0.5">{value}</p>
+      <p className="text-2xl font-bold text-[#0d1117] font-['Outfit'] mb-0.5">{value}</p>
       <p className="text-xs font-medium text-[#6b7280]">{label}</p>
       {sub && <p className="text-[11px] text-[#9ca3af] mt-1">{sub}</p>}
     </div>

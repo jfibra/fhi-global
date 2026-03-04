@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type Project = {
   id: number
@@ -153,7 +153,7 @@ export type ProjectStats = {
 
 export type ProjectFormData = Partial<Omit<Project, "id" | "uuid" | "developers" | "created_at" | "updated_at" | "deleted_at" | "views_count" | "rating" | "reviews_count">>
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function generateProjectSlug(name: string): string {
   return name
@@ -207,7 +207,7 @@ function sanitizeProjectPatch(form: Partial<ProjectFormData>): Partial<ProjectFo
   return patch as Partial<ProjectFormData>
 }
 
-// ─── Projects ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Projects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchProjects(params: {
   page?: number
@@ -330,7 +330,7 @@ export async function duplicateProject(id: number): Promise<{ data: Project | nu
   return { data: dup as Project, error: null }
 }
 
-// ─── Units ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Units â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchProjectUnits(projectId: number): Promise<{ data: ProjectUnit[]; error: string | null }> {
   const supabase = createClient()
@@ -359,7 +359,7 @@ export async function deleteProjectUnit(id: number): Promise<{ error: string | n
   return { error: error?.message ?? null }
 }
 
-// ─── Images ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Images â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchProjectImages(projectId: number): Promise<{ data: ProjectImage[]; error: string | null }> {
   const supabase = createClient()
@@ -401,7 +401,7 @@ export async function updateImageRank(id: number, rank: number): Promise<{ error
   return { error: error?.message ?? null }
 }
 
-// ─── Media ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Media â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchProjectMedia(projectId: number): Promise<{ data: ProjectMedia[]; error: string | null }> {
   const supabase = createClient()
@@ -430,7 +430,7 @@ export async function deleteProjectMedia(id: number): Promise<{ error: string | 
   return { error: error?.message ?? null }
 }
 
-// ─── Features ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Features â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchProjectFeatures(projectId: number): Promise<{ data: ProjectFeature[]; error: string | null }> {
   const supabase = createClient()
@@ -456,7 +456,7 @@ export async function deleteProjectFeature(id: number): Promise<{ error: string 
   return { error: error?.message ?? null }
 }
 
-// ─── Keywords / SEO ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Keywords / SEO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchProjectKeywords(projectId: number): Promise<{ data: ProjectKeyword[]; error: string | null }> {
   const supabase = createClient()
@@ -481,7 +481,7 @@ export async function syncProjectKeywords(projectId: number, keywords: string[])
   return { error: error?.message ?? null }
 }
 
-// ─── Neighbors ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Neighbors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchProjectNeighbors(projectId: number): Promise<{ data: ProjectNeighbor[]; error: string | null }> {
   const supabase = createClient()
@@ -509,7 +509,7 @@ export async function deleteProjectNeighbor(id: number): Promise<{ error: string
   return { error: error?.message ?? null }
 }
 
-// ─── Points ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Points â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchProjectPoints(projectId: number): Promise<{ data: ProjectPoint[]; error: string | null }> {
   const supabase = createClient()
@@ -537,7 +537,7 @@ export async function deleteProjectPoint(id: number): Promise<{ error: string | 
   return { error: error?.message ?? null }
 }
 
-// ─── Amenities ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Amenities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchAmenities(): Promise<{ data: Amenity[]; error: string | null }> {
   const supabase = createClient()
@@ -568,7 +568,7 @@ export async function syncProjectAmenities(projectId: number, amenityIds: number
   return { error: error?.message ?? null }
 }
 
-// ─── Property Types ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Property Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchPropertyTypes(): Promise<{ data: PropertyType[]; error: string | null }> {
   const supabase = createClient()
@@ -599,7 +599,7 @@ export async function syncProjectPropertyTypes(projectId: number, typeIds: numbe
   return { error: error?.message ?? null }
 }
 
-// ─── Project Stats / Completeness ────────────────────────────────────────────
+// â”€â”€â”€ Project Stats / Completeness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchProjectStats(projectId: number): Promise<{ data: ProjectStats | null; error: string | null }> {
   const supabase = createClient()
@@ -635,7 +635,7 @@ export async function fetchProjectStats(projectId: number): Promise<{ data: Proj
   }
 }
 
-// ─── Developers ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Developers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchDevelopersForSelect(): Promise<{ data: Developer[]; error: string | null }> {
   const supabase = createClient()

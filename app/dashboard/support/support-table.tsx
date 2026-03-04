@@ -60,7 +60,7 @@ const PRIORITY_LABEL: Record<SupportTicketPriority, string> = {
 
 function formatDate(value: string) {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "—"
+  if (Number.isNaN(date.getTime())) return "â€”"
   return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
 }
 
@@ -94,7 +94,7 @@ function ToastStack({ toasts, remove }: { toasts: Array<{ id: number; type: Toas
           className={`flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold pointer-events-auto max-w-xs ${toast.type === "success" ? "bg-green-50 text-green-800 border border-green-100" : "bg-rose-50 text-rose-800 border border-rose-100"}`}
         >
           <span className="flex-1">{toast.text}</span>
-          <button type="button" onClick={() => remove(toast.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
+          <button type="button" onClick={() => remove(toast.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
         </div>
       ))}
     </div>
@@ -118,7 +118,7 @@ function QuickViewDialog({
         <div className="pointer-events-auto w-full max-w-2xl bg-white rounded-[24px] shadow-2xl p-6 space-y-4" onClick={(event) => event.stopPropagation()}>
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117]">{ticket.title}</h3>
+              <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{ticket.title}</h3>
               <p className="text-xs text-[#9ca3af] mt-1">{ticket.id}</p>
             </div>
             <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-[#f3f4f6] flex items-center justify-center text-[#9ca3af]">
@@ -167,7 +167,7 @@ function ShortcutModal({
         <div className="pointer-events-auto w-full max-w-3xl bg-white rounded-[24px] shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117]">{title}</h3>
+              <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{title}</h3>
               {subtitle && <p className="text-xs text-[#9ca3af] mt-1">{subtitle}</p>}
             </div>
             <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-[#f3f4f6] flex items-center justify-center text-[#9ca3af]">
@@ -301,7 +301,7 @@ export function SupportTable({
               <AlertCircle className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-[#0d1117]">Support Tickets</h1>
+              <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">Support Tickets</h1>
               <p className="text-sm text-[#6b7280]">
                 {isAdmin
                   ? "Manage and triage every support ticket for the team."
@@ -322,7 +322,7 @@ export function SupportTable({
         {!isAdmin && (
           <div className="rounded-[24px] border border-[#e5e7eb] bg-[#f8fafc] px-5 py-4 text-sm text-[#0f172a] space-y-1">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#6b7280]">Personal View</p>
-            <p>We only expose tickets you submitted so your teammates can’t see your requests. We’ll ping you here as soon as the team updates the status.</p>
+            <p>We only expose tickets you submitted so your teammates canâ€™t see your requests. Weâ€™ll ping you here as soon as the team updates the status.</p>
           </div>
         )}
 
@@ -438,12 +438,12 @@ export function SupportTable({
                         </div>
                       </td>
                       {isAdmin && (
-                        <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">{ticket.reported_by_profile?.fullname ?? "—"}</td>
+                        <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">{ticket.reported_by_profile?.fullname ?? "â€”"}</td>
                       )}
                       <td className="px-4 py-3.5 whitespace-nowrap"><PriorityBadge value={ticket.priority} /></td>
                       <td className="px-4 py-3.5 whitespace-nowrap"><StatusBadge value={ticket.status} /></td>
                       {isAdmin && (
-                        <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">{ticket.assigned_to_profile?.fullname ?? "—"}</td>
+                        <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">{ticket.assigned_to_profile?.fullname ?? "â€”"}</td>
                       )}
                       <td className="px-4 py-3.5 whitespace-nowrap text-[#6b7280]">{formatDate(ticket.created_at)}</td>
                       <td className="px-4 py-3.5 pr-6 whitespace-nowrap">
@@ -499,7 +499,7 @@ export function SupportTable({
           </div>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-6 py-3.5 border-t border-[#f0f2f5] bg-white/40">
-            <p className="text-xs text-[#9ca3af]">Showing {total === 0 ? 0 : (page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}</p>
+            <p className="text-xs text-[#9ca3af]">Showing {total === 0 ? 0 : (page - 1) * perPage + 1}â€“{Math.min(page * perPage, total)} of {total}</p>
             <div className="flex items-center gap-2">
               <select value={perPage} onChange={(event) => { setPerPage(Number(event.target.value) as 10 | 20 | 50); setPage(1) }} className="pl-3 pr-8 py-1.5 rounded-xl border border-[#e5e5e5] text-xs bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer">
                 {PER_PAGE_OPTIONS.map((option) => <option key={option} value={option}>{option} / page</option>)}
@@ -536,7 +536,7 @@ export function SupportTable({
       <ShortcutModal
         open={Boolean(statusTicket)}
         title="Update Ticket Status"
-        subtitle={statusTicket ? `${statusTicket.title} · ${statusTicket.id}` : undefined}
+        subtitle={statusTicket ? `${statusTicket.title} Â· ${statusTicket.id}` : undefined}
         onClose={() => setStatusTicket(null)}
       >
         {statusTicket && (
@@ -572,7 +572,7 @@ export function SupportTable({
       <ShortcutModal
         open={Boolean(commentsTicket)}
         title="Support Ticket Comments"
-        subtitle={commentsTicket ? `${commentsTicket.title} · ${commentsTicket.id}` : undefined}
+        subtitle={commentsTicket ? `${commentsTicket.title} Â· ${commentsTicket.id}` : undefined}
         onClose={() => setCommentsTicket(null)}
       >
         {commentsTicket && (
@@ -588,7 +588,7 @@ export function SupportTable({
       <ShortcutModal
         open={Boolean(attachmentsTicket)}
         title="Support Ticket Attachments"
-        subtitle={attachmentsTicket ? `${attachmentsTicket.title} · ${attachmentsTicket.id}` : undefined}
+        subtitle={attachmentsTicket ? `${attachmentsTicket.title} Â· ${attachmentsTicket.id}` : undefined}
         onClose={() => setAttachmentsTicket(null)}
       >
         {attachmentsTicket && (

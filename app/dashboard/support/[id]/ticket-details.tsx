@@ -36,9 +36,9 @@ const STATUS_LABEL: Record<SupportTicketStatus, string> = {
 }
 
 function formatDate(value: string | null) {
-  if (!value) return "—"
+  if (!value) return "â€”"
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "—"
+  if (Number.isNaN(date.getTime())) return "â€”"
   return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
 }
 
@@ -67,7 +67,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">{label}</span>
-      <span className="text-sm text-[#0d1117] font-medium">{value ?? <span className="text-[#9ca3af]">—</span>}</span>
+      <span className="text-sm text-[#0d1117] font-medium">{value ?? <span className="text-[#9ca3af]">â€”</span>}</span>
     </div>
   )
 }
@@ -154,7 +154,7 @@ export function TicketDetails({
         </div>
 
         <div className="bg-white/60 backdrop-blur-xl rounded-[20px] border border-white/60 shadow-sm shadow-black/5 p-6">
-          <h3 className="font-['Space_Grotesk'] text-sm font-bold text-[#0d1117] uppercase tracking-wider mb-4">Environment Details</h3>
+          <h3 className="font-['Outfit'] text-sm font-bold text-[#0d1117] uppercase tracking-wider mb-4">Environment Details</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
             <DetailRow label="Device Type" value={ticket.device_type} />
             <DetailRow label="Device OS" value={ticket.device_os} />
@@ -170,7 +170,7 @@ export function TicketDetails({
 
         {isAdmin && (
           <div className="bg-white/60 backdrop-blur-xl rounded-[20px] border border-white/60 shadow-sm shadow-black/5 p-6">
-            <h3 className="font-['Space_Grotesk'] text-sm font-bold text-[#0d1117] uppercase tracking-wider mb-4">Admin Actions</h3>
+            <h3 className="font-['Outfit'] text-sm font-bold text-[#0d1117] uppercase tracking-wider mb-4">Admin Actions</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-[#374151] ml-1 mb-2 block">Update Status</label>
@@ -244,7 +244,7 @@ export function TicketDetails({
           <Link href="/dashboard/support" className="inline-flex items-center gap-1.5 text-xs text-[#6b7280] hover:text-[#001f3f] transition-colors mb-3">
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Support Tickets
           </Link>
-          <h1 className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-[#0d1117]">{ticket?.title ?? "Support Ticket"}</h1>
+          <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">{ticket?.title ?? "Support Ticket"}</h1>
           <p className="text-sm text-[#6b7280]">Ticket details, attachments, and discussion</p>
         </div>
         {ticket && (
@@ -309,7 +309,7 @@ export function TicketDetails({
             className={`flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold pointer-events-auto max-w-xs ${toast.type === "success" ? "bg-green-50 text-green-800 border border-green-100" : "bg-rose-50 text-rose-800 border border-rose-100"}`}
           >
             <span className="flex-1">{toast.text}</span>
-            <button type="button" onClick={() => setToasts((prev) => prev.filter((item) => item.id !== toast.id))} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
+            <button type="button" onClick={() => setToasts((prev) => prev.filter((item) => item.id !== toast.id))} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
           </div>
         ))}
       </div>

@@ -92,7 +92,7 @@ export function SaleActions({
               ref={menuRef}
               className="bg-white rounded-2xl border border-[#f0f0f0] shadow-2xl py-1.5 min-w-[210px] mt-1"
             >
-              {/* View Sale — all roles */}
+              {/* View Sale â€” all roles */}
               <button
                 type="button"
                 onClick={() => act(onView)}

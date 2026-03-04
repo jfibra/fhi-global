@@ -66,7 +66,7 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
             <Building2 className="w-3.5 h-3.5 text-[#d6b357]" />
             Trusted Developers
           </div>
-          <h1 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold text-white leading-tight mb-3" style={{ textShadow: "0 2px 20px rgba(0,0,0,0.4)" }}>
+          <h1 className="font-['Outfit'] text-4xl md:text-5xl font-bold text-white leading-tight mb-3" style={{ textShadow: "0 2px 20px rgba(0,0,0,0.4)" }}>
             Dubai&apos;s Top Real Estate<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">Developers</span>
           </h1>
@@ -101,7 +101,7 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
             <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#001f3f]/6 to-[#d6b357]/6 border border-[#e8eaed] flex items-center justify-center mb-5 shadow-sm">
               <Building2 className="w-9 h-9 text-[#001f3f]/30" />
             </div>
-            <h3 className="font-['Space_Grotesk'] font-bold text-[#0d1117] text-xl mb-2">No developers found</h3>
+            <h3 className="font-['Outfit'] font-bold text-[#0d1117] text-xl mb-2">No developers found</h3>
             <p className="text-sm text-[#6b7280] max-w-xs">Try adjusting your search criteria or browse all developers.</p>
           </div>
         )}

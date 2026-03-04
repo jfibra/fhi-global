@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createPageMetadata } from "@/lib/seo";
@@ -179,9 +179,9 @@ export default async function HomePage() {
       <Header />
       <HeroSection developers={devOptions} cities={uniqueCities} />
 
-      {/* ─────────────────────────────────────────────── */}
+      {/* ----------------------------------------------- */}
       {/* STATS BANNER                                    */}
-      {/* ─────────────────────────────────────────────── */}
+      {/* ----------------------------------------------- */}
       {/* <section className="relative bg-gradient-to-r from-[#001f3f] to-[#002a52] overflow-hidden">
         <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
         <div className="absolute inset-0 bg-gradient-to-r from-[#d6b357]/10 via-transparent to-[#d6b357]/5" />
@@ -193,7 +193,7 @@ export default async function HomePage() {
                   <Icon className="w-5 h-5 text-[#d6b357]" />
                 </div>
                 <div>
-                  <p className="font-['Space_Grotesk'] text-2xl font-bold text-white leading-none">{value}</p>
+                  <p className="font-['Outfit'] text-2xl font-bold text-white leading-none">{value}</p>
                   <p className="text-xs text-white/50 mt-0.5">{label}</p>
                 </div>
               </div>
@@ -203,9 +203,9 @@ export default async function HomePage() {
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/40 to-transparent" />
       </section> */}
 
-      {/* ─────────────────────────────────────────────── */}
+      {/* ----------------------------------------------- */}
       {/* FEATURED DEVELOPERS                             */}
-      {/* ─────────────────────────────────────────────── */}
+      {/* ----------------------------------------------- */}
       {developers && developers.length > 0 && (
         <section className="py-24 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -216,7 +216,7 @@ export default async function HomePage() {
                   <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2" />
                   Our Partners
                 </div>
-                <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold tracking-tight">
+                <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight">
                   Featured{" "}
                   <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
                     Developers
@@ -252,9 +252,9 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ─────────────────────────────────────────────── */}
+      {/* ----------------------------------------------- */}
       {/* FEATURED PROJECTS                               */}
-      {/* ─────────────────────────────────────────────── */}
+      {/* ----------------------------------------------- */}
       {featuredProjects && featuredProjects.length > 0 && (
         <section className="py-24 bg-[#f5f3ef]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -264,7 +264,7 @@ export default async function HomePage() {
                   <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2 animate-pulse" />
                   Hand-Picked Selection
                 </div>
-                <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold tracking-tight">
+                <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight">
                   Featured{" "}
                   <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
                     Projects
@@ -290,9 +290,9 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ─────────────────────────────────────────────── */}
+      {/* ----------------------------------------------- */}
       {/* WHY CHOOSE US                                   */}
-      {/* ─────────────────────────────────────────────── */}
+      {/* ----------------------------------------------- */}
       <section className="relative py-24 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
@@ -311,7 +311,7 @@ export default async function HomePage() {
               <span className="w-2 h-2 bg-[#001f3f] rounded-full mr-2" />
               Why FHI Global
             </div>
-            <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold tracking-tight mb-4">
+            <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight mb-4">
               Your Trusted{" "}
               <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
                 Real Estate Partner
@@ -334,7 +334,7 @@ export default async function HomePage() {
                   <Icon className="w-5 h-5 text-[#001f3f] group-hover:text-[#d6b357] transition-colors duration-300" />
                 </div>
                 <div>
-                  <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117] mb-2">
+                  <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117] mb-2">
                     {title}
                   </h3>
                   <p className="text-sm text-[#555] leading-relaxed">{desc}</p>
@@ -350,9 +350,9 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ─────────────────────────────────────────────── */}
+      {/* ----------------------------------------------- */}
       {/* CALL TO ACTION                                  */}
-      {/* ─────────────────────────────────────────────── */}
+      {/* ----------------------------------------------- */}
       <section className="relative overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
@@ -383,7 +383,7 @@ export default async function HomePage() {
               <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357] animate-pulse" />
               Ready to Invest?
             </div>
-            <h2 className="font-['Space_Grotesk'] text-4xl md:text-6xl font-bold text-white leading-[1.1] mb-5 tracking-tight">
+            <h2 className="font-['Outfit'] text-4xl md:text-6xl font-bold text-white leading-[1.1] mb-5 tracking-tight">
               Start Exploring
               <br />
               <span className="bg-gradient-to-r from-[#d6b357] to-[#f0d890] bg-clip-text text-transparent">

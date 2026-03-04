@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type TaxType = "vat" | "non_vat"
 
@@ -73,7 +73,7 @@ export type PurchasesListResponse = {
 type SortField = "invoice_number" | "tax_month" | "total_actual_amount" | "created_at"
 type SortDir = "asc" | "desc"
 
-// ─── Normalizer ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Normalizer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function normalizePurchase(row: unknown): Purchase {
   const raw = row as Record<string, unknown>
@@ -155,7 +155,7 @@ function normalizeAttachment(row: unknown): PurchaseAttachment {
   }
 }
 
-// ─── Reference data ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Reference data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchTaxEntitiesForPurchase(): Promise<{
   data: TaxEntityOption[] | null
@@ -205,7 +205,7 @@ export async function fetchCategoriesForPurchase(): Promise<{
   }
 }
 
-// ─── CRUD ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchPurchases(params: {
   page: number
@@ -355,7 +355,7 @@ export async function softDeletePurchase(
   return { error: error ? error.message : null }
 }
 
-// ─── Attachments ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Attachments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchAttachments(
   purchaseId: string,

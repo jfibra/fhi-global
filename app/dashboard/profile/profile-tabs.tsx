@@ -16,7 +16,7 @@ const TABS: Array<{ key: TabKey; label: string }> = [
   { key: "bank_accounts", label: "Bank Accounts" },
 ]
 
-// ─── Timezone options ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Timezone options â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TIMEZONES = [
   { label: "UTC (UTC +00:00)", value: "UTC" },
   { label: "London (UTC +00:00)", value: "Europe/London" },
@@ -44,27 +44,27 @@ const TIMEZONES = [
   { label: "Honolulu (UTC -10:00)", value: "Pacific/Honolulu" },
 ]
 
-// ─── Country codes ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Country codes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const COUNTRY_CODES = [
-  { label: "🇦🇪 +971", value: "+971" }, // UAE (first — target market)
-  { label: "🇵🇭 +63",  value: "+63" },
-  { label: "🇮🇳 +91",  value: "+91" },
-  { label: "🇵🇰 +92",  value: "+92" },
-  { label: "🇧🇩 +880", value: "+880" },
-  { label: "🇱🇰 +94",  value: "+94" },
-  { label: "🇬🇧 +44",  value: "+44" },
-  { label: "🇺🇸 +1",   value: "+1" },
-  { label: "🇨🇦 +1",   value: "+1-CA" },
-  { label: "🇦🇺 +61",  value: "+61" },
-  { label: "🇸🇬 +65",  value: "+65" },
-  { label: "🇲🇾 +60",  value: "+60" },
-  { label: "🇮🇩 +62",  value: "+62" },
-  { label: "🇳🇬 +234", value: "+234" },
-  { label: "🇿🇦 +27",  value: "+27" },
-  { label: "🇪🇬 +20",  value: "+20" },
+  { label: "ðŸ‡¦ðŸ‡ª +971", value: "+971" }, // UAE (first â€” target market)
+  { label: "ðŸ‡µðŸ‡­ +63",  value: "+63" },
+  { label: "ðŸ‡®ðŸ‡³ +91",  value: "+91" },
+  { label: "ðŸ‡µðŸ‡° +92",  value: "+92" },
+  { label: "ðŸ‡§ðŸ‡© +880", value: "+880" },
+  { label: "ðŸ‡±ðŸ‡° +94",  value: "+94" },
+  { label: "ðŸ‡¬ðŸ‡§ +44",  value: "+44" },
+  { label: "ðŸ‡ºðŸ‡¸ +1",   value: "+1" },
+  { label: "ðŸ‡¨ðŸ‡¦ +1",   value: "+1-CA" },
+  { label: "ðŸ‡¦ðŸ‡º +61",  value: "+61" },
+  { label: "ðŸ‡¸ðŸ‡¬ +65",  value: "+65" },
+  { label: "ðŸ‡²ðŸ‡¾ +60",  value: "+60" },
+  { label: "ðŸ‡®ðŸ‡© +62",  value: "+62" },
+  { label: "ðŸ‡³ðŸ‡¬ +234", value: "+234" },
+  { label: "ðŸ‡¿ðŸ‡¦ +27",  value: "+27" },
+  { label: "ðŸ‡ªðŸ‡¬ +20",  value: "+20" },
 ]
 
-// ─── Phone input sub-component ────────────────────────────────────────────────
+// â”€â”€â”€ Phone input sub-component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function PhoneField({
   label,
   icon: Icon,
@@ -109,7 +109,7 @@ function PhoneField({
   )
 }
 
-// ─── Password strength ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Password strength â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type PwdStrength = { score: number; label: string; color: string }
 
 const PWD_RULES = [
@@ -128,7 +128,7 @@ function getStrength(password: string): PwdStrength {
   return           { score, label: "Strong", color: "#10b981" }
 }
 
-// ─── Metadata helpers ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Metadata helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type MetadataShape = {
   phone_country_code?: string
   phone_number?: string
@@ -212,9 +212,9 @@ export function ProfileTabs({
   }, [hasUnsavedChanges])
 
   const joinedDate = useMemo(() => {
-    if (!profile.joined_at) return "—"
+    if (!profile.joined_at) return "â€”"
     const date = new Date(profile.joined_at)
-    return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString()
+    return Number.isNaN(date.getTime()) ? "â€”" : date.toLocaleString()
   }, [profile.joined_at])
 
   const handleProfileFieldChange = (key: keyof typeof profileInfo, value: string) => {
@@ -385,7 +385,7 @@ export function ProfileTabs({
 
   return (
     <section className="bg-white/60 backdrop-blur-2xl rounded-[24px] border border-white/60 shadow-xl shadow-black/5 overflow-hidden">
-      {/* ── Tab Bar ── */}
+      {/* â”€â”€ Tab Bar â”€â”€ */}
       <div className="border-b border-[#f0f0f0] px-6 pt-5">
         <div className="flex flex-wrap gap-2 pb-0">
           {TABS.map((tab) => (
@@ -408,7 +408,7 @@ export function ProfileTabs({
 
       <div className="p-6 md:p-8">
 
-        {/* ── Profile Info Tab ── */}
+        {/* â”€â”€ Profile Info Tab â”€â”€ */}
         {activeTab === "profile" && (
           <div className="space-y-5">
 
@@ -444,7 +444,7 @@ export function ProfileTabs({
             <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-[#f8fafc] border border-[#f0f0f0] text-sm text-[#6b7280]">
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">Full name preview</span>
               <span className="font-medium text-[#374151]">
-                {[profileInfo.fname, profileInfo.mname, profileInfo.lname].map(p => p.trim()).filter(Boolean).join(" ") || "—"}
+                {[profileInfo.fname, profileInfo.mname, profileInfo.lname].map(p => p.trim()).filter(Boolean).join(" ") || "â€”"}
               </span>
             </div>
 
@@ -532,14 +532,14 @@ export function ProfileTabs({
                 className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
               >
                 {busySection === "profile" ? (
-                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Savingâ€¦</>
                 ) : "Save Profile Info"}
               </button>
             </div>
           </div>
         )}
 
-        {/* ── Personal Info Tab ── */}
+        {/* â”€â”€ Personal Info Tab â”€â”€ */}
         {activeTab === "personal" && (
           <div className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -581,14 +581,14 @@ export function ProfileTabs({
                 className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
               >
                 {busySection === "personal" ? (
-                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Savingâ€¦</>
                 ) : "Save Personal Info"}
               </button>
             </div>
           </div>
         )}
 
-        {/* ── Account Settings Tab ── */}
+        {/* â”€â”€ Account Settings Tab â”€â”€ */}
         {activeTab === "account" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
@@ -606,12 +606,12 @@ export function ProfileTabs({
           </div>
         )}
 
-        {/* ── Bank Accounts Tab ── */}
+        {/* â”€â”€ Bank Accounts Tab â”€â”€ */}
         {activeTab === "bank_accounts" && (
           <BankAccountsTab userId={userId} />
         )}
 
-        {/* ── Security Tab ── */}
+        {/* â”€â”€ Security Tab â”€â”€ */}
         {activeTab === "security" && (
           <div className="space-y-5 max-w-xl">
 
@@ -741,7 +741,7 @@ export function ProfileTabs({
                 className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
               >
                 {busySection === "password" ? (
-                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Updating…</>
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Updatingâ€¦</>
                 ) : "Change Password"}
               </button>
             </div>

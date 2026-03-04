@@ -1,4 +1,4 @@
-﻿import Link from "next/link"
+import Link from "next/link"
 import Image from "next/image"
 import { MapPin, ArrowRight, Building2 } from "lucide-react"
 
@@ -82,7 +82,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
           )}
           {is_featured && (
             <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-gradient-to-r from-[#d6b357] to-[#f0d890] text-[#001f3f] border border-[#d6b357]/50">
-              ★ Featured
+              ? Featured
             </span>
           )}
         </div>
@@ -103,7 +103,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
       {/* Body */}
       <div className="p-5">
         {/* Project Name */}
-        <h3 className="font-['Space_Grotesk'] font-bold text-[#0d1117] text-base leading-snug mb-2 line-clamp-1 group-hover:text-[#001f3f] transition-colors">
+        <h3 className="font-['Outfit'] font-bold text-[#0d1117] text-base leading-snug mb-2 line-clamp-1 group-hover:text-[#001f3f] transition-colors">
           {name}
         </h3>
 
@@ -121,7 +121,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             {launch_price_from ? (
               <>
                 <span className="text-[10px] font-medium text-[#9ca3af] uppercase tracking-wider">Starting from</span>
-                <p className="font-['Space_Grotesk'] font-bold text-[#0d1117] text-base leading-none mt-0.5 group-hover:text-[#001f3f] transition-colors">
+                <p className="font-['Outfit'] font-bold text-[#0d1117] text-base leading-none mt-0.5 group-hover:text-[#001f3f] transition-colors">
                   {formatPrice(launch_price_from, currency ?? "AED")}
                 </p>
               </>

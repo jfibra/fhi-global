@@ -91,7 +91,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
 
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2 flex-wrap">
-                <h1 className="font-['Space_Grotesk'] text-3xl md:text-4xl font-bold text-white" style={{ textShadow: "0 2px 20px rgba(0,0,0,0.4)" }}>
+                <h1 className="font-['Outfit'] text-3xl md:text-4xl font-bold text-white" style={{ textShadow: "0 2px 20px rgba(0,0,0,0.4)" }}>
                   {developer.name}
                 </h1>
                 {developer.is_verified && (
@@ -164,7 +164,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
             <div className="inline-flex items-center px-3 py-1.5 bg-[#fdf9f0] border border-[#d6b357]/25 rounded-full text-xs font-semibold uppercase tracking-wider mb-3 shadow-sm">
               <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2" /> About
             </div>
-            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#0d1117] mb-2">About {developer.name}</h2>
+            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mb-2">About {developer.name}</h2>
             <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
             <p className="text-[#374151] leading-relaxed whitespace-pre-line">{developer.description}</p>
           </section>
@@ -177,7 +177,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
               <div className="inline-flex items-center px-3 py-1.5 bg-white border border-[#e5e5e5] rounded-full text-xs font-semibold uppercase tracking-wider mb-3 shadow-sm">
                 <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2" /> Portfolio
               </div>
-              <h2 className="font-['Space_Grotesk'] text-2xl font-bold text-[#0d1117] leading-tight">
+              <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] leading-tight">
                 Projects by{" "}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">{developer.name}</span>
               </h2>
@@ -201,7 +201,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
               <div className="w-14 h-14 rounded-2xl bg-[#001f3f]/6 flex items-center justify-center mb-4">
                 <Building2 className="w-7 h-7 text-[#001f3f]/25" />
               </div>
-              <p className="font-['Space_Grotesk'] font-semibold text-[#0d1117] text-sm mb-1">No projects yet</p>
+              <p className="font-['Outfit'] font-semibold text-[#0d1117] text-sm mb-1">No projects yet</p>
               <p className="text-[#6b7280] text-xs">This developer hasn&apos;t published any projects.</p>
             </div>
           )}

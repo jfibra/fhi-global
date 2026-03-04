@@ -10,7 +10,7 @@ import {
 
 function formatDateTime(value: string) {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "—"
+  if (Number.isNaN(date.getTime())) return "â€”"
   return date.toLocaleString("en-US", {
     year: "numeric",
     month: "short",

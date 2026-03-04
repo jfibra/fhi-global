@@ -28,7 +28,7 @@ import {
   updateTaxEntity,
 } from "@/lib/tax-entity-service"
 
-// UAE TRN is 15 digits — formatted as XXX-XXXXXXX-XXXXX
+// UAE TRN is 15 digits â€” formatted as XXX-XXXXXXX-XXXXX
 const TRN_REGEX = /^[0-9]{15}$/
 
 function formatTRN(raw: string): string {
@@ -317,7 +317,7 @@ export function TaxEntityFormDialog({
                 {viewMode ? <Landmark className="w-5 h-5 text-white" /> : editEntity ? <Pencil className="w-5 h-5 text-white" /> : <Plus className="w-5 h-5 text-white" />}
               </div>
               <div>
-                <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117]">{title}</h3>
+                <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{title}</h3>
                 <p className="text-xs text-[#6b7280]">{subtitle}</p>
               </div>
             </div>
@@ -331,7 +331,7 @@ export function TaxEntityFormDialog({
           </div>
 
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-            {/* ── Section: identity ── */}
+            {/* â”€â”€ Section: identity â”€â”€ */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
               {/* Registered Name */}
@@ -381,7 +381,7 @@ export function TaxEntityFormDialog({
                 </div>
                 {errors.tax_registration_number
                   ? <p className="text-xs text-rose-500 mt-1 ml-1">{errors.tax_registration_number}</p>
-                  : <p className="text-[11px] text-[#9ca3af] mt-1 ml-1">UAE VAT TRN · 15 digits · XXX-XXXXXXX-XXXXX</p>
+                  : <p className="text-[11px] text-[#9ca3af] mt-1 ml-1">UAE VAT TRN Â· 15 digits Â· XXX-XXXXXXX-XXXXX</p>
                 }
               </div>
 
@@ -561,7 +561,7 @@ export function TaxEntityFormDialog({
                 {errors.currency_code && <p className="text-xs text-rose-500 mt-1 ml-1">{errors.currency_code}</p>}
               </div>
 
-              {/* ── Toggles ── */}
+              {/* â”€â”€ Toggles â”€â”€ */}
               <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3">
                 {([
                   { key: "vat_registered" as const, label: "VAT Registered", desc: "Include VAT in calculations" },
@@ -617,7 +617,7 @@ export function TaxEntityFormDialog({
                 {busy ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Saving…
+                    Savingâ€¦
                   </>
                 ) : editEntity ? (
                   <>

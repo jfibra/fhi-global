@@ -1,4 +1,4 @@
-﻿import Link from "next/link"
+import Link from "next/link"
 import Image from "next/image"
 import { Building2, Star, BadgeCheck, ArrowRight } from "lucide-react"
 
@@ -51,7 +51,7 @@ export function DeveloperCard({ developer }: DeveloperCardProps) {
       <div className="p-6">
         {/* Name + verified */}
         <div className="flex items-start justify-between gap-2 mb-2">
-          <h3 className="font-['Space_Grotesk'] font-bold text-[#0d1117] text-base leading-tight group-hover:text-[#001f3f] transition-colors">
+          <h3 className="font-['Outfit'] font-bold text-[#0d1117] text-base leading-tight group-hover:text-[#001f3f] transition-colors">
             {name}
           </h3>
           {is_verified && (

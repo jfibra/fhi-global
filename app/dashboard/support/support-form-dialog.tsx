@@ -177,7 +177,7 @@ export function SupportFormDialog({
                   <AlertCircle className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h2 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117]">Create Support Ticket</h2>
+                  <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Create Support Ticket</h2>
                   <p className="text-xs text-[#9ca3af] mt-0.5">Report and track system issues.</p>
                 </div>
               </div>
@@ -191,7 +191,7 @@ export function SupportFormDialog({
 
           <div className="flex-1 overflow-y-auto px-7 py-6 space-y-6">
             <div>
-              <h3 className="font-['Space_Grotesk'] text-sm font-bold text-[#0d1117] uppercase tracking-wider mb-4">Issue Information</h3>
+              <h3 className="font-['Outfit'] text-sm font-bold text-[#0d1117] uppercase tracking-wider mb-4">Issue Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <FieldLabel text="Title" required />
@@ -221,7 +221,7 @@ export function SupportFormDialog({
             </div>
 
             <div>
-              <h3 className="font-['Space_Grotesk'] text-sm font-bold text-[#0d1117] uppercase tracking-wider mb-4">Issue Location</h3>
+              <h3 className="font-['Outfit'] text-sm font-bold text-[#0d1117] uppercase tracking-wider mb-4">Issue Location</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <FieldLabel text="Page URL" />
@@ -235,7 +235,7 @@ export function SupportFormDialog({
             </div>
 
             <div>
-              <h3 className="font-['Space_Grotesk'] text-sm font-bold text-[#0d1117] uppercase tracking-wider mb-4">Screenshot Attachments</h3>
+              <h3 className="font-['Outfit'] text-sm font-bold text-[#0d1117] uppercase tracking-wider mb-4">Screenshot Attachments</h3>
               <div
                 onDragOver={(event) => { event.preventDefault(); setDragOver(true) }}
                 onDragLeave={() => setDragOver(false)}
@@ -255,7 +255,7 @@ export function SupportFormDialog({
                 </div>
                 <div className="text-center">
                   <p className="text-sm font-semibold text-[#374151]">Click to add files or drag & drop</p>
-                  <p className="text-xs text-[#9ca3af] mt-0.5">Images, PDFs, docs — max 25 MB each</p>
+                  <p className="text-xs text-[#9ca3af] mt-0.5">Images, PDFs, docs â€” max 25 MB each</p>
                 </div>
               </div>
               <input

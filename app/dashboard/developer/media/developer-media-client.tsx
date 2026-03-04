@@ -26,7 +26,7 @@ import {
 } from "@/lib/developer-portal-service"
 import { createClient } from "@/lib/supabase/client"
 
-// ─── Toast ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type ToastVariant = "success" | "error"
 interface ToastMsg { id: number; variant: ToastVariant; message: string }
 
@@ -38,21 +38,21 @@ function ToastList({ toasts, remove }: { toasts: ToastMsg[]; remove: (id: number
           t.variant === "success" ? "bg-green-50 text-green-800 border border-green-100" : "bg-rose-50 text-rose-800 border border-rose-100"
         }`}>
           <span className="flex-1">{t.message}</span>
-          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
+          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
         </div>
       ))}
     </div>
   )
 }
 
-// ─── Media type icon ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Media type icon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function MediaTypeIcon({ type }: { type: string }) {
   if (type === "video")        return <Video className="w-4 h-4 text-blue-500" />
   if (type === "virtual_tour") return <Globe className="w-4 h-4 text-violet-500" />
   return <ImageIcon className="w-4 h-4 text-indigo-500" />
 }
 
-// ─── Media type label ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Media type label â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function MediaTypeLabel({ type }: { type: string }) {
   const MAP: Record<string, { label: string; cls: string }> = {
     image:        { label: "Image",        cls: "bg-indigo-100 text-indigo-700" },
@@ -67,7 +67,7 @@ function MediaTypeLabel({ type }: { type: string }) {
   )
 }
 
-// ─── Upload Modal ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Upload Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function UploadModal({
   developerId,
   developerSlug,
@@ -179,7 +179,7 @@ function UploadModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div className="relative bg-white rounded-[28px] p-7 max-w-md w-full shadow-2xl border border-white/60">
-        <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117] mb-1">Upload Media</h3>
+        <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117] mb-1">Upload Media</h3>
         <p className="text-xs text-[#9ca3af] mb-5">For: <span className="font-semibold text-[#374151]">{projectName}</span></p>
 
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
@@ -236,7 +236,7 @@ function UploadModal({
                   <Upload className="w-8 h-8" />
                   <p className="text-sm font-semibold text-[#374151]">Drop file or click to upload</p>
                   <p className="text-xs">
-                    {mediaType === "image" ? "PNG, JPG, WEBP • Max 50 MB" : "PDF • Max 50 MB"}
+                    {mediaType === "image" ? "PNG, JPG, WEBP â€¢ Max 50 MB" : "PDF â€¢ Max 50 MB"}
                   </p>
                 </div>
               )}
@@ -258,7 +258,7 @@ function UploadModal({
             <button type="submit" disabled={uploading}
               className="flex-1 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
               {uploading ? (
-                <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploading…</>
+                <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploadingâ€¦</>
               ) : (
                 <><Upload className="w-4 h-4" /> Upload</>
               )}
@@ -270,7 +270,7 @@ function UploadModal({
   )
 }
 
-// ─── No developer placeholder ─────────────────────────────────────────────────
+// â”€â”€â”€ No developer placeholder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function NoDeveloperLinked({ userName }: { userName: string }) {
   return (
     <DashboardShell role="developer" roleLabel={roleToLabel("developer")} roleColor={getRoleColor("developer")} userName={userName}>
@@ -285,7 +285,7 @@ function NoDeveloperLinked({ userName }: { userName: string }) {
   )
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function DeveloperMediaClient({
   userId,
   userName,
@@ -368,7 +368,7 @@ export function DeveloperMediaClient({
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-[#0d1117]">
+            <h2 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">
               Media &amp; Files
             </h2>
             <p className="text-sm text-[#6b7280] mt-1">
@@ -388,7 +388,7 @@ export function DeveloperMediaClient({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search media…"
+              placeholder="Search mediaâ€¦"
               className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-[#e5e5e5] bg-white focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/10 transition-all"
             />
           </div>

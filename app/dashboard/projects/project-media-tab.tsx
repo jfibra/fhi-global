@@ -48,7 +48,7 @@ export function ProjectMediaTab({ projectId, showToast }: Props) {
   return (
     <div className="max-w-3xl space-y-5">
       <div className="flex items-center justify-between">
-        <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#001f3f]">Videos & Virtual Tours</h3>
+        <h3 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">Videos & Virtual Tours</h3>
         <button type="button" onClick={() => setAdding(true)}
           className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
           <Plus className="w-3.5 h-3.5" /> Add Media
@@ -69,7 +69,7 @@ export function ProjectMediaTab({ projectId, showToast }: Props) {
             <div>
               <label className="block text-xs font-semibold text-[#6b7280] mb-1.5">URL *</label>
               <input type="url" value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
-                placeholder="https://…"
+                placeholder="https://â€¦"
                 className="w-full border border-[#e5e5e5] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#001f3f]/20 focus:border-[#001f3f]" />
             </div>
           </div>
@@ -78,7 +78,7 @@ export function ProjectMediaTab({ projectId, showToast }: Props) {
               className="px-4 py-2 rounded-full border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-all">Cancel</button>
             <button type="button" onClick={() => void handleAdd()} disabled={saving || !form.url.trim()}
               className="px-4 py-2 rounded-full bg-[#001f3f] text-white text-sm font-semibold disabled:opacity-50 hover:bg-[#001f3f]/90 transition-all">
-              {saving ? "Saving…" : "Add"}
+              {saving ? "Savingâ€¦" : "Add"}
             </button>
           </div>
         </div>

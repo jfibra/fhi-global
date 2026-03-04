@@ -17,7 +17,7 @@ import {
   type PurchaseAttachment,
 } from "@/lib/purchase-service"
 
-// ─── Portal ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Portal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -26,25 +26,25 @@ function Portal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body)
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function formatDate(value: string) {
-  if (!value) return "—"
+  if (!value) return "â€”"
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "—"
+  if (Number.isNaN(date.getTime())) return "â€”"
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
 function fileIcon(fileType: string | null) {
   const t = (fileType ?? "").toLowerCase()
-  if (["jpg", "jpeg", "png", "gif", "webp"].includes(t)) return "🖼️"
-  if (t === "pdf") return "📄"
-  if (["doc", "docx"].includes(t)) return "📝"
-  if (["xls", "xlsx", "csv"].includes(t)) return "📊"
-  return "📎"
+  if (["jpg", "jpeg", "png", "gif", "webp"].includes(t)) return "ðŸ–¼ï¸"
+  if (t === "pdf") return "ðŸ“„"
+  if (["doc", "docx"].includes(t)) return "ðŸ“"
+  if (["xls", "xlsx", "csv"].includes(t)) return "ðŸ“Š"
+  return "ðŸ“Ž"
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function PurchaseAttachmentsDialog({
   open,
@@ -165,9 +165,9 @@ export function PurchaseAttachmentsDialog({
                   <Paperclip className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h2 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117]">Attachments</h2>
+                  <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Attachments</h2>
                   <p className="text-xs text-[#9ca3af] mt-0.5 truncate max-w-[240px]">
-                    {purchase.invoice_number} — {purchase.company_tax_entities?.registered_name ?? "—"}
+                    {purchase.invoice_number} â€” {purchase.company_tax_entities?.registered_name ?? "â€”"}
                   </p>
                 </div>
               </div>
@@ -207,9 +207,9 @@ export function PurchaseAttachmentsDialog({
               )}
               <div className="text-center">
                 <p className="text-sm font-semibold text-[#374151]">
-                  {uploading ? "Uploading…" : "Click or drag file to upload"}
+                  {uploading ? "Uploadingâ€¦" : "Click or drag file to upload"}
                 </p>
-                <p className="text-xs text-[#9ca3af] mt-0.5">PDF, JPG, PNG, DOCX, XLSX — max 25 MB</p>
+                <p className="text-xs text-[#9ca3af] mt-0.5">PDF, JPG, PNG, DOCX, XLSX â€” max 25 MB</p>
               </div>
             </div>
 

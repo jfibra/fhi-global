@@ -22,7 +22,7 @@ const STATUS_LABEL: Record<ValidationStatus, string> = {
 
 function formatDateTime(value: string) {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "—"
+  if (Number.isNaN(date.getTime())) return "â€”"
   return date.toLocaleString("en-US", {
     year: "numeric",
     month: "short",
@@ -235,15 +235,15 @@ export function ValidationDiscussion({
                 </div>
                 <p className="mt-1 text-xs text-[#6b7280]">
                   {entry.profiles?.fullname ?? entry.performed_role ?? "User"}
-                  {entry.performed_role ? ` · ${entry.performed_role}` : ""}
+                  {entry.performed_role ? ` Â· ${entry.performed_role}` : ""}
                 </p>
                 {(entry.old_value != null || entry.new_value != null) && (
                   <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
                     <div className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-100 break-all">
-                      Old: {entry.old_value == null ? "—" : JSON.stringify(entry.old_value)}
+                      Old: {entry.old_value == null ? "â€”" : JSON.stringify(entry.old_value)}
                     </div>
                     <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 break-all">
-                      New: {entry.new_value == null ? "—" : JSON.stringify(entry.new_value)}
+                      New: {entry.new_value == null ? "â€”" : JSON.stringify(entry.new_value)}
                     </div>
                   </div>
                 )}

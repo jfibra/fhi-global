@@ -19,12 +19,12 @@ export default function NotFound() {
         </div>
 
         {/* Large 404 */}
-        <h1 className="font-['Space_Grotesk'] text-[120px] leading-none font-bold tracking-tight bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent select-none">
+        <h1 className="font-['Outfit'] text-[120px] leading-none font-bold tracking-tight bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent select-none">
           404
         </h1>
 
         {/* Heading */}
-        <h2 className="font-['Space_Grotesk'] text-2xl font-bold text-[#0d1117] mt-4 mb-3">
+        <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mt-4 mb-3">
           Page Not Found
         </h2>
 
@@ -70,7 +70,7 @@ export default function NotFound() {
       </div>
 
       {/* Footer note */}
-      <p className="mt-8 text-xs text-[#9ca3af]">FHI Global — Dubai Real Estate CRM</p>
+      <p className="mt-8 text-xs text-[#9ca3af]">FHI Global â€” Dubai Real Estate CRM</p>
     </div>
   )
 }

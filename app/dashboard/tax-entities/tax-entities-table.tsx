@@ -59,7 +59,7 @@ function ToastStack({
             onClick={() => remove(toast.id)}
             className="opacity-60 hover:opacity-100 text-xs ml-2"
           >
-            ✕
+            âœ•
           </button>
         </div>
       ))}
@@ -68,9 +68,9 @@ function ToastStack({
 }
 
 function formatDate(value: string) {
-  if (!value) return "—"
+  if (!value) return "â€”"
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "—"
+  if (Number.isNaN(date.getTime())) return "â€”"
   return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
 }
 
@@ -263,7 +263,7 @@ export function TaxEntitiesTable({ currentRole, userName }: { currentRole: strin
               <Landmark className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-[#0d1117]">Company Tax Entities</h1>
+              <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">Company Tax Entities</h1>
               <p className="text-sm text-[#6b7280]">Manage VAT registered companies used for invoicing</p>
             </div>
           </div>
@@ -424,11 +424,11 @@ export function TaxEntitiesTable({ currentRole, userName }: { currentRole: strin
                   entities.map((entity) => (
                     <tr key={entity.id} className="hover:bg-[#fcfdff] transition-colors">
                       <td className="px-4 py-3.5 first:pl-6 whitespace-nowrap font-semibold text-[#0d1117]">{entity.registered_name}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-[#6b7280]">{entity.trade_name || "—"}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap text-[#6b7280]">{entity.trade_name || "â€”"}</td>
                       <td className="px-4 py-3.5 whitespace-nowrap font-mono text-xs text-[#374151]">{entity.tax_registration_number}</td>
                       <td className="px-4 py-3.5 whitespace-nowrap"><TypeBadge type={entity.entity_type} /></td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">{entity.developers?.name ?? "—"}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">{entity.country_code || "—"}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">{entity.developers?.name ?? "â€”"}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">{entity.country_code || "â€”"}</td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">{entity.vat_rate.toFixed(2)}%</td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">{entity.currency_code}</td>
                       <td className="px-4 py-3.5 whitespace-nowrap"><StatusBadge active={entity.is_active} /></td>
@@ -451,7 +451,7 @@ export function TaxEntitiesTable({ currentRole, userName }: { currentRole: strin
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-6 py-3.5 border-t border-[#f0f2f5] bg-white/40">
             <p className="text-xs text-[#9ca3af]">
-              Showing {total === 0 ? 0 : (page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
+              Showing {total === 0 ? 0 : (page - 1) * perPage + 1}â€“{Math.min(page * perPage, total)} of {total}
             </p>
 
             <div className="flex items-center gap-2">

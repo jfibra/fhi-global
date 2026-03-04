@@ -26,7 +26,7 @@ import {
   type TaxType,
 } from "@/lib/purchase-service"
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -59,7 +59,7 @@ function buildTaxMonth(month: number, year: number): string {
   return `${year}-${String(month).padStart(2, "0")}-01`
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const CURRENT_YEAR = new Date().getFullYear()
 const YEAR_OPTIONS = Array.from({ length: 10 }, (_, i) => CURRENT_YEAR - i)
@@ -78,7 +78,7 @@ const EMPTY_FORM: PurchaseFormData = {
   notes:                 "",
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function PurchaseFormDialog({
   open,
@@ -210,7 +210,7 @@ export function PurchaseFormDialog({
                     : <Plus className="w-4.5 h-4.5 text-white" />}
                 </div>
                 <div>
-                  <h2 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117]">{title}</h2>
+                  <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{title}</h2>
                   <p className="text-xs text-[#9ca3af] mt-0.5">
                     {viewMode ? "Purchase record details"
                       : isEdit ? "Update purchase transaction"
@@ -244,10 +244,10 @@ export function PurchaseFormDialog({
                   disabled={disabled}
                   className={inp(Boolean(errors.tax_entity_id), "appearance-none")}
                 >
-                  <option value="">Select vendor…</option>
+                  <option value="">Select vendorâ€¦</option>
                   {taxEntities.map((te) => (
                     <option key={te.id} value={te.id}>
-                      {te.registered_name} — {te.tax_registration_number} ({te.country_code})
+                      {te.registered_name} â€” {te.tax_registration_number} ({te.country_code})
                     </option>
                   ))}
                 </select>
@@ -257,7 +257,7 @@ export function PurchaseFormDialog({
               )}
             </div>
 
-            {/* Tax Month — month + year pickers */}
+            {/* Tax Month â€” month + year pickers */}
             <div>
               <FieldLabel text="Tax Month" required />
               <div className="grid grid-cols-2 gap-3">
@@ -430,7 +430,7 @@ export function PurchaseFormDialog({
                 <textarea
                   value={form.notes}
                   onChange={(e) => set("notes", e.target.value)}
-                  placeholder="Additional notes or description…"
+                  placeholder="Additional notes or descriptionâ€¦"
                   rows={3}
                   disabled={disabled}
                   className={`w-full pl-11 pr-4 py-3 rounded-2xl border bg-white text-sm text-[#0d1117] placeholder:text-[#9ca3af]
@@ -478,7 +478,7 @@ export function PurchaseFormDialog({
                     ) : (
                       <Check className="w-4 h-4" />
                     )}
-                    {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Purchase"}
+                    {saving ? "Savingâ€¦" : isEdit ? "Save Changes" : "Create Purchase"}
                   </button>
                 </div>
               </div>

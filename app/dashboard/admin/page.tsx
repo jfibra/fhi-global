@@ -1,25 +1,28 @@
-"use client"
+import { redirect } from "next/navigation"
+import { isInactiveProfile, getProfileByUserId, roleToLabel } from "@/lib/auth"
+import { createClient } from "@/lib/supabase/server"
+import { AdminDashboardContent } from "./_dashboard"
 
-import { DashboardShell } from "@/components/dashboard/shell"
-import { useAuth } from "@/context/auth-context"
-import { roleToLabel } from "@/lib/auth"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
+export const dynamic = "force-dynamic"
 
-export default function AdminDashboard() {
-  const { user, profile } = useAuth()
-  const displayName = profile?.fullname ?? user?.email ?? "User"
+export default async function AdminDashboardPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect("/login")
+
+  const { profile } = await getProfileByUserId(supabase, user.id)
+  if (!profile) redirect("/login")
+  if (isInactiveProfile(profile)) redirect("/account-inactive")
+
+  const roleValue = String(profile.role ?? "").toLowerCase()
+  if (!["super_admin", "admin"].includes(roleValue)) redirect("/dashboard")
 
   return (
-    <DashboardShell
-      role="admin"
-      roleLabel={roleToLabel("admin")}
-      roleColor={getRoleColor("admin")}
-      userName={displayName}
-    >
-      <div className="mb-6">
-        <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#0d1117]">Welcome, {displayName}</h2>
-        <p className="text-sm text-[#9ca3af] mt-0.5">Your dashboard will be available here soon.</p>
-      </div>
-    </DashboardShell>
+    <AdminDashboardContent
+      roleValue={roleValue}
+      roleLabel={roleToLabel(roleValue)}
+      userName={profile.fullname ?? user.email ?? "Admin"}
+      userId={user.id}
+    />
   )
 }

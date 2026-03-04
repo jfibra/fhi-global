@@ -38,7 +38,7 @@ import { SaleFormDialog } from "./sale-form-dialog"
 import { SaleDetails } from "./sale-details"
 import { ValidationDiscussion, type DiscussionTab } from "./[id]/validation-discussion"
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type ToastType = "success" | "error"
 type SortField = "reservation_date" | "contract_price" | "created_at"
@@ -60,7 +60,7 @@ const STATUS_LABEL: Record<string, string> = {
   invalid_sale: "Invalid Sale",
 }
 
-// ─── Toast Stack ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Toast Stack â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ToastStack({
   toasts,
@@ -81,20 +81,20 @@ function ToastStack({
           }`}
         >
           <span className="flex-1">{toast.text}</span>
-          <button type="button" onClick={() => remove(toast.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
+          <button type="button" onClick={() => remove(toast.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
         </div>
       ))}
     </div>
   )
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function formatDate(value: string | null) {
-  if (!value) return "—"
+  if (!value) return "â€”"
   const date = new Date(value)
   return Number.isNaN(date.getTime())
-    ? "—"
+    ? "â€”"
     : date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
 }
 
@@ -180,7 +180,7 @@ function SortableHead({
   )
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function SalesTable({
   currentUserId,
@@ -340,7 +340,7 @@ export function SalesTable({
               <TrendingUp className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-[#0d1117]">
+              <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">
                 Sales Reports
               </h1>
               <p className="text-sm text-[#6b7280]">Record and manage property sales transactions</p>
@@ -367,7 +367,7 @@ export function SalesTable({
                   type="text"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search client name, unit, project…"
+                  placeholder="Search client name, unit, projectâ€¦"
                   className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 placeholder:text-[#9ca3af]"
                 />
               </div>
@@ -510,23 +510,23 @@ export function SalesTable({
                       className="hover:bg-[#fcfdff] transition-colors"
                     >
                       <td className="px-4 py-3.5 pl-6 whitespace-nowrap font-semibold text-[#0d1117]">
-                        {sale.profiles?.fullname ?? "—"}
+                        {sale.profiles?.fullname ?? "â€”"}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">
-                        {sale.developers?.name ?? "—"}
+                        {sale.developers?.name ?? "â€”"}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">
-                        {sale.projects?.name ?? "—"}
+                        {sale.projects?.name ?? "â€”"}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-xs text-[#6b7280]">
                         {sale.unit_number
-                          ? `${sale.project_units?.unit_type ?? ""} · ${sale.unit_number}`
-                          : (sale.project_units?.unit_type ?? "—")}
+                          ? `${sale.project_units?.unit_type ?? ""} Â· ${sale.unit_number}`
+                          : (sale.project_units?.unit_type ?? "â€”")}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap font-semibold text-[#0d1117]">
                         {sale.clients
                           ? `${sale.clients.first_name} ${sale.clients.last_name}`
-                          : "—"}
+                          : "â€”"}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-right font-mono text-sm font-semibold text-[#0d1117]">
                         {formatCurrency(sale.contract_price)}
@@ -554,7 +554,7 @@ export function SalesTable({
                             {sale.attachments_count}
                           </button>
                         ) : (
-                          <span className="text-[#9ca3af] text-xs">—</span>
+                          <span className="text-[#9ca3af] text-xs">â€”</span>
                         )}
                       </td>
                       <td className="px-4 py-3.5 pr-6 whitespace-nowrap">
@@ -624,7 +624,7 @@ export function SalesTable({
           {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-6 py-3.5 border-t border-[#f0f2f5] bg-white/40">
             <p className="text-xs text-[#9ca3af]">
-              Showing {total === 0 ? 0 : (page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
+              Showing {total === 0 ? 0 : (page - 1) * perPage + 1}â€“{Math.min(page * perPage, total)} of {total}
             </p>
             <div className="flex items-center gap-2">
               <select

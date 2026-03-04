@@ -54,7 +54,7 @@ export function ProjectSeoTab({ project, onSave, showToast }: Props) {
 
   return (
     <form onSubmit={handleSave} className="max-w-2xl space-y-6">
-      <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#001f3f]">SEO & Meta</h3>
+      <h3 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">SEO & Meta</h3>
 
       <div className="bg-white rounded-2xl border border-[#f0f0f0] p-5 space-y-4">
         <div>
@@ -118,7 +118,7 @@ export function ProjectSeoTab({ project, onSave, showToast }: Props) {
       <div className="flex justify-end">
         <button type="submit" disabled={saving}
           className="flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50">
-          <Save className="w-4 h-4" />{saving ? "Saving…" : "Save SEO Data"}
+          <Save className="w-4 h-4" />{saving ? "Savingâ€¦" : "Save SEO Data"}
         </button>
       </div>
     </form>

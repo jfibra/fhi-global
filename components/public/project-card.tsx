@@ -31,7 +31,7 @@ function formatPrice(from: number | null, to: number | null, currency: string | 
     if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`
     return n.toString()
   }
-  if (to && to !== from) return `${cur} ${fmt(from)} – ${fmt(to)}`
+  if (to && to !== from) return `${cur} ${fmt(from)} â€“ ${fmt(to)}`
   return `${cur} ${fmt(from)}`
 }
 
@@ -95,7 +95,7 @@ export function ProjectCard({ project }: { project: ProjectCardData }) {
           </div>
         )}
 
-        <h3 className="font-['Space_Grotesk'] font-bold text-[#0d1117] text-base leading-snug mb-2 group-hover:text-[#001f3f] transition-colors">
+        <h3 className="font-['Outfit'] font-bold text-[#0d1117] text-base leading-snug mb-2 group-hover:text-[#001f3f] transition-colors">
           {project.name}
         </h3>
 
@@ -111,7 +111,7 @@ export function ProjectCard({ project }: { project: ProjectCardData }) {
             {price ? (
               <>
                 <p className="text-xs text-[#9ca3af] font-medium uppercase tracking-wider">Starting from</p>
-                <p className="font-['Space_Grotesk'] font-bold text-[#001f3f] text-base">{price}</p>
+                <p className="font-['Outfit'] font-bold text-[#001f3f] text-base">{price}</p>
               </>
             ) : (
               <p className="text-sm text-[#9ca3af]">Price on request</p>

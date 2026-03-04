@@ -22,11 +22,18 @@ type SearchParams = Promise<{
   status?: string
   city?: string
   featured?: string
+  price_min?: string
+  price_max?: string
 }>
 
 export default async function ProjectsPage({ searchParams }: { searchParams: SearchParams }) {
-  const { q, developer, status, city, featured } = await searchParams
+  const { q, developer, status, city, featured, price_min, price_max } = await searchParams
   const supabase = await createClient()
+
+  const priceMin = price_min ? Number(price_min) : null
+  const priceMax = price_max ? Number(price_max) : null
+  const hasPriceMin = Number.isFinite(priceMin)
+  const hasPriceMax = Number.isFinite(priceMax)
 
   // Fetch filter options
   const [{ data: devOptions }, { data: cityOptions }] = await Promise.all([
@@ -50,6 +57,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
   if (developer) query = query.eq("developer_id", developer)
   if (status) query = query.eq("status", status)
   if (city) query = query.eq("city", city)
+  if (hasPriceMin && priceMin !== null) query = query.gte("launch_price_from", priceMin)
+  if (hasPriceMax && priceMax !== null) query = query.lte("launch_price_from", priceMax)
 
   const { data: projects } = await query
 
@@ -82,7 +91,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
             <Building2 className="w-3.5 h-3.5 text-[#d6b357]" />
             {featured === "true" ? "Featured Projects" : "All Projects"}
           </div>
-          <h1 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold text-white leading-tight mb-3" style={{ textShadow: "0 2px 20px rgba(0,0,0,0.4)" }}>
+          <h1 className="font-['Outfit'] text-4xl md:text-5xl font-bold text-white leading-tight mb-3" style={{ textShadow: "0 2px 20px rgba(0,0,0,0.4)" }}>
             Discover Premium<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">
               Property Projects
@@ -124,7 +133,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
             <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#001f3f]/6 to-[#d6b357]/6 border border-[#e8eaed] flex items-center justify-center mb-5 shadow-sm">
               <Building2 className="w-9 h-9 text-[#001f3f]/30" />
             </div>
-            <h3 className="font-['Space_Grotesk'] font-bold text-[#0d1117] text-xl mb-2">No projects found</h3>
+            <h3 className="font-['Outfit'] font-bold text-[#0d1117] text-xl mb-2">No projects found</h3>
             <p className="text-sm text-[#6b7280] max-w-xs">Try adjusting your filters or explore all available listings.</p>
           </div>
         )}

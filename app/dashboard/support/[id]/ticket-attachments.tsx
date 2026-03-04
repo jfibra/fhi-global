@@ -12,7 +12,7 @@ import {
 
 function formatDate(value: string) {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "—"
+  if (Number.isNaN(date.getTime())) return "â€”"
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
@@ -161,7 +161,7 @@ export function TicketAttachments({
               <Paperclip className="w-4 h-4 text-[#9ca3af] shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-[#0d1117] truncate">{attachment.file_name}</p>
-                <p className="text-xs text-[#9ca3af] mt-0.5">{attachment.profiles?.fullname ?? "User"} · {formatDate(attachment.uploaded_at)}</p>
+                <p className="text-xs text-[#9ca3af] mt-0.5">{attachment.profiles?.fullname ?? "User"} Â· {formatDate(attachment.uploaded_at)}</p>
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
                 <button

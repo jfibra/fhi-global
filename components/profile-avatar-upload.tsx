@@ -6,7 +6,7 @@ import Cropper from "react-easy-crop"
 import type { Area, Point } from "react-easy-crop"
 import { Trash2, ZoomIn, ZoomOut, X, Check, Upload } from "lucide-react"
 
-// ─── canvas helper ────────────────────────────────────────────────────────────
+// â”€â”€â”€ canvas helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function getCroppedBlob(imageSrc: string, pixelCrop: Area): Promise<Blob> {
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new window.Image()
@@ -44,7 +44,7 @@ async function getCroppedBlob(imageSrc: string, pixelCrop: Area): Promise<Blob> 
   })
 }
 
-// ─── component ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function ProfileAvatarUpload({
   userId,
   displayName,
@@ -165,7 +165,7 @@ export function ProfileAvatarUpload({
         onChange={handleFileChange}
       />
 
-      {/* ── Options Modal ── */}
+      {/* â”€â”€ Options Modal â”€â”€ */}
       {open && !imageSrc && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={!busy ? onClose : undefined} />
@@ -173,7 +173,7 @@ export function ProfileAvatarUpload({
           <div className="relative z-10 w-full max-w-sm bg-white/90 backdrop-blur-2xl rounded-[32px] border border-white/60 shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#f0f0f0]">
               <div>
-                <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117]">Profile Photo</h3>
+                <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Profile Photo</h3>
                 <p className="text-xs text-[#9ca3af] mt-0.5">Choose or update your profile picture</p>
               </div>
               <button type="button" onClick={onClose} disabled={busy} className="w-8 h-8 flex items-center justify-center rounded-xl bg-[#f4f6f9] hover:bg-[#e8eaed] text-[#6b7280] transition-all disabled:opacity-50">
@@ -191,13 +191,13 @@ export function ProfileAvatarUpload({
                   </div>
                 )}
               </div>
-              <p className="mt-3 text-[11px] text-[#9ca3af]">JPG, PNG, WEBP · max 10 MB</p>
+              <p className="mt-3 text-[11px] text-[#9ca3af]">JPG, PNG, WEBP Â· max 10 MB</p>
             </div>
 
             <div className="flex flex-col gap-3 px-6 pb-6">
               <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 disabled:cursor-not-allowed">
                 <Upload className="w-4 h-4" />
-                {busy ? "Uploading…" : "Choose Photo"}
+                {busy ? "Uploadingâ€¦" : "Choose Photo"}
               </button>
               {currentUrl && (
                 <button type="button" onClick={handleRemove} disabled={busy} className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-full font-semibold text-sm bg-white/50 border border-[#e5e5e5] text-[#6b7280] hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 transition-all disabled:opacity-60 disabled:cursor-not-allowed">
@@ -210,7 +210,7 @@ export function ProfileAvatarUpload({
         </div>
       )}
 
-      {/* ── Crop Modal ── */}
+      {/* â”€â”€ Crop Modal â”€â”€ */}
       {imageSrc && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
@@ -219,8 +219,8 @@ export function ProfileAvatarUpload({
             {/* Header */}
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#f0f0f0]">
               <div>
-                <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117]">Crop Profile Photo</h3>
-                <p className="text-xs text-[#9ca3af] mt-0.5">Drag to reposition · scroll or slider to zoom</p>
+                <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Crop Profile Photo</h3>
+                <p className="text-xs text-[#9ca3af] mt-0.5">Drag to reposition Â· scroll or slider to zoom</p>
               </div>
               <button
                 onClick={handleCancelCrop}
@@ -300,7 +300,7 @@ export function ProfileAvatarUpload({
                 ) : (
                   <Check className="w-4 h-4" />
                 )}
-                {uploading ? "Saving…" : "Apply & Upload"}
+                {uploading ? "Savingâ€¦" : "Apply & Upload"}
               </button>
             </div>
           </div>

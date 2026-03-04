@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type CategoryType = "default" | "custom"
 
@@ -29,7 +29,7 @@ export type PurchaseCategoriesListResponse = {
 type SortField = "category_name" | "created_at"
 type SortDir = "asc" | "desc"
 
-// ─── Normalizer ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Normalizer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function normalizeCategory(row: unknown): PurchaseCategory {
   const raw = row as Record<string, unknown>
@@ -51,7 +51,7 @@ function normalizeCategory(row: unknown): PurchaseCategory {
   }
 }
 
-// ─── Queries ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Queries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchPurchaseCategories(params: {
   page: number
