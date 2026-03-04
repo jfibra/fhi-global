@@ -13,7 +13,7 @@ import {
 export const metadata: Metadata = createPageMetadata({
   title: "About FHI Global | Dubai Real Estate Excellence",
   description:
-    "Learn about FHI Global — Dubai's trusted real estate platform connecting buyers with the finest residential and commercial developments.",
+    "Learn about FHI Global â€” Dubai's trusted real estate platform connecting buyers with the finest residential and commercial developments.",
   openGraphDescription: "Dubai's trusted real estate platform connecting buyers with the finest developments.",
 })
 
@@ -34,7 +34,7 @@ const VALUES = [
   {
     icon: Zap,
     title:  "Innovation First",
-    desc:   "We continuously build smarter tools — from real-time project tracking to commission dashboards — so our agents always stay ahead.",
+    desc:   "We continuously build smarter tools â€” from real-time project tracking to commission dashboards â€” so our agents always stay ahead.",
     color:  "#d6b357",
   },
   {
@@ -80,7 +80,7 @@ const TEAM = [
 
 const MILESTONES = [
   { year: "2015", title: "Founded in Dubai", desc: "FHI Global was established with a vision to modernise real estate sales in the UAE." },
-  { year: "2018", title: "100+ Developers", desc: "Reached our first major milestone — onboarding over a hundred verified Dubai developers." },
+  { year: "2018", title: "100+ Developers", desc: "Reached our first major milestone â€” onboarding over a hundred verified Dubai developers." },
   { year: "2021", title: "Platform Launch", desc: "Launched our proprietary CRM platform, transforming how agents track and close deals." },
   { year: "2024", title: "Global Expansion", desc: "Extended our reach to 25+ countries, helping international buyers access Dubai property." },
 ]
@@ -95,7 +95,7 @@ export default function AboutPage() {
       <TopBar />
       <Header />
 
-      {/* ── Hero ─────────────────────────────────────────────── */}
+      {/* â”€â”€ Hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="relative pt-20 pb-24 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
@@ -122,7 +122,7 @@ export default function AboutPage() {
           </div>
 
           <h1
-            className="font-['Space_Grotesk'] text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight mb-6"
+            className="font-['Outfit'] text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight mb-6"
             style={{ textShadow: "0 2px 30px rgba(0,0,0,0.4)" }}
           >
             We Are{" "}
@@ -132,7 +132,7 @@ export default function AboutPage() {
           </h1>
 
           <p className="text-white/60 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-10">
-            Dubai&apos;s most trusted real estate platform — connecting visionary developers,
+            Dubai&apos;s most trusted real estate platform â€” connecting visionary developers,
             dedicated agents, and global buyers since 2015.
           </p>
 
@@ -153,7 +153,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── Stats bar ─────────────────────────────────────────── */}
+      {/* â”€â”€ Stats bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="bg-white border-b border-[#e8eaed]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-0 md:divide-x divide-[#f0f0f0]">
           {STATS.map(({ icon: Icon, value, label }) => (
@@ -161,14 +161,14 @@ export default function AboutPage() {
               <div className="w-10 h-10 rounded-xl bg-[#001f3f]/6 flex items-center justify-center mb-3">
                 <Icon className="w-5 h-5 text-[#001f3f]" />
               </div>
-              <p className="font-['Space_Grotesk'] text-3xl font-bold text-[#001f3f] leading-none mb-1">{value}</p>
+              <p className="font-['Outfit'] text-3xl font-bold text-[#001f3f] leading-none mb-1">{value}</p>
               <p className="text-xs text-[#9ca3af] font-medium uppercase tracking-wider">{label}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── Our Story ─────────────────────────────────────────── */}
+      {/* â”€â”€ Our Story â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="relative py-20 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
@@ -186,7 +186,7 @@ export default function AboutPage() {
             <div className="inline-flex items-center px-3 py-1.5 bg-white border border-[#e5e5e5] rounded-full text-xs font-semibold uppercase tracking-wider mb-5 shadow-sm">
               <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2" /> Our Story
             </div>
-            <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold text-[#0d1117] leading-tight tracking-tight mb-6">
+            <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold text-[#0d1117] leading-tight tracking-tight mb-6">
               A Decade of{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
                 Building Trust
@@ -195,7 +195,7 @@ export default function AboutPage() {
             <div className="space-y-4 text-[#374151] leading-relaxed">
               <p>
                 FHI Global was born from a simple frustration: Dubai&apos;s incredible real estate market was
-                fragmented, opaque, and difficult to navigate — for agents, developers, and buyers alike.
+                fragmented, opaque, and difficult to navigate â€” for agents, developers, and buyers alike.
               </p>
               <p>
                 We set out to change that. Starting with a small team in DIFC, we built the relationships,
@@ -204,7 +204,7 @@ export default function AboutPage() {
               <p>
                 Today, FHI Global is the backbone of Dubai property sales for over 100 premium developers
                 and thousands of agents across the globe. Our platform tracks every deal, every commission,
-                and every milestone — in real time.
+                and every milestone â€” in real time.
               </p>
             </div>
           </div>
@@ -219,7 +219,7 @@ export default function AboutPage() {
                     <span className="text-[10px] font-bold text-[#d6b357] tracking-wider">{year}</span>
                   </div>
                   <div>
-                    <h3 className="font-['Space_Grotesk'] font-bold text-[#0d1117] mb-1">{title}</h3>
+                    <h3 className="font-['Outfit'] font-bold text-[#0d1117] mb-1">{title}</h3>
                     <p className="text-sm text-[#6b7280] leading-relaxed">{desc}</p>
                   </div>
                 </div>
@@ -230,7 +230,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── Values ────────────────────────────────────────────── */}
+      {/* â”€â”€ Values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="relative bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] py-20 overflow-hidden">
         <div
           className="absolute inset-0 opacity-[0.04]"
@@ -243,7 +243,7 @@ export default function AboutPage() {
             <div className="inline-flex items-center px-3 py-1.5 bg-white/10 border border-white/20 rounded-full text-xs font-semibold uppercase tracking-wider mb-5 text-white/70 backdrop-blur-sm">
               <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2" /> Our Values
             </div>
-            <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold text-white leading-tight tracking-tight">
+            <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold text-white leading-tight tracking-tight">
               What We Stand For
             </h2>
           </div>
@@ -260,7 +260,7 @@ export default function AboutPage() {
                 >
                   <Icon className="w-5 h-5" style={{ color }} />
                 </div>
-                <h3 className="font-['Space_Grotesk'] font-bold text-white mb-3 text-lg">{title}</h3>
+                <h3 className="font-['Outfit'] font-bold text-white mb-3 text-lg">{title}</h3>
                 <p className="text-white/50 text-sm leading-relaxed">{desc}</p>
               </div>
             ))}
@@ -268,14 +268,14 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── Awards & Recognition ──────────────────────────────── */}
+      {/* â”€â”€ Awards & Recognition â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
           <div className="inline-flex items-center px-3 py-1.5 bg-white border border-[#e5e5e5] rounded-full text-xs font-semibold uppercase tracking-wider mb-5 shadow-sm">
             <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2" /> Recognition
           </div>
-          <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold text-[#0d1117] leading-tight tracking-tight">
+          <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold text-[#0d1117] leading-tight tracking-tight">
             Industry{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
               Awards
@@ -297,7 +297,7 @@ export default function AboutPage() {
                 <Icon className="w-5 h-5 text-[#d6b357]" />
               </div>
               <div>
-                <p className="font-['Space_Grotesk'] font-bold text-[#0d1117] mb-0.5">{award}</p>
+                <p className="font-['Outfit'] font-bold text-[#0d1117] mb-0.5">{award}</p>
                 <p className="text-sm text-[#6b7280]">{org}</p>
                 <span className="inline-block mt-2 px-2 py-0.5 rounded-full bg-[#f7f8fa] border border-[#e8eaed] text-[10px] font-bold text-[#9ca3af] uppercase tracking-wider">{year}</span>
               </div>
@@ -307,7 +307,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── Leadership Team ───────────────────────────────────── */}
+      {/* â”€â”€ Leadership Team â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="relative py-20 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
@@ -324,7 +324,7 @@ export default function AboutPage() {
             <div className="inline-flex items-center px-3 py-1.5 bg-white border border-[#e5e5e5] rounded-full text-xs font-semibold uppercase tracking-wider mb-5 shadow-sm">
               <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2" /> Leadership
             </div>
-            <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold text-[#0d1117] leading-tight tracking-tight">
+            <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold text-[#0d1117] leading-tight tracking-tight">
               Meet the{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
                 Team
@@ -343,9 +343,9 @@ export default function AboutPage() {
               >
                 {/* Avatar */}
                 <div className="w-16 h-16 rounded-[18px] bg-gradient-to-br from-[#001f3f] to-[#002a52] flex items-center justify-center mb-5 shadow-md">
-                  <span className="font-['Space_Grotesk'] text-lg font-bold text-[#d6b357]">{initials}</span>
+                  <span className="font-['Outfit'] text-lg font-bold text-[#d6b357]">{initials}</span>
                 </div>
-                <h3 className="font-['Space_Grotesk'] font-bold text-[#0d1117] mb-0.5">{name}</h3>
+                <h3 className="font-['Outfit'] font-bold text-[#0d1117] mb-0.5">{name}</h3>
                 <p className="text-xs font-semibold text-[#d6b357] uppercase tracking-wider mb-3">{role}</p>
                 <p className="text-sm text-[#6b7280] leading-relaxed">{bio}</p>
               </div>
@@ -354,7 +354,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── Trusted by ────────────────────────────────────────── */}
+      {/* â”€â”€ Trusted by â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="bg-white/40 backdrop-blur-2xl rounded-[32px] border border-white border-opacity-60 shadow-xl shadow-black/5 p-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
@@ -362,7 +362,7 @@ export default function AboutPage() {
               <div className="inline-flex items-center px-3 py-1.5 bg-white border border-[#e5e5e5] rounded-full text-xs font-semibold uppercase tracking-wider mb-5 shadow-sm">
                 <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2" /> Trusted Partner
               </div>
-              <h2 className="font-['Space_Grotesk'] text-3xl md:text-4xl font-bold text-[#0d1117] leading-tight mb-4">
+              <h2 className="font-['Outfit'] text-3xl md:text-4xl font-bold text-[#0d1117] leading-tight mb-4">
                 Preferred by Dubai&apos;s{" "}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
                   Best Developers
@@ -397,7 +397,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── CTA ───────────────────────────────────────────────── */}
+      {/* â”€â”€ CTA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
         <div className="relative bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] rounded-[40px] overflow-hidden p-1">
           {/* Background */}
@@ -418,7 +418,7 @@ export default function AboutPage() {
               Join Our Network
             </div>
             <h2
-              className="font-['Space_Grotesk'] text-4xl md:text-6xl font-bold text-white leading-tight tracking-tight mb-4"
+              className="font-['Outfit'] text-4xl md:text-6xl font-bold text-white leading-tight tracking-tight mb-4"
               style={{ textShadow: "0 2px 20px rgba(0,0,0,0.3)" }}
             >
               Ready to{" "}
@@ -427,7 +427,7 @@ export default function AboutPage() {
               </span>
             </h2>
             <p className="text-white/55 text-lg max-w-xl mx-auto mb-10">
-              Whether you&apos;re a developer, an agent, or an investor — FHI Global has the tools and the team to take you further.
+              Whether you&apos;re a developer, an agent, or an investor â€” FHI Global has the tools and the team to take you further.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link

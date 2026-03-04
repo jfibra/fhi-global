@@ -73,7 +73,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const totalPages = Math.ceil(total / PER_PAGE)
 
-  // ── fetch ──────────────────────────────────────────────────────────────────
+  // â”€â”€ fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchUsers = useCallback(async (opts?: { page?: number; search?: string; role?: string; status?: string; deleted?: boolean }) => {
     setLoading(true)
     const url = buildQuery({
@@ -97,7 +97,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
 
   useEffect(() => { void fetchUsers() }, [fetchUsers])
 
-  // ── debounced search ───────────────────────────────────────────────────────
+  // â”€â”€ debounced search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleSearch = (val: string) => {
     setSearch(val)
     setPage(1)
@@ -119,7 +119,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     void fetchUsers({ page: p })
   }
 
-  // ── actions ────────────────────────────────────────────────────────────────
+  // â”€â”€ actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleUserSaved = () => {
     setBanner({ type: "success", msg: "User saved successfully." })
     setFormOpen(false)
@@ -170,7 +170,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     setDrawerOpen(true)
   }
 
-  // ── render ─────────────────────────────────────────────────────────────────
+  // â”€â”€ render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <DashboardShell
       role={currentRole}
@@ -180,9 +180,9 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#0d1117]">User Management</h2>
+          <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117]">User Management</h2>
           <p className="text-sm text-[#9ca3af] mt-0.5">
-            {total} user{total !== 1 ? "s" : ""} · manage roles, status and access
+            {total} user{total !== 1 ? "s" : ""} Â· manage roles, status and access
           </p>
         </div>
         <button
@@ -211,7 +211,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
             <input
               type="text"
-              placeholder="Search by name, email…"
+              placeholder="Search by name, emailâ€¦"
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 placeholder:text-[#9ca3af]"
@@ -317,7 +317,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-6 py-3.5 border-t border-[#f0f2f5] bg-white/40">
             <p className="text-xs text-[#9ca3af]">
-              Showing {(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, total)} of {total}
+              Showing {(page - 1) * PER_PAGE + 1}â€“{Math.min(page * PER_PAGE, total)} of {total}
             </p>
             <div className="flex items-center gap-1">
               <button
@@ -377,7 +377,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   )
 }
 
-// ─── Row component ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Row component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function UserRow({
   user,
   onOpen,
@@ -473,7 +473,7 @@ function UserRow({
 
       {/* Email */}
       <td className="px-5 py-3.5 text-[#6b7280] whitespace-nowrap">
-        {user.email ?? <span className="text-[#d0d5dd]">—</span>}
+        {user.email ?? <span className="text-[#d0d5dd]">â€”</span>}
       </td>
 
       {/* Role */}
@@ -488,7 +488,7 @@ function UserRow({
 
       {/* Joined */}
       <td className="px-5 py-3.5 text-[#9ca3af] whitespace-nowrap text-xs">
-        {user.joined_at ? new Date(user.joined_at).toLocaleDateString() : "—"}
+        {user.joined_at ? new Date(user.joined_at).toLocaleDateString() : "â€”"}
       </td>
 
       {/* Actions */}

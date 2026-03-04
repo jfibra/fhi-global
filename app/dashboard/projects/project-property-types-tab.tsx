@@ -57,7 +57,7 @@ export function ProjectPropertyTypesTab({ projectId, showToast }: Props) {
   return (
     <div className="max-w-3xl space-y-5">
       <div className="flex items-center justify-between">
-        <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#001f3f]">Property Types</h3>
+        <h3 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">Property Types</h3>
         <span className="text-xs text-[#6b7280]">{selected.size} selected</span>
       </div>
 
@@ -83,7 +83,7 @@ export function ProjectPropertyTypesTab({ projectId, showToast }: Props) {
       <div className="flex justify-end">
         <button type="button" onClick={() => void handleSave()} disabled={saving}
           className="flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50">
-          <Save className="w-4 h-4" />{saving ? "Saving…" : "Save Property Types"}
+          <Save className="w-4 h-4" />{saving ? "Savingâ€¦" : "Save Property Types"}
         </button>
       </div>
     </div>

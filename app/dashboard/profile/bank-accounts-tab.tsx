@@ -29,7 +29,7 @@ import {
   toggleBankAccountStatus,
 } from "@/lib/bank-account-service"
 
-// ─── Portal (escapes backdrop-filter stacking context) ───────────────────────
+// â”€â”€â”€ Portal (escapes backdrop-filter stacking context) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -37,10 +37,10 @@ function Portal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body)
 }
 
-// ─── Static option lists ───────────────────────────────────────────────────────
+// â”€â”€â”€ Static option lists â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const COUNTRIES = [
-  { label: "🇦🇪 United Arab Emirates (AE)", value: "AE" },
-  { label: "🇵🇭 Philippines (PH)",           value: "PH" },
+  { label: "ðŸ‡¦ðŸ‡ª United Arab Emirates (AE)", value: "AE" },
+  { label: "ðŸ‡µðŸ‡­ Philippines (PH)",           value: "PH" },
 ]
 
 const BANKS_BY_COUNTRY: Record<string, string[]> = {
@@ -95,22 +95,22 @@ const CURRENCY_BY_COUNTRY: Record<string, string> = {
 }
 
 const CURRENCIES = [
-  { label: "AED — UAE Dirham",       value: "AED" },
-  { label: "PHP — Philippine Peso",  value: "PHP" },
-  { label: "USD — US Dollar",        value: "USD" },
-  { label: "GBP — British Pound",    value: "GBP" },
-  { label: "SGD — Singapore Dollar", value: "SGD" },
-  { label: "AUD — Australian Dollar",value: "AUD" },
-  { label: "CAD — Canadian Dollar",  value: "CAD" },
-  { label: "INR — Indian Rupee",     value: "INR" },
-  { label: "PKR — Pakistani Rupee",  value: "PKR" },
-  { label: "BDT — Bangladeshi Taka", value: "BDT" },
-  { label: "EUR — Euro",             value: "EUR" },
-  { label: "JPY — Japanese Yen",     value: "JPY" },
-  { label: "CNY — Chinese Yuan",     value: "CNY" },
-  { label: "KRW — South Korean Won", value: "KRW" },
-  { label: "IDR — Indonesian Rupiah",value: "IDR" },
-  { label: "MYR — Malaysian Ringgit",value: "MYR" },
+  { label: "AED â€” UAE Dirham",       value: "AED" },
+  { label: "PHP â€” Philippine Peso",  value: "PHP" },
+  { label: "USD â€” US Dollar",        value: "USD" },
+  { label: "GBP â€” British Pound",    value: "GBP" },
+  { label: "SGD â€” Singapore Dollar", value: "SGD" },
+  { label: "AUD â€” Australian Dollar",value: "AUD" },
+  { label: "CAD â€” Canadian Dollar",  value: "CAD" },
+  { label: "INR â€” Indian Rupee",     value: "INR" },
+  { label: "PKR â€” Pakistani Rupee",  value: "PKR" },
+  { label: "BDT â€” Bangladeshi Taka", value: "BDT" },
+  { label: "EUR â€” Euro",             value: "EUR" },
+  { label: "JPY â€” Japanese Yen",     value: "JPY" },
+  { label: "CNY â€” Chinese Yuan",     value: "CNY" },
+  { label: "KRW â€” South Korean Won", value: "KRW" },
+  { label: "IDR â€” Indonesian Rupiah",value: "IDR" },
+  { label: "MYR â€” Malaysian Ringgit",value: "MYR" },
 ]
 
 const BANK_TYPES = [
@@ -134,23 +134,23 @@ const EMPTY_FORM: BankAccountFormData = {
   is_primary:     false,
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function maskAccountNumber(num: string) {
   if (!num || num.length <= 4) return num
-  return "•".repeat(num.length - 4) + num.slice(-4)
+  return "â€¢".repeat(num.length - 4) + num.slice(-4)
 }
 
 function bankTypeLabel(type: string | null) {
-  if (!type) return "—"
+  if (!type) return "â€”"
   return BANK_TYPES.find((t) => t.value === type)?.label ?? type
 }
 
 function countryLabel(code: string | null) {
-  if (!code) return "—"
+  if (!code) return "â€”"
   return COUNTRIES.find((c) => c.value === code)?.label.replace(/^[^ ]+ /, "") ?? code
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function FieldLabel({ icon: Icon, text }: { icon?: React.ElementType; text: string }) {
   return (
     <div className="flex items-center gap-1.5 ml-1 mb-2">
@@ -188,7 +188,7 @@ function SelectField({
   )
 }
 
-// ─── Bank Account Form Modal ────────────────────────────────────────────────────
+// â”€â”€â”€ Bank Account Form Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function BankAccountModal({
   open,
   editAccount,
@@ -295,7 +295,7 @@ function BankAccountModal({
               <Landmark className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117]">
+              <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">
                 {editAccount ? "Edit Bank Account" : "Add Bank Account"}
               </h3>
               <p className="text-xs text-[#6b7280]">Used for commission payouts</p>
@@ -312,7 +312,7 @@ function BankAccountModal({
 
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-          {/* Row 1 — Country + Bank Name */}
+          {/* Row 1 â€” Country + Bank Name */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <FieldLabel icon={Globe} text="Bank Country" />
@@ -329,7 +329,7 @@ function BankAccountModal({
             </div>
           </div>
 
-          {/* Row 2 — Branch + Type + Currency */}
+          {/* Row 2 â€” Branch + Type + Currency */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <FieldLabel text="Bank Branch" />
@@ -347,12 +347,12 @@ function BankAccountModal({
             <div>
               <FieldLabel text="Currency" />
               <div className="px-5 py-3.5 rounded-2xl border border-[#f0f0f0] bg-[#f8fafc] text-sm text-[#374151] font-semibold select-none">
-                {form.currency_code} — {CURRENCIES.find((c) => c.value === form.currency_code)?.label.split(" — ")[1] ?? ""}
+                {form.currency_code} â€” {CURRENCIES.find((c) => c.value === form.currency_code)?.label.split(" â€” ")[1] ?? ""}
               </div>
             </div>
           </div>
 
-          {/* Row 3 — Account name + Account number */}
+          {/* Row 3 â€” Account name + Account number */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <FieldLabel icon={CreditCard} text="Account Name *" />
@@ -377,7 +377,7 @@ function BankAccountModal({
             </div>
           </div>
 
-          {/* Row 4 — IBAN + SWIFT + Routing */}
+          {/* Row 4 â€” IBAN + SWIFT + Routing */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <FieldLabel text="IBAN" />
@@ -446,7 +446,7 @@ function BankAccountModal({
             className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
           >
             {busy ? (
-              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
+              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Savingâ€¦</>
             ) : editAccount ? (
               <><Check className="w-4 h-4" /> Save Changes</>
             ) : (
@@ -458,7 +458,7 @@ function BankAccountModal({
     </div>    </Portal>  )
 }
 
-// ─── Confirm Delete Dialog ──────────────────────────────────────────────────────
+// â”€â”€â”€ Confirm Delete Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ConfirmDeleteDialog({
   open,
   account,
@@ -484,14 +484,14 @@ function ConfirmDeleteDialog({
             <Trash2 className="w-5 h-5 text-rose-600" />
           </div>
           <div>
-            <h3 className="font-['Space_Grotesk'] text-base font-bold text-[#0d1117]">Delete Bank Account</h3>
+            <h3 className="font-['Outfit'] text-base font-bold text-[#0d1117]">Delete Bank Account</h3>
             <p className="text-xs text-[#6b7280]">This action cannot be undone</p>
           </div>
         </div>
         <p className="text-sm text-[#4b5563] mb-5">
           Are you sure you want to delete{" "}
           <span className="font-semibold text-[#0d1117]">{account.bank_name}</span> ending in{" "}
-          <span className="font-mono font-semibold">•••{account.account_number.slice(-4)}</span>?
+          <span className="font-mono font-semibold">â€¢â€¢â€¢{account.account_number.slice(-4)}</span>?
         </p>
         <div className="flex gap-3 justify-end">
           <button
@@ -508,7 +508,7 @@ function ConfirmDeleteDialog({
             className="px-5 py-2.5 rounded-full bg-rose-500 text-white text-sm font-semibold hover:bg-rose-600 transition-all disabled:opacity-60 flex items-center gap-2"
           >
             {busy ? (
-              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deleting…</>
+              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deletingâ€¦</>
             ) : (
               <><Trash2 className="w-4 h-4" /> Delete</>
             )}
@@ -520,7 +520,7 @@ function ConfirmDeleteDialog({
   )
 }
 
-// ─── Account Row ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Account Row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function AccountRow({
   account,
   onEdit,
@@ -643,14 +643,14 @@ function AccountRow({
   )
 }
 
-// ─── Empty state ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Empty state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="w-16 h-16 rounded-[24px] bg-gradient-to-br from-[#f3f4f6] to-[#e5e7eb] flex items-center justify-center mb-4">
         <Landmark className="w-8 h-8 text-[#9ca3af]" />
       </div>
-      <h4 className="font-['Space_Grotesk'] text-base font-bold text-[#0d1117] mb-1">
+      <h4 className="font-['Outfit'] text-base font-bold text-[#0d1117] mb-1">
         No bank accounts yet
       </h4>
       <p className="text-sm text-[#6b7280] max-w-xs mb-6">
@@ -667,7 +667,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   )
 }
 
-// ─── Toast ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Toast({ message, type, onDismiss }: { message: string; type: "success" | "error"; onDismiss: () => void }) {
   return (
     <div
@@ -691,7 +691,7 @@ function Toast({ message, type, onDismiss }: { message: string; type: "success" 
   )
 }
 
-// ─── Main component ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function BankAccountsTab({ userId }: { userId: string }) {
   const [accounts, setAccounts]       = useState<BankAccount[]>([])
   const [loading, setLoading]         = useState(true)
@@ -781,7 +781,7 @@ export function BankAccountsTab({ userId }: { userId: string }) {
         {/* Header */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117]">Bank Accounts</h3>
+            <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Bank Accounts</h3>
             <p className="text-sm text-[#6b7280] mt-0.5">
               Manage the accounts where your commissions will be sent.
             </p>

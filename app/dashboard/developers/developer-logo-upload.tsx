@@ -119,7 +119,7 @@ export function DeveloperLogoUpload({
                 <ImageIcon className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117]">Upload Logo</h3>
+                <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Upload Logo</h3>
                 <p className="text-xs text-[#6b7280] truncate max-w-[180px]">{developerName}</p>
               </div>
             </div>
@@ -159,7 +159,7 @@ export function DeveloperLogoUpload({
                   </div>
                   <div className="text-center">
                     <p className="text-sm font-semibold text-[#374151]">Drag & drop or click to upload</p>
-                    <p className="text-xs mt-1">PNG, JPG, WEBP, SVG • Max 10 MB</p>
+                    <p className="text-xs mt-1">PNG, JPG, WEBP, SVG â€¢ Max 10 MB</p>
                   </div>
                 </div>
               )}
@@ -207,7 +207,7 @@ export function DeveloperLogoUpload({
               <button type="button" onClick={() => void handleUpload()} disabled={!file || busy}
                 className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-6 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-50 disabled:translate-y-0 flex items-center gap-2">
                 {busy
-                  ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploading…</>
+                  ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploadingâ€¦</>
                   : <><Check className="w-4 h-4" /> Upload</>
                 }
               </button>

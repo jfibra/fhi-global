@@ -36,7 +36,7 @@ export function PublicNavbar() {
             <Building2 className="w-4.5 h-4.5 text-[#d6b357]" strokeWidth={2} />
           </div>
           <span
-            className={`font-['Space_Grotesk'] font-bold text-lg tracking-tight transition-colors ${
+            className={`font-['Outfit'] font-bold text-lg tracking-tight transition-colors ${
               scrolled ? "text-[#001f3f]" : "text-white"
             }`}
           >

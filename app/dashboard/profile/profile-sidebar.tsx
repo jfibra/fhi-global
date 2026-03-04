@@ -7,9 +7,9 @@ import { ProfileAvatarUpload } from "@/components/profile-avatar-upload"
 import type { DashboardProfile } from "./profile-form"
 
 function formatDate(dateValue: string | null) {
-  if (!dateValue) return "—"
+  if (!dateValue) return "â€”"
   const date = new Date(dateValue)
-  if (Number.isNaN(date.getTime())) return "—"
+  if (Number.isNaN(date.getTime())) return "â€”"
   return date.toLocaleDateString()
 }
 
@@ -69,7 +69,7 @@ export function ProfileSidebar({
           </button>
         </div>
 
-        <h3 className="mt-4 font-['Space_Grotesk'] text-xl font-bold text-[#0d1117]">{displayName}</h3>
+        <h3 className="mt-4 font-['Outfit'] text-xl font-bold text-[#0d1117]">{displayName}</h3>
 
         <div className="mt-2 inline-flex items-center px-3 py-1 bg-gradient-to-r from-[#001f3f] to-[#d6b357] rounded-full">
           <span className="text-xs font-semibold text-white tracking-wide">{roleLabel(profile.role)}</span>
@@ -93,7 +93,7 @@ export function ProfileSidebar({
       {/* Info items */}
       <div className="mt-6 space-y-3">
         {[
-          { icon: Mail, label: email || "—" },
+          { icon: Mail, label: email || "â€”" },
           { icon: ShieldCheck, label: roleLabel(profile.role) },
           { icon: CalendarDays, label: `Joined ${formatDate(profile.joined_at)}` },
           { icon: Clock3, label: profile.timezone || "UTC" },

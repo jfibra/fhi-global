@@ -17,7 +17,7 @@ export default function MemberDashboard() {
       userName={displayName}
     >
       <div className="mb-6">
-        <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#0d1117]">Welcome, {displayName}</h2>
+        <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117]">Welcome, {displayName}</h2>
         <p className="text-sm text-[#9ca3af] mt-0.5">This workspace will house your dashboard soon.</p>
       </div>
     </DashboardShell>

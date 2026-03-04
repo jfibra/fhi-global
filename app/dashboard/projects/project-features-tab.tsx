@@ -46,7 +46,7 @@ export function ProjectFeaturesTab({ projectId, showToast }: Props) {
 
   return (
     <div className="max-w-2xl space-y-5">
-      <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#001f3f]">Project Features</h3>
+      <h3 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">Project Features</h3>
 
       {/* Add */}
       <div className="flex gap-2">
@@ -55,7 +55,7 @@ export function ProjectFeaturesTab({ projectId, showToast }: Props) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && void handleAdd()}
-          placeholder="e.g. Smart home automation…"
+          placeholder="e.g. Smart home automationâ€¦"
           className="flex-1 border border-[#e5e5e5] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#001f3f]/20 focus:border-[#001f3f]"
         />
         <button type="button" onClick={() => void handleAdd()} disabled={saving || !text.trim()}

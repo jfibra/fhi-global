@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { label: "Home",       href: "/" },
   { label: "Developers", href: "/developers" },
   { label: "Projects",   href: "/projects" },
+  { label: "News",       href: "/news" },
   { label: "Contact",    href: "/contact" },
 ]
 
@@ -97,7 +98,7 @@ export function Header() {
               Login
             </Link>
             <Link
-              href="/login"
+              href="/register"
               className="px-6 py-2.5 text-sm font-semibold text-[#001f3f] bg-gradient-to-r from-[#d6b357] to-[#f0d890] hover:from-[#c9a449] hover:to-[#e8d080] rounded-full transition-all duration-300 shadow-md hover:shadow-lg hover:translate-y-[-1px]"
             >
               Register
@@ -239,7 +240,7 @@ export function Header() {
           {/* Footer note */}
           <div className="px-6 py-4 border-t border-white/10">
             <p className="text-[11px] text-white/20 text-center">
-              © {new Date().getFullYear()} FHI Global • Dubai Operations
+              Â© {new Date().getFullYear()} FHI Global â€¢ Dubai Operations
             </p>
           </div>
         </div>

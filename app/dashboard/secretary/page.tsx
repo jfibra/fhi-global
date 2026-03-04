@@ -17,7 +17,7 @@ export default function SecretaryDashboard() {
       userName={displayName}
     >
       <div className="mb-6">
-        <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#0d1117]">Welcome, {displayName}</h2>
+        <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117]">Welcome, {displayName}</h2>
         <p className="text-sm text-[#9ca3af] mt-0.5">Your workspace is getting an update soon.</p>
       </div>
     </DashboardShell>

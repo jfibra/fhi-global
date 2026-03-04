@@ -25,7 +25,7 @@ import {
 } from "@/lib/developer-portal-service"
 import type { Project } from "@/lib/project-service"
 
-// ─── Status badge ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const STATUS_CONFIG: Record<
   string,
   { label: string; cls: string }
@@ -45,7 +45,7 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-// ─── Stat card ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Stat card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StatCard({
   label,
   value,
@@ -67,13 +67,13 @@ function StatCard({
       </div>
       <div>
         <p className="text-xs font-semibold text-[#9ca3af] uppercase tracking-wider mb-0.5">{label}</p>
-        <p className="text-2xl font-bold text-[#0d1117] font-['Space_Grotesk']">{value.toLocaleString()}</p>
+        <p className="text-2xl font-bold text-[#0d1117] font-['Outfit']">{value.toLocaleString()}</p>
       </div>
     </div>
   )
 }
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Skeleton â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function SkeletonCard() {
   return (
     <div className="bg-white/70 backdrop-blur-xl rounded-[24px] border border-white/60 p-5 shadow-md shadow-black/5 flex items-center gap-4 animate-pulse">
@@ -86,14 +86,14 @@ function SkeletonCard() {
   )
 }
 
-// ─── No-developer placeholder ─────────────────────────────────────────────────
+// â”€â”€â”€ No-developer placeholder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function NoDeveloperLinked() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center py-24 px-4">
       <div className="w-20 h-20 rounded-[28px] bg-indigo-50 flex items-center justify-center mb-6">
         <Building2 className="w-9 h-9 text-indigo-400" />
       </div>
-      <h2 className="font-['Space_Grotesk'] text-2xl font-bold text-[#0d1117] mb-3">
+      <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mb-3">
         No Developer Company Linked
       </h2>
       <p className="text-[#6b7280] max-w-md leading-relaxed mb-8">
@@ -110,7 +110,7 @@ function NoDeveloperLinked() {
   )
 }
 
-// ─── Main shell ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function DeveloperDashboardShell({
   userId,
   userName,
@@ -168,7 +168,7 @@ export function DeveloperDashboardShell({
               </div>
             )}
             <div>
-              <h2 className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-[#0d1117]">
+              <h2 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">
                 {developerName ?? "Developer Dashboard"}
               </h2>
               <p className="text-sm text-[#6b7280] mt-0.5">
@@ -230,7 +230,7 @@ export function DeveloperDashboardShell({
           {/* Recent projects */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-['Space_Grotesk'] text-base font-bold text-[#0d1117]">Recent Projects</h3>
+              <h3 className="font-['Outfit'] text-base font-bold text-[#0d1117]">Recent Projects</h3>
               <Link
                 href="/dashboard/developer/projects"
                 className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors flex items-center gap-1"
@@ -290,7 +290,7 @@ export function DeveloperDashboardShell({
                       <p className="font-semibold text-sm text-[#0d1117] truncate">{project.name}</p>
                       <p className="text-xs text-[#9ca3af] flex items-center gap-1.5 mt-0.5">
                         <Clock className="w-3 h-3" />
-                        {project.city ?? "—"} &middot; Updated {new Date(project.updated_at).toLocaleDateString()}
+                        {project.city ?? "â€”"} &middot; Updated {new Date(project.updated_at).toLocaleDateString()}
                       </p>
                     </div>
 

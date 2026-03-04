@@ -32,7 +32,7 @@ export function ContactForm() {
     setStatus("sending")
     setError("")
 
-    // Simulate async send — replace with real API route or email service
+    // Simulate async send â€” replace with real API route or email service
     await new Promise((r) => setTimeout(r, 1400))
     setStatus("success")
     form.reset()
@@ -44,7 +44,7 @@ export function ContactForm() {
         <div className="w-16 h-16 rounded-full bg-[#d6b357]/15 border-2 border-[#d6b357]/30 flex items-center justify-center mb-6">
           <CheckCircle2 className="w-8 h-8 text-[#d6b357]" />
         </div>
-        <h3 className="font-['Space_Grotesk'] text-2xl font-bold text-white lg:text-[#0d1117] mb-2">Message Sent!</h3>
+        <h3 className="font-['Outfit'] text-2xl font-bold text-white lg:text-[#0d1117] mb-2">Message Sent!</h3>
         <p className="text-white/55 lg:text-[#6b7280] text-sm mb-6 max-w-sm">
           Thank you for reaching out. Our team will get back to you within 24 hours.
         </p>

@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { data } = await supabase.from("projects").select("name, meta_title, meta_description, main_image").eq("slug", slug).maybeSingle()
   if (!data) return { title: "Project Not Found" }
   const title = data.meta_title ?? `${data.name} | FHI Global`
-  const description = data.meta_description ?? `Discover ${data.name} – a premium real estate project in Dubai.`
+  const description = data.meta_description ?? `Discover ${data.name} â€“ a premium real estate project in Dubai.`
 
   return createPageMetadata({
     title,
@@ -49,7 +49,7 @@ function formatPrice(from: number | null, to: number | null, currency: string | 
     if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`
     return n.toLocaleString()
   }
-  if (to && to !== from) return `${cur} ${fmt(from)} – ${fmt(to)}`
+  if (to && to !== from) return `${cur} ${fmt(from)} â€“ ${fmt(to)}`
   return `${cur} ${fmt(from)}`
 }
 
@@ -102,7 +102,7 @@ export default async function ProjectDetailPage({ params }: Props) {
       <TopBar />
       <Header />
 
-      {/* ── Hero ──────────────────────────────────────────── */}
+      {/* â”€â”€ Hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="relative min-h-[60vh] flex items-end overflow-hidden">
         {/* BG image */}
         {project.main_image ? (
@@ -143,7 +143,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                 ))}
               </div>
 
-              <h1 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold text-white leading-tight mb-3" style={{ textShadow: "0 2px 30px rgba(0,0,0,0.5)" }}>
+              <h1 className="font-['Outfit'] text-4xl md:text-5xl font-bold text-white leading-tight mb-3" style={{ textShadow: "0 2px 30px rgba(0,0,0,0.5)" }}>
                 {project.name}
               </h1>
 
@@ -163,7 +163,7 @@ export default async function ProjectDetailPage({ params }: Props) {
               {price ? (
                 <div className="mb-4">
                   <p className="text-xs text-white/50 uppercase tracking-widest font-medium mb-1">Starting From</p>
-                  <p className="font-['Space_Grotesk'] text-2xl font-bold text-white">{price}</p>
+                  <p className="font-['Outfit'] text-2xl font-bold text-white">{price}</p>
                 </div>
               ) : null}
               <div className="flex flex-col gap-2.5">
@@ -193,7 +193,7 @@ export default async function ProjectDetailPage({ params }: Props) {
         </div>
       </section>
 
-      {/* ── Quick stats bar ───────────────────────────────── */}
+      {/* â”€â”€ Quick stats bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="bg-white border-b border-[#e8eaed] shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-wrap gap-6 md:gap-10">
           {[
@@ -220,7 +220,7 @@ export default async function ProjectDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* ── Main content ─────────────────────────────────── */}
+      {/* â”€â”€ Main content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left / main column */}
         <div className="lg:col-span-2 space-y-10">
@@ -229,7 +229,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           {(project.description || project.about_project) && (
             <section className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Project Overview</h2>
+              <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Project Overview</h2>
               <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
               {project.description && (
                 <p className="text-[#374151] leading-relaxed mb-4">{project.description}</p>
@@ -247,7 +247,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           {features.length > 0 && (
             <section className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Key Features</h2>
+              <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Key Features</h2>
               <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {features.map((f) => (
@@ -266,7 +266,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           {images.length > 0 && (
             <section className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#0d1117] mt-1 mb-2">
+              <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">
                 Gallery <span className="text-sm font-normal text-[#9ca3af]">({images.length} photos)</span>
               </h2>
               <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
@@ -278,7 +278,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           {units.length > 0 && (
             <section id="units" className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 hover:-translate-y-1 transition-all duration-300 overflow-hidden scroll-mt-24">
               <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Available Unit Types</h2>
+              <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Available Unit Types</h2>
               <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -292,21 +292,21 @@ export default async function ProjectDetailPage({ params }: Props) {
                   <tbody>
                     {units.map((u) => (
                       <tr key={u.id} className="border-b border-[#f9fafb] hover:bg-[#fdf9f0] transition-colors">
-                        <td className="py-3 pr-6 font-semibold text-[#0d1117]">{u.unit_type ?? "—"}</td>
+                        <td className="py-3 pr-6 font-semibold text-[#0d1117]">{u.unit_type ?? "â€”"}</td>
                         <td className="py-3 pr-6 text-[#374151]">
                           {u.bedrooms !== null ? (
                             <span className="flex items-center gap-1"><BedDouble className="w-3.5 h-3.5 text-[#9ca3af]" />{u.bedrooms}</span>
-                          ) : "—"}
+                          ) : "â€”"}
                         </td>
                         <td className="py-3 pr-6 text-[#374151]">
                           {u.bathrooms !== null ? (
                             <span className="flex items-center gap-1"><Bath className="w-3.5 h-3.5 text-[#9ca3af]" />{u.bathrooms}</span>
-                          ) : "—"}
+                          ) : "â€”"}
                         </td>
                         <td className="py-3 pr-6 text-[#374151]">
                           {u.size_sqft ? (
                             <span className="flex items-center gap-1"><Maximize2 className="w-3.5 h-3.5 text-[#9ca3af]" />{u.size_sqft.toLocaleString()}</span>
-                          ) : "—"}
+                          ) : "â€”"}
                         </td>
                         <td className="py-3 pr-6 font-semibold text-[#001f3f]">
                           {u.price_from ? formatPrice(u.price_from, u.price_to, project.currency) : "On Request"}
@@ -334,7 +334,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           {project.project_amenities && project.project_amenities.length > 0 && (
             <section className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Amenities</h2>
+              <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Amenities</h2>
               <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
               <AmenitiesGrid amenities={project.project_amenities as any} />
             </section>
@@ -344,7 +344,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           {((project.project_points && project.project_points.length > 0) || (project.project_neighbors && project.project_neighbors.length > 0)) && (
             <section className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Nearby Places</h2>
+              <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Nearby Places</h2>
               <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
               <NearbyPlaces
                 points={(project.project_points as any[])?.map((p) => ({ ...p, place_type: p.category }))}
@@ -357,7 +357,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           {media.length > 0 && (
             <section className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Media & Virtual Tours</h2>
+              <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Media & Virtual Tours</h2>
               <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {media.map((m) => (
@@ -384,13 +384,13 @@ export default async function ProjectDetailPage({ params }: Props) {
           )}
         </div>
 
-        {/* ── Right sidebar ───────────────────────────────── */}
+        {/* â”€â”€ Right sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="space-y-6">
           {/* Payment plan */}
           {(project.down_payment_percentage || project.payment_plan_details || project.installment_available) && (
             <div className="relative bg-white rounded-[28px] border border-[#e8eaed] p-6 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 transition-all duration-300 overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h3 className="font-['Space_Grotesk'] font-bold text-[#0d1117] mt-1 mb-4">Payment Plan</h3>
+              <h3 className="font-['Outfit'] font-bold text-[#0d1117] mt-1 mb-4">Payment Plan</h3>
               <div className="space-y-3">
                 {project.down_payment_percentage && (
                   <div className="flex items-center justify-between text-sm">
@@ -465,7 +465,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           <div className="bg-gradient-to-br from-[#001f3f] to-[#001428] rounded-[28px] p-6 shadow-lg">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-1.5 h-5 rounded-full bg-gradient-to-b from-[#d6b357] to-[#f0d890]" />
-              <h3 className="font-['Space_Grotesk'] font-bold text-white">Quick Facts</h3>
+              <h3 className="font-['Outfit'] font-bold text-white">Quick Facts</h3>
             </div>
             <div className="space-y-3">
               {[
@@ -486,7 +486,7 @@ export default async function ProjectDetailPage({ params }: Props) {
 
           {/* Contact CTA */}
           <div className="bg-gradient-to-br from-[#d6b357] to-[#c9a449] rounded-[28px] p-6 shadow-[0_8px_32px_rgba(214,179,87,0.4)]">
-            <h3 className="font-['Space_Grotesk'] font-bold text-[#001f3f] text-lg mb-2">Interested in this project?</h3>
+            <h3 className="font-['Outfit'] font-bold text-[#001f3f] text-lg mb-2">Interested in this project?</h3>
             <p className="text-[#001f3f]/70 text-sm mb-4">Get in touch with our team for more details and exclusive offers.</p>
             <div className="flex flex-col gap-2.5">
               {project.sales_contact_phone && (

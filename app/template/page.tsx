@@ -33,7 +33,7 @@ export default function StyleGuide() {
 
       {/* Navigation - Minimal for style guide */}
       <header className="fixed top-0 z-[1000] w-full h-20 flex justify-between items-center px-4 md:px-12 bg-[rgba(250,250,250,0.85)] backdrop-blur-xl border-b border-[rgba(0,0,0,0.03)]">
-        <div className="font-['Space_Grotesk'] font-bold text-xl md:text-2xl tracking-[-0.03em]">
+        <div className="font-['Outfit'] font-bold text-xl md:text-2xl tracking-[-0.03em]">
           glow<span className="text-[#001f3f]">.</span>co <span className="text-sm font-normal text-muted-foreground ml-2">Style Guide</span>
         </div>
         <a href="/" className="text-sm font-medium hover:text-[#001f3f] transition-colors flex items-center gap-2">
@@ -48,7 +48,7 @@ export default function StyleGuide() {
             <span className="w-2 h-2 bg-[#001f3f] rounded-full mr-2 animate-pulse" />
             V2.0 Design System
           </div>
-          <h1 className="font-['Space_Grotesk'] text-5xl md:text-7xl leading-[1.1] font-bold tracking-tight mb-6">
+          <h1 className="font-['Outfit'] text-5xl md:text-7xl leading-[1.1] font-bold tracking-tight mb-6">
             Everything is <br />
             <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
               Built with Intention.
@@ -70,11 +70,11 @@ export default function StyleGuide() {
           <div className="grid gap-12">
             <div className="grid md:grid-cols-3 items-baseline gap-8">
               <span className="text-xs font-mono text-muted-foreground">Heading 1 / Space Grotesk Bold</span>
-              <h1 className="md:col-span-2 font-['Space_Grotesk'] text-5xl md:text-6xl font-bold tracking-tight">Main Heading Display</h1>
+              <h1 className="md:col-span-2 font-['Outfit'] text-5xl md:text-6xl font-bold tracking-tight">Main Heading Display</h1>
             </div>
             <div className="grid md:grid-cols-3 items-baseline gap-8">
               <span className="text-xs font-mono text-muted-foreground">Heading 2 / Space Grotesk SemiBold</span>
-              <h2 className="md:col-span-2 font-['Space_Grotesk'] text-4xl font-semibold tracking-tight">Section Title Header</h2>
+              <h2 className="md:col-span-2 font-['Outfit'] text-4xl font-semibold tracking-tight">Section Title Header</h2>
             </div>
             <div className="grid md:grid-cols-3 items-baseline gap-8">
               <span className="text-xs font-mono text-muted-foreground">Body Large / Geist Sans</span>
@@ -226,7 +226,7 @@ export default function StyleGuide() {
               <div className="w-12 h-12 rounded-2xl bg-[#001f3f]/10 flex items-center justify-center text-[#001f3f]">
                 <Info className="w-6 h-6" />
               </div>
-              <h3 className="font-['Space_Grotesk'] text-xl font-bold">Glassmorphism Surface</h3>
+              <h3 className="font-['Outfit'] text-xl font-bold">Glassmorphism Surface</h3>
               <p className="text-sm text-[#555] leading-relaxed">
                 Used for floating elements and high-contrast sections over images or colorful backgrounds.
               </p>
@@ -245,7 +245,7 @@ export default function StyleGuide() {
                   <h4 className="font-bold">Product Title</h4>
                   <p className="text-xs text-muted-foreground uppercase tracking-widest">Category</p>
                 </div>
-                <span className="text-lg font-bold font-['Space_Grotesk']">$48</span>
+                <span className="text-lg font-bold font-['Outfit']">$48</span>
               </div>
             </div>
 
@@ -269,7 +269,7 @@ export default function StyleGuide() {
       </main>
 
       <footer className="bg-[#111] text-white py-12 px-4 text-center">
-        <p className="text-sm text-muted-foreground mb-4">glow.co — Design System v2.0</p>
+        <p className="text-sm text-muted-foreground mb-4">glow.co â€” Design System v2.0</p>
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           className="p-3 rounded-full bg-white/10 hover:bg-white/20 transition-all"

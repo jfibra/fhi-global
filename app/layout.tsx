@@ -1,18 +1,20 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google"
+import { Geist, Geist_Mono, Outfit } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { DEFAULT_PREVIEW_IMAGE_URL } from "@/lib/seo"
+import { PageTransitionWrapper } from "@/components/ui/PageTransitionWrapper"
+import { NavigationLoader } from "@/components/ui/NavigationLoader"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
-// <CHANGE> Added Space Grotesk font for the display text
-const _spaceGrotesk = Space_Grotesk({ subsets: ["latin"] })
+// Outfit font for display headings (matches Figma design)
+const _outfit = Outfit({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: {
-    default: "FHI Global — Dubai Real Estate",
+    default: "FHI Global â€” Dubai Real Estate",
     template: "%s | FHI Global",
   },
   description: "Discover premium property projects in Dubai from verified developers.",
@@ -29,14 +31,14 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
-    title: "FHI Global — Dubai Real Estate",
+    title: "FHI Global â€” Dubai Real Estate",
     description: "Discover premium property projects in Dubai from verified developers.",
     type: "website",
     images: [{ url: DEFAULT_PREVIEW_IMAGE_URL }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "FHI Global — Dubai Real Estate",
+    title: "FHI Global â€” Dubai Real Estate",
     description: "Discover premium property projects in Dubai from verified developers.",
     images: [DEFAULT_PREVIEW_IMAGE_URL],
   },
@@ -50,7 +52,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>
-        {children}
+        <PageTransitionWrapper>
+          {children}
+        </PageTransitionWrapper>
+        <NavigationLoader />
         <Analytics />
       </body>
     </html>

@@ -97,7 +97,7 @@ export function ProjectHeader({ project, onPublishToggle, onDuplicate, onDelete 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
-            <h2 className="font-['Space_Grotesk'] text-2xl font-bold text-[#001f3f] truncate">{project.name}</h2>
+            <h2 className="font-['Outfit'] text-2xl font-bold text-[#001f3f] truncate">{project.name}</h2>
             {project.is_featured && (
               <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#d6b357]/20 text-[#a0842c]">
                 <Star className="w-3 h-3" />Featured
@@ -121,7 +121,7 @@ export function ProjectHeader({ project, onPublishToggle, onDuplicate, onDelete 
               <span className="text-[#6b7280] text-xs">by {project.developers.name}</span>
             )}
             {project.city && (
-              <span className="text-[#9ca3af] text-xs">· {project.city}{project.country ? `, ${project.country}` : ""}</span>
+              <span className="text-[#9ca3af] text-xs">Â· {project.city}{project.country ? `, ${project.country}` : ""}</span>
             )}
           </div>
         </div>

@@ -90,7 +90,7 @@ export function TeamFormDialog({ open, onClose, onSave, initialData, teams }: Pr
     }
   }
 
-  // Available parent options — exclude current team and its subteams
+  // Available parent options â€” exclude current team and its subteams
   const excluded = new Set<string>()
   if (initialData) {
     excluded.add(initialData.id)
@@ -109,7 +109,7 @@ export function TeamFormDialog({ open, onClose, onSave, initialData, teams }: Pr
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#f0f2f5] shrink-0">
           <div>
-            <h2 className="font-['Space_Grotesk'] text-base font-bold text-[#0d1117]">
+            <h2 className="font-['Outfit'] text-base font-bold text-[#0d1117]">
               {initialData ? "Edit Team" : "Create Team"}
             </h2>
             <p className="text-xs text-[#9ca3af] mt-0.5">
@@ -162,7 +162,7 @@ export function TeamFormDialog({ open, onClose, onSave, initialData, teams }: Pr
                   onChange={e => field("team_type", e.target.value)}
                   className={selectCls(false)}
                 >
-                  <option value="">— Select type —</option>
+                  <option value="">â€” Select type â€”</option>
                   {TEAM_TYPES.map(t => (
                     <option key={t} value={t}>{t}</option>
                   ))}
@@ -180,7 +180,7 @@ export function TeamFormDialog({ open, onClose, onSave, initialData, teams }: Pr
                   onChange={e => field("parent_id", e.target.value || null)}
                   className={selectCls(!!errors.parent_id)}
                 >
-                  <option value="">— None (main team) —</option>
+                  <option value="">â€” None (main team) â€”</option>
                   {parentOptions.map(t => (
                     <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
@@ -202,7 +202,7 @@ export function TeamFormDialog({ open, onClose, onSave, initialData, teams }: Pr
                 rows={3}
                 value={form.description}
                 onChange={e => field("description", e.target.value)}
-                placeholder="Describe the purpose of this team…"
+                placeholder="Describe the purpose of this teamâ€¦"
                 className={`${inputCls(false)} resize-none`}
               />
             </div>
@@ -261,7 +261,7 @@ export function TeamFormDialog({ open, onClose, onSave, initialData, teams }: Pr
   return createPortal(modal, document.body)
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Label({ text, required }: { text: string; required?: boolean }) {
   return (

@@ -13,9 +13,9 @@ import { StatusBadge } from "@/components/status-badge"
 
 type BannerType = "success" | "error"
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function fmt(date: string | null | undefined) {
-  if (!date) return "—"
+  if (!date) return "â€”"
   return new Date(date).toLocaleDateString("en-AE", { year: "numeric", month: "short", day: "numeric" })
 }
 function metaStr(meta: Record<string, unknown> | null, key: string) {
@@ -23,7 +23,7 @@ function metaStr(meta: Record<string, unknown> | null, key: string) {
   return typeof v === "string" && v.trim() ? v.trim() : null
 }
 
-// ─── Component ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function UserDrawer({
   user,
   onClose,
@@ -56,7 +56,7 @@ export function UserDrawer({
     ? `${metaStr(user.metadata, "whatsapp_country_code")} ${metaStr(user.metadata, "whatsapp_number")}` : null
   const linkedDeveloperId = metaStr(user.metadata, "developer_id")
 
-  // ── Reset password handler ───────────────────────────────────────────────────
+  // â”€â”€ Reset password handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleResetPassword = async () => {
     if (!newPwd || newPwd.length < 8) {
       onBanner("error", "Password must be at least 8 characters.")
@@ -87,9 +87,9 @@ export function UserDrawer({
       {/* Drawer */}
       <aside className="fixed inset-y-0 right-0 z-[210] w-full max-w-md bg-white shadow-2xl shadow-black/20 flex flex-col">
 
-        {/* ── Header ── */}
+        {/* â”€â”€ Header â”€â”€ */}
         <div className="flex items-center justify-between px-6 pt-6 pb-5 border-b border-[#f0f2f5] shrink-0">
-          <h2 className="font-['Space_Grotesk'] font-bold text-[#0d1117]">User Details</h2>
+          <h2 className="font-['Outfit'] font-bold text-[#0d1117]">User Details</h2>
           <button
             type="button"
             onClick={onClose}
@@ -99,21 +99,21 @@ export function UserDrawer({
           </button>
         </div>
 
-        {/* ── Scrollable body ── */}
+        {/* â”€â”€ Scrollable body â”€â”€ */}
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
 
-          {/* ── Identity card ── */}
+          {/* â”€â”€ Identity card â”€â”€ */}
           <div className="flex flex-col items-center text-center py-4 bg-gradient-to-b from-[#f8f9fb] to-white rounded-[20px] border border-[#f0f2f5]">
             <UserAvatar name={displayName} imageUrl={user.profile_url} size={72} />
-            <h3 className="mt-3 font-['Space_Grotesk'] text-lg font-bold text-[#0d1117]">{displayName}</h3>
-            <p className="text-sm text-[#9ca3af] mt-0.5">{user.email ?? "—"}</p>
+            <h3 className="mt-3 font-['Outfit'] text-lg font-bold text-[#0d1117]">{displayName}</h3>
+            <p className="text-sm text-[#9ca3af] mt-0.5">{user.email ?? "â€”"}</p>
             <div className="flex items-center gap-2 mt-3">
               <RoleBadge role={user.role} />
               <StatusBadge status={user.status} isDeleted={user.is_deleted} />
             </div>
           </div>
 
-          {/* ── Info rows ── */}
+          {/* â”€â”€ Info rows â”€â”€ */}
           <div className="space-y-2.5">
             <InfoRow icon={Mail}        label="Email"    value={user.email} />
             <InfoRow icon={Shield}      label="Role"     value={<RoleBadge role={user.role} />} />
@@ -128,7 +128,7 @@ export function UserDrawer({
             {user.gender   && <InfoRow icon={Shield}       label="Gender"   value={user.gender} />}
           </div>
 
-          {/* ── Reset password panel ── */}
+          {/* â”€â”€ Reset password panel â”€â”€ */}
           {resetTab && (
             <div className="rounded-[20px] border border-[#e5e5e5] bg-[#f8f9fb] p-4 space-y-3">
               <p className="text-xs font-bold uppercase tracking-wider text-[#6b7280]">New Password</p>
@@ -167,19 +167,19 @@ export function UserDrawer({
                   ) : (
                     <CheckCircle className="w-4 h-4" />
                   )}
-                  {busy ? "Saving…" : "Set Password"}
+                  {busy ? "Savingâ€¦" : "Set Password"}
                 </button>
               </div>
             </div>
           )}
 
-          {/* ── Updated at ── */}
+          {/* â”€â”€ Updated at â”€â”€ */}
           {user.updated_at && (
             <p className="text-center text-[11px] text-[#c4c9d4]">Last updated {fmt(user.updated_at)}</p>
           )}
         </div>
 
-        {/* ── Action footer ── */}
+        {/* â”€â”€ Action footer â”€â”€ */}
         <div className="shrink-0 border-t border-[#f0f2f5] px-6 py-4 space-y-2">
           <div className="grid grid-cols-2 gap-2">
             <ActionBtn icon={Edit3} label="Edit Profile"
@@ -212,7 +212,7 @@ export function UserDrawer({
   )
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function InfoRow({
   icon: Icon,
   label,
@@ -230,7 +230,7 @@ function InfoRow({
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">{label}</p>
-        <div className="text-[#374151] mt-0.5 truncate">{value ?? "—"}</div>
+        <div className="text-[#374151] mt-0.5 truncate">{value ?? "â€”"}</div>
       </div>
     </div>
   )

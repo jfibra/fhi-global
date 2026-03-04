@@ -22,10 +22,10 @@ function Portal({ children }: { children: React.ReactNode }) {
 }
 
 function formatDate(value: string | null) {
-  if (!value) return "—"
+  if (!value) return "â€”"
   const date = new Date(value)
   return Number.isNaN(date.getTime())
-    ? "—"
+    ? "â€”"
     : date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
 }
 
@@ -61,7 +61,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">{label}</span>
-      <span className="text-sm text-[#0d1117] font-medium">{value ?? "—"}</span>
+      <span className="text-sm text-[#0d1117] font-medium">{value ?? "â€”"}</span>
     </div>
   )
 }
@@ -81,7 +81,7 @@ function SectionCard({
         <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center">
           <Icon className="w-3.5 h-3.5 text-white" />
         </div>
-        <h3 className="font-['Space_Grotesk'] text-sm font-bold text-[#0d1117] uppercase tracking-wider">{title}</h3>
+        <h3 className="font-['Outfit'] text-sm font-bold text-[#0d1117] uppercase tracking-wider">{title}</h3>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
         {children}
@@ -99,7 +99,7 @@ export function SaleDetails({
 }) {
   const clientName = sale.clients
     ? `${sale.clients.first_name} ${sale.clients.last_name}`
-    : "—"
+    : "â€”"
 
   return (
     <Portal>
@@ -121,9 +121,9 @@ export function SaleDetails({
                   <DollarSign className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h2 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117]">{clientName}</h2>
+                  <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{clientName}</h2>
                   <p className="text-xs text-[#9ca3af] mt-0.5">
-                    {sale.projects?.name ?? "—"} · {sale.developers?.name ?? "—"}
+                    {sale.projects?.name ?? "â€”"} Â· {sale.developers?.name ?? "â€”"}
                   </p>
                 </div>
               </div>

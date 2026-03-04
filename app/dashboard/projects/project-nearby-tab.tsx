@@ -64,7 +64,7 @@ export function ProjectNearbyTab({ projectId, showToast }: Props) {
   return (
     <div className="max-w-3xl space-y-5">
       <div className="flex items-center justify-between">
-        <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#001f3f]">Nearby Places</h3>
+        <h3 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">Nearby Places</h3>
         <button type="button" onClick={() => setEditing({ ...EMPTY })}
           className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
           <Plus className="w-3.5 h-3.5" /> Add Place
@@ -98,7 +98,7 @@ export function ProjectNearbyTab({ projectId, showToast }: Props) {
               className="px-4 py-2 rounded-full border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-all">Cancel</button>
             <button type="button" onClick={() => void handleSave()} disabled={saving || !editing.description?.trim()}
               className="px-4 py-2 rounded-full bg-[#001f3f] text-white text-sm font-semibold disabled:opacity-50 hover:bg-[#001f3f]/90 transition-all">
-              {saving ? "Saving…" : "Save"}
+              {saving ? "Savingâ€¦" : "Save"}
             </button>
           </div>
         </div>

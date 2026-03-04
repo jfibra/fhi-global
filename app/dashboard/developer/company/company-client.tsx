@@ -21,7 +21,7 @@ import { DeveloperLogoUpload } from "@/app/dashboard/developers/developer-logo-u
 import { updateDeveloperCompany, type DeveloperCompanyFormData } from "@/lib/developer-portal-service"
 import type { Developer } from "@/lib/developer-service"
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type ToastVariant = "success" | "error"
 interface ToastMsg { id: number; variant: ToastVariant; message: string }
 
@@ -38,14 +38,14 @@ function ToastList({ toasts, remove }: { toasts: ToastMsg[]; remove: (id: number
           }`}
         >
           <span className="flex-1">{t.message}</span>
-          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
+          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
         </div>
       ))}
     </div>
   )
 }
 
-// ─── Slug generator ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Slug generator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function generateSlug(name: string): string {
   return name
     .toLowerCase()
@@ -55,7 +55,7 @@ function generateSlug(name: string): string {
     .replace(/-+/g, "-")
 }
 
-// ─── Field ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Field({
   label,
   icon: Icon,
@@ -76,21 +76,21 @@ function Field({
   )
 }
 
-// ─── Input style ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Input style â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const inputCls =
   "w-full rounded-2xl border border-[#e5e5e5] bg-white px-4 py-3 text-sm text-[#0d1117] placeholder-[#d1d5db] focus:outline-none focus:border-[#001f3f] focus:ring-2 focus:ring-[#001f3f]/10 transition-all"
 
 const textareaCls =
   "w-full rounded-2xl border border-[#e5e5e5] bg-white px-4 py-3 text-sm text-[#0d1117] placeholder-[#d1d5db] focus:outline-none focus:border-[#001f3f] focus:ring-2 focus:ring-[#001f3f]/10 transition-all resize-none"
 
-// ─── No-developer placeholder ─────────────────────────────────────────────────
+// â”€â”€â”€ No-developer placeholder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function NoDeveloperLinked() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] text-center py-20">
       <div className="w-16 h-16 rounded-[28px] bg-indigo-50 flex items-center justify-center mb-5">
         <Building2 className="w-8 h-8 text-indigo-400" />
       </div>
-      <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#0d1117] mb-2">No Developer Linked</h2>
+      <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mb-2">No Developer Linked</h2>
       <p className="text-sm text-[#6b7280] max-w-sm">
         Your account hasn&apos;t been linked to a developer company yet. Please contact an administrator.
       </p>
@@ -98,7 +98,7 @@ function NoDeveloperLinked() {
   )
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function CompanyClient({
   userId,
   userName,
@@ -179,7 +179,7 @@ export function CompanyClient({
         <form onSubmit={(e) => void handleSave(e)} className="space-y-8">
           {/* Header */}
           <div>
-            <h2 className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-[#0d1117]">
+            <h2 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">
               Company Information
             </h2>
             <p className="text-sm text-[#6b7280] mt-1">
@@ -216,18 +216,18 @@ export function CompanyClient({
 
               {/* Identity */}
               <div className="flex-1 text-center sm:text-left">
-                <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#0d1117]">{developer.name}</h3>
+                <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{developer.name}</h3>
                 <p className="text-sm text-[#9ca3af] font-mono mt-0.5">slug: {developer.slug}</p>
                 <div className="flex items-center justify-center sm:justify-start gap-2 mt-2.5">
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${developer.is_verified ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                    {developer.is_verified ? "✓ Verified" : "Unverified"}
+                    {developer.is_verified ? "âœ“ Verified" : "Unverified"}
                   </span>
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${developer.is_active ? "bg-indigo-100 text-indigo-700" : "bg-rose-100 text-rose-700"}`}>
                     {developer.is_active ? "Active" : "Inactive"}
                   </span>
                   {(developer.rating ?? 0) > 0 && (
                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                      ★ {developer.rating}
+                      â˜… {developer.rating}
                     </span>
                   )}
                 </div>
@@ -353,7 +353,7 @@ export function CompanyClient({
               {saving ? (
                 <>
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Saving…
+                  Savingâ€¦
                 </>
               ) : (
                 <>

@@ -64,7 +64,7 @@ export function ProjectSettingsTab({ project, onSave, onPublishToggle }: Props) 
 
   return (
     <div className="max-w-2xl space-y-5">
-      <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#001f3f]">Project Settings</h3>
+      <h3 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">Project Settings</h3>
 
       <div className="bg-white rounded-2xl border border-[#f0f0f0] p-5 space-y-0">
         <Toggle
@@ -78,7 +78,7 @@ export function ProjectSettingsTab({ project, onSave, onPublishToggle }: Props) 
         <Toggle
           fieldKey="is_active"
           label="Active"
-          description="Internal active status — affects listing visibility"
+          description="Internal active status â€” affects listing visibility"
           icon={CheckCircle2}
           value={project.is_active}
           accent="#2563eb"

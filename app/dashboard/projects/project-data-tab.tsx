@@ -110,7 +110,7 @@ export function ProjectDataTab({ project, onJump, showToast }: Props) {
       key: "settings",
       label: "Status",
       ok: project.is_active && project.is_published,
-      detail: `${project.is_published ? "Published" : "Draft"} · ${project.is_active ? "Active" : "Inactive"}`,
+      detail: `${project.is_published ? "Published" : "Draft"} Â· ${project.is_active ? "Active" : "Inactive"}`,
       targetTab: "settings",
     },
   ]
@@ -126,7 +126,7 @@ export function ProjectDataTab({ project, onJump, showToast }: Props) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-['Space_Grotesk'] text-lg font-bold text-[#001f3f]">Data health check</h3>
+          <h3 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">Data health check</h3>
           <p className="text-sm text-[#6b7280]">See which parts of this project are missing data and jump to the right tab.</p>
         </div>
         <button

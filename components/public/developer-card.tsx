@@ -37,12 +37,12 @@ export function DeveloperCard({ developer }: { developer: DeveloperCardData }) {
       {/* Info */}
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-['Space_Grotesk'] font-bold text-[#0d1117] text-base leading-snug group-hover:text-[#001f3f] transition-colors">
+          <h3 className="font-['Outfit'] font-bold text-[#0d1117] text-base leading-snug group-hover:text-[#001f3f] transition-colors">
             {developer.name}
           </h3>
           {developer.is_verified && (
             <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#001f3f]/8 text-[10px] font-bold text-[#001f3f] uppercase tracking-wider">
-              ✓ Verified
+              âœ“ Verified
             </span>
           )}
         </div>

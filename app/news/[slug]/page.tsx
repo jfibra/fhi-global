@@ -1,0 +1,367 @@
+import type { Metadata } from "next"
+import Link from "next/link"
+import { notFound } from "next/navigation"
+import { TopBar } from "@/components/topbar"
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
+import { fetchArticleBySlug, fetchArticles, type NewsArticle } from "@/lib/news-service"
+import { Clock, Play } from "lucide-react"
+
+export const revalidate = 300
+
+// â”€â”€ Metadata â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+type PageProps = { params: Promise<{ slug: string }> }
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
+
+  const article = await fetchArticleBySlug(slug)
+  if (!article) {
+    return {
+      title: "Article Not Found | FHI Global News",
+    }
+  }
+
+  const canonical = `${siteUrl}/news/${article.slug}`
+  const description = article.excerpt || article.title
+  const image = article.img && article.img !== "/img/1.png" ? article.img : undefined
+
+  return {
+    title: `${article.title} | FHI Global News`,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title: article.title,
+      description,
+      url: canonical,
+      type: "article",
+      publishedTime: article.date || undefined,
+      images: image ? [{ url: image, alt: article.title }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: article.title,
+      description,
+      images: image ? [image] : undefined,
+    },
+  }
+}
+
+// â”€â”€ Time ago label â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function timeAgoLabel(dateStr: string): string {
+  if (!dateStr) return "UPDATED RECENTLY"
+  try {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60_000)
+    const hours = Math.floor(diff / 3_600_000)
+    const days = Math.floor(diff / 86_400_000)
+    if (mins < 60) return `UPDATED ${mins} MIN AGO`
+    if (hours < 24) return `UPDATED ${hours} HOUR${hours === 1 ? "" : "S"} AGO`
+    if (days < 30) return `UPDATED ${days} DAY${days === 1 ? "" : "S"} AGO`
+    return "UPDATED RECENTLY"
+  } catch {
+    return "UPDATED RECENTLY"
+  }
+}
+
+function fmt(dateStr: string) {
+  if (!dateStr) return ""
+  try {
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
+  } catch {
+    return dateStr
+  }
+}
+
+// â”€â”€ Share strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function ShareStrip({ url, title, compact }: { url: string; title: string; compact?: boolean }) {
+  const e = encodeURIComponent(url)
+  const t = encodeURIComponent(title)
+  return (
+    <div className="flex items-center gap-2">
+      {!compact && (
+        <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mr-1">Share</span>
+      )}
+      <a
+        href={`https://www.facebook.com/sharer/sharer.php?u=${e}`}
+        target="_blank" rel="noopener noreferrer"
+        className="w-7 h-7 rounded-full bg-[#1877f2] flex items-center justify-center text-white hover:opacity-75 transition-opacity"
+        aria-label="Share on Facebook"
+      >
+        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg>
+      </a>
+      <a
+        href={`https://twitter.com/intent/tweet?url=${e}&text=${t}`}
+        target="_blank" rel="noopener noreferrer"
+        className="w-7 h-7 rounded-full bg-black flex items-center justify-center text-white hover:opacity-75 transition-opacity"
+        aria-label="Share on X / Twitter"
+      >
+        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+      </a>
+      <a
+        href={`https://www.linkedin.com/sharing/share-offsite/?url=${e}`}
+        target="_blank" rel="noopener noreferrer"
+        className="w-7 h-7 rounded-full bg-[#0077b5] flex items-center justify-center text-white hover:opacity-75 transition-opacity"
+        aria-label="Share on LinkedIn"
+      >
+        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" /><rect x="2" y="9" width="4" height="12" /><circle cx="4" cy="4" r="2" /></svg>
+      </a>
+    </div>
+  )
+}
+
+// â”€â”€ Article content renderer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function ArticleContent({ content }: { content: string }) {
+  if (!content) {
+    return <p className="text-gray-400 italic text-sm">No content available.</p>
+  }
+  // If HTML, render as-is
+  if (content.trimStart().startsWith("<")) {
+    return (
+      <div
+        className="prose prose-sm sm:prose max-w-none prose-headings:text-[#001428] prose-headings:font-black prose-a:text-[#d6b357] prose-a:no-underline hover:prose-a:underline prose-img:rounded"
+        dangerouslySetInnerHTML={{ __html: content }}
+      />
+    )
+  }
+  // Otherwise, split by blank lines into paragraphs
+  const paragraphs = content
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+  return (
+    <>
+      {paragraphs.map((p, i) => (
+        <p key={i} className="text-gray-700 text-sm sm:text-base leading-relaxed mb-4">
+          {p}
+        </p>
+      ))}
+    </>
+  )
+}
+
+// â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export default async function NewsDetailPage({ params }: PageProps) {
+  const { slug } = await params
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
+
+  // Fetch in parallel
+  const [article, latestNews] = await Promise.all([
+    fetchArticleBySlug(slug),
+    fetchArticles(1),
+  ])
+
+  if (!article) {
+    notFound()
+  }
+
+  const articleUrl = `${siteUrl}/news/${article.slug}`
+  const timeLabel = timeAgoLabel(article.date)
+
+  // Related stories: latest news excluding current, shuffled, take 6
+  const related = latestNews
+    .filter((a) => a.slug !== article.slug)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 6)
+
+  const latestStories = related.slice(0, 4)
+  const trending = related.slice(3, 6)
+
+  return (
+    <div className="min-h-screen bg-white font-sans">
+      <TopBar />
+      <Header />
+
+      {/* â”€â”€ Breadcrumb â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      <div className="border-b border-gray-200 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-9 flex items-center gap-2 text-xs text-gray-400">
+          <Link href="/" className="hover:text-[#d6b357] transition-colors">Home</Link>
+          <span>/</span>
+          <Link href="/news" className="hover:text-[#d6b357] transition-colors">News</Link>
+          <span>/</span>
+          <span className="text-gray-600 truncate max-w-xs">{article.title}</span>
+        </div>
+      </div>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+          {/* â”€â”€ LEFT / MAIN ARTICLE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          <article className="lg:col-span-8">
+
+            {/* Title block with left border style */}
+            <div className="border-l-4 border-[#d6b357] pl-4 mb-4">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#001428] leading-tight">
+                {article.title}
+              </h1>
+            </div>
+
+            {/* Meta row: updated label + author + share actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-5 py-3 border-y border-gray-100">
+              <div className="flex flex-wrap items-center gap-4">
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#d6b357]">
+                  {timeLabel}
+                </span>
+                {article.author && (
+                  <span className="text-xs text-gray-500">
+                    By <span className="font-semibold text-[#001428]">{article.author}</span>
+                  </span>
+                )}
+                {article.readTime && (
+                  <span className="flex items-center gap-1 text-xs text-gray-400">
+                    <Clock className="w-3 h-3" />
+                    {article.readTime}
+                  </span>
+                )}
+              </div>
+              <ShareStrip url={articleUrl} title={article.title} />
+            </div>
+
+            {/* Excerpt */}
+            {article.excerpt && (
+              <p className="text-base sm:text-lg text-gray-600 font-medium leading-relaxed mb-5 border-b border-gray-100 pb-5">
+                {article.excerpt}
+              </p>
+            )}
+
+            {/* Featured image */}
+            <div className="relative overflow-hidden aspect-video bg-gray-100 mb-6">
+              <img
+                src={article.img}
+                alt={article.title}
+                className="w-full h-full object-cover"
+              />
+              {article.hasVideo && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center">
+                    <Play className="w-6 h-6 text-white fill-current" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Article content */}
+            <div className="mb-8">
+              <ArticleContent content={article.content ?? ""} />
+            </div>
+
+            {/* Bottom share section */}
+            <div className="border-t border-gray-200 pt-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-[#001428] mb-0.5">
+                  Share this article
+                </p>
+                <p className="text-[10px] text-gray-400">
+                  Help others stay informed about the real estate market.
+                </p>
+              </div>
+              <ShareStrip url={articleUrl} title={article.title} />
+            </div>
+
+            {/* Back link */}
+            <div className="mt-6">
+              <Link
+                href="/news"
+                className="inline-flex items-center gap-2 text-xs font-semibold text-[#001428] hover:text-[#d6b357] transition-colors uppercase tracking-widest"
+              >
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-none stroke-current" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 12H5m7-7-7 7 7 7" />
+                </svg>
+                Back to News
+              </Link>
+            </div>
+          </article>
+
+          {/* â”€â”€ RIGHT SIDEBAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          <aside className="lg:col-span-4 flex flex-col gap-8">
+
+            {/* LATEST STORIES */}
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#001428] border-b-2 border-[#001428] pb-1 mb-4">
+                Latest Stories
+              </p>
+              <ul className="space-y-4">
+                {latestStories.map((item) => (
+                  <li key={item.id}>
+                    <Link href={`/news/${item.slug}`} className="group flex gap-3">
+                      <div className="w-16 h-12 shrink-0 overflow-hidden bg-gray-100">
+                        <img
+                          src={item.img}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-[#001428] group-hover:text-[#d6b357] transition-colors leading-snug line-clamp-2 mb-1">
+                          {item.title}
+                        </p>
+                        <p className="text-[10px] text-gray-400">{fmt(item.date)}</p>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* TRENDING */}
+            {trending.length > 0 && (
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#001428] border-b-2 border-[#001428] pb-1 mb-4">
+                  Trending
+                </p>
+                <ul className="space-y-4">
+                  {trending.map((item) => (
+                    <li key={item.id}>
+                      <Link href={`/news/${item.slug}`} className="group block">
+                        <div className="relative overflow-hidden aspect-video bg-gray-100 mb-2">
+                          <img
+                            src={item.img}
+                            alt={item.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                          {item.badge && (
+                            <span className="absolute top-1.5 left-1.5 bg-[#d6b357] text-[#001428] text-[8px] font-black uppercase px-1.5 py-0.5">
+                              {item.badge}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm font-bold text-[#001428] group-hover:text-[#d6b357] transition-colors leading-snug line-clamp-2 mb-1">
+                          {item.title}
+                        </p>
+                        <p className="text-[10px] text-gray-400">{fmt(item.date)}</p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Static ad / newsletter promo */}
+            <div className="bg-[#001428] p-5 text-white">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#d6b357] mb-2">
+                Stay Informed
+              </p>
+              <p className="text-sm font-bold leading-snug mb-3">
+                Get the latest real estate intelligence delivered to your inbox.
+              </p>
+              <Link
+                href="/contact"
+                className="inline-block bg-[#d6b357] text-[#001428] text-xs font-black uppercase tracking-widest px-4 py-2 hover:bg-[#c4a247] transition-colors"
+              >
+                Contact Us
+              </Link>
+            </div>
+          </aside>
+
+        </div>
+      </main>
+
+      <Footer />
+    </div>
+  )
+}

@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy,
 } from "lucide-react"
 
-// ─── Base types ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Base types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface NavItem {
   icon: LucideIcon
@@ -29,7 +29,7 @@ export interface NavGroupSection {
 
 export type NavSection = NavStandaloneSection | NavGroupSection
 
-// ─── Role configuration ────────────────────────────────────────────────────────
+// â”€â”€â”€ Role configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ROLE_BASE_PATH: Record<string, string> = {
   super_admin:    "/dashboard/superadmin",
@@ -65,7 +65,7 @@ export function getRoleColor(role: string | null | undefined): string {
   return ROLE_COLOR[resolveRole(role)]
 }
 
-// ─── Grouped nav sections ──────────────────────────────────────────────────────
+// â”€â”€â”€ Grouped nav sections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function getSidebarNavSections(role: string | null | undefined): NavSection[] {
   const normalizedRole = resolveRole(role)
@@ -149,14 +149,14 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
     ]
   }
 
-  // All other roles — flat overview only
+  // All other roles â€” flat overview only
   return [
     { type: "item", item: { icon: LayoutDashboard, label: "Overview", href: basePath } },
     { type: "item", item: { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support" } },
   ]
 }
 
-// ─── Backward-compat flat list ─────────────────────────────────────────────────
+// â”€â”€â”€ Backward-compat flat list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function getSidebarNavItems(role: string | null | undefined): NavItem[] {
   return getSidebarNavSections(role).flatMap(section =>

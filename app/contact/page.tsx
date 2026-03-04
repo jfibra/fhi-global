@@ -23,14 +23,14 @@ const OFFICES = [
     address: "Level 12, DIFC Gate Building, Dubai International Financial Centre, Dubai, UAE",
     phone: "+971 4 300 1234",
     email: "info@fhiglobal.com",
-    hours: "Sun–Thu: 9:00 AM – 6:00 PM",
+    hours: "Sunâ€“Thu: 9:00 AM â€“ 6:00 PM",
   },
   {
     city: "Abu Dhabi",
     address: "Suite 501, Al Bateen Investment Complex, Abu Dhabi, UAE",
     phone: "+971 2 400 5678",
     email: "abudhabi@fhiglobal.com",
-    hours: "Sun–Thu: 9:00 AM – 6:00 PM",
+    hours: "Sunâ€“Thu: 9:00 AM â€“ 6:00 PM",
   },
 ]
 
@@ -65,7 +65,7 @@ export default function ContactPage() {
       <TopBar />
       <Header />
 
-      {/* ── Hero ─────────────────────────────────────────────── */}
+      {/* â”€â”€ Hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="relative pt-20 pb-24 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
@@ -91,7 +91,7 @@ export default function ContactPage() {
           </div>
 
           <h1
-            className="font-['Space_Grotesk'] text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight mb-5"
+            className="font-['Outfit'] text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight mb-5"
             style={{ textShadow: "0 2px 30px rgba(0,0,0,0.4)" }}
           >
             Get In{" "}
@@ -107,10 +107,10 @@ export default function ContactPage() {
         </div>
       </section>
 
-      {/* ── Main content ─────────────────────────────────────── */}
+      {/* â”€â”€ Main content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
 
-        {/* ── Left: info panel ──────────────────────────────── */}
+        {/* â”€â”€ Left: info panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="lg:col-span-2 space-y-6">
 
           {/* Quick contact */}
@@ -127,7 +127,7 @@ export default function ContactPage() {
                   { icon: Phone, label: "Main Office", value: "+971 4 300 1234", href: "tel:+97143001234" },
                   { icon: Mail,  label: "Email Us",    value: "info@fhiglobal.com", href: "mailto:info@fhiglobal.com" },
                   { icon: MapPin, label: "HQ Location", value: "DIFC, Dubai, UAE", href: "#offices" },
-                  { icon: Clock,  label: "Working Hours", value: "Sun–Thu, 9AM–6PM GST" },
+                  { icon: Clock,  label: "Working Hours", value: "Sunâ€“Thu, 9AMâ€“6PM GST" },
                 ].map(({ icon: Icon, label, value, href }) => (
                   <div key={label} className="flex items-start gap-4 py-3.5 border-b border-white/8 last:border-0">
                     <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0">
@@ -189,14 +189,14 @@ export default function ContactPage() {
           </div>
         </div>
 
-        {/* ── Right: form ───────────────────────────────────── */}
+        {/* â”€â”€ Right: form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="lg:col-span-3">
           <div className="bg-white rounded-[28px] border border-[#e8eaed] shadow-[0_8px_40px_-8px_rgba(0,31,63,0.10)] p-8 lg:p-10">
             <div className="mb-8">
               <div className="w-10 h-10 rounded-2xl bg-[#001f3f] flex items-center justify-center mb-5 shadow-md">
                 <Send className="w-4 h-4 text-[#d6b357]" />
               </div>
-              <h2 className="font-['Space_Grotesk'] text-2xl font-bold text-[#0d1117] mb-1">Send us a message</h2>
+              <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mb-1">Send us a message</h2>
               <p className="text-sm text-[#6b7280]">We respond to all enquiries within one business day.</p>
             </div>
             <ContactForm />
@@ -204,7 +204,7 @@ export default function ContactPage() {
         </div>
       </section>
 
-      {/* ── Offices ───────────────────────────────────────────── */}
+      {/* â”€â”€ Offices â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section id="offices" className="relative py-16 scroll-mt-24 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
@@ -221,7 +221,7 @@ export default function ContactPage() {
             <div className="inline-flex items-center px-3 py-1.5 bg-white border border-[#e5e5e5] rounded-full text-xs font-semibold uppercase tracking-wider mb-5 shadow-sm">
               <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2" /> Our Offices
             </div>
-            <h2 className="font-['Space_Grotesk'] text-4xl md:text-5xl font-bold text-[#0d1117] leading-tight tracking-tight">
+            <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold text-[#0d1117] leading-tight tracking-tight">
               Find{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
                 Us
@@ -236,7 +236,7 @@ export default function ContactPage() {
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#001f3f] to-[#002a52] flex items-center justify-center">
                     <Building2 className="w-5 h-5 text-[#d6b357]" />
                   </div>
-                  <h3 className="font-['Space_Grotesk'] font-bold text-[#0d1117] text-lg">{city}</h3>
+                  <h3 className="font-['Outfit'] font-bold text-[#0d1117] text-lg">{city}</h3>
                 </div>
                 <div className="space-y-3">
                   {[
@@ -261,7 +261,7 @@ export default function ContactPage() {
         </div>
       </section>
 
-      {/* ── CTA strip ─────────────────────────────────────────── */}
+      {/* â”€â”€ CTA strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="relative bg-gradient-to-r from-[#001f3f] to-[#002a52] rounded-[28px] overflow-hidden p-10 md:p-14 flex flex-col md:flex-row md:items-center md:justify-between gap-8">
           <div
@@ -271,7 +271,7 @@ export default function ContactPage() {
           <div className="absolute top-[-40px] left-[-40px] w-[300px] h-[300px] rounded-full opacity-20 blur-[100px] bg-[radial-gradient(circle,#d6b357,transparent)]" />
           <div className="relative">
             <h3
-              className="font-['Space_Grotesk'] text-3xl md:text-4xl font-bold text-white leading-tight mb-2"
+              className="font-['Outfit'] text-3xl md:text-4xl font-bold text-white leading-tight mb-2"
               style={{ textShadow: "0 2px 16px rgba(0,0,0,0.3)" }}
             >
               Not sure where to start?

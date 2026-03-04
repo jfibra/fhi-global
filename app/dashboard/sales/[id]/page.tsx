@@ -19,10 +19,10 @@ export const dynamic = "force-dynamic"
 const ALLOWED_ROLES = ["super_admin", "admin", "team_leader", "unit_manager", "agent"]
 
 function formatDate(value: string | null) {
-  if (!value) return "—"
+  if (!value) return "â€”"
   const date = new Date(value)
   return Number.isNaN(date.getTime())
-    ? "—"
+    ? "â€”"
     : date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
 }
 
@@ -58,7 +58,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">{label}</span>
-      <span className="text-sm text-[#0d1117] font-medium">{value ?? <span className="text-[#9ca3af]">—</span>}</span>
+      <span className="text-sm text-[#0d1117] font-medium">{value ?? <span className="text-[#9ca3af]">â€”</span>}</span>
     </div>
   )
 }
@@ -78,7 +78,7 @@ function SectionCard({
         <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center">
           <Icon className="w-4 h-4 text-white" />
         </div>
-        <h3 className="font-['Space_Grotesk'] text-sm font-bold text-[#0d1117] uppercase tracking-wider">{title}</h3>
+        <h3 className="font-['Outfit'] text-sm font-bold text-[#0d1117] uppercase tracking-wider">{title}</h3>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-5">
         {children}
@@ -134,7 +134,7 @@ export default async function SaleDetailPage({
 
   const clientName = sale.clients
     ? `${sale.clients.first_name} ${sale.clients.last_name}`
-    : "—"
+    : "â€”"
 
   const attachmentsCount = Array.isArray(sale.sales_attachments) ? sale.sales_attachments.length : 0
   const clientFull = sale.clients as {
@@ -173,11 +173,11 @@ export default async function SaleDetailPage({
                 <DollarSign className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-[#0d1117]">
+                <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">
                   {clientName}
                 </h1>
                 <p className="text-sm text-[#6b7280]">
-                  {sale.projects?.name ?? "—"} · {sale.developers?.name ?? "—"}
+                  {sale.projects?.name ?? "â€”"} Â· {sale.developers?.name ?? "â€”"}
                 </p>
               </div>
             </div>

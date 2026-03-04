@@ -32,7 +32,7 @@ export function PublicFooter() {
               <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
                 <Building2 className="w-4.5 h-4.5 text-[#d6b357]" strokeWidth={2} />
               </div>
-              <span className="font-['Space_Grotesk'] font-bold text-lg">
+              <span className="font-['Outfit'] font-bold text-lg">
                 FHI<span className="text-[#d6b357]">Global</span>
               </span>
             </Link>
@@ -92,7 +92,7 @@ export function PublicFooter() {
       {/* Bottom bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
         <p className="text-xs text-white/25">
-          © {new Date().getFullYear()} FHI Global Real Estate LLC. All rights reserved. RERA Registered.
+          Â© {new Date().getFullYear()} FHI Global Real Estate LLC. All rights reserved. RERA Registered.
         </p>
         <div className="flex items-center gap-5">
           <Link href="#" className="text-xs text-white/25 hover:text-white/50 transition-colors">Privacy Policy</Link>

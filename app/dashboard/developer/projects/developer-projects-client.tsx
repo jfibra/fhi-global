@@ -32,7 +32,7 @@ import { ProjectSeoTab }           from "@/app/dashboard/projects/project-seo-ta
 import { ProjectSettingsTab }      from "@/app/dashboard/projects/project-settings-tab"
 import { ProjectHeader }           from "@/app/dashboard/projects/project-header"
 
-// ─── Portal ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Portal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -40,7 +40,7 @@ function Portal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body)
 }
 
-// ─── Toast ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type ToastVariant = "success" | "error"
 interface ToastMsg { id: number; variant: ToastVariant; message: string }
 
@@ -52,14 +52,14 @@ function ToastList({ toasts, remove }: { toasts: ToastMsg[]; remove: (id: number
           t.variant === "success" ? "bg-green-50 text-green-800 border border-green-100" : "bg-rose-50 text-rose-800 border border-rose-100"
         }`}>
           <span className="flex-1">{t.message}</span>
-          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
+          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
         </div>
       ))}
     </div>
   )
 }
 
-// ─── Confirm dialog ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Confirm dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
   return (
     <Portal>
@@ -77,7 +77,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onCo
   )
 }
 
-// ─── Tab types ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Tab types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type TabId = "data" | "overview" | "units" | "images" | "amenities" | "property_types" | "media" | "features" | "nearby" | "seo" | "settings"
 const TABS: { id: TabId; label: string }[] = [
   { id: "data",            label: "Data Health" },
@@ -93,7 +93,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "settings",        label: "Settings" },
 ]
 
-// ─── New Project Modal ─────────────────────────────────────────────────────────
+// â”€â”€â”€ New Project Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function NewProjectModal({
   developerId,
   onClose,
@@ -143,7 +143,7 @@ function NewProjectModal({
       <div className="fixed inset-0 z-[55] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
         <div className="relative bg-white rounded-[28px] p-8 max-w-md w-full shadow-2xl border border-white/60">
-          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#001f3f] mb-2">New Project</h2>
+          <h2 className="font-['Outfit'] text-xl font-bold text-[#001f3f] mb-2">New Project</h2>
           <p className="text-xs text-[#9ca3af] mb-6">This project will be linked to your developer account.</p>
           <form onSubmit={(e) => void submit(e)} className="space-y-4">
             <div>
@@ -185,7 +185,7 @@ function NewProjectModal({
               </button>
               <button type="submit" disabled={saving || !name.trim()}
                 className="flex-1 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white text-sm font-semibold transition-all disabled:opacity-50">
-                {saving ? "Creating…" : "Create Project"}
+                {saving ? "Creatingâ€¦" : "Create Project"}
               </button>
             </div>
           </form>
@@ -195,12 +195,12 @@ function NewProjectModal({
   )
 }
 
-// ─── Status badge ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const STATUS_LABEL: Record<string, string> = {
   pre_launch: "Pre-Launch", launch: "Launch", under_construction: "Under Const.", completed: "Completed",
 }
 
-// ─── No developer placeholder ─────────────────────────────────────────────────
+// â”€â”€â”€ No developer placeholder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function NoDeveloperLinked({ userName }: { userName: string }) {
   return (
     <DashboardShell role="developer" roleLabel={roleToLabel("developer")} roleColor={getRoleColor("developer")} userName={userName}>
@@ -208,14 +208,14 @@ function NoDeveloperLinked({ userName }: { userName: string }) {
         <div className="w-16 h-16 rounded-[28px] bg-indigo-50 flex items-center justify-center mb-5">
           <Building2 className="w-8 h-8 text-indigo-400" />
         </div>
-        <h2 className="font-['Space_Grotesk'] text-xl font-bold text-[#0d1117] mb-2">No Developer Company Linked</h2>
+        <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mb-2">No Developer Company Linked</h2>
         <p className="text-sm text-[#6b7280] max-w-sm">Contact an administrator to link your account to a developer company.</p>
       </div>
     </DashboardShell>
   )
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function DeveloperProjectsClient({
   userId,
   userName,
@@ -334,13 +334,13 @@ export function DeveloperProjectsClient({
       userName={userName}
     >
       <div className="flex h-full -mx-4 sm:-mx-6 -my-4 sm:-my-6 min-h-[calc(100vh-80px)]">
-        {/* ── Sidebar ──────────────────────────────────────────────────────────── */}
+        {/* â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <aside className="w-72 flex-shrink-0 flex flex-col border-r border-[#f0f0f0] bg-white/50 backdrop-blur-sm overflow-hidden">
           {/* Header */}
           <div className="px-4 pt-5 pb-3 border-b border-[#f0f0f0]">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h3 className="font-['Space_Grotesk'] text-base font-bold text-[#0d1117]">My Projects</h3>
+                <h3 className="font-['Outfit'] text-base font-bold text-[#0d1117]">My Projects</h3>
                 <p className="text-xs text-[#9ca3af]">{developerName}</p>
               </div>
               <button
@@ -357,7 +357,7 @@ export function DeveloperProjectsClient({
                 type="text"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-                placeholder="Search projects…"
+                placeholder="Search projectsâ€¦"
                 className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-[#e5e5e5] bg-white focus:outline-none focus:border-[#001f3f] focus:ring-2 focus:ring-[#001f3f]/10 transition-all"
               />
             </div>
@@ -407,7 +407,7 @@ export function DeveloperProjectsClient({
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <p className={`text-xs font-semibold truncate ${selected?.id === p.id ? "text-white" : "text-[#0d1117]"}`}>{p.name}</p>
-                      <p className={`text-[10px] mt-0.5 ${selected?.id === p.id ? "text-white/60" : "text-[#9ca3af]"}`}>{p.city ?? "—"}</p>
+                      <p className={`text-[10px] mt-0.5 ${selected?.id === p.id ? "text-white/60" : "text-[#9ca3af]"}`}>{p.city ?? "â€”"}</p>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
@@ -430,25 +430,25 @@ export function DeveloperProjectsClient({
             <div className="flex items-center justify-between px-4 py-3 border-t border-[#f0f0f0] text-xs text-[#6b7280]">
               <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
                 className="px-3 py-1.5 rounded-xl border border-[#e5e5e5] disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
-                ← Prev
+                â† Prev
               </button>
               <span>{page} / {totalPages}</span>
               <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}
                 className="px-3 py-1.5 rounded-xl border border-[#e5e5e5] disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
-                Next →
+                Next â†’
               </button>
             </div>
           )}
         </aside>
 
-        {/* ── Main ────────────────────────────────────────────────────────────── */}
+        {/* â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <main className="flex-1 flex flex-col overflow-hidden">
           {!selected ? (
             <div className="flex-1 flex flex-col items-center justify-center min-h-[50vh] text-center p-8">
               <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-50 to-indigo-100 flex items-center justify-center mb-5">
                 <Layers className="w-9 h-9 text-indigo-400" />
               </div>
-              <p className="text-[#374151] font-semibold text-lg font-['Space_Grotesk']">Select a project</p>
+              <p className="text-[#374151] font-semibold text-lg font-['Outfit']">Select a project</p>
               <p className="text-sm text-[#9ca3af] mt-1 mb-6">Choose from the sidebar or create a new one.</p>
               <button
                 onClick={() => setShowNew(true)}
@@ -465,7 +465,7 @@ export function DeveloperProjectsClient({
             </div>
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Project header — no duplicate for developer portal */}
+              {/* Project header â€” no duplicate for developer portal */}
               <ProjectHeader
                 project={selected}
                 onPublishToggle={() => void handlePublishToggle()}

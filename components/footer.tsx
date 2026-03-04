@@ -38,6 +38,7 @@ function TwitterXIcon() {
 const COMPANY_LINKS = [
   { label: "Contact Us", href: "/contact" },
   { label: "Developers", href: "/developers" },
+  { label: "News",       href: "/news" },
   { label: "Projects", href: "/projects" },
 ]
 
@@ -83,7 +84,7 @@ export function Footer() {
               <p className="text-xs font-bold uppercase tracking-widest text-[#d6b357] mb-1">
                 Ready to find your next investment?
               </p>
-              <h3 className="font-['Space_Grotesk'] text-2xl md:text-3xl font-bold text-white leading-snug">
+              <h3 className="font-['Outfit'] text-2xl md:text-3xl font-bold text-white leading-snug">
                 Browse Dubai&apos;s Finest Properties
               </h3>
             </div>
@@ -109,7 +110,7 @@ export function Footer() {
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8">
 
-          {/* ── Brand column ──────────────────────────────── */}
+          {/* â”€â”€ Brand column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div className="lg:col-span-2 space-y-6">
             <Link href="/" className="inline-block">
               <Image
@@ -122,7 +123,7 @@ export function Footer() {
             </Link>
 
             <p className="text-sm leading-relaxed text-white/45 max-w-xs">
-              Dubai&apos;s premier real estate portal — connecting investors
+              Dubai&apos;s premier real estate portal â€” connecting investors
               with the finest developments from the most trusted developers.
             </p>
 
@@ -176,7 +177,7 @@ export function Footer() {
             </div>
           </div>
 
-          {/* ── Company ───────────────────────────────────── */}
+          {/* â”€â”€ Company â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div>
             <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white mb-5">
               <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357]" />
@@ -196,7 +197,7 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* ── Account ───────────────────────────────────── */}
+          {/* â”€â”€ Account â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div>
             <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white mb-5">
               <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357]" />
@@ -216,7 +217,7 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* ── Projects ──────────────────────────────────── */}
+          {/* â”€â”€ Projects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div>
             <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white mb-5">
               <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357]" />
@@ -242,7 +243,7 @@ export function Footer() {
       <div className="relative z-10 border-t border-white/[0.06]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-white/25">
-            © {year} FHI Global Real Estate LLC. All rights reserved. RERA Licensed.
+            Â© {year} FHI Global Real Estate LLC. All rights reserved. RERA Licensed.
           </p>
           <div className="flex items-center gap-5">
             {[

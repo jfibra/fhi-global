@@ -37,7 +37,7 @@ export type DevelopersListResponse = {
   error: string | null
 }
 
-// ─── Slug generator ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Slug generator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function generateSlug(name: string): string {
   return name
     .toLowerCase()
@@ -47,7 +47,7 @@ export function generateSlug(name: string): string {
     .replace(/-+/g, "-")
 }
 
-// ─── Fetch list ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Fetch list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function fetchDevelopers(params: {
   page?: number
   perPage?: number
@@ -91,7 +91,7 @@ export async function fetchDevelopers(params: {
   return { data: (data ?? []) as Developer[], total: count ?? 0, error: null }
 }
 
-// ─── Create ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Create â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function createDeveloper(
   formData: DeveloperFormData,
 ): Promise<{ data: Developer | null; error: string | null }> {
@@ -117,7 +117,7 @@ export async function createDeveloper(
   return { data: data as Developer, error: null }
 }
 
-// ─── Update ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function updateDeveloper(
   id: string,
   formData: DeveloperFormData,
@@ -145,7 +145,7 @@ export async function updateDeveloper(
   return { data: data as Developer, error: null }
 }
 
-// ─── Soft delete ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Soft delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function softDeleteDeveloper(id: string): Promise<{ error: string | null }> {
   const supabase = createClient()
   const { error } = await supabase
@@ -155,7 +155,7 @@ export async function softDeleteDeveloper(id: string): Promise<{ error: string |
   return { error: error?.message ?? null }
 }
 
-// ─── Restore ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Restore â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function restoreDeveloper(id: string): Promise<{ error: string | null }> {
   const supabase = createClient()
   const { error } = await supabase
@@ -165,7 +165,7 @@ export async function restoreDeveloper(id: string): Promise<{ error: string | nu
   return { error: error?.message ?? null }
 }
 
-// ─── Toggle active ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Toggle active â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 /** Pass the CURRENT value; the function will flip it. */
 export async function toggleDeveloperActive(
   id: string,
@@ -179,7 +179,7 @@ export async function toggleDeveloperActive(
   return { error: error?.message ?? null }
 }
 
-// ─── Toggle verified ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Toggle verified â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 /** Pass the CURRENT value; the function will flip it. */
 export async function toggleDeveloperVerified(
   id: string,
@@ -193,7 +193,7 @@ export async function toggleDeveloperVerified(
   return { error: error?.message ?? null }
 }
 
-// ─── Update logo_url ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Update logo_url â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function updateDeveloperLogoUrl(
   id: string,
   logo_url: string | null,

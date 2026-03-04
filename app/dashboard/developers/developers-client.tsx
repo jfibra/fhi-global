@@ -21,7 +21,7 @@ import {
 import { DeveloperFormDialog } from "./developer-form-dialog"
 import { DeveloperLogoUpload } from "./developer-logo-upload"
 
-// ─── Toast ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Portal({ children }: { children: React.ReactNode }) {
   const [m, setM] = useState(false)
   useEffect(() => setM(true), [])
@@ -40,14 +40,14 @@ function Toast({ toasts, remove }: { toasts: ToastMsg[]; remove: (id: number) =>
           t.type === "success" ? "bg-green-50 text-green-800 border border-green-100" : "bg-rose-50 text-rose-800 border border-rose-100"
         }`}>
           <span className="flex-1">{t.text}</span>
-          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
+          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
         </div>
       ))}
     </div>
   )
 }
 
-// ─── Confirm dialog ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Confirm dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface ConfirmProps { message: string; onConfirm: () => void; onCancel: () => void }
 function ConfirmDialog({ message, onConfirm, onCancel }: ConfirmProps) {
   return (
@@ -66,7 +66,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }: ConfirmProps) {
   )
 }
 
-// ─── Row actions dropdown ───────────────────────────────────────────────────
+// â”€â”€â”€ Row actions dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface RowActionsProps {
   dev: Developer
   onEdit: () => void
@@ -170,9 +170,9 @@ function RowActions({ dev, onEdit, onLogo, onToggleVerified, onToggleActive, onD
   )
 }
 
-// ─── Stars ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Stars â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StarRating({ value }: { value: number | null }) {
-  if (value === null) return <span className="text-[#d1d5db] text-xs">—</span>
+  if (value === null) return <span className="text-[#d1d5db] text-xs">â€”</span>
   return (
     <div className="flex items-center gap-1">
       {[1,2,3,4,5].map((i) => (
@@ -183,7 +183,7 @@ function StarRating({ value }: { value: number | null }) {
   )
 }
 
-// ─── Skeleton ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Skeleton â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Skeleton() {
   return (
     <div className="space-y-3">
@@ -194,7 +194,7 @@ function Skeleton() {
   )
 }
 
-// ─── Logo / Initials ────────────────────────────────────────────────────────
+// â”€â”€â”€ Logo / Initials â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function DeveloperLogo({ url, name }: { url: string | null; name: string }) {
   if (url) {
     return (
@@ -211,7 +211,7 @@ function DeveloperLogo({ url, name }: { url: string | null; name: string }) {
   )
 }
 
-// ─── Main component ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface Props {
   currentRole: string
   userId: string
@@ -278,7 +278,7 @@ export function DevelopersClient({ currentRole }: Props) {
     return () => clearTimeout(t)
   }, [searchInput])
 
-  // ── actions ──
+  // â”€â”€ actions â”€â”€
   const handleToggleVerified = async (dev: Developer) => {
     const { error } = await toggleDeveloperVerified(dev.id, dev.is_verified)
     if (error) { addToast("error", error); return }
@@ -332,7 +332,7 @@ export function DevelopersClient({ currentRole }: Props) {
               <Building2 className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-[#0d1117]">Developers</h1>
+              <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">Developers</h1>
               <p className="text-sm text-[#6b7280]">Manage real estate developer profiles</p>
             </div>
           </div>
@@ -352,7 +352,7 @@ export function DevelopersClient({ currentRole }: Props) {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
               <input
                 className="w-full pl-11 pr-4 py-3 rounded-2xl border border-[#e5e5e5] bg-white text-sm focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 transition-all"
-                placeholder="Search by name, slug, email, website…"
+                placeholder="Search by name, slug, email, websiteâ€¦"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
               />
@@ -406,7 +406,7 @@ export function DevelopersClient({ currentRole }: Props) {
                     : "border-[#e5e5e5] text-[#6b7280] hover:border-[#001f3f] hover:text-[#001f3f]"
                 }`}>
                 {f === "created_at" ? "Date added" : f.charAt(0).toUpperCase() + f.slice(1)}
-                {sortField === f && <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>}
+                {sortField === f && <span className="ml-1">{sortDir === "asc" ? "â†‘" : "â†“"}</span>}
               </button>
             ))}
           </div>
@@ -524,7 +524,7 @@ export function DevelopersClient({ currentRole }: Props) {
                       <div className="flex flex-wrap gap-2 mt-2">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
                           dev.is_verified ? "bg-emerald-50 text-emerald-700" : "bg-[#f3f4f6] text-[#6b7280]"
-                        }`}>{dev.is_verified ? "✓ Verified" : "Unverified"}</span>
+                        }`}>{dev.is_verified ? "âœ“ Verified" : "Unverified"}</span>
                         {dev.deleted_at
                           ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-600">Deleted</span>
                           : <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${dev.is_active ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"}`}>{dev.is_active ? "Active" : "Inactive"}</span>
@@ -542,7 +542,7 @@ export function DevelopersClient({ currentRole }: Props) {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <p className="text-sm text-[#6b7280]">
-              {total > 0 ? `Showing ${Math.min((page - 1) * perPage + 1, total)}–${Math.min(page * perPage, total)} of ${total}` : "No results"}
+              {total > 0 ? `Showing ${Math.min((page - 1) * perPage + 1, total)}â€“${Math.min(page * perPage, total)} of ${total}` : "No results"}
             </p>
             <select
               value={perPage}
