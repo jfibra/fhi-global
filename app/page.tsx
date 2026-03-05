@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createPageMetadata } from "@/lib/seo";
@@ -34,6 +35,8 @@ export const metadata: Metadata = createPageMetadata({
     "Discover premium off-plan and ready properties from Dubai's top developers. Explore luxury apartments, villas, and penthouses.",
   openGraphTitle: "FHI Global — Dubai's Premier Real Estate Portal",
   openGraphDescription: "Discover premium off-plan and ready properties from Dubai's top developers.",
+  pathname: "/",
+  keywords: ["Dubai real estate", "off-plan projects Dubai", "luxury apartments Dubai", "FHI Global"],
 });
 
 const STATS = [
@@ -169,7 +172,34 @@ export default async function HomePage() {
     name: d.name,
   }));
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com";
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "FHI Global",
+    url: siteUrl,
+    logo: `${siteUrl}/android-chrome-512x512.png`,
+    contactPoint: [
+      {
+        "@type": "ContactPoint",
+        contactType: "customer support",
+        areaServed: "AE",
+        availableLanguage: ["en", "ar"],
+      },
+    ],
+    sameAs: [
+      "https://www.linkedin.com",
+      "https://www.instagram.com",
+      "https://www.facebook.com",
+    ],
+  };
+
   return (
+    <>
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+    />
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
       {/* Ambient blobs */}
       <div className="fixed top-[-10%] left-[-10%] w-[700px] h-[700px] rounded-full opacity-30 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />
@@ -208,7 +238,7 @@ export default async function HomePage() {
       {/* ----------------------------------------------- */}
       {developers && developers.length > 0 && (
         <section className="py-24 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-0">
             {/* Section header */}
             <div className="flex items-end justify-between mb-14">
               <div>
@@ -231,7 +261,7 @@ export default async function HomePage() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               {developers.map((dev) => (
                 <DeveloperCard
                   key={dev.id}
@@ -296,10 +326,12 @@ export default async function HomePage() {
       <section className="relative py-24 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
-          <img
+          <Image
             src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x800/3.png"
             alt=""
-            className="w-full h-full object-cover object-center"
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
             aria-hidden="true"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-white/92 via-white/88 to-white/92" />
@@ -356,10 +388,12 @@ export default async function HomePage() {
       <section className="relative overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
-          <img
+          <Image
             src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/7.png"
             alt=""
-            className="w-full h-full object-cover object-center"
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
             aria-hidden="true"
           />
           <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f]/92 via-[#002a52]/90 to-[#001428]/95" />
@@ -414,5 +448,6 @@ export default async function HomePage() {
 
       <Footer />
     </div>
+    </>
   );
 }

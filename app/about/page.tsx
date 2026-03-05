@@ -15,6 +15,8 @@ export const metadata: Metadata = createPageMetadata({
   description:
     "Learn about FHI Global â€” Dubai's trusted real estate platform connecting buyers with the finest residential and commercial developments.",
   openGraphDescription: "Dubai's trusted real estate platform connecting buyers with the finest developments.",
+  pathname: "/about",
+  keywords: ["About FHI Global", "Dubai real estate company", "property platform UAE"],
 })
 
 const STATS = [
@@ -99,10 +101,12 @@ export default function AboutPage() {
       <section className="relative pt-20 pb-24 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
-          <img
+          <Image
             src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/2.png"
             alt=""
-            className="w-full h-full object-cover object-center"
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
             aria-hidden="true"
           />
           <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f]/88 via-[#002a52]/85 to-[#001428]/92" />
@@ -172,10 +176,12 @@ export default function AboutPage() {
       <section className="relative py-20 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
-          <img
+          <Image
             src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x800/5.png"
             alt=""
-            className="w-full h-full object-cover object-center"
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
             aria-hidden="true"
           />
           <div className="absolute inset-0 bg-white/90" />
@@ -311,10 +317,12 @@ export default function AboutPage() {
       <section className="relative py-20 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
-          <img
+          <Image
             src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x800/6.png"
             alt=""
-            className="w-full h-full object-cover object-center"
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
             aria-hidden="true"
           />
           <div className="absolute inset-0 bg-[#f5f3ef]/88" />
@@ -402,10 +410,12 @@ export default function AboutPage() {
         <div className="relative bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] rounded-[40px] overflow-hidden p-1">
           {/* Background */}
           <div className="absolute inset-0">
-            <img
+            <Image
               src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/8.png"
               alt=""
-              className="w-full h-full object-cover object-center"
+              fill
+              sizes="100vw"
+              className="object-cover object-center"
               aria-hidden="true"
             />
             <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f]/92 via-[#002a52]/88 to-[#001428]/95" />

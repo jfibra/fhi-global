@@ -1,6 +1,6 @@
 import Link from "next/link"
 import Image from "next/image"
-import { Building2, Star, BadgeCheck, ArrowRight } from "lucide-react"
+import { Building2, Star, BadgeCheck, ArrowUpRight, Layers, MapPin } from "lucide-react"
 
 export interface DeveloperCardData {
   id: string
@@ -19,74 +19,96 @@ interface DeveloperCardProps {
 
 export function DeveloperCard({ developer }: DeveloperCardProps) {
   const { name, slug, description, logo_url, rating, is_verified, project_count } = developer
+  const stars = rating != null ? Math.round(rating) : 0
 
   return (
     <Link
       href={`/developers/${slug}`}
-      className="group block bg-white rounded-[24px] border border-[#eee] transition-all duration-300 hover:translate-y-[-10px] hover:shadow-2xl shadow-sky-950/5 overflow-hidden"
+      className="group relative flex flex-row bg-white rounded-[24px] p-4 border border-[#eaecf0] overflow-hidden transition-all duration-500 hover:shadow-[0_20px_60px_-8px_rgba(0,31,63,0.2)] hover:-translate-y-1 shadow-[0_2px_16px_rgba(0,0,0,0.05)]"
     >
-      {/* Logo area */}
-      <div className="relative w-full aspect-[3/2] bg-gradient-to-br from-[#f8f6f0] to-[#f0ede4] overflow-hidden flex items-center justify-center">
-        {/* Subtle dot pattern */}
-        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "radial-gradient(circle, #001f3f 1px, transparent 1px)", backgroundSize: "18px 18px" }} />
+      {/* ── Left: Logo Panel ── */}
+      <div className="relative w-[160px] sm:w-[225px] shrink-0 bg-gradient-to-br bg-[#e5edf5] flex flex-col items-center justify-center overflow-hidden">
+        {/* dot grid texture */}
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+        />
+        {/* right-edge gold separator */}
+        <div className="absolute top-0 right-0 bottom-0 w-[1.5px] bg-gradient-to-b from-transparent via-[#d6b357]/50 to-transparent" />
+        {/* warm glow */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#d6b357]/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+        {/* Logo */}
         {logo_url ? (
           <Image
             src={logo_url}
             alt={name}
-            width={160}
-            height={80}
-            className="relative object-contain w-[55%] h-[55%] transition-transform duration-300 group-hover:scale-105"
+            width={72}
+            height={72}
+            className="object-contain w-[74%] h-[74%]"
           />
         ) : (
-          <div className="relative flex flex-col items-center gap-2 text-[#c0c8d4]">
-            <Building2 className="w-10 h-10" />
-            <span className="text-xs font-medium tracking-wide">{name}</span>
-          </div>
+          <Building2 className="w-8 h-8 text-[#001f3f]/25" />
         )}
-        {/* Gold shimmer on hover */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#d6b357]/0 to-transparent group-hover:from-[#d6b357]/8 transition-all duration-500" />
       </div>
 
-      {/* Body */}
-      <div className="p-6">
-        {/* Name + verified */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <h3 className="font-['Outfit'] font-bold text-[#0d1117] text-base leading-tight group-hover:text-[#001f3f] transition-colors">
+      {/* ── Right: Content ── */}
+      <div className="flex flex-col flex-1 min-w-0 px-5 gap-2.5">
+
+        {/* Row 1: Name + verified badge */}
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-['Outfit'] font-bold text-[#0d1117] text-[16px] leading-tight group-hover:text-[#001f3f] transition-colors duration-200 line-clamp-1">
             {name}
           </h3>
           {is_verified && (
-            <BadgeCheck className="w-4 h-4 text-[#d6b357] shrink-0 mt-0.5" aria-label="Verified" />
-          )}
-        </div>
-
-        {/* Rating + project count */}
-        <div className="flex items-center gap-3 mb-3">
-          {rating != null && (
-            <div className="flex items-center gap-1 text-xs font-medium text-[#6b7280]">
-              <Star className="w-3 h-3 text-[#d6b357] fill-[#d6b357]" />
-              {rating.toFixed(1)}
+            <div className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
+              <BadgeCheck className="w-3 h-3 text-emerald-500" />
+              <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wide">Verified</span>
             </div>
           )}
-          {project_count != null && project_count > 0 && (
+        </div>
+
+        {/* Row 2: Stars */}
+        <div className="flex items-center gap-1">
+          {rating != null ? (
             <>
-              <span className="w-1 h-1 rounded-full bg-[#d1d5db]" />
-              <span className="text-xs text-[#6b7280] uppercase tracking-wider">{project_count} project{project_count !== 1 ? "s" : ""}</span>
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`w-3.5 h-3.5 ${i < stars ? "text-[#d6b357] fill-[#d6b357]" : "text-[#e5e7eb] fill-[#e5e7eb]"
+                      }`}
+                  />
+                ))}
+              </div>
+              <span className="text-xs font-bold text-[#374151] ml-1">{rating.toFixed(1)}</span>
+              <span className="text-xs text-[#9ca3af] ml-0.5">/ 5.0</span>
             </>
+          ) : (
+            <span className="text-xs text-[#d1d5db] italic">Not yet rated</span>
           )}
         </div>
 
-        {/* Description */}
+        {/* Row 3: Description */}
         {description && (
-          <p className="text-sm text-[#555] leading-relaxed line-clamp-2 mb-4">{description}</p>
+          <p className="text-[13px] text-[#6b7280] leading-relaxed line-clamp-2 flex-1">
+            {description}
+          </p>
         )}
 
-        {/* Gold gradient CTA bar */}
-        <div className="flex items-center justify-between pt-3 border-t border-[#f0f0f0]">
-          <span className="text-xs font-bold text-[#001f3f] group-hover:text-[#d6b357] transition-colors duration-200 uppercase tracking-wider">
-            View Projects
-          </span>
-          <div className="w-8 h-8 rounded-full bg-[#001f3f]/6 group-hover:bg-gradient-to-br group-hover:from-[#d6b357] group-hover:to-[#f0d890] flex items-center justify-center transition-all duration-300">
-            <ArrowRight className="w-3.5 h-3.5 text-[#001f3f] group-hover:text-[#001f3f] transition-transform duration-200 group-hover:translate-x-0.5" />
+        {/* Row 4: Footer — project count + CTA */}
+        <div className="flex items-center justify-between pt-1 mt-auto">
+          {project_count != null && project_count > 0 ? (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#6b7280]">
+              <Layers className="w-3 h-3 text-[#001f3f]/40" />
+              {project_count} Project{project_count !== 1 ? "s" : ""}
+            </span>
+          ) : (
+            <span className="text-[10px] font-semibold text-[#d1d5db] uppercase tracking-widest">Developer</span>
+          )}
+          <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#001f3f] text-white text-[11px] font-bold tracking-wide transition-all duration-300 group-hover:bg-gradient-to-r group-hover:from-[#c9a94e] group-hover:to-[#f0d890] group-hover:text-[#001f3f] group-hover:shadow-[0_6px_20px_rgba(214,179,87,0.4)] shrink-0">
+            View Details
+            <ArrowUpRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </div>
         </div>
       </div>

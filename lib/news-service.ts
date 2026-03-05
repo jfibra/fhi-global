@@ -11,6 +11,12 @@ export type NewsArticle = {
   excerpt: string
   date: string
   img: string
+  featuredImage?: string
+  publishedAt?: string
+  updatedAt?: string
+  isPublished?: boolean
+  tags?: string[]
+  language?: string
   badge?: string
   readTime?: string
   hasVideo?: boolean
@@ -32,13 +38,28 @@ export function slugify(text: string): string {
 
 // â”€â”€ Normalize a single raw API object â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function normalize(raw: Record<string, any>, idx: number): NewsArticle {
+  const image = raw?.featured_image ?? raw?.image ?? raw?.image_url ?? raw?.cover ?? "/img/1.png"
+  const publishedAt = raw?.published_at ?? raw?.publish_at ?? raw?.created_at ?? ""
+  const updatedAt = raw?.updated_at ?? publishedAt
+  const tags = Array.isArray(raw?.tags)
+    ? raw.tags.map((t: unknown) => String(t)).filter(Boolean)
+    : typeof raw?.tags === "string"
+      ? raw.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
+      : []
+
   return {
     id: typeof raw?.id === "number" ? raw.id : idx + 1,
     slug: raw?.slug || slugify(raw?.title ?? `article-${idx + 1}`),
     title: raw?.title ?? "Untitled",
     excerpt: raw?.excerpt ?? raw?.summary ?? raw?.description ?? "",
-    date: raw?.published_at ?? raw?.created_at ?? "",
-    img: raw?.image ?? raw?.image_url ?? raw?.cover ?? "/img/1.png",
+    date: publishedAt,
+    img: image,
+    featuredImage: image,
+    publishedAt,
+    updatedAt,
+    isPublished: typeof raw?.is_published === "boolean" ? raw.is_published : true,
+    tags,
+    language: raw?.language ?? "en",
     badge: raw?.badge ?? undefined,
     readTime: raw?.read_time ?? raw?.readTime ?? undefined,
     hasVideo: !!(raw?.has_video ?? raw?.hasVideo),

@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation"
 import { useCallback, useState } from "react"
-import { Search } from "lucide-react"
+import { Search, X } from "lucide-react"
 
 export function DeveloperSearch({ initialQ }: { initialQ: string }) {
   const router = useRouter()
@@ -20,24 +20,26 @@ export function DeveloperSearch({ initialQ }: { initialQ: string }) {
   )
 
   return (
-    <div className="relative mb-8">
-      <div className="relative bg-white border border-[#e8eaed] rounded-[20px] shadow-sm overflow-hidden">
+    <div className="relative">
+      <div className="relative bg-white border border-[#e2e5ea] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.06)] overflow-hidden transition-shadow duration-200 focus-within:shadow-[0_4px_20px_rgba(0,31,63,0.12)] focus-within:border-[#001f3f]/30">
+        {/* top accent line */}
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#001f3f] via-[#d6b357] to-transparent" />
-        <div className="flex items-center gap-3 px-5 py-1">
+        <div className="flex items-center gap-3 px-5">
           <Search className="w-4 h-4 text-[#d6b357] shrink-0" />
           <input
             type="text"
-            placeholder="Search by developer name..."
+            placeholder="Search developers by name…"
             value={value}
             onChange={(e) => handleChange(e.target.value)}
-            className="flex-1 py-3.5 bg-transparent text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none"
+            className="flex-1 py-4 bg-transparent text-sm text-[#111827] placeholder:text-[#b0b7c3] focus:outline-none"
           />
           {value && (
             <button
               onClick={() => handleChange("")}
-              className="text-xs text-[#9ca3af] hover:text-[#001f3f] transition-colors font-medium px-2 py-1 rounded-lg hover:bg-[#f3f4f6]"
+              className="flex items-center justify-center w-6 h-6 rounded-full bg-[#f0f2f5] hover:bg-[#e2e5ea] transition-colors text-[#6b7280]"
+              aria-label="Clear search"
             >
-              Clear
+              <X className="w-3 h-3" />
             </button>
           )}
         </div>

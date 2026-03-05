@@ -1,0 +1,75 @@
+import { ImageResponse } from "next/og"
+import { createAdminSupabase } from "@/lib/admin-supabase"
+
+export const runtime = "nodejs"
+
+export async function GET(_: Request, context: { params: Promise<{ slug: string }> }) {
+  const { slug } = await context.params
+  const supabase = createAdminSupabase()
+
+  const { data } = await supabase
+    .from("projects")
+    .select("name, city, location, main_image, developers(name)")
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .eq("is_published", true)
+    .is("deleted_at", null)
+    .maybeSingle()
+
+  const title = data?.name ?? "FHI Global Project"
+  const subtitle = [data?.developers?.[0]?.name, data?.city ?? data?.location].filter(Boolean).join(" • ")
+  const image = data?.main_image ?? "https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/fhi_global/fhi%20global.jpg"
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          position: "relative",
+          fontFamily: "Arial, sans-serif",
+          color: "white",
+          background: "#001f3f",
+        }}
+      >
+        <img
+          src={image}
+          alt={title}
+          width={1200}
+          height={630}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            position: "absolute",
+            inset: 0,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "linear-gradient(180deg, rgba(0,20,40,0.2) 0%, rgba(0,20,40,0.85) 100%)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            left: 48,
+            right: 48,
+            bottom: 44,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
+          <div style={{ fontSize: 22, color: "#d6b357", fontWeight: 700 }}>FHI Global • Project</div>
+          <div style={{ fontSize: 56, lineHeight: 1.05, fontWeight: 800, maxWidth: "90%" }}>{title}</div>
+          <div style={{ fontSize: 28, opacity: 0.9 }}>{subtitle || "Dubai Real Estate"}</div>
+        </div>
+      </div>
+    ),
+    { width: 1200, height: 630 },
+  )
+}

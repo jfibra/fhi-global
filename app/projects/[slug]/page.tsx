@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Image from "next/image"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
@@ -21,16 +22,37 @@ type Props = { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
   const supabase = await createClient()
-  const { data } = await supabase.from("projects").select("name, meta_title, meta_description, main_image").eq("slug", slug).maybeSingle()
+  const { data } = await supabase
+    .from("projects")
+    .select("name, description, meta_title, meta_description, main_image, city, location")
+    .eq("slug", slug)
+    .eq("is_published", true)
+    .is("deleted_at", null)
+    .maybeSingle()
   if (!data) return { title: "Project Not Found" }
+
   const title = data.meta_title ?? `${data.name} | FHI Global`
   const description = data.meta_description ?? `Discover ${data.name} â€“ a premium real estate project in Dubai.`
+  const ogImage = `${siteUrl}/og/project/${slug}`
+  const keywords = [
+    data.name,
+    data.city,
+    data.location,
+    "Dubai project",
+    "off-plan property",
+    "real estate Dubai",
+  ].filter(Boolean) as string[]
 
   return createPageMetadata({
     title,
     description,
-    imageUrl: data.main_image,
+    imageUrl: ogImage || data.main_image,
+    pathname: `/projects/${slug}`,
+    keywords,
+    openGraphTitle: data.name,
+    openGraphDescription: data.description ?? description,
   })
 }
 
@@ -94,8 +116,49 @@ export default async function ProjectDetailPage({ params }: Props) {
   const media = (project.project_media ?? []) as { id:number; media_type:string|null; url:string }[]
   const propertyTypes = ((project.project_property_types ?? []) as { property_types: { name: string } | null }[])
     .map((pt) => pt.property_types?.name).filter(Boolean) as string[]
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
+  const listingSchema = {
+    "@context": "https://schema.org",
+    "@type": "RealEstateListing",
+    name: project.name,
+    description: project.meta_description || project.description || project.about_project || project.name,
+    url: `${siteUrl}/projects/${project.slug}`,
+    image: [project.main_image, ...images.map((image) => image.image_url)].filter(Boolean),
+    offers: project.launch_price_from
+      ? {
+          "@type": "Offer",
+          priceCurrency: project.currency ?? "AED",
+          price: project.launch_price_from,
+        }
+      : undefined,
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: project.city || undefined,
+      streetAddress: [project.location, project.community].filter(Boolean).join(", ") || undefined,
+      addressCountry: "AE",
+    },
+    geo: project.latitude && project.longitude
+      ? {
+          "@type": "GeoCoordinates",
+          latitude: project.latitude,
+          longitude: project.longitude,
+        }
+      : undefined,
+    seller: developer
+      ? {
+          "@type": "Organization",
+          name: developer.name,
+          url: developer.slug ? `${siteUrl}/developers/${developer.slug}` : undefined,
+        }
+      : undefined,
+  }
 
   return (
+    <>
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(listingSchema) }}
+    />
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
       <div className="fixed top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-20 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />
 
@@ -106,11 +169,12 @@ export default async function ProjectDetailPage({ params }: Props) {
       <section className="relative min-h-[60vh] flex items-end overflow-hidden">
         {/* BG image */}
         {project.main_image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={project.main_image}
             alt={project.name}
-            className="absolute inset-0 w-full h-full object-cover"
+            fill
+            sizes="100vw"
+            className="absolute inset-0 object-cover"
           />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f] to-[#002a52]" />
@@ -425,8 +489,13 @@ export default async function ProjectDetailPage({ params }: Props) {
               <Link href={`/developers/${developer.slug}`} className="flex items-center gap-4 group mb-4">
                 <div className="w-14 h-14 rounded-2xl bg-[#f7f8fa] border border-[#e8eaed] flex items-center justify-center overflow-hidden shrink-0">
                   {developer.logo_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={developer.logo_url} alt={developer.name} className="max-w-[80%] max-h-[80%] object-contain" />
+                    <Image
+                      src={developer.logo_url}
+                      alt={`${developer.name} logo`}
+                      width={44}
+                      height={44}
+                      className="max-w-[80%] max-h-[80%] object-contain"
+                    />
                   ) : (
                     <Building2 className="w-6 h-6 text-[#9ca3af]" />
                   )}
@@ -514,5 +583,6 @@ export default async function ProjectDetailPage({ params }: Props) {
 
       <Footer />
     </div>
+    </>
   )
 }

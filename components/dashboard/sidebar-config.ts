@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   LayoutDashboard, Users, Building2, UsersRound, Layers, Images,
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
-  Tag, TrendingUp, LifeBuoy,
+  Tag, TrendingUp, LifeBuoy, CreditCard,
 } from "lucide-react"
 
 // â”€â”€â”€ Base types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -116,6 +116,10 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
           { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support" },
         ],
       },
+      {
+        type: "item",
+        item: { icon: CreditCard, label: "Business Card", href: `${basePath}/business-card` },
+      },
     ]
   }
 
@@ -146,6 +150,15 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
           { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support" },
         ],
       },
+      { type: "item", item: { icon: CreditCard, label: "Business Card", href: `${basePath}/business-card` } },
+    ]
+  }
+
+  if (["secretary", "team_secretary"].includes(normalizedRole)) {
+    return [
+      { type: "item", item: { icon: LayoutDashboard, label: "Overview",       href: basePath } },
+      { type: "item", item: { icon: LifeBuoy,        label: "Support Tickets", href: "/dashboard/support" } },
+      { type: "item", item: { icon: CreditCard,      label: "Business Card",   href: `${basePath}/business-card` } },
     ]
   }
 

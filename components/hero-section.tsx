@@ -64,14 +64,20 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
         .hero-float { animation: hero-float 6s ease-in-out infinite; }
       `}</style>
 
-      <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-0 lg:min-h-[88vh] flex items-center">
-        <div className="grid grid-cols-1 lg:grid-cols-[3fr_1fr] gap-10 lg:gap-8 items-center w-full">
+      <div className="relative w-full max-w-7xl mx-auto px-1 sm:px-5 lg:px-0 py-20 lg:py-0 lg:min-h-[88vh] flex items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-[7fr_5fr] gap-10 lg:gap-8 items-center w-full">
 
           {/* â•â•â• LEFT COLUMN â•â•â• */}
           <div className="flex flex-col w-full">
             {/* Badge */}
             <div className="inline-flex self-start items-center gap-2 px-3.5 py-1.5 bg-white/10 border border-white/20 rounded-full text-xs font-medium text-white/85 mb-7 backdrop-blur-sm">
-              <span className="text-base leading-none">ðŸ‡¦ðŸ‡ª</span>
+              <img
+                src="https://flagcdn.com/w20/ae.png"
+                alt="UAE"
+                width={18}
+                height={13}
+                className="rounded-sm object-cover shrink-0"
+              />
               Dubai&apos;s Premier Real Estate Portal
             </div>
 
@@ -79,7 +85,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
             <h1 className="font-['Outfit'] text-4xl sm:text-5xl lg:text-[3.25rem] xl:text-[3.75rem] font-bold leading-[1.08] mb-5 tracking-tight whitespace-nowrap">
               <span className="text-white">Discover Premium</span>
               <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">
+              <span className="text-transparent bg-clip-text bg-gradient-to-b from-[#f3dd89] to-[#daa843]">
                 Real Estate Investment
               </span>
             </h1>
@@ -92,12 +98,12 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
             {/* â”€â”€ Search form â”€â”€ */}
             <form
               onSubmit={handleSearch}
-              className="bg-[#001428]/70 backdrop-blur-2xl border border-white/15 rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.45)] w-full"
+              className="bg-[#3a5571]/70 backdrop-blur-2xl border border-white/15 rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.45)] w-full"
             >
               {/* 4-column field row */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-white/[0.08] rounded-xl overflow-hidden mb-3">
                 {/* Project Name */}
-                <div className="bg-[#001428]/80 px-4 py-3 hover:bg-white/5 transition-colors">
+                <div className="bg-[#4a6179]/80 border border-white/15  px-4 py-3 hover:bg-white/5 transition-colors">
                   <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#d6b357] mb-1.5">
                     <Search className="w-3 h-3 shrink-0" /> Project Name
                   </label>
@@ -111,7 +117,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
                 </div>
 
                 {/* Developer */}
-                <div className="bg-[#001428]/80 px-4 py-3 hover:bg-white/5 transition-colors">
+                <div className="bg-[#4a6179]/80 border border-white/15  px-4 py-3 hover:bg-white/5 transition-colors">
                   <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#d6b357] mb-1.5">
                     <Building2 className="w-3 h-3 shrink-0" /> Developer
                   </label>
@@ -131,7 +137,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
                 </div>
 
                 {/* City / Community */}
-                <div className="bg-[#001428]/80 px-4 py-3 hover:bg-white/5 transition-colors">
+                <div className="bg-[#4a6179]/80 border border-white/15  px-4 py-3 hover:bg-white/5 transition-colors">
                   <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#d6b357] mb-1.5">
                     <MapPin className="w-3 h-3 shrink-0" /> City/ Community
                   </label>
@@ -151,7 +157,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
                 </div>
 
                 {/* Price Range */}
-                <div className="bg-[#001428]/80 px-4 py-3 hover:bg-white/5 transition-colors">
+                <div className="bg-[#4a6179]/80 border border-white/15  px-4 py-3 hover:bg-white/5 transition-colors">
                   <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#d6b357] mb-1.5">
                     <DollarSign className="w-3 h-3 shrink-0" /> Price Range
                   </label>
@@ -204,7 +210,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
             <img
               src={FLOAT_IMG}
               alt="Dubai skyline"
-              className="hero-float relative w-full max-w-[280px] xl:max-w-[320px] drop-shadow-[0_40px_80px_rgba(0,0,0,0.5)] select-none"
+              className="hero-float relative w-full max-w-[280px] xl:max-w-[500px] drop-shadow-[0_40px_80px_rgba(0,0,0,0.5)] select-none"
               draggable={false}
             />
           </div>
