@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Image from "next/image"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
@@ -16,15 +17,28 @@ type Props = { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
   const supabase = await createClient()
-  const { data } = await supabase.from("developers").select("name, description, logo_url").eq("slug", slug).single()
+  const { data } = await supabase
+    .from("developers")
+    .select("name, description, logo_url, address")
+    .eq("slug", slug)
+    .is("deleted_at", null)
+    .maybeSingle()
   if (!data) return { title: "Developer Not Found" }
+
+  const ogImage = `${siteUrl}/og/developer/${slug}`
+  const description = data.description ?? `Explore projects by ${data.name} on FHI Global.`
+  const keywords = [data.name, data.address, "Dubai developer", "real estate developer UAE"].filter(Boolean) as string[]
 
   return createPageMetadata({
     title: `${data.name} | FHI Global Developers`,
-    description: data.description ?? `Explore projects by ${data.name} on FHI Global.`,
+    description,
     openGraphTitle: `${data.name} | FHI Global`,
-    imageUrl: data.logo_url,
+    openGraphDescription: description,
+    imageUrl: ogImage || data.logo_url,
+    pathname: `/developers/${slug}`,
+    keywords,
   })
 }
 
@@ -82,8 +96,13 @@ export default async function DeveloperDetailPage({ params }: Props) {
             {/* Logo */}
             <div className="w-28 h-28 rounded-[24px] bg-white border-2 border-[#d6b357]/40 shadow-[0_0_0_6px_rgba(214,179,87,0.1),0_8px_32px_rgba(0,0,0,0.25)] flex items-center justify-center shrink-0 overflow-hidden">
               {developer.logo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={developer.logo_url} alt={developer.name} className="max-w-[75%] max-h-[75%] object-contain" />
+                <Image
+                  src={developer.logo_url}
+                  alt={`${developer.name} logo`}
+                  width={84}
+                  height={84}
+                  className="max-w-[75%] max-h-[75%] object-contain"
+                />
               ) : (
                 <Building2 className="w-10 h-10 text-[#d6b357]" />
               )}

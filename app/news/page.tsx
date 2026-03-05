@@ -1,19 +1,23 @@
 import type { Metadata } from "next"
+import Image from "next/image"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { createPageMetadata } from "@/lib/seo"
 import { fetchArticles, slugify, type NewsArticle } from "@/lib/news-service"
 import { Clock, Play, TrendingUp, Clock3, ChevronRight } from "lucide-react"
 
 export const revalidate = 300
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "News | FHI Global â€” Real Estate Insights",
   description:
     "Stay up to date with the latest real estate news, market trends, and investment insights from FHI Global.",
-}
+  pathname: "/news",
+  keywords: ["Dubai real estate news", "UAE property updates", "FHI Global news", "property market insights"],
+})
 
 type SearchParams = Promise<{ title?: string }>
 
@@ -50,8 +54,13 @@ function ThumbCard({ item }: { item: NewsArticle }) {
   return (
     <Link href={`/news/${item.slug}`} className="group flex flex-col gap-1.5">
       <div className="relative overflow-hidden aspect-[4/3] bg-gray-100">
-        <img src={item.img} alt={item.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        <Image
+          src={item.img}
+          alt={item.title}
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          className="object-cover group-hover:scale-105 transition-transform duration-500"
+        />
         {item.badge && (
           <span className="absolute top-1.5 left-1.5 bg-[#d6b357] text-[#001428] text-[8px] font-black uppercase px-1.5 py-0.5 leading-tight">
             {item.badge}
@@ -78,8 +87,13 @@ function OverlayCard({ item, tall = false }: { item: NewsArticle; tall?: boolean
   return (
     <Link href={`/news/${item.slug}`}
       className={`group relative overflow-hidden bg-gray-200 block ${tall ? "aspect-[3/4]" : "aspect-[4/3]"}`}>
-      <img src={item.img} alt={item.title}
-        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+      <Image
+        src={item.img}
+        alt={item.title}
+        fill
+        sizes="(max-width: 768px) 100vw, 33vw"
+        className="object-cover group-hover:scale-105 transition-transform duration-500"
+      />
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
       {item.badge && (
         <span className="absolute top-2 left-2 bg-[#d6b357] text-[#001428] text-[8px] font-black uppercase px-1.5 py-0.5 leading-tight">
@@ -106,8 +120,13 @@ function ArchiveRow({ item, rank }: { item: NewsArticle; rank?: number }) {
         </span>
       )}
       <div className="relative w-20 h-14 shrink-0 overflow-hidden bg-gray-100">
-        <img src={item.img} alt={item.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        <Image
+          src={item.img}
+          alt={item.title}
+          fill
+          sizes="80px"
+          className="object-cover group-hover:scale-105 transition-transform duration-500"
+        />
         {item.hasVideo && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-5 h-5 rounded-full bg-black/60 flex items-center justify-center">
@@ -266,9 +285,14 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
                     {featureList.map((item) => (
                       <li key={item.id}>
                         <Link href={`/news/${item.slug}`} className="group flex gap-2.5 items-start">
-                          <div className="w-16 h-11 shrink-0 overflow-hidden bg-gray-100">
-                            <img src={item.img} alt={item.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                          <div className="relative w-16 h-11 shrink-0 overflow-hidden bg-gray-100">
+                            <Image
+                              src={item.img}
+                              alt={item.title}
+                              fill
+                              sizes="64px"
+                              className="object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-semibold text-[#001428] group-hover:text-[#d6b357] transition-colors leading-snug line-clamp-2">
@@ -341,9 +365,14 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
                     {sidebarRecent.map((item) => (
                       <li key={item.id}>
                         <Link href={`/news/${item.slug}`} className="group flex gap-2.5 items-start">
-                          <div className="w-14 h-10 shrink-0 overflow-hidden bg-gray-100">
-                            <img src={item.img} alt={item.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                          <div className="relative w-14 h-10 shrink-0 overflow-hidden bg-gray-100">
+                            <Image
+                              src={item.img}
+                              alt={item.title}
+                              fill
+                              sizes="56px"
+                              className="object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-[11px] font-semibold text-[#001428] group-hover:text-[#d6b357] transition-colors leading-snug line-clamp-2">

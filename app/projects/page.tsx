@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Image from "next/image"
 import { createClient } from "@/lib/supabase/server"
 import { createPageMetadata } from "@/lib/seo"
 import { TopBar } from "@/components/topbar"
@@ -14,6 +15,8 @@ export const dynamic = "force-dynamic"
 export const metadata: Metadata = createPageMetadata({
   title: "Real Estate Projects in Dubai | FHI Global",
   description: "Browse premium off-plan and ready residential projects from top Dubai developers.",
+  pathname: "/projects",
+  keywords: ["Dubai projects", "off-plan properties Dubai", "ready properties UAE", "Dubai investment properties"],
 })
 
 type SearchParams = Promise<{
@@ -74,10 +77,12 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
       <section className="relative pt-16 pb-16 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
-          <img
+          <Image
             src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/5.png"
             alt=""
-            className="w-full h-full object-cover object-center"
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
             aria-hidden="true"
           />
           <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f]/88 via-[#002a52]/85 to-[#001428]/92" />

@@ -7,14 +7,17 @@ import { DEFAULT_PREVIEW_IMAGE_URL } from "@/lib/seo"
 import { PageTransitionWrapper } from "@/components/ui/PageTransitionWrapper"
 import { NavigationLoader } from "@/components/ui/NavigationLoader"
 
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
+const _geist = Geist({ subsets: ["latin"], display: "swap", variable: "--font-geist" })
+const _geistMono = Geist_Mono({ subsets: ["latin"], display: "swap", variable: "--font-geist-mono" })
 // Outfit font for display headings (matches Figma design)
-const _outfit = Outfit({ subsets: ["latin"] })
+const _outfit = Outfit({ subsets: ["latin"], display: "swap", variable: "--font-outfit" })
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "FHI Global â€” Dubai Real Estate",
+    default: "FHI Global Dubai Real Estate",
     template: "%s | FHI Global",
   },
   description: "Discover premium property projects in Dubai from verified developers.",
@@ -42,6 +45,17 @@ export const metadata: Metadata = {
     description: "Discover premium property projects in Dubai from verified developers.",
     images: [DEFAULT_PREVIEW_IMAGE_URL],
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
 }
 
 export default function RootLayout({
@@ -51,7 +65,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`font-sans antialiased`}>
+      <head>
+        <link rel="preconnect" href="https://hefwmaoborpfuyhbguzv.supabase.co" crossOrigin="anonymous" />
+        <link rel="preload" as="image" href="/FHI_Branding_White.png" />
+        <link rel="preload" as="image" href="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/fhi_global/bg%20background.png" />
+      </head>
+      <body className={`${_geist.variable} ${_geistMono.variable} ${_outfit.variable} font-sans antialiased`}>
         <PageTransitionWrapper>
           {children}
         </PageTransitionWrapper>

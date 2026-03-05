@@ -145,3 +145,30 @@
     }
   }
 }
+
+/* ── Business Card 3-D flip ────────────────────────────────────────────────── */
+.bc-scene {
+  perspective: 1200px;
+}
+
+.bc-card {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.65s cubic-bezier(0.4, 0.2, 0.2, 1);
+  will-change: transform;
+}
+
+.bc-card--flipped {
+  transform: rotateY(180deg);
+}
+
+.bc-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.bc-face--back {
+  transform: rotateY(180deg);
+}

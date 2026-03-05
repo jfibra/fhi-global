@@ -12,7 +12,7 @@ import {
   Lock, AlertCircle, FileText, ScanLine, Scan, ZoomIn,
 } from "lucide-react"
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Types Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 type AccountType = "salesperson" | "developer" | ""
 
@@ -54,7 +54,7 @@ const INITIAL_STATE: FormState = {
   faceBlob: null, facePreview: "",
 }
 
-// â”€â”€â”€ Password strength â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Password strength Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 const PWD_RULES = [
   { label: "At least 8 characters",     test: (p: string) => p.length >= 8 },
@@ -85,34 +85,36 @@ function PasswordStrength({ password }: { password: string }) {
 
 function allPwdRulesPassed(p: string) { return PWD_RULES.every(r => r.test(p)) }
 
-// â”€â”€â”€ Stepper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Stepper Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 const STEPS_SALESPERSON = ["Account Type", "Information", "ID Upload", "ID Scan", "Face Verify", "Complete"]
 const STEPS_DEVELOPER   = ["Account Type", "Information", "Complete"]
 
 function Stepper({ current, steps }: { current: number; steps: string[] }) {
   return (
-    <div className="flex items-center justify-center gap-0 mb-8">
+    <div className="flex items-start justify-center gap-0 mb-8">
       {steps.map((label, i) => {
-        const done    = i < current
-        const active  = i === current
-        const last    = i === steps.length - 1
+        const done   = i < current
+        const active = i === current
+        const last   = i === steps.length - 1
         return (
-          <div key={label} className="flex items-center">
+          <div key={label} className="flex items-start">
             <div className="flex flex-col items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 border-2 ${
-                done    ? "bg-[#001f3f] border-[#001f3f] text-white"
-                : active  ? "bg-gradient-to-br from-[#001f3f] to-[#d6b357] border-transparent text-white shadow-[0_0_0_4px_rgba(214,179,87,0.2)]"
-                          : "bg-white border-[#e5e7eb] text-[#9ca3af]"
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+                done
+                  ? "bg-[#001f3f] text-white"
+                  : active
+                  ? "bg-[#001f3f] text-white shadow-[0_0_0_4px_rgba(0,31,63,0.12)]"
+                  : "bg-[#f0f2f5] text-[#adb5bd] border border-[#e4e7ec]"
               }`}>
-                {done ? <Check className="w-3.5 h-3.5" /> : i + 1}
+                {done ? <Check className="w-4 h-4" /> : <span className="text-sm">{i + 1}</span>}
               </div>
-              <span className={`mt-1.5 text-[9px] font-semibold uppercase tracking-[0.15em] transition-colors hidden sm:block ${
+              <span className={`mt-2 text-[10px] font-semibold uppercase tracking-[0.1em] whitespace-nowrap transition-colors ${
                 active ? "text-[#001f3f]" : done ? "text-[#6b7280]" : "text-[#c4c9d4]"
               }`}>{label}</span>
             </div>
             {!last && (
-              <div className={`w-8 sm:w-14 h-0.5 mb-5 transition-colors ${done || (active && i < current) ? "bg-[#001f3f]" : "bg-[#e5e7eb]"}`} />
+              <div className={`w-12 sm:w-20 h-px mt-5 mx-1 transition-colors ${done ? "bg-[#001f3f]" : "bg-[#e4e7ec]"}`} />
             )}
           </div>
         )
@@ -121,47 +123,42 @@ function Stepper({ current, steps }: { current: number; steps: string[] }) {
   )
 }
 
-// â”€â”€â”€ Card shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Card shell Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function StepCard({ title, subtitle, children, onBack, onNext, nextLabel = "Continue", nextDisabled = false, loading = false, hideBack = false }:
   { title: string; subtitle?: string; children: React.ReactNode; onBack?: () => void; onNext?: () => void; nextLabel?: string; nextDisabled?: boolean; loading?: boolean; hideBack?: boolean }) {
   return (
-    <div className="bg-white rounded-[28px] border border-[#e8eaed] shadow-[0_8px_48px_-8px_rgba(0,31,63,0.12)] overflow-hidden">
-      {/* Gold accent top */}
-      <div className="h-[3px] bg-gradient-to-r from-transparent via-[#d6b357] to-transparent" />
-      <div className="p-8">
-        <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mb-1">{title}</h2>
-        {subtitle && <p className="text-sm text-[#6b7280] mb-6 leading-relaxed">{subtitle}</p>}
-        <div className="mt-4">{children}</div>
-        {(onBack || onNext) && (
-          <div className="flex items-center justify-between mt-8 pt-6 border-t border-[#f0f2f5]">
-            {onBack && !hideBack ? (
-              <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-[#6b7280] hover:text-[#001f3f] transition-colors font-medium">
-                <ArrowLeft className="w-4 h-4" /> Back
-              </button>
-            ) : <span />}
-            {onNext && (
-              <button
-                onClick={onNext}
-                disabled={nextDisabled || loading}
-                className="group relative flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#001f3f] to-[#002a52] text-white text-sm font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_4px_16px_-2px_rgba(0,31,63,0.30)] hover:shadow-[0_6px_20px_-2px_rgba(0,31,63,0.40)] hover:-translate-y-0.5 transition-all duration-300 overflow-hidden"
-              >
-                <span className="absolute inset-0 bg-gradient-to-r from-transparent via-[#d6b357]/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-                <span className="relative flex items-center gap-2">
-                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {nextLabel}
-                  {!loading && <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />}
-                </span>
-              </button>
-            )}
-          </div>
-        )}
+    <div className="bg-white rounded-[20px] border border-[#e4e7ec] shadow-[0_2px_24px_-4px_rgba(0,31,63,0.10)] overflow-hidden">
+      <div className="px-7 pt-7 pb-2">
+        <h2 className="font-['Outfit'] text-[21px] font-bold text-[#0d1117] mb-1.5">{title}</h2>
+        {subtitle && <p className="text-sm text-[#6b7280] leading-relaxed">{subtitle}</p>}
+        <div className="mt-6">{children}</div>
       </div>
+      {(onBack || onNext) && (
+        <div className="flex items-center justify-between px-7 py-5 mt-4 border-t border-[#f0f2f5]">
+          {onBack && !hideBack ? (
+            <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-[#6b7280] hover:text-[#001f3f] transition-colors font-semibold">
+              <ArrowLeft className="w-4 h-4" /> Back
+            </button>
+          ) : <span />}
+          {onNext && (
+            <button
+              onClick={onNext}
+              disabled={nextDisabled || loading}
+              className="flex items-center gap-2 px-7 py-3 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_4px_14px_-2px_rgba(0,31,63,0.40)] hover:shadow-[0_6px_20px_-2px_rgba(0,31,63,0.50)] hover:-translate-y-0.5 transition-all duration-200"
+            >
+              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {nextLabel}
+              {!loading && <ArrowRight className="w-4 h-4" />}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
-// â”€â”€â”€ Input â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Input Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
   return (
@@ -175,7 +172,7 @@ function Field({ label, children, error }: { label: string; children: React.Reac
 
 const inputCls = "w-full px-4 py-3 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all duration-200"
 
-// â”€â”€â”€ Upload zone â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Upload zone Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function UploadZone({ label, idFile, onFile, onCamera }: {
   label: string;
@@ -211,7 +208,7 @@ function UploadZone({ label, idFile, onFile, onCamera }: {
         >
           <UploadCloud className="w-8 h-8 text-[#c4c9d4] group-hover:text-[#001f3f] transition-colors" />
           <p className="text-xs text-[#6b7280] group-hover:text-[#374151] transition-colors font-medium">Click to upload</p>
-          <p className="text-[10px] text-[#9ca3af]">JPG, PNG or PDF Â· max 10 MB</p>
+          <p className="text-[10px] text-[#9ca3af]">JPG, PNG or PDF Ã‚Â· max 10 MB</p>
         </div>
       )}
       <input
@@ -231,7 +228,7 @@ function UploadZone({ label, idFile, onFile, onCamera }: {
   )
 }
 
-// â”€â”€â”€ Camera modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Camera modal Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function CameraModal({ onCapture, onClose, title }: { onCapture: (blob: Blob, preview: string) => void; onClose: () => void; title: string }) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -294,7 +291,7 @@ function CameraModal({ onCapture, onClose, title }: { onCapture: (blob: Blob, pr
   )
 }
 
-// â”€â”€â”€ Main RegisterUI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Main RegisterUI Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export function RegisterUI() {
   const [showPassword, setShowPassword]   = useState(false)
@@ -312,7 +309,7 @@ export function RegisterUI() {
   const isSalesperson = form.accountType === "salesperson"
   const steps = isSalesperson ? STEPS_SALESPERSON : STEPS_DEVELOPER
 
-  // â”€â”€ field helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Ã¢â€â‚¬Ã¢â€â‚¬ field helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const set = (key: keyof FormState, value: unknown) => setForm(f => ({ ...f, [key]: value }))
   const setOcr = (k: keyof OcrData, v: string) => setForm(f => ({ ...f, ocrData: { ...f.ocrData, [k]: v } }))
 
@@ -321,7 +318,7 @@ export function RegisterUI() {
     return { file, preview: URL.createObjectURL(file) }
   }
 
-  // â”€â”€ validation per step â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Ã¢â€â‚¬Ã¢â€â‚¬ validation per step Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const validate = (s: number): boolean => {
     const e: Record<string, string> = {}
     if (s === 0 && !form.accountType) e.accountType = "Please select an account type"
@@ -348,7 +345,7 @@ export function RegisterUI() {
   const next = () => { if (validate(step)) setStep(s => s + 1) }
   const back = () => { setStep(s => s - 1); setErrors({}) }
 
-  // â”€â”€ OCR call â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Ã¢â€â‚¬Ã¢â€â‚¬ OCR call Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const runOcr = async () => {
     if (!form.primaryId.file) return
     setOcrLoading(true); setOcrWarning("")
@@ -363,7 +360,7 @@ export function RegisterUI() {
     finally { setOcrLoading(false) }
   }
 
-  // â”€â”€ submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Ã¢â€â‚¬Ã¢â€â‚¬ submit Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const submit = async () => {
     if (!validate(isSalesperson ? 4 : 1)) return
     setSubmitting(true); setGlobalError("")
@@ -389,340 +386,363 @@ export function RegisterUI() {
     setSubmitting(false)
   }
 
-  // â”€â”€ last step index for this flow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Ã¢â€â‚¬Ã¢â€â‚¬ last step index for this flow Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const lastStep = steps.length - 1
 
   return (
-    <div className="relative min-h-screen flex bg-[#f4f6f9] font-sans overflow-x-hidden">
+    <div className="relative min-h-screen bg-[#f4f6f9] font-sans overflow-x-hidden">
       {/* Ambient blobs */}
-      <div className="hidden lg:block fixed top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-30 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(180,235,255)_0%,rgba(255,255,255,0)_70%)]" />
-      <div className="hidden lg:block fixed bottom-0 right-[-5%] w-[600px] h-[600px] rounded-full opacity-30 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(255,240,200)_0%,rgba(255,255,255,0)_70%)]" />
+      <div className="fixed top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-20 blur-[130px] -z-10 bg-[radial-gradient(circle,rgb(180,235,255)_0%,rgba(255,255,255,0)_70%)]" />
+      <div className="fixed bottom-0 right-[-5%] w-[600px] h-[600px] rounded-full opacity-20 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(255,240,200)_0%,rgba(255,255,255,0)_70%)]" />
 
-      {/* â”€â”€ Left brand panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <div className="hidden lg:flex lg:w-[420px] xl:w-[480px] shrink-0 relative flex-col justify-between p-14 bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "radial-gradient(circle,#fff 1px,transparent 1px)", backgroundSize: "28px 28px" }} />
-        <div className="absolute top-[-100px] left-[-100px] w-[500px] h-[500px] rounded-full opacity-25 blur-[130px] bg-[radial-gradient(circle,#d6b357,transparent)]" />
-        <div className="absolute bottom-[-80px] right-[-80px] w-[450px] h-[450px] rounded-full opacity-20 blur-[110px] bg-[radial-gradient(circle,#95292a,transparent)]" />
-        <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#d6b357]/60 to-transparent" />
-        <div className="relative z-10">
-          <Image src="/FHI_Branding_White.png" alt="FHI Global" width={148} height={44} className="object-contain" />
-        </div>
-        <div className="relative z-10 space-y-8">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 border border-white/20 rounded-full text-xs font-medium text-white/80 mb-6 backdrop-blur-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357] animate-pulse" />
-              Join FHI Global
-            </div>
-            <h1 className="font-['Outfit'] text-3xl xl:text-4xl font-bold text-white leading-tight mb-4">
-              Start Closing Deals<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">in Minutes.</span>
-            </h1>
-            <p className="text-white/55 text-sm leading-relaxed">
-              Create your FHI Global account and gain access to Dubai&apos;s most powerful real estate CRM platform.
-            </p>
+      {/* â”€â”€ Marketing header â”€â”€ */}
+      <div className="bg-white border-b border-[#eaecf0]">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 text-center">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white border border-[#e4e7ec] rounded-full text-xs font-semibold text-[#374151] mb-5 shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-[#d6b357]" />
+            Join FHI Global
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          {/* Heading */}
+          <h1 className="font-['Outfit'] text-3xl sm:text-4xl font-bold text-[#0d1117] mb-3 leading-tight tracking-tight">
+            Start Closing Deals{" "}
+            <span className="relative inline-block">
+              <span className="relative z-10">in Minutes</span>
+              <span className="absolute -bottom-0.5 left-0 right-0 h-[3px] rounded-full bg-gradient-to-r from-[#d6b357] to-[#f0d890]" aria-hidden="true" />
+            </span>
+          </h1>
+          <p className="text-[#6b7280] text-base leading-relaxed mb-8 max-w-xl mx-auto">
+            Create your FHI Global account and gain access to Dubai&apos;s most powerful real estate CRM platform.
+          </p>
+          {/* Stat strip */}
+          <div className="flex items-center justify-center gap-8 sm:gap-14 mb-8 py-5 border-y border-[#f0f0f0]">
             {[
-              { icon: <Building2 className="w-4 h-4 text-[#d6b357]" />, label: "Developers", value: "100+" },
-              { icon: <TrendingUp className="w-4 h-4 text-[#d6b357]" />, label: "Projects", value: "500+" },
-              { icon: <DollarSign className="w-4 h-4 text-[#d6b357]" />, label: "Sold Units", value: "1K+" },
-            ].map(({ icon, label, value }) => (
-              <div key={label} className="group bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#d6b357]/30 rounded-2xl p-3 transition-all duration-300">
-                <div className="flex items-center gap-2 mb-2">{icon}<span className="text-[10px] text-white/50 font-medium uppercase tracking-wider">{label}</span></div>
-                <p className="text-xl font-bold text-white font-['Outfit']">{value}</p>
-                <div className="mt-1.5 h-0.5 w-6 rounded-full bg-[#d6b357]/30 group-hover:w-full transition-all duration-500" />
+              { icon: <Building2 className="w-4 h-4" />, value: "100+", label: "Developers" },
+              { icon: <TrendingUp className="w-4 h-4" />, value: "500+", label: "Projects" },
+              { icon: <DollarSign className="w-4 h-4" />, value: "1K+", label: "Deals Closed" },
+            ].map(({ icon, value, label }) => (
+              <div key={label} className="flex flex-col items-center gap-0.5">
+                <div className="flex items-center gap-1.5 text-[#d6b357]">{icon}<span className="font-['Outfit'] text-xl font-bold text-[#001f3f]">{value}</span></div>
+                <span className="text-[11px] text-[#9ca3af] font-medium">{label}</span>
               </div>
             ))}
           </div>
-          <div className="space-y-2.5">
-            {["Manage all your Dubai developer relationships", "Track purchases, commissions, and performance", "Access premium project listings and media"].map(point => (
-              <div key={point} className="flex items-center gap-3">
-                <CheckCircle2 className="w-4 h-4 text-[#d6b357] shrink-0" />
-                <span className="text-white/60 text-sm">{point}</span>
+
+          {/* Feature cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { title: "Developer Network", desc: "Manage all your Dubai developer relationships.", icon: <Building2 className="w-3.5 h-3.5 text-[#001f3f]" /> },
+              { title: "Sales Tracking",     desc: "Track purchases, commissions, and performance.", icon: <TrendingUp className="w-3.5 h-3.5 text-[#001f3f]" /> },
+              { title: "Premium Listings",   desc: "Access premium project listings and media.",     icon: <FileText className="w-3.5 h-3.5 text-[#001f3f]" /> },
+            ].map(({ title, desc, icon }) => (
+              <div key={title} className="flex flex-col gap-2 bg-[#fffdf3] border border-[#f0e8c8] rounded-2xl px-4 py-4 text-left">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-[#d6b357] flex items-center justify-center shrink-0">{icon}</div>
+                  <span className="text-sm font-bold text-[#111827]">{title}</span>
+                </div>
+                <p className="text-xs text-[#6b7280] leading-relaxed pl-8">{desc}</p>
               </div>
             ))}
           </div>
-        </div>
-        <div className="relative z-10 flex items-center gap-3">
-          <ShieldCheck className="w-4 h-4 text-white/25" />
-          <p className="text-white/25 text-xs">Accounts require admin approval before access is granted</p>
         </div>
       </div>
 
-      {/* â”€â”€ Right multi-step panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <div className="flex-1 flex flex-col items-center justify-start lg:justify-center px-4 py-10 lg:px-10 lg:py-14 overflow-y-auto bg-gradient-to-br lg:bg-none from-[#001f3f] via-[#002a52] to-[#001428]">
-        {/* Mobile logo */}
-        <div className="mb-8 lg:hidden flex justify-center">
-          <Image src="/FHI_Branding_White.png" alt="FHI Global" width={130} height={40} className="object-contain" />
-        </div>
-
-        <div className="w-full max-w-lg">
-          {success ? (
-            /* â”€â”€ Success â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-            <div className="bg-white rounded-[28px] border border-[#e8eaed] shadow-[0_12px_56px_-8px_rgba(0,31,63,0.15)] overflow-hidden text-center">
-              <div className="h-[3px] bg-gradient-to-r from-transparent via-[#d6b357] to-transparent" />
-              <div className="p-10">
-                <div className="w-20 h-20 rounded-full bg-[#d6b357]/12 border-2 border-[#d6b357]/30 flex items-center justify-center mx-auto mb-6">
-                  <CheckCircle2 className="w-10 h-10 text-[#d6b357]" />
-                </div>
-                <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mb-3">Account Created!</h2>
-                <p className="text-[#6b7280] text-sm mb-8 leading-relaxed max-w-sm mx-auto">
-                  Check your email to confirm your account. Once an administrator approves your access, you can sign in.
-                </p>
-                <Link
-                  href="/login"
-                  className="group relative inline-flex items-center justify-center gap-2 w-full py-3.5 px-4 bg-gradient-to-r from-[#001f3f] to-[#002a52] text-white text-sm font-semibold rounded-xl shadow-[0_4px_16px_-2px_rgba(0,31,63,0.35)] hover:shadow-[0_6px_20px_-2px_rgba(0,31,63,0.45)] hover:-translate-y-0.5 transition-all duration-300 overflow-hidden"
-                >
-                  <span className="absolute inset-0 bg-gradient-to-r from-transparent via-[#d6b357]/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-                  <span className="relative flex items-center gap-2">Go to Sign In <ArrowRight className="w-4 h-4" /></span>
-                </Link>
+      {/* â”€â”€ Form area â”€â”€ */}
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
+        {success ? (
+          <div className="bg-white rounded-[20px] border border-[#e4e7ec] shadow-[0_2px_24px_-4px_rgba(0,31,63,0.10)] overflow-hidden text-center">
+            <div className="px-8 py-10">
+              <div className="w-20 h-20 rounded-full bg-[#d6b357]/12 border-2 border-[#d6b357]/30 flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="w-10 h-10 text-[#d6b357]" />
               </div>
+              <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mb-3">Account Created!</h2>
+              <p className="text-[#6b7280] text-sm mb-8 leading-relaxed max-w-sm mx-auto">
+                Check your email to confirm your account. Once an administrator approves your access, you can sign in.
+              </p>
+              <Link
+                href="/login"
+                className="inline-flex items-center justify-center gap-2 w-full py-3.5 px-4 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl shadow-[0_4px_16px_-2px_rgba(0,31,63,0.35)] hover:-translate-y-0.5 transition-all duration-200"
+              >
+                Go to Sign In <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
-          ) : (
-            <>
-              {/* Stepper */}
-              <Stepper current={step} steps={steps} />
+          </div>
+        ) : (
+          <>
+            {/* Stepper */}
+            <Stepper current={step} steps={steps} />
 
-              {/* â”€â”€ Step 0: Account Type â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-              {step === 0 && (
-                <StepCard
-                  title="Choose Account Type"
-                  subtitle="Select the role that best describes how you will use FHI Global."
-                  onNext={next}
-                  nextDisabled={!form.accountType}
-                  hideBack
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {([
-                      { type: "salesperson" as AccountType, icon: <User className="w-6 h-6" />, title: "Salesperson", desc: "Property agents, brokers, and sales representatives who manage clients and commissions." },
-                      { type: "developer" as AccountType, icon: <Building2 className="w-6 h-6" />, title: "Developer", desc: "Real estate developers and property companies looking to list and manage projects." },
-                    ] as const).map(({ type, icon, title, desc }) => {
-                      const active = form.accountType === type
-                      return (
-                        <button
-                          key={type}
-                          onClick={() => set("accountType", type)}
-                          className={`relative flex flex-col items-start gap-4 rounded-2xl p-5 border-2 text-left transition-all duration-300 group ${
-                            active
-                              ? "border-[#d6b357] bg-gradient-to-br from-[#001f3f]/5 to-[#d6b357]/5 shadow-[0_0_0_4px_rgba(214,179,87,0.1)]"
-                              : "border-[#e5e7eb] bg-[#f9fafb] hover:border-[#d6b357]/40 hover:bg-white"
-                          }`}
-                        >
-                          {active && <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#d6b357] flex items-center justify-center"><Check className="w-3 h-3 text-white" /></span>}
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${active ? "bg-[#001f3f] text-[#d6b357]" : "bg-white text-[#374151] border border-[#e5e7eb] group-hover:bg-[#001f3f] group-hover:text-[#d6b357]"}`}>{icon}</div>
-                          <div>
-                            <p className={`font-['Outfit'] font-bold text-base mb-1 transition-colors ${active ? "text-[#001f3f]" : "text-[#111827]"}`}>{title}</p>
-                            <p className="text-xs text-[#6b7280] leading-relaxed">{desc}</p>
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                  {errors.accountType && <p className="mt-3 text-xs text-rose-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.accountType}</p>}
-                </StepCard>
-              )}
-
-              {/* â”€â”€ Step 1: Account Information â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-              {step === 1 && (
-                <StepCard title="Your Information" subtitle="Enter your personal and login details." onBack={back} onNext={next}>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="First Name" error={errors.firstName}>
-                        <input value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Ahmed" className={inputCls} />
-                      </Field>
-                      <Field label="Last Name" error={errors.lastName}>
-                        <input value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Al Rashidi" className={inputCls} />
-                      </Field>
-                    </div>
-                    <Field label="Email Address" error={errors.email}>
-                      <input type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="you@example.com" className={inputCls} />
-                    </Field>
-                    {form.accountType === "developer" && (
-                      <Field label="Company Name" error={errors.companyName}>
-                        <input value={form.companyName} onChange={e => set("companyName", e.target.value)} placeholder="EMAAR Properties" className={inputCls} />
-                      </Field>
-                    )}
-                    <Field label="Password" error={errors.password}>
-                      <div className="relative">
-                        <input type={showPassword ? "text" : "password"} value={form.password} onChange={e => set("password", e.target.value)} placeholder="Min. 8 characters" className={`${inputCls} pr-11`} />
-                        <button type="button" onClick={() => setShowPassword(p => !p)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#001f3f] transition-colors">
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                      <PasswordStrength password={form.password} />
-                    </Field>
-                    <Field label="Confirm Password" error={errors.confirmPassword}>
-                      <div className="relative">
-                        <input type={showConfirm ? "text" : "password"} value={form.confirmPassword} onChange={e => set("confirmPassword", e.target.value)} placeholder="Re-enter password" className={`${inputCls} pr-11`} />
-                        <button type="button" onClick={() => setShowConfirm(p => !p)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#001f3f] transition-colors">
-                          {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </Field>
-                  </div>
-                </StepCard>
-              )}
-
-              {/* â”€â”€ Step 2: ID Upload (salesperson) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-              {isSalesperson && step === 2 && (
-                <StepCard title="Identity Documents" subtitle="Upload a clear photo or scan of your government-issued IDs. Both front sides are required." onBack={back} onNext={next}>
-                  <div className="space-y-6">
-                    <UploadZone
-                      label="Primary ID (Emirates ID / Passport)"
-                      idFile={form.primaryId}
-                      onFile={f => set("primaryId", makeIdFile(f))}
-                      onCamera={() => setCamera({ open: true, target: "primary" })}
-                    />
-                    {errors.primaryId && <p className="text-xs text-rose-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.primaryId}</p>}
-                    <div className="border-t border-[#f0f2f5]" />
-                    <UploadZone
-                      label="Secondary ID (Driver's License / Visa)"
-                      idFile={form.secondaryId}
-                      onFile={f => set("secondaryId", makeIdFile(f))}
-                      onCamera={() => setCamera({ open: true, target: "secondary" })}
-                    />
-                    {errors.secondaryId && <p className="text-xs text-rose-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.secondaryId}</p>}
-                  </div>
-                </StepCard>
-              )}
-
-              {/* â”€â”€ Step 3: OCR / Document Review (salesperson) â”€â”€â”€ */}
-              {isSalesperson && step === 3 && (
-                <StepCard
-                  title="ID Scan & Review"
-                  subtitle="We'll try to extract your details from the uploaded ID. Review and correct any information below."
-                  onBack={back}
-                  onNext={next}
-                >
-                  <div className="space-y-5">
-                    {/* ID preview */}
-                    {form.primaryId.preview && form.primaryId.file?.type !== "application/pdf" && (
-                      <div className="rounded-2xl overflow-hidden border border-[#e5e7eb] h-36">
-                        <img src={form.primaryId.preview} alt="Primary ID" className="w-full h-full object-cover" />
-                      </div>
-                    )}
-                    <button
-                      onClick={runOcr}
-                      disabled={ocrLoading}
-                      className="group relative w-full py-3 px-4 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#001f3f]/30 hover:border-[#001f3f] bg-[#f0f4f8] hover:bg-white text-sm font-semibold text-[#001f3f] disabled:opacity-50 transition-all duration-200"
-                    >
-                      {ocrLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Scanningâ€¦</> : <><ScanLine className="w-4 h-4" /> Analyze Document</>}
-                    </button>
-                    {ocrWarning && (
-                      <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200">
-                        <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                        <p className="text-xs text-amber-700">{ocrWarning}</p>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-1 gap-4">
-                      <Field label="Full Name as on ID">
-                        <input value={form.ocrData.name} onChange={e => setOcr("name", e.target.value)} placeholder="As shown on your document" className={inputCls} />
-                      </Field>
-                      <Field label="ID / Passport Number">
-                        <input value={form.ocrData.idNumber} onChange={e => setOcr("idNumber", e.target.value)} placeholder="784-XXXX-XXXXXXX-X" className={inputCls} />
-                      </Field>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Field label="Date of Birth">
-                          <input type="date" value={form.ocrData.dateOfBirth} onChange={e => setOcr("dateOfBirth", e.target.value)} className={inputCls} />
-                        </Field>
-                        <Field label="Expiry Date">
-                          <input type="date" value={form.ocrData.expiryDate} onChange={e => setOcr("expiryDate", e.target.value)} className={inputCls} />
-                        </Field>
-                      </div>
-                      <Field label="Country Code">
-                        <input value={form.ocrData.countryCode} onChange={e => setOcr("countryCode", e.target.value)} placeholder="AE" maxLength={3} className={inputCls} />
-                      </Field>
-                    </div>
-                  </div>
-                </StepCard>
-              )}
-
-              {/* â”€â”€ Step 4: Face Verification (salesperson) â”€â”€â”€â”€â”€â”€â”€â”€ */}
-              {isSalesperson && step === 4 && (
-                <StepCard
-                  title="Face Verification"
-                  subtitle="Capture a quick selfie to verify your identity against your submitted ID."
-                  onBack={back}
-                  onNext={next}
-                  nextDisabled={!form.faceBlob}
-                >
-                  <div className="space-y-5">
-                    {form.facePreview ? (
-                      <div className="space-y-4">
-                        <div className="relative rounded-2xl overflow-hidden border-2 border-[#d6b357]/40 bg-black aspect-square max-h-64 flex items-center justify-center mx-auto w-64">
-                          <img src={form.facePreview} alt="Selfie" className="w-full h-full object-cover" />
+            {/* â”€â”€ Step 0: Account Type â”€â”€ */}
+            {step === 0 && (
+              <StepCard
+                title="Choose Account Type"
+                subtitle="Select the role that best describes how you will use FHI Global."
+                onNext={next}
+                nextDisabled={!form.accountType}
+                hideBack
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {([
+                    {
+                      type: "salesperson" as AccountType,
+                      icon: <User className="w-5 h-5" />,
+                      title: "RERA Salesperson",
+                      desc: "Property agents, brokers, and sales representatives who manage clients and commissions.",
+                    },
+                    {
+                      type: "developer" as AccountType,
+                      icon: <Building2 className="w-5 h-5" />,
+                      title: "Developer",
+                      desc: "Real estate developers and property companies looking to list and manage projects.",
+                    },
+                  ] as const).map(({ type, icon, title, desc }) => {
+                    const active = form.accountType === type
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => set("accountType", type)}
+                        className={`relative flex flex-col items-start gap-3 rounded-2xl p-5 border-2 text-left transition-all duration-200 group overflow-hidden ${
+                          active
+                            ? "border-[#001f3f] bg-[#f0f4fa] shadow-[0_0_0_4px_rgba(0,31,63,0.07)]"
+                            : "border-[#e4e7ec] bg-[#f8fafc] hover:border-[#001f3f]/40 hover:bg-white"
+                        }`}
+                      >
+                        {/* Faint skyline watermark */}
+                        <div
+                          className="absolute bottom-0 right-0 w-full h-16 opacity-[0.05] pointer-events-none"
+                          style={{
+                            backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 80'%3E%3Crect x='0' y='40' width='20' height='40' fill='%23001f3f'/%3E%3Crect x='25' y='25' width='20' height='55' fill='%23001f3f'/%3E%3Crect x='50' y='10' width='15' height='70' fill='%23001f3f'/%3E%3Crect x='70' y='30' width='25' height='50' fill='%23001f3f'/%3E%3Crect x='100' y='5' width='18' height='75' fill='%23001f3f'/%3E%3Crect x='123' y='20' width='22' height='60' fill='%23001f3f'/%3E%3Crect x='150' y='35' width='16' height='45' fill='%23001f3f'/%3E%3Crect x='170' y='15' width='20' height='65' fill='%23001f3f'/%3E%3Crect x='195' y='28' width='18' height='52' fill='%23001f3f'/%3E%3Crect x='218' y='8' width='22' height='72' fill='%23001f3f'/%3E%3Crect x='245' y='22' width='16' height='58' fill='%23001f3f'/%3E%3Crect x='266' y='32' width='20' height='48' fill='%23001f3f'/%3E%3Crect x='290' y='12' width='18' height='68' fill='%23001f3f'/%3E%3Crect x='313' y='18' width='24' height='62' fill='%23001f3f'/%3E%3Crect x='342' y='38' width='14' height='42' fill='%23001f3f'/%3E%3Crect x='360' y='25' width='20' height='55' fill='%23001f3f'/%3E%3C/svg%3E\")",
+                            backgroundSize: "cover",
+                            backgroundPosition: "bottom",
+                            backgroundRepeat: "no-repeat",
+                          }}
+                        />
+                        {active && (
+                          <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#001f3f] flex items-center justify-center">
+                            <Check className="w-3 h-3 text-white" />
+                          </span>
+                        )}
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${active ? "bg-[#001f3f] text-white" : "bg-white text-[#374151] border border-[#e4e7ec] group-hover:bg-[#001f3f] group-hover:text-white"}`}>
+                          {icon}
                         </div>
-                        <button
-                          onClick={() => { set("faceBlob", null); set("facePreview", "") }}
-                          className="w-full py-3 rounded-xl border border-[#e5e7eb] text-sm font-semibold text-[#374151] hover:bg-[#f9fafb] flex items-center justify-center gap-2 transition-all"
-                        ><RotateCcw className="w-4 h-4" /> Retake Selfie</button>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="rounded-2xl border-2 border-dashed border-[#d1d5db] bg-[#f9fafb] aspect-square max-h-64 flex flex-col items-center justify-center gap-3 mx-auto w-64">
-                          <Scan className="w-10 h-10 text-[#c4c9d4]" />
-                          <p className="text-sm text-[#6b7280] font-medium">No selfie captured yet</p>
+                        <div>
+                          <p className={`font-['Outfit'] font-bold text-[15px] mb-1 transition-colors ${active ? "text-[#001f3f]" : "text-[#111827]"}`}>{title}</p>
+                          <p className="text-xs text-[#6b7280] leading-relaxed">{desc}</p>
                         </div>
-                        <button
-                          onClick={() => setCamera({ open: true, target: "face" })}
-                          className="group relative w-full py-3.5 px-4 flex items-center justify-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#002a52] text-white text-sm font-semibold rounded-xl shadow-[0_4px_16px_-2px_rgba(0,31,63,0.30)] hover:shadow-[0_6px_20px_-2px_rgba(0,31,63,0.40)] hover:-translate-y-0.5 transition-all duration-300 overflow-hidden"
-                        >
-                          <Camera className="w-4 h-4" /> Open Camera
-                        </button>
-                      </div>
-                    )}
-                    {errors.face && <p className="text-xs text-rose-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.face}</p>}
-                  </div>
-                </StepCard>
-              )}
+                      </button>
+                    )
+                  })}
+                </div>
+                {errors.accountType && <p className="mt-3 text-xs text-rose-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.accountType}</p>}
+              </StepCard>
+            )}
 
-              {/* â”€â”€ Final step: Review & Submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-              {step === lastStep && (
-                <StepCard
-                  title="Almost done!"
-                  subtitle="Review your details and submit your application for admin approval."
-                  onBack={back}
-                  onNext={submit}
-                  nextLabel="Create Account"
-                  loading={submitting}
-                >
-                  <div className="space-y-3">
-                    {[
-                      ["Account Type", form.accountType === "salesperson" ? "Salesperson / Agent" : "Developer"],
-                      ["Full Name", `${form.firstName} ${form.lastName}`],
-                      ["Email", form.email],
-                      ...(form.accountType === "developer" && form.companyName ? [["Company", form.companyName] as [string, string]] : []),
-                      ...(isSalesperson && form.primaryId.file ? [["Primary ID", form.primaryId.file.name] as [string, string]] : []),
-                      ...(isSalesperson && form.secondaryId.file ? [["Secondary ID", form.secondaryId.file.name] as [string, string]] : []),
-                      ...(isSalesperson && form.faceBlob ? [["Selfie", "Captured âœ“"] as [string, string]] : []),
-                    ].map(([k, v]) => (
-                      <div key={k} className="flex items-center justify-between gap-4 py-2.5 border-b border-[#f0f2f5] last:border-0">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-[#9ca3af]">{k}</span>
-                        <span className="text-sm font-medium text-[#111827] text-right truncate max-w-[60%]">{v}</span>
-                      </div>
-                    ))}
+            {/* â”€â”€ Step 1: Account Information â”€â”€ */}
+            {step === 1 && (
+              <StepCard title="Your Information" subtitle="Enter your personal and login details." onBack={back} onNext={next}>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="First Name" error={errors.firstName}>
+                      <input value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Ahmed" className={inputCls} />
+                    </Field>
+                    <Field label="Last Name" error={errors.lastName}>
+                      <input value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Al Rashidi" className={inputCls} />
+                    </Field>
                   </div>
-                  {globalError && (
-                    <div className="mt-4 flex items-start gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200">
-                      <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                      <p className="text-xs text-rose-700">{globalError}</p>
+                  <Field label="Email Address" error={errors.email}>
+                      <div className="relative">
+                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+                        <input type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="you@example.com" className={`${inputCls} pl-10`} />
+                      </div>
+                  </Field>
+                  {form.accountType === "developer" && (
+                    <Field label="Company Name" error={errors.companyName}>
+                      <input value={form.companyName} onChange={e => set("companyName", e.target.value)} placeholder="EMAAR Properties" className={inputCls} />
+                    </Field>
+                  )}
+                  <Field label="Password" error={errors.password}>
+                    <div className="relative">
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+                        <input type={showPassword ? "text" : "password"} value={form.password} onChange={e => set("password", e.target.value)} placeholder="Min. 8 characters" className={`${inputCls} pl-10 pr-11`} />
+                      <button type="button" onClick={() => setShowPassword(p => !p)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#001f3f] transition-colors">
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <PasswordStrength password={form.password} />
+                  </Field>
+                  <Field label="Confirm Password" error={errors.confirmPassword}>
+                    <div className="relative">
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+                        <input type={showConfirm ? "text" : "password"} value={form.confirmPassword} onChange={e => set("confirmPassword", e.target.value)} placeholder="Re-enter password" className={`${inputCls} pl-10 pr-11`} />
+                      <button type="button" onClick={() => setShowConfirm(p => !p)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#001f3f] transition-colors">
+                        {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </Field>
+                </div>
+              </StepCard>
+            )}
+
+            {/* â”€â”€ Step 2: ID Upload (salesperson) â”€â”€ */}
+            {isSalesperson && step === 2 && (
+              <StepCard title="Identity Documents" subtitle="Upload a clear photo or scan of your government-issued IDs. Both front sides are required." onBack={back} onNext={next}>
+                <div className="space-y-6">
+                  <UploadZone
+                    label="Primary ID (Emirates ID / Passport)"
+                    idFile={form.primaryId}
+                    onFile={f => set("primaryId", makeIdFile(f))}
+                    onCamera={() => setCamera({ open: true, target: "primary" })}
+                  />
+                  {errors.primaryId && <p className="text-xs text-rose-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.primaryId}</p>}
+                  <div className="border-t border-[#f0f2f5]" />
+                  <UploadZone
+                    label="Secondary ID (Driver's License / Visa)"
+                    idFile={form.secondaryId}
+                    onFile={f => set("secondaryId", makeIdFile(f))}
+                    onCamera={() => setCamera({ open: true, target: "secondary" })}
+                  />
+                  {errors.secondaryId && <p className="text-xs text-rose-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.secondaryId}</p>}
+                </div>
+              </StepCard>
+            )}
+
+            {/* â”€â”€ Step 3: OCR / Document Review (salesperson) â”€â”€ */}
+            {isSalesperson && step === 3 && (
+              <StepCard
+                title="ID Scan & Review"
+                subtitle="We'll try to extract your details from the uploaded ID. Review and correct any information below."
+                onBack={back}
+                onNext={next}
+              >
+                <div className="space-y-5">
+                  {form.primaryId.preview && form.primaryId.file?.type !== "application/pdf" && (
+                    <div className="rounded-2xl overflow-hidden border border-[#e5e7eb] h-36">
+                      <img src={form.primaryId.preview} alt="Primary ID" className="w-full h-full object-cover" />
                     </div>
                   )}
-                  <div className="mt-5 flex items-start gap-3 p-4 rounded-2xl bg-[#f8faff] border border-[#e0e7ff]">
-                    <ShieldCheck className="w-4 h-4 text-[#001f3f] shrink-0 mt-0.5" />
-                    <p className="text-xs text-[#6b7280] leading-relaxed">New accounts must be approved by an administrator before you can sign in.</p>
+                  <button
+                    onClick={runOcr}
+                    disabled={ocrLoading}
+                    className="w-full py-3 px-4 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#001f3f]/25 hover:border-[#001f3f] bg-[#f0f4f8] hover:bg-white text-sm font-semibold text-[#001f3f] disabled:opacity-50 transition-all duration-200"
+                  >
+                    {ocrLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Scanning&hellip;</> : <><ScanLine className="w-4 h-4" /> Analyze Document</>}
+                  </button>
+                  {ocrWarning && (
+                    <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200">
+                      <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-700">{ocrWarning}</p>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 gap-4">
+                    <Field label="Full Name as on ID">
+                      <input value={form.ocrData.name} onChange={e => setOcr("name", e.target.value)} placeholder="As shown on your document" className={inputCls} />
+                    </Field>
+                    <Field label="ID / Passport Number">
+                      <input value={form.ocrData.idNumber} onChange={e => setOcr("idNumber", e.target.value)} placeholder="784-XXXX-XXXXXXX-X" className={inputCls} />
+                    </Field>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Date of Birth">
+                        <input type="date" value={form.ocrData.dateOfBirth} onChange={e => setOcr("dateOfBirth", e.target.value)} className={inputCls} />
+                      </Field>
+                      <Field label="Expiry Date">
+                        <input type="date" value={form.ocrData.expiryDate} onChange={e => setOcr("expiryDate", e.target.value)} className={inputCls} />
+                      </Field>
+                    </div>
+                    <Field label="Country Code">
+                      <input value={form.ocrData.countryCode} onChange={e => setOcr("countryCode", e.target.value)} placeholder="AE" maxLength={3} className={inputCls} />
+                    </Field>
                   </div>
-                </StepCard>
-              )}
+                </div>
+              </StepCard>
+            )}
 
-              <p className="text-center text-[11px] text-[#9ca3af] mt-6">
+            {/* â”€â”€ Step 4: Face Verification (salesperson) â”€â”€ */}
+            {isSalesperson && step === 4 && (
+              <StepCard
+                title="Face Verification"
+                subtitle="Capture a quick selfie to verify your identity against your submitted ID."
+                onBack={back}
+                onNext={next}
+                nextDisabled={!form.faceBlob}
+              >
+                <div className="space-y-5">
+                  {form.facePreview ? (
+                    <div className="space-y-4">
+                      <div className="relative rounded-2xl overflow-hidden border-2 border-[#d6b357]/40 bg-black aspect-square max-h-64 flex items-center justify-center mx-auto w-64">
+                        <img src={form.facePreview} alt="Selfie" className="w-full h-full object-cover" />
+                      </div>
+                      <button
+                        onClick={() => { set("faceBlob", null); set("facePreview", "") }}
+                        className="w-full py-3 rounded-xl border border-[#e5e7eb] text-sm font-semibold text-[#374151] hover:bg-[#f9fafb] flex items-center justify-center gap-2 transition-all"
+                      ><RotateCcw className="w-4 h-4" /> Retake Selfie</button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border-2 border-dashed border-[#d1d5db] bg-[#f9fafb] aspect-square max-h-64 flex flex-col items-center justify-center gap-3 mx-auto w-64">
+                        <Scan className="w-10 h-10 text-[#c4c9d4]" />
+                        <p className="text-sm text-[#6b7280] font-medium">No selfie captured yet</p>
+                      </div>
+                      <button
+                        onClick={() => setCamera({ open: true, target: "face" })}
+                        className="w-full py-3.5 px-4 flex items-center justify-center gap-2 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl shadow-[0_4px_16px_-2px_rgba(0,31,63,0.30)] hover:-translate-y-0.5 transition-all duration-200"
+                      >
+                        <Camera className="w-4 h-4" /> Open Camera
+                      </button>
+                    </div>
+                  )}
+                  {errors.face && <p className="text-xs text-rose-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.face}</p>}
+                </div>
+              </StepCard>
+            )}
+
+            {/* â”€â”€ Final step: Review & Submit â”€â”€ */}
+            {step === lastStep && (
+              <StepCard
+                title="Almost done!"
+                subtitle="Review your details and submit your application for admin approval."
+                onBack={back}
+                onNext={submit}
+                nextLabel="Create Account"
+                loading={submitting}
+              >
+                <div className="space-y-3">
+                  {[
+                    ["Account Type", form.accountType === "salesperson" ? "Salesperson / Agent" : "Developer"],
+                    ["Full Name", `${form.firstName} ${form.lastName}`],
+                    ["Email", form.email],
+                    ...(form.accountType === "developer" && form.companyName ? [["Company", form.companyName] as [string, string]] : []),
+                    ...(isSalesperson && form.primaryId.file ? [["Primary ID", form.primaryId.file.name] as [string, string]] : []),
+                    ...(isSalesperson && form.secondaryId.file ? [["Secondary ID", form.secondaryId.file.name] as [string, string]] : []),
+                    ...(isSalesperson && form.faceBlob ? [["Selfie", "Captured âœ“"] as [string, string]] : []),
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between gap-4 py-2.5 border-b border-[#f0f2f5] last:border-0">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-[#9ca3af]">{k}</span>
+                      <span className="text-sm font-medium text-[#111827] text-right truncate max-w-[60%]">{v}</span>
+                    </div>
+                  ))}
+                </div>
+                {globalError && (
+                  <div className="mt-4 flex items-start gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200">
+                    <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-rose-700">{globalError}</p>
+                  </div>
+                )}
+                <div className="mt-5 flex items-start gap-3 p-4 rounded-2xl bg-[#f8faff] border border-[#e0e7ff]">
+                  <ShieldCheck className="w-4 h-4 text-[#001f3f] shrink-0 mt-0.5" />
+                  <p className="text-xs text-[#6b7280] leading-relaxed">New accounts must be approved by an administrator before you can sign in.</p>
+                </div>
+              </StepCard>
+            )}
+
+            <div className="text-center mt-6 space-y-1.5">
+              <p className="text-sm text-[#374151]">
                 Already have an account?{" "}
-                <Link href="/login" className="text-[#001f3f] font-semibold hover:underline">Sign in</Link>
-                {" · "}© {new Date().getFullYear()} FHI Global
+                <Link href="/login" className="text-[#d6b357] font-semibold hover:text-[#b8972e] hover:underline transition-colors">Sign in</Link>
               </p>
-            </>
-          )}
-        </div>
+              <p className="text-[11px] text-[#c4c9d4]">© {new Date().getFullYear()} FHI Global &middot; Dubai, UAE</p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Camera modal */}

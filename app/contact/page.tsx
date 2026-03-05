@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Image from "next/image"
 import Link from "next/link"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
@@ -15,6 +16,8 @@ export const metadata: Metadata = createPageMetadata({
   description:
     "Contact FHI Global's team in Dubai. Reach out for developer partnerships, agent onboarding, or any real estate inquiry.",
   openGraphDescription: "Reach out to FHI Global's Dubai team for any real estate inquiry.",
+  pathname: "/contact",
+  keywords: ["Contact FHI Global", "Dubai real estate support", "developer partnerships Dubai"],
 })
 
 const OFFICES = [
@@ -69,10 +72,12 @@ export default function ContactPage() {
       <section className="relative pt-20 pb-24 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
-          <img
+          <Image
             src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/3.png"
             alt=""
-            className="w-full h-full object-cover object-center"
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
             aria-hidden="true"
           />
           <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f]/88 via-[#002a52]/85 to-[#001428]/92" />
@@ -208,10 +213,12 @@ export default function ContactPage() {
       <section id="offices" className="relative py-16 scroll-mt-24 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
-          <img
+          <Image
             src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x800/7.png"
             alt=""
-            className="w-full h-full object-cover object-center"
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
             aria-hidden="true"
           />
           <div className="absolute inset-0 bg-[#f5f3ef]/88" />

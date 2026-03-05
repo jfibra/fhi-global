@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { TopBar } from "@/components/topbar"
@@ -25,18 +26,35 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const canonical = `${siteUrl}/news/${article.slug}`
   const description = article.excerpt || article.title
-  const image = article.img && article.img !== "/img/1.png" ? article.img : undefined
+  const image = article.featuredImage && article.featuredImage !== "/img/1.png"
+    ? article.featuredImage
+    : article.img && article.img !== "/img/1.png"
+      ? article.img
+      : undefined
+  const keywords = [
+    ...(article.tags ?? []),
+    article.author,
+    "Dubai real estate news",
+    "FHI Global news",
+  ].filter(Boolean) as string[]
+  const publishedTime = article.publishedAt || article.date || undefined
+  const modifiedTime = article.updatedAt || publishedTime
 
   return {
     title: `${article.title} | FHI Global News`,
     description,
+    metadataBase: new URL(siteUrl),
+    keywords,
     alternates: { canonical },
     openGraph: {
       title: article.title,
       description,
       url: canonical,
       type: "article",
-      publishedTime: article.date || undefined,
+      publishedTime,
+      modifiedTime,
+      authors: article.author ? [article.author] : undefined,
+      tags: article.tags,
       images: image ? [{ url: image, alt: article.title }] : undefined,
     },
     twitter: {
@@ -162,6 +180,31 @@ export default async function NewsDetailPage({ params }: PageProps) {
 
   const articleUrl = `${siteUrl}/news/${article.slug}`
   const timeLabel = timeAgoLabel(article.date)
+  const articleSchema = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: article.title,
+    description: article.excerpt || article.title,
+    image: article.featuredImage || article.img,
+    author: {
+      "@type": "Person",
+      name: article.author || "FHI Global Editorial Team",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "FHI Global",
+      logo: {
+        "@type": "ImageObject",
+        url: `${siteUrl}/android-chrome-512x512.png`,
+      },
+    },
+    datePublished: article.publishedAt || article.date || new Date().toISOString(),
+    dateModified: article.updatedAt || article.publishedAt || article.date || new Date().toISOString(),
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": articleUrl,
+    },
+  }
 
   // Related stories: latest news excluding current, shuffled, take 6
   const related = latestNews
@@ -174,6 +217,10 @@ export default async function NewsDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-white font-sans">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
+      />
       <TopBar />
       <Header />
 
@@ -231,10 +278,12 @@ export default async function NewsDetailPage({ params }: PageProps) {
 
             {/* Featured image */}
             <div className="relative overflow-hidden aspect-video bg-gray-100 mb-6">
-              <img
+              <Image
                 src={article.img}
                 alt={article.title}
-                className="w-full h-full object-cover"
+                fill
+                sizes="(max-width: 1024px) 100vw, 66vw"
+                className="object-cover"
               />
               {article.hasVideo && (
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -289,11 +338,13 @@ export default async function NewsDetailPage({ params }: PageProps) {
                 {latestStories.map((item) => (
                   <li key={item.id}>
                     <Link href={`/news/${item.slug}`} className="group flex gap-3">
-                      <div className="w-16 h-12 shrink-0 overflow-hidden bg-gray-100">
-                        <img
+                      <div className="relative w-16 h-12 shrink-0 overflow-hidden bg-gray-100">
+                        <Image
                           src={item.img}
                           alt={item.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          fill
+                          sizes="64px"
+                          className="object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -319,10 +370,12 @@ export default async function NewsDetailPage({ params }: PageProps) {
                     <li key={item.id}>
                       <Link href={`/news/${item.slug}`} className="group block">
                         <div className="relative overflow-hidden aspect-video bg-gray-100 mb-2">
-                          <img
+                          <Image
                             src={item.img}
                             alt={item.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            fill
+                            sizes="(max-width: 1024px) 100vw, 33vw"
+                            className="object-cover group-hover:scale-105 transition-transform duration-500"
                           />
                           {item.badge && (
                             <span className="absolute top-1.5 left-1.5 bg-[#d6b357] text-[#001428] text-[8px] font-black uppercase px-1.5 py-0.5">
