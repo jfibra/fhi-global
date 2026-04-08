@@ -87,8 +87,8 @@ function allPwdRulesPassed(p: string) { return PWD_RULES.every(r => r.test(p)) }
 
 // Stepper
 
-const STEPS_SALESPERSON = ["Account Type", "Information", "ID Upload", "ID Scan", "Face Verify", "Complete"]
-const STEPS_DEVELOPER   = ["Account Type", "Information", "Complete"]
+const STEPS_SALESPERSON = ["Information", "ID Upload", "ID Scan", "Face Verify", "Complete"]
+const STEPS_DEVELOPER   = ["Information", "Complete"]
 
 function Stepper({ current, steps }: { current: number; steps: string[] }) {
   return (
@@ -293,11 +293,11 @@ function CameraModal({ onCapture, onClose, title }: { onCapture: (blob: Blob, pr
 
 // Main RegisterUI
 
-export function RegisterUI() {
+export function RegisterUI({ defaultAccountType = "salesperson" }: { defaultAccountType?: "salesperson" | "developer" }) {
   const [showPassword, setShowPassword]   = useState(false)
   const [showConfirm,  setShowConfirm]    = useState(false)
   const [step,         setStep]           = useState(0)
-  const [form,         setForm]           = useState<FormState>(INITIAL_STATE)
+  const [form,         setForm]           = useState<FormState>({ ...INITIAL_STATE, accountType: defaultAccountType })
   const [errors,       setErrors]         = useState<Record<string, string>>({})
   const [globalError,  setGlobalError]    = useState("")
   const [submitting,   setSubmitting]     = useState(false)
@@ -321,8 +321,7 @@ export function RegisterUI() {
   // validation per step
   const validate = (s: number): boolean => {
     const e: Record<string, string> = {}
-    if (s === 0 && !form.accountType) e.accountType = "Please select an account type"
-    if (s === 1) {
+    if (s === 0) {
       if (!form.firstName.trim())  e.firstName = "Required"
       if (!form.lastName.trim())   e.lastName  = "Required"
       if (!form.email.trim())      e.email     = "Required"
@@ -331,11 +330,11 @@ export function RegisterUI() {
       if (form.password !== form.confirmPassword) e.confirmPassword = "Passwords do not match"
       if (form.accountType === "developer" && !form.companyName.trim()) e.companyName = "Required"
     }
-    if (isSalesperson && s === 2) {
+    if (isSalesperson && s === 1) {
       if (!form.primaryId.file)   e.primaryId   = "Required"
       if (!form.secondaryId.file) e.secondaryId = "Required"
     }
-    if (isSalesperson && s === 4) {
+    if (isSalesperson && s === 3) {
       if (!form.faceBlob) e.face = "Selfie required"
     }
     setErrors(e)
@@ -362,7 +361,7 @@ export function RegisterUI() {
 
   // submit
   const submit = async () => {
-    if (!validate(isSalesperson ? 4 : 1)) return
+    if (!validate(isSalesperson ? 3 : 0)) return
     setSubmitting(true); setGlobalError("")
     try {
       const fd = new FormData()
@@ -401,18 +400,22 @@ export function RegisterUI() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white border border-[#e4e7ec] rounded-full text-xs font-semibold text-[#374151] mb-5 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-[#d6b357]" />
-            Join FHI Global
+            {defaultAccountType === "developer" ? "Developer Registration" : "RERA Salesperson Registration"}
           </div>
           {/* Heading */}
           <h1 className="font-['Outfit'] text-3xl sm:text-4xl font-bold text-[#0d1117] mb-3 leading-tight tracking-tight">
-            Start Closing Deals{" "}
+            {defaultAccountType === "developer" ? "List and Manage Projects" : "Start Closing Deals"}{" "}
             <span className="relative inline-block">
-              <span className="relative z-10">in Minutes</span>
+              <span className="relative z-10">
+                {defaultAccountType === "developer" ? "as a Developer" : "in Minutes"}
+              </span>
               <span className="absolute -bottom-0.5 left-0 right-0 h-[3px] rounded-full bg-gradient-to-r from-[#d6b357] to-[#f0d890]" aria-hidden="true" />
             </span>
           </h1>
           <p className="text-[#6b7280] text-base leading-relaxed mb-8 max-w-xl mx-auto">
-            Create your FHI Global account and gain access to Dubai&apos;s most powerful real estate CRM platform.
+            {defaultAccountType === "developer"
+              ? "Create your developer account to publish projects, manage media, and track listing performance on FHI Global."
+              : "Create your FHI Global account and gain access to Dubai&apos;s most powerful real estate CRM platform."}
           </p>
           {/* Stat strip */}
           <div className="flex items-center justify-center gap-8 sm:gap-14 mb-8 py-5 border-y border-[#f0f0f0]">
@@ -472,73 +475,8 @@ export function RegisterUI() {
             {/* Stepper */}
             <Stepper current={step} steps={steps} />
 
-            {/* ── Step 0: Account Type ── */}
+            {/* ── Step 0: Account Information ── */}
             {step === 0 && (
-              <StepCard
-                title="Choose Account Type"
-                subtitle="Select the role that best describes how you will use FHI Global."
-                onNext={next}
-                nextDisabled={!form.accountType}
-                hideBack
-              >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {([
-                    {
-                      type: "salesperson" as AccountType,
-                      icon: <User className="w-5 h-5" />,
-                      title: "RERA Salesperson",
-                      desc: "Property agents, brokers, and sales representatives who manage clients and commissions.",
-                    },
-                    {
-                      type: "developer" as AccountType,
-                      icon: <Building2 className="w-5 h-5" />,
-                      title: "Developer",
-                      desc: "Real estate developers and property companies looking to list and manage projects.",
-                    },
-                  ] as const).map(({ type, icon, title, desc }) => {
-                    const active = form.accountType === type
-                    return (
-                      <button
-                        key={type}
-                        onClick={() => set("accountType", type)}
-                        className={`relative flex flex-col items-start gap-3 rounded-2xl p-5 border-2 text-left transition-all duration-200 group overflow-hidden ${
-                          active
-                            ? "border-[#001f3f] bg-[#f0f4fa] shadow-[0_0_0_4px_rgba(0,31,63,0.07)]"
-                            : "border-[#e4e7ec] bg-[#f8fafc] hover:border-[#001f3f]/40 hover:bg-white"
-                        }`}
-                      >
-                        {/* Faint skyline watermark */}
-                        <div
-                          className="absolute bottom-0 right-0 w-full h-16 opacity-[0.05] pointer-events-none"
-                          style={{
-                            backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 80'%3E%3Crect x='0' y='40' width='20' height='40' fill='%23001f3f'/%3E%3Crect x='25' y='25' width='20' height='55' fill='%23001f3f'/%3E%3Crect x='50' y='10' width='15' height='70' fill='%23001f3f'/%3E%3Crect x='70' y='30' width='25' height='50' fill='%23001f3f'/%3E%3Crect x='100' y='5' width='18' height='75' fill='%23001f3f'/%3E%3Crect x='123' y='20' width='22' height='60' fill='%23001f3f'/%3E%3Crect x='150' y='35' width='16' height='45' fill='%23001f3f'/%3E%3Crect x='170' y='15' width='20' height='65' fill='%23001f3f'/%3E%3Crect x='195' y='28' width='18' height='52' fill='%23001f3f'/%3E%3Crect x='218' y='8' width='22' height='72' fill='%23001f3f'/%3E%3Crect x='245' y='22' width='16' height='58' fill='%23001f3f'/%3E%3Crect x='266' y='32' width='20' height='48' fill='%23001f3f'/%3E%3Crect x='290' y='12' width='18' height='68' fill='%23001f3f'/%3E%3Crect x='313' y='18' width='24' height='62' fill='%23001f3f'/%3E%3Crect x='342' y='38' width='14' height='42' fill='%23001f3f'/%3E%3Crect x='360' y='25' width='20' height='55' fill='%23001f3f'/%3E%3C/svg%3E\")",
-                            backgroundSize: "cover",
-                            backgroundPosition: "bottom",
-                            backgroundRepeat: "no-repeat",
-                          }}
-                        />
-                        {active && (
-                          <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#001f3f] flex items-center justify-center">
-                            <Check className="w-3 h-3 text-white" />
-                          </span>
-                        )}
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${active ? "bg-[#001f3f] text-white" : "bg-white text-[#374151] border border-[#e4e7ec] group-hover:bg-[#001f3f] group-hover:text-white"}`}>
-                          {icon}
-                        </div>
-                        <div>
-                          <p className={`font-['Outfit'] font-bold text-[15px] mb-1 transition-colors ${active ? "text-[#001f3f]" : "text-[#111827]"}`}>{title}</p>
-                          <p className="text-xs text-[#6b7280] leading-relaxed">{desc}</p>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-                {errors.accountType && <p className="mt-3 text-xs text-rose-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.accountType}</p>}
-              </StepCard>
-            )}
-
-            {/* ── Step 1: Account Information ── */}
-            {step === 1 && (
               <StepCard title="Your Information" subtitle="Enter your personal and login details." onBack={back} onNext={next}>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
@@ -583,8 +521,8 @@ export function RegisterUI() {
               </StepCard>
             )}
 
-            {/* ── Step 2: ID Upload (salesperson) ── */}
-            {isSalesperson && step === 2 && (
+            {/* ── Step 1: ID Upload (salesperson) ── */}
+            {isSalesperson && step === 1 && (
               <StepCard title="Identity Documents" subtitle="Upload a clear photo or scan of your government-issued IDs. Both front sides are required." onBack={back} onNext={next}>
                 <div className="space-y-6">
                   <UploadZone
@@ -606,8 +544,8 @@ export function RegisterUI() {
               </StepCard>
             )}
 
-            {/* ── Step 3: OCR / Document Review (salesperson) ── */}
-            {isSalesperson && step === 3 && (
+            {/* ── Step 2: OCR / Document Review (salesperson) ── */}
+            {isSalesperson && step === 2 && (
               <StepCard
                 title="ID Scan & Review"
                 subtitle="We'll try to extract your details from the uploaded ID. Review and correct any information below."
@@ -656,8 +594,8 @@ export function RegisterUI() {
               </StepCard>
             )}
 
-            {/* ── Step 4: Face Verification (salesperson) ── */}
-            {isSalesperson && step === 4 && (
+            {/* ── Step 3: Face Verification (salesperson) ── */}
+            {isSalesperson && step === 3 && (
               <StepCard
                 title="Face Verification"
                 subtitle="Capture a quick selfie to verify your identity against your submitted ID."
@@ -735,6 +673,21 @@ export function RegisterUI() {
             )}
 
             <div className="text-center mt-6 space-y-1.5">
+              {defaultAccountType === "salesperson" ? (
+                <p className="text-sm text-[#374151]">
+                  Registering as a developer?{" "}
+                  <Link href="/register/developer" className="text-[#d6b357] font-semibold hover:text-[#b8972e] hover:underline transition-colors">
+                    Use Developer Registration
+                  </Link>
+                </p>
+              ) : (
+                <p className="text-sm text-[#374151]">
+                  Need a RERA Salesperson account?{" "}
+                  <Link href="/register" className="text-[#d6b357] font-semibold hover:text-[#b8972e] hover:underline transition-colors">
+                    Use Salesperson Registration
+                  </Link>
+                </p>
+              )}
               <p className="text-sm text-[#374151]">
                 Already have an account?{" "}
                 <Link href="/login" className="text-[#d6b357] font-semibold hover:text-[#b8972e] hover:underline transition-colors">Sign in</Link>

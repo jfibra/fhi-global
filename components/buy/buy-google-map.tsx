@@ -15,10 +15,52 @@ export type BuyMapMarker = {
   slug: string
   /** Property hero image for circular map pin; optional. */
   image_url: string | null
+  price_label?: string
+  bedrooms?: number | null
+  bathrooms?: number | null
+  area_label?: string | null
+  location_label?: string | null
 }
 
 const DUBAI = { lat: 25.2048, lng: 55.2708 }
 const ICON_PX = 52
+
+function esc(v: string) {
+  return v
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;")
+}
+
+function mapPreviewCardHtml(m: BuyMapMarker) {
+  const img = m.image_url?.trim()
+    ? `<img src="${proxiedMarkerImageSrc(m.image_url)}" alt="" style="width:78px;height:78px;object-fit:cover;border-radius:10px;flex-shrink:0;background:#e5e7eb;" />`
+    : `<div style="width:78px;height:78px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#e5e7eb;color:#64748b;font-size:11px;flex-shrink:0;">No image</div>`
+  const specs = [
+    typeof m.bedrooms === "number" ? `🛏 ${m.bedrooms}` : "",
+    typeof m.bathrooms === "number" ? `🛁 ${m.bathrooms}` : "",
+    m.area_label ? m.area_label : "",
+  ]
+    .filter(Boolean)
+    .join("   ")
+  const location = m.location_label ?? m.title
+  const price = m.price_label ?? "Price on request"
+  const specsHtml = specs
+    ? `<div style="font-size:12px;color:#4b5563;line-height:1.35;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(specs)}</div>`
+    : ""
+  return `
+    <a href="/projects/${m.slug}" style="display:flex;gap:10px;align-items:flex-start;min-width:260px;max-width:320px;text-decoration:none;color:inherit;">
+      ${img}
+      <div style="min-width:0;">
+        <div style="font-size:24px;font-weight:700;line-height:1.15;color:#1f2937;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(price)}</div>
+        ${specsHtml}
+        <div style="font-size:12px;color:#374151;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(location)}</div>
+      </div>
+    </a>
+  `
+}
 
 function drawFallbackPin(ctx: CanvasRenderingContext2D, size: number) {
   const c = size / 2
@@ -172,6 +214,7 @@ export function BuyGoogleMap({
 
       markerObjsRef.current.forEach((mk) => mk.setMap(null))
       markerObjsRef.current = []
+      const info = new g.InfoWindow()
 
       valid.forEach((m, i) => {
         const dataUrl = iconUrls[i]
@@ -189,9 +232,9 @@ export function BuyGoogleMap({
           title: m.title,
           icon,
         })
-        const url = `/projects/${m.slug}`
         mk.addListener("click", () => {
-          window.open(url, "_self")
+          info.setContent(mapPreviewCardHtml(m))
+          info.open({ map, anchor: mk })
         })
         markerObjsRef.current.push(mk)
       })

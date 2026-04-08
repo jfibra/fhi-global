@@ -10,23 +10,17 @@ import { RegisterUI } from "@/app/register/register-ui"
 export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Create Account | FHI Global",
-  description: "Create your FHI Global account.",
+  title: "Developer Registration | FHI Global",
+  description: "Create your developer account on FHI Global.",
+  pathname: "/register/developer",
 })
 
-export default async function RegisterPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ type?: string; role?: string }>
-}) {
-  const sp = await searchParams
-  const requestedType = (sp.type ?? sp.role ?? "").toLowerCase()
-  const defaultAccountType = requestedType === "developer" ? "developer" : "salesperson"
-
-  // If already logged in, redirect to dashboard
+export default async function DeveloperRegisterPage() {
   if (hasServerSupabaseEnv()) {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (user) redirect("/dashboard")
   }
 
@@ -52,8 +46,9 @@ export default async function RegisterPage({
     <>
       <TopBar />
       <Header />
-      <RegisterUI defaultAccountType={defaultAccountType} />
+      <RegisterUI defaultAccountType="developer" />
       <Footer />
     </>
   )
 }
+

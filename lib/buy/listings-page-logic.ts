@@ -33,10 +33,36 @@ function parseCoord(v: string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+function formatPrice(from: number | null, to: number | null, currency = "AED") {
+  if (from == null) return "Price on request"
+  const code = (currency || "AED").toUpperCase()
+  const locale = code === "AED" ? "en-AE" : "en-US"
+  const fmt = (n: number) => n.toLocaleString(locale, { maximumFractionDigits: 0 })
+  if (code === "USD") {
+    if (to != null && to !== from) return `$${fmt(from)} - $${fmt(to)}`
+    return `$${fmt(from)}`
+  }
+  if (code === "AED") {
+    if (to != null && to !== from) return `AED ${fmt(from)} - ${fmt(to)}`
+    return `AED ${fmt(from)}`
+  }
+  const prefix = code === "PHP" ? "Php" : code
+  if (to != null && to !== from) return `${prefix} ${fmt(from)} - ${fmt(to)}`
+  return `${prefix} ${fmt(from)}`
+}
+
 export function toMapMarker(p: BuyRawProject): BuyMapMarker | null {
   const lat = parseCoord(p.latitude)
   const lng = parseCoord(p.longitude)
   if (lat == null || lng == null) return null
+  const u = pickUnit(p.project_units)
+  const locationLabel = [p.city, p.location].filter(Boolean).join(", ") || "United Arab Emirates"
+  const areaLabel =
+    u?.size_sqm != null
+      ? `${u.size_sqm.toLocaleString("en-AE")} sqm`
+      : u?.size_sqft != null
+        ? `${u.size_sqft.toLocaleString("en-AE")} sqft`
+        : null
   return {
     id: String(p.id),
     lat,
@@ -44,6 +70,11 @@ export function toMapMarker(p: BuyRawProject): BuyMapMarker | null {
     title: p.name,
     slug: p.slug,
     image_url: pickBuyListingImage(p) ?? p.developers?.logo_url ?? null,
+    price_label: formatPrice(p.launch_price_from, p.launch_price_to, p.currency ?? "AED"),
+    bedrooms: u?.bedrooms ?? null,
+    bathrooms: u?.bathrooms ?? null,
+    area_label: areaLabel,
+    location_label: locationLabel,
   }
 }
 

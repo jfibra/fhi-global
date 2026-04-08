@@ -8,6 +8,7 @@ import {
   MapPin,
   Phone,
   Save,
+  Sparkles,
 } from "lucide-react"
 import type { Project, Developer, ProjectFormData } from "@/lib/project-service"
 import { generateProjectSlug } from "@/lib/project-service"
@@ -44,6 +45,10 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
   const [form, setForm]         = useState<Partial<ProjectFormData>>({})
   const [saving, setSaving]     = useState(false)
   const [active, setActive]     = useState<InnerTab>("basic")
+  const [aiLoading, setAiLoading] = useState<"description" | "about_project" | null>(null)
+  const [aiModalOpen, setAiModalOpen] = useState(false)
+  const [aiTarget, setAiTarget] = useState<"description" | "about_project">("description")
+  const [aiPrompt, setAiPrompt] = useState("")
 
   useEffect(() => {
     setForm({
@@ -106,9 +111,12 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
 
   // ─── Shared field helpers ─────────────────────────────────────────────────
 
-  const field = (label: string, content: React.ReactNode) => (
+  const field = (label: string, content: React.ReactNode, action?: React.ReactNode) => (
     <div>
-      <label className="block text-xs font-semibold text-[#6b7280] mb-1.5">{label}</label>
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <label className="block text-xs font-semibold text-[#6b7280]">{label}</label>
+        {action}
+      </div>
       {content}
     </div>
   )
@@ -164,6 +172,67 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
     </label>
   )
 
+  const openAiModal = (target: "description" | "about_project") => {
+    if (aiLoading) return
+    setAiTarget(target)
+    setAiPrompt("")
+    setAiModalOpen(true)
+  }
+
+  const generateAiCopy = async (target: "description" | "about_project", customPrompt: string) => {
+    if (aiLoading) return
+    const projectName = String(form.name ?? "").trim()
+    if (!projectName) {
+      showToast("error", "Enter project name first")
+      return
+    }
+
+    const developerName =
+      developers.find((d) => d.id === form.developer_id)?.name ??
+      developers.find((d) => String(d.id) === String(form.developer_id ?? ""))?.name ??
+      ""
+
+    setAiLoading(target)
+    try {
+      const res = await fetch("/api/ai/project-copy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target,
+          name: projectName,
+          status: form.status ?? "",
+          location: form.location ?? "",
+          city: form.city ?? "",
+          country: form.country ?? "",
+          developerName,
+          customPrompt: customPrompt.trim(),
+        }),
+      })
+      const json = await res.json() as { text?: string; error?: string }
+      if (!res.ok || !json.text) {
+        showToast("error", json.error ?? "Failed to generate content")
+        return
+      }
+      set(target, json.text.trim())
+      showToast("success", target === "description" ? "Description generated" : "About project generated")
+    } catch {
+      showToast("error", "Failed to generate content")
+    } finally {
+      setAiLoading(null)
+    }
+  }
+
+  const handleAiGenerateFromModal = async () => {
+    const prompt = aiPrompt.trim()
+    if (!prompt) {
+      showToast("error", "Add your prompt first")
+      return
+    }
+    const target = aiTarget
+    setAiModalOpen(false)
+    await generateAiCopy(target, prompt)
+  }
+
   // ─── Tab panels ───────────────────────────────────────────────────────────
 
   const panels: Record<InnerTab, React.ReactNode> = {
@@ -192,8 +261,36 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
             </>,
           ),
         )}
-        <div className="col-span-2">{field("Short Description", area("description", "Short description visible in listings…", 2))}</div>
-        <div className="col-span-2">{field("About Project", area("about_project", "Detailed about section shown on the project page…", 5))}</div>
+        <div className="col-span-2">
+          {field(
+            "Short Description",
+            area("description", "Short description visible in listings…", 2),
+            <button
+              type="button"
+              onClick={() => openAiModal("description")}
+              disabled={Boolean(aiLoading)}
+              className="inline-flex items-center gap-1 rounded-full border border-[#d6b357]/40 bg-[#fff8e1] px-2.5 py-1 text-[11px] font-semibold text-[#0f2940] hover:bg-[#fff3cc] disabled:opacity-50"
+            >
+              <Sparkles className="h-3 w-3 text-[#d6b357]" />
+              {aiLoading === "description" ? "Generating…" : "AI Generate"}
+            </button>,
+          )}
+        </div>
+        <div className="col-span-2">
+          {field(
+            "About Project",
+            area("about_project", "Detailed about section shown on the project page…", 5),
+            <button
+              type="button"
+              onClick={() => openAiModal("about_project")}
+              disabled={Boolean(aiLoading)}
+              className="inline-flex items-center gap-1 rounded-full border border-[#d6b357]/40 bg-[#fff8e1] px-2.5 py-1 text-[11px] font-semibold text-[#0f2940] hover:bg-[#fff3cc] disabled:opacity-50"
+            >
+              <Sparkles className="h-3 w-3 text-[#d6b357]" />
+              {aiLoading === "about_project" ? "Generating…" : "AI Generate"}
+            </button>,
+          )}
+        </div>
       </div>
     ),
 
@@ -287,6 +384,47 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
       <div className="bg-white rounded-2xl border border-[#f0f0f0] p-6">
         {panels[active]}
       </div>
+
+      {aiModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close AI prompt"
+            onClick={() => setAiModalOpen(false)}
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+          />
+          <div className="relative w-full max-w-lg rounded-2xl border border-[#e5e7eb] bg-white p-6 shadow-2xl">
+            <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">AI Generate</h3>
+            <p className="mt-1 text-sm text-[#6b7280]">
+              Tell AI what you want for {aiTarget === "description" ? "Short Description" : "About Project"}.
+            </p>
+            <textarea
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              rows={5}
+              placeholder="Example: Focus on luxury waterfront lifestyle, family amenities, and strong investment value."
+              className="mt-4 w-full resize-none rounded-xl border border-[#e5e5e5] px-3 py-2.5 text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#001f3f]/20 focus:border-[#001f3f]"
+            />
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setAiModalOpen(false)}
+                className="rounded-full border border-[#d1d5db] px-4 py-2 text-sm font-semibold text-[#374151] hover:bg-[#f9fafb]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleAiGenerateFromModal()}
+                className="inline-flex items-center gap-1 rounded-full bg-[#001f3f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#001f3f]/90"
+              >
+                <Sparkles className="h-4 w-4" />
+                Generate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Save */}
       <div className="flex justify-end pt-4">
