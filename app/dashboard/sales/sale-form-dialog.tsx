@@ -41,7 +41,7 @@ import {
   deleteSaleAttachment,
 } from "@/lib/sales-service"
 
-// â”€â”€â”€ Portal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Portal ───────────────────────────────────────────────────────────────────
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -50,7 +50,7 @@ function Portal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body)
 }
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function FieldLabel({ text, required }: { text: string; required?: boolean }) {
   return (
@@ -73,7 +73,7 @@ function SectionTitle({ icon: Icon, title }: { icon: React.ComponentType<{ class
 
 const iconCls = "absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none z-10"
 
-// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const COMMISSION_STATUSES: CommissionStatus[] = ["pending", "processing", "approved", "released", "rejected"]
 const VALIDATION_STATUSES: ValidationStatus[] = ["pending", "under_review", "validated", "invalid_sale"]
@@ -108,7 +108,7 @@ const EMPTY_FORM: SaleFormData = {
   validation_status: "pending",
 }
 
-// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function SaleFormDialog({
   open,
@@ -135,7 +135,7 @@ export function SaleFormDialog({
   const disabled = viewMode || (isEdit && !canEditCurrentSale)
   const isAdmin = ["admin", "super_admin"].includes(currentRole)
 
-  // â”€â”€â”€ All state declarations (must precede derived values) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── All state declarations (must precede derived values) ────────────────
   const [activeTab, setActiveTab] = useState<"property"|"client"|"contract"|"workflow"|"attachments">("property")
   const [form, setForm] = useState<SaleFormData>(EMPTY_FORM)
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({})
@@ -156,7 +156,7 @@ export function SaleFormDialog({
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const pendingInputRef = useRef<HTMLInputElement>(null)
 
-  // â”€â”€â”€ Tab configuration (derived after state) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Tab configuration (derived after state) ─────────────────────────────
   type TabId = "property" | "client" | "contract" | "workflow" | "attachments"
   const tabForErrorKey = (key: string): TabId => {
     if (["developer_id", "project_id", "unit_information"].includes(key)) return "property"
@@ -279,7 +279,7 @@ export function SaleFormDialog({
     setLoadingUnits(false)
   }
 
-  // â”€â”€â”€ Attachment handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Attachment handlers ───────────────────────────────────────────────────
   const loadAttachments = async (saleId: string) => {
     setAttLoading(true)
     setAttError(null)
@@ -494,7 +494,7 @@ export function SaleFormDialog({
                     className={sel("developer_id")}
                     data-error-key="developer_id"
                   >
-                    <option value="">Select developerâ€¦</option>
+                    <option value="">Select developer…</option>
                     {developers.map((d) => (
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
@@ -512,7 +512,7 @@ export function SaleFormDialog({
                     data-error-key="project_id"
                   >
                     <option value="">
-                      {loadingProjects ? "Loading projectsâ€¦" : "Select projectâ€¦"}
+                      {loadingProjects ? "Loading projects…" : "Select project…"}
                     </option>
                     {projects.map((p) => (
                       <option key={p.id} value={p.id}>{p.name}</option>
@@ -531,11 +531,11 @@ export function SaleFormDialog({
                     data-error-key="unit_information"
                   >
                     <option value="">
-                      {loadingUnits ? "Loading unitsâ€¦" : "Select unit typeâ€¦"}
+                      {loadingUnits ? "Loading units…" : "Select unit type…"}
                     </option>
                     {units.map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.unit_type}{u.layout_name ? ` â€” ${u.layout_name}` : ""}{u.bedrooms != null ? ` (${u.bedrooms}BR)` : ""}
+                        {u.unit_type}{u.layout_name ? ` — ${u.layout_name}` : ""}{u.bedrooms != null ? ` (${u.bedrooms}BR)` : ""}
                       </option>
                     ))}
                   </select>
@@ -698,7 +698,7 @@ export function SaleFormDialog({
                     disabled={disabled}
                     className={sel("client.gender")}
                   >
-                    <option value="">Select genderâ€¦</option>
+                    <option value="">Select gender…</option>
                     {GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}
                   </select>
                 </div>
@@ -841,7 +841,7 @@ export function SaleFormDialog({
                     value={form.payment_terms}
                     onChange={(e) => set("payment_terms", e.target.value)}
                     disabled={disabled}
-                    placeholder="Describe payment termsâ€¦"
+                    placeholder="Describe payment terms…"
                     rows={2}
                     data-error-key="payment_terms"
                     className={`w-full px-4 py-3 rounded-2xl border bg-white text-sm text-[#0d1117] placeholder:text-[#9ca3af] focus:outline-none focus:ring-4 focus:ring-[#001f3f]/5 transition-all disabled:bg-[#f8fafc] resize-none ${errors.payment_terms ? "border-rose-400" : "border-[#e5e5e5] focus:border-[#001f3f]"}`}
@@ -855,7 +855,7 @@ export function SaleFormDialog({
                     value={form.remarks}
                     onChange={(e) => set("remarks", e.target.value)}
                     disabled={disabled}
-                    placeholder="Optional notes or remarksâ€¦"
+                    placeholder="Optional notes or remarks…"
                     rows={2}
                     className="w-full px-4 py-3 rounded-2xl border border-[#e5e5e5] bg-white text-sm text-[#0d1117] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 transition-all disabled:bg-[#f8fafc] resize-none"
                   />
@@ -864,7 +864,7 @@ export function SaleFormDialog({
             </div>
             )} {/* end contract tab */}
 
-            {/* === Commission & Validation â€” Admin only === */}
+            {/* === Commission & Validation — Admin only === */}
             {isAdmin && (viewMode || activeTab === "workflow") && (
             <div>
               <SectionTitle icon={DollarSign} title="Workflow Status" />
@@ -904,7 +904,7 @@ export function SaleFormDialog({
             {activeTab === "attachments" && !viewMode && (
               <div className="space-y-4">
                 {isEdit ? (
-                  /* â”€â”€ EDIT MODE: live upload to S3 â”€â”€ */
+                  /* ── EDIT MODE: live upload to S3 ── */
                   <>
                     <div
                       onDragOver={(e) => {
@@ -933,7 +933,7 @@ export function SaleFormDialog({
                       {attUploading ? (
                         <div className="flex items-center gap-2 text-sm text-[#6b7280]">
                           <div className="w-4 h-4 border-2 border-[#001f3f]/20 border-t-[#001f3f] rounded-full animate-spin" />
-                          Uploadingâ€¦
+                          Uploading…
                         </div>
                       ) : (
                         <>
@@ -945,7 +945,7 @@ export function SaleFormDialog({
                               {canManageAttachments ? "Click to upload or drag & drop" : "Attachments are read-only for this validation status"}
                             </p>
                             <p className="text-xs text-[#9ca3af] mt-0.5">
-                              {canManageAttachments ? "PDF, Word, Excel, images â€” max 25 MB" : "Set validation to Invalid Sale or Under Review to manage files"}
+                              {canManageAttachments ? "PDF, Word, Excel, images — max 25 MB" : "Set validation to Invalid Sale or Under Review to manage files"}
                             </p>
                           </div>
                         </>
@@ -964,7 +964,7 @@ export function SaleFormDialog({
                     />
                     {attError && (
                       <div className="flex items-center gap-2 px-4 py-3 bg-rose-50 border border-rose-100 rounded-2xl text-sm text-rose-700">
-                        <span>âš ï¸</span> {attError}
+                        <span aria-hidden>{"\u26A0\uFE0F"}</span> {attError}
                       </div>
                     )}
                     {attLoading ? (
@@ -1003,7 +1003,7 @@ export function SaleFormDialog({
                     )}
                   </>
                 ) : (
-                  /* â”€â”€ CREATE MODE: stage files locally; uploaded after sale is saved â”€â”€ */
+                  /* ── CREATE MODE: stage files locally; uploaded after sale is saved ── */
                   <>
                     <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-100 rounded-2xl text-sm text-amber-800">
                       <span>ðŸ“Ž</span>
@@ -1030,7 +1030,7 @@ export function SaleFormDialog({
                       </div>
                       <div className="text-center">
                         <p className="text-sm font-semibold text-[#374151]">Click to add files or drag & drop</p>
-                        <p className="text-xs text-[#9ca3af] mt-0.5">PDF, Word, Excel, images â€” max 25 MB each</p>
+                        <p className="text-xs text-[#9ca3af] mt-0.5">PDF, Word, Excel, images — max 25 MB each</p>
                         <p className="text-xs text-[#9ca3af] mt-1 italic">e.g. Reservation Agreement, Payment Receipt, Contract</p>
                       </div>
                     </div>
@@ -1080,7 +1080,7 @@ export function SaleFormDialog({
             )} {/* end attachments tab */}
           </div>
 
-          {/* Footer â€” always visible in create mode; hidden in edit mode's attachments tab */}
+          {/* Footer — always visible in create mode; hidden in edit mode's attachments tab */}
           {!viewMode && (activeTab !== "attachments" || !isEdit) && (
             <>
               <div className="mx-7 h-px bg-[#f0f2f5]" />
@@ -1099,7 +1099,7 @@ export function SaleFormDialog({
                   className="inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {saving
-                    ? (pendingFiles.length > 0 && !isEdit ? "Saving & uploadingâ€¦" : "Savingâ€¦")
+                    ? (pendingFiles.length > 0 && !isEdit ? "Saving & uploading…" : "Saving…")
                     : isEdit
                     ? "Save Changes"
                     : pendingFiles.length > 0

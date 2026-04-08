@@ -90,7 +90,7 @@ export function TeamFormDialog({ open, onClose, onSave, initialData, teams }: Pr
     }
   }
 
-  // Available parent options â€” exclude current team and its subteams
+  // Available parent options — exclude current team and its subteams
   const excluded = new Set<string>()
   if (initialData) {
     excluded.add(initialData.id)
@@ -162,7 +162,7 @@ export function TeamFormDialog({ open, onClose, onSave, initialData, teams }: Pr
                   onChange={e => field("team_type", e.target.value)}
                   className={selectCls(false)}
                 >
-                  <option value="">â€” Select type â€”</option>
+                  <option value="">— Select type —</option>
                   {TEAM_TYPES.map(t => (
                     <option key={t} value={t}>{t}</option>
                   ))}
@@ -180,7 +180,7 @@ export function TeamFormDialog({ open, onClose, onSave, initialData, teams }: Pr
                   onChange={e => field("parent_id", e.target.value || null)}
                   className={selectCls(!!errors.parent_id)}
                 >
-                  <option value="">â€” None (main team) â€”</option>
+                  <option value="">— None (main team) —</option>
                   {parentOptions.map(t => (
                     <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
@@ -202,7 +202,7 @@ export function TeamFormDialog({ open, onClose, onSave, initialData, teams }: Pr
                 rows={3}
                 value={form.description}
                 onChange={e => field("description", e.target.value)}
-                placeholder="Describe the purpose of this teamâ€¦"
+                placeholder="Describe the purpose of this team…"
                 className={`${inputCls(false)} resize-none`}
               />
             </div>
@@ -261,7 +261,7 @@ export function TeamFormDialog({ open, onClose, onSave, initialData, teams }: Pr
   return createPortal(modal, document.body)
 }
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function Label({ text, required }: { text: string; required?: boolean }) {
   return (

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import type { CreateUserPayload, UsersListResponse, UserRecord } from "@/lib/user-service"
 
-// â”€â”€â”€ Auth guard helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Auth guard helper ─────────────────────────────────────────────────────────
 async function requireAdmin() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -17,7 +17,7 @@ async function requireAdmin() {
   return user
 }
 
-// â”€â”€â”€ GET /api/admin/users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── GET /api/admin/users ──────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const caller = await requireAdmin()
   if (!caller) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminSupabase()
 
-  // â”€â”€ Fetch auth users for email lookup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Fetch auth users for email lookup ────────────────────────────────────────
   const { data: { users: authUsers } } = await admin.auth.admin.listUsers({
     page: 1, perPage: 1000,
   })
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  // â”€â”€ Build profiles query â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Build profiles query ──────────────────────────────────────────────────────
   const from = (page - 1) * perPage
   const to   = from + perPage - 1
 
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  // Email search â€” restrict by allowed IDs
+  // Email search — restrict by allowed IDs
   if (allowedIds) {
     query = query.in("id", [...allowedIds])
   }
@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(result)
 }
 
-// â”€â”€â”€ POST /api/admin/users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── POST /api/admin/users ─────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const caller = await requireAdmin()
   if (!caller) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminSupabase()
 
-  // Create auth user â€” email already confirmed, no invite email sent
+  // Create auth user — email already confirmed, no invite email sent
   const { data: authData, error: authError } = await admin.auth.admin.createUser({
     email,
     password,

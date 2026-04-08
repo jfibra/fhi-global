@@ -1,15 +1,19 @@
 import type { Metadata } from "next"
 import Image from "next/image"
-import { createClient } from "@/lib/supabase/server"
+import Link from "next/link"
+import { Suspense } from "react"
+import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { DeveloperCard, type DeveloperCardData } from "@/components/developer-card"
 import { DeveloperSearch } from "./developer-search"
-import { Building2, BadgeCheck, Users } from "lucide-react"
-
-export const dynamic = "force-dynamic"
+import { BuyFiltersLoader } from "@/app/buy/buy-filters-loader"
+import { DevelopersGoogleMap } from "@/components/developers/developers-google-map"
+import { DevelopersListToolbar } from "@/components/developers/developers-list-toolbar"
+import { buildDeveloperMapMarkers } from "@/lib/developers/map-markers"
+import { Building2, BadgeCheck, ChevronRight, Users } from "lucide-react"
 
 export const metadata: Metadata = createPageMetadata({
   title: "Real Estate Developers in Dubai | FHI Global",
@@ -18,13 +22,33 @@ export const metadata: Metadata = createPageMetadata({
   keywords: ["Dubai developers", "real estate developers Dubai", "verified developers UAE"],
 })
 
-type SearchParams = Promise<{ q?: string }>
+type SearchParams = Promise<{ q?: string; view?: string }>
+
+function listViewHrefFromQ(q: string | undefined): string {
+  const p = new URLSearchParams()
+  if (q) p.set("q", q)
+  const qs = p.toString()
+  return qs ? `/developers?${qs}` : "/developers"
+}
+
+function FiltersFallback() {
+  return <div className="bg-white border-b border-[#e5e7eb] h-[88px] animate-pulse" aria-hidden />
+}
+
+function SearchFallback() {
+  return <div className="h-14 rounded-2xl bg-white border border-[#e8eaed] animate-pulse" aria-hidden />
+}
+
+function ToolbarFallback() {
+  return <div className="h-10 w-36 rounded-full bg-[#f1f5f9] animate-pulse shrink-0" aria-hidden />
+}
 
 export default async function DevelopersPage({ searchParams }: { searchParams: SearchParams }) {
-  const { q } = await searchParams
-  const supabase = await createClient()
+  const { q, view } = await searchParams
+  const isMap = view === "map"
+  const supabase = createPublicSupabaseClient()
 
-  let query = supabase
+  let devQuery = supabase
     .from("developers")
     .select("id, name, slug, description, logo_url, rating, is_verified")
     .eq("is_active", true)
@@ -32,12 +56,141 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
     .order("name")
 
   if (q) {
-    query = query.ilike("name", `%${q}%`)
+    devQuery = devQuery.ilike("name", `%${q}%`)
   }
 
-  const { data: developers } = await query
+  const coordsQuery = supabase
+    .from("projects")
+    .select("developer_id, latitude, longitude")
+    .eq("is_active", true)
+    .eq("is_published", true)
+    .is("deleted_at", null)
+
+  const [{ data: developers }, { data: projectCoords }] = await Promise.all([devQuery, coordsQuery])
 
   const verifiedCount = (developers ?? []).filter((d) => d.is_verified).length
+
+  const mapMarkers = buildDeveloperMapMarkers(
+    (developers ?? []).map((d) => ({
+      id: d.id,
+      name: d.name,
+      slug: d.slug,
+      logo_url: d.logo_url,
+    })),
+    projectCoords ?? [],
+  )
+
+  const apiKey =
+    process.env.GOOGLE_MAPS_API_KEY?.trim() || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || ""
+
+  const listViewHref = listViewHrefFromQ(q)
+
+  const verifiedHint =
+    !q && verifiedCount > 0 ? (
+      <div className="flex items-center gap-2 mb-6 lg:mb-8 text-xs text-[#6b7280]">
+        <BadgeCheck className="w-3.5 h-3.5 text-[#d6b357] shrink-0" />
+        <span>
+          {verifiedCount} verified developer{verifiedCount !== 1 ? "s" : ""} on this platform
+        </span>
+      </div>
+    ) : null
+
+  const emptyState = (
+    <div className="flex flex-col items-center justify-center py-20 lg:py-24 text-center">
+      <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#001f3f]/6 to-[#d6b357]/6 border border-[#e8eaed] flex items-center justify-center mb-6 shadow-sm">
+        <Building2 className="w-9 h-9 text-[#001f3f]/25" />
+      </div>
+      <h3 className="font-['Outfit'] font-bold text-[#0d1117] text-xl mb-2">No developers found</h3>
+      <p className="text-sm text-[#6b7280] max-w-xs leading-relaxed">
+        Try adjusting your search or{" "}
+        <a href="/developers" className="text-[#001f3f] font-medium hover:underline">
+          browse all developers
+        </a>
+        .
+      </p>
+    </div>
+  )
+
+  const cardsBlock =
+    developers && developers.length > 0 ? (
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        {developers.map((dev) => (
+          <DeveloperCard key={dev.id} developer={dev as DeveloperCardData} />
+        ))}
+      </div>
+    ) : (
+      emptyState
+    )
+
+  if (isMap) {
+    const total = developers?.length ?? 0
+    const mapCards =
+      developers && developers.length > 0 ? (
+        <div className="flex flex-col gap-4 pb-4">
+          {developers.map((dev) => (
+            <DeveloperCard key={dev.id} developer={dev as DeveloperCardData} variant="directory" />
+          ))}
+        </div>
+      ) : (
+        emptyState
+      )
+
+    return (
+      <div className="relative min-h-screen bg-[#f6f7f9] font-sans">
+        <TopBar />
+        <Header />
+
+        <Suspense fallback={<FiltersFallback />}>
+          <BuyFiltersLoader />
+        </Suspense>
+
+        <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pb-16">
+          <div className="grid grid-cols-1 gap-6 lg:gap-8 lg:grid-cols-[minmax(0,50%)_minmax(0,1fr)] lg:items-start">
+            <div className="scrollbar-none min-w-0 max-w-full lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto">
+              <nav className="mb-4 flex flex-wrap items-center gap-1 text-sm text-[#6b7280]">
+                <span className="font-medium text-[#0f2940]">For Sale:</span>
+                <Link href="/" className="text-[#0f2940] transition-colors hover:text-[#d6b357]">
+                  Home
+                </Link>
+                <ChevronRight className="h-4 w-4 shrink-0 text-[#9ca3af]" />
+                <span className="font-semibold text-[#d6b357]">Developers</span>
+              </nav>
+
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <h1 className="font-['Outfit'] text-2xl font-bold leading-tight tracking-tight text-[#0f2940] sm:text-3xl">
+                    Dubai&apos;s Top Real Estate Developers
+                  </h1>
+                  <p className="mt-1 text-base font-semibold text-[#0f2940] sm:text-lg">
+                    {total} Developer{total !== 1 ? "s" : ""}
+                    {q ? (
+                      <>
+                        {" "}
+                        <span className="font-normal text-[#6b7280]">
+                          matching <span className="font-medium text-[#001f3f]">&ldquo;{q}&rdquo;</span>
+                        </span>
+                      </>
+                    ) : null}
+                  </p>
+                </div>
+                <Suspense fallback={<ToolbarFallback />}>
+                  <DevelopersListToolbar className="mb-0 shrink-0" />
+                </Suspense>
+              </div>
+
+              {mapCards}
+            </div>
+
+            <div className="mt-0 min-h-[min(55vh,520px)] w-full min-w-0 max-w-full flex-1 overflow-hidden lg:sticky lg:top-24 lg:mt-0 lg:min-h-0 lg:self-start">
+              <DevelopersGoogleMap apiKey={apiKey} markers={mapMarkers} listViewHref={listViewHref} fillHeight />
+            </div>
+          </div>
+        </div>
+
+        <Footer />
+      </div>
+    )
+  }
 
   return (
     <div className="relative min-h-screen bg-[#f6f7f9] font-sans overflow-x-hidden">
@@ -87,8 +240,8 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
                 </span>
               </h1>
               <p className="text-white/50 text-lg max-w-lg leading-relaxed">
-                Explore verified developers behind Dubai&apos;s most iconic residential
-                and commercial projects — vetted, RERA-registered, and trusted.
+                Explore verified developers behind Dubai&apos;s most iconic residential and commercial projects — vetted,
+                RERA-registered, and trusted.
               </p>
             </div>
 
@@ -109,49 +262,41 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
 
       {/* ─── Content ─── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-
-        {/* Search + count row */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-10">
-          <div className="flex-1">
-            <DeveloperSearch initialQ={q ?? ""} />
-          </div>
-          {/* Count badge */}
-          <div className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#e8eaed] rounded-full shadow-sm self-start sm:self-auto">
-            <Users className="w-3.5 h-3.5 text-[#d6b357]" />
-            <span className="text-sm font-semibold text-[#0d1117]">{developers?.length ?? 0}</span>
-            <span className="text-sm text-[#6b7280]">
-              developer{(developers?.length ?? 0) !== 1 ? "s" : ""}
-              {q ? <> matching <span className="font-medium text-[#001f3f]">&ldquo;{q}&rdquo;</span></> : ""}
-            </span>
+        {/* Search + count + map toggle */}
+        <div className="flex flex-col gap-4 mb-10">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+            <div className="flex-1 min-w-0">
+              <Suspense fallback={<SearchFallback />}>
+                <DeveloperSearch initialQ={q ?? ""} />
+              </Suspense>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 shrink-0">
+              <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#e8eaed] rounded-full shadow-sm self-start">
+                <Users className="w-3.5 h-3.5 text-[#d6b357]" />
+                <span className="text-sm font-semibold text-[#0d1117]">{developers?.length ?? 0}</span>
+                <span className="text-sm text-[#6b7280]">
+                  developer{(developers?.length ?? 0) !== 1 ? "s" : ""}
+                  {q ? (
+                    <>
+                      {" "}
+                      matching <span className="font-medium text-[#001f3f]">&ldquo;{q}&rdquo;</span>
+                    </>
+                  ) : (
+                    ""
+                  )}
+                </span>
+              </div>
+              <Suspense fallback={<ToolbarFallback />}>
+                <DevelopersListToolbar className="mb-0 self-start sm:self-auto" />
+              </Suspense>
+            </div>
           </div>
         </div>
 
         {/* Verified filter hint */}
-        {!q && verifiedCount > 0 && (
-          <div className="flex items-center gap-2 mb-8 text-xs text-[#6b7280]">
-            <BadgeCheck className="w-3.5 h-3.5 text-[#d6b357]" />
-            <span>{verifiedCount} verified developer{verifiedCount !== 1 ? "s" : ""} on this platform</span>
-          </div>
-        )}
+        {verifiedHint}
 
-        {developers && developers.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {developers.map((dev) => (
-              <DeveloperCard key={dev.id} developer={dev as DeveloperCardData} />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-32 text-center">
-            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#001f3f]/6 to-[#d6b357]/6 border border-[#e8eaed] flex items-center justify-center mb-6 shadow-sm">
-              <Building2 className="w-9 h-9 text-[#001f3f]/25" />
-            </div>
-            <h3 className="font-['Outfit'] font-bold text-[#0d1117] text-xl mb-2">No developers found</h3>
-            <p className="text-sm text-[#6b7280] max-w-xs leading-relaxed">
-              Try adjusting your search or{" "}
-              <a href="/developers" className="text-[#001f3f] font-medium hover:underline">browse all developers</a>.
-            </p>
-          </div>
-        )}
+        {cardsBlock}
       </section>
 
       <Footer />

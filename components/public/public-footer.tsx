@@ -92,7 +92,7 @@ export function PublicFooter() {
       {/* Bottom bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
         <p className="text-xs text-white/25">
-          Â© {new Date().getFullYear()} FHI Global Real Estate LLC. All rights reserved. RERA Registered.
+          © {new Date().getFullYear()} FHI Global Real Estate LLC. All rights reserved. RERA Registered.
         </p>
         <div className="flex items-center gap-5">
           <Link href="#" className="text-xs text-white/25 hover:text-white/50 transition-colors">Privacy Policy</Link>

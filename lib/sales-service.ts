@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type CommissionStatus = "pending" | "processing" | "approved" | "released" | "rejected"
 export type ValidationStatus = "pending" | "under_review" | "validated" | "invalid_sale"
@@ -217,7 +217,7 @@ export function validateSaleFormData(form: SaleFormData) {
   return errors
 }
 
-// â”€â”€â”€ Normalizer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Normalizer ───────────────────────────────────────────────────────────────
 
 function normalizeSale(row: unknown): SaleRecord {
   const raw = row as Record<string, unknown>
@@ -401,7 +401,7 @@ function normalizeAttachment(row: unknown): SaleAttachment {
   }
 }
 
-// â”€â”€â”€ Reference data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Reference data ───────────────────────────────────────────────────────────
 
 export async function fetchDevelopersForSale(): Promise<{ data: DeveloperOption[] | null; error: string | null }> {
   const supabase = createClient()
@@ -483,7 +483,7 @@ export async function fetchAgentsForSale(): Promise<{ data: AgentOption[] | null
   }
 }
 
-// â”€â”€â”€ Sales CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Sales CRUD ───────────────────────────────────────────────────────────────
 
 export async function fetchSales(opts: {
   page: number
@@ -871,7 +871,7 @@ export async function deleteSale(id: string): Promise<{ error: string | null }> 
   return { error: error?.message ?? null }
 }
 
-// â”€â”€â”€ Attachments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Attachments ──────────────────────────────────────────────────────────────
 
 export async function fetchSaleAttachments(saleId: string): Promise<{
   data: SaleAttachment[] | null

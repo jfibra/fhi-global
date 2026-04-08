@@ -153,6 +153,22 @@ export function isProfileMissingMinimumFields(profile: AppProfile) {
   )
 }
 
+/**
+ * Dashboard paths allowed before personal profile is complete (fname, lname, timezone, phone).
+ * Developers primarily use /dashboard/developer; forcing profile first blocked every sidebar link.
+ */
+export function isPathExemptFromProfileCompletionGate(pathname: string, role?: string | null) {
+  if (pathname.startsWith("/dashboard/profile")) return true
+  const r = String(role ?? "").toLowerCase().trim()
+  if (r === "developer") {
+    return (
+      pathname.startsWith("/dashboard/developer") ||
+      pathname.startsWith("/dashboard/support")
+    )
+  }
+  return false
+}
+
 export function roleToLabel(role?: string | null) {
   if (!role) return "Member"
   return role

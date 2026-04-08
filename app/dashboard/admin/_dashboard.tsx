@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server"
 import { fetchSales } from "@/lib/sales-service"
 import { AdminAnalyticsCharts } from "./charts-client"
 
-// â”€â”€â”€ Formatters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Formatters ───────────────────────────────────────────────────────────────
 
 const AED = new Intl.NumberFormat("en-AE", { style: "currency", currency: "AED", maximumFractionDigits: 0 })
 const NUM = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 })
@@ -20,22 +20,22 @@ const fmtCurrency = (v: number) => AED.format(v)
 const fmtNumber = (v: number) => NUM.format(v)
 
 function fmtDate(v?: string | null) {
-  if (!v) return "â€”"
+  if (!v) return "—"
   const d = new Date(v)
-  return Number.isNaN(d.getTime()) ? "â€”" : DATE_FMT.format(d)
+  return Number.isNaN(d.getTime()) ? "—" : DATE_FMT.format(d)
 }
 
 function fmtTime(v?: string | null) {
-  if (!v) return "â€”"
+  if (!v) return "—"
   const d = new Date(v)
-  return Number.isNaN(d.getTime()) ? "â€”" : TIME_FMT.format(d)
+  return Number.isNaN(d.getTime()) ? "—" : TIME_FMT.format(d)
 }
 
 function humanize(s: string) {
   return s.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
 }
 
-// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const PROJECT_STATUSES = ["pre_launch", "launch", "under_construction", "completed"] as const
 const PROJECT_STATUS_LABELS: Record<string, string> = {
@@ -84,7 +84,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   { label: "Create Purchase",      desc: "Track procurement spend",   href: "/dashboard/purchases",  icon: FileText    },
 ]
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function pick(rel: unknown): string {
   if (!rel) return "Unknown"
@@ -137,7 +137,7 @@ function buildMonthlySeries(
   })
 }
 
-// â”€â”€â”€ Public page component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Public page component ────────────────────────────────────────────────────
 
 export async function AdminDashboardContent({
   roleValue,
@@ -232,7 +232,7 @@ export async function AdminDashboardContent({
     }),
   ])
 
-  // â”€â”€ KPI counts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── KPI counts ──────────────────────────────────────────────────────────────
   const totalUsers       = safeCount(profilesCountRes)
   const totalDevelopers  = safeCount(developersCountRes)
   const totalProjects    = safeCount(totalProjectsRes)
@@ -248,7 +248,7 @@ export async function AdminDashboardContent({
   const rawSalesValueRow = !totalSalesValueRes.error ? totalSalesValueRes.data?.[0] : null
   const totalSalesValue = Number((rawSalesValueRow as Record<string, unknown> | null | undefined)?.total_value ?? 0)
 
-  // â”€â”€ Chart data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Chart data ───────────────────────────────────────────────────────────────
   const monthlyRows = safeRows(monthlySalesRes) as { reservation_date: string | null; contract_price: string | null }[]
   const monthlySeries = buildMonthlySeries(monthlyRows, monthlyWindowStart)
 
@@ -295,7 +295,7 @@ export async function AdminDashboardContent({
     color: VALIDATION_STATUS_COLORS[s],
   }))
 
-  // â”€â”€ Recent data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Recent data ───────────────────────────────────────────────────────────────
   const supportRows = safeRows(supportTicketsRes) as unknown[]
   const supportTickets = (supportRows as Record<string, unknown>[]).map(row => ({
     id: String(row.id ?? ""),
@@ -310,7 +310,7 @@ export async function AdminDashboardContent({
   const purchaseRows = safeRows(purchasesTableRes) as Record<string, unknown>[]
   const purchaseList = purchaseRows.map(row => ({
     id: String(row.id ?? ""),
-    invoiceNumber: String(row.invoice_number ?? "â€”"),
+    invoiceNumber: String(row.invoice_number ?? "—"),
     category: pickKey(row.purchase_categories, "category_name") ?? "General",
     taxMonth: String(row.tax_month ?? ""),
     totalAmount: Number(row.total_actual_amount ?? 0),
@@ -329,7 +329,7 @@ export async function AdminDashboardContent({
 
   const recentSales = recentSalesRes.data ?? []
 
-  // â”€â”€ Summary cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Summary cards ──────────────────────────────────────────────────────────
   const kpiCards = [
     { label: "Total Active Users",    value: fmtNumber(totalUsers),       detail: "Active profiles",                 accent: "from-[#001f3f] to-[#0ea5e9]" },
     { label: "Active Developers",     value: fmtNumber(totalDevelopers),   detail: "Verified partners",               accent: "from-[#001f3f] to-[#0ea5e9]" },
@@ -356,7 +356,7 @@ export async function AdminDashboardContent({
     >
       <div className="space-y-10 pb-12">
 
-        {/* â”€â”€ Section header â”€â”€ */}
+        {/* ── Section header ── */}
         <div className="flex items-end justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#d6b357]">Enterprise Overview</p>
@@ -367,7 +367,7 @@ export async function AdminDashboardContent({
           </div>
         </div>
 
-        {/* â”€â”€ Section 1: KPI cards â”€â”€ */}
+        {/* ── Section 1: KPI cards ── */}
         <section>
           <SectionLabel index={1} title="Key Performance Indicators" />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -377,7 +377,7 @@ export async function AdminDashboardContent({
           </div>
         </section>
 
-        {/* â”€â”€ Section 2: Charts â”€â”€ */}
+        {/* ── Section 2: Charts ── */}
         <section>
           <SectionLabel index={2} title="Sales & Business Analytics" />
           <AdminAnalyticsCharts
@@ -388,7 +388,7 @@ export async function AdminDashboardContent({
           />
         </section>
 
-        {/* â”€â”€ Section 3: Operational insights â”€â”€ */}
+        {/* ── Section 3: Operational insights ── */}
         <section>
           <SectionLabel index={3} title="Operational Insights" />
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-4">
@@ -416,7 +416,7 @@ export async function AdminDashboardContent({
           </div>
         </section>
 
-        {/* â”€â”€ Section 4: Recent activity tables â”€â”€ */}
+        {/* ── Section 4: Recent activity tables ── */}
         <section className="space-y-5">
           <SectionLabel index={4} title="Recent Activity Tables" />
 
@@ -436,10 +436,10 @@ export async function AdminDashboardContent({
                 )}
                 {recentSales.map(sale => (
                   <tr key={sale.id} className="border-b border-[#f0f2f5] hover:bg-[#f9fafb] transition-colors">
-                    <Td>{sale.profiles?.fullname ?? "â€”"}</Td>
-                    <Td>{[sale.clients?.first_name, sale.clients?.last_name].filter(Boolean).join(" ") || "â€”"}</Td>
-                    <Td>{sale.projects?.name ?? "â€”"}</Td>
-                    <Td>{sale.developers?.name ?? "â€”"}</Td>
+                    <Td>{sale.profiles?.fullname ?? "—"}</Td>
+                    <Td>{[sale.clients?.first_name, sale.clients?.last_name].filter(Boolean).join(" ") || "—"}</Td>
+                    <Td>{sale.projects?.name ?? "—"}</Td>
+                    <Td>{sale.developers?.name ?? "—"}</Td>
                     <Td>{fmtCurrency(sale.contract_price ?? 0)}</Td>
                     <Td>{fmtDate(sale.reservation_date)}</Td>
                     <Td><StatusPill status={sale.validation_status} /></Td>
@@ -509,7 +509,7 @@ export async function AdminDashboardContent({
           </div>
         </section>
 
-        {/* â”€â”€ Section 5: Quick actions â”€â”€ */}
+        {/* ── Section 5: Quick actions ── */}
         <section>
           <SectionLabel index={5} title="Quick Actions" />
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
@@ -519,7 +519,7 @@ export async function AdminDashboardContent({
           </div>
         </section>
 
-        {/* â”€â”€ Section 6: Activity feed â”€â”€ */}
+        {/* ── Section 6: Activity feed ── */}
         <section>
           <SectionLabel index={6} title="System Activity Feed" />
           {activityFeed.length === 0 ? (
@@ -548,7 +548,7 @@ export async function AdminDashboardContent({
   )
 }
 
-// â”€â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Sub-components ────────────────────────────────────────────────────────────
 
 function SectionLabel({ index, title }: { index: number; title: string }) {
   return (

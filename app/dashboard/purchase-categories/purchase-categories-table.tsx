@@ -24,7 +24,7 @@ import {
 import { PurchaseCategoryActions } from "./purchase-category-actions"
 import { PurchaseCategoryFormDialog } from "./purchase-category-form-dialog"
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type ToastType = "success" | "error"
 type SortField = "category_name" | "created_at"
@@ -32,7 +32,7 @@ type SortDir = "asc" | "desc"
 
 const PER_PAGE_OPTIONS = [10, 20, 50] as const
 
-// â”€â”€â”€ Toast Stack â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Toast Stack ──────────────────────────────────────────────────────────────
 
 function ToastStack({
   toasts,
@@ -58,7 +58,7 @@ function ToastStack({
             onClick={() => remove(toast.id)}
             className="opacity-60 hover:opacity-100 text-xs ml-2"
           >
-            âœ•
+            ✕
           </button>
         </div>
       ))}
@@ -66,12 +66,12 @@ function ToastStack({
   )
 }
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDate(value: string) {
-  if (!value) return "â€”"
+  if (!value) return "—"
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "â€”"
+  if (Number.isNaN(date.getTime())) return "—"
   return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
 }
 
@@ -157,7 +157,7 @@ function SortableHead({
   )
 }
 
-// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export function PurchaseCategoriesTable({
   currentUserId,
@@ -325,7 +325,7 @@ export function PurchaseCategoriesTable({
                 type="text"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search category nameâ€¦"
+                placeholder="Search category name…"
                 className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 placeholder:text-[#9ca3af]"
               />
             </div>
@@ -468,7 +468,7 @@ export function PurchaseCategoriesTable({
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-6 py-3.5 border-t border-[#f0f2f5] bg-white/40">
             <p className="text-xs text-[#9ca3af]">
               Showing{" "}
-              {total === 0 ? 0 : (page - 1) * perPage + 1}â€“{Math.min(page * perPage, total)} of{" "}
+              {total === 0 ? 0 : (page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of{" "}
               {total}
             </p>
 

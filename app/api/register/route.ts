@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 
-// â”€â”€ S3 client â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── S3 client ─────────────────────────────────────────────────────────────────
 
 const s3 = new S3Client({
   region: process.env.S3_REGION!,
@@ -22,7 +22,7 @@ async function uploadFileToS3(buffer: Buffer, key: string, contentType: string):
   return `${process.env.S3_PUBLIC_URL}/${key}`
 }
 
-// â”€â”€ Slug helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Slug helper ───────────────────────────────────────────────────────────────
 
 function slugify(text: string) {
   return text
@@ -33,7 +33,7 @@ function slugify(text: string) {
     .replace(/-+/g, "-")
 }
 
-// â”€â”€ POST /api/register â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── POST /api/register ────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   try {
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     const supabase = createAdminSupabase()
 
-    // â”€â”€ 1. Create the auth user â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── 1. Create the auth user ──────────────────────────────────────────────
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
@@ -82,13 +82,13 @@ export async function POST(req: NextRequest) {
     const year   = now.getFullYear().toString()
     const month  = String(now.getMonth() + 1).padStart(2, "0")
 
-    // â”€â”€ 2. Update profile: role + status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── 2. Update profile: role + status ────────────────────────────────────
     await supabase
       .from("profiles")
       .update({ role, status: "pending" })
       .eq("id", userId)
 
-    // â”€â”€ 3. Developer path â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── 3. Developer path ────────────────────────────────────────────────────
     if (isDeveloper && companyName) {
       const baseSlug = slugify(companyName)
       // Ensure slug uniqueness by appending a short random suffix
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // â”€â”€ 4. Salesperson path: upload docs + insert records â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── 4. Salesperson path: upload docs + insert records ───────────────────
     if (isSalesperson) {
       let primaryUrl   = ""
       let secondaryUrl = ""

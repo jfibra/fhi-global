@@ -17,7 +17,7 @@ import {
   type PurchaseAttachment,
 } from "@/lib/purchase-service"
 
-// â”€â”€â”€ Portal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Portal ───────────────────────────────────────────────────────────────────
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -26,12 +26,12 @@ function Portal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body)
 }
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDate(value: string) {
-  if (!value) return "â€”"
+  if (!value) return "—"
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "â€”"
+  if (Number.isNaN(date.getTime())) return "—"
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
@@ -44,7 +44,7 @@ function fileIcon(fileType: string | null) {
   return "ðŸ“Ž"
 }
 
-// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function PurchaseAttachmentsDialog({
   open,
@@ -167,7 +167,7 @@ export function PurchaseAttachmentsDialog({
                 <div>
                   <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Attachments</h2>
                   <p className="text-xs text-[#9ca3af] mt-0.5 truncate max-w-[240px]">
-                    {purchase.invoice_number} â€” {purchase.company_tax_entities?.registered_name ?? "â€”"}
+                    {purchase.invoice_number} — {purchase.company_tax_entities?.registered_name ?? "—"}
                   </p>
                 </div>
               </div>
@@ -207,9 +207,9 @@ export function PurchaseAttachmentsDialog({
               )}
               <div className="text-center">
                 <p className="text-sm font-semibold text-[#374151]">
-                  {uploading ? "Uploadingâ€¦" : "Click or drag file to upload"}
+                  {uploading ? "Uploading…" : "Click or drag file to upload"}
                 </p>
-                <p className="text-xs text-[#9ca3af] mt-0.5">PDF, JPG, PNG, DOCX, XLSX â€” max 25 MB</p>
+                <p className="text-xs text-[#9ca3af] mt-0.5">PDF, JPG, PNG, DOCX, XLSX — max 25 MB</p>
               </div>
             </div>
 

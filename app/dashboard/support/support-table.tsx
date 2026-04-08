@@ -31,6 +31,7 @@ import {
   type SupportTicketRecord,
   type SupportTicketStatus,
 } from "@/lib/support-service"
+import { DeveloperPortalPageHeader } from "@/components/developer/developer-portal-page-header"
 import { SupportFormDialog } from "./support-form-dialog"
 import { TicketAttachments } from "./[id]/ticket-attachments"
 import { TicketComments } from "./[id]/ticket-comments"
@@ -60,7 +61,7 @@ const PRIORITY_LABEL: Record<SupportTicketPriority, string> = {
 
 function formatDate(value: string) {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "â€”"
+  if (Number.isNaN(date.getTime())) return "—"
   return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
 }
 
@@ -94,7 +95,7 @@ function ToastStack({ toasts, remove }: { toasts: Array<{ id: number; type: Toas
           className={`flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold pointer-events-auto max-w-xs ${toast.type === "success" ? "bg-green-50 text-green-800 border border-green-100" : "bg-rose-50 text-rose-800 border border-rose-100"}`}
         >
           <span className="flex-1">{toast.text}</span>
-          <button type="button" onClick={() => remove(toast.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
+          <button type="button" onClick={() => remove(toast.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
         </div>
       ))}
     </div>
@@ -292,37 +293,49 @@ export function SupportTable({
     addToast("success", "Ticket status updated")
   }
 
+  const createTicketButton = (
+    <button
+      type="button"
+      onClick={() => setShowCreate(true)}
+      className="inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-4 py-2.5 rounded-full text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all"
+    >
+      <Plus className="w-4 h-4" /> Create ticket
+    </button>
+  )
+
   return (
     <DashboardShell role={currentRole} roleLabel={roleToLabel(currentRole)} roleColor={getRoleColor(currentRole)} userName={userName}>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-lg">
-              <AlertCircle className="w-6 h-6 text-white" />
+        {currentRole === "developer" ? (
+          <DeveloperPortalPageHeader
+            segmentLabel="Support"
+            title="Support tickets"
+            description="Report portal issues, listing questions, or upload problems. You only see tickets you created; our team updates status here when they respond."
+            actions={createTicketButton}
+          />
+        ) : (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-lg">
+                <AlertCircle className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">Support Tickets</h1>
+                <p className="text-sm text-[#6b7280]">
+                  {isAdmin
+                    ? "Manage and triage every support ticket for the team."
+                    : "Send us a ticket or monitor the updates for your own reports."}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">Support Tickets</h1>
-              <p className="text-sm text-[#6b7280]">
-                {isAdmin
-                  ? "Manage and triage every support ticket for the team."
-                  : "Send us a ticket or monitor the updates for your own reports."
-                }
-              </p>
-            </div>
+            {createTicketButton}
           </div>
-          <button
-            type="button"
-            onClick={() => setShowCreate(true)}
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-4 py-2.5 rounded-full text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all"
-          >
-            <Plus className="w-4 h-4" /> Create Ticket
-          </button>
-        </div>
+        )}
 
         {!isAdmin && (
           <div className="rounded-[24px] border border-[#e5e7eb] bg-[#f8fafc] px-5 py-4 text-sm text-[#0f172a] space-y-1">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#6b7280]">Personal View</p>
-            <p>We only expose tickets you submitted so your teammates canâ€™t see your requests. Weâ€™ll ping you here as soon as the team updates the status.</p>
+            <p>We only expose tickets you submitted so your teammates can’t see your requests. We’ll ping you here as soon as the team updates the status.</p>
           </div>
         )}
 
@@ -438,12 +451,12 @@ export function SupportTable({
                         </div>
                       </td>
                       {isAdmin && (
-                        <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">{ticket.reported_by_profile?.fullname ?? "â€”"}</td>
+                        <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">{ticket.reported_by_profile?.fullname ?? "—"}</td>
                       )}
                       <td className="px-4 py-3.5 whitespace-nowrap"><PriorityBadge value={ticket.priority} /></td>
                       <td className="px-4 py-3.5 whitespace-nowrap"><StatusBadge value={ticket.status} /></td>
                       {isAdmin && (
-                        <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">{ticket.assigned_to_profile?.fullname ?? "â€”"}</td>
+                        <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">{ticket.assigned_to_profile?.fullname ?? "—"}</td>
                       )}
                       <td className="px-4 py-3.5 whitespace-nowrap text-[#6b7280]">{formatDate(ticket.created_at)}</td>
                       <td className="px-4 py-3.5 pr-6 whitespace-nowrap">
@@ -499,7 +512,7 @@ export function SupportTable({
           </div>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-6 py-3.5 border-t border-[#f0f2f5] bg-white/40">
-            <p className="text-xs text-[#9ca3af]">Showing {total === 0 ? 0 : (page - 1) * perPage + 1}â€“{Math.min(page * perPage, total)} of {total}</p>
+            <p className="text-xs text-[#9ca3af]">Showing {total === 0 ? 0 : (page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}</p>
             <div className="flex items-center gap-2">
               <select value={perPage} onChange={(event) => { setPerPage(Number(event.target.value) as 10 | 20 | 50); setPage(1) }} className="pl-3 pr-8 py-1.5 rounded-xl border border-[#e5e5e5] text-xs bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer">
                 {PER_PAGE_OPTIONS.map((option) => <option key={option} value={option}>{option} / page</option>)}

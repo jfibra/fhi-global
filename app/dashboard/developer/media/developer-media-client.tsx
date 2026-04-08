@@ -24,9 +24,11 @@ import {
   fetchDeveloperMedia,
   type MediaFile,
 } from "@/lib/developer-portal-service"
+import { addProjectImage } from "@/lib/project-service"
 import { createClient } from "@/lib/supabase/client"
+import { DeveloperPortalPageHeader } from "@/components/developer/developer-portal-page-header"
 
-// â”€â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Toast ─────────────────────────────────────────────────────────────────────
 type ToastVariant = "success" | "error"
 interface ToastMsg { id: number; variant: ToastVariant; message: string }
 
@@ -38,21 +40,21 @@ function ToastList({ toasts, remove }: { toasts: ToastMsg[]; remove: (id: number
           t.variant === "success" ? "bg-green-50 text-green-800 border border-green-100" : "bg-rose-50 text-rose-800 border border-rose-100"
         }`}>
           <span className="flex-1">{t.message}</span>
-          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
+          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
         </div>
       ))}
     </div>
   )
 }
 
-// â”€â”€â”€ Media type icon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Media type icon ──────────────────────────────────────────────────────────
 function MediaTypeIcon({ type }: { type: string }) {
   if (type === "video")        return <Video className="w-4 h-4 text-blue-500" />
   if (type === "virtual_tour") return <Globe className="w-4 h-4 text-violet-500" />
   return <ImageIcon className="w-4 h-4 text-indigo-500" />
 }
 
-// â”€â”€â”€ Media type label â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Media type label ─────────────────────────────────────────────────────────
 function MediaTypeLabel({ type }: { type: string }) {
   const MAP: Record<string, { label: string; cls: string }> = {
     image:        { label: "Image",        cls: "bg-indigo-100 text-indigo-700" },
@@ -67,7 +69,7 @@ function MediaTypeLabel({ type }: { type: string }) {
   )
 }
 
-// â”€â”€â”€ Upload Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Upload Modal ────────────────────────────────────────────────────────────
 function UploadModal({
   developerId,
   developerSlug,
@@ -148,14 +150,9 @@ function UploadModal({
           return
         }
 
-        // Save to project_images
-        const { data, error } = await supabase
-          .from("project_images")
-          .insert({ project_id: projectId, url: json.url, thumb: null, is_main: false, rank: 0 })
-          .select()
-          .single()
-
-        if (error) { onError(error.message); setUploading(false); return }
+        const { data, error } = await addProjectImage(projectId, json.url, null, 0)
+        if (error) { onError(error); setUploading(false); return }
+        if (!data) { onError("Failed to save image"); setUploading(false); return }
 
         onUploaded({
           id:           data.id,
@@ -164,8 +161,8 @@ function UploadModal({
           type:         "image",
           url:          json.url,
           thumb:        null,
-          is_main:      false,
-          rank:         0,
+          is_main:      data.is_main,
+          rank:         data.rank,
         })
       }
     } catch (err) {
@@ -236,7 +233,7 @@ function UploadModal({
                   <Upload className="w-8 h-8" />
                   <p className="text-sm font-semibold text-[#374151]">Drop file or click to upload</p>
                   <p className="text-xs">
-                    {mediaType === "image" ? "PNG, JPG, WEBP â€¢ Max 50 MB" : "PDF â€¢ Max 50 MB"}
+                    {mediaType === "image" ? "PNG, JPG, WEBP • Max 50 MB" : "PDF • Max 50 MB"}
                   </p>
                 </div>
               )}
@@ -258,7 +255,7 @@ function UploadModal({
             <button type="submit" disabled={uploading}
               className="flex-1 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
               {uploading ? (
-                <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploadingâ€¦</>
+                <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploading…</>
               ) : (
                 <><Upload className="w-4 h-4" /> Upload</>
               )}
@@ -270,7 +267,7 @@ function UploadModal({
   )
 }
 
-// â”€â”€â”€ No developer placeholder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── No developer placeholder ─────────────────────────────────────────────────
 function NoDeveloperLinked({ userName }: { userName: string }) {
   return (
     <DashboardShell role="developer" roleLabel={roleToLabel("developer")} roleColor={getRoleColor("developer")} userName={userName}>
@@ -285,7 +282,7 @@ function NoDeveloperLinked({ userName }: { userName: string }) {
   )
 }
 
-// â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main component ───────────────────────────────────────────────────────────
 export function DeveloperMediaClient({
   userId,
   userName,
@@ -365,20 +362,16 @@ export function DeveloperMediaClient({
       userName={userName}
     >
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">
-              Media &amp; Files
-            </h2>
-            <p className="text-sm text-[#6b7280] mt-1">
-              Manage images, videos, brochures, and floor plans for your projects.
-            </p>
-          </div>
-          <div className="text-sm text-[#9ca3af]">
-            {media.length} total files
-          </div>
-        </div>
+        <DeveloperPortalPageHeader
+          segmentLabel="Media / files"
+          title="Media and files"
+          description="Browse every image, video link, and virtual tour attached to your projects. Upload new assets from each project under the Images or Media tab; delete items here when you need to clean up."
+          actions={
+            <span className="inline-flex items-center rounded-2xl border border-[#e5e5e5] bg-white/80 px-4 py-2 text-sm font-semibold text-[#374151]">
+              {media.length} file{media.length === 1 ? "" : "s"}
+            </span>
+          }
+        />
 
         {/* Filters bar */}
         <div className="bg-white/70 backdrop-blur-xl rounded-[20px] border border-white/60 p-4 flex flex-wrap gap-3 items-center">
@@ -388,7 +381,7 @@ export function DeveloperMediaClient({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search mediaâ€¦"
+              placeholder="Search media…"
               className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-[#e5e5e5] bg-white focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/10 transition-all"
             />
           </div>

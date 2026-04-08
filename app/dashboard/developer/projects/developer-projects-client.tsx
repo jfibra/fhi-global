@@ -31,8 +31,9 @@ import { ProjectNearbyTab }        from "@/app/dashboard/projects/project-nearby
 import { ProjectSeoTab }           from "@/app/dashboard/projects/project-seo-tab"
 import { ProjectSettingsTab }      from "@/app/dashboard/projects/project-settings-tab"
 import { ProjectHeader }           from "@/app/dashboard/projects/project-header"
+import { DeveloperPortalPageHeader } from "@/components/developer/developer-portal-page-header"
 
-// â”€â”€â”€ Portal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Portal ────────────────────────────────────────────────────────────────────
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -40,7 +41,7 @@ function Portal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body)
 }
 
-// â”€â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Toast ─────────────────────────────────────────────────────────────────────
 type ToastVariant = "success" | "error"
 interface ToastMsg { id: number; variant: ToastVariant; message: string }
 
@@ -52,14 +53,14 @@ function ToastList({ toasts, remove }: { toasts: ToastMsg[]; remove: (id: number
           t.variant === "success" ? "bg-green-50 text-green-800 border border-green-100" : "bg-rose-50 text-rose-800 border border-rose-100"
         }`}>
           <span className="flex-1">{t.message}</span>
-          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
+          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
         </div>
       ))}
     </div>
   )
 }
 
-// â”€â”€â”€ Confirm dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Confirm dialog ──────────────────────────────────────────────────────────
 function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
   return (
     <Portal>
@@ -77,7 +78,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onCo
   )
 }
 
-// â”€â”€â”€ Tab types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Tab types ─────────────────────────────────────────────────────────────────
 type TabId = "data" | "overview" | "units" | "images" | "amenities" | "property_types" | "media" | "features" | "nearby" | "seo" | "settings"
 const TABS: { id: TabId; label: string }[] = [
   { id: "data",            label: "Data Health" },
@@ -93,7 +94,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "settings",        label: "Settings" },
 ]
 
-// â”€â”€â”€ New Project Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── New Project Modal ─────────────────────────────────────────────────────────
 function NewProjectModal({
   developerId,
   onClose,
@@ -185,7 +186,7 @@ function NewProjectModal({
               </button>
               <button type="submit" disabled={saving || !name.trim()}
                 className="flex-1 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white text-sm font-semibold transition-all disabled:opacity-50">
-                {saving ? "Creatingâ€¦" : "Create Project"}
+                {saving ? "Creating…" : "Create Project"}
               </button>
             </div>
           </form>
@@ -195,12 +196,12 @@ function NewProjectModal({
   )
 }
 
-// â”€â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Status badge ─────────────────────────────────────────────────────────────
 const STATUS_LABEL: Record<string, string> = {
   pre_launch: "Pre-Launch", launch: "Launch", under_construction: "Under Const.", completed: "Completed",
 }
 
-// â”€â”€â”€ No developer placeholder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── No developer placeholder ─────────────────────────────────────────────────
 function NoDeveloperLinked({ userName }: { userName: string }) {
   return (
     <DashboardShell role="developer" roleLabel={roleToLabel("developer")} roleColor={getRoleColor("developer")} userName={userName}>
@@ -215,7 +216,7 @@ function NoDeveloperLinked({ userName }: { userName: string }) {
   )
 }
 
-// â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main component ───────────────────────────────────────────────────────────
 export function DeveloperProjectsClient({
   userId,
   userName,
@@ -333,8 +334,19 @@ export function DeveloperProjectsClient({
       roleColor={getRoleColor("developer")}
       userName={userName}
     >
-      <div className="flex h-full -mx-4 sm:-mx-6 -my-4 sm:-my-6 min-h-[calc(100vh-80px)]">
-        {/* â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      <div className="space-y-5 mb-5">
+        <DeveloperPortalPageHeader
+          segmentLabel="My projects"
+          title="My projects"
+          description={
+            developerName
+              ? `Create and maintain projects for ${developerName}. Pick a project in the list to edit overview, units, gallery, amenities, SEO, and publishing.`
+              : "Create and maintain your projects. Pick a project in the list to edit overview, units, gallery, amenities, SEO, and publishing."
+          }
+        />
+      </div>
+      <div className="flex h-full -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 min-h-[calc(100vh-11rem)]">
+        {/* ── Sidebar ──────────────────────────────────────────────────────────── */}
         <aside className="w-72 flex-shrink-0 flex flex-col border-r border-[#f0f0f0] bg-white/50 backdrop-blur-sm overflow-hidden">
           {/* Header */}
           <div className="px-4 pt-5 pb-3 border-b border-[#f0f0f0]">
@@ -357,7 +369,7 @@ export function DeveloperProjectsClient({
                 type="text"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-                placeholder="Search projectsâ€¦"
+                placeholder="Search projects…"
                 className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-[#e5e5e5] bg-white focus:outline-none focus:border-[#001f3f] focus:ring-2 focus:ring-[#001f3f]/10 transition-all"
               />
             </div>
@@ -407,7 +419,7 @@ export function DeveloperProjectsClient({
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <p className={`text-xs font-semibold truncate ${selected?.id === p.id ? "text-white" : "text-[#0d1117]"}`}>{p.name}</p>
-                      <p className={`text-[10px] mt-0.5 ${selected?.id === p.id ? "text-white/60" : "text-[#9ca3af]"}`}>{p.city ?? "â€”"}</p>
+                      <p className={`text-[10px] mt-0.5 ${selected?.id === p.id ? "text-white/60" : "text-[#9ca3af]"}`}>{p.city ?? "—"}</p>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
@@ -430,18 +442,18 @@ export function DeveloperProjectsClient({
             <div className="flex items-center justify-between px-4 py-3 border-t border-[#f0f0f0] text-xs text-[#6b7280]">
               <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
                 className="px-3 py-1.5 rounded-xl border border-[#e5e5e5] disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
-                â† Prev
+                ← Prev
               </button>
               <span>{page} / {totalPages}</span>
               <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}
                 className="px-3 py-1.5 rounded-xl border border-[#e5e5e5] disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
-                Next â†’
+                Next →
               </button>
             </div>
           )}
         </aside>
 
-        {/* â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Main ────────────────────────────────────────────────────────────── */}
         <main className="flex-1 flex flex-col overflow-hidden">
           {!selected ? (
             <div className="flex-1 flex flex-col items-center justify-center min-h-[50vh] text-center p-8">
@@ -465,7 +477,7 @@ export function DeveloperProjectsClient({
             </div>
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Project header â€” no duplicate for developer portal */}
+              {/* Project header — no duplicate for developer portal */}
               <ProjectHeader
                 project={selected}
                 onPublishToggle={() => void handlePublishToggle()}

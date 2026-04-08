@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = createPageMetadata({
   title: "Sign In | FHI Global Operations",
-  description: "Sign in to the FHI Global operations portal â€” sales reports, commission tracking, team management, developer directory, and support, all in one place.",
+  description: "Sign in to the FHI Global operations portal — sales reports, commission tracking, team management, developer directory, and support, all in one place.",
 })
 
 export default async function LoginPage() {

@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/server"
+import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
@@ -11,14 +11,14 @@ import { ProjectCard, type ProjectCardData } from "@/components/project-card"
 import { SocialShare } from "@/components/social-share"
 import { Building2, Globe, Phone, Mail, MapPin, Star, CheckCircle2, ArrowLeft } from "lucide-react"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 120
 
 type Props = { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
-  const supabase = await createClient()
+  const supabase = createPublicSupabaseClient()
   const { data } = await supabase
     .from("developers")
     .select("name, description, logo_url, address")
@@ -44,7 +44,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function DeveloperDetailPage({ params }: Props) {
   const { slug } = await params
-  const supabase = await createClient()
+  const supabase = createPublicSupabaseClient()
 
   const { data: developer, error: devError } = await supabase
     .from("developers")

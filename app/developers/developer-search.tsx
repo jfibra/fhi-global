@@ -1,22 +1,29 @@
 "use client"
 
-import { useRouter, usePathname } from "next/navigation"
-import { useCallback, useState } from "react"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
+import { useCallback, useEffect, useState } from "react"
 import { Search, X } from "lucide-react"
 
 export function DeveloperSearch({ initialQ }: { initialQ: string }) {
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [value, setValue] = useState(initialQ)
+
+  useEffect(() => {
+    setValue(initialQ)
+  }, [initialQ])
 
   const handleChange = useCallback(
     (val: string) => {
       setValue(val)
-      const params = new URLSearchParams()
+      const params = new URLSearchParams(searchParams.toString())
       if (val.trim()) params.set("q", val.trim())
-      router.push(`${pathname}?${params.toString()}`)
+      else params.delete("q")
+      const qs = params.toString()
+      router.push(qs ? `${pathname}?${qs}` : pathname)
     },
-    [router, pathname]
+    [router, pathname, searchParams],
   )
 
   return (

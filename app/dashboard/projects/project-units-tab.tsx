@@ -135,7 +135,7 @@ export function ProjectUnitsTab({ projectId, showToast }: Props) {
               className="px-4 py-2 rounded-full border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-all">Cancel</button>
             <button type="button" onClick={() => void handleSave()} disabled={saving || !editing.unit_type}
               className="px-4 py-2 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50">
-              {saving ? "Savingâ€¦" : "Save"}
+              {saving ? "Saving…" : "Save"}
             </button>
           </div>
         </div>
@@ -162,10 +162,10 @@ export function ProjectUnitsTab({ projectId, showToast }: Props) {
               {units.map((u) => (
                 <tr key={u.id} className="border-t border-[#f0f0f0] hover:bg-[#f9fafb] transition-colors">
                   <td className="px-4 py-3 font-medium text-[#111827]">{u.unit_type}</td>
-                  <td className="px-4 py-3 text-[#374151]">{u.bedrooms ?? "â€”"}</td>
-                  <td className="px-4 py-3 text-[#374151]">{u.bathrooms ?? "â€”"}</td>
-                  <td className="px-4 py-3 text-[#374151]">{u.size_sqft ? u.size_sqft.toLocaleString() : "â€”"}</td>
-                  <td className="px-4 py-3 text-[#374151]">{u.price_from ? u.price_from.toLocaleString() : "â€”"}</td>
+                  <td className="px-4 py-3 text-[#374151]">{u.bedrooms ?? "—"}</td>
+                  <td className="px-4 py-3 text-[#374151]">{u.bathrooms ?? "—"}</td>
+                  <td className="px-4 py-3 text-[#374151]">{u.size_sqft ? u.size_sqft.toLocaleString() : "—"}</td>
+                  <td className="px-4 py-3 text-[#374151]">{u.price_from ? u.price_from.toLocaleString() : "—"}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${u.is_available ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                       {u.is_available ? "Yes" : "No"}

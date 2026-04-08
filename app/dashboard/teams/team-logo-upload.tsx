@@ -136,7 +136,7 @@ export function TeamLogoUpload({ open, onClose, onUploaded, team }: Props) {
               <p className="text-sm font-semibold text-[#0d1117]">
                 {dragging ? "Drop to upload" : "Drag & drop or click to browse"}
               </p>
-              <p className="text-xs text-[#9ca3af] mt-1">PNG, JPG, WEBP, SVG â€” max 10 MB</p>
+              <p className="text-xs text-[#9ca3af] mt-1">PNG, JPG, WEBP, SVG — max 10 MB</p>
             </div>
           </div>
           <input
@@ -205,7 +205,7 @@ export function TeamLogoUpload({ open, onClose, onUploaded, team }: Props) {
             className="px-5 py-2 rounded-xl text-sm font-semibold text-white bg-[#001f3f] hover:bg-[#002a56] disabled:opacity-40 flex items-center gap-2 transition-all"
           >
             {uploading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {uploading ? "Uploadingâ€¦" : "Upload"}
+            {uploading ? "Uploading…" : "Upload"}
           </button>
         </div>
       </div>

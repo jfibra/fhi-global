@@ -5,7 +5,6 @@ import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { DEFAULT_PREVIEW_IMAGE_URL } from "@/lib/seo"
 import { PageTransitionWrapper } from "@/components/ui/PageTransitionWrapper"
-import { NavigationLoader } from "@/components/ui/NavigationLoader"
 
 const _geist = Geist({ subsets: ["latin"], display: "swap", variable: "--font-geist" })
 const _geistMono = Geist_Mono({ subsets: ["latin"], display: "swap", variable: "--font-geist-mono" })
@@ -34,14 +33,14 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
-    title: "FHI Global â€” Dubai Real Estate",
+    title: "FHI Global — Dubai Real Estate",
     description: "Discover premium property projects in Dubai from verified developers.",
     type: "website",
     images: [{ url: DEFAULT_PREVIEW_IMAGE_URL }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "FHI Global â€” Dubai Real Estate",
+    title: "FHI Global — Dubai Real Estate",
     description: "Discover premium property projects in Dubai from verified developers.",
     images: [DEFAULT_PREVIEW_IMAGE_URL],
   },
@@ -68,13 +67,9 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://hefwmaoborpfuyhbguzv.supabase.co" crossOrigin="anonymous" />
         <link rel="preload" as="image" href="/FHI_Branding_White.png" />
-        <link rel="preload" as="image" href="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/fhi_global/bg%20background.png" />
       </head>
       <body className={`${_geist.variable} ${_geistMono.variable} ${_outfit.variable} font-sans antialiased`}>
-        <PageTransitionWrapper>
-          {children}
-        </PageTransitionWrapper>
-        <NavigationLoader />
+        <PageTransitionWrapper>{children}</PageTransitionWrapper>
         <Analytics />
       </body>
     </html>

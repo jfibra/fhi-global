@@ -1,4 +1,4 @@
-// â”€â”€â”€ Shared types for user management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Shared types for user management ─────────────────────────────────────────
 
 export type UserRecord = {
   id: string
@@ -55,7 +55,7 @@ export type UpdateUserPayload = {
   whatsapp_number?: string
 }
 
-// â”€â”€â”€ Role configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Role configuration ────────────────────────────────────────────────────────
 
 export type RoleKey =
   | "super_admin"
@@ -124,20 +124,36 @@ export const TIMEZONES = [
   { label: "Los Angeles (UTC -08:00)",value: "America/Los_Angeles"},
 ]
 
-export const COUNTRY_CODES = [
-  { label: "ðŸ‡¦ðŸ‡ª +971", value: "+971"   },
-  { label: "ðŸ‡µðŸ‡­ +63",  value: "+63"    },
-  { label: "ðŸ‡®ðŸ‡³ +91",  value: "+91"    },
-  { label: "ðŸ‡µðŸ‡° +92",  value: "+92"    },
-  { label: "ðŸ‡§ðŸ‡© +880", value: "+880"   },
-  { label: "ðŸ‡±ðŸ‡° +94",  value: "+94"    },
-  { label: "ðŸ‡¬ðŸ‡§ +44",  value: "+44"    },
-  { label: "ðŸ‡ºðŸ‡¸ +1",   value: "+1"     },
-  { label: "ðŸ‡¸ðŸ‡¬ +65",  value: "+65"    },
-  { label: "ðŸ‡²ðŸ‡¾ +60",  value: "+60"    },
+export type CountryDialOption = {
+  /** Stored in profile metadata (e.g. +1-CA for Canada). */
+  value: string
+  /** Shown on the closed phone control after selection. */
+  dial: string
+  /** Shown in the open picker list. */
+  country: string
+}
+
+/** Country names in the list; dial code on the closed trigger only (custom picker). */
+export const COUNTRY_CODES: CountryDialOption[] = [
+  { value: "+971", dial: "+971", country: "United Arab Emirates" },
+  { value: "+63", dial: "+63", country: "Philippines" },
+  { value: "+91", dial: "+91", country: "India" },
+  { value: "+92", dial: "+92", country: "Pakistan" },
+  { value: "+880", dial: "+880", country: "Bangladesh" },
+  { value: "+94", dial: "+94", country: "Sri Lanka" },
+  { value: "+44", dial: "+44", country: "United Kingdom" },
+  { value: "+1", dial: "+1", country: "United States" },
+  { value: "+1-CA", dial: "+1 (CA)", country: "Canada" },
+  { value: "+61", dial: "+61", country: "Australia" },
+  { value: "+65", dial: "+65", country: "Singapore" },
+  { value: "+60", dial: "+60", country: "Malaysia" },
+  { value: "+62", dial: "+62", country: "Indonesia" },
+  { value: "+234", dial: "+234", country: "Nigeria" },
+  { value: "+27", dial: "+27", country: "South Africa" },
+  { value: "+20", dial: "+20", country: "Egypt" },
 ]
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 export function roleToLabel(role: string | null | undefined) {
   if (!role) return "Member"

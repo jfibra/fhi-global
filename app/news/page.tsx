@@ -12,7 +12,7 @@ import { Clock, Play, TrendingUp, Clock3, ChevronRight } from "lucide-react"
 export const revalidate = 300
 
 export const metadata: Metadata = createPageMetadata({
-  title: "News | FHI Global â€” Real Estate Insights",
+  title: "News | FHI Global — Real Estate Insights",
   description:
     "Stay up to date with the latest real estate news, market trends, and investment insights from FHI Global.",
   pathname: "/news",
@@ -21,7 +21,7 @@ export const metadata: Metadata = createPageMetadata({
 
 type SearchParams = Promise<{ title?: string }>
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Helpers ────────────────────────────────────────────────────────────────────
 function safe(arr: NewsArticle[], i: number): NewsArticle | null {
   return arr[i] ?? null
 }
@@ -82,7 +82,7 @@ function ThumbCard({ item }: { item: NewsArticle }) {
   )
 }
 
-/** Overlay card â€” gradient title on image */
+/** Overlay card — gradient title on image */
 function OverlayCard({ item, tall = false }: { item: NewsArticle; tall?: boolean }) {
   return (
     <Link href={`/news/${item.slug}`}
@@ -110,7 +110,7 @@ function OverlayCard({ item, tall = false }: { item: NewsArticle; tall?: boolean
   )
 }
 
-/** Archive row â€” horizontal card with thumb + meta */
+/** Archive row — horizontal card with thumb + meta */
 function ArchiveRow({ item, rank }: { item: NewsArticle; rank?: number }) {
   return (
     <Link href={`/news/${item.slug}`} className="group flex gap-3 py-3 border-b border-gray-100 last:border-0 items-start">
@@ -150,7 +150,7 @@ function ArchiveRow({ item, rank }: { item: NewsArticle; rank?: number }) {
   )
 }
 
-// â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Page ───────────────────────────────────────────────────────────────────────
 export default async function NewsPage({ searchParams }: { searchParams: SearchParams }) {
   const { title } = await searchParams
 
@@ -190,14 +190,14 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
     )
   }
 
-  // â”€â”€ Adaptive slicing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Adaptive slicing ─────────────────────────────────────────────────────────
   // Hero: up to 3 overlay cards
   const heroCount    = Math.min(3, all.length)
   const heroArticles = all.slice(0, heroCount)
 
   // After hero: divide remaining into card grid + archive
   const afterHero    = all.slice(heroCount)
-  // Card grid: next up-to-9 articles (fills 3Ã—3 max)
+  // Card grid: next up-to-9 articles (fills 3x3 max)
   const cardGrid     = afterHero.slice(0, 9)
   // Feature + list combo (only meaningful if 5+ cards)
   const featureBig   = cardGrid.length >= 5 ? safe(cardGrid, 0) : null
@@ -227,7 +227,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
       <TopBar />
       <Header />
 
-      {/* â”€â”€ TICKER â”€â”€ */}
+      {/* ── TICKER ── */}
       <div className="bg-[#001428]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-9 flex items-center overflow-hidden">
           <span className="shrink-0 bg-[#d6b357] text-[#001428] text-[10px] font-black uppercase tracking-widest px-3 py-1 mr-4">
@@ -247,7 +247,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
         </div>
       </div>
 
-      {/* â”€â”€ PAGE HEADER â”€â”€ */}
+      {/* ── PAGE HEADER ── */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
           <h1 className="text-xl font-black tracking-tight text-[#001428] uppercase">Latest News</h1>
@@ -255,7 +255,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
         </div>
       </div>
 
-      {/* â”€â”€ HERO OVERLAY CARDS â”€â”€ */}
+      {/* ── HERO OVERLAY CARDS ── */}
       <div className="bg-[#001428] py-5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={`grid ${heroGridCols} gap-3`}>
@@ -266,14 +266,14 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
         </div>
       </div>
 
-      {/* â”€â”€ MAIN + SIDEBAR â”€â”€ */}
+      {/* ── MAIN + SIDEBAR ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-          {/* â•â•â•â• MAIN â•â•â•â• */}
+          {/* ════ MAIN ════ */}
           <main className="lg:col-span-8 space-y-6">
 
-            {/* Latest News â€” feature + list (only when 5+ cards available) */}
+            {/* Latest News — feature + list (only when 5+ cards available) */}
             {featureBig && (
               <section className="bg-white p-4 shadow-sm">
                 <SecHead>Latest News</SecHead>
@@ -308,7 +308,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
               </section>
             )}
 
-            {/* Card grid â€” remaining cards after feature (or all cards if < 5) */}
+            {/* Card grid — remaining cards after feature (or all cards if < 5) */}
             {(cardGrid.length < 5 ? cardGrid : thumbGrid).length > 0 && (
               <section className="bg-white p-4 shadow-sm">
                 <SecHead>{featureBig ? "More Stories" : "Latest News"}</SecHead>
@@ -320,7 +320,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
               </section>
             )}
 
-            {/* Archive rows â€” only shown when articles exist beyond the card grid */}
+            {/* Archive rows — only shown when articles exist beyond the card grid */}
             {archiveItems.length > 0 && (
               <section className="bg-white p-4 shadow-sm">
                 <SecHead>All Stories</SecHead>
@@ -337,11 +337,11 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
 
           </main>
 
-          {/* â•â•â•â• SIDEBAR â•â•â•â• */}
+          {/* ════ SIDEBAR ════ */}
           <aside className="lg:col-span-4 space-y-5">
             <div className="lg:sticky lg:top-[52px] space-y-5">
 
-              {/* Most Read Today â€” always shown */}
+              {/* Most Read Today — always shown */}
               <div className="bg-white p-4 shadow-sm">
                 <div className="flex items-center gap-2 border-b-2 border-[#001428] pb-1.5 mb-4">
                   <TrendingUp className="w-3.5 h-3.5 text-[#d6b357]" />
@@ -354,7 +354,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
                 </ol>
               </div>
 
-              {/* Recent Posts â€” only shown if articles exist beyond index 5 */}
+              {/* Recent Posts — only shown if articles exist beyond index 5 */}
               {sidebarRecent.length > 0 && (
                 <div className="bg-white p-4 shadow-sm">
                   <div className="flex items-center gap-2 border-b-2 border-[#001428] pb-1.5 mb-4">

@@ -7,11 +7,12 @@ import { usePathname } from "next/navigation"
 import { Menu, X, Phone, Mail, Facebook, Instagram, Linkedin, Twitter } from "lucide-react"
 
 const NAV_LINKS = [
-  { label: "Home",       href: "/" },
+  { label: "Home", href: "/" },
+  { label: "Buy", href: "/buy" },
+  { label: "Rent", href: "/rent" },
   { label: "Developers", href: "/developers" },
-  { label: "Projects",   href: "/projects" },
-  { label: "News",       href: "/news" },
-  { label: "Contact",    href: "/contact" },
+  { label: "News", href: "/news" },
+  { label: "Contact", href: "/contact" },
 ]
 
 const SOCIAL_LINKS = [
@@ -55,7 +56,16 @@ export function Header() {
 
         <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10 h-25 flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex-shrink-0 relative z-10">
+          <Link
+            href="/"
+            onClick={(e) => {
+              e.preventDefault()
+              setMobileOpen(false)
+              window.location.href = "/"
+            }}
+            className="flex-shrink-0 relative z-10"
+            aria-label="Go to homepage"
+          >
             <Image
               src="/FHI_Branding_White.png"
               alt="FHI Global"
@@ -240,7 +250,7 @@ export function Header() {
           {/* Footer note */}
           <div className="px-6 py-4 border-t border-white/10">
             <p className="text-[11px] text-white/20 text-center">
-              Â© {new Date().getFullYear()} FHI Global â€¢ Dubai Operations
+              © {new Date().getFullYear()} FHI Global • Dubai Operations
             </p>
           </div>
         </div>

@@ -18,10 +18,11 @@ import { DashboardShell } from "@/components/dashboard/shell"
 import { getRoleColor } from "@/components/dashboard/sidebar-config"
 import { roleToLabel } from "@/lib/auth"
 import { DeveloperLogoUpload } from "@/app/dashboard/developers/developer-logo-upload"
+import { DeveloperPortalPageHeader } from "@/components/developer/developer-portal-page-header"
 import { updateDeveloperCompany, type DeveloperCompanyFormData } from "@/lib/developer-portal-service"
 import type { Developer } from "@/lib/developer-service"
 
-// â”€â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Toast ────────────────────────────────────────────────────────────────────
 type ToastVariant = "success" | "error"
 interface ToastMsg { id: number; variant: ToastVariant; message: string }
 
@@ -38,14 +39,14 @@ function ToastList({ toasts, remove }: { toasts: ToastMsg[]; remove: (id: number
           }`}
         >
           <span className="flex-1">{t.message}</span>
-          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
+          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
         </div>
       ))}
     </div>
   )
 }
 
-// â”€â”€â”€ Slug generator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Slug generator ─────────────────────────────────────────────────────────
 function generateSlug(name: string): string {
   return name
     .toLowerCase()
@@ -55,7 +56,7 @@ function generateSlug(name: string): string {
     .replace(/-+/g, "-")
 }
 
-// â”€â”€â”€ Field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Field ────────────────────────────────────────────────────────────────────
 function Field({
   label,
   icon: Icon,
@@ -76,14 +77,14 @@ function Field({
   )
 }
 
-// â”€â”€â”€ Input style â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Input style ──────────────────────────────────────────────────────────────
 const inputCls =
   "w-full rounded-2xl border border-[#e5e5e5] bg-white px-4 py-3 text-sm text-[#0d1117] placeholder-[#d1d5db] focus:outline-none focus:border-[#001f3f] focus:ring-2 focus:ring-[#001f3f]/10 transition-all"
 
 const textareaCls =
   "w-full rounded-2xl border border-[#e5e5e5] bg-white px-4 py-3 text-sm text-[#0d1117] placeholder-[#d1d5db] focus:outline-none focus:border-[#001f3f] focus:ring-2 focus:ring-[#001f3f]/10 transition-all resize-none"
 
-// â”€â”€â”€ No-developer placeholder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── No-developer placeholder ─────────────────────────────────────────────────
 function NoDeveloperLinked() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] text-center py-20">
@@ -98,7 +99,7 @@ function NoDeveloperLinked() {
   )
 }
 
-// â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main component ───────────────────────────────────────────────────────────
 export function CompanyClient({
   userId,
   userName,
@@ -177,15 +178,11 @@ export function CompanyClient({
         <NoDeveloperLinked />
       ) : (
         <form onSubmit={(e) => void handleSave(e)} className="space-y-8">
-          {/* Header */}
-          <div>
-            <h2 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">
-              Company Information
-            </h2>
-            <p className="text-sm text-[#6b7280] mt-1">
-              Manage your developer company profile. This information is visible on your listings.
-            </p>
-          </div>
+          <DeveloperPortalPageHeader
+            segmentLabel="Company info"
+            title="Company information"
+            description="Keep your public developer profile accurate: name, logo, and contact details appear on project pages and the FHI Global directory. Slug changes affect your public URL."
+          />
 
           {/* Logo + identity card */}
           <div className="bg-white/70 backdrop-blur-xl rounded-[28px] border border-white/60 shadow-md shadow-black/5 p-6">
@@ -220,14 +217,14 @@ export function CompanyClient({
                 <p className="text-sm text-[#9ca3af] font-mono mt-0.5">slug: {developer.slug}</p>
                 <div className="flex items-center justify-center sm:justify-start gap-2 mt-2.5">
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${developer.is_verified ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                    {developer.is_verified ? "âœ“ Verified" : "Unverified"}
+                    {developer.is_verified ? "✓ Verified" : "Unverified"}
                   </span>
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${developer.is_active ? "bg-indigo-100 text-indigo-700" : "bg-rose-100 text-rose-700"}`}>
                     {developer.is_active ? "Active" : "Inactive"}
                   </span>
                   {(developer.rating ?? 0) > 0 && (
                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                      â˜… {developer.rating}
+                      ★ {developer.rating}
                     </span>
                   )}
                 </div>
@@ -353,7 +350,7 @@ export function CompanyClient({
               {saving ? (
                 <>
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Savingâ€¦
+                  Saving…
                 </>
               ) : (
                 <>

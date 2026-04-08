@@ -25,7 +25,7 @@ import {
 } from "@/lib/developer-portal-service"
 import type { Project } from "@/lib/project-service"
 
-// â”€â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Status badge ─────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<
   string,
   { label: string; cls: string }
@@ -45,7 +45,7 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-// â”€â”€â”€ Stat card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Stat card ────────────────────────────────────────────────────────────────
 function StatCard({
   label,
   value,
@@ -73,7 +73,7 @@ function StatCard({
   )
 }
 
-// â”€â”€â”€ Skeleton â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
     <div className="bg-white/70 backdrop-blur-xl rounded-[24px] border border-white/60 p-5 shadow-md shadow-black/5 flex items-center gap-4 animate-pulse">
@@ -86,7 +86,7 @@ function SkeletonCard() {
   )
 }
 
-// â”€â”€â”€ No-developer placeholder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── No-developer placeholder ─────────────────────────────────────────────────
 function NoDeveloperLinked() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center py-24 px-4">
@@ -110,7 +110,7 @@ function NoDeveloperLinked() {
   )
 }
 
-// â”€â”€â”€ Main shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main shell ───────────────────────────────────────────────────────────────
 export function DeveloperDashboardShell({
   userId,
   userName,
@@ -290,7 +290,7 @@ export function DeveloperDashboardShell({
                       <p className="font-semibold text-sm text-[#0d1117] truncate">{project.name}</p>
                       <p className="text-xs text-[#9ca3af] flex items-center gap-1.5 mt-0.5">
                         <Clock className="w-3 h-3" />
-                        {project.city ?? "â€”"} &middot; Updated {new Date(project.updated_at).toLocaleDateString()}
+                        {project.city ?? "—"} &middot; Updated {new Date(project.updated_at).toLocaleDateString()}
                       </p>
                     </div>
 

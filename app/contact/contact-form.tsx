@@ -32,7 +32,7 @@ export function ContactForm() {
     setStatus("sending")
     setError("")
 
-    // Simulate async send â€” replace with real API route or email service
+    // Simulate async send — replace with real API route or email service
     await new Promise((r) => setTimeout(r, 1400))
     setStatus("success")
     form.reset()

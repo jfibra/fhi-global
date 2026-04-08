@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -13,7 +13,7 @@ import { roleToLabel } from "@/lib/auth"
 import { useAuth } from "@/context/auth-context"
 import { getSidebarNavSections, type NavItem, type NavSection } from "@/components/dashboard/sidebar-config"
 
-// â”€â”€â”€ types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── types ────────────────────────────────────────────────────────────────────
 export interface DashboardShellProps {
   role: string
   roleLabel: string
@@ -27,7 +27,7 @@ export interface DashboardShellProps {
   children: React.ReactNode
 }
 
-// â”€â”€â”€ role badge colors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── role badge colors ─────────────────────────────────────────────────────────
 const ROLE_BADGE: Record<string, string> = {
   super_admin:    "bg-purple-500/20 text-purple-300 border-purple-500/30",
   admin:          "bg-sky-500/20 text-sky-300 border-sky-500/30",
@@ -51,6 +51,8 @@ export function DashboardShell({
   children,
 }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const notificationsRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
   const router = useRouter()
   const { user, profile } = useAuth()
@@ -59,7 +61,7 @@ export function DashboardShell({
   const effectiveRoleLabel = profile?.role ? roleToLabel(profile.role) : roleLabel
   const displayName = profile?.fullname || userName || user?.email || "User"
 
-  // Resolve sections: prop override â†’ flat navItems override wrapped â†’ auto from role
+  // Resolve sections: prop override → flat navItems override wrapped → auto from role
   const resolvedSections: NavSection[] = navSectionsProp
     ?? (navItems
       ? navItems.map(item => ({ type: "item" as const, item }))
@@ -68,7 +70,7 @@ export function DashboardShell({
 
   const badgeCls = ROLE_BADGE[effectiveRole] ?? "bg-white/10 text-white/60 border-white/20"
 
-  // â”€â”€ Collapse state: keyed by group label, default open â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Collapse state: keyed by group label, default open ────────────────────
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {}
     resolvedSections.forEach(section => {
@@ -95,7 +97,24 @@ export function DashboardShell({
     router.refresh()
   }
 
-  // â”€â”€ Single nav item renderer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  useEffect(() => {
+    if (!notificationsOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNotificationsOpen(false)
+    }
+    const onPointer = (e: MouseEvent) => {
+      const el = notificationsRef.current
+      if (el && !el.contains(e.target as Node)) setNotificationsOpen(false)
+    }
+    document.addEventListener("keydown", onKey)
+    document.addEventListener("mousedown", onPointer)
+    return () => {
+      document.removeEventListener("keydown", onKey)
+      document.removeEventListener("mousedown", onPointer)
+    }
+  }, [notificationsOpen])
+
+  // ── Single nav item renderer ───────────────────────────────────────────────
   const renderNavItem = (item: NavItem, indented = false) => {
     const { icon: Icon, label, href, badge } = item
     const isActive = pathname === href
@@ -143,7 +162,7 @@ export function DashboardShell({
           return renderNavItem(section.item)
         }
 
-        // â”€â”€ Collapsible group â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Collapsible group ──────────────────────────────────────────────
         const { label, items } = section
         const isOpen = openGroups[label] ?? true
         const hasActiveChild = items.some(item => pathname === item.href)
@@ -170,7 +189,7 @@ export function DashboardShell({
               />
             </button>
 
-            {/* Collapsible items â€” CSS max-height transition */}
+            {/* Collapsible items — CSS max-height transition */}
             <div
               className="overflow-hidden transition-all duration-200 ease-in-out"
               style={{ maxHeight: isOpen ? `${items.length * 52}px` : "0px" }}
@@ -196,8 +215,8 @@ export function DashboardShell({
   return (
     <div className="flex h-screen bg-[#f4f6f9] font-sans overflow-hidden">
 
-      {/* â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      {/* Mobile overlay â€” backdrop blur */}
+      {/* ── Sidebar ───────────────────────────────────────────────────── */}
+      {/* Mobile overlay — backdrop blur */}
       <div
         className={`fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden transition-opacity duration-300 ${
           sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
@@ -215,7 +234,7 @@ export function DashboardShell({
           style={{ background: `linear-gradient(to right, transparent, ${roleColor}, #d6b357, transparent)` }}
         />
 
-        {/* â”€â”€ FIXED: Logo + role header â”€â”€ */}
+        {/* ── FIXED: Logo + role header ── */}
         <div className="shrink-0 px-5 pt-6 pb-4">
           {/* Logo row */}
           <div className="flex items-center justify-between mb-5">
@@ -252,7 +271,7 @@ export function DashboardShell({
           style={{ background: "linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)" }}
         />
 
-        {/* â”€â”€ SCROLLABLE: Nav â”€â”€ */}
+        {/* ── SCROLLABLE: Nav ── */}
         <NavLinks />
 
         {/* Gradient divider */}
@@ -261,7 +280,7 @@ export function DashboardShell({
           style={{ background: "linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)" }}
         />
 
-        {/* â”€â”€ FIXED: Footer actions â”€â”€ */}
+        {/* ── FIXED: Footer actions ── */}
         <div className="shrink-0 px-3 py-4 space-y-0.5">
           <Link
             href="/dashboard/profile"
@@ -285,7 +304,7 @@ export function DashboardShell({
         </div>
       </aside>
 
-      {/* â”€â”€ Main content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Main content ──────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* Top bar */}
@@ -307,10 +326,39 @@ export function DashboardShell({
           </div>
 
           <div className="flex items-center gap-3">
-            <button className="relative w-8 h-8 flex items-center justify-center rounded-xl bg-[#f4f6f9] hover:bg-[#e8eaed] text-[#6b7280] transition-all">
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#d6b357]" />
-            </button>
+            <div className="relative" ref={notificationsRef}>
+              <button
+                type="button"
+                aria-label="Notifications"
+                aria-expanded={notificationsOpen}
+                aria-haspopup="dialog"
+                onClick={() => setNotificationsOpen((o) => !o)}
+                className={`relative w-8 h-8 flex items-center justify-center rounded-xl text-[#6b7280] transition-all ${
+                  notificationsOpen ? "bg-[#e8eaed] text-[#0d1117]" : "bg-[#f4f6f9] hover:bg-[#e8eaed]"
+                }`}
+              >
+                <Bell className="w-4 h-4" />
+              </button>
+              {notificationsOpen && (
+                <div
+                  role="dialog"
+                  aria-label="Notifications"
+                  className="absolute right-0 top-full z-50 mt-2 w-[min(100vw-2rem,20rem)] rounded-2xl border border-[#e8eaed] bg-white py-2 shadow-[0_8px_30px_-4px_rgba(0,31,63,0.12)]"
+                >
+                  <div className="border-b border-[#f0f2f5] px-4 py-2.5">
+                    <p className="font-['Outfit'] text-sm font-bold text-[#0d1117]">Notifications</p>
+                    <p className="text-[11px] text-[#9ca3af]">Alerts for your account and workspace</p>
+                  </div>
+                  <div className="px-4 py-10 text-center">
+                    <Bell className="mx-auto mb-2 h-8 w-8 text-[#d1d5db]" aria-hidden />
+                    <p className="text-sm font-medium text-[#6b7280]">No notifications yet</p>
+                    <p className="mt-1 text-xs text-[#9ca3af] leading-relaxed">
+                      When there are updates, they will appear here.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
             <div
               className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white shadow-md"
               style={{ backgroundColor: "#001f3f" }}
@@ -329,7 +377,7 @@ export function DashboardShell({
   )
 }
 
-// â”€â”€â”€ Shared sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Shared sub-components ─────────────────────────────────────────────────────
 
 export function StatCard({
   label,
@@ -359,7 +407,7 @@ export function StatCard({
         </div>
         {change && (
           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${changePositive ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500"}`}>
-            {changePositive ? "â†‘" : "â†“"} {change}
+            {changePositive ? "↑" : "↓"} {change}
           </span>
         )}
       </div>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getCachedHomePageData } from "@/lib/data/home";
 import { createPageMetadata } from "@/lib/seo";
 import { TopBar } from "@/components/topbar";
 import { Header } from "@/components/header";
@@ -27,7 +27,8 @@ import {
   BadgeCheck,
 } from "lucide-react";
 
-export const dynamic = "force-dynamic";
+/** Revalidate homepage data from Supabase (ISR) */
+export const revalidate = 120;
 
 export const metadata: Metadata = createPageMetadata({
   title: "FHI Global — Dubai Real Estate | Premium Property Projects",
@@ -118,54 +119,10 @@ const TRUST = [
 ];
 
 export default async function HomePage() {
-  const supabase = await createClient();
-
-  const [
-    { data: developers },
-    { data: featuredProjects },
-    { data: latestProjects },
-    { data: allCities },
-  ] = await Promise.all([
-    supabase
-      .from("developers")
-      .select("id, name, slug, description, logo_url, rating, is_verified")
-      .eq("is_active", true)
-      .is("deleted_at", null)
-      .order("name")
-      .limit(8),
-    supabase
-      .from("projects")
-      .select(
-        "id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)"
-      )
-      .eq("is_active", true)
-      .eq("is_published", true)
-      .eq("is_featured", true)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(6),
-    supabase
-      .from("projects")
-      .select(
-        "id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)"
-      )
-      .eq("is_active", true)
-      .eq("is_published", true)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(6),
-    supabase
-      .from("projects")
-      .select("city")
-      .eq("is_active", true)
-      .eq("is_published", true)
-      .not("city", "is", null),
-  ]);
+  const { developers, featuredProjects, cityRows } = await getCachedHomePageData();
 
   const uniqueCities = [
-    ...new Set(
-      (allCities ?? []).map((r) => r.city).filter(Boolean) as string[]
-    ),
+    ...new Set(cityRows.map((r) => r.city).filter(Boolean) as string[]),
   ].sort();
   const devOptions = (developers ?? []).map((d) => ({
     id: d.id,

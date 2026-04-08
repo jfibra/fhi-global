@@ -5,6 +5,7 @@ import { Eye, EyeOff, Phone, MessageCircle, Lock, Check, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { DashboardProfile } from "./profile-form"
 import { BankAccountsTab } from "./bank-accounts-tab"
+import { PhoneCountrySelect } from "@/components/phone-country-select"
 
 type TabKey = "profile" | "personal" | "account" | "security" | "bank_accounts"
 
@@ -16,7 +17,7 @@ const TABS: Array<{ key: TabKey; label: string }> = [
   { key: "bank_accounts", label: "Bank Accounts" },
 ]
 
-// â”€â”€â”€ Timezone options â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Timezone options ──────────────────────────────────────────────────────────
 const TIMEZONES = [
   { label: "UTC (UTC +00:00)", value: "UTC" },
   { label: "London (UTC +00:00)", value: "Europe/London" },
@@ -44,27 +45,7 @@ const TIMEZONES = [
   { label: "Honolulu (UTC -10:00)", value: "Pacific/Honolulu" },
 ]
 
-// â”€â”€â”€ Country codes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const COUNTRY_CODES = [
-  { label: "ðŸ‡¦ðŸ‡ª +971", value: "+971" }, // UAE (first â€” target market)
-  { label: "ðŸ‡µðŸ‡­ +63",  value: "+63" },
-  { label: "ðŸ‡®ðŸ‡³ +91",  value: "+91" },
-  { label: "ðŸ‡µðŸ‡° +92",  value: "+92" },
-  { label: "ðŸ‡§ðŸ‡© +880", value: "+880" },
-  { label: "ðŸ‡±ðŸ‡° +94",  value: "+94" },
-  { label: "ðŸ‡¬ðŸ‡§ +44",  value: "+44" },
-  { label: "ðŸ‡ºðŸ‡¸ +1",   value: "+1" },
-  { label: "ðŸ‡¨ðŸ‡¦ +1",   value: "+1-CA" },
-  { label: "ðŸ‡¦ðŸ‡º +61",  value: "+61" },
-  { label: "ðŸ‡¸ðŸ‡¬ +65",  value: "+65" },
-  { label: "ðŸ‡²ðŸ‡¾ +60",  value: "+60" },
-  { label: "ðŸ‡®ðŸ‡© +62",  value: "+62" },
-  { label: "ðŸ‡³ðŸ‡¬ +234", value: "+234" },
-  { label: "ðŸ‡¿ðŸ‡¦ +27",  value: "+27" },
-  { label: "ðŸ‡ªðŸ‡¬ +20",  value: "+20" },
-]
-
-// â”€â”€â”€ Phone input sub-component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Phone input sub-component ────────────────────────────────────────────────
 function PhoneField({
   label,
   icon: Icon,
@@ -87,16 +68,13 @@ function PhoneField({
         <label className="text-xs font-bold uppercase tracking-wider text-[#374151]">{label}</label>
       </div>
       <div className="flex gap-2">
-        <select
+        <PhoneCountrySelect
           value={countryCode}
-          onChange={(e) => onCountryChange(e.target.value)}
-          className="px-3 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white text-sm focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 appearance-none cursor-pointer"
+          onChange={onCountryChange}
+          ariaLabel={`${label} country calling code`}
+          className="px-3 py-3.5"
           style={{ minWidth: 90 }}
-        >
-          {COUNTRY_CODES.map((c) => (
-            <option key={c.value} value={c.value}>{c.label}</option>
-          ))}
-        </select>
+        />
         <input
           type="tel"
           value={number}
@@ -109,7 +87,7 @@ function PhoneField({
   )
 }
 
-// â”€â”€â”€ Password strength â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Password strength ─────────────────────────────────────────────────────────
 type PwdStrength = { score: number; label: string; color: string }
 
 const PWD_RULES = [
@@ -128,7 +106,7 @@ function getStrength(password: string): PwdStrength {
   return           { score, label: "Strong", color: "#10b981" }
 }
 
-// â”€â”€â”€ Metadata helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Metadata helpers ──────────────────────────────────────────────────────────
 type MetadataShape = {
   phone_country_code?: string
   phone_number?: string
@@ -212,9 +190,9 @@ export function ProfileTabs({
   }, [hasUnsavedChanges])
 
   const joinedDate = useMemo(() => {
-    if (!profile.joined_at) return "â€”"
+    if (!profile.joined_at) return "—"
     const date = new Date(profile.joined_at)
-    return Number.isNaN(date.getTime()) ? "â€”" : date.toLocaleString()
+    return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString()
   }, [profile.joined_at])
 
   const handleProfileFieldChange = (key: keyof typeof profileInfo, value: string) => {
@@ -385,7 +363,7 @@ export function ProfileTabs({
 
   return (
     <section className="bg-white/60 backdrop-blur-2xl rounded-[24px] border border-white/60 shadow-xl shadow-black/5 overflow-hidden">
-      {/* â”€â”€ Tab Bar â”€â”€ */}
+      {/* ── Tab Bar ── */}
       <div className="border-b border-[#f0f0f0] px-6 pt-5">
         <div className="flex flex-wrap gap-2 pb-0">
           {TABS.map((tab) => (
@@ -408,7 +386,7 @@ export function ProfileTabs({
 
       <div className="p-6 md:p-8">
 
-        {/* â”€â”€ Profile Info Tab â”€â”€ */}
+        {/* ── Profile Info Tab ── */}
         {activeTab === "profile" && (
           <div className="space-y-5">
 
@@ -444,7 +422,7 @@ export function ProfileTabs({
             <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-[#f8fafc] border border-[#f0f0f0] text-sm text-[#6b7280]">
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">Full name preview</span>
               <span className="font-medium text-[#374151]">
-                {[profileInfo.fname, profileInfo.mname, profileInfo.lname].map(p => p.trim()).filter(Boolean).join(" ") || "â€”"}
+                {[profileInfo.fname, profileInfo.mname, profileInfo.lname].map(p => p.trim()).filter(Boolean).join(" ") || "—"}
               </span>
             </div>
 
@@ -532,14 +510,14 @@ export function ProfileTabs({
                 className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
               >
                 {busySection === "profile" ? (
-                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Savingâ€¦</>
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
                 ) : "Save Profile Info"}
               </button>
             </div>
           </div>
         )}
 
-        {/* â”€â”€ Personal Info Tab â”€â”€ */}
+        {/* ── Personal Info Tab ── */}
         {activeTab === "personal" && (
           <div className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -581,14 +559,14 @@ export function ProfileTabs({
                 className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
               >
                 {busySection === "personal" ? (
-                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Savingâ€¦</>
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
                 ) : "Save Personal Info"}
               </button>
             </div>
           </div>
         )}
 
-        {/* â”€â”€ Account Settings Tab â”€â”€ */}
+        {/* ── Account Settings Tab ── */}
         {activeTab === "account" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
@@ -606,12 +584,12 @@ export function ProfileTabs({
           </div>
         )}
 
-        {/* â”€â”€ Bank Accounts Tab â”€â”€ */}
+        {/* ── Bank Accounts Tab ── */}
         {activeTab === "bank_accounts" && (
           <BankAccountsTab userId={userId} />
         )}
 
-        {/* â”€â”€ Security Tab â”€â”€ */}
+        {/* ── Security Tab ── */}
         {activeTab === "security" && (
           <div className="space-y-5 max-w-xl">
 
@@ -741,7 +719,7 @@ export function ProfileTabs({
                 className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
               >
                 {busySection === "password" ? (
-                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Updatingâ€¦</>
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Updating…</>
                 ) : "Change Password"}
               </button>
             </div>

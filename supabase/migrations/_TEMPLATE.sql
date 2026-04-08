@@ -1,0 +1,42 @@
+-- TEMPLATE ONLY — not executed (name starts with _).
+--
+-- Future schema changes (new tables, columns, indexes, RLS policies):
+--
+-- 1. Copy this file to a new name: NNN_short_description.sql
+--    Use the next number after existing migrations (001, 002, …).
+--    Or run: npm run db:new-migration -- buy_saved_searches
+--
+-- 2. Write idempotent SQL where possible:
+--    CREATE TABLE IF NOT EXISTS …
+--    CREATE INDEX IF NOT EXISTS …
+--    ALTER TABLE … ADD COLUMN IF NOT EXISTS …   (Postgres 9.1+ for IF NOT EXISTS on column: PG11+)
+--
+-- 3. Apply: npm run db:migrate   (needs DATABASE_URL in .env)
+--
+-- 4. Mirror important changes in guides/database.md if you use it as docs.
+--
+-- 5. In Supabase Dashboard → SQL Editor you can paste the same file to run once,
+--    but keeping files here gives you version history and repeatable deploys.
+--
+-- Example (commented out):
+--
+-- BEGIN;
+--
+-- CREATE TABLE IF NOT EXISTS public.buy_saved_searches (
+--   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+--   user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+--   name text,
+--   query_params jsonb NOT NULL DEFAULT '{}'::jsonb,
+--   created_at timestamptz NOT NULL DEFAULT now()
+-- );
+--
+-- CREATE INDEX IF NOT EXISTS idx_buy_saved_searches_user
+--   ON public.buy_saved_searches (user_id);
+--
+-- ALTER TABLE public.buy_saved_searches ENABLE ROW LEVEL SECURITY;
+--
+-- CREATE POLICY "Users read own saved searches"
+--   ON public.buy_saved_searches FOR SELECT
+--   USING (auth.uid() = user_id);
+--
+-- COMMIT;

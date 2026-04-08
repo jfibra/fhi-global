@@ -42,7 +42,7 @@ export function DeveloperCard({ developer }: { developer: DeveloperCardData }) {
           </h3>
           {developer.is_verified && (
             <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#001f3f]/8 text-[10px] font-bold text-[#001f3f] uppercase tracking-wider">
-              âœ“ Verified
+              ✓ Verified
             </span>
           )}
         </div>

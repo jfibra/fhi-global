@@ -7,7 +7,7 @@ import { randomUUID } from "crypto"
  *
  * Pre-authentication file upload for registration ID documents.
  * Files are stored in a temporary path and referenced during final submission.
- * No auth required â€” files are stored in temp/ prefix and validated by size/type.
+ * No auth required — files are stored in temp/ prefix and validated by size/type.
  *
  * Body: FormData { file: File, sessionToken: string }
  * Response: { url, key }

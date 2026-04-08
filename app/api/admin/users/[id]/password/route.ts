@@ -15,7 +15,7 @@ async function requireAdmin() {
   return user
 }
 
-// â”€â”€â”€ POST /api/admin/users/[id]/password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── POST /api/admin/users/[id]/password ───────────────────────────────────────
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },

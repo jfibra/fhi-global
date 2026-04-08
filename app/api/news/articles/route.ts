@@ -3,7 +3,7 @@ import { fetchArticles } from "@/lib/news-service"
 
 /**
  * GET /api/news/articles?page=1
- * Server-side proxy â€” returns paginated news articles.
+ * Server-side proxy — returns paginated news articles.
  * The external API key lives only in server env and is never sent to the client.
  */
 export async function GET(req: NextRequest) {

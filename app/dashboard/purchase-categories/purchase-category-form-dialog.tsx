@@ -10,7 +10,7 @@ import {
   type PurchaseCategoryFormData,
 } from "@/lib/purchase-category-service"
 
-// â”€â”€â”€ Portal helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Portal helper ────────────────────────────────────────────────────────────
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -19,7 +19,7 @@ function Portal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body)
 }
 
-// â”€â”€â”€ Shared field label â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Shared field label ───────────────────────────────────────────────────────
 
 function FieldLabel({ text, required }: { text: string; required?: boolean }) {
   return (
@@ -30,7 +30,7 @@ function FieldLabel({ text, required }: { text: string; required?: boolean }) {
   )
 }
 
-// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const EMPTY_FORM: PurchaseCategoryFormData = {
   category_name: "",
@@ -40,7 +40,7 @@ const EMPTY_FORM: PurchaseCategoryFormData = {
 
 const iconCls = "absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none"
 
-// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function PurchaseCategoryFormDialog({
   open,
@@ -204,7 +204,7 @@ export function PurchaseCategoryFormDialog({
               )}
             </div>
 
-            {/* Category Type â€” only shown on create */}
+            {/* Category Type — only shown on create */}
             {!isEdit && (
               <div>
                 <FieldLabel text="Category Type" required />
@@ -334,7 +334,7 @@ export function PurchaseCategoryFormDialog({
                 ) : (
                   <Check className="w-4 h-4" />
                 )}
-                {saving ? "Savingâ€¦" : isEdit ? "Save Changes" : "Create Category"}
+                {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Category"}
               </button>
             </div>
           </div>

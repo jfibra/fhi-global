@@ -27,11 +27,11 @@ export function ProjectsSidebar({ search, onSearch, filterDev, onFilterDev, filt
           type="text"
           value={search}
           onChange={(e) => onSearch(e.target.value)}
-          placeholder="Search projectsâ€¦"
+          placeholder="Search projects…"
           className="flex-1 bg-transparent text-sm text-[#111827] placeholder-[#9ca3af] outline-none"
         />
         {search && (
-          <button type="button" onClick={() => onSearch("")} className="text-[#9ca3af] hover:text-[#374151] text-xs">âœ•</button>
+          <button type="button" onClick={() => onSearch("")} className="text-[#9ca3af] hover:text-[#374151] text-xs">✕</button>
         )}
       </div>
 

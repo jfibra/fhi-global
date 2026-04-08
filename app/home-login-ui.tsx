@@ -12,7 +12,7 @@ const PILLARS = [
   { icon: ShieldCheck, label: "Trusted Network", desc: "Verified developers. Transparent process. Zero guesswork." },
 ]
 
-// â”€â”€â”€ Shared login card (used by both mobile and desktop) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Shared login card (used by both mobile and desktop) ─────────────────────
 
 function LoginCard({
   showPassword,
@@ -113,7 +113,7 @@ function LoginCard({
         {/* Error */}
         {state.error && (
           <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
-            <span className="text-rose-400 mt-px text-sm leading-none">âœ•</span>
+            <span className="text-rose-400 mt-px text-sm leading-none">✕</span>
             <p className="text-sm text-rose-700">{state.error}</p>
           </div>
         )}
@@ -129,7 +129,7 @@ function LoginCard({
             {pending ? (
               <>
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Signing inâ€¦
+                Signing in…
               </>
             ) : (
               <>
@@ -160,7 +160,7 @@ function LoginCard({
   )
 }
 
-// â”€â”€â”€ Page component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Page component ───────────────────────────────────────────────────────────
 
 export function HomeLoginUI() {
   const [showPassword, setShowPassword] = useState(false)
@@ -175,7 +175,7 @@ export function HomeLoginUI() {
 
   return (
     <>
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• MOBILE (< lg) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* ══════════════════════ MOBILE (< lg) ══════════════════════ */}
       <div className="lg:hidden flex flex-col min-h-[calc(100dvh-56px)]">
 
         {/* Navy brand hero */}
@@ -213,13 +213,13 @@ export function HomeLoginUI() {
           <div className="max-w-sm mx-auto">
             <LoginCard {...cardProps} />
             <p className="text-center text-[11px] text-[#9ca3af] mt-5 tracking-wide">
-              Â© {new Date().getFullYear()} FHI Global Â· Dubai, UAE Â· All rights reserved
+              © {new Date().getFullYear()} FHI Global Â· Dubai, UAE Â· All rights reserved
             </p>
           </div>
         </div>
       </div>
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• DESKTOP (lg+) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* ══════════════════════ DESKTOP (lg+) ══════════════════════ */}
       <section className="hidden lg:block bg-[#f4f6f9] py-20">
         <div className="max-w-7xl mx-auto px-8 lg:px-10">
           <div className="grid lg:grid-cols-[1fr_440px] xl:grid-cols-[1fr_480px] gap-10 xl:gap-16 items-center">
@@ -249,7 +249,7 @@ export function HomeLoginUI() {
                   </h1>
                   <p className="text-white/50 text-base leading-relaxed max-w-md">
                     A private portal connecting real estate professionals with premium developments across the UAE.
-                    Everything you need â€” and nothing you don't.
+                    Everything you need — and nothing you don't.
                   </p>
                 </div>
 
@@ -279,7 +279,7 @@ export function HomeLoginUI() {
             <div>
               <LoginCard {...cardProps} />
               <p className="text-center text-[11px] text-[#bbb] mt-5 tracking-wide">
-                Â© {new Date().getFullYear()} FHI Global Â· Dubai, UAE Â· All rights reserved
+                © {new Date().getFullYear()} FHI Global Â· Dubai, UAE Â· All rights reserved
               </p>
             </div>
           </div>

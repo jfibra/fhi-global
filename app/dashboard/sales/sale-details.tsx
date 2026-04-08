@@ -22,10 +22,10 @@ function Portal({ children }: { children: React.ReactNode }) {
 }
 
 function formatDate(value: string | null) {
-  if (!value) return "â€”"
+  if (!value) return "—"
   const date = new Date(value)
   return Number.isNaN(date.getTime())
-    ? "â€”"
+    ? "—"
     : date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
 }
 
@@ -61,7 +61,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">{label}</span>
-      <span className="text-sm text-[#0d1117] font-medium">{value ?? "â€”"}</span>
+      <span className="text-sm text-[#0d1117] font-medium">{value ?? "—"}</span>
     </div>
   )
 }
@@ -99,7 +99,7 @@ export function SaleDetails({
 }) {
   const clientName = sale.clients
     ? `${sale.clients.first_name} ${sale.clients.last_name}`
-    : "â€”"
+    : "—"
 
   return (
     <Portal>
@@ -123,7 +123,7 @@ export function SaleDetails({
                 <div>
                   <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{clientName}</h2>
                   <p className="text-xs text-[#9ca3af] mt-0.5">
-                    {sale.projects?.name ?? "â€”"} Â· {sale.developers?.name ?? "â€”"}
+                    {sale.projects?.name ?? "—"} Â· {sale.developers?.name ?? "—"}
                   </p>
                 </div>
               </div>

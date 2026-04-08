@@ -3,7 +3,7 @@ import { fetchArticleBySlug } from "@/lib/news-service"
 
 /**
  * GET /api/news/article?slug=...
- * Server-side proxy â€” returns a single news article by slug.
+ * Server-side proxy — returns a single news article by slug.
  * The external API key lives only in server env and is never sent to the client.
  */
 export async function GET(req: NextRequest) {

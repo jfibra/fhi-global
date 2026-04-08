@@ -70,7 +70,7 @@ export default function NotFound() {
       </div>
 
       {/* Footer note */}
-      <p className="mt-8 text-xs text-[#9ca3af]">FHI Global â€” Dubai Real Estate CRM</p>
+      <p className="mt-8 text-xs text-[#9ca3af]">FHI Global — Dubai Real Estate CRM</p>
     </div>
   )
 }

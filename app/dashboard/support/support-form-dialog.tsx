@@ -255,7 +255,7 @@ export function SupportFormDialog({
                 </div>
                 <div className="text-center">
                   <p className="text-sm font-semibold text-[#374151]">Click to add files or drag & drop</p>
-                  <p className="text-xs text-[#9ca3af] mt-0.5">Images, PDFs, docs â€” max 25 MB each</p>
+                  <p className="text-xs text-[#9ca3af] mt-0.5">Images, PDFs, docs — max 25 MB each</p>
                 </div>
               </div>
               <input

@@ -1,0 +1,308 @@
+import type { Metadata } from "next"
+import Link from "next/link"
+import { Suspense } from "react"
+import { createPageMetadata } from "@/lib/seo"
+import {
+  deriveListings,
+  listViewHrefFromSp,
+  loadListingProjects,
+  type ListingSearchParams,
+} from "@/lib/buy/listings-page-logic"
+import { TopBar } from "@/components/topbar"
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
+import { BuyFiltersLoader } from "../buy/buy-filters-loader"
+import { BuyListToolbar } from "@/components/buy/buy-list-toolbar"
+import { BuyPropertyCard } from "@/components/buy/buy-property-card"
+import {
+  BuySidebarTop,
+  BuySidebarNews,
+  BuySidebarBottom,
+  BuySidebarNewsSkeleton,
+} from "@/components/buy/buy-sidebar"
+import { BuyGoogleMap } from "@/components/buy/buy-google-map"
+import { ChevronRight } from "lucide-react"
+
+export const revalidate = 120
+
+export const metadata: Metadata = createPageMetadata({
+  title: "Rent Property in the United Arab Emirates | FHI Global",
+  description:
+    "Browse properties for rent in the United Arab Emirates — filter by location, type, and bedrooms. Find apartments, villas, and more from trusted developers.",
+  pathname: "/rent",
+  keywords: [
+    "rent property UAE",
+    "apartments for rent Dubai",
+    "FHI Global rent",
+    "Dubai rentals",
+    "villa for rent UAE",
+  ],
+})
+
+function FiltersFallback() {
+  return (
+    <div
+      className="flow-root w-full min-h-[152px] animate-pulse border-b border-[#e5e7eb] bg-white"
+      aria-hidden
+    />
+  )
+}
+
+function ToolbarFallback() {
+  return (
+    <div className="h-10 w-full sm:w-48 shrink-0 rounded-full bg-[#f1f5f9] animate-pulse mb-0" aria-hidden />
+  )
+}
+
+type Sp = Awaited<ListingSearchParams>
+
+function RentMapPropertyListSkeleton() {
+  return (
+    <div className="space-y-5 animate-pulse pb-4">
+      {[1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="flex flex-col overflow-hidden rounded-xl border border-[#d1d5db] bg-white shadow-sm md:flex-row"
+        >
+          <div className="aspect-[4/3] w-full bg-[#e2e8f0] md:w-[min(42%,320px)] md:min-h-[200px]" />
+          <div className="flex flex-1 flex-col space-y-3 p-5">
+            <div className="h-7 w-48 rounded bg-[#e2e8f0]" />
+            <div className="h-3 w-full rounded bg-[#e2e8f0]" />
+            <div className="h-3 w-3/4 rounded bg-[#e2e8f0]" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function RentMapPropertyMapSkeleton() {
+  return (
+    <div className="min-h-[min(55vh,520px)] w-full rounded-xl border border-[#e8eaed] bg-[#e2e8f0] animate-pulse lg:min-h-[calc(100vh-9rem)]" />
+  )
+}
+
+function RentListingsSkeleton() {
+  return (
+    <div className="space-y-5">
+      {[1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="bg-white rounded-xl border border-[#d1d5db] overflow-hidden flex flex-col md:flex-row animate-pulse shadow-sm"
+        >
+          <div className="w-full md:w-[min(42%,380px)] aspect-[4/3] md:min-h-[240px] bg-[#e2e8f0]" />
+          <div className="flex-1 p-6 space-y-3">
+            <div className="h-8 w-48 bg-[#e2e8f0] rounded" />
+            <div className="h-4 w-full bg-[#e2e8f0] rounded" />
+            <div className="h-4 w-3/4 bg-[#e2e8f0] rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+async function RentMapListingSubtitle({ sp }: { sp: Sp }) {
+  const { rows, error } = await loadListingProjects()
+  const { totalLabel } = deriveListings(sp, rows, error)
+  if (error || !totalLabel) return null
+  return <p className="mt-1 text-sm text-[#64748b] sm:text-base">{totalLabel}</p>
+}
+
+async function RentMapSplitList({ sp }: { sp: Sp }) {
+  const { rows, error } = await loadListingProjects()
+  const { properties } = deriveListings(sp, rows, error)
+
+  return (
+    <div className="space-y-5 min-w-0 max-w-full">
+      {error && (
+        <div
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          role="alert"
+        >
+          We couldn&apos;t load listings from the server. Check your connection and Supabase settings, then refresh
+          the page.
+        </div>
+      )}
+      {!error && properties.length === 0 && (
+        <div className="rounded-2xl border border-[#e8eaed] bg-white p-12 text-center">
+          <p className="mb-4 text-[#475569]">
+            No rental listings match your filters yet. Try clearing filters or browse all projects in the UAE.
+          </p>
+          <Link
+            href="/projects"
+            className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#d6b357] to-[#f0d890] px-6 py-3 text-sm font-bold text-[#001f3f]"
+          >
+            View all projects
+          </Link>
+        </div>
+      )}
+      {!error && properties.length > 0 && (
+        <div className="flex flex-col gap-5">
+          {properties.map((p) => (
+            <BuyPropertyCard key={p.id} property={p} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+async function RentMapSplitMap({ sp }: { sp: Sp }) {
+  const { rows, error } = await loadListingProjects()
+  const { mapMarkers } = deriveListings(sp, rows, error)
+  const apiKey =
+    process.env.GOOGLE_MAPS_API_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ||
+    ""
+
+  return (
+    <BuyGoogleMap
+      apiKey={apiKey}
+      markers={mapMarkers}
+      listViewHref={listViewHrefFromSp(sp, "/rent")}
+      fillHeight
+    />
+  )
+}
+
+async function RentListingsColumn({ sp }: { sp: Sp }) {
+  const { rows, error } = await loadListingProjects()
+  const { properties, totalLabel } = deriveListings(sp, rows, error)
+
+  return (
+    <>
+      {error && (
+        <div
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          role="alert"
+        >
+          We couldn&apos;t load listings from the server. Check your connection and Supabase settings, then refresh
+          the page.
+        </div>
+      )}
+      {totalLabel && !error && <p className="text-sm text-[#64748b]">{totalLabel}</p>}
+      {!error && properties.length === 0 && (
+        <div className="rounded-2xl border border-[#e8eaed] bg-white p-12 text-center">
+          <p className="text-[#475569] mb-4">
+            No rental listings match your filters yet. Try clearing filters or browse all projects in the UAE.
+          </p>
+          <Link
+            href="/projects"
+            className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-gradient-to-r from-[#d6b357] to-[#f0d890] text-[#001f3f] text-sm font-bold"
+          >
+            View all projects
+          </Link>
+        </div>
+      )}
+      {!error &&
+        properties.length > 0 &&
+        properties.map((p) => <BuyPropertyCard key={p.id} property={p} />)}
+    </>
+  )
+}
+
+export default async function RentPage({ searchParams }: { searchParams: ListingSearchParams }) {
+  const sp = await searchParams
+  const view = sp.view === "map" ? "map" : "list"
+
+  const breadcrumbs = (
+    <nav className="flex flex-wrap items-center gap-1 text-sm text-[#6b7280] mb-4">
+      <span className="text-[#0f2940] font-medium">For Rent:</span>
+      <Link href="/" className="text-[#0f2940] hover:text-[#d6b357] transition-colors">
+        Home
+      </Link>
+      <ChevronRight className="w-4 h-4 shrink-0 text-[#9ca3af]" />
+      <span className="text-[#d6b357] font-semibold">Rent</span>
+    </nav>
+  )
+
+  const titleRow = (
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-5 md:gap-x-6 lg:flex-nowrap min-w-0 mb-6 lg:mb-7">
+      <h1 className="font-['Outfit'] text-2xl sm:text-3xl md:text-[2.05rem] font-bold text-[#0f2940] tracking-tight leading-tight shrink-0 min-w-0">
+        Properties for rent in the UAE
+      </h1>
+      <Suspense fallback={<ToolbarFallback />}>
+        <BuyListToolbar listingBasePath="/rent" className="mb-0 w-full sm:w-auto shrink-0 min-w-0" />
+      </Suspense>
+    </div>
+  )
+
+  const mapViewTitleRow = (
+    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0">
+        <h1 className="font-['Outfit'] text-2xl font-bold leading-tight tracking-tight text-[#0f2940] sm:text-3xl">
+          Properties for rent in the UAE
+        </h1>
+        <Suspense
+          fallback={<span className="mt-2 inline-block h-5 w-56 animate-pulse rounded bg-[#e2e8f0]" aria-hidden />}
+        >
+          <RentMapListingSubtitle sp={sp} />
+        </Suspense>
+      </div>
+      <Suspense fallback={<ToolbarFallback />}>
+        <BuyListToolbar listingBasePath="/rent" className="mb-0 shrink-0" />
+      </Suspense>
+    </div>
+  )
+
+  return (
+    <div
+      className={`relative min-h-screen font-sans ${view === "map" ? "bg-[#f6f7f9]" : "bg-[#faf8f4]"}`}
+    >
+      {view !== "map" && (
+        <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full opacity-20 blur-[100px] -z-10 bg-[radial-gradient(circle,rgb(200,235,255)_0%,transparent_70%)]" />
+      )}
+      <TopBar />
+      <Header />
+
+      <Suspense fallback={<FiltersFallback />}>
+        <BuyFiltersLoader />
+      </Suspense>
+
+      {view === "map" ? (
+        <div className="mx-auto max-w-[1920px] px-4 py-8 pb-16 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,50%)_minmax(0,1fr)] lg:items-start lg:gap-8">
+            <div className="scrollbar-none min-w-0 max-w-full lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto">
+              {breadcrumbs}
+              {mapViewTitleRow}
+              <Suspense fallback={<RentMapPropertyListSkeleton />}>
+                <RentMapSplitList sp={sp} />
+              </Suspense>
+            </div>
+            <div className="mt-0 min-h-[min(55vh,520px)] w-full min-w-0 max-w-full flex-1 overflow-hidden lg:sticky lg:top-24 lg:mt-0 lg:min-h-0 lg:self-start">
+              <Suspense fallback={<RentMapPropertyMapSkeleton />}>
+                <RentMapSplitMap sp={sp} />
+              </Suspense>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:gap-x-10 gap-8">
+            <div className="min-w-0 flex-1 w-full">
+              {breadcrumbs}
+              {titleRow}
+
+              <div className="space-y-5 min-w-0">
+                <Suspense fallback={<RentListingsSkeleton />}>
+                  <RentListingsColumn sp={sp} />
+                </Suspense>
+              </div>
+            </div>
+
+            <aside className="w-full min-w-0 space-y-6 lg:w-[min(100%,18.875rem)] lg:shrink-0 lg:sticky lg:top-24 lg:z-20 lg:bg-[#faf8f4] lg:pb-2 lg:pt-0">
+              <BuySidebarTop />
+              <Suspense fallback={<BuySidebarNewsSkeleton />}>
+                <BuySidebarNews />
+              </Suspense>
+              <BuySidebarBottom searchBasePath="/rent" />
+            </aside>
+          </div>
+        </div>
+      )}
+
+      <Footer />
+    </div>
+  )
+}

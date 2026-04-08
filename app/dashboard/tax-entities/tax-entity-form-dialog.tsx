@@ -28,7 +28,7 @@ import {
   updateTaxEntity,
 } from "@/lib/tax-entity-service"
 
-// UAE TRN is 15 digits â€” formatted as XXX-XXXXXXX-XXXXX
+// UAE TRN is 15 digits — formatted as XXX-XXXXXXX-XXXXX
 const TRN_REGEX = /^[0-9]{15}$/
 
 function formatTRN(raw: string): string {
@@ -331,7 +331,7 @@ export function TaxEntityFormDialog({
           </div>
 
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-            {/* â”€â”€ Section: identity â”€â”€ */}
+            {/* ── Section: identity ── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
               {/* Registered Name */}
@@ -561,7 +561,7 @@ export function TaxEntityFormDialog({
                 {errors.currency_code && <p className="text-xs text-rose-500 mt-1 ml-1">{errors.currency_code}</p>}
               </div>
 
-              {/* â”€â”€ Toggles â”€â”€ */}
+              {/* ── Toggles ── */}
               <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3">
                 {([
                   { key: "vat_registered" as const, label: "VAT Registered", desc: "Include VAT in calculations" },
@@ -617,7 +617,7 @@ export function TaxEntityFormDialog({
                 {busy ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Savingâ€¦
+                    Saving…
                   </>
                 ) : editEntity ? (
                   <>

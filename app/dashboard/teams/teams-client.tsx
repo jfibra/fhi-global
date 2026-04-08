@@ -29,12 +29,12 @@ import { TeamFormDialog } from "./team-form-dialog"
 import { TeamLogoUpload } from "./team-logo-upload"
 import { AddMemberDialog, TransferMemberDialog } from "./add-member-dialog"
 
-// â”€â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Toast ─────────────────────────────────────────────────────────────────────
 
 type Toast = { id: number; message: string; variant: "success" | "error" }
 let toastId = 0
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function buildTree(teams: Team[]) {
   const roots  = teams.filter(t => !t.parent_id)
@@ -49,7 +49,7 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
 }
 
-// â”€â”€â”€ Main Client â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main Client ───────────────────────────────────────────────────────────────
 
 export function TeamsClient({ currentRole: _role }: { currentRole: string; userId: string }) {
   const [teams,           setTeams]           = useState<Team[]>([])
@@ -82,7 +82,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
   // Confirm delete
   const [confirmDelete, setConfirmDelete]       = useState<{ type: "team" | "member"; id: string; label: string } | null>(null)
 
-  // â”€â”€ Load teams â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Load teams ───────────────────────────────────────────────────────────────
 
   const loadTeams = useCallback(async () => {
     setTeamsLoading(true)
@@ -97,7 +97,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
 
   useEffect(() => { loadTeams() }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // â”€â”€ Load members for selected team â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Load members for selected team ───────────────────────────────────────────
 
   const loadMembers = useCallback(async () => {
     if (!selectedId) return
@@ -121,7 +121,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
 
   useEffect(() => { setMemberPage(1) }, [selectedId, memberSearch, memberSort, showInactive])
 
-  // â”€â”€ Toast helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Toast helper ─────────────────────────────────────────────────────────────
 
   function addToast(message: string, variant: "success" | "error") {
     const id = ++toastId
@@ -129,7 +129,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
     setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 3500)
   }
 
-  // â”€â”€ Team tree helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Team tree helpers ─────────────────────────────────────────────────────────
 
   const { roots, byParent } = buildTree(teams)
   const selectedTeam = teams.find(t => t.id === selectedId) ?? null
@@ -143,7 +143,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
     setMemberSearch("")
   }
 
-  // â”€â”€ CRUD handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── CRUD handlers ─────────────────────────────────────────────────────────────
 
   const handleSaveTeam = async (data: TeamFormData) => {
     if (editingTeam) {
@@ -189,7 +189,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
     loadMembers()
   }
 
-  // â”€â”€ Sorting helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Sorting helper ────────────────────────────────────────────────────────────
 
   const toggleSort = (field: typeof memberSort.field) =>
     setMemberSort(prev => ({
@@ -199,7 +199,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
 
   const subteams = selectedTeam ? (byParent[selectedTeam.id] ?? []) : []
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─────────────────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col gap-0">
@@ -221,7 +221,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
       {/* Two-panel layout */}
       <div className="flex gap-5 min-h-0" style={{ minHeight: "calc(100vh - 220px)" }}>
 
-        {/* â”€â”€ Sidebar tree â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Sidebar tree ─────────────────────────────────────────────────── */}
         <aside className="w-56 xl:w-64 shrink-0 flex flex-col rounded-2xl bg-white border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] overflow-hidden">
           <div className="px-4 pt-4 pb-3 border-b border-[#f0f2f5]">
             <p className="text-xs font-bold text-[#374151] uppercase tracking-wider">Departments</p>
@@ -257,7 +257,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
           </div>
         </aside>
 
-        {/* â”€â”€ Main content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Main content ──────────────────────────────────────────────────── */}
         <div className="flex-1 min-w-0 flex flex-col gap-5">
 
           {!selectedTeam ? (
@@ -285,7 +285,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
             </div>
           ) : (
             <>
-              {/* â”€â”€ Team header card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+              {/* ── Team header card ─────────────────────────────────────── */}
               <TeamHeaderCard
                 team={selectedTeam}
                 subteamCount={subteams.length}
@@ -296,7 +296,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
                 onDelete={() => setConfirmDelete({ type: "team", id: selectedTeam.id, label: selectedTeam.name })}
               />
 
-              {/* â”€â”€ Members table card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+              {/* ── Members table card ───────────────────────────────────── */}
               <div className="bg-white rounded-2xl border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] overflow-hidden">
                 {/* Table header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-[#f0f2f5] flex-wrap gap-3">
@@ -311,7 +311,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
                       <input
                         value={memberSearch}
                         onChange={e => setMemberSearch(e.target.value)}
-                        placeholder="Search membersâ€¦"
+                        placeholder="Search members…"
                         className="pl-8 pr-3 py-2 rounded-xl border border-[#e8eaed] text-xs bg-white focus:border-[#001f3f] focus:ring-2 focus:ring-[#001f3f]/10 outline-none placeholder:text-[#9ca3af] text-[#0d1117] w-44 transition-all"
                       />
                     </div>
@@ -409,19 +409,19 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
                 {membersTotal > memberPerPage && (
                   <div className="flex items-center justify-between px-6 py-3 border-t border-[#f0f2f5] bg-[#fafbfc]">
                     <p className="text-xs text-[#9ca3af]">
-                      {((memberPage - 1) * memberPerPage) + 1}â€“{Math.min(memberPage * memberPerPage, membersTotal)} of {membersTotal}
+                      {((memberPage - 1) * memberPerPage) + 1}–{Math.min(memberPage * memberPerPage, membersTotal)} of {membersTotal}
                     </p>
                     <div className="flex items-center gap-1">
                       {Array.from({ length: Math.ceil(membersTotal / memberPerPage) }, (_, i) => i + 1)
                         .filter(p => p === 1 || p === Math.ceil(membersTotal / memberPerPage) || Math.abs(p - memberPage) <= 1)
-                        .reduce<(number | "â€¦")[]>((acc, p, i, arr) => {
-                          if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push("â€¦")
+                        .reduce<(number | "…")[]>((acc, p, i, arr) => {
+                          if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push("…")
                           acc.push(p)
                           return acc
                         }, [])
                         .map((p, i) =>
-                          p === "â€¦" ? (
-                            <span key={`ellipsis-${i}`} className="px-2 text-xs text-[#9ca3af]">â€¦</span>
+                          p === "…" ? (
+                            <span key={`ellipsis-${i}`} className="px-2 text-xs text-[#9ca3af]">…</span>
                           ) : (
                             <button
                               key={p}
@@ -441,7 +441,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
                 )}
               </div>
 
-              {/* â”€â”€ Subteams list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+              {/* ── Subteams list ─────────────────────────────────────────── */}
               {!selectedTeam.parent_id && (
                 <div className="bg-white rounded-2xl border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] overflow-hidden">
                   <div className="flex items-center justify-between px-6 py-4 border-b border-[#f0f2f5]">
@@ -509,7 +509,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
         </div>
       </div>
 
-      {/* â”€â”€ Dialogs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Dialogs ───────────────────────────────────────────────────────────── */}
 
       <TeamFormDialog
         open={teamFormOpen}
@@ -588,11 +588,11 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
   )
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
-// â”€â”€ TreeNode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── TreeNode ─────────────────────────────────────────────────────────────────
 
 function TreeNode({
   team, children, selectedId, expanded, onSelect, onToggleExpand,
@@ -663,7 +663,7 @@ function TreeNode({
   )
 }
 
-// â”€â”€ TeamHeaderCard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── TeamHeaderCard ─────────────────────────────────────────────────────────────
 
 function TeamHeaderCard({
   team, subteamCount, memberCount,
@@ -800,7 +800,7 @@ function TeamHeaderCard({
   )
 }
 
-// â”€â”€ SortTh â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SortTh ─────────────────────────────────────────────────────────────────────
 
 function SortTh({
   label, field, current, onToggle,
@@ -826,7 +826,7 @@ function SortTh({
   )
 }
 
-// â”€â”€ MemberRow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── MemberRow ─────────────────────────────────────────────────────────────────
 
 function MemberRow({
   membership, index, teams, currentTeamId,
@@ -847,7 +847,7 @@ function MemberRow({
   const [pos, setPos] = useState({ top: 0, right: 0 })
 
   const profile = membership.profiles
-  const name    = (profile?.fullname ?? `${(profile?.fname ?? "")} ${(profile?.lname ?? "")}`.trim()) || "â€”"
+  const name    = (profile?.fullname ?? `${(profile?.fname ?? "")} ${(profile?.lname ?? "")}`.trim()) || "—"
   const initials = name.charAt(0).toUpperCase()
 
   const openMenu = () => {
@@ -907,7 +907,7 @@ function MemberRow({
       </td>
       <td className="px-6 py-3.5">
         <span className="text-xs text-[#374151] font-medium">
-          {membership.role_in_team ?? <span className="text-[#9ca3af] italic">â€”</span>}
+          {membership.role_in_team ?? <span className="text-[#9ca3af] italic">—</span>}
         </span>
       </td>
       <td className="px-6 py-3.5 text-xs text-[#6b7280]">{fmtDate(membership.joined_at)}</td>
@@ -949,7 +949,7 @@ function MemberRow({
   )
 }
 
-// â”€â”€ EditRoleModal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── EditRoleModal ──────────────────────────────────────────────────────────────
 
 function EditRoleModal({
   open, onClose, membership, onSaved,
@@ -992,12 +992,12 @@ function EditRoleModal({
               onChange={e => setRole(e.target.value)}
               className="w-full appearance-none px-3 py-2.5 pr-10 rounded-xl border border-[#e8eaed] text-sm bg-white focus:border-[#001f3f] focus:ring-2 focus:ring-[#001f3f]/10 outline-none text-[#0d1117] transition-all"
             >
-              <option value="">â€” No specific role â€”</option>
+              <option value="">— No specific role —</option>
               {["Agent","Secretary","Team Leader","Unit Manager","Member","Observer"].map(r => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#9ca3af]">â–¾</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#9ca3af]">▾</span>
           </div>
         </div>
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#f0f2f5] bg-[#fafbfc] rounded-b-2xl">
@@ -1013,7 +1013,7 @@ function EditRoleModal({
   )
 }
 
-// â”€â”€ ConfirmDialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ConfirmDialog ─────────────────────────────────────────────────────────────
 
 function ConfirmDialog({
   title, description, onConfirm, onCancel,
@@ -1056,7 +1056,7 @@ function ConfirmDialog({
   )
 }
 
-// â”€â”€ ToastList â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ToastList ─────────────────────────────────────────────────────────────────
 
 function ToastList({ toasts }: { toasts: Toast[] }) {
   if (!toasts.length) return null

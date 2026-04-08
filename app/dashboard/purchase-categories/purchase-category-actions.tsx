@@ -114,7 +114,7 @@ export function PurchaseCategoryActions({
                 {category.is_active ? "Deactivate" : "Activate"}
               </button>
 
-              {/* Delete â€” custom categories only */}
+              {/* Delete — custom categories only */}
               {category.category_type === "custom" && (
                 <>
                   <div className="border-t border-[#f0f0f0] my-1" />

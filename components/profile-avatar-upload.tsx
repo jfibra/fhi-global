@@ -6,7 +6,7 @@ import Cropper from "react-easy-crop"
 import type { Area, Point } from "react-easy-crop"
 import { Trash2, ZoomIn, ZoomOut, X, Check, Upload } from "lucide-react"
 
-// â”€â”€â”€ canvas helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── canvas helper ────────────────────────────────────────────────────────────
 async function getCroppedBlob(imageSrc: string, pixelCrop: Area): Promise<Blob> {
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new window.Image()
@@ -44,7 +44,7 @@ async function getCroppedBlob(imageSrc: string, pixelCrop: Area): Promise<Blob> 
   })
 }
 
-// â”€â”€â”€ component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── component ────────────────────────────────────────────────────────────────
 export function ProfileAvatarUpload({
   userId,
   displayName,
@@ -165,7 +165,7 @@ export function ProfileAvatarUpload({
         onChange={handleFileChange}
       />
 
-      {/* â”€â”€ Options Modal â”€â”€ */}
+      {/* ── Options Modal ── */}
       {open && !imageSrc && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={!busy ? onClose : undefined} />
@@ -197,7 +197,7 @@ export function ProfileAvatarUpload({
             <div className="flex flex-col gap-3 px-6 pb-6">
               <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 disabled:cursor-not-allowed">
                 <Upload className="w-4 h-4" />
-                {busy ? "Uploadingâ€¦" : "Choose Photo"}
+                {busy ? "Uploading…" : "Choose Photo"}
               </button>
               {currentUrl && (
                 <button type="button" onClick={handleRemove} disabled={busy} className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-full font-semibold text-sm bg-white/50 border border-[#e5e5e5] text-[#6b7280] hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 transition-all disabled:opacity-60 disabled:cursor-not-allowed">
@@ -210,7 +210,7 @@ export function ProfileAvatarUpload({
         </div>
       )}
 
-      {/* â”€â”€ Crop Modal â”€â”€ */}
+      {/* ── Crop Modal ── */}
       {imageSrc && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
@@ -300,7 +300,7 @@ export function ProfileAvatarUpload({
                 ) : (
                   <Check className="w-4 h-4" />
                 )}
-                {uploading ? "Savingâ€¦" : "Apply & Upload"}
+                {uploading ? "Saving…" : "Apply & Upload"}
               </button>
             </div>
           </div>

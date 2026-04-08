@@ -31,7 +31,7 @@ import { ProjectNearbyTab } from "./project-nearby-tab"
 import { ProjectSeoTab } from "./project-seo-tab"
 import { ProjectSettingsTab } from "./project-settings-tab"
 
-// â”€â”€â”€ Portal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Portal ────────────────────────────────────────────────────────────────────
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -39,7 +39,7 @@ function Portal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body)
 }
 
-// â”€â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Toast ─────────────────────────────────────────────────────────────────────
 type ToastVariant = "success" | "error"
 interface ToastMsg { id: number; variant: ToastVariant; message: string }
 
@@ -51,14 +51,14 @@ function ToastList({ toasts, remove }: { toasts: ToastMsg[]; remove: (id: number
           t.variant === "success" ? "bg-green-50 text-green-800 border border-green-100" : "bg-rose-50 text-rose-800 border border-rose-100"
         }`}>
           <span className="flex-1">{t.message}</span>
-          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
+          <button type="button" onClick={() => remove(t.id)} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
         </div>
       ))}
     </div>
   )
 }
 
-// â”€â”€â”€ Confirm dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Confirm dialog ─────────────────────────────────────────────────────────
 function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
   return (
     <Portal>
@@ -76,7 +76,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onCo
   )
 }
 
-// â”€â”€â”€ Tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Tabs ──────────────────────────────────────────────────────────────────────
 export type TabId = "data" | "overview" | "units" | "images" | "amenities" | "property_types" | "media" | "features" | "nearby" | "seo" | "settings"
 
 const TABS: { id: TabId; label: string }[] = [
@@ -93,7 +93,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "settings",        label: "Settings" },
 ]
 
-// â”€â”€â”€ New Project Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── New Project Modal ─────────────────────────────────────────────────────────
 function NewProjectModal({
   developers,
   onClose,
@@ -162,7 +162,7 @@ function NewProjectModal({
               <label className="block text-xs font-semibold text-[#6b7280] mb-1.5">Developer</label>
               <select value={developerId} onChange={(e) => setDevId(e.target.value)}
                 className="w-full border border-[#e5e5e5] rounded-xl px-4 py-2.5 text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#001f3f]/20 focus:border-[#001f3f] bg-white">
-                <option value="">â€” No developer â€”</option>
+                <option value="">— No developer —</option>
                 {developers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
@@ -183,7 +183,7 @@ function NewProjectModal({
               </button>
               <button type="submit" disabled={saving || !name.trim()}
                 className="flex-1 px-5 py-2.5 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50">
-                {saving ? "Creatingâ€¦" : "Create Project"}
+                {saving ? "Creating…" : "Create Project"}
               </button>
             </div>
           </form>
@@ -193,7 +193,7 @@ function NewProjectModal({
   )
 }
 
-// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main Component ─────────────────────────────────────────────────────────
 export function ProjectsClient({ currentRole, userId }: { currentRole: string; userId: string }) {
   const [projects, setProjects]     = useState<Project[]>([])
   const [total, setTotal]           = useState(0)
@@ -224,7 +224,7 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
 
   const PER_PAGE = 20
 
-  // â”€â”€ Load list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Load list ──────────────────────────────────────────────────────────────
   const loadList = useCallback(async () => {
     setLoading(true)
     const { data, total: t, error } = await fetchProjects({
@@ -240,12 +240,12 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
 
   useEffect(() => { void loadList() }, [loadList])
 
-  // â”€â”€ Load developers for selects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Load developers for selects ────────────────────────────────────────────
   useEffect(() => {
     fetchDevelopersForSelect().then(({ data }) => setDevelopers(data))
   }, [])
 
-  // â”€â”€ Select project â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Select project ──────────────────────────────────────────────────────────
   const handleSelect = async (id: number) => {
     setLoadingProject(true)
     setActiveTab("overview")
@@ -255,14 +255,14 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
     setSelected(data)
   }
 
-  // â”€â”€ Refresh selected â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Refresh selected ─────────────────────────────────────────────────────────
   const refreshSelected = async () => {
     if (!selected) return
     const { data } = await fetchProject(selected.id)
     if (data) setSelected(data)
   }
 
-  // â”€â”€ Publish toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Publish toggle ───────────────────────────────────────────────────────────
   const handlePublishToggle = async () => {
     if (!selected) return
     const next = !selected.is_published
@@ -273,7 +273,7 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
     setProjects((prev) => prev.map((p) => p.id === selected.id ? { ...p, is_published: next } : p))
   }
 
-  // â”€â”€ Duplicate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Duplicate ────────────────────────────────────────────────────────────────
   const handleDuplicate = () => {
     if (!selected) return
     setConfirm({
@@ -291,7 +291,7 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
     })
   }
 
-  // â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Delete ───────────────────────────────────────────────────────────────────
   const handleDelete = () => {
     if (!selected) return
     setConfirm({
@@ -307,7 +307,7 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
     })
   }
 
-  // â”€â”€ Update field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Update field ─────────────────────────────────────────────────────────────
   const handleUpdateProject = async (fields: Parameters<typeof updateProject>[1]) => {
     if (!selected) return
     const { error } = await updateProject(selected.id, fields)
@@ -321,7 +321,7 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
 
   return (
     <div className="flex h-full min-h-screen bg-[#f9fafb]">
-      {/* â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Sidebar ───────────────────────────────────────────────────────────── */}
       <aside className="w-[340px] flex-shrink-0 flex flex-col bg-white border-r border-[#f0f0f0] h-screen sticky top-0 overflow-hidden">
         {/* header */}
         <div className="px-5 pt-6 pb-4 border-b border-[#f0f0f0]">
@@ -387,18 +387,18 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
           <div className="flex items-center justify-between px-4 py-3 border-t border-[#f0f0f0] text-xs text-[#6b7280]">
             <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
               className="px-3 py-1.5 rounded-xl border border-[#e5e5e5] disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
-              â† Prev
+              ← Prev
             </button>
             <span>{page} / {totalPages}</span>
             <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}
               className="px-3 py-1.5 rounded-xl border border-[#e5e5e5] disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
-              Next â†’
+              Next →
             </button>
           </div>
         )}
       </aside>
 
-      {/* â”€â”€ Main panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Main panel ──────────────────────────────────────────────────────── */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {!selected ? (
           <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
@@ -462,7 +462,7 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
         )}
       </main>
 
-      {/* â”€â”€ Overlays â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Overlays ─────────────────────────────────────────────────────────── */}
       {showNew && (
         <NewProjectModal
           developers={developers}

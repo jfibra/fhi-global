@@ -69,7 +69,7 @@ export function ProjectMediaTab({ projectId, showToast }: Props) {
             <div>
               <label className="block text-xs font-semibold text-[#6b7280] mb-1.5">URL *</label>
               <input type="url" value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
-                placeholder="https://â€¦"
+                placeholder="https://…"
                 className="w-full border border-[#e5e5e5] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#001f3f]/20 focus:border-[#001f3f]" />
             </div>
           </div>
@@ -78,7 +78,7 @@ export function ProjectMediaTab({ projectId, showToast }: Props) {
               className="px-4 py-2 rounded-full border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-all">Cancel</button>
             <button type="button" onClick={() => void handleAdd()} disabled={saving || !form.url.trim()}
               className="px-4 py-2 rounded-full bg-[#001f3f] text-white text-sm font-semibold disabled:opacity-50 hover:bg-[#001f3f]/90 transition-all">
-              {saving ? "Savingâ€¦" : "Add"}
+              {saving ? "Saving…" : "Add"}
             </button>
           </div>
         </div>

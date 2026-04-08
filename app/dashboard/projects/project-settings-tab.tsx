@@ -78,7 +78,7 @@ export function ProjectSettingsTab({ project, onSave, onPublishToggle }: Props) 
         <Toggle
           fieldKey="is_active"
           label="Active"
-          description="Internal active status â€” affects listing visibility"
+          description="Internal active status — affects listing visibility"
           icon={CheckCircle2}
           value={project.is_active}
           accent="#2563eb"

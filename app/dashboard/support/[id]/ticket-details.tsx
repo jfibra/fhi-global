@@ -36,9 +36,9 @@ const STATUS_LABEL: Record<SupportTicketStatus, string> = {
 }
 
 function formatDate(value: string | null) {
-  if (!value) return "â€”"
+  if (!value) return "—"
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "â€”"
+  if (Number.isNaN(date.getTime())) return "—"
   return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
 }
 
@@ -67,7 +67,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">{label}</span>
-      <span className="text-sm text-[#0d1117] font-medium">{value ?? <span className="text-[#9ca3af]">â€”</span>}</span>
+      <span className="text-sm text-[#0d1117] font-medium">{value ?? <span className="text-[#9ca3af]">—</span>}</span>
     </div>
   )
 }
@@ -309,7 +309,7 @@ export function TicketDetails({
             className={`flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold pointer-events-auto max-w-xs ${toast.type === "success" ? "bg-green-50 text-green-800 border border-green-100" : "bg-rose-50 text-rose-800 border border-rose-100"}`}
           >
             <span className="flex-1">{toast.text}</span>
-            <button type="button" onClick={() => setToasts((prev) => prev.filter((item) => item.id !== toast.id))} className="opacity-60 hover:opacity-100 text-xs ml-2">âœ•</button>
+            <button type="button" onClick={() => setToasts((prev) => prev.filter((item) => item.id !== toast.id))} className="opacity-60 hover:opacity-100 text-xs ml-2">✕</button>
           </div>
         ))}
       </div>

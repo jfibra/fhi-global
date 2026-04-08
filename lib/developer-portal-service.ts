@@ -10,7 +10,7 @@ import type { Project, ProjectImage, ProjectMedia } from "@/lib/project-service"
 
 export type { Developer }
 
-// â”€â”€â”€ Link â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Link ──────────────────────────────────────────────────────────────────────
 // Returns the developers row linked to the given profile via metadata.developer_id
 export async function getDeveloperForUser(
   userId: string,
@@ -45,7 +45,7 @@ export async function getDeveloperForUser(
   return { data, error: null }
 }
 
-// â”€â”€â”€ Update company info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Update company info ───────────────────────────────────────────────────────
 export type DeveloperCompanyFormData = {
   name: string
   slug: string
@@ -81,7 +81,7 @@ export async function updateDeveloperCompany(
   return { data, error: null }
 }
 
-// â”€â”€â”€ Projects (scoped) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Projects (scoped) ────────────────────────────────────────────────────────
 export type DeveloperProjectsResponse = {
   data: Project[] | null
   total: number | null
@@ -131,7 +131,7 @@ export async function fetchDeveloperProjects(params: {
   return { data: (data ?? []) as Project[], total: count ?? 0, error: null }
 }
 
-// â”€â”€â”€ Project stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Project stats ────────────────────────────────────────────────────────────
 export type DeveloperStats = {
   totalProjects: number
   activeProjects: number
@@ -166,7 +166,7 @@ export async function fetchDeveloperStats(
   }
 }
 
-// â”€â”€â”€ Soft-toggle publish â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Soft-toggle publish ──────────────────────────────────────────────────────
 export async function toggleProjectPublish(
   projectId: number,
   developerId: string,
@@ -185,7 +185,7 @@ export async function toggleProjectPublish(
   return { error: error?.message ?? null }
 }
 
-// â”€â”€â”€ Soft-toggle active â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Soft-toggle active ───────────────────────────────────────────────────────
 export async function toggleProjectActive(
   projectId: number,
   developerId: string,
@@ -201,7 +201,7 @@ export async function toggleProjectActive(
   return { error: error?.message ?? null }
 }
 
-// â”€â”€â”€ Soft delete project â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Soft delete project ──────────────────────────────────────────────────────
 export async function softDeleteDeveloperProject(
   projectId: number,
   developerId: string,
@@ -216,7 +216,7 @@ export async function softDeleteDeveloperProject(
   return { error: error?.message ?? null }
 }
 
-// â”€â”€â”€ Media â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Media ────────────────────────────────────────────────────────────────────
 export type MediaFile = {
   id: number
   project_id: number
@@ -287,7 +287,7 @@ export async function fetchDeveloperMedia(
   return { data: result, error: null }
 }
 
-// â”€â”€â”€ Recent projects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Recent projects ──────────────────────────────────────────────────────────
 export async function fetchRecentDeveloperProjects(
   developerId: string,
   limit = 5,

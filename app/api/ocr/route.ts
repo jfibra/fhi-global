@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ warning: "No image provided. Please fill in your details manually." }, { status: 200 })
     }
 
-    // â”€â”€ If a real OCR service API key is configured, use it â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── If a real OCR service API key is configured, use it ──────────────────
     // Example: Google Cloud Vision
     const gcpKey = process.env.GOOGLE_CLOUD_VISION_API_KEY
     if (gcpKey) {
@@ -49,8 +49,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // â”€â”€ Lightweight fallback: regex on raw base64 decoded text â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // This has very limited accuracy â€” it may catch numeric patterns in
+    // ── Lightweight fallback: regex on raw base64 decoded text ───────────────
+    // This has very limited accuracy — it may catch numeric patterns in
     // low-entropy parts of the encoded data. Real text extraction via OCR
     // is strongly recommended. Return fields empty with a clear warning.
     return NextResponse.json({
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// â”€â”€ Text extraction helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Text extraction helpers ───────────────────────────────────────────────────
 
 interface OcrResult {
   name:        string

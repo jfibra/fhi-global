@@ -55,7 +55,7 @@ export function ProjectFeaturesTab({ projectId, showToast }: Props) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && void handleAdd()}
-          placeholder="e.g. Smart home automationâ€¦"
+          placeholder="e.g. Smart home automation…"
           className="flex-1 border border-[#e5e5e5] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#001f3f]/20 focus:border-[#001f3f]"
         />
         <button type="button" onClick={() => void handleAdd()} disabled={saving || !text.trim()}

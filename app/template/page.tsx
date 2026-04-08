@@ -269,7 +269,7 @@ export default function StyleGuide() {
       </main>
 
       <footer className="bg-[#111] text-white py-12 px-4 text-center">
-        <p className="text-sm text-muted-foreground mb-4">glow.co â€” Design System v2.0</p>
+        <p className="text-sm text-muted-foreground mb-4">glow.co — Design System v2.0</p>
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           className="p-3 rounded-full bg-white/10 hover:bg-white/20 transition-all"

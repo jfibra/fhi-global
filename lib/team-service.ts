@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
 export type Team = {
   id: string
@@ -62,7 +62,7 @@ export type ProfileSearchResult = {
   role: string | null
 }
 
-// â”€â”€â”€ Slug generator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Slug generator ────────────────────────────────────────────────────────────
 
 export function generateTeamSlug(name: string): string {
   return name
@@ -73,7 +73,7 @@ export function generateTeamSlug(name: string): string {
     .replace(/-+/g, "-")
 }
 
-// â”€â”€â”€ Teams â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Teams ─────────────────────────────────────────────────────────────────────
 
 export async function fetchTeams(): Promise<{ data: Team[] | null; error: string | null }> {
   const supabase = createClient()
@@ -169,7 +169,7 @@ export async function updateTeamLogoUrl(
   return { error: error?.message ?? null }
 }
 
-// â”€â”€â”€ Members â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Members ───────────────────────────────────────────────────────────────────
 
 export async function fetchTeamMembers(params: {
   teamId: string
@@ -289,7 +289,7 @@ export async function transferMember(params: {
 }): Promise<{ error: string | null }> {
   const supabase = createClient()
 
-  // Step 1 â€” close current membership (trigger handle_team_transfer will fire)
+  // Step 1 — close current membership (trigger handle_team_transfer will fire)
   const { error: closeErr } = await supabase
     .from("team_memberships")
     .update({
@@ -300,7 +300,7 @@ export async function transferMember(params: {
 
   if (closeErr) return { error: closeErr.message }
 
-  // Step 2 â€” create new membership (only if trigger hasn't done it already)
+  // Step 2 — create new membership (only if trigger hasn't done it already)
   const { error: insertErr } = await supabase
     .from("team_memberships")
     .insert({
@@ -313,7 +313,7 @@ export async function transferMember(params: {
   return { error: insertErr?.message ?? null }
 }
 
-// â”€â”€â”€ Profile search (for Add Member dialog) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Profile search (for Add Member dialog) ────────────────────────────────────
 
 export async function searchProfiles(
   query: string,

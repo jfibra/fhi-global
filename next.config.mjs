@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 
+const isProd = process.env.NODE_ENV === "production"
+
 // ── External origins used by the app ────────────────────────────────────────
 // Supabase project (storage + API + realtime)
 const SUPABASE_HOST  = "hefwmaoborpfuyhbguzv.supabase.co"
@@ -8,6 +10,9 @@ const VERCEL_SCRIPTS = "va.vercel-scripts.com"
 const VERCEL_VITALS  = "vitals.vercel-insights.com"
 // Flag images (hero section)
 const FLAGCDN        = "flagcdn.com"
+// Google Maps JavaScript API (buy page map)
+const MAPS_API       = "maps.googleapis.com"
+const MAPS_GSTATIC   = "maps.gstatic.com"
 
 // ── Content-Security-Policy ──────────────────────────────────────────────────
 // next/font/google self-hosts fonts at build-time → no fonts.googleapis.com needed.
@@ -17,20 +22,20 @@ const CSP = [
   // Fallback for anything not matched below
   `default-src 'self'`,
 
-  // JS: own scripts + Next.js inline chunks + Vercel Analytics loader
-  `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${VERCEL_SCRIPTS}`,
+  // JS: own scripts + Next.js inline chunks + Vercel Analytics + Google Maps
+  `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://${MAPS_API} https://${MAPS_GSTATIC} ${VERCEL_SCRIPTS}`,
 
   // CSS: Tailwind / Next.js injects inline styles
   `style-src 'self' 'unsafe-inline'`,
 
-  // Images: own assets, data URIs, blob previews (camera/OCR), Supabase storage, flag CDN
-  `img-src 'self' data: blob: https://${SUPABASE_HOST} https://${FLAGCDN}`,
+  // Images: own assets, data URIs, blob previews (camera/OCR), Supabase storage, flag CDN, map tiles
+  `img-src 'self' data: blob: https://${SUPABASE_HOST} https://${FLAGCDN} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com`,
 
   // Fonts: self-hosted via next/font – no external font CDN required
   `font-src 'self' data:`,
 
-  // XHR / fetch: Supabase REST + Auth + Realtime, Vercel Analytics
-  `connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST} https://${VERCEL_VITALS} https://${VERCEL_SCRIPTS}`,
+  // XHR / fetch: Supabase REST + Auth + Realtime, Vercel Analytics, Google Maps
+  `connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST} https://${VERCEL_VITALS} https://${VERCEL_SCRIPTS} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.googleapis.com`,
 
   // Camera / microphone captured media (face-verify & ID-capture steps)
   `media-src 'self' blob:`,
@@ -51,19 +56,23 @@ const CSP = [
   // Lock <base> tag (prevents base-tag injection attacks)
   `base-uri 'self'`,
 
-  // Block mixed HTTP content
-  `upgrade-insecure-requests`,
+  // In dev over http://localhost, this upgrades RSC fetches to https:// and breaks navigation
+  // ("TypeError: Failed to fetch"). Keep only for production behind HTTPS.
+  ...(isProd ? [`upgrade-insecure-requests`] : []),
 ]
   .join("; ")
 
 // ── Security headers applied to every route ──────────────────────────────────
 const SECURITY_HEADERS = [
-  // === Transport ===
-  {
-    key: "Strict-Transport-Security",
-    // 2 years; include subdomains; submit to preload list
-    value: "max-age=63072000; includeSubDomains; preload",
-  },
+  // HSTS is for HTTPS production only; sending it during local HTTP dev can confuse browsers.
+  ...(isProd
+    ? [
+        {
+          key: "Strict-Transport-Security",
+          value: "max-age=63072000; includeSubDomains; preload",
+        },
+      ]
+    : []),
 
   // === Content sniffing ===
   {
@@ -137,7 +146,9 @@ const nextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
-    minimumCacheTTL: 60,
+    minimumCacheTTL: 300,
+    // Next.js 16: any <Image quality={n}> must be listed here or rendering can warn/fail
+    qualities: [75, 80],
     deviceSizes: [400, 640, 750, 828, 1080, 1200, 1600, 1920],
     imageSizes: [32, 48, 64, 96, 128, 256, 384, 400, 800],
     remotePatterns: [

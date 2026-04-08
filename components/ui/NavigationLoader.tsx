@@ -21,7 +21,7 @@ export function NavigationLoader() {
   const pathnameRef = useRef(pathname)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // â”€â”€ Intercept internal link clicks â†’ show loader â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Intercept internal link clicks → show loader ──────────────────────────
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       const anchor = (e.target as HTMLElement).closest("a")
@@ -49,7 +49,7 @@ export function NavigationLoader() {
     return () => document.removeEventListener("click", handleClick, { capture: true })
   }, [])
 
-  // â”€â”€ Pathname resolved â†’ fade out and hide â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Pathname resolved → fade out and hide ────────────────────────────────
   useEffect(() => {
     pathnameRef.current = pathname
     if (!visible) return

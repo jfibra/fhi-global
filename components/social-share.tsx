@@ -84,7 +84,7 @@ export function SocialShare({ title, text, variant = "light" }: SocialShareProps
               <LinkIcon className="w-3.5 h-3.5" /> {url.replace(/^https?:\/\//, "")}
             </span>
           ) : (
-            <span>Loadingâ€¦</span>
+            <span>Loading…</span>
           )}
         </div>
       </div>

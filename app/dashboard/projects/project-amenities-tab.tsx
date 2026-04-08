@@ -83,7 +83,7 @@ export function ProjectAmenitiesTab({ projectId, showToast }: Props) {
       <div className="flex justify-end">
         <button type="button" onClick={() => void handleSave()} disabled={saving}
           className="flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50">
-          <Save className="w-4 h-4" />{saving ? "Savingâ€¦" : "Save Amenities"}
+          <Save className="w-4 h-4" />{saving ? "Saving…" : "Save Amenities"}
         </button>
       </div>
     </div>

@@ -98,7 +98,7 @@ export function ProjectNearbyTab({ projectId, showToast }: Props) {
               className="px-4 py-2 rounded-full border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-all">Cancel</button>
             <button type="button" onClick={() => void handleSave()} disabled={saving || !editing.description?.trim()}
               className="px-4 py-2 rounded-full bg-[#001f3f] text-white text-sm font-semibold disabled:opacity-50 hover:bg-[#001f3f]/90 transition-all">
-              {saving ? "Savingâ€¦" : "Save"}
+              {saving ? "Saving…" : "Save"}
             </button>
           </div>
         </div>

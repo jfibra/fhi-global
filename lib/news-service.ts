@@ -1,5 +1,5 @@
 /**
- * news-service.ts â€” server-only module
+ * news-service.ts — server-only module
  * Calls the HomesPH News external API using server-side env vars.
  * The API key is never sent to the browser.
  */
@@ -24,7 +24,7 @@ export type NewsArticle = {
   content?: string
 }
 
-// â”€â”€ Slugify â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Slugify ────────────────────────────────────────────────────────────────────
 export function slugify(text: string): string {
   return (text ?? "")
     .toString()
@@ -36,7 +36,7 @@ export function slugify(text: string): string {
     .replace(/^-+|-+$/g, "") || "news"
 }
 
-// â”€â”€ Normalize a single raw API object â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Normalize a single raw API object ─────────────────────────────────────────
 function normalize(raw: Record<string, any>, idx: number): NewsArticle {
   const image = raw?.featured_image ?? raw?.image ?? raw?.image_url ?? raw?.cover ?? "/img/1.png"
   const publishedAt = raw?.published_at ?? raw?.publish_at ?? raw?.created_at ?? ""
@@ -68,9 +68,9 @@ function normalize(raw: Record<string, any>, idx: number): NewsArticle {
   }
 }
 
-// â”€â”€ Unwrap flexible API response shapes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// List responses: { data: { data: [...] } }  â†’ result.data.data
-// Single article: { data: { id, title, â€¦ } } â†’ result.data  (object, not array)
+// ── Unwrap flexible API response shapes ───────────────────────────────────────
+// List responses: { data: { data: [...] } }  → result.data.data
+// Single article: { data: { id, title, … } } → result.data  (object, not array)
 // Fallback array or bare object also handled.
 function extractArray(result: unknown): Record<string, any>[] {
   if (!result || typeof result !== "object") return []
@@ -94,7 +94,7 @@ function extractArray(result: unknown): Record<string, any>[] {
   return [d]
 }
 
-// â”€â”€ Base URL helper (strips trailing slash) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Base URL helper (strips trailing slash) ───────────────────────────────────
 function baseUrl(): string {
   return (process.env.HOMESPH_NEWS_API_URL ?? "").replace(/\/$/, "")
 }
@@ -103,8 +103,8 @@ function apiKey(): string {
   return process.env.HOMESPH_NEWS_API_KEY ?? ""
 }
 
-// â”€â”€ Low-level fetch wrapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function apiFetch(url: string): Promise<unknown> {
+// ── Low-level fetch wrapper ────────────────────────────────────────────────────
+async function apiFetch(url: string, init?: { signal?: AbortSignal }): Promise<unknown> {
   const key = apiKey()
   if (!url || !key) return null
   try {
@@ -114,6 +114,7 @@ async function apiFetch(url: string): Promise<unknown> {
         Accept: "application/json",
       },
       next: { revalidate: 300 },
+      signal: init?.signal,
     })
     if (!res.ok) return null
     return res.json()
@@ -122,13 +123,16 @@ async function apiFetch(url: string): Promise<unknown> {
   }
 }
 
-// â”€â”€ Public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Public API ─────────────────────────────────────────────────────────────────
 
 /** Fetch a paginated list of articles. */
-export async function fetchArticles(page = 1): Promise<NewsArticle[]> {
+export async function fetchArticles(
+  page = 1,
+  init?: { signal?: AbortSignal }
+): Promise<NewsArticle[]> {
   const base = baseUrl()
   if (!base) return []
-  const result = await apiFetch(`${base}?page=${page}`)
+  const result = await apiFetch(`${base}?page=${page}`, init)
   return extractArray(result).map(normalize)
 }
 
@@ -136,16 +140,16 @@ export async function fetchArticles(page = 1): Promise<NewsArticle[]> {
  * Fetch a single article by slug.
  *
  * Strategy (in order):
- *   1. Path segment:  BASE/{slug}          â€” standard REST detail endpoint
- *   2. Query param:   BASE?slug={slug}      â€” alternate API convention
- *   3. List scan:     fetch pages 1â€“3 and match by slug or slugified title
+ *   1. Path segment:  BASE/{slug}          — standard REST detail endpoint
+ *   2. Query param:   BASE?slug={slug}      — alternate API convention
+ *   3. List scan:     fetch pages 1–3 and match by slug or slugified title
  *      (guaranteed to work even if the API has no dedicated detail route)
  */
 export async function fetchArticleBySlug(slug: string): Promise<NewsArticle | null> {
   const base = baseUrl()
   if (!base || !slug) return null
 
-  // â”€â”€ Strategy 1: path segment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Strategy 1: path segment ───────────────────────────────────────────────
   const byPath = await apiFetch(`${base}/${slug}`)
   if (byPath) {
     const arr = extractArray(byPath)
@@ -154,14 +158,14 @@ export async function fetchArticleBySlug(slug: string): Promise<NewsArticle | nu
       // Extra guard: make sure the returned item is actually the requested article
       // (some APIs return list results even on path endpoints)
       if (Array.isArray((byPath as any)?.data?.data)) {
-        // Got a list back â€” fall through to scan
+        // Got a list back — fall through to scan
       } else {
         return article
       }
     }
   }
 
-  // â”€â”€ Strategy 2: query param â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Strategy 2: query param ────────────────────────────────────────────────
   const byQuery = await apiFetch(`${base}?slug=${encodeURIComponent(slug)}`)
   if (byQuery) {
     const arr = extractArray(byQuery)
@@ -171,7 +175,7 @@ export async function fetchArticleBySlug(slug: string): Promise<NewsArticle | nu
     }
   }
 
-  // â”€â”€ Strategy 3: scan list pages 1â€“3 and match by slug â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Strategy 3: scan list pages 1–3 and match by slug ─────────────────────
   for (let page = 1; page <= 3; page++) {
     const articles = await fetchArticles(page)
     if (articles.length === 0) break

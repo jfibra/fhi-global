@@ -13,7 +13,7 @@ import {
 export const metadata: Metadata = createPageMetadata({
   title: "About FHI Global | Dubai Real Estate Excellence",
   description:
-    "Learn about FHI Global â€” Dubai's trusted real estate platform connecting buyers with the finest residential and commercial developments.",
+    "Learn about FHI Global — Dubai's trusted real estate platform connecting buyers with the finest residential and commercial developments.",
   openGraphDescription: "Dubai's trusted real estate platform connecting buyers with the finest developments.",
   pathname: "/about",
   keywords: ["About FHI Global", "Dubai real estate company", "property platform UAE"],
@@ -36,7 +36,7 @@ const VALUES = [
   {
     icon: Zap,
     title:  "Innovation First",
-    desc:   "We continuously build smarter tools â€” from real-time project tracking to commission dashboards â€” so our agents always stay ahead.",
+    desc:   "We continuously build smarter tools — from real-time project tracking to commission dashboards — so our agents always stay ahead.",
     color:  "#d6b357",
   },
   {
@@ -82,7 +82,7 @@ const TEAM = [
 
 const MILESTONES = [
   { year: "2015", title: "Founded in Dubai", desc: "FHI Global was established with a vision to modernise real estate sales in the UAE." },
-  { year: "2018", title: "100+ Developers", desc: "Reached our first major milestone â€” onboarding over a hundred verified Dubai developers." },
+  { year: "2018", title: "100+ Developers", desc: "Reached our first major milestone — onboarding over a hundred verified Dubai developers." },
   { year: "2021", title: "Platform Launch", desc: "Launched our proprietary CRM platform, transforming how agents track and close deals." },
   { year: "2024", title: "Global Expansion", desc: "Extended our reach to 25+ countries, helping international buyers access Dubai property." },
 ]
@@ -97,7 +97,7 @@ export default function AboutPage() {
       <TopBar />
       <Header />
 
-      {/* â”€â”€ Hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Hero ─────────────────────────────────────────────── */}
       <section className="relative pt-20 pb-24 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
@@ -136,7 +136,7 @@ export default function AboutPage() {
           </h1>
 
           <p className="text-white/60 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-10">
-            Dubai&apos;s most trusted real estate platform â€” connecting visionary developers,
+            Dubai&apos;s most trusted real estate platform — connecting visionary developers,
             dedicated agents, and global buyers since 2015.
           </p>
 
@@ -157,7 +157,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* â”€â”€ Stats bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Stats bar ─────────────────────────────────────────── */}
       <section className="bg-white border-b border-[#e8eaed]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-0 md:divide-x divide-[#f0f0f0]">
           {STATS.map(({ icon: Icon, value, label }) => (
@@ -172,7 +172,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* â”€â”€ Our Story â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Our Story ─────────────────────────────────────────── */}
       <section className="relative py-20 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
@@ -201,7 +201,7 @@ export default function AboutPage() {
             <div className="space-y-4 text-[#374151] leading-relaxed">
               <p>
                 FHI Global was born from a simple frustration: Dubai&apos;s incredible real estate market was
-                fragmented, opaque, and difficult to navigate â€” for agents, developers, and buyers alike.
+                fragmented, opaque, and difficult to navigate — for agents, developers, and buyers alike.
               </p>
               <p>
                 We set out to change that. Starting with a small team in DIFC, we built the relationships,
@@ -210,7 +210,7 @@ export default function AboutPage() {
               <p>
                 Today, FHI Global is the backbone of Dubai property sales for over 100 premium developers
                 and thousands of agents across the globe. Our platform tracks every deal, every commission,
-                and every milestone â€” in real time.
+                and every milestone — in real time.
               </p>
             </div>
           </div>
@@ -236,7 +236,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* â”€â”€ Values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Values ────────────────────────────────────────────── */}
       <section className="relative bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] py-20 overflow-hidden">
         <div
           className="absolute inset-0 opacity-[0.04]"
@@ -274,7 +274,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* â”€â”€ Awards & Recognition â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Awards & Recognition ──────────────────────────────── */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
@@ -313,7 +313,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* â”€â”€ Leadership Team â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Leadership Team ───────────────────────────────────── */}
       <section className="relative py-20 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
@@ -362,7 +362,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* â”€â”€ Trusted by â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Trusted by ────────────────────────────────────────── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="bg-white/40 backdrop-blur-2xl rounded-[32px] border border-white border-opacity-60 shadow-xl shadow-black/5 p-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
@@ -405,7 +405,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* â”€â”€ CTA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── CTA ───────────────────────────────────────────────── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
         <div className="relative bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] rounded-[40px] overflow-hidden p-1">
           {/* Background */}
@@ -437,7 +437,7 @@ export default function AboutPage() {
               </span>
             </h2>
             <p className="text-white/55 text-lg max-w-xl mx-auto mb-10">
-              Whether you&apos;re a developer, an agent, or an investor â€” FHI Global has the tools and the team to take you further.
+              Whether you&apos;re a developer, an agent, or an investor — FHI Global has the tools and the team to take you further.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link

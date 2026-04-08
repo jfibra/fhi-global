@@ -10,7 +10,7 @@ import { Clock, Play } from "lucide-react"
 
 export const revalidate = 300
 
-// â”€â”€ Metadata â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Metadata ───────────────────────────────────────────────────────────────────
 type PageProps = { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -66,7 +66,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-// â”€â”€ Time ago label â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Time ago label ─────────────────────────────────────────────────────────────
 function timeAgoLabel(dateStr: string): string {
   if (!dateStr) return "UPDATED RECENTLY"
   try {
@@ -96,7 +96,7 @@ function fmt(dateStr: string) {
   }
 }
 
-// â”€â”€ Share strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Share strip ────────────────────────────────────────────────────────────────
 function ShareStrip({ url, title, compact }: { url: string; title: string; compact?: boolean }) {
   const e = encodeURIComponent(url)
   const t = encodeURIComponent(title)
@@ -133,7 +133,7 @@ function ShareStrip({ url, title, compact }: { url: string; title: string; compa
   )
 }
 
-// â”€â”€ Article content renderer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Article content renderer ───────────────────────────────────────────────────
 function ArticleContent({ content }: { content: string }) {
   if (!content) {
     return <p className="text-gray-400 italic text-sm">No content available.</p>
@@ -163,7 +163,7 @@ function ArticleContent({ content }: { content: string }) {
   )
 }
 
-// â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Page ───────────────────────────────────────────────────────────────────────
 export default async function NewsDetailPage({ params }: PageProps) {
   const { slug } = await params
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
@@ -224,7 +224,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
       <TopBar />
       <Header />
 
-      {/* â”€â”€ Breadcrumb â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Breadcrumb ─────────────────────────────────────────────────────── */}
       <div className="border-b border-gray-200 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-9 flex items-center gap-2 text-xs text-gray-400">
           <Link href="/" className="hover:text-[#d6b357] transition-colors">Home</Link>
@@ -238,7 +238,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-          {/* â”€â”€ LEFT / MAIN ARTICLE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── LEFT / MAIN ARTICLE ─────────────────────────────────────────── */}
           <article className="lg:col-span-8">
 
             {/* Title block with left border style */}
@@ -326,7 +326,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
             </div>
           </article>
 
-          {/* â”€â”€ RIGHT SIDEBAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── RIGHT SIDEBAR ────────────────────────────────────────────────── */}
           <aside className="lg:col-span-4 flex flex-col gap-8">
 
             {/* LATEST STORIES */}

@@ -12,7 +12,7 @@ import {
   type TeamMemberProfile,
 } from "@/lib/team-service"
 
-// â”€â”€â”€ Add Member dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Add Member dialog ─────────────────────────────────────────────────────────
 
 interface AddMemberProps {
   open: boolean
@@ -105,8 +105,8 @@ export function AddMemberDialog({ open, onClose, onAdded, team }: AddMemberProps
                   {(selected.fullname ?? "U").charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-[#0d1117] truncate">{selected.fullname ?? "â€”"}</p>
-                  <p className="text-[11px] text-[#9ca3af]">{selected.role ?? "â€”"}</p>
+                  <p className="text-xs font-semibold text-[#0d1117] truncate">{selected.fullname ?? "—"}</p>
+                  <p className="text-[11px] text-[#9ca3af]">{selected.role ?? "—"}</p>
                 </div>
                 <button
                   onClick={() => setSelected(null)}
@@ -123,7 +123,7 @@ export function AddMemberDialog({ open, onClose, onAdded, team }: AddMemberProps
                     autoFocus
                     value={query}
                     onChange={e => setQuery(e.target.value)}
-                    placeholder="Search by nameâ€¦"
+                    placeholder="Search by name…"
                     className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[#e8eaed] text-sm bg-white focus:border-[#001f3f] focus:ring-2 focus:ring-[#001f3f]/10 outline-none placeholder:text-[#9ca3af] text-[#0d1117] transition-all"
                   />
                   {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-[#9ca3af]" />}
@@ -141,7 +141,7 @@ export function AddMemberDialog({ open, onClose, onAdded, team }: AddMemberProps
                           {(r.fullname ?? "U").charAt(0)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-[#0d1117] truncate">{r.fullname ?? "â€”"}</p>
+                          <p className="font-medium text-[#0d1117] truncate">{r.fullname ?? "—"}</p>
                           {r.role && <p className="text-[11px] text-[#9ca3af]">{r.role}</p>}
                         </div>
                         <User className="w-3.5 h-3.5 text-[#d1d5db] shrink-0" />
@@ -165,10 +165,10 @@ export function AddMemberDialog({ open, onClose, onAdded, team }: AddMemberProps
                 onChange={e => setRoleStr(e.target.value)}
                 className="w-full appearance-none px-3 py-2.5 pr-10 rounded-xl border border-[#e8eaed] text-sm bg-white focus:border-[#001f3f] focus:ring-2 focus:ring-[#001f3f]/10 outline-none text-[#0d1117] transition-all"
               >
-                <option value="">â€” Select a role â€”</option>
+                <option value="">— Select a role —</option>
                 {TEAM_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#9ca3af]">â–¾</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#9ca3af]">▾</span>
             </div>
           </div>
 
@@ -203,7 +203,7 @@ export function AddMemberDialog({ open, onClose, onAdded, team }: AddMemberProps
   return createPortal(modal, document.body)
 }
 
-// â”€â”€â”€ Transfer Member dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Transfer Member dialog ────────────────────────────────────────────────────
 
 interface TransferProps {
   open: boolean
@@ -282,14 +282,14 @@ export function TransferMemberDialog({
                 onChange={e => setTargetTeamId(e.target.value)}
                 className="w-full appearance-none px-3 py-2.5 pr-10 rounded-xl border border-[#e8eaed] text-sm bg-white focus:border-[#001f3f] focus:ring-2 focus:ring-[#001f3f]/10 outline-none text-[#0d1117] transition-all"
               >
-                <option value="">â€” Select destination team â€”</option>
+                <option value="">— Select destination team —</option>
                 {available.map(t => (
                   <option key={t.id} value={t.id}>
-                    {t.parent_id ? `  â†³ ${t.name}` : t.name}
+                    {t.parent_id ? `  ↳ ${t.name}` : t.name}
                   </option>
                 ))}
               </select>
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#9ca3af]">â–¾</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#9ca3af]">▾</span>
             </div>
           </div>
 
@@ -301,12 +301,12 @@ export function TransferMemberDialog({
                 onChange={e => setRoleInTeam(e.target.value)}
                 className="w-full appearance-none px-3 py-2.5 pr-10 rounded-xl border border-[#e8eaed] text-sm bg-white focus:border-[#001f3f] focus:ring-2 focus:ring-[#001f3f]/10 outline-none text-[#0d1117] transition-all"
               >
-                <option value="">â€” Same role â€”</option>
+                <option value="">— Same role —</option>
                 {["Agent","Secretary","Team Leader","Unit Manager","Member","Observer"].map(r => (
                   <option key={r} value={r}>{r}</option>
                 ))}
               </select>
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#9ca3af]">â–¾</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#9ca3af]">▾</span>
             </div>
           </div>
 

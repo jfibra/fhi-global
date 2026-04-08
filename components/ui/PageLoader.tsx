@@ -10,7 +10,7 @@ export function PageLoader() {
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-[#001428]">
 
-      {/* â”€â”€ Radial background gradient â”€â”€ */}
+      {/* ── Radial background gradient ── */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -19,7 +19,7 @@ export function PageLoader() {
         }}
       />
 
-      {/* â”€â”€ Subtle dot grid â”€â”€ */}
+      {/* ── Subtle dot grid ── */}
       <div
         className="absolute inset-0 pointer-events-none opacity-[0.04]"
         style={{
@@ -29,7 +29,7 @@ export function PageLoader() {
         }}
       />
 
-      {/* â”€â”€ Gold ambient glow blob (pulsing) â”€â”€ */}
+      {/* ── Gold ambient glow blob (pulsing) ── */}
       <div
         className="absolute"
         style={{
@@ -43,7 +43,7 @@ export function PageLoader() {
         }}
       />
 
-      {/* â”€â”€ Logo container â”€â”€ */}
+      {/* ── Logo container ── */}
       <div
         className="relative flex flex-col items-center gap-8"
         style={{
@@ -82,7 +82,7 @@ export function PageLoader() {
           />
         </div>
 
-        {/* â”€â”€ Gold shimmer progress line â”€â”€ */}
+        {/* ── Gold shimmer progress line ── */}
         <div
           className="relative overflow-hidden rounded-full"
           style={{ width: 160, height: 2, background: "rgba(214,179,87,0.15)" }}
@@ -98,7 +98,7 @@ export function PageLoader() {
         </div>
       </div>
 
-      {/* â”€â”€ Keyframes injected via a style tag â”€â”€ */}
+      {/* ── Keyframes injected via a style tag ── */}
       <style>{`
         @keyframes fhi-blob-pulse {
           0%, 100% { opacity: 1; transform: scale(1); }

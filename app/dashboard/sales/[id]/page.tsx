@@ -19,10 +19,10 @@ export const dynamic = "force-dynamic"
 const ALLOWED_ROLES = ["super_admin", "admin", "team_leader", "unit_manager", "agent"]
 
 function formatDate(value: string | null) {
-  if (!value) return "â€”"
+  if (!value) return "—"
   const date = new Date(value)
   return Number.isNaN(date.getTime())
-    ? "â€”"
+    ? "—"
     : date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
 }
 
@@ -58,7 +58,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">{label}</span>
-      <span className="text-sm text-[#0d1117] font-medium">{value ?? <span className="text-[#9ca3af]">â€”</span>}</span>
+      <span className="text-sm text-[#0d1117] font-medium">{value ?? <span className="text-[#9ca3af]">—</span>}</span>
     </div>
   )
 }
@@ -134,7 +134,7 @@ export default async function SaleDetailPage({
 
   const clientName = sale.clients
     ? `${sale.clients.first_name} ${sale.clients.last_name}`
-    : "â€”"
+    : "—"
 
   const attachmentsCount = Array.isArray(sale.sales_attachments) ? sale.sales_attachments.length : 0
   const clientFull = sale.clients as {
@@ -177,7 +177,7 @@ export default async function SaleDetailPage({
                   {clientName}
                 </h1>
                 <p className="text-sm text-[#6b7280]">
-                  {sale.projects?.name ?? "â€”"} Â· {sale.developers?.name ?? "â€”"}
+                  {sale.projects?.name ?? "—"} Â· {sale.developers?.name ?? "—"}
                 </p>
               </div>
             </div>

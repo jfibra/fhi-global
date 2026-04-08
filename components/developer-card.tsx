@@ -1,6 +1,6 @@
 import Link from "next/link"
 import Image from "next/image"
-import { Building2, Star, BadgeCheck, ArrowUpRight, Layers, MapPin } from "lucide-react"
+import { Building2, Star, BadgeCheck, ArrowUpRight, Layers, Check } from "lucide-react"
 
 export interface DeveloperCardData {
   id: string
@@ -15,11 +15,70 @@ export interface DeveloperCardData {
 
 interface DeveloperCardProps {
   developer: DeveloperCardData
+  /** Split map + list reference: compact card, “Rating:” label, full-width CTA. */
+  variant?: "default" | "directory"
 }
 
-export function DeveloperCard({ developer }: DeveloperCardProps) {
+export function DeveloperCard({ developer, variant = "default" }: DeveloperCardProps) {
   const { name, slug, description, logo_url, rating, is_verified, project_count } = developer
   const stars = rating != null ? Math.round(rating) : 0
+
+  if (variant === "directory") {
+    return (
+      <Link
+        href={`/developers/${slug}`}
+        className="group flex flex-row gap-3 sm:gap-4 rounded-lg border border-[#e8eaed] bg-white p-3 sm:p-4 shadow-sm transition-shadow hover:shadow-md"
+      >
+        <div className="relative h-[100px] w-[100px] shrink-0 rounded-lg bg-[#eef2f6] flex items-center justify-center overflow-hidden sm:h-[112px] sm:w-[112px]">
+          {logo_url ? (
+            <Image src={logo_url} alt={name} width={80} height={80} className="object-contain p-2" />
+          ) : (
+            <Building2 className="h-9 w-9 text-[#001f3f]/20" aria-hidden />
+          )}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <h3 className="font-['Outfit'] text-[15px] font-bold leading-tight text-[#0f2940] line-clamp-1 sm:text-base">
+              {name}
+            </h3>
+            {is_verified && (
+              <span
+                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"
+                title="Verified"
+              >
+                <Check className="h-3 w-3 stroke-[3]" aria-hidden />
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 text-sm text-[#374151]">
+            <span className="font-medium text-[#4b5563]">Rating:</span>
+            {rating != null ? (
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`h-3.5 w-3.5 ${
+                      i < stars ? "fill-[#d6b357] text-[#d6b357]" : "fill-[#e5e7eb] text-[#e5e7eb]"
+                    }`}
+                  />
+                ))}
+              </div>
+            ) : (
+              <span className="text-xs italic text-[#9ca3af]">Not yet rated</span>
+            )}
+          </div>
+          {description ? (
+            <p className="line-clamp-2 text-[13px] leading-relaxed text-[#6b7280]">{description}</p>
+          ) : null}
+          <div className="mt-auto w-full border-t border-transparent pt-2">
+            <span className="flex w-full items-center justify-center rounded-lg bg-[#0f2940] py-2.5 text-center text-sm font-semibold text-white transition-colors group-hover:bg-[#001f3f]">
+              View Details
+            </span>
+          </div>
+        </div>
+      </Link>
+    )
+  }
 
   return (
     <Link

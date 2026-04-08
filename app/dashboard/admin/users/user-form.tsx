@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react"
 import { X, Eye, EyeOff, User, Mail, Lock, Globe, Shield, CheckCircle } from "lucide-react"
 import type { UserRecord, CreateUserPayload, UpdateUserPayload } from "@/lib/user-service"
-import { ROLE_OPTIONS, STATUS_OPTIONS, TIMEZONES, COUNTRY_CODES, getUserDisplayName } from "@/lib/user-service"
+import { ROLE_OPTIONS, STATUS_OPTIONS, TIMEZONES, getUserDisplayName } from "@/lib/user-service"
 import { UserAvatar } from "@/components/user-avatar"
+import { PhoneCountrySelect } from "@/components/phone-country-select"
 
 type Mode = "create" | "edit"
 
@@ -20,12 +21,12 @@ type FormField = {
 type BannerType = "success" | "error"
 type DeveloperOption = { id: string; name: string; slug: string }
 
-// â”€â”€â”€ Shared input styling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Shared input styling ──────────────────────────────────────────────────────
 const INPUT = "w-full px-4 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm text-[#0d1117] bg-white focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 placeholder:text-[#9ca3af] disabled:bg-[#f9fafb] disabled:text-[#9ca3af]"
 const LABEL = "block text-[11px] font-bold uppercase tracking-wider text-[#6b7280] mb-1.5 ml-1"
 const SELECT = `${INPUT} cursor-pointer appearance-none`
 
-// â”€â”€â”€ UserForm â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── UserForm ──────────────────────────────────────────────────────────────────
 export function UserForm({
   editUser,
   onClose,
@@ -94,7 +95,7 @@ export function UserForm({
     void loadDevelopers()
   }, [])
 
-  // â”€â”€ Create handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Create handler ───────────────────────────────────────────────────────────
   const handleCreate = async () => {
     if (!create.email.trim() || !create.password || !create.fname.trim() || !create.lname.trim()) {
       onBanner("error", "Email, password, first name, and last name are required.")
@@ -119,7 +120,7 @@ export function UserForm({
     }
   }
 
-  // â”€â”€ Edit handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Edit handler ─────────────────────────────────────────────────────────────
   const handleEdit = async () => {
     if (!editUser) return
     if (edit.role === "developer" && !edit.developer_id) {
@@ -178,7 +179,7 @@ export function UserForm({
         {/* Body */}
         <div className="overflow-y-auto px-7 py-6 space-y-6 flex-1">
 
-          {/* â”€â”€ Name section â”€â”€ */}
+          {/* ── Name section ── */}
           <div>
             <SectionLabel icon={User} label="Name" />
             <div className="grid grid-cols-3 gap-3">
@@ -224,7 +225,7 @@ export function UserForm({
             </div>
           </div>
 
-          {/* â”€â”€ Account fields (create only) â”€â”€ */}
+          {/* ── Account fields (create only) ── */}
           {!isEdit && (
             <div>
               <SectionLabel icon={Mail} label="Account Credentials" />
@@ -262,7 +263,7 @@ export function UserForm({
             </div>
           )}
 
-          {/* â”€â”€ Personal info (edit only) â”€â”€ */}
+          {/* ── Personal info (edit only) ── */}
           {isEdit && (
             <div>
               <SectionLabel icon={User} label="Personal Information" />
@@ -294,7 +295,7 @@ export function UserForm({
             </div>
           )}
 
-          {/* â”€â”€ Phone (edit only) â”€â”€ */}
+          {/* ── Phone (edit only) ── */}
           {isEdit && (
             <div>
               <SectionLabel icon={Globe} label="Contact Numbers" />
@@ -317,7 +318,7 @@ export function UserForm({
             </div>
           )}
 
-          {/* â”€â”€ Role & access â”€â”€ */}
+          {/* ── Role & access ── */}
           <div>
             <SectionLabel icon={Shield} label="Role & Access" />
             <div className="grid grid-cols-3 gap-3">
@@ -408,7 +409,7 @@ export function UserForm({
             ) : (
               <CheckCircle className="w-4 h-4" />
             )}
-            {busy ? "Savingâ€¦" : isEdit ? "Save Changes" : "Create User"}
+            {busy ? "Saving…" : isEdit ? "Save Changes" : "Create User"}
           </button>
         </div>
       </div>
@@ -416,7 +417,7 @@ export function UserForm({
   )
 }
 
-// â”€â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Sub-components ────────────────────────────────────────────────────────────
 function SectionLabel({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
@@ -445,13 +446,12 @@ function PhoneField({
     <div>
       <label className={LABEL}>{label}</label>
       <div className="flex gap-1.5">
-        <select
+        <PhoneCountrySelect
           value={countryCode}
-          onChange={(e) => onCountryChange(e.target.value)}
-          className="pl-2.5 pr-1 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white focus:outline-none focus:border-[#001f3f] cursor-pointer w-24 shrink-0"
-        >
-          {COUNTRY_CODES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-        </select>
+          onChange={onCountryChange}
+          ariaLabel={`${label} country calling code`}
+          className="pl-2.5 pr-1 py-2.5 w-24"
+        />
         <input
           type="tel"
           placeholder="50 123 4567"

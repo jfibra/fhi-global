@@ -31,7 +31,7 @@ function formatPrice(from: number | null, to: number | null, currency: string | 
     if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`
     return n.toString()
   }
-  if (to && to !== from) return `${cur} ${fmt(from)} â€“ ${fmt(to)}`
+  if (to && to !== from) return `${cur} ${fmt(from)} – ${fmt(to)}`
   return `${cur} ${fmt(from)}`
 }
 

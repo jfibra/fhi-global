@@ -26,14 +26,14 @@ const OFFICES = [
     address: "Level 12, DIFC Gate Building, Dubai International Financial Centre, Dubai, UAE",
     phone: "+971 4 300 1234",
     email: "info@fhiglobal.com",
-    hours: "Sunâ€“Thu: 9:00 AM â€“ 6:00 PM",
+    hours: "Sun–Thu: 9:00 AM – 6:00 PM",
   },
   {
     city: "Abu Dhabi",
     address: "Suite 501, Al Bateen Investment Complex, Abu Dhabi, UAE",
     phone: "+971 2 400 5678",
     email: "abudhabi@fhiglobal.com",
-    hours: "Sunâ€“Thu: 9:00 AM â€“ 6:00 PM",
+    hours: "Sun–Thu: 9:00 AM – 6:00 PM",
   },
 ]
 
@@ -68,7 +68,7 @@ export default function ContactPage() {
       <TopBar />
       <Header />
 
-      {/* â”€â”€ Hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Hero ─────────────────────────────────────────────── */}
       <section className="relative pt-20 pb-24 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
@@ -112,10 +112,10 @@ export default function ContactPage() {
         </div>
       </section>
 
-      {/* â”€â”€ Main content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Main content ─────────────────────────────────────── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
 
-        {/* â”€â”€ Left: info panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Left: info panel ──────────────────────────────── */}
         <div className="lg:col-span-2 space-y-6">
 
           {/* Quick contact */}
@@ -132,7 +132,7 @@ export default function ContactPage() {
                   { icon: Phone, label: "Main Office", value: "+971 4 300 1234", href: "tel:+97143001234" },
                   { icon: Mail,  label: "Email Us",    value: "info@fhiglobal.com", href: "mailto:info@fhiglobal.com" },
                   { icon: MapPin, label: "HQ Location", value: "DIFC, Dubai, UAE", href: "#offices" },
-                  { icon: Clock,  label: "Working Hours", value: "Sunâ€“Thu, 9AMâ€“6PM GST" },
+                  { icon: Clock,  label: "Working Hours", value: "Sun–Thu, 9AM–6PM GST" },
                 ].map(({ icon: Icon, label, value, href }) => (
                   <div key={label} className="flex items-start gap-4 py-3.5 border-b border-white/8 last:border-0">
                     <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0">
@@ -194,7 +194,7 @@ export default function ContactPage() {
           </div>
         </div>
 
-        {/* â”€â”€ Right: form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Right: form ───────────────────────────────────── */}
         <div className="lg:col-span-3">
           <div className="bg-white rounded-[28px] border border-[#e8eaed] shadow-[0_8px_40px_-8px_rgba(0,31,63,0.10)] p-8 lg:p-10">
             <div className="mb-8">
@@ -209,7 +209,7 @@ export default function ContactPage() {
         </div>
       </section>
 
-      {/* â”€â”€ Offices â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Offices ───────────────────────────────────────────── */}
       <section id="offices" className="relative py-16 scroll-mt-24 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
@@ -268,7 +268,7 @@ export default function ContactPage() {
         </div>
       </section>
 
-      {/* â”€â”€ CTA strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── CTA strip ─────────────────────────────────────────── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="relative bg-gradient-to-r from-[#001f3f] to-[#002a52] rounded-[28px] overflow-hidden p-10 md:p-14 flex flex-col md:flex-row md:items-center md:justify-between gap-8">
           <div

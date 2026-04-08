@@ -14,7 +14,7 @@ import {
   updateDeveloper,
 } from "@/lib/developer-service"
 
-// â”€â”€â”€ Portal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Portal ────────────────────────────────────────────────────────────────────
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -170,7 +170,7 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
               <textarea className={`${inp} resize-none border-[#e5e5e5]`} rows={3}
                 value={form.description}
                 onChange={(e) => set("description", e.target.value)}
-                placeholder="Brief description of the developerâ€¦" />
+                placeholder="Brief description of the developer…" />
             </div>
 
             {/* Website + Phone */}
@@ -225,7 +225,7 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
 
             {/* Rating */}
             <div className="max-w-[180px]">
-              <FieldLabel text="Rating (0â€“5)" />
+              <FieldLabel text="Rating (0–5)" />
               <div className="relative">
                 <Star className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
                 <input className={`${inp} border-[#e5e5e5] pl-11`}
@@ -271,7 +271,7 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
             <button type="button" onClick={() => void handleSubmit()} disabled={busy}
               className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2">
               {busy
-                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Savingâ€¦</>
+                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
                 : editDeveloper
                   ? <><Check className="w-4 h-4" /> Save Changes</>
                   : <><Plus className="w-4 h-4" /> Add Developer</>

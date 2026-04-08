@@ -27,9 +27,9 @@ function Portal({ children }: { children: React.ReactNode }) {
 }
 
 function formatDate(value: string) {
-  if (!value) return "â€”"
+  if (!value) return "—"
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "â€”"
+  if (Number.isNaN(date.getTime())) return "—"
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
@@ -156,7 +156,7 @@ export function SaleAttachmentsDialog({
 
   const clientName = sale.clients
     ? `${sale.clients.first_name} ${sale.clients.last_name}`
-    : "â€”"
+    : "—"
 
   return (
     <Portal>
@@ -180,7 +180,7 @@ export function SaleAttachmentsDialog({
                 <div>
                   <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Attachments</h2>
                   <p className="text-xs text-[#9ca3af] mt-0.5 truncate max-w-[260px]">
-                    {clientName} â€” {sale.projects?.name ?? "â€”"}
+                    {clientName} — {sale.projects?.name ?? "—"}
                   </p>
                 </div>
               </div>
@@ -223,7 +223,7 @@ export function SaleAttachmentsDialog({
               {uploading ? (
                 <div className="flex items-center gap-2 text-sm text-[#6b7280]">
                   <div className="w-4 h-4 border-2 border-[#001f3f]/20 border-t-[#001f3f] rounded-full animate-spin" />
-                  Uploadingâ€¦
+                  Uploading…
                 </div>
               ) : (
                 <>
@@ -235,7 +235,7 @@ export function SaleAttachmentsDialog({
                       {canManageAttachments ? "Click to upload or drag & drop" : "Attachments are read-only for this validation status"}
                     </p>
                     <p className="text-xs text-[#9ca3af] mt-0.5">
-                      {canManageAttachments ? "PDF, Word, Excel, images â€” max 25 MB" : "Set validation to Invalid Sale or Under Review to manage files"}
+                      {canManageAttachments ? "PDF, Word, Excel, images — max 25 MB" : "Set validation to Invalid Sale or Under Review to manage files"}
                     </p>
                     {canManageAttachments && <p className="text-xs text-[#9ca3af] mt-1 italic">e.g. Reservation Agreement, Receipt, Contract</p>}
                   </div>
@@ -253,7 +253,7 @@ export function SaleAttachmentsDialog({
 
             {uploadError && (
               <div className="flex items-center gap-2 px-4 py-3 bg-rose-50 border border-rose-100 rounded-2xl text-sm text-rose-700">
-                <span>âš ï¸</span> {uploadError}
+                <span aria-hidden>{"\u26A0\uFE0F"}</span> {uploadError}
               </div>
             )}
 
@@ -287,9 +287,9 @@ export function SaleAttachmentsDialog({
                         {att.profiles?.fullname && ` Â· ${att.profiles.fullname}`}
                       </p>
                     </div>
-                    {/* Action buttons â€” shown on row hover */}
+                    {/* Action buttons — shown on row hover */}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                      {/* Eye â€” open in new tab, always visible */}
+                      {/* Eye — open in new tab, always visible */}
                       <button
                         type="button"
                         title="View file"
@@ -298,7 +298,7 @@ export function SaleAttachmentsDialog({
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                       </button>
-                      {/* Trash â€” delete for admins or review-stage owner roles */}
+                      {/* Trash — delete for admins or review-stage owner roles */}
                       {(isAdmin || canManageAttachments) && (
                         <button
                           type="button"

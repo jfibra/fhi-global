@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/server"
+import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
@@ -16,14 +16,14 @@ import {
   TrendingUp, Star
 } from "lucide-react"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 120
 
 type Props = { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
-  const supabase = await createClient()
+  const supabase = createPublicSupabaseClient()
   const { data } = await supabase
     .from("projects")
     .select("name, description, meta_title, meta_description, main_image, city, location")
@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!data) return { title: "Project Not Found" }
 
   const title = data.meta_title ?? `${data.name} | FHI Global`
-  const description = data.meta_description ?? `Discover ${data.name} â€“ a premium real estate project in Dubai.`
+  const description = data.meta_description ?? `Discover ${data.name} – a premium real estate project in Dubai.`
   const ogImage = `${siteUrl}/og/project/${slug}`
   const keywords = [
     data.name,
@@ -71,13 +71,13 @@ function formatPrice(from: number | null, to: number | null, currency: string | 
     if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`
     return n.toLocaleString()
   }
-  if (to && to !== from) return `${cur} ${fmt(from)} â€“ ${fmt(to)}`
+  if (to && to !== from) return `${cur} ${fmt(from)} – ${fmt(to)}`
   return `${cur} ${fmt(from)}`
 }
 
 export default async function ProjectDetailPage({ params }: Props) {
   const { slug } = await params
-  const supabase = await createClient()
+  const supabase = createPublicSupabaseClient()
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
@@ -165,7 +165,7 @@ export default async function ProjectDetailPage({ params }: Props) {
       <TopBar />
       <Header />
 
-      {/* â”€â”€ Hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Hero ──────────────────────────────────────────── */}
       <section className="relative min-h-[60vh] flex items-end overflow-hidden">
         {/* BG image */}
         {project.main_image ? (
@@ -257,7 +257,7 @@ export default async function ProjectDetailPage({ params }: Props) {
         </div>
       </section>
 
-      {/* â”€â”€ Quick stats bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Quick stats bar ───────────────────────────────── */}
       <div className="bg-white border-b border-[#e8eaed] shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-wrap gap-6 md:gap-10">
           {[
@@ -284,7 +284,7 @@ export default async function ProjectDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* â”€â”€ Main content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Main content ─────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left / main column */}
         <div className="lg:col-span-2 space-y-10">
@@ -356,21 +356,21 @@ export default async function ProjectDetailPage({ params }: Props) {
                   <tbody>
                     {units.map((u) => (
                       <tr key={u.id} className="border-b border-[#f9fafb] hover:bg-[#fdf9f0] transition-colors">
-                        <td className="py-3 pr-6 font-semibold text-[#0d1117]">{u.unit_type ?? "â€”"}</td>
+                        <td className="py-3 pr-6 font-semibold text-[#0d1117]">{u.unit_type ?? "—"}</td>
                         <td className="py-3 pr-6 text-[#374151]">
                           {u.bedrooms !== null ? (
                             <span className="flex items-center gap-1"><BedDouble className="w-3.5 h-3.5 text-[#9ca3af]" />{u.bedrooms}</span>
-                          ) : "â€”"}
+                          ) : "—"}
                         </td>
                         <td className="py-3 pr-6 text-[#374151]">
                           {u.bathrooms !== null ? (
                             <span className="flex items-center gap-1"><Bath className="w-3.5 h-3.5 text-[#9ca3af]" />{u.bathrooms}</span>
-                          ) : "â€”"}
+                          ) : "—"}
                         </td>
                         <td className="py-3 pr-6 text-[#374151]">
                           {u.size_sqft ? (
                             <span className="flex items-center gap-1"><Maximize2 className="w-3.5 h-3.5 text-[#9ca3af]" />{u.size_sqft.toLocaleString()}</span>
-                          ) : "â€”"}
+                          ) : "—"}
                         </td>
                         <td className="py-3 pr-6 font-semibold text-[#001f3f]">
                           {u.price_from ? formatPrice(u.price_from, u.price_to, project.currency) : "On Request"}
@@ -448,7 +448,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           )}
         </div>
 
-        {/* â”€â”€ Right sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Right sidebar ───────────────────────────────── */}
         <div className="space-y-6">
           {/* Payment plan */}
           {(project.down_payment_percentage || project.payment_plan_details || project.installment_available) && (

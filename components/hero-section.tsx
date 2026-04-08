@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Search, MapPin, Building2, DollarSign, ChevronDown } from "lucide-react"
 
@@ -12,10 +13,10 @@ interface HeroSectionProps {
 const PRICE_RANGES = [
   { label: "Any Price",      value: "" },
   { label: "Under AED 500K", value: "0-500000" },
-  { label: "AED 500K â€“ 1M",  value: "500000-1000000" },
-  { label: "AED 1M â€“ 2M",    value: "1000000-2000000" },
-  { label: "AED 2M â€“ 5M",    value: "2000000-5000000" },
-  { label: "AED 5M â€“ 10M",   value: "5000000-10000000" },
+  { label: "AED 500K – 1M",  value: "500000-1000000" },
+  { label: "AED 1M – 2M",    value: "1000000-2000000" },
+  { label: "AED 2M – 5M",    value: "2000000-5000000" },
+  { label: "AED 5M – 10M",   value: "5000000-10000000" },
   { label: "Above AED 10M",  value: "10000000-" },
 ]
 
@@ -45,16 +46,20 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
 
   return (
     <section className="relative min-h-[88vh] flex items-center overflow-hidden">
-      {/* â”€â”€ Background â”€â”€ */}
+      {/* ── Background ── */}
       <div className="absolute inset-0">
-        <img
+        <Image
           src={BG_IMAGE}
           alt=""
-          className="w-full h-full object-cover object-center"
+          fill
+          priority
+          sizes="100vw"
+          quality={80}
+          className="object-cover object-center"
         />
       </div>
 
-      {/* â”€â”€ CSS keyframe for floating image â”€â”€ */}
+      {/* ── CSS keyframe for floating image ── */}
       <style>{`
         @keyframes hero-float {
           0%, 100% { transform: translateY(0px) rotate(0deg); }
@@ -67,7 +72,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
       <div className="relative w-full max-w-7xl mx-auto px-1 sm:px-5 lg:px-0 py-20 lg:py-0 lg:min-h-[88vh] flex items-center">
         <div className="grid grid-cols-1 lg:grid-cols-[7fr_5fr] gap-10 lg:gap-8 items-center w-full">
 
-          {/* â•â•â• LEFT COLUMN â•â•â• */}
+          {/* ═══ LEFT COLUMN ═══ */}
           <div className="flex flex-col w-full">
             {/* Badge */}
             <div className="inline-flex self-start items-center gap-2 px-3.5 py-1.5 bg-white/10 border border-white/20 rounded-full text-xs font-medium text-white/85 mb-7 backdrop-blur-sm">
@@ -95,7 +100,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
               in Dubai, handpicked for discerning investors.
             </p>
 
-            {/* â”€â”€ Search form â”€â”€ */}
+            {/* ── Search form ── */}
             <form
               onSubmit={handleSearch}
               className="bg-[#3a5571]/70 backdrop-blur-2xl border border-white/15 rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.45)] w-full"
@@ -201,16 +206,19 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
             </div>
           </div>
 
-          {/* â•â•â• RIGHT COLUMN â€” floating Dubai image â•â•â• */}
+          {/* ═══ RIGHT COLUMN — floating Dubai image ═══ */}
           <div className="hidden lg:flex items-center justify-center lg:justify-end relative">
             {/* Soft ambient glow behind the image */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="w-[0px] h-[480px] rounded-full bg-[#d6b357]/10 blur-[90px]" />
             </div>
-            <img
+            <Image
               src={FLOAT_IMG}
               alt="Dubai skyline"
-              className="hero-float relative w-full max-w-[280px] xl:max-w-[500px] drop-shadow-[0_40px_80px_rgba(0,0,0,0.5)] select-none"
+              width={560}
+              height={420}
+              sizes="(max-width: 1280px) 280px, 500px"
+              className="hero-float relative w-full max-w-[280px] xl:max-w-[500px] h-auto drop-shadow-[0_40px_80px_rgba(0,0,0,0.5)] select-none"
               draggable={false}
             />
           </div>

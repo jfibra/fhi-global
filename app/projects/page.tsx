@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Image from "next/image"
-import { createClient } from "@/lib/supabase/server"
+import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
@@ -9,8 +9,6 @@ import { ProjectCard, type ProjectCardData } from "@/components/project-card"
 import { ProjectFilters } from "@/components/public/project-filters"
 import { Building2 } from "lucide-react"
 import { Suspense } from "react"
-
-export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = createPageMetadata({
   title: "Real Estate Projects in Dubai | FHI Global",
@@ -31,7 +29,7 @@ type SearchParams = Promise<{
 
 export default async function ProjectsPage({ searchParams }: { searchParams: SearchParams }) {
   const { q, developer, status, city, featured, price_min, price_max } = await searchParams
-  const supabase = await createClient()
+  const supabase = createPublicSupabaseClient()
 
   const priceMin = price_min ? Number(price_min) : null
   const priceMax = price_max ? Number(price_max) : null

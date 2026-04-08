@@ -1,5 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { canAccessDashboardPath, ensureProfileForUser, getDashboardRouteByRole, isInactiveProfile, isProfileMissingMinimumFields } from "@/lib/auth"
+import {
+  canAccessDashboardPath,
+  ensureProfileForUser,
+  getDashboardRouteByRole,
+  isInactiveProfile,
+  isPathExemptFromProfileCompletionGate,
+  isProfileMissingMinimumFields,
+} from "@/lib/auth"
 import { updateSession } from "@/lib/supabase/middleware"
 
 export async function proxy(request: NextRequest) {
@@ -66,7 +73,7 @@ export async function proxy(request: NextRequest) {
     isDashboardRoute &&
     !isPrivilegedRole &&
     isProfileMissingMinimumFields(profile) &&
-    !pathname.startsWith("/dashboard/profile")
+    !isPathExemptFromProfileCompletionGate(pathname, profile.role)
   ) {
     const url = request.nextUrl.clone()
     url.pathname = "/dashboard/profile"

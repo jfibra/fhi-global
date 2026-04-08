@@ -38,7 +38,7 @@ export function TopBar() {
   return (
     <div className="bg-[#001428] border-b border-white/5 text-white/70 text-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-9 flex items-center justify-between">
-        {/* Left â€” contact info */}
+        {/* Left — contact info */}
         <div className="flex items-center gap-5">
           <a
             href="tel:+97143001234"
@@ -57,7 +57,7 @@ export function TopBar() {
           </a>
         </div>
 
-        {/* Right â€” social icons */}
+        {/* Right — social icons */}
         <div className="flex items-center gap-0.5">
           {[
             { href: "#", label: "Facebook",  Icon: FacebookIcon },

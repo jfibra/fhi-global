@@ -12,7 +12,7 @@ import {
 import type { Project, Developer, ProjectFormData } from "@/lib/project-service"
 import { generateProjectSlug } from "@/lib/project-service"
 
-// â”€â”€â”€ Inner tab definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Inner tab definitions ────────────────────────────────────────────────────
 
 type InnerTab = "basic" | "location" | "pricing" | "dates" | "building" | "contact"
 
@@ -31,7 +31,7 @@ const INNER_TABS: TabDef[] = [
   { id: "contact",  label: "Sales Contact",   icon: Phone },
 ]
 
-// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
   project: Project
@@ -104,7 +104,7 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
     showToast("success", "Changes saved")
   }
 
-  // â”€â”€â”€ Shared field helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Shared field helpers ─────────────────────────────────────────────────
 
   const field = (label: string, content: React.ReactNode) => (
     <div>
@@ -164,7 +164,7 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
     </label>
   )
 
-  // â”€â”€â”€ Tab panels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Tab panels ───────────────────────────────────────────────────────────
 
   const panels: Record<InnerTab, React.ReactNode> = {
     basic: (
@@ -176,7 +176,7 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
         {field("Developer",
           sel("developer_id",
             <>
-              <option value="">â€” None â€”</option>
+              <option value="">— None —</option>
               {developers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </>,
             true,
@@ -192,8 +192,8 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
             </>,
           ),
         )}
-        <div className="col-span-2">{field("Short Description", area("description", "Short description visible in listingsâ€¦", 2))}</div>
-        <div className="col-span-2">{field("About Project", area("about_project", "Detailed about section shown on the project pageâ€¦", 5))}</div>
+        <div className="col-span-2">{field("Short Description", area("description", "Short description visible in listings…", 2))}</div>
+        <div className="col-span-2">{field("About Project", area("about_project", "Detailed about section shown on the project page…", 5))}</div>
       </div>
     ),
 
@@ -225,7 +225,7 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
         {field("Expected ROI %",     inp("expected_roi",               "0", "number"))}
         {field("Rental Yield %",     inp("rental_yield",               "0", "number"))}
         {field("Ownership Type",     inp("ownership_type",             "e.g. Freehold, Leasehold"))}
-        <div className="col-span-3">{field("Payment Plan Details", area("payment_plan_details", "Describe installment schedule or milestonesâ€¦", 3))}</div>
+        <div className="col-span-3">{field("Payment Plan Details", area("payment_plan_details", "Describe installment schedule or milestones…", 3))}</div>
         <div className="col-span-3 flex items-center gap-6">
           {check("installment_available", "Installment Available", "installment")}
           {check("freehold",              "Freehold",              "freehold")}
@@ -248,19 +248,19 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
         {field("No. of Buildings", inp("number_of_buildings", "0", "number"))}
         {field("Total Units",      inp("total_units",         "0", "number"))}
         {field("Floors",           inp("floors",              "0", "number"))}
-        <div className="col-span-3">{field("Video URL", inp("video_url", "https://youtube.com/â€¦", "url"))}</div>
+        <div className="col-span-3">{field("Video URL", inp("video_url", "https://youtube.com/…", "url"))}</div>
       </div>
     ),
 
     contact: (
       <div className="grid grid-cols-2 gap-4">
-        {field("Sales Phone", inp("sales_contact_phone", "+971â€¦",    "tel"))}
-        {field("Sales Email", inp("sales_contact_email", "sales@â€¦",  "email"))}
+        {field("Sales Phone", inp("sales_contact_phone", "+971…",    "tel"))}
+        {field("Sales Email", inp("sales_contact_email", "sales@…",  "email"))}
       </div>
     ),
   }
 
-  // â”€â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <form onSubmit={handleSubmit} className="max-w-3xl space-y-0">
@@ -296,7 +296,7 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
           className="flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50"
         >
           <Save className="w-4 h-4" />
-          {saving ? "Savingâ€¦" : "Save Changes"}
+          {saving ? "Saving…" : "Save Changes"}
         </button>
       </div>
     </form>

@@ -88,7 +88,7 @@ export function ProjectImagesTab({ project, showToast, onMainImageChange }: Prop
           className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50"
         >
           <Upload className="w-3.5 h-3.5" />
-          {uploading ? "Uploadingâ€¦" : "Upload Images"}
+          {uploading ? "Uploading…" : "Upload Images"}
         </button>
         <input ref={inputRef} type="file" accept="image/*" multiple className="hidden"
           onChange={(e) => void handleUpload(e.target.files)} />
