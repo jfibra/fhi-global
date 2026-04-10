@@ -331,14 +331,14 @@ export async function AdminDashboardContent({
 
   // ── Summary cards ──────────────────────────────────────────────────────────
   const kpiCards = [
-    { label: "Total Active Users",    value: fmtNumber(totalUsers),       detail: "Active profiles",                 accent: "from-[#001f3f] to-[#0ea5e9]" },
-    { label: "Active Developers",     value: fmtNumber(totalDevelopers),   detail: "Verified partners",               accent: "from-[#001f3f] to-[#0ea5e9]" },
-    { label: "Total Projects",        value: fmtNumber(totalProjects),     detail: `${fmtNumber(publishedProjects)} published`, accent: "from-[#0ea5e9] to-[#d6b357]" },
-    { label: "Total Sales",           value: fmtNumber(totalSalesCount),   detail: "All sales records",               accent: "from-[#d6b357] to-[#f97316]"  },
-    { label: "Total Sales Value",     value: fmtCurrency(totalSalesValue), detail: "Sum of contract prices",          accent: "from-[#001f3f] to-[#a855f7]"  },
-    { label: "Total Clients",         value: fmtNumber(totalClients),      detail: "Registered leads",                accent: "from-[#001f3f] to-[#22d3ee]"  },
-    { label: "Total Purchases",       value: fmtNumber(totalPurchases),    detail: "Procurement records",             accent: "from-[#001f3f] to-[#14b8a6]"  },
-    { label: "Open Support Tickets",  value: fmtNumber(openTickets),       detail: "Awaiting triage",                 accent: "from-[#f97316] to-[#fb7185]"  },
+    { label: "Active Users",          value: fmtNumber(totalUsers),       detail: "Active Profiles"       },
+    { label: "Active Developers",     value: fmtNumber(totalDevelopers),   detail: "Verified Partners"     },
+    { label: "Total Projects",        value: fmtNumber(totalProjects),     detail: "Published"             },
+    { label: "Total Sales",           value: `${Math.round(totalSalesCount / 1000)}K`, detail: "All Sales Records" },
+    { label: "Sales Value",           value: `AED ${fmtNumber(Math.round(totalSalesValue))}`, detail: "Sum of Contract Prices" },
+    { label: "Total Clients",         value: fmtNumber(totalClients),      detail: "Registered Leads"      },
+    { label: "Total Purchases",       value: fmtNumber(totalPurchases),    detail: "Procurement Records"   },
+    { label: "Open Support Tickets",  value: fmtNumber(openTickets),       detail: "Awaiting Triage"       },
   ]
 
   const opsCards = [
@@ -356,16 +356,6 @@ export async function AdminDashboardContent({
     >
       <div className="space-y-10 pb-12">
 
-        {/* ── Section header ── */}
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#d6b357]">Enterprise Overview</p>
-            <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mt-0.5">
-              {roleLabel} Dashboard
-            </h1>
-            <p className="text-sm text-[#9ca3af] mt-0.5">FHI Global Â· Dubai Operations</p>
-          </div>
-        </div>
 
         {/* ── Section 1: KPI cards ── */}
         <section>
@@ -552,25 +542,21 @@ export async function AdminDashboardContent({
 
 function SectionLabel({ index, title }: { index: number; title: string }) {
   return (
-    <div className="flex items-center gap-4 mb-4">
-      <span className="shrink-0 w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center text-white bg-gradient-to-br from-[#001f3f] to-[#d6b357]">
-        {index}
-      </span>
-      <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#6b7280]">{title}</p>
-      <div className="flex-1 h-px bg-[#f0f2f5]" />
+    <div className="mb-4">
+      <h2 className="text-[20px] font-bold text-[#0d1117] font-['Outfit']">{title}</h2>
     </div>
   )
 }
 
 function KpiCard({ label, value, detail, accent }: { label: string; value: string; detail?: string; accent?: string }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-white border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] p-5 group hover:shadow-[0_4px_20px_-2px_rgba(0,31,63,0.10)] transition-all duration-300">
-      {accent && (
-        <div className={`absolute top-0 left-5 right-5 h-[3px] rounded-b-full bg-gradient-to-r ${accent}`} />
-      )}
-      <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#9ca3af] mt-2">{label}</p>
-      <p className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mt-2">{value}</p>
-      {detail && <p className="text-xs text-[#9ca3af] mt-0.5">{detail}</p>}
+    <div className="relative overflow-hidden rounded-2xl bg-white border border-[#e8eaed] p-5 hover:shadow-[0_4px_20px_-2px_rgba(0,31,63,0.06)] transition-all duration-300">
+      <div className="absolute top-4 bottom-4 left-0 w-1.5 rounded-r bg-[#001f3f]" />
+      <div className="pl-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.05em] text-[#374151]">{label}</p>
+        <p className="font-['Outfit'] text-[40px] leading-tight font-bold text-[#001f3f] mt-1 tracking-tight">{value}</p>
+        {detail && <p className="text-[13px] text-[#6b7280]">{detail}</p>}
+      </div>
     </div>
   )
 }

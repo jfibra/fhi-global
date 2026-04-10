@@ -73,28 +73,28 @@ export function SalesPipelineOverview({ displayName, userId }: Props) {
       title: "Sales reports",
       desc: "Track sales, commissions, and validation workflow.",
       icon: TrendingUp,
-      accent: "from-emerald-700 to-emerald-500",
+      accent: "from-[#001f3f] to-[#003d7a]",
     },
     {
       href: "/buy",
       title: "Buy listings",
       desc: "Public sale listings published by the sales team.",
       icon: Building2,
-      accent: "from-amber-700 to-[#d6b357]",
+      accent: "from-[#001f3f] to-[#003d7a]",
     },
     {
       href: "/rent",
       title: "Rent listings",
       desc: "Public rental listings published by the sales team.",
       icon: KeyRound,
-      accent: "from-sky-700 to-sky-500",
+      accent: "from-[#001f3f] to-[#003d7a]",
     },
     {
       href: "/dashboard/support",
       title: "Support",
       desc: "Open tickets and get help from the team.",
       icon: LifeBuoy,
-      accent: "from-rose-700 to-rose-500",
+      accent: "from-[#001f3f] to-[#003d7a]",
     },
   ]
 
@@ -110,26 +110,32 @@ export function SalesPipelineOverview({ displayName, userId }: Props) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-[#e8eaed] bg-white p-5 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">Listings</p>
-          <p className="mt-1 text-3xl font-bold text-[#001f3f] font-['Outfit']">{stat(totalListings)}</p>
-          <p className="text-xs text-[#6b7280] mt-1">Total active</p>
-        </div>
-        <div className="rounded-2xl border border-[#e8eaed] bg-white p-5 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">Published</p>
-          <p className="mt-1 text-3xl font-bold text-emerald-700 font-['Outfit']">{stat(publishedListings)}</p>
-          <p className="text-xs text-[#6b7280] mt-1">Live on your account</p>
-        </div>
-        <div className="rounded-2xl border border-[#e8eaed] bg-white p-5 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">Drafts</p>
-          <p className="mt-1 text-3xl font-bold text-amber-700 font-['Outfit']">{stat(draftListings)}</p>
-          <p className="text-xs text-[#6b7280] mt-1">Finish when ready</p>
-        </div>
+        <KpiCard
+          label="Listings"
+          value={stat(totalListings)}
+          detail="Total active"
+          accentClass="bg-[#001f3f]"
+          textClass="text-[#001f3f]"
+        />
+        <KpiCard
+          label="Published"
+          value={stat(publishedListings)}
+          detail="Live on your account"
+          accentClass="bg-[#001f3f]"
+          textClass="text-[#001f3f]"
+        />
+        <KpiCard
+          label="Drafts"
+          value={stat(draftListings)}
+          detail="Finish when ready"
+          accentClass="bg-[#001f3f]"
+          textClass="text-[#001f3f]"
+        />
       </div>
 
       <div>
         <h3 className="text-sm font-bold text-[#374151] uppercase tracking-wider mb-3 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-[#d6b357]" />
+          <Sparkles className="w-4 h-4 text-[#001f3f]" />
           Quick links
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -155,6 +161,33 @@ export function SalesPipelineOverview({ displayName, userId }: Props) {
             </Link>
           ))}
         </div>
+      </div>
+    </div>
+  )
+}
+
+function KpiCard({
+  label,
+  value,
+  detail,
+  accentClass,
+  textClass,
+}: {
+  label: string
+  value: string
+  detail?: string
+  accentClass: string
+  textClass: string
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl bg-white border border-[#e8eaed] p-5 hover:shadow-[0_4px_20px_-2px_rgba(0,31,63,0.06)] transition-all duration-300">
+      <div className={`absolute top-4 bottom-4 left-0 w-1.5 rounded-r ${accentClass}`} />
+      <div className="pl-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.05em] text-[#374151]">{label}</p>
+        <p className={`font-['Outfit'] text-[40px] leading-tight font-bold ${textClass} mt-1 tracking-tight`}>
+          {value}
+        </p>
+        {detail && <p className="text-[13px] text-[#6b7280]">{detail}</p>}
       </div>
     </div>
   )

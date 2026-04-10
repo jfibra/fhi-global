@@ -258,7 +258,7 @@ export function AgentListingsClient({
       roleColor={getRoleColor(currentRole)}
       userName={userName}
     >
-      <div className="max-w-5xl space-y-6">
+      <div className="w-full space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117]">My listings</h1>
@@ -271,7 +271,7 @@ export function AgentListingsClient({
             <button
               type="button"
               onClick={() => void load()}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-colors whitespace-nowrap"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
               Refresh
@@ -279,7 +279,7 @@ export function AgentListingsClient({
             <button
               type="button"
               onClick={openCreate}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
               New listing
@@ -377,7 +377,7 @@ export function AgentListingsClient({
             aria-label="Close"
             onClick={() => setModalOpen(false)}
           />
-          <div className="relative bg-white rounded-2xl border border-[#e8eaed] shadow-xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-6">
+          <div className="relative bg-white rounded-2xl border border-[#e8eaed] shadow-xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-6 scrollbar-none">
             <h2 className="font-['Outfit'] text-lg font-bold text-[#001f3f] mb-4">
               {editing ? "Edit listing" : "New listing"}
             </h2>

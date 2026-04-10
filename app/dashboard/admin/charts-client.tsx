@@ -3,14 +3,12 @@
 import {
   ResponsiveContainer,
   ComposedChart,
+  BarChart,
   Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
-  PieChart,
-  Pie,
   Cell,
 } from "recharts"
 
@@ -41,43 +39,51 @@ interface Props {
 
 const AED = new Intl.NumberFormat("en-AE", { style: "currency", currency: "AED", maximumFractionDigits: 0 })
 
-function PieCard({ title, data }: { title: string; data: StatusItem[] }) {
+// ─── Bar chart card matching the image design ──────────────────────────────────
+
+function BarCard({ title, data }: { title: string; data: Array<{ label: string; count: number; color: string }> }) {
   const total = data.reduce((s, d) => s + d.count, 0)
+  // Recharts needs a flat structure for per-bar coloring — transform to one-entry-per-bar
+  const chartData = data.map(d => ({ name: d.label, value: d.count, color: d.color }))
+
   return (
-    <div className="rounded-2xl bg-white border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] p-5">
-      <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#9ca3af] mb-1">Distribution</p>
-      <h3 className="text-sm font-bold text-[#0d1117] mb-4">{title}</h3>
-      <ResponsiveContainer width="100%" height={180}>
-        <PieChart>
-          <Pie
-            data={data}
-            dataKey="count"
-            nameKey="label"
-            cx="50%"
-            cy="50%"
-            innerRadius={50}
-            outerRadius={80}
-            paddingAngle={2}
-          >
-            {data.map((entry, i) => (
-              <Cell key={i} fill={entry.color} />
+    <div className="rounded-2xl bg-white border border-[#e8eaed] p-5">
+      <h3 className="text-[15px] font-semibold text-[#374151] mb-4">{title}</h3>
+
+      <ResponsiveContainer width="100%" height={160}>
+        <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 4, left: -28 }} barCategoryGap="30%">
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+          <XAxis
+            dataKey="name"
+            tick={false}
+            tickLine={false}
+            axisLine={{ stroke: "#e5e7eb" }}
+          />
+          <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} tickLine={false} axisLine={false} allowDecimals={false} />
+          <Tooltip
+            cursor={{ fill: "rgba(0,31,63,0.04)" }}
+            contentStyle={{ borderRadius: 10, border: "1px solid #e8eaed", fontSize: 12 }}
+            formatter={(value, _name, props) => [value, props.payload?.name ?? ""]}
+          />
+          <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={40}>
+            {chartData.map((entry, index) => (
+              <Cell key={index} fill={entry.color} />
             ))}
-          </Pie>
-          <Tooltip formatter={(v) => [v ?? 0, ""]} />
-        </PieChart>
+          </Bar>
+        </BarChart>
       </ResponsiveContainer>
-      <div className="mt-3 space-y-1.5">
+
+      {/* Legend */}
+      <div className="mt-4 space-y-2">
         {data.map((item, index) => (
           <div key={`${item.label}-${index}`} className="flex items-center justify-between text-xs">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: item.color }} />
-              <span className="text-[#374151]">{item.label}</span>
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color }} />
+              <span className="text-[#374151] text-[12px]">{item.label}</span>
             </span>
-            <span className="font-semibold text-[#0d1117]">
-              {item.count}
-              <span className="ml-1 text-[#9ca3af] font-normal">
-                ({total > 0 ? Math.round((item.count / total) * 100) : 0}%)
-              </span>
+            <span className="text-[#374151] text-[12px]">
+              {item.count}&nbsp;
+              <span className="text-[#9ca3af]">({total > 0 ? Math.round((item.count / total) * 100) : 0}%)</span>
             </span>
           </div>
         ))}
@@ -90,43 +96,41 @@ export function AdminAnalyticsCharts({ monthlySales, developerSales, projectStat
   return (
     <div className="space-y-5">
       {/* Monthly Sales Bar Chart */}
-      <div className="rounded-2xl bg-white border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] p-5">
-        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#9ca3af] mb-1">Trend</p>
-        <h3 className="text-sm font-bold text-[#0d1117] mb-4">Monthly Sales Volume &amp; Value (Last 12 Months)</h3>
-        <ResponsiveContainer width="100%" height={260}>
-          <ComposedChart data={monthlySales} margin={{ top: 4, right: 16, bottom: 0, left: 16 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f5" />
-            <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
-            <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+      <div className="rounded-2xl bg-white border border-[#e8eaed] p-6 shadow-sm">
+        <h3 className="text-[17px] font-medium text-[#4b5563] mb-6 tracking-wide">Monthly Sales Volume &amp; Value (Last 12 Months)</h3>
+        <ResponsiveContainer width="100%" height={320}>
+          <ComposedChart data={monthlySales} margin={{ top: 20, right: 20, bottom: 20, left: -10 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={true} horizontal={true} stroke="#f3f4f6" />
+            <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#6b7280" }} tickLine={false} axisLine={{ stroke: "#e5e7eb" }} />
+            <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "#6b7280" }} tickLine={false} axisLine={false} />
             <YAxis
               yAxisId="right"
               orientation="right"
-              tick={{ fontSize: 11, fill: "#9ca3af" }}
+              tick={{ fontSize: 11, fill: "#6b7280" }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={v => AED.format(v)}
+              tickFormatter={v => v === 0 ? "AED 0" : AED.format(v)}
             />
             <Tooltip
               formatter={(value, name) =>
                 name === "value" ? [AED.format(Number(value ?? 0)), "Contract Value"] : [value ?? 0, "Sales Count"]
               }
               contentStyle={{ borderRadius: 12, border: "1px solid #e8eaed", fontSize: 12 }}
+              cursor={{ fill: "transparent" }}
             />
-            <Legend
-              wrapperStyle={{ fontSize: 12 }}
-              formatter={v => (v === "count" ? "Sales Count" : "Contract Value")}
-            />
-            <Bar yAxisId="left" dataKey="count" name="count" fill="#0ea5e9" radius={[6, 6, 0, 0]} maxBarSize={32} />
-            <Bar yAxisId="right" dataKey="value" name="value" fill="#d6b357" radius={[6, 6, 0, 0]} maxBarSize={32} />
+            <Bar yAxisId="left" dataKey="count" name="count" fill="#001f3f" radius={[2, 2, 0, 0]} maxBarSize={28} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Three Pie Charts */}
+      {/* Three Bar Charts — Sales by Developer, Project Status, Validation Status */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <PieCard title="Sales by Developer" data={developerSales.map(d => ({ label: d.developer, count: d.count, color: d.color }))} />
-        <PieCard title="Project Status" data={projectStatus} />
-        <PieCard title="Validation Status" data={validationStatus} />
+        <BarCard
+          title="Sales by Developer"
+          data={developerSales.map(d => ({ label: d.developer, count: d.count, color: d.color }))}
+        />
+        <BarCard title="Project Status" data={projectStatus} />
+        <BarCard title="Validation Status" data={validationStatus} />
       </div>
     </div>
   )
