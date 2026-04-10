@@ -47,11 +47,15 @@ function normalize(raw: Record<string, any>, idx: number): NewsArticle {
       ? raw.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
       : []
 
+  const title = raw?.title ?? raw?.headline ?? raw?.subject ?? "Untitled"
+  const content = raw?.content ?? raw?.body ?? raw?.content_html ?? raw?.body_html ?? raw?.description_html ?? raw?.text ?? raw?.description ?? ""
+  const excerpt = raw?.excerpt ?? raw?.summary ?? (content.length > 160 ? content.replace(/<[^>]*>/g, "").substring(0, 157) + "..." : content.replace(/<[^>]*>/g, ""))
+
   return {
     id: typeof raw?.id === "number" ? raw.id : idx + 1,
-    slug: raw?.slug || slugify(raw?.title ?? `article-${idx + 1}`),
-    title: raw?.title ?? "Untitled",
-    excerpt: raw?.excerpt ?? raw?.summary ?? raw?.description ?? "",
+    slug: raw?.slug || slugify(title),
+    title,
+    excerpt,
     date: publishedAt,
     img: image,
     featuredImage: image,
@@ -64,7 +68,7 @@ function normalize(raw: Record<string, any>, idx: number): NewsArticle {
     readTime: raw?.read_time ?? raw?.readTime ?? undefined,
     hasVideo: !!(raw?.has_video ?? raw?.hasVideo),
     author: raw?.author ?? raw?.author_name ?? undefined,
-    content: raw?.content ?? raw?.body ?? undefined,
+    content,
   }
 }
 
@@ -73,25 +77,42 @@ function normalize(raw: Record<string, any>, idx: number): NewsArticle {
 // Single article: { data: { id, title, … } } → result.data  (object, not array)
 // Fallback array or bare object also handled.
 function extractArray(result: unknown): Record<string, any>[] {
-  if (!result || typeof result !== "object") return []
+  if (!result || typeof result !== "object" || result === null) return []
   const d = result as Record<string, any>
 
-  // Standard list shape from HomesPH API: result.data.data (paginated)
+  // 1. Paginated list: { data: { data: [...] } }
   if (Array.isArray(d?.data?.data)) return d.data.data
 
-  // Flat array in result.data
+  // 2. Flat list in data: { data: [...] }
   if (Array.isArray(d?.data)) return d.data
 
-  // Single article shape: result.data is a plain object with article fields
-  if (d?.data && typeof d.data === "object" && !Array.isArray(d.data)) {
-    return [d.data as Record<string, any>]
+  // 3. Single article in common wrappers
+  // Try to find the most likely article object
+  const candidates = [
+    d?.article,
+    d?.post,
+    d?.data?.article,
+    d?.data?.post,
+    d?.data
+  ]
+
+  for (const c of candidates) {
+    if (c && typeof c === "object" && !Array.isArray(c)) {
+      if (c.title || c.slug || c.id || c.content || c.body) {
+        return [c as Record<string, any>]
+      }
+    }
   }
 
-  // Bare array at root
+  // 4. Bare array at root
   if (Array.isArray(d)) return d
 
-  // Bare single object at root (last resort)
-  return [d]
+  // 5. Bare single object at root
+  if (d.title || d.slug || d.id || d.content || d.body) {
+    return [d]
+  }
+
+  return []
 }
 
 // ── Base URL helper (strips trailing slash) ───────────────────────────────────
