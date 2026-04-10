@@ -1,9 +1,7 @@
 import { cache } from "react"
-import {
-  getBuyPageProjectsCached,
-  pickBuyListingImage,
-  type BuyRawProject,
-} from "@/lib/buy/cached-projects"
+import type { BuyRawProject, ListingMarket } from "@/lib/buy/cached-projects"
+import { getPublicAgentListingsCached, type PublicAgentListingRow } from "@/lib/buy/agent-listings-public"
+import { mergedListingGalleryUrls } from "@/lib/listing-gallery-urls"
 import type { BuyPropertyCardData } from "@/components/buy/buy-property-card"
 import type { BuyMapMarker } from "@/components/buy/buy-google-map"
 
@@ -51,55 +49,6 @@ function formatPrice(from: number | null, to: number | null, currency = "AED") {
   return `${prefix} ${fmt(from)}`
 }
 
-export function toMapMarker(p: BuyRawProject): BuyMapMarker | null {
-  const lat = parseCoord(p.latitude)
-  const lng = parseCoord(p.longitude)
-  if (lat == null || lng == null) return null
-  const u = pickUnit(p.project_units)
-  const locationLabel = [p.city, p.location].filter(Boolean).join(", ") || "United Arab Emirates"
-  const areaLabel =
-    u?.size_sqm != null
-      ? `${u.size_sqm.toLocaleString("en-AE")} sqm`
-      : u?.size_sqft != null
-        ? `${u.size_sqft.toLocaleString("en-AE")} sqft`
-        : null
-  return {
-    id: String(p.id),
-    lat,
-    lng,
-    title: p.name,
-    slug: p.slug,
-    image_url: pickBuyListingImage(p) ?? p.developers?.logo_url ?? null,
-    price_label: formatPrice(p.launch_price_from, p.launch_price_to, p.currency ?? "AED"),
-    bedrooms: u?.bedrooms ?? null,
-    bathrooms: u?.bathrooms ?? null,
-    area_label: areaLabel,
-    location_label: locationLabel,
-  }
-}
-
-export function toCard(p: BuyRawProject): BuyPropertyCardData {
-  const u = pickUnit(p.project_units)
-  return {
-    id: p.id,
-    name: p.name,
-    slug: p.slug,
-    main_image: pickBuyListingImage(p),
-    description: p.description,
-    city: p.city,
-    location: p.location,
-    launch_price_from: p.launch_price_from,
-    launch_price_to: p.launch_price_to,
-    currency: p.currency,
-    developers: p.developers,
-    unit_type: u?.unit_type ?? null,
-    bedrooms: u?.bedrooms ?? null,
-    bathrooms: u?.bathrooms ?? null,
-    size_sqft: u?.size_sqft ?? null,
-    size_sqm: u?.size_sqm ?? null,
-  }
-}
-
 export function parsePriceParam(v: string | undefined): number | null {
   if (v == null) return null
   const t = String(v).trim()
@@ -114,93 +63,163 @@ export function listingEntryPrice(p: BuyRawProject): number | null {
   return null
 }
 
-export function filterProjects(rows: BuyRawProject[], sp: Awaited<ListingSearchParams>): BuyRawProject[] {
-  let list = [...rows]
-  const q = (sp.q ?? "").trim().toLowerCase()
-  const type = (sp.type ?? "").trim().toLowerCase()
-  const minBeds = sp.beds ? Number(sp.beds) : NaN
-  const minBaths = sp.minBaths ? Number(sp.minBaths) : NaN
-  const minPrice = parsePriceParam(sp.minPrice)
-  const maxPrice = parsePriceParam(sp.maxPrice)
-
-  if (q) {
-    list = list.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.city ?? "").toLowerCase().includes(q) ||
-        (p.location ?? "").toLowerCase().includes(q)
-    )
-  }
-
-  if (type) {
-    list = list.filter((p) => {
-      const units = p.project_units ?? []
-      if (units.some((u) => (u.unit_type ?? "").toLowerCase().includes(type))) return true
-      const linked = (p.project_property_types ?? [])
-        .map((row) => row.property_types?.name)
-        .filter((n): n is string => Boolean(n?.trim()))
-      return linked.some((name) => name.toLowerCase().includes(type))
-    })
-  }
-
-  if (Number.isFinite(minBeds) && minBeds > 0) {
-    list = list.filter((p) => {
-      const units = p.project_units ?? []
-      return units.some((u) => u.bedrooms != null && u.bedrooms >= minBeds)
-    })
-  }
-
-  if (Number.isFinite(minBaths) && minBaths > 0) {
-    list = list.filter((p) => {
-      const units = p.project_units ?? []
-      return units.some((u) => u.bathrooms != null && u.bathrooms >= minBaths)
-    })
-  }
-
-  if (minPrice != null) {
-    list = list.filter((p) => {
-      const entry = listingEntryPrice(p)
-      return entry != null && entry >= minPrice
-    })
-  }
-
-  if (maxPrice != null) {
-    list = list.filter((p) => {
-      const entry = listingEntryPrice(p)
-      return entry != null && entry <= maxPrice
-    })
-  }
-
-  return list
+function agentListingNumericPrice(row: PublicAgentListingRow): number | null {
+  if (row.price == null) return null
+  const n = typeof row.price === "number" ? row.price : Number(row.price)
+  return Number.isFinite(n) ? n : null
 }
 
-export function sortProjects(list: BuyRawProject[], sort: string): BuyRawProject[] {
-  const out = [...list]
+export function agentListingEntryPrice(row: PublicAgentListingRow): number | null {
+  const own = agentListingNumericPrice(row)
+  if (own != null) return own
+  if (row.projects) return listingEntryPrice(row.projects)
+  return null
+}
+
+function agentMatchesFilters(row: PublicAgentListingRow, sp: Awaited<ListingSearchParams>): boolean {
+  const proj = row.projects
+  const q = (sp.q ?? "").trim().toLowerCase()
+  if (q) {
+    const blob = [
+      row.title,
+      row.description ?? "",
+      proj?.name ?? "",
+      proj?.city ?? "",
+      proj?.location ?? "",
+    ]
+      .join(" ")
+      .toLowerCase()
+    if (!blob.includes(q)) return false
+  }
+
+  const type = (sp.type ?? "").trim().toLowerCase()
+  if (type) {
+    if (proj) {
+      const units = proj.project_units ?? []
+      const matchUnit = units.some((u) => (u.unit_type ?? "").toLowerCase().includes(type))
+      const linked = (proj.project_property_types ?? [])
+        .map((r) => r.property_types?.name)
+        .filter((n): n is string => Boolean(n?.trim()))
+      const matchPt = linked.some((name) => name.toLowerCase().includes(type))
+      if (!matchUnit && !matchPt) return false
+    } else {
+      const blob = `${row.title} ${row.description ?? ""}`.toLowerCase()
+      if (!blob.includes(type)) return false
+    }
+  }
+
+  const minBeds = sp.beds ? Number(sp.beds) : NaN
+  if (Number.isFinite(minBeds) && minBeds > 0) {
+    const units = proj?.project_units ?? []
+    if (!units.some((u) => u.bedrooms != null && u.bedrooms >= minBeds)) return false
+  }
+
+  const minBaths = sp.minBaths ? Number(sp.minBaths) : NaN
+  if (Number.isFinite(minBaths) && minBaths > 0) {
+    const units = proj?.project_units ?? []
+    if (!units.some((u) => u.bathrooms != null && u.bathrooms >= minBaths)) return false
+  }
+
+  const minPrice = parsePriceParam(sp.minPrice)
+  const maxPrice = parsePriceParam(sp.maxPrice)
+  const entry = agentListingEntryPrice(row)
+  if (minPrice != null) {
+    if (entry == null || entry < minPrice) return false
+  }
+  if (maxPrice != null) {
+    if (entry == null || entry > maxPrice) return false
+  }
+
+  return true
+}
+
+function sortPublicAgentRows(rows: PublicAgentListingRow[], sort: string): PublicAgentListingRow[] {
+  const out = [...rows]
   const t = (d: string) => {
     const x = new Date(d).getTime()
     return Number.isFinite(x) ? x : 0
   }
+  const dateIso = (r: PublicAgentListingRow) => r.updated_at || r.created_at
 
   switch (sort) {
     case "price_asc":
-      out.sort((a, b) => (a.launch_price_from ?? 1e15) - (b.launch_price_from ?? 1e15))
+      out.sort((a, b) => (agentListingEntryPrice(a) ?? 1e15) - (agentListingEntryPrice(b) ?? 1e15))
       break
     case "price_desc":
-      out.sort((a, b) => (b.launch_price_from ?? 0) - (a.launch_price_from ?? 0))
+      out.sort((a, b) => (agentListingEntryPrice(b) ?? 0) - (agentListingEntryPrice(a) ?? 0))
       break
     case "newest":
-      out.sort((a, b) => t(b.created_at) - t(a.created_at))
+      out.sort((a, b) => t(dateIso(b)) - t(dateIso(a)))
       break
     default:
-      out.sort((a, b) => {
-        const fa = a.is_featured === true ? 1 : 0
-        const fb = b.is_featured === true ? 1 : 0
-        if (fb !== fa) return fb - fa
-        return t(b.created_at) - t(a.created_at)
-      })
+      out.sort((a, b) => t(dateIso(b)) - t(dateIso(a)))
   }
 
   return out
+}
+
+function agentListingToCard(row: PublicAgentListingRow): BuyPropertyCardData {
+  const proj = row.projects
+  const u = proj ? pickUnit(proj.project_units) : null
+  const own = agentListingNumericPrice(row)
+  const fromPrice = own ?? proj?.launch_price_from ?? null
+  const toPrice = own ?? proj?.launch_price_to ?? null
+  const gallery = mergedListingGalleryUrls(proj, row.agent_listing_images)
+  return {
+    id: `agent:${row.id}`,
+    name: row.title,
+    slug: proj?.slug ?? "",
+    detail_path: `/listings/${row.id}`,
+    main_image: gallery[0] ?? null,
+    gallery_urls: gallery.length > 0 ? gallery : undefined,
+    description: row.description ?? proj?.description ?? null,
+    city: proj?.city ?? null,
+    location: proj?.location ?? null,
+    launch_price_from: fromPrice,
+    launch_price_to: toPrice,
+    currency: row.currency?.trim() || proj?.currency || "AED",
+    developers: proj?.developers ?? null,
+    unit_type: u?.unit_type ?? null,
+    bedrooms: u?.bedrooms ?? null,
+    bathrooms: u?.bathrooms ?? null,
+    size_sqft: u?.size_sqft ?? null,
+    size_sqm: u?.size_sqm ?? null,
+  }
+}
+
+function agentListingToMapMarker(row: PublicAgentListingRow): BuyMapMarker | null {
+  const proj = row.projects
+  if (!proj) return null
+  const lat = parseCoord(proj.latitude)
+  const lng = parseCoord(proj.longitude)
+  if (lat == null || lng == null) return null
+  const u = pickUnit(proj.project_units)
+  const locationLabel = [proj.city, proj.location].filter(Boolean).join(", ") || "United Arab Emirates"
+  const areaLabel =
+    u?.size_sqm != null
+      ? `${u.size_sqm.toLocaleString("en-AE")} sqm`
+      : u?.size_sqft != null
+        ? `${u.size_sqft.toLocaleString("en-AE")} sqft`
+        : null
+  const own = agentListingNumericPrice(row)
+  const pf = own ?? proj.launch_price_from
+  const pt = own ?? proj.launch_price_to
+  const gallery = mergedListingGalleryUrls(proj, row.agent_listing_images)
+  const firstImg = gallery[0]
+  return {
+    id: `agent:${row.id}`,
+    lat,
+    lng,
+    title: row.title,
+    slug: proj.slug,
+    detail_href: `/listings/${row.id}`,
+    image_url: firstImg ?? proj.developers?.logo_url ?? null,
+    price_label: formatPrice(pf, pt, row.currency?.trim() || proj.currency || "AED"),
+    bedrooms: u?.bedrooms ?? null,
+    bathrooms: u?.bathrooms ?? null,
+    area_label: areaLabel,
+    location_label: locationLabel,
+  }
 }
 
 export function listViewHrefFromSp(sp: Awaited<ListingSearchParams>, basePath: "/buy" | "/rent"): string {
@@ -216,22 +235,29 @@ export function listViewHrefFromSp(sp: Awaited<ListingSearchParams>, basePath: "
   return qs ? `${basePath}?${qs}` : basePath
 }
 
-export const loadListingProjects = cache(getBuyPageProjectsCached)
+export type { ListingMarket }
 
+export const loadPublicAgentListings = cache((market: ListingMarket) => getPublicAgentListingsCached(market))
+
+/** Public /buy and /rent: published sales-pipeline listings only (no developer project catalog). */
 export function deriveListings(
   sp: Awaited<ListingSearchParams>,
-  rows: BuyRawProject[],
-  error: boolean
+  agentRows: PublicAgentListingRow[],
+  agentError: boolean,
 ) {
-  const filtered = error ? [] : filterProjects(rows, sp)
-  const sorted = sortProjects(filtered, sp.sort ?? "popular")
-  const properties = sorted.map(toCard)
-  const mapMarkers = sorted.map(toMapMarker).filter((m): m is BuyMapMarker => m != null)
+  const filtered = agentError ? [] : agentRows.filter((a) => agentMatchesFilters(a, sp))
+  const sorted = sortPublicAgentRows(filtered, sp.sort ?? "popular")
+  const properties = sorted.map(agentListingToCard)
+  const mapMarkers = sorted.map(agentListingToMapMarker).filter((m): m is BuyMapMarker => m != null)
+
+  const rawTotal = agentError ? 0 : agentRows.length
+  const shown = sorted.length
   const totalLabel =
-    error || rows.length === 0
+    agentError || rawTotal === 0
       ? null
-      : filtered.length === rows.length
-        ? `Showing all ${filtered.length} listing${filtered.length === 1 ? "" : "s"}`
-        : `Showing ${filtered.length} of ${rows.length} listing${rows.length === 1 ? "" : "s"}`
-  return { filtered, sorted, properties, mapMarkers, totalLabel }
+      : shown === rawTotal
+        ? `Showing all ${shown} listing${shown === 1 ? "" : "s"}`
+        : `Showing ${shown} of ${rawTotal} listing${rawTotal === 1 ? "" : "s"}`
+
+  return { properties, mapMarkers, totalLabel }
 }

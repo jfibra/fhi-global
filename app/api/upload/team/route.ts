@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 
 const s3 = new S3Client({
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     const roleValue = String(profile?.role ?? "").toLowerCase().trim()
-    if (!profile || !["super_admin", "admin"].includes(roleValue)) {
+    if (!profile || !isAdminStaffRole(profile.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

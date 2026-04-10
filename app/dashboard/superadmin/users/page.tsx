@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { isSuperAdminRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { AdminUsersClient } from "@/app/dashboard/admin/users/users-client"
 
@@ -18,7 +19,7 @@ export default async function SuperAdminUsersPage() {
     .eq("id", user.id)
     .single()
 
-  if (!profile || profile.role !== "super_admin") {
+  if (!profile || !isSuperAdminRole(profile.role)) {
     redirect("/dashboard/superadmin")
   }
 

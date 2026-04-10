@@ -22,6 +22,7 @@ function LoginCard({
   state,
   formAction,
   pending,
+  nextRedirect,
 }: {
   showPassword: boolean
   togglePassword: () => void
@@ -30,6 +31,7 @@ function LoginCard({
   state: { error?: string }
   formAction: (payload: FormData) => void
   pending: boolean
+  nextRedirect?: string
 }) {
   return (
     <div className="bg-white rounded-[28px] border border-[#e8eaed] shadow-[0_8px_48px_-8px_rgba(0,31,63,0.12)] p-8 lg:p-10">
@@ -47,6 +49,7 @@ function LoginCard({
       </div>
 
       <form action={formAction} className="space-y-5">
+        {nextRedirect ? <input type="hidden" name="next" value={nextRedirect} /> : null}
         {/* Email */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">
@@ -162,7 +165,7 @@ function LoginCard({
 
 // ─── Page component ───────────────────────────────────────────────────────────
 
-export function HomeLoginUI() {
+export function HomeLoginUI({ nextRedirect }: { nextRedirect?: string }) {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe]     = useState(false)
   const [state, formAction, pending]    = useActionState(loginAction, initialState)
@@ -171,6 +174,7 @@ export function HomeLoginUI() {
     showPassword,  togglePassword: () => setShowPassword(p => !p),
     rememberMe,    toggleRemember:  () => setRememberMe(p => !p),
     state, formAction, pending,
+    nextRedirect,
   }
 
   return (

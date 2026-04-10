@@ -222,7 +222,6 @@ export function SalesTable({
   const [toasts, setToasts] = useState<Array<{ id: number; type: ToastType; text: string }>>([])
   const toastIdRef = useRef(0)
 
-  const isManagement = ["admin", "super_admin"].includes(currentRole)
   const isAdminUser = isAdminRole(currentRole)
 
   const addToast = (type: ToastType, text: string) => {
@@ -375,7 +374,7 @@ export function SalesTable({
               <div className="flex items-center gap-2 flex-wrap">
                 <Filter className="w-3.5 h-3.5 text-[#9ca3af]" />
 
-                {isManagement && (
+                {isAdminUser && (
                   <select
                     value={agentFilter}
                     onChange={(e) => { setAgentFilter(e.target.value); setPage(1) }}
@@ -595,7 +594,7 @@ export function SalesTable({
                           >
                             <MessageSquare className="w-4 h-4" />
                           </button>
-                          {isManagement && (
+                          {isAdminUser && (
                             <button
                               type="button"
                               onClick={() => openDiscussion(sale, "activity")}

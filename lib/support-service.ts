@@ -1,4 +1,11 @@
 import { createClient } from "@/lib/supabase/client"
+import {
+  canUseSupportPortal,
+  isSupportAdminRole,
+  normalizeAppRole,
+  ROLES_SUPPORT_INTERNAL_ASSIGNEES,
+  ROLES_SUPPORT_REPORTER_POOL,
+} from "@/lib/app-roles"
 
 export type SupportTicketStatus = "open" | "in_progress" | "waiting_user" | "resolved" | "closed"
 export type SupportTicketPriority = "low" | "normal" | "high" | "critical"
@@ -79,28 +86,12 @@ export type SupportTicketFormData = {
 
 const STATUS_VALUES: SupportTicketStatus[] = ["open", "in_progress", "waiting_user", "resolved", "closed"]
 const PRIORITY_VALUES: SupportTicketPriority[] = ["low", "normal", "high", "critical"]
-const ALLOWED_ROLES = [
-  "super_admin",
-  "admin",
-  "team_leader",
-  "unit_manager",
-  "agent",
-  "secretary",
-  "team_secretary",
-  "member",
-  "developer",
-]
-
-function normalizeRole(role: string | undefined | null) {
-  return String(role ?? "").toLowerCase().trim()
-}
-
 export function canAccessSupportRole(role: string | undefined | null) {
-  return ALLOWED_ROLES.includes(normalizeRole(role))
+  return canUseSupportPortal(role)
 }
 
 export function isSupportAdmin(role: string | undefined | null) {
-  return ["admin", "super_admin"].includes(normalizeRole(role))
+  return isSupportAdminRole(role)
 }
 
 function normalizeTicket(row: unknown): SupportTicketRecord {
@@ -202,7 +193,7 @@ export async function fetchSupportAssignableUsers(): Promise<{ data: SupportAssi
   const { data, error } = await supabase
     .from("profiles")
     .select("id, fullname, role")
-    .in("role", ["admin", "developer"])
+    .in("role", [...ROLES_SUPPORT_INTERNAL_ASSIGNEES])
     .order("fullname", { ascending: true })
 
   if (error) return { data: null, error: error.message }
@@ -221,7 +212,7 @@ export async function fetchSupportReporters(): Promise<{ data: SupportAssignable
   const { data, error } = await supabase
     .from("profiles")
     .select("id, fullname, role")
-    .in("role", ["agent", "team_leader", "unit_manager", "admin"])
+    .in("role", [...ROLES_SUPPORT_REPORTER_POOL])
     .order("fullname", { ascending: true })
 
   if (error) return { data: null, error: error.message }
@@ -267,7 +258,7 @@ export async function fetchSupportTickets(opts: {
     .range(from, to)
     .order(sortField, { ascending: sortDir === "asc" })
 
-  const role = normalizeRole(opts.currentRole)
+  const role = normalizeAppRole(opts.currentRole)
   if (!isSupportAdmin(role)) {
     query = query.eq("reported_by", opts.currentUserId)
   }
@@ -371,7 +362,7 @@ export async function updateSupportTicketAdmin(
   payload: { status?: SupportTicketStatus; assigned_to?: string | null },
   currentRole: string,
 ): Promise<{ data: SupportTicketRecord | null; error: string | null }> {
-  const role = normalizeRole(currentRole)
+  const role = normalizeAppRole(currentRole)
   if (!isSupportAdmin(role)) return { data: null, error: "Only admin users can update ticket status/assignment" }
 
   const supabase = createClient()
@@ -478,7 +469,7 @@ export async function insertSupportTicketComment(payload: {
       ticket_id: payload.ticket_id,
       comment: body,
       commented_by: payload.commented_by,
-      commenter_role: normalizeRole(payload.commenter_role),
+      commenter_role: normalizeAppRole(payload.commenter_role),
       parent_comment_id: payload.parent_comment_id ?? null,
     })
     .select("*, profiles:commented_by(fullname, profile_url)")

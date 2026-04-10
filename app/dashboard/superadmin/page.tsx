@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { isInactiveProfile, getProfileByUserId, roleToLabel } from "@/lib/auth"
+import { isSuperAdminRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { AdminDashboardContent } from "../admin/_dashboard"
 
@@ -13,7 +14,7 @@ export default async function SuperAdminDashboardPage() {
   if (!profile) redirect("/login")
   if (isInactiveProfile(profile)) redirect("/account-inactive")
   const roleValue = String(profile.role ?? "").toLowerCase()
-  if (roleValue !== "super_admin") redirect("/dashboard")
+  if (!isSuperAdminRole(profile.role)) redirect("/dashboard")
   return (
     <AdminDashboardContent
       roleValue={roleValue}

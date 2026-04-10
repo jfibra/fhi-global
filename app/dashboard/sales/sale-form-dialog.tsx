@@ -40,6 +40,7 @@ import {
   insertSaleAttachment,
   deleteSaleAttachment,
 } from "@/lib/sales-service"
+import { isAdminStaffRole } from "@/lib/app-roles"
 
 // ─── Portal ───────────────────────────────────────────────────────────────────
 
@@ -133,7 +134,7 @@ export function SaleFormDialog({
   const canEditCurrentSale = canEditSaleForRole(currentRole, editSale)
   const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, editSale)
   const disabled = viewMode || (isEdit && !canEditCurrentSale)
-  const isAdmin = ["admin", "super_admin"].includes(currentRole)
+  const isAdmin = isAdminStaffRole(currentRole)
 
   // ─── All state declarations (must precede derived values) ────────────────
   const [activeTab, setActiveTab] = useState<"property"|"client"|"contract"|"workflow"|"attachments">("property")

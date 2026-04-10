@@ -18,6 +18,7 @@ import {
   type SaleRecord,
   type SaleAttachment,
 } from "@/lib/sales-service"
+import { isAdminStaffRole } from "@/lib/app-roles"
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -57,7 +58,7 @@ export function SaleAttachmentsDialog({
   onClose: () => void
   onCountChange: (id: string, count: number) => void
 }) {
-  const isAdmin = ["admin", "super_admin"].includes(currentRole)
+  const isAdmin = isAdminStaffRole(currentRole)
   const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, sale)
   const [attachments, setAttachments] = useState<SaleAttachment[]>([])
   const [loading, setLoading] = useState(false)

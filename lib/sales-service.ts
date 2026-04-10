@@ -1,4 +1,9 @@
 import { createClient } from "@/lib/supabase/client"
+import {
+  isAdminStaffRole,
+  isSalesPipelineRole,
+  ROLES_SALE_AGENT_PROFILES,
+} from "@/lib/app-roles"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -157,8 +162,6 @@ type SortField = "reservation_date" | "contract_price" | "created_at"
 type SortDir = "asc" | "desc"
 
 const EDITABLE_REVIEW_STATUSES: ValidationStatus[] = ["invalid_sale", "under_review"]
-const ADMIN_ROLES = ["admin", "super_admin"]
-const AGENT_ROLES = ["agent", "team_leader", "unit_manager"]
 
 const REQUIRED_FIELDS: Array<{ key: string; valid: (form: SaleFormData) => boolean; message: string }> = [
   { key: "developer_id", valid: (form) => Boolean(form.developer_id), message: "Developer is required" },
@@ -191,11 +194,11 @@ function normalizeRole(role: string | undefined | null) {
 }
 
 export function isAdminRole(role: string | undefined | null) {
-  return ADMIN_ROLES.includes(normalizeRole(role))
+  return isAdminStaffRole(role)
 }
 
 export function isAgentScopedRole(role: string | undefined | null) {
-  return AGENT_ROLES.includes(normalizeRole(role))
+  return isSalesPipelineRole(role)
 }
 
 export function canEditSaleForRole(role: string | undefined | null, sale: SaleRecord | null) {
@@ -473,7 +476,7 @@ export async function fetchAgentsForSale(): Promise<{ data: AgentOption[] | null
   const { data, error } = await supabase
     .from("profiles")
     .select("id, fullname")
-    .in("role", ["agent", "team_leader", "unit_manager"])
+    .in("role", [...ROLES_SALE_AGENT_PROFILES])
     .order("fullname", { ascending: true })
 
   if (error) return { data: null, error: error.message }
@@ -537,7 +540,7 @@ export async function fetchSales(opts: {
     .order(sortField, { ascending: sortDir === "asc" })
 
   // Agent, team leader, and unit manager can only see their own sales
-  if (["agent", "team_leader", "unit_manager"].includes(String(currentRole ?? "")) && currentUserId) {
+  if (isSalesPipelineRole(currentRole) && currentUserId) {
     query = query.eq("agent_id", currentUserId)
   } else if (agentId) {
     query = query.eq("agent_id", agentId)

@@ -12,6 +12,7 @@ import { createClient as createSupabaseClient } from "@/lib/supabase/client"
 import { roleToLabel } from "@/lib/auth"
 import { useAuth } from "@/context/auth-context"
 import { getSidebarNavSections, type NavItem, type NavSection } from "@/components/dashboard/sidebar-config"
+import { ROLE_SHELL_BADGE, normalizeAppRole } from "@/lib/app-roles"
 
 // ─── types ────────────────────────────────────────────────────────────────────
 export interface DashboardShellProps {
@@ -25,19 +26,6 @@ export interface DashboardShellProps {
   /** Override grouped nav sections */
   navSections?: NavSection[]
   children: React.ReactNode
-}
-
-// ─── role badge colors ─────────────────────────────────────────────────────────
-const ROLE_BADGE: Record<string, string> = {
-  super_admin:    "bg-purple-500/20 text-purple-300 border-purple-500/30",
-  admin:          "bg-sky-500/20 text-sky-300 border-sky-500/30",
-  team_leader:    "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-  unit_manager:   "bg-orange-500/20 text-orange-300 border-orange-500/30",
-  agent:          "bg-[#d6b357]/20 text-[#d6b357] border-[#d6b357]/30",
-  secretary:      "bg-rose-500/20 text-rose-300 border-rose-500/30",
-  team_secretary: "bg-teal-500/20 text-teal-300 border-teal-500/30",
-  member:         "bg-slate-500/20 text-slate-300 border-slate-500/30",
-  developer:      "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
 }
 
 export function DashboardShell({
@@ -68,7 +56,8 @@ export function DashboardShell({
       : getSidebarNavSections(effectiveRole)
     )
 
-  const badgeCls = ROLE_BADGE[effectiveRole] ?? "bg-white/10 text-white/60 border-white/20"
+  const badgeCls =
+    ROLE_SHELL_BADGE[normalizeAppRole(effectiveRole)] ?? "bg-white/10 text-white/60 border-white/20"
 
   // ── Collapse state: keyed by group label, default open ────────────────────
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {

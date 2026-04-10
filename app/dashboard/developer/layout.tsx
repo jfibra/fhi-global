@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getDashboardRouteByRole } from "@/lib/auth"
+import { isDeveloperRole } from "@/lib/app-roles"
 
 export const dynamic = "force-dynamic"
 
@@ -32,7 +33,7 @@ export default async function DeveloperDashboardLayout({
   const role = String(profile.role ?? "").toLowerCase().trim()
 
   // Only developer role can access this section
-  if (role !== "developer") {
+  if (!isDeveloperRole(profile.role)) {
     redirect(getDashboardRouteByRole(role))
   }
 

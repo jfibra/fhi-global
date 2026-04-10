@@ -55,48 +55,16 @@ export type UpdateUserPayload = {
   whatsapp_number?: string
 }
 
-// ─── Role configuration ────────────────────────────────────────────────────────
+// ─── Role configuration (canonical definitions in `lib/app-roles.ts`) ─────────
 
-export type RoleKey =
-  | "super_admin"
-  | "admin"
-  | "team_leader"
-  | "unit_manager"
-  | "agent"
-  | "developer"
-  | "secretary"
-  | "team_secretary"
-  | "member"
-
-export const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "super_admin",    label: "Super Admin"    },
-  { value: "admin",          label: "Admin"          },
-  { value: "team_leader",    label: "Team Leader"    },
-  { value: "unit_manager",   label: "Unit Manager"   },
-  { value: "agent",          label: "Agent"          },
-  { value: "developer",      label: "Developer"      },
-  { value: "secretary",      label: "Secretary"      },
-  { value: "team_secretary", label: "Team Secretary" },
-  { value: "member",         label: "Member"         },
-]
+export type { AppRoleId as RoleKey } from "@/lib/app-roles"
+export { ROLE_OPTIONS, ROLE_COLORS, roleToLabel } from "@/lib/app-roles"
 
 export const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "active",   label: "Active"   },
   { value: "inactive", label: "Inactive" },
   { value: "pending",  label: "Pending"  },
 ]
-
-export const ROLE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  super_admin:    { bg: "bg-purple-50",  text: "text-purple-700",  border: "border-purple-200"  },
-  admin:          { bg: "bg-sky-50",     text: "text-sky-700",     border: "border-sky-200"     },
-  team_leader:    { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
-  unit_manager:   { bg: "bg-orange-50",  text: "text-orange-700",  border: "border-orange-200"  },
-  agent:          { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200"   },
-  developer:      { bg: "bg-indigo-50",  text: "text-indigo-700",  border: "border-indigo-200"  },
-  secretary:      { bg: "bg-rose-50",    text: "text-rose-700",    border: "border-rose-200"    },
-  team_secretary: { bg: "bg-teal-50",    text: "text-teal-700",    border: "border-teal-200"    },
-  member:         { bg: "bg-slate-50",   text: "text-slate-600",   border: "border-slate-200"   },
-}
 
 export const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   active:   { bg: "bg-green-50",  text: "text-green-700",  border: "border-green-200",  dot: "bg-green-500"  },
@@ -154,14 +122,6 @@ export const COUNTRY_CODES: CountryDialOption[] = [
 ]
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
-
-export function roleToLabel(role: string | null | undefined) {
-  if (!role) return "Member"
-  return role
-    .split("_")
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-    .join(" ")
-}
 
 export function getUserDisplayName(user: Pick<UserRecord, "fullname" | "fname" | "lname" | "email">) {
   return (

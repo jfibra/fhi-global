@@ -1,9 +1,14 @@
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
+import type { ProjectListingType } from "@/lib/project-service"
+
+/** Which public listing route loads this row. */
+export type ListingMarket = "buy" | "rent"
 
 export type BuyRawProject = {
   id: string
   name: string
   slug: string
+  listing_type: ProjectListingType
   main_image: string | null
   project_images?: { url: string; is_main: boolean; rank: number | null }[] | null
   description: string | null
@@ -28,15 +33,21 @@ export type BuyRawProject = {
   project_property_types?: { property_types: { name: string } | null }[] | null
 }
 
-async function fetchBuyProjectsFromSupabase(): Promise<{
+const LISTING_TYPES_FOR_MARKET: Record<ListingMarket, ProjectListingType[]> = {
+  buy: ["sale", "both"],
+  rent: ["rent", "both"],
+}
+
+async function fetchBuyProjectsFromSupabase(market: ListingMarket): Promise<{
   rows: BuyRawProject[]
   error: boolean
 }> {
   const supabase = createPublicSupabaseClient()
+  const types = LISTING_TYPES_FOR_MARKET[market]
   const { data, error } = await supabase
     .from("projects")
     .select(
-      `id, name, slug, main_image, description, city, location, latitude, longitude, launch_price_from, launch_price_to, currency, created_at, is_featured,
+      `id, name, slug, listing_type, main_image, description, city, location, latitude, longitude, launch_price_from, launch_price_to, currency, created_at, is_featured,
        developers ( name, logo_url, slug ),
        project_units ( unit_type, bedrooms, bathrooms, size_sqft, size_sqm ),
        project_property_types ( property_types ( name ) ),
@@ -44,6 +55,7 @@ async function fetchBuyProjectsFromSupabase(): Promise<{
     )
     .eq("is_active", true)
     .eq("is_published", true)
+    .in("listing_type", types)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(80)
@@ -56,14 +68,29 @@ async function fetchBuyProjectsFromSupabase(): Promise<{
 
 /** Public listing hero: `projects.main_image`, else gallery `is_main`, else first by `rank`. */
 export function pickBuyListingImage(p: BuyRawProject): string | null {
-  const direct = p.main_image?.trim()
-  if (direct) return direct
-  const imgs = p.project_images
-  if (!imgs?.length) return null
-  const main = imgs.find((i) => i.is_main)
-  if (main?.url) return main.url
-  const sorted = [...imgs].sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
-  return sorted[0]?.url?.trim() || null
+  const urls = orderedProjectGalleryUrls(p)
+  return urls[0] ?? null
+}
+
+/** Developer project images in display order (main image first, then gallery by main flag + rank). */
+export function orderedProjectGalleryUrls(p: BuyRawProject | null): string[] {
+  if (!p) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  const add = (u: string | null | undefined) => {
+    const t = u?.trim()
+    if (!t || seen.has(t)) return
+    seen.add(t)
+    out.push(t)
+  }
+  add(p.main_image)
+  const imgs = [...(p.project_images ?? [])].sort((a, b) => {
+    if (a.is_main && !b.is_main) return -1
+    if (!a.is_main && b.is_main) return 1
+    return (a.rank ?? 0) - (b.rank ?? 0)
+  })
+  for (const im of imgs) add(im.url)
+  return out
 }
 
 const DEV_QUERY_MS = 18_000
@@ -75,7 +102,7 @@ function withDevTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
   return new Promise((resolve) => {
     const t = setTimeout(() => {
       console.warn(
-        `[buy] Supabase query exceeded ${DEV_QUERY_MS}ms — returning empty list so the page can render.`
+        `[listings] Supabase query exceeded ${DEV_QUERY_MS}ms — returning empty list so the page can render.`
       )
       resolve(fallback)
     }, DEV_QUERY_MS)
@@ -92,12 +119,12 @@ function withDevTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
 }
 
 /**
- * Loads published projects for the buy page (filters run in memory in the page).
+ * Loads published projects for /buy or /rent (filters run in memory on the page).
  * Avoids `unstable_cache` here — it interacted badly with Turbopack (stuck on "Compiling /buy").
  */
-export async function getBuyPageProjectsCached(): Promise<{
+export async function getListingPageProjectsCached(market: ListingMarket): Promise<{
   rows: BuyRawProject[]
   error: boolean
 }> {
-  return withDevTimeout(fetchBuyProjectsFromSupabase(), { rows: [], error: true })
+  return withDevTimeout(fetchBuyProjectsFromSupabase(market), { rows: [], error: true })
 }

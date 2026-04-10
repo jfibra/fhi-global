@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { TeamsDashboardShell } from "./teams-dashboard-shell"
 
 export const dynamic = "force-dynamic"
@@ -17,7 +18,7 @@ export default async function TeamsPage() {
     .single()
 
   const roleValue = String(profile?.role ?? "").toLowerCase().trim()
-  if (!profile || !["super_admin", "admin"].includes(roleValue)) {
+  if (!profile || !isAdminStaffRole(profile.role)) {
     redirect("/dashboard")
   }
 

@@ -28,8 +28,8 @@ const CSP = [
   // CSS: Tailwind / Next.js injects inline styles
   `style-src 'self' 'unsafe-inline'`,
 
-  // Images: own assets, data URIs, blob previews (camera/OCR), Supabase storage, flag CDN, map tiles
-  `img-src 'self' data: blob: https://${SUPABASE_HOST} https://${FLAGCDN} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com`,
+  // Images: own assets, data URIs, blob previews, Supabase, flag CDN, maps, S3/CloudFront (listing + project media)
+  `img-src 'self' data: blob: https://${SUPABASE_HOST} https://${FLAGCDN} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://*.amazonaws.com https://*.cloudfront.net`,
 
   // Fonts: self-hosted via next/font – no external font CDN required
   `font-src 'self' data:`,
@@ -163,6 +163,17 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "filipinohomes123.s3.ap-southeast-1.amazonaws.com",
+      },
+      // Agent listing uploads + any other bucket host (virtual-hosted S3 URLs)
+      {
+        protocol: "https",
+        hostname: "**.amazonaws.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.cloudfront.net",
+        pathname: "/**",
       },
       {
         protocol: "https",

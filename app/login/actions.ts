@@ -1,7 +1,7 @@
 "use server"
 
 import { redirect } from "next/navigation"
-import { ensureProfileForUser, getDashboardRouteByRole, isInactiveProfile } from "@/lib/auth"
+import { ensureProfileForUser, isInactiveProfile, pickSafePostLoginRedirect } from "@/lib/auth"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
 
 export type LoginState = {
@@ -46,5 +46,6 @@ export async function loginAction(_: LoginState, formData: FormData): Promise<Lo
     redirect("/account-inactive")
   }
 
-  redirect(getDashboardRouteByRole(profile.role))
+  const nextRaw = String(formData.get("next") ?? "").trim()
+  redirect(pickSafePostLoginRedirect(nextRaw, profile.role))
 }

@@ -1,17 +1,29 @@
 "use client"
 
 import { useState } from "react"
-import { Globe, EyeOff, Star, Gem, CheckCircle2, Store } from "lucide-react"
-import type { Project, ProjectFormData } from "@/lib/project-service"
+import { Globe, EyeOff, Star, Gem, CheckCircle2, Store, Tag } from "lucide-react"
+import {
+  PROJECT_LISTING_TYPE_LABELS,
+  type Project,
+  type ProjectFormData,
+  type ProjectListingType,
+} from "@/lib/project-service"
 
 interface Props {
   project: Project
   onSave: (fields: Partial<ProjectFormData>) => Promise<void>
   onPublishToggle: () => void
   showToast: (variant: "success" | "error", message: string) => void
+  /** Developer portal: projects are primary sale only; rent/resale is agent-led. */
+  listingVisibilityMode?: "full" | "developer_primary_sale"
 }
 
-export function ProjectSettingsTab({ project, onSave, onPublishToggle }: Props) {
+export function ProjectSettingsTab({
+  project,
+  onSave,
+  onPublishToggle,
+  listingVisibilityMode = "full",
+}: Props) {
   const [saving, setSaving] = useState<string | null>(null)
 
   const toggle = async (key: keyof Project, label: string) => {
@@ -67,6 +79,53 @@ export function ProjectSettingsTab({ project, onSave, onPublishToggle }: Props) 
       <h3 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">Project Settings</h3>
 
       <div className="bg-white rounded-2xl border border-[#f0f0f0] p-5 space-y-0">
+        <div className="flex items-start gap-3 py-4 border-b border-[#f0f0f0]">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#001f3f]/10 text-[#001f3f]">
+            <Tag className="w-4 h-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-[#111827]">Buy / Rent visibility</p>
+            {listingVisibilityMode === "developer_primary_sale" ? (
+              <>
+                <p className="text-xs text-[#6b7280] mt-0.5 mb-2">
+                  Developer projects are published as <strong>for sale</strong>. Rentals and resales are handled by agents in the Buy/Rent workspace after clients purchase.
+                </p>
+                <p className="text-xs text-[#374151] font-medium">
+                  Current listing mode:{" "}
+                  <span className="text-[#001f3f]">{PROJECT_LISTING_TYPE_LABELS[project.listing_type]}</span>
+                  {project.listing_type !== "sale" && (
+                    <span className="block mt-1 font-normal text-[#6b7280]">
+                      Set by an administrator. Contact support if this should change.
+                    </span>
+                  )}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-[#6b7280] mt-0.5 mb-2">
+                  Controls whether this project appears in the agent Buy listing, Rent listing, or both.
+                </p>
+                <select
+                  value={project.listing_type}
+                  disabled={saving === "listing_type"}
+                  onChange={(e) => {
+                    const listing_type = e.target.value as ProjectListingType
+                    void (async () => {
+                      setSaving("listing_type")
+                      await onSave({ listing_type })
+                      setSaving(null)
+                    })()
+                  }}
+                  className="w-full max-w-sm border border-[#e5e5e5] rounded-xl px-3 py-2 text-sm text-[#111827] bg-white focus:outline-none focus:ring-2 focus:ring-[#001f3f]/20 focus:border-[#001f3f] disabled:opacity-50"
+                >
+                  {(Object.keys(PROJECT_LISTING_TYPE_LABELS) as ProjectListingType[]).map((k) => (
+                    <option key={k} value={k}>{PROJECT_LISTING_TYPE_LABELS[k]}</option>
+                  ))}
+                </select>
+              </>
+            )}
+          </div>
+        </div>
         <Toggle
           fieldKey="is_published"
           label="Published"

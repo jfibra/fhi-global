@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { DevelopersDashboardShell } from "./developers-dashboard-shell"
 
@@ -17,7 +18,7 @@ export default async function DevelopersPage() {
     .single()
 
   const roleValue = String(profile?.role ?? "").toLowerCase().trim()
-  if (!profile || !["super_admin", "admin"].includes(roleValue)) {
+  if (!profile || !isAdminStaffRole(profile.role)) {
     redirect("/dashboard")
   }
 

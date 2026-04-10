@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
-import { ensureProfileForUser, getDashboardRouteByRole, isInactiveProfile } from "@/lib/auth"
+import { ensureProfileForUser, isInactiveProfile, pickSafePostLoginRedirect } from "@/lib/auth"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
 import { createPageMetadata } from "@/lib/seo"
 import { HomeLoginUI } from "@/app/home-login-ui"
@@ -15,7 +15,13 @@ export const metadata: Metadata = createPageMetadata({
   description: "Sign in to the FHI Global operations portal — sales reports, commission tracking, team management, developer directory, and support, all in one place.",
 })
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ next?: string | string[] }>
+}) {
+  const sp = searchParams ? await searchParams : {}
+  const nextParam = typeof sp.next === "string" ? sp.next : Array.isArray(sp.next) ? sp.next[0] : undefined
   if (!hasServerSupabaseEnv()) {
     return (
       <>
@@ -51,7 +57,7 @@ export default async function LoginPage() {
     }
 
     if (profile) {
-      redirect(getDashboardRouteByRole(profile.role))
+      redirect(pickSafePostLoginRedirect(nextParam, profile.role))
     }
   }
 
@@ -59,7 +65,7 @@ export default async function LoginPage() {
     <>
       <TopBar />
       <Header />
-      <HomeLoginUI />
+      <HomeLoginUI nextRedirect={nextParam} />
       <Footer />
     </>
   )

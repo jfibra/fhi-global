@@ -6,6 +6,8 @@ import { Plus } from "lucide-react"
 import {
   type Project,
   type Developer,
+  type ProjectListingType,
+  PROJECT_LISTING_TYPE_LABELS,
   fetchProjects,
   fetchProject,
   createProject,
@@ -109,6 +111,7 @@ function NewProjectModal({
   const [slug, setSlug]           = useState("")
   const [developerId, setDevId]   = useState("")
   const [status, setStatus]       = useState<string>("pre_launch")
+  const [listingType, setListingType] = useState<ProjectListingType>("sale")
   const [saving, setSaving]       = useState(false)
 
   const handleNameChange = (v: string) => {
@@ -124,6 +127,7 @@ function NewProjectModal({
       name: name.trim(),
       slug: slug.trim() || generateProjectSlug(name.trim()),
       status: status as Project["status"],
+      listing_type: listingType,
       developer_id: developerId || null,
       is_active: true,
       is_published: false,
@@ -174,6 +178,19 @@ function NewProjectModal({
                 <option value="launch">Launch</option>
                 <option value="under_construction">Under Construction</option>
                 <option value="completed">Completed</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#6b7280] mb-1.5">Public listings</label>
+              <p className="text-[10px] text-[#9ca3af] mb-1.5">Buy page, Rent page, or both.</p>
+              <select
+                value={listingType}
+                onChange={(e) => setListingType(e.target.value as ProjectListingType)}
+                className="w-full border border-[#e5e5e5] rounded-xl px-4 py-2.5 text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#001f3f]/20 focus:border-[#001f3f] bg-white"
+              >
+                {(Object.keys(PROJECT_LISTING_TYPE_LABELS) as ProjectListingType[]).map((k) => (
+                  <option key={k} value={k}>{PROJECT_LISTING_TYPE_LABELS[k]}</option>
+                ))}
               </select>
             </div>
             <div className="flex gap-3 pt-2">

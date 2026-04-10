@@ -21,6 +21,7 @@ import {
 import { DashboardShell } from "@/components/dashboard/shell"
 import { getRoleColor } from "@/components/dashboard/sidebar-config"
 import { roleToLabel } from "@/lib/auth"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import {
   fetchSupportAssignableUsers,
   fetchSupportReporters,
@@ -220,7 +221,7 @@ export function SupportTable({
   const [toasts, setToasts] = useState<Array<{ id: number; type: ToastType; text: string }>>([])
   const toastIdRef = useRef(0)
 
-  const isAdmin = isAdminView ?? ["admin", "super_admin"].includes(currentRole)
+  const isAdmin = isAdminView ?? isAdminStaffRole(currentRole)
 
   const addToast = (type: ToastType, text: string) => {
     const id = ++toastIdRef.current

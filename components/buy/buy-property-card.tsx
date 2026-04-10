@@ -9,7 +9,11 @@ export type BuyPropertyCardData = {
   id: string
   name: string
   slug: string
+  /** When set (e.g. agent listing), the price/title link goes here instead of `/projects/[slug]`. */
+  detail_path?: string | null
   main_image: string | null
+  /** Full gallery (developer project + sales-uploaded photos), in display order. */
+  gallery_urls?: string[]
   description: string | null
   city: string | null
   location: string | null
@@ -62,9 +66,15 @@ function WhatsAppGlyph({ className }: { className?: string }) {
 
 export function BuyPropertyCard({ property }: { property: BuyPropertyCardData }) {
   const [imgIndex, setImgIndex] = useState(0)
-  const images = property.main_image ? [property.main_image] : []
+  const images =
+    property.gallery_urls && property.gallery_urls.length > 0
+      ? property.gallery_urls
+      : property.main_image
+        ? [property.main_image]
+        : []
   const n = Math.max(images.length, 1)
   const src = images[imgIndex] ?? null
+  const detailHref = property.detail_path?.trim() || `/projects/${property.slug}`
 
   const loc = [property.city, property.location].filter(Boolean).join(", ") || "United Arab Emirates"
   const typeLabel = (property.unit_type || "Apartment").replace(/\b\w/g, (c) => c.toUpperCase())
@@ -126,7 +136,7 @@ export function BuyPropertyCard({ property }: { property: BuyPropertyCardData })
         )}
 
         <Link
-          href={`/projects/${property.slug}`}
+          href={detailHref}
           className="font-['Outfit'] text-2xl md:text-[1.7rem] font-bold text-[#0f2940] leading-tight mb-3 pr-12 md:pr-28 block hover:text-[#d6b357] transition-colors w-fit max-w-full"
         >
           {formatPrice(

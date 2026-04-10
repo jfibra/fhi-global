@@ -9,6 +9,7 @@ import {
   type PurchaseCategory,
   type PurchaseCategoryFormData,
 } from "@/lib/purchase-category-service"
+import { isSuperAdminRole } from "@/lib/app-roles"
 
 // ─── Portal helper ────────────────────────────────────────────────────────────
 
@@ -125,7 +126,7 @@ export function PurchaseCategoryFormDialog({
     focus:outline-none focus:ring-4 focus:ring-[#001f3f]/5 transition-all
     ${hasError ? "border-rose-400 focus:border-rose-400" : "border-[#e5e5e5] focus:border-[#001f3f]"}`
 
-  const isSuperAdmin = currentRole === "super_admin"
+  const isSuperAdmin = isSuperAdminRole(currentRole)
 
   if (!open) return null
 

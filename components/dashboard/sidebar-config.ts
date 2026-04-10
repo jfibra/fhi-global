@@ -1,9 +1,18 @@
 import type { LucideIcon } from "lucide-react"
 import {
-  LayoutDashboard, Users, Building2, UsersRound, Layers, Images,
+  LayoutDashboard, Users, Building2, Layers, Images,
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
-  Tag, TrendingUp, LifeBuoy, CreditCard,
+  Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList,
 } from "lucide-react"
+import {
+  ROLE_DASHBOARD_MAP,
+  getRoleSidebarHex,
+  resolveAppRoleOrMember,
+  roleInList,
+  ROLES_SALES_PIPELINE,
+  ROLES_SECRETARY_LIKE,
+  type AppRoleId,
+} from "@/lib/app-roles"
 
 // ─── Base types ────────────────────────────────────────────────────────────────
 
@@ -29,47 +38,19 @@ export interface NavGroupSection {
 
 export type NavSection = NavStandaloneSection | NavGroupSection
 
-// ─── Role configuration ────────────────────────────────────────────────────────
-
-const ROLE_BASE_PATH: Record<string, string> = {
-  super_admin:    "/dashboard/superadmin",
-  admin:          "/dashboard/admin",
-  team_leader:    "/dashboard/teamleader",
-  unit_manager:   "/dashboard/unitmanager",
-  agent:          "/dashboard/agent",
-  secretary:      "/dashboard/secretary",
-  team_secretary: "/dashboard/teamsecretary",
-  member:         "/dashboard/member",
-  developer:      "/dashboard/developer",
-}
-
-export const ROLE_COLOR: Record<string, string> = {
-  super_admin:    "#7c3aed",
-  admin:          "#0ea5e9",
-  team_leader:    "#10b981",
-  unit_manager:   "#f59e0b",
-  agent:          "#d6b357",
-  secretary:      "#f43f5e",
-  team_secretary: "#14b8a6",
-  member:         "#64748b",
-  developer:      "#6366f1",
-}
-
-function resolveRole(role: string | null | undefined): string {
-  const r = String(role ?? "").toLowerCase().trim()
-  if (!r) return "member"
-  return ROLE_BASE_PATH[r] ? r : "member"
+function resolveRole(role: string | null | undefined): AppRoleId {
+  return resolveAppRoleOrMember(role)
 }
 
 export function getRoleColor(role: string | null | undefined): string {
-  return ROLE_COLOR[resolveRole(role)]
+  return getRoleSidebarHex(role)
 }
 
 // ─── Grouped nav sections ──────────────────────────────────────────────────────
 
 export function getSidebarNavSections(role: string | null | undefined): NavSection[] {
   const normalizedRole = resolveRole(role)
-  const basePath = ROLE_BASE_PATH[normalizedRole]
+  const basePath = ROLE_DASHBOARD_MAP[normalizedRole] ?? ROLE_DASHBOARD_MAP.member
 
   if (normalizedRole === "super_admin" || normalizedRole === "admin") {
     return [
@@ -133,9 +114,10 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
     ]
   }
 
-  if (["team_leader", "unit_manager", "agent"].includes(normalizedRole)) {
+  if (roleInList(normalizedRole, ROLES_SALES_PIPELINE)) {
     return [
       { type: "item", item: { icon: LayoutDashboard, label: "Overview", href: basePath } },
+      { type: "item", item: { icon: ClipboardList, label: "My listings", href: "/dashboard/listings" } },
       {
         type: "group",
         label: "Sales Management",
@@ -154,7 +136,7 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
     ]
   }
 
-  if (["secretary", "team_secretary"].includes(normalizedRole)) {
+  if (roleInList(normalizedRole, ROLES_SECRETARY_LIKE)) {
     return [
       { type: "item", item: { icon: LayoutDashboard, label: "Overview",       href: basePath } },
       { type: "item", item: { icon: LifeBuoy,        label: "Support Tickets", href: "/dashboard/support" } },

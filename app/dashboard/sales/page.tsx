@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { canAccessSalesReportsArea } from "@/lib/app-roles"
 import { SalesTable } from "./sales-table"
 
 export const dynamic = "force-dynamic"
-
-const ALLOWED_ROLES = ["super_admin", "admin", "team_leader", "unit_manager", "agent"]
 
 export default async function SalesPage() {
   const supabase = await createClient()
@@ -21,7 +20,7 @@ export default async function SalesPage() {
     .single()
 
   const roleValue = String(profile?.role ?? "").toLowerCase().trim()
-  if (!profile || !ALLOWED_ROLES.includes(roleValue)) {
+  if (!profile || !canAccessSalesReportsArea(profile.role)) {
     redirect("/dashboard")
   }
 

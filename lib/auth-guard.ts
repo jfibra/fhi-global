@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getProfileByUserId, isInactiveProfile } from "@/lib/auth"
+import { normalizeAppRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 
 export type GuardResult = {
@@ -62,9 +63,10 @@ export async function requireRole(allowedRoles: string[]) {
     return session
   }
 
-  const role = session.context.profile.role
+  const role = normalizeAppRole(session.context.profile.role)
+  const allowed = new Set(allowedRoles.map((r) => normalizeAppRole(r)))
 
-  if (!role || !allowedRoles.includes(role)) {
+  if (!role || !allowed.has(role)) {
     return {
       ok: false as const,
       response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),

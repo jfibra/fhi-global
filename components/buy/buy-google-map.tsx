@@ -13,6 +13,8 @@ export type BuyMapMarker = {
   lng: number
   title: string
   slug: string
+  /** When set, info-window link uses this path instead of `/projects/[slug]`. */
+  detail_href?: string | null
   /** Property hero image for circular map pin; optional. */
   image_url: string | null
   price_label?: string
@@ -47,11 +49,12 @@ function mapPreviewCardHtml(m: BuyMapMarker) {
     .join("   ")
   const location = m.location_label ?? m.title
   const price = m.price_label ?? "Price on request"
+  const href = m.detail_href?.trim() || `/projects/${m.slug}`
   const specsHtml = specs
     ? `<div style="font-size:12px;color:#4b5563;line-height:1.35;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(specs)}</div>`
     : ""
   return `
-    <a href="/projects/${m.slug}" style="display:flex;gap:10px;align-items:flex-start;min-width:260px;max-width:320px;text-decoration:none;color:inherit;">
+    <a href="${esc(href)}" style="display:flex;gap:10px;align-items:flex-start;min-width:260px;max-width:320px;text-decoration:none;color:inherit;">
       ${img}
       <div style="min-width:0;">
         <div style="font-size:24px;font-weight:700;line-height:1.15;color:#1f2937;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(price)}</div>
@@ -312,7 +315,7 @@ export function BuyGoogleMap({
       <div className="absolute bottom-0 left-0 right-0 bg-white/95 border-t border-[#e8eaed] px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[#64748b]">
         <span>
           {markers.length === 0
-            ? "No coordinates on listings — showing Dubai. Add latitude/longitude on projects to plot pins."
+            ? "No map pins for the current results — listings need a linked project with coordinates, or we show Dubai by default."
             : `${markers.length} location${markers.length === 1 ? "" : "s"} on map`}
         </span>
         <Link href={listViewHref} className="text-[#001f3f] font-semibold hover:text-[#d6b357]">

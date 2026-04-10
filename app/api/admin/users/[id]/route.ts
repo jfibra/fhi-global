@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import type { UpdateUserPayload } from "@/lib/user-service"
@@ -12,7 +13,7 @@ async function requireAdmin() {
     .select("role")
     .eq("id", user.id)
     .single()
-  if (!profile || !["super_admin", "admin"].includes(profile.role ?? "")) return null
+  if (!profile || !isAdminStaffRole(profile.role)) return null
   return user
 }
 

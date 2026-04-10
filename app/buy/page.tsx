@@ -5,7 +5,7 @@ import { createPageMetadata } from "@/lib/seo"
 import {
   deriveListings,
   listViewHrefFromSp,
-  loadListingProjects,
+  loadPublicAgentListings,
   type ListingSearchParams,
 } from "@/lib/buy/listings-page-logic"
 import { TopBar } from "@/components/topbar"
@@ -28,7 +28,7 @@ export const revalidate = 120
 export const metadata: Metadata = createPageMetadata({
   title: "Buy Property in the United Arab Emirates | FHI Global",
   description:
-    "Browse properties for sale in the United Arab Emirates — filter by location, type, and bedrooms. Find apartments, villas, and more from trusted developers.",
+    "Browse properties for sale in the UAE from FHI Global listings — filter by location, type, and budget. Listings are curated by our sales team.",
   pathname: "/buy",
   keywords: [
     "buy property UAE",
@@ -55,6 +55,10 @@ function ToolbarFallback() {
 }
 
 type Sp = Awaited<ListingSearchParams>
+
+async function loadBuyListings() {
+  return loadPublicAgentListings("buy")
+}
 
 function BuyMapPropertyListSkeleton() {
   return (
@@ -103,19 +107,19 @@ function BuyListingsSkeleton() {
 }
 
 async function BuyMapListingSubtitle({ sp }: { sp: Sp }) {
-  const { rows, error } = await loadListingProjects()
-  const { totalLabel } = deriveListings(sp, rows, error)
-  if (error || !totalLabel) return null
+  const { rows: agentRows, error: agentErr } = await loadBuyListings()
+  const { totalLabel } = deriveListings(sp, agentRows, agentErr)
+  if (agentErr || !totalLabel) return null
   return <p className="mt-1 text-sm text-[#64748b] sm:text-base">{totalLabel}</p>
 }
 
 async function BuyMapSplitList({ sp }: { sp: Sp }) {
-  const { rows, error } = await loadListingProjects()
-  const { properties } = deriveListings(sp, rows, error)
+  const { rows: agentRows, error: agentErr } = await loadBuyListings()
+  const { properties } = deriveListings(sp, agentRows, agentErr)
 
   return (
     <div className="space-y-5 min-w-0 max-w-full">
-      {error && (
+      {agentErr && (
         <div
           className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
           role="alert"
@@ -124,20 +128,21 @@ async function BuyMapSplitList({ sp }: { sp: Sp }) {
           the page.
         </div>
       )}
-      {!error && properties.length === 0 && (
+      {!agentErr && properties.length === 0 && (
         <div className="rounded-2xl border border-[#e8eaed] bg-white p-12 text-center">
           <p className="mb-4 text-[#475569]">
-            No listings match your filters yet. Try clearing filters or browse all projects in the UAE.
+            No published sale listings match your filters yet. Try clearing filters or contact us for off-market
+            options.
           </p>
           <Link
-            href="/projects"
+            href="/contact"
             className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#d6b357] to-[#f0d890] px-6 py-3 text-sm font-bold text-[#001f3f]"
           >
-            View all projects
+            Contact an advisor
           </Link>
         </div>
       )}
-      {!error && properties.length > 0 && (
+      {!agentErr && properties.length > 0 && (
         <div className="flex flex-col gap-5">
           {properties.map((p) => (
             <BuyPropertyCard key={p.id} property={p} />
@@ -149,8 +154,8 @@ async function BuyMapSplitList({ sp }: { sp: Sp }) {
 }
 
 async function BuyMapSplitMap({ sp }: { sp: Sp }) {
-  const { rows, error } = await loadListingProjects()
-  const { mapMarkers } = deriveListings(sp, rows, error)
+  const { rows: agentRows, error: agentErr } = await loadBuyListings()
+  const { mapMarkers } = deriveListings(sp, agentRows, agentErr)
   const apiKey =
     process.env.GOOGLE_MAPS_API_KEY?.trim() ||
     process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ||
@@ -167,12 +172,12 @@ async function BuyMapSplitMap({ sp }: { sp: Sp }) {
 }
 
 async function BuyListingsColumn({ sp }: { sp: Sp }) {
-  const { rows, error } = await loadListingProjects()
-  const { properties, totalLabel } = deriveListings(sp, rows, error)
+  const { rows: agentRows, error: agentErr } = await loadBuyListings()
+  const { properties, totalLabel } = deriveListings(sp, agentRows, agentErr)
 
   return (
     <>
-      {error && (
+      {agentErr && (
         <div
           className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
           role="alert"
@@ -181,21 +186,22 @@ async function BuyListingsColumn({ sp }: { sp: Sp }) {
           the page.
         </div>
       )}
-      {totalLabel && !error && <p className="text-sm text-[#64748b]">{totalLabel}</p>}
-      {!error && properties.length === 0 && (
+      {totalLabel && !agentErr && <p className="text-sm text-[#64748b]">{totalLabel}</p>}
+      {!agentErr && properties.length === 0 && (
         <div className="rounded-2xl border border-[#e8eaed] bg-white p-12 text-center">
           <p className="text-[#475569] mb-4">
-            No listings match your filters yet. Try clearing filters or browse all projects in the UAE.
+            No published sale listings match your filters yet. Try clearing filters or contact us for off-market
+            options.
           </p>
           <Link
-            href="/projects"
+            href="/contact"
             className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-gradient-to-r from-[#d6b357] to-[#f0d890] text-[#001f3f] text-sm font-bold"
           >
-            View all projects
+            Contact an advisor
           </Link>
         </div>
       )}
-      {!error &&
+      {!agentErr &&
         properties.length > 0 &&
         properties.map((p) => <BuyPropertyCard key={p.id} property={p} />)}
     </>

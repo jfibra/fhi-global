@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 
@@ -13,7 +14,7 @@ async function requireAdmin() {
     .eq("id", user.id)
     .single<{ role: string | null }>()
 
-  if (!profile || !["super_admin", "admin"].includes(String(profile.role ?? ""))) {
+  if (!profile || !isAdminStaffRole(profile.role)) {
     return null
   }
 

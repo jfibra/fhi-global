@@ -5,6 +5,7 @@ import { createPortal } from "react-dom"
 import { Plus, Search, Building2, Layers, ArrowRight } from "lucide-react"
 import {
   type Project,
+  PROJECT_LISTING_TYPE_SHORT,
   createProject,
   fetchProject,
   updateProject,
@@ -124,6 +125,7 @@ function NewProjectModal({
       name: name.trim(),
       slug: slug.trim() || generateProjectSlug(name.trim()),
       status: status as Project["status"],
+      listing_type: "sale",
       developer_id: developerId,
       is_active: true,
       is_published: false,
@@ -179,6 +181,9 @@ function NewProjectModal({
                 <option value="completed">Completed</option>
               </select>
             </div>
+            <p className="text-[11px] text-[#6b7280] leading-relaxed rounded-xl border border-[#e8eaed] bg-[#f8fafc] px-3 py-2.5">
+              New projects are listed as <strong>for sale</strong> from the developer. Agents use Buy/Rent tools for rentals and resales after purchase.
+            </p>
             <div className="flex gap-3 pt-2">
               <button type="button" onClick={onClose}
                 className="flex-1 px-5 py-2.5 rounded-full border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-all">
@@ -430,6 +435,11 @@ export function DeveloperProjectsClient({
                       <span className={`text-[10px] px-2 py-0.5 rounded-full ${
                         selected?.id === p.id ? "bg-white/20 text-white/60" : "bg-[#f3f4f6] text-[#6b7280]"
                       }`}>{STATUS_LABEL[p.status] ?? p.status}</span>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                        selected?.id === p.id ? "bg-amber-400/25 text-white" : "bg-amber-50 text-amber-900"
+                      }`}>
+                        {PROJECT_LISTING_TYPE_SHORT[p.listing_type] ?? "Sale"}
+                      </span>
                     </div>
                   </div>
                 </button>
@@ -529,6 +539,7 @@ export function DeveloperProjectsClient({
                     onSave={handleUpdateProject}
                     onPublishToggle={() => void handlePublishToggle()}
                     showToast={showToast}
+                    listingVisibilityMode="developer_primary_sale"
                   />
                 )}
               </div>

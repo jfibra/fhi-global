@@ -18,6 +18,7 @@ import {
   toggleDeveloperActive,
   toggleDeveloperVerified,
 } from "@/lib/developer-service"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { DeveloperFormDialog } from "./developer-form-dialog"
 import { DeveloperLogoUpload } from "./developer-logo-upload"
 
@@ -319,7 +320,7 @@ export function DevelopersClient({ currentRole }: Props) {
     setPage(1)
   }
 
-  const isAdmin = ["super_admin", "admin"].includes(currentRole)
+  const isAdmin = isAdminStaffRole(currentRole)
 
   return (
     <div className="space-y-6">

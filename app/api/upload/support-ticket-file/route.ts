@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
+import { canUseSupportPortal } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 
 const s3 = new S3Client({
@@ -24,18 +25,6 @@ const CONTENT_TYPE_MAP: Record<string, string> = {
   csv: "text/csv",
 }
 
-const ALLOWED_ROLES = [
-  "super_admin",
-  "admin",
-  "team_leader",
-  "unit_manager",
-  "agent",
-  "secretary",
-  "team_secretary",
-  "member",
-  "developer",
-]
-
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -53,8 +42,7 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id)
       .single()
 
-    const roleValue = String(profile?.role ?? "").toLowerCase().trim()
-    if (!profile || !ALLOWED_ROLES.includes(roleValue)) {
+    if (!profile || !canUseSupportPortal(profile.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

@@ -7,6 +7,7 @@ import {
   isPathExemptFromProfileCompletionGate,
   isProfileMissingMinimumFields,
 } from "@/lib/auth"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { updateSession } from "@/lib/supabase/middleware"
 
 export async function proxy(request: NextRequest) {
@@ -36,7 +37,6 @@ export async function proxy(request: NextRequest) {
       url.pathname = "/"
       return NextResponse.redirect(url)
     }
-
     return response
   }
 
@@ -66,8 +66,7 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
-  const normalizedRole = String(profile.role ?? "").toLowerCase().trim()
-  const isPrivilegedRole = normalizedRole === "super_admin" || normalizedRole === "admin"
+  const isPrivilegedRole = isAdminStaffRole(profile.role)
 
   if (
     isDashboardRoute &&

@@ -1,4 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import {
+  ROLE_DASHBOARD_MAP,
+  roleToLabel,
+  isSuperAdminRole,
+  isDeveloperRole,
+} from "@/lib/app-roles"
 
 export type AppUser = {
   id: string
@@ -18,17 +24,7 @@ export type AppProfile = {
   timezone: string | null
 }
 
-export const ROLE_DASHBOARD_MAP: Record<string, string> = {
-  super_admin: "/dashboard/superadmin",
-  admin: "/dashboard/admin",
-  team_leader: "/dashboard/teamleader",
-  unit_manager: "/dashboard/unitmanager",
-  agent: "/dashboard/agent",
-  secretary: "/dashboard/secretary",
-  team_secretary: "/dashboard/teamsecretary",
-  member: "/dashboard/member",
-  developer: "/dashboard/developer",
-}
+export { ROLE_DASHBOARD_MAP, roleToLabel }
 
 const SHARED_DASHBOARD_PREFIXES = [
   "/dashboard/profile",
@@ -40,6 +36,7 @@ const SHARED_DASHBOARD_PREFIXES = [
   "/dashboard/purchase-categories",
   "/dashboard/purchases",
   "/dashboard/sales",
+  "/dashboard/listings",
   "/dashboard/support",
 ]
 
@@ -47,6 +44,26 @@ export function getDashboardRouteByRole(role?: string | null) {
   const normalizedRole = String(role ?? "").toLowerCase().trim()
   if (!normalizedRole) return "/dashboard/member"
   return ROLE_DASHBOARD_MAP[normalizedRole] ?? "/dashboard/member"
+}
+
+/** After login: allow `/buy` or `/rent` as safe relative targets (open redirect safe). */
+export function pickSafePostLoginRedirect(nextRaw: string | null | undefined, role: string | null | undefined): string {
+  const fallback = getDashboardRouteByRole(role)
+  const raw = String(nextRaw ?? "").trim()
+  if (!raw) return fallback
+  if (raw.includes("://") || raw.startsWith("//")) return fallback
+  if (!raw.startsWith("/")) return fallback
+  let pathname = ""
+  let search = ""
+  try {
+    const u = new URL(raw, "https://internal.invalid")
+    pathname = u.pathname
+    search = u.search
+  } catch {
+    return fallback
+  }
+  if (pathname !== "/buy" && pathname !== "/rent") return fallback
+  return pathname + search
 }
 
 export function canAccessDashboardPath(pathname: string, role?: string | null) {
@@ -61,7 +78,7 @@ export function canAccessDashboardPath(pathname: string, role?: string | null) {
   }
 
   // Super admin can access every dashboard route
-  if (normalizedRole === "super_admin") return true
+  if (isSuperAdminRole(normalizedRole)) return true
 
   if (SHARED_DASHBOARD_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
     return true
@@ -160,7 +177,7 @@ export function isProfileMissingMinimumFields(profile: AppProfile) {
 export function isPathExemptFromProfileCompletionGate(pathname: string, role?: string | null) {
   if (pathname.startsWith("/dashboard/profile")) return true
   const r = String(role ?? "").toLowerCase().trim()
-  if (r === "developer") {
+  if (isDeveloperRole(r)) {
     return (
       pathname.startsWith("/dashboard/developer") ||
       pathname.startsWith("/dashboard/support")
@@ -169,10 +186,3 @@ export function isPathExemptFromProfileCompletionGate(pathname: string, role?: s
   return false
 }
 
-export function roleToLabel(role?: string | null) {
-  if (!role) return "Member"
-  return role
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ")
-}

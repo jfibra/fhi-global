@@ -16,6 +16,7 @@ import {
   type SupportTicketPriority,
   type SupportTicketRecord,
 } from "@/lib/support-service"
+import { isAdminStaffRole } from "@/lib/app-roles"
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -73,7 +74,7 @@ export function SupportFormDialog({
   onSaved: (ticket: SupportTicketRecord) => void
   onError: (message: string) => void
 }) {
-  const isAdmin = ["admin", "super_admin"].includes(String(currentRole ?? "").toLowerCase().trim())
+  const isAdmin = isAdminStaffRole(currentRole)
   const [form, setForm] = useState<SupportTicketFormData>(EMPTY_FORM)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)

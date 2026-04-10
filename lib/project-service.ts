@@ -2,11 +2,28 @@ import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
+/** Which agent Buy/Rent listing views include this project (admins can set all; developers create sale-only). */
+export type ProjectListingType = "sale" | "rent" | "both"
+
+export const PROJECT_LISTING_TYPE_LABELS: Record<ProjectListingType, string> = {
+  sale: "For sale only",
+  rent: "For rent only",
+  both: "Sale & rent",
+}
+
+/** Compact label for badges and tables. */
+export const PROJECT_LISTING_TYPE_SHORT: Record<ProjectListingType, string> = {
+  sale: "Sale",
+  rent: "Rent",
+  both: "Both",
+}
+
 export type Project = {
   id: number
   uuid: string
   name: string
   slug: string
+  listing_type: ProjectListingType
   description: string | null
   about_project: string | null
   status: "pre_launch" | "launch" | "under_construction" | "completed"
@@ -256,7 +273,7 @@ export async function fetchProjects(params: {
 
   let q = supabase
     .from("projects")
-    .select("id, uuid, name, slug, status, developer_id, city, country, main_image, is_active, is_published, is_featured, is_premium, launch_price_from, launch_price_to, currency, created_at, updated_at, deleted_at, developers(name, logo_url)", { count: "exact" })
+    .select("id, uuid, name, slug, listing_type, status, developer_id, city, country, main_image, is_active, is_published, is_featured, is_premium, launch_price_from, launch_price_to, currency, created_at, updated_at, deleted_at, developers(name, logo_url)", { count: "exact" })
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .range(from, to)

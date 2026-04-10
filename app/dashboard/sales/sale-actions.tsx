@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { Eye, MoreHorizontal, Paperclip, Pencil } from "lucide-react"
 import { canManageSaleAttachmentsForRole, type SaleRecord } from "@/lib/sales-service"
+import { isAdminStaffRole } from "@/lib/app-roles"
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -25,7 +26,7 @@ export function SaleActions({
   onEdit: () => void
   onAttachments: () => void
 }) {
-  const isAdmin = ["admin", "super_admin"].includes(currentRole)
+  const isAdmin = isAdminStaffRole(currentRole)
   const canEdit = isAdmin
   const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, sale)
   const [open, setOpen] = useState(false)

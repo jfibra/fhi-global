@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { TaxEntitiesTable } from "./tax-entities-table"
 
@@ -19,7 +20,7 @@ export default async function TaxEntitiesPage() {
     .single()
 
   const roleValue = String(profile?.role ?? "").toLowerCase().trim()
-  if (!profile || !["super_admin", "admin"].includes(roleValue)) {
+  if (!profile || !isAdminStaffRole(profile.role)) {
     redirect("/dashboard")
   }
 

@@ -12,11 +12,14 @@ import {
 import { DashboardShell } from "@/components/dashboard/shell"
 import { getRoleColor } from "@/components/dashboard/sidebar-config"
 import { roleToLabel } from "@/lib/auth"
+import {
+  canAccessSalesReportsArea,
+  isAdminStaffRole,
+  isSalesPipelineRole,
+} from "@/lib/app-roles"
 import { ValidationDiscussion } from "./validation-discussion"
 
 export const dynamic = "force-dynamic"
-
-const ALLOWED_ROLES = ["super_admin", "admin", "team_leader", "unit_manager", "agent"]
 
 function formatDate(value: string | null) {
   if (!value) return "—"
@@ -108,8 +111,8 @@ export default async function SaleDetailPage({
     .single()
 
   const roleValue = String(profile?.role ?? "").toLowerCase().trim()
-  const isAdmin = roleValue === "admin"
-  if (!profile || !ALLOWED_ROLES.includes(roleValue)) redirect("/dashboard")
+  const isAdmin = isAdminStaffRole(profile?.role)
+  if (!profile || !canAccessSalesReportsArea(profile.role)) redirect("/dashboard")
 
   const { data: sale, error } = await supabase
     .from("sales_reports")
@@ -128,7 +131,7 @@ export default async function SaleDetailPage({
   if (!sale || error) notFound()
 
   // Agent, team leader, and unit manager can only view their own sales
-  if (["agent", "team_leader", "unit_manager"].includes(roleValue) && sale.agent_id !== profile.id) {
+  if (isSalesPipelineRole(roleValue) && sale.agent_id !== profile.id) {
     redirect("/dashboard/sales")
   }
 
