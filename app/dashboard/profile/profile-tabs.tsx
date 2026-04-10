@@ -1,19 +1,17 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Eye, EyeOff, Phone, MessageCircle, Lock, Check, X } from "lucide-react"
+import { Eye, EyeOff, Phone, MessageCircle, Lock, Check, X, ChevronDown } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { DashboardProfile } from "./profile-form"
 import { BankAccountsTab } from "./bank-accounts-tab"
 import { PhoneCountrySelect } from "@/components/phone-country-select"
 
-type TabKey = "profile" | "personal" | "account" | "security" | "bank_accounts"
+type TabKey = "profile" | "account" | "bank_accounts"
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: "profile",       label: "Profile Info" },
-  { key: "personal",      label: "Personal Info" },
   { key: "account",       label: "Account Settings" },
-  { key: "security",      label: "Security" },
   { key: "bank_accounts", label: "Bank Accounts" },
 ]
 
@@ -154,7 +152,7 @@ export function ProfileTabs({
 }) {
   const userId = profile.id
   const [activeTab, setActiveTab] = useState<TabKey>("profile")
-  const [busySection, setBusySection] = useState<"profile" | "personal" | "password" | null>(null)
+  const [busySection, setBusySection] = useState<"profile" | "password" | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   const [profileInfo, setProfileInfo] = useState(() => ({
@@ -162,12 +160,9 @@ export function ProfileTabs({
     mname: profile.mname ?? "",
     lname: profile.lname ?? "",
     timezone: profile.timezone ?? "UTC",
-    ...toMetadata(profile.metadata),
-  }))
-
-  const [personalInfo, setPersonalInfo] = useState(() => ({
     birthday: profile.birthday ?? "",
     gender: profile.gender ?? "",
+    ...toMetadata(profile.metadata),
   }))
 
   const [securityForm, setSecurityForm] = useState({
@@ -220,6 +215,11 @@ export function ProfileTabs({
       return
     }
 
+    if (profileInfo.birthday && !toISOStringDateOnly(profileInfo.birthday)) {
+      onError("Birthday must be a valid date.")
+      return
+    }
+
     const previous = profile
 
     // Auto-generate fullname
@@ -246,6 +246,8 @@ export function ProfileTabs({
       lname:    profileInfo.lname.trim(),
       fullname,
       timezone: profileInfo.timezone.trim() || "UTC",
+      birthday: profileInfo.birthday ? toISOStringDateOnly(profileInfo.birthday) : null,
+      gender:   profileInfo.gender.trim() || null,
       metadata: nextMetadata,
     }
 
@@ -273,45 +275,6 @@ export function ProfileTabs({
     setHasUnsavedChanges(false)
     onSuccess("Profile information updated.")
     await logActivity("profile_info_update", payload)
-  }
-
-  const handleSavePersonalInfo = async () => {
-    if (personalInfo.birthday && !toISOStringDateOnly(personalInfo.birthday)) {
-      onError("Birthday must be a valid date.")
-      return
-    }
-
-    const previous = profile
-
-    const payload = {
-      birthday: personalInfo.birthday ? toISOStringDateOnly(personalInfo.birthday) : null,
-      gender: personalInfo.gender.trim() || null,
-    }
-
-    const optimistic = { ...profile, ...payload }
-    onProfileChange(optimistic)
-    setBusySection("personal")
-
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from("profiles")
-      .update(payload)
-      .eq("id", profile.id)
-      .select("id, role, fname, mname, lname, fullname, birthday, gender, profile_url, status, timezone, metadata, joined_at, updated_at, is_deleted, deleted_at")
-      .single<DashboardProfile>()
-
-    setBusySection(null)
-
-    if (error || !data) {
-      onProfileChange(previous)
-      onError(error?.message || "Failed to update personal info.")
-      return
-    }
-
-    onProfileChange(data)
-    setHasUnsavedChanges(false)
-    onSuccess("Personal information updated.")
-    await logActivity("personal_info_update", payload)
   }
 
   const handleChangePassword = async () => {
@@ -426,18 +389,49 @@ export function ProfileTabs({
               </span>
             </div>
 
-            {/* Timezone dropdown */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Timezone</label>
-              <select
-                className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm appearance-none cursor-pointer"
-                value={profileInfo.timezone}
-                onChange={(e) => handleProfileFieldChange("timezone", e.target.value)}
-              >
-                {TIMEZONES.map((tz) => (
-                  <option key={tz.value} value={tz.value}>{tz.label}</option>
-                ))}
-              </select>
+            {/* Birthday, Gender, Timezone */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Birthday</label>
+                <input
+                  type="date"
+                  className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
+                  value={profileInfo.birthday ?? ""}
+                  onChange={(e) => handleProfileFieldChange("birthday", e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Gender</label>
+                <div className="relative">
+                  <select
+                    className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm appearance-none cursor-pointer"
+                    value={profileInfo.gender}
+                    onChange={(e) => handleProfileFieldChange("gender", e.target.value)}
+                  >
+                    <option value="">Select gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                    <option value="prefer_not_to_say">Prefer not to say</option>
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Timezone</label>
+                <div className="relative">
+                  <select
+                    className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm appearance-none cursor-pointer"
+                    value={profileInfo.timezone}
+                    onChange={(e) => handleProfileFieldChange("timezone", e.target.value)}
+                  >
+                    {TIMEZONES.map((tz) => (
+                      <option key={tz.value} value={tz.value}>{tz.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+                </div>
+              </div>
             </div>
 
             {/* Phone + WhatsApp */}
@@ -517,69 +511,161 @@ export function ProfileTabs({
           </div>
         )}
 
-        {/* ── Personal Info Tab ── */}
-        {activeTab === "personal" && (
-          <div className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Birthday</label>
-                <input
-                  type="date"
-                  className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
-                  value={personalInfo.birthday ?? ""}
-                  onChange={(e) => {
-                    setHasUnsavedChanges(true)
-                    setPersonalInfo((prev) => ({ ...prev, birthday: e.target.value }))
-                  }}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Gender</label>
-                <select
-                  className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm appearance-none"
-                  value={personalInfo.gender}
-                  onChange={(e) => {
-                    setHasUnsavedChanges(true)
-                    setPersonalInfo((prev) => ({ ...prev, gender: e.target.value }))
-                  }}
-                >
-                  <option value="">Select gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                  <option value="prefer_not_to_say">Prefer not to say</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex justify-end pt-1">
-              <button
-                type="button"
-                onClick={() => void handleSavePersonalInfo()}
-                disabled={busySection === "personal"}
-                className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
-              >
-                {busySection === "personal" ? (
-                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
-                ) : "Save Personal Info"}
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* ── Account Settings Tab ── */}
         {activeTab === "account" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Email</label>
-              <input className="w-full px-5 py-3.5 rounded-2xl border border-[#f0f0f0] bg-[#f8fafc] text-[#6b7280] text-sm cursor-not-allowed" value={email} readOnly />
+          <div className="space-y-8 max-w-2xl">
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold text-[#0d1117] font-['Outfit']">Account Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Email</label>
+                  <input className="w-full px-5 py-3.5 rounded-2xl border border-[#f0f0f0] bg-[#f8fafc] text-[#6b7280] text-sm cursor-not-allowed" value={email} readOnly />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Role</label>
+                  <input className="w-full px-5 py-3.5 rounded-2xl border border-[#f0f0f0] bg-[#f8fafc] text-[#6b7280] text-sm cursor-not-allowed" value={profile.role ?? "member"} readOnly />
+                </div>
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Joined Date</label>
+                  <input className="w-full px-5 py-3.5 rounded-2xl border border-[#f0f0f0] bg-[#f8fafc] text-[#6b7280] text-sm cursor-not-allowed" value={joinedDate} readOnly />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Role</label>
-              <input className="w-full px-5 py-3.5 rounded-2xl border border-[#f0f0f0] bg-[#f8fafc] text-[#6b7280] text-sm cursor-not-allowed" value={profile.role ?? "member"} readOnly />
-            </div>
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Joined Date</label>
-              <input className="w-full px-5 py-3.5 rounded-2xl border border-[#f0f0f0] bg-[#f8fafc] text-[#6b7280] text-sm cursor-not-allowed" value={joinedDate} readOnly />
+
+            <div className="space-y-4 pt-6 border-t border-[#f0f0f0]">
+              <h3 className="text-lg font-bold text-[#0d1117] font-['Outfit']">Change Password</h3>
+              <div className="space-y-5">
+                {/* Current password */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5 ml-1">
+                    <Lock className="w-3.5 h-3.5 text-[#6b7280]" />
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#374151]">Current Password</label>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showPwd.current ? "text" : "password"}
+                      className="w-full px-5 py-3.5 pr-12 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
+                      value={securityForm.currentPassword}
+                      onChange={(e) => setSecurityForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPwd((p) => ({ ...p, current: !p.current }))}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#374151] transition-colors"
+                    >
+                      {showPwd.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* New password + strength */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5 ml-1">
+                    <Lock className="w-3.5 h-3.5 text-[#6b7280]" />
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#374151]">New Password</label>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showPwd.new ? "text" : "password"}
+                      className="w-full px-5 py-3.5 pr-12 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
+                      value={securityForm.newPassword}
+                      onChange={(e) => setSecurityForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPwd((p) => ({ ...p, new: !p.new }))}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#374151] transition-colors"
+                    >
+                      {showPwd.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* Strength bar */}
+                  {securityForm.newPassword && (
+                    <div className="space-y-2 mt-2">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-1.5 rounded-full bg-[#e5e5e5] overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${(pwdStrength.score / PWD_RULES.length) * 100}%`,
+                              backgroundColor: pwdStrength.color,
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs font-bold" style={{ color: pwdStrength.color }}>
+                          {pwdStrength.label}
+                        </span>
+                      </div>
+
+                      {/* Rule checklist */}
+                      <div className="grid grid-cols-1 gap-1.5 pt-1">
+                        {PWD_RULES.map((rule) => {
+                          const passed = rule.test(securityForm.newPassword)
+                          return (
+                            <div key={rule.key} className="flex items-center gap-2">
+                              <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${passed ? "bg-green-500" : "bg-[#e5e5e5]"}`}>
+                                {passed
+                                  ? <Check className="w-2.5 h-2.5 text-white" />
+                                  : <X className="w-2.5 h-2.5 text-[#9ca3af]" />}
+                              </div>
+                              <span className={`text-xs transition-colors ${passed ? "text-green-600 font-medium" : "text-[#9ca3af]"}`}>
+                                {rule.label}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Confirm password */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5 ml-1">
+                    <Lock className="w-3.5 h-3.5 text-[#6b7280]" />
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#374151]">Confirm Password</label>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showPwd.confirm ? "text" : "password"}
+                      className="w-full px-5 py-3.5 pr-12 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
+                      value={securityForm.confirmPassword}
+                      onChange={(e) => setSecurityForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPwd((p) => ({ ...p, confirm: !p.confirm }))}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#374151] transition-colors"
+                    >
+                      {showPwd.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {securityForm.confirmPassword && securityForm.newPassword !== securityForm.confirmPassword && (
+                    <p className="text-xs text-rose-500 ml-1 flex items-center gap-1">
+                      <X className="w-3 h-3" /> Passwords do not match
+                    </p>
+                  )}
+                  {securityForm.confirmPassword && securityForm.newPassword === securityForm.confirmPassword && securityForm.newPassword && (
+                    <p className="text-xs text-green-600 ml-1 flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Passwords match
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={() => void handleChangePassword()}
+                    disabled={busySection === "password"}
+                    className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
+                  >
+                    {busySection === "password" ? (
+                      <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Updating…</>
+                    ) : "Change Password"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -587,143 +673,6 @@ export function ProfileTabs({
         {/* ── Bank Accounts Tab ── */}
         {activeTab === "bank_accounts" && (
           <BankAccountsTab userId={userId} />
-        )}
-
-        {/* ── Security Tab ── */}
-        {activeTab === "security" && (
-          <div className="space-y-5 max-w-xl">
-
-            {/* Current password */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-1.5 ml-1">
-                <Lock className="w-3.5 h-3.5 text-[#6b7280]" />
-                <label className="text-xs font-bold uppercase tracking-wider text-[#374151]">Current Password</label>
-              </div>
-              <div className="relative">
-                <input
-                  type={showPwd.current ? "text" : "password"}
-                  className="w-full px-5 py-3.5 pr-12 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
-                  value={securityForm.currentPassword}
-                  onChange={(e) => setSecurityForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPwd((p) => ({ ...p, current: !p.current }))}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#374151] transition-colors"
-                >
-                  {showPwd.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            {/* New password + strength */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-1.5 ml-1">
-                <Lock className="w-3.5 h-3.5 text-[#6b7280]" />
-                <label className="text-xs font-bold uppercase tracking-wider text-[#374151]">New Password</label>
-              </div>
-              <div className="relative">
-                <input
-                  type={showPwd.new ? "text" : "password"}
-                  className="w-full px-5 py-3.5 pr-12 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
-                  value={securityForm.newPassword}
-                  onChange={(e) => setSecurityForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPwd((p) => ({ ...p, new: !p.new }))}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#374151] transition-colors"
-                >
-                  {showPwd.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {/* Strength bar */}
-              {securityForm.newPassword && (
-                <div className="space-y-2 mt-2">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-1.5 rounded-full bg-[#e5e5e5] overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${(pwdStrength.score / PWD_RULES.length) * 100}%`,
-                          backgroundColor: pwdStrength.color,
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs font-bold" style={{ color: pwdStrength.color }}>
-                      {pwdStrength.label}
-                    </span>
-                  </div>
-
-                  {/* Rule checklist */}
-                  <div className="grid grid-cols-1 gap-1.5 pt-1">
-                    {PWD_RULES.map((rule) => {
-                      const passed = rule.test(securityForm.newPassword)
-                      return (
-                        <div key={rule.key} className="flex items-center gap-2">
-                          <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${passed ? "bg-green-500" : "bg-[#e5e5e5]"}`}>
-                            {passed
-                              ? <Check className="w-2.5 h-2.5 text-white" />
-                              : <X className="w-2.5 h-2.5 text-[#9ca3af]" />}
-                          </div>
-                          <span className={`text-xs transition-colors ${passed ? "text-green-600 font-medium" : "text-[#9ca3af]"}`}>
-                            {rule.label}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Confirm password */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-1.5 ml-1">
-                <Lock className="w-3.5 h-3.5 text-[#6b7280]" />
-                <label className="text-xs font-bold uppercase tracking-wider text-[#374151]">Confirm Password</label>
-              </div>
-              <div className="relative">
-                <input
-                  type={showPwd.confirm ? "text" : "password"}
-                  className="w-full px-5 py-3.5 pr-12 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
-                  value={securityForm.confirmPassword}
-                  onChange={(e) => setSecurityForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPwd((p) => ({ ...p, confirm: !p.confirm }))}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#374151] transition-colors"
-                >
-                  {showPwd.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              {securityForm.confirmPassword && securityForm.newPassword !== securityForm.confirmPassword && (
-                <p className="text-xs text-rose-500 ml-1 flex items-center gap-1">
-                  <X className="w-3 h-3" /> Passwords do not match
-                </p>
-              )}
-              {securityForm.confirmPassword && securityForm.newPassword === securityForm.confirmPassword && securityForm.newPassword && (
-                <p className="text-xs text-green-600 ml-1 flex items-center gap-1">
-                  <Check className="w-3 h-3" /> Passwords match
-                </p>
-              )}
-            </div>
-
-            <div className="flex justify-end pt-1">
-              <button
-                type="button"
-                onClick={() => void handleChangePassword()}
-                disabled={busySection === "password"}
-                className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
-              >
-                {busySection === "password" ? (
-                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Updating…</>
-                ) : "Change Password"}
-              </button>
-            </div>
-          </div>
         )}
 
       </div>

@@ -10,24 +10,25 @@ export async function PATCH(req: Request) {
   const { userId, profile } = guard.context
 
   // ── Parse body ─────────────────────────────────────────────────────────────
-  let body: { phone?: string }
+  let body: { phone?: string; phone_country_code?: string; phone_number?: string }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  const { phone } = body
+  const { phone, phone_country_code, phone_number } = body
 
   // ── Validate ───────────────────────────────────────────────────────────────
-  if (!phone) {
+  if (!phone && !phone_number) {
     return NextResponse.json({ error: "Phone number is required" }, { status: 400 })
   }
 
-  // Must be E.164 UAE mobile: +971 followed by 5x and 8 more digits
-  if (!/^\+9715\d{8}$/.test(phone)) {
+  // Basic E.164-ish validation: starts with + and at least 4 digits after
+  const e164 = phone ?? ""
+  if (e164 && !/^\+\d{4,}$/.test(e164)) {
     return NextResponse.json(
-      { error: "Phone must be a valid UAE mobile number in +971XXXXXXXXX format" },
+      { error: "Phone must be a valid number in international format (e.g. +971XXXXXXXXX)" },
       { status: 422 },
     )
   }
@@ -36,7 +37,11 @@ export async function PATCH(req: Request) {
   const adminClient = createAdminSupabase()
 
   const existingMeta = (profile.metadata as Record<string, unknown>) ?? {}
-  const newMeta = { ...existingMeta, phone_number: phone }
+  const newMeta = {
+    ...existingMeta,
+    phone_number: phone_number ?? e164,
+    ...(phone_country_code ? { phone_country_code } : {}),
+  }
 
   const { error: profileErr } = await adminClient
     .from("profiles")

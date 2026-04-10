@@ -1,4 +1,5 @@
 "use client"
+import { useRouter } from "next/navigation"
 
 import React, {
   useState, useEffect, useRef, useCallback, ChangeEvent,
@@ -7,6 +8,8 @@ import { DashboardShell } from "@/components/dashboard/shell"
 import { useAuth } from "@/context/auth-context"
 import { roleToLabel } from "@/lib/auth"
 import { getRoleColor } from "@/components/dashboard/sidebar-config"
+import { COUNTRY_CODES } from "@/lib/user-service"
+import { PhoneCountrySelect } from "@/components/phone-country-select"
 import {
   Phone, Mail, Save, Loader2, CheckCircle2, AlertCircle,
   RefreshCcw, Info, CreditCard, Download,
@@ -20,27 +23,28 @@ const EXPORT_H  = 1200
 const API_BASE  = process.env.NEXT_PUBLIC_API_BASE_URL ?? ""
 
 // ── Phone helpers ────────────────────────────────────────────────────────────
-function toNational(raw: string): string {
+/** Strip any leading 0 from the local number (digits only). */
+function stripLocal(raw: string): string {
   let d = raw.replace(/\D/g, "")
-  if (d.startsWith("00971")) d = d.slice(5)
-  else if (d.startsWith("971")) d = d.slice(3)
-  else if (d.startsWith("0"))   d = d.slice(1)
-  return d.slice(0, 9)
+  if (d.startsWith("0")) d = d.slice(1)
+  return d
 }
 
-function formatDisplay(national: string): string {
-  if (!national) return ""
-  const n = national
-  let out = "+971 "
-  if (n.length <= 2)  return out + n
-  out += n.slice(0, 2) + " "
-  if (n.length <= 5)  return out + n.slice(2)
-  out += n.slice(2, 5) + " "
-  return out + n.slice(5)
+/** Resolve the dial code string from a country-code value (e.g. "+1-CA" → "+1"). */
+function dialFromValue(ccValue: string): string {
+  const entry = COUNTRY_CODES.find((c) => c.value === ccValue)
+  if (entry) return entry.dial
+  // fallback: strip any suffix after a dash (e.g. "+1-CA" → "+1")
+  return ccValue.includes("-") ? ccValue.split("-")[0] : ccValue
 }
 
-function isPhoneOk(nat: string)  { return nat.length === 9 && nat.startsWith("5") }
-function toE164(nat: string)     { return `+971${nat}` }
+function formatDisplay(dial: string, local: string): string {
+  if (!local) return ""
+  return `${dial} ${local}`
+}
+
+function isPhoneOk(local: string) { return local.length >= 4 }
+function toE164(dial: string, local: string) { return `${dial}${local}` }
 
 // ── Image loader ─────────────────────────────────────────────────────────────
 function loadImg(src: string): Promise<HTMLImageElement> {
@@ -92,7 +96,7 @@ function drawMailIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, siz
 }
 
 // ── Canvas renderer ───────────────────────────────────────────────────────────
-interface CardData { name: string; phone: string; email: string }
+interface CardData { name: string; phoneDial: string; phoneLocal: string; email: string }
 
 async function renderCard(
   side: "front" | "back",
@@ -164,7 +168,7 @@ async function renderCard(
 
   // Phone row
   drawPhoneIcon(ctx, iconX + iconSize * 0.5, row1Y, iconSize)
-  ctx.fillText(data.phone ? formatDisplay(data.phone) : "+971 5x xxx xxxx", txtStartX, row1Y)
+  ctx.fillText(data.phoneLocal ? formatDisplay(data.phoneDial, data.phoneLocal) : "+971 5x xxx xxxx", txtStartX, row1Y)
 
   // Email row
   drawMailIcon(ctx, iconX + iconSize * 0.5, row2Y, iconSize)
@@ -182,17 +186,16 @@ const DISP_H = 400
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function BusinessCardPage() {
+  const router = useRouter()
   const { user, profile } = useAuth()
   const role = (profile?.role ?? "agent") as string
 
   const fullName = profile?.fullname ?? user?.email?.split("@")[0] ?? ""
 
   // phone/email state
-  const [national, setNational] = useState("")     // 9-digit national number
-  const [email,    setEmail]    = useState("")
-
-  // derived display value for the input
-  const [phoneDisplay, setPhoneDisplay] = useState("")
+  const [countryCode, setCountryCode] = useState("+971") // country-code value (e.g. "+63")
+  const [localNumber, setLocalNumber] = useState("")     // local number digits
+  const [email,       setEmail]       = useState("")
 
   // card side
   const [flipped, setFlipped] = useState(false)
@@ -211,12 +214,13 @@ export function BusinessCardPage() {
   useEffect(() => {
     if (profile?.metadata) {
       const meta = profile.metadata as Record<string, unknown>
-      // stored as phone_number in the metadata JSON column
+      // country code stored as phone_country_code in the metadata JSON column
+      const cc = typeof meta.phone_country_code === "string" ? meta.phone_country_code : "+971"
+      setCountryCode(cc)
+      // local number stored as phone_number in the metadata JSON column
       const raw = typeof meta.phone_number === "string" ? meta.phone_number : ""
       if (raw) {
-        const nat = toNational(raw)
-        setNational(nat)
-        setPhoneDisplay(formatDisplay(nat))
+        setLocalNumber(stripLocal(raw))
       }
     }
     if (user?.email) setEmail(user.email.toLowerCase())
@@ -224,20 +228,16 @@ export function BusinessCardPage() {
 
   // ── phone input handler ──────────────────────────────────────────────────
   const handlePhoneChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const nat = toNational(e.target.value)
-    setNational(nat)
-    setPhoneDisplay(formatDisplay(nat))
+    setLocalNumber(e.target.value.replace(/\D/g, ""))
   }
 
-  // keep display formatted on blur
-  const handlePhoneBlur = () => {
-    setPhoneDisplay(formatDisplay(national))
-  }
+  // resolved dial code for display (e.g. "+63")
+  const phoneDial = dialFromValue(countryCode)
 
   // ── regenerate canvas preview ────────────────────────────────────────────
   const regeneratePreview = useCallback(async () => {
     setPreviewLoading(true)
-    const data: CardData = { name: fullName, phone: national, email }
+    const data: CardData = { name: fullName, phoneDial, phoneLocal: localNumber, email }
     const [f, b] = await Promise.all([
       renderCard("front", data, DISP_W, DISP_H),
       renderCard("back",  data, DISP_W, DISP_H),
@@ -245,7 +245,7 @@ export function BusinessCardPage() {
     setFrontDataUrl(f)
     setBackDataUrl(b)
     setPreviewLoading(false)
-  }, [fullName, national, email])
+  }, [fullName, phoneDial, localNumber, email])
 
   // regenerate whenever inputs change (debounced 400ms)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -259,7 +259,7 @@ export function BusinessCardPage() {
   const download = async (side: "front" | "back") => {
     const safeName = fullName.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-]/g, "")
     const filename  = `business-card-${side}-${safeName}-${EXPORT_W}x${EXPORT_H}.png`
-    const url = await renderCard(side, { name: fullName, phone: national, email }, EXPORT_W, EXPORT_H)
+    const url = await renderCard(side, { name: fullName, phoneDial, phoneLocal: localNumber, email }, EXPORT_W, EXPORT_H)
     const a = document.createElement("a")
     a.href     = url
     a.download = filename
@@ -275,13 +275,18 @@ export function BusinessCardPage() {
       const res = await fetch(`${API_BASE}/api/me/contact`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: toE164(national) }),
+        body: JSON.stringify({
+          phone: toE164(phoneDial, localNumber),
+          phone_country_code: countryCode,
+          phone_number: localNumber,
+        }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error ?? `Error ${res.status}`)
       }
       setSaveState("success")
+      router.refresh()
       setTimeout(() => setSaveState("idle"), 3000)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Save failed")
@@ -289,14 +294,14 @@ export function BusinessCardPage() {
     }
   }
 
-  const phoneOk   = isPhoneOk(national)
+  const phoneOk   = isPhoneOk(localNumber)
   const canSave   = phoneOk && saveState !== "saving"
   const inputBase = "w-full px-4 py-3 rounded-xl border text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:ring-4 transition-all duration-200"
   const inputIdle = "border-[#e5e7eb] bg-[#f9fafb] focus:border-[#001f3f] focus:bg-white focus:ring-[#001f3f]/6"
   const inputErr  = "border-rose-300 bg-rose-50 focus:border-rose-500 focus:ring-rose-500/10"
   const inputOk   = "border-emerald-300 bg-white focus:border-emerald-500 focus:ring-emerald-500/10"
 
-  function phoneState()  { if (!national) return "idle"; return phoneOk ? "ok" : "err" }
+  function phoneState()  { if (!localNumber) return "idle"; return phoneOk ? "ok" : "err" }
   function inputCls(st: "idle"|"ok"|"err") {
     if (st === "ok")  return `${inputBase} ${inputOk}`
     if (st === "err") return `${inputBase} ${inputErr}`
@@ -360,25 +365,33 @@ export function BusinessCardPage() {
                 <label htmlFor="bc-phone" className="text-xs font-semibold uppercase tracking-wider text-[#374151]">
                   Phone Number
                 </label>
-                <div className="relative">
-                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
-                  <input
-                    id="bc-phone"
-                    type="tel"
-                    inputMode="numeric"
-                    value={phoneDisplay}
-                    onChange={handlePhoneChange}
-                    onBlur={handlePhoneBlur}
-                    placeholder="+971 5x xxx xxxx"
-                    className={`${inputCls(phoneState())} pl-10`}
+                <div className="flex gap-2">
+                  <PhoneCountrySelect
+                    value={countryCode}
+                    onChange={setCountryCode}
+                    ariaLabel="Phone country calling code"
+                    className="px-3 py-3"
+                    style={{ minWidth: 90 }}
                   />
-                  {phoneState() === "ok"  && <CheckCircle2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 pointer-events-none" />}
-                  {phoneState() === "err" && <AlertCircle  className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-400   pointer-events-none" />}
+                  <div className="relative flex-1">
+                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+                    <input
+                      id="bc-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      value={localNumber}
+                      onChange={handlePhoneChange}
+                      placeholder="5xxxxxxxx"
+                      className={`${inputCls(phoneState())} pl-10`}
+                    />
+                    {phoneState() === "ok"  && <CheckCircle2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 pointer-events-none" />}
+                    {phoneState() === "err" && <AlertCircle  className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-400   pointer-events-none" />}
+                  </div>
                 </div>
                 {phoneState() === "err" && (
                   <p className="text-xs text-rose-600 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" />
-                    Must be a UAE mobile: +971 5x xxx xxxx (9 national digits)
+                    Enter at least 4 digits for the local number
                   </p>
                 )}
               </div>

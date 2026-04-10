@@ -49,25 +49,25 @@ function StatusBadge({ status }: { status: string }) {
 function StatCard({
   label,
   value,
-  icon: Icon,
-  accent,
+  detail,
+  accentClass,
+  textClass,
 }: {
   label: string
   value: number | string
-  icon: React.ElementType
-  accent: string
+  detail?: string
+  accentClass: string
+  textClass: string
 }) {
   return (
-    <div className="bg-white/70 backdrop-blur-xl rounded-[24px] border border-white/60 p-5 shadow-md shadow-black/5 flex items-center gap-4">
-      <div
-        className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
-        style={{ background: `${accent}18` }}
-      >
-        <Icon className="w-5 h-5" style={{ color: accent }} />
-      </div>
-      <div>
-        <p className="text-xs font-semibold text-[#9ca3af] uppercase tracking-wider mb-0.5">{label}</p>
-        <p className="text-2xl font-bold text-[#0d1117] font-['Outfit']">{value.toLocaleString()}</p>
+    <div className="relative overflow-hidden rounded-2xl bg-white border border-[#e8eaed] p-5 hover:shadow-[0_4px_20px_-2px_rgba(0,31,63,0.06)] transition-all duration-300">
+      <div className={`absolute top-4 bottom-4 left-0 w-1.5 rounded-r ${accentClass}`} />
+      <div className="pl-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.05em] text-[#374151]">{label}</p>
+        <p className={`font-['Outfit'] text-[40px] leading-tight font-bold ${textClass} mt-1 tracking-tight`}>
+          {typeof value === "number" ? value.toLocaleString() : value}
+        </p>
+        {detail && <p className="text-[13px] text-[#6b7280]">{detail}</p>}
       </div>
     </div>
   )
@@ -76,11 +76,12 @@ function StatCard({
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div className="bg-white/70 backdrop-blur-xl rounded-[24px] border border-white/60 p-5 shadow-md shadow-black/5 flex items-center gap-4 animate-pulse">
-      <div className="w-12 h-12 rounded-2xl bg-[#f3f4f6]" />
-      <div className="flex-1 space-y-2">
-        <div className="h-3 w-24 rounded bg-[#f3f4f6]" />
-        <div className="h-7 w-16 rounded bg-[#f3f4f6]" />
+    <div className="relative overflow-hidden rounded-2xl bg-white border border-[#e8eaed] p-5 animate-pulse">
+      <div className="absolute top-4 bottom-4 left-0 w-1.5 rounded-r bg-[#f3f4f6]" />
+      <div className="pl-3 space-y-3">
+        <div className="h-2 w-16 rounded bg-[#f3f4f6]" />
+        <div className="h-10 w-24 rounded bg-[#f3f4f6]" />
+        <div className="h-3 w-20 rounded bg-[#f3f4f6]" />
       </div>
     </div>
   )
@@ -191,11 +192,41 @@ export function DeveloperDashboardShell({
               Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
             ) : (
               <>
-                <StatCard label="Total Projects"     value={stats?.totalProjects ?? 0}     icon={Layers}      accent="#6366f1" />
-                <StatCard label="Active Projects"    value={stats?.activeProjects ?? 0}    icon={CheckCircle2} accent="#10b981" />
-                <StatCard label="Published"          value={stats?.publishedProjects ?? 0} icon={TrendingUp}  accent="#0ea5e9" />
-                <StatCard label="Total Units"        value={stats?.totalUnits ?? 0}        icon={Boxes}       accent="#f59e0b" />
-                <StatCard label="Total Views"        value={stats?.totalViews ?? 0}        icon={Eye}         accent="#d6b357" />
+                <StatCard
+                  label="Total Projects"
+                  value={stats?.totalProjects ?? 0}
+                  detail="All projects"
+                  accentClass="bg-[#001f3f]"
+                  textClass="text-[#001f3f]"
+                />
+                <StatCard
+                  label="Active Projects"
+                  value={stats?.activeProjects ?? 0}
+                  detail="Live status"
+                  accentClass="bg-[#001f3f]"
+                  textClass="text-[#001f3f]"
+                />
+                <StatCard
+                  label="Published"
+                  value={stats?.publishedProjects ?? 0}
+                  detail="Publicly visible"
+                  accentClass="bg-[#001f3f]"
+                  textClass="text-[#001f3f]"
+                />
+                <StatCard
+                  label="Total Units"
+                  value={stats?.totalUnits ?? 0}
+                  detail="Inventory"
+                  accentClass="bg-[#001f3f]"
+                  textClass="text-[#001f3f]"
+                />
+                <StatCard
+                  label="Total Views"
+                  value={stats?.totalViews ?? 0}
+                  detail="Analytics"
+                  accentClass="bg-[#001f3f]"
+                  textClass="text-[#001f3f]"
+                />
               </>
             )}
           </div>
@@ -203,9 +234,9 @@ export function DeveloperDashboardShell({
           {/* Quick links */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { label: "Manage Company Info",  desc: "Update your company profile & logo",  href: "/dashboard/developer/company",  icon: Building2,       color: "#6366f1" },
-              { label: "Manage Projects",       desc: "View, edit and publish your projects", href: "/dashboard/developer/projects", icon: Layers,          color: "#0ea5e9" },
-              { label: "Media & Files",         desc: "Manage images, videos & brochures",    href: "/dashboard/developer/media",    icon: LayoutDashboard, color: "#10b981" },
+              { label: "Manage Company Info",  desc: "Update your company profile & logo",  href: "/dashboard/developer/company",  icon: Building2,       color: "#001f3f" },
+              { label: "Manage Projects",       desc: "View, edit and publish your projects", href: "/dashboard/developer/projects", icon: Layers,          color: "#001f3f" },
+              { label: "Media & Files",         desc: "Manage images, videos & brochures",    href: "/dashboard/developer/media",    icon: LayoutDashboard, color: "#001f3f" },
             ].map((item) => (
               <Link
                 key={item.href}
@@ -233,7 +264,7 @@ export function DeveloperDashboardShell({
               <h3 className="font-['Outfit'] text-base font-bold text-[#0d1117]">Recent Projects</h3>
               <Link
                 href="/dashboard/developer/projects"
-                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors flex items-center gap-1"
+                className="text-xs font-semibold text-[#001f3f] hover:text-[#001f3f]/80 transition-colors flex items-center gap-1"
               >
                 View all <ArrowRight className="w-3.5 h-3.5" />
               </Link>
@@ -254,8 +285,8 @@ export function DeveloperDashboardShell({
               </div>
             ) : recent.length === 0 ? (
               <div className="bg-white/60 backdrop-blur-xl rounded-[24px] border border-white/60 p-10 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
-                  <Layers className="w-7 h-7 text-indigo-400" />
+                <div className="w-14 h-14 rounded-2xl bg-[#001f3f]/10 flex items-center justify-center mx-auto mb-4">
+                  <Layers className="w-7 h-7 text-[#001f3f]" />
                 </div>
                 <p className="font-semibold text-[#374151] mb-1">No projects yet</p>
                 <p className="text-sm text-[#9ca3af] mb-5">Create your first project to start listing properties.</p>
