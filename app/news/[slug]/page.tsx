@@ -138,8 +138,12 @@ function ArticleContent({ content }: { content: string }) {
   if (!content) {
     return <p className="text-gray-400 italic text-sm">No content available.</p>
   }
-  // If HTML, render as-is
-  if (content.trimStart().startsWith("<")) {
+  
+  // More robust HTML detection: check if it starts with < OR contains multiple common tags
+  const isHtml = content.trimStart().startsWith("<") || 
+                (/<[a-z][\s\S]*>/i.test(content) && (content.includes("<p") || content.includes("<br") || content.includes("<div")));
+
+  if (isHtml) {
     return (
       <div
         className="prose prose-sm sm:prose max-w-none prose-headings:text-[#001428] prose-headings:font-black prose-a:text-[#d6b357] prose-a:no-underline hover:prose-a:underline prose-img:rounded"

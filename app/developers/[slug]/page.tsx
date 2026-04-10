@@ -134,35 +134,8 @@ export default async function DeveloperDetailPage({ params }: Props) {
               )}
             </div>
 
-            {/* Contact chips */}
-            <div className="flex flex-wrap gap-3">
-              {developer.website_url && (
-                <a
-                  href={developer.website_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/10 hover:bg-white/18 border border-white/25 text-white text-sm font-medium transition-all duration-200 backdrop-blur-sm"
-                >
-                  <Globe className="w-3.5 h-3.5 text-[#d6b357]" /> Website
-                </a>
-              )}
-              {developer.phone && (
-                <a
-                  href={`tel:${developer.phone}`}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/10 hover:bg-white/18 border border-white/25 text-white text-sm font-medium transition-all duration-200 backdrop-blur-sm"
-                >
-                  <Phone className="w-3.5 h-3.5 text-[#d6b357]" /> {developer.phone}
-                </a>
-              )}
-              {developer.email && (
-                <a
-                  href={`mailto:${developer.email}`}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#d6b357] to-[#f0d890] hover:from-[#c9a449] hover:to-[#e8d080] text-[#001f3f] text-sm font-bold transition-all duration-300 shadow-md hover:shadow-[0_8px_24px_rgba(214,179,87,0.35)] hover:-translate-y-0.5"
-                >
-                  <Mail className="w-3.5 h-3.5" /> Get in Touch
-                </a>
-              )}
-            </div>
+
+
           </div>
 
           <div className="mt-6">
