@@ -34,6 +34,7 @@ export type PublicAgentListingRow = {
   listing_kind: "sale" | "rent"
   price: number | string | null
   currency: string
+  unit_type: string | null
   created_at: string
   updated_at: string
   projects: BuyRawProject | null
@@ -58,7 +59,7 @@ async function fetchPublishedAgentListings(market: ListingMarket): Promise<{
   const { data, error } = await supabase
     .from("agent_listings")
     .select(
-      `id, title, description, listing_kind, price, currency, created_at, updated_at, projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
+      `id, title, description, listing_kind, price, currency, unit_type, created_at, updated_at, projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
     )
     .eq("status", "published")
     .is("deleted_at", null)
@@ -102,7 +103,7 @@ export async function fetchPublicAgentListingById(id: string): Promise<{
   const { data, error } = await supabase
     .from("agent_listings")
     .select(
-      `id, title, description, listing_kind, price, currency, created_at, updated_at, projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
+      `id, title, description, listing_kind, price, currency, unit_type, created_at, updated_at, projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
     )
     .eq("id", trimmed)
     .eq("status", "published")

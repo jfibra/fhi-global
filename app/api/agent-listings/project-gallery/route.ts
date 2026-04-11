@@ -22,7 +22,9 @@ export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("projects")
-    .select("main_image, project_images ( url, is_main, rank )")
+    .select(
+      "description, about_project, currency, launch_price_from, launch_price_to, main_image, project_images ( url, is_main, rank ), project_units ( unit_type )",
+    )
     .eq("id", projectId)
     .eq("is_published", true)
     .eq("is_active", true)
@@ -36,6 +38,42 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 })
   }
 
-  const urls = orderedProjectGalleryUrls(data as unknown as BuyRawProject)
-  return NextResponse.json({ urls })
+  const row = data as unknown as BuyRawProject & {
+    description?: string | null
+    about_project?: string | null
+    currency?: string | null
+    launch_price_from?: number | string | null
+    launch_price_to?: number | string | null
+  }
+
+  const urls = orderedProjectGalleryUrls(row as BuyRawProject)
+  const rawUnits = row.project_units ?? []
+  const unitTypes = Array.from(
+    new Set(
+      rawUnits
+        .map((u) => (typeof u.unit_type === "string" ? u.unit_type.trim() : ""))
+        .filter(Boolean),
+    ),
+  ).sort((a, b) => a.localeCompare(b))
+
+  const num = (v: unknown): number | null => {
+    if (v == null) return null
+    const n = typeof v === "number" ? v : Number(v)
+    return Number.isFinite(n) ? n : null
+  }
+
+  const projectDescription =
+    typeof row.description === "string" && row.description.trim() ? row.description.trim() : null
+  const projectAbout =
+    typeof row.about_project === "string" && row.about_project.trim() ? row.about_project.trim() : null
+
+  return NextResponse.json({
+    urls,
+    unitTypes: unitTypes,
+    currency: (row.currency ?? "AED").trim() || "AED",
+    launchPriceFrom: num(row.launch_price_from),
+    launchPriceTo: num(row.launch_price_to),
+    projectDescription,
+    projectAbout,
+  })
 }

@@ -1,6 +1,14 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react"
 import { Plus, Pencil, Trash2, RefreshCw, Sparkles, ImagePlus, X } from "lucide-react"
 import { DashboardShell } from "@/components/dashboard/shell"
 import { getRoleColor } from "@/components/dashboard/sidebar-config"
@@ -9,6 +17,7 @@ import {
   type AgentListing,
   type AgentListingFormInput,
   type ProjectPickerOption,
+  UNASSIGNED_DEVELOPER_KEY,
   fetchMyAgentListings,
   fetchPublishedProjectsForListingForm,
   createAgentListing,
@@ -21,10 +30,43 @@ const emptyForm: AgentListingFormInput = {
   title: "",
   description: "",
   listing_kind: "sale",
-  price: null,
-  currency: "AED",
   project_id: null,
-  status: "draft",
+  status: "published",
+  unit_type: null,
+}
+
+type ProjectPickerExtras = {
+  unitTypes: string[]
+  currency: string
+  launchPriceFrom: number | null
+  launchPriceTo: number | null
+  projectDescription: string | null
+  projectAbout: string | null
+}
+
+type ProjectGalleryApi = {
+  urls?: string[]
+  unitTypes?: string[]
+  currency?: string
+  launchPriceFrom?: number | null
+  launchPriceTo?: number | null
+  projectDescription?: string | null
+  projectAbout?: string | null
+}
+
+function extrasFromProjectGalleryPayload(data: ProjectGalleryApi): ProjectPickerExtras {
+  return {
+    unitTypes: Array.isArray(data.unitTypes) ? data.unitTypes : [],
+    currency: (data.currency ?? "AED").trim() || "AED",
+    launchPriceFrom: data.launchPriceFrom ?? null,
+    launchPriceTo: data.launchPriceTo ?? null,
+    projectDescription:
+      typeof data.projectDescription === "string" && data.projectDescription.trim()
+        ? data.projectDescription.trim()
+        : null,
+    projectAbout:
+      typeof data.projectAbout === "string" && data.projectAbout.trim() ? data.projectAbout.trim() : null,
+  }
 }
 
 type Toast = { id: number; variant: "success" | "error"; message: string }
@@ -53,7 +95,35 @@ export function AgentListingsClient({
   const galleryFileRef = useRef<HTMLInputElement>(null)
   const [projectGalleryUrls, setProjectGalleryUrls] = useState<string[]>([])
   const [projectGalleryLoading, setProjectGalleryLoading] = useState(false)
+  const [projectPickerExtras, setProjectPickerExtras] = useState<ProjectPickerExtras | null>(null)
   const [galleryUrls, setGalleryUrls] = useState<string[]>([])
+  /** UI only: which developer's projects are shown. "" = no project link; UNASSIGNED = projects without developer_id */
+  const [selectedDeveloperId, setSelectedDeveloperId] = useState<string>("")
+
+  const developerOptions = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const p of projects) {
+      if (!p.developer_id) continue
+      const label = p.developerName?.trim() || "Developer"
+      if (!m.has(p.developer_id)) m.set(p.developer_id, label)
+    }
+    return Array.from(m.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [projects])
+
+  const hasUnassignedDeveloperProjects = useMemo(
+    () => projects.some((p) => p.developer_id == null),
+    [projects],
+  )
+
+  const filteredProjects = useMemo(() => {
+    if (selectedDeveloperId === "") return []
+    if (selectedDeveloperId === UNASSIGNED_DEVELOPER_KEY) {
+      return projects.filter((p) => p.developer_id == null)
+    }
+    return projects.filter((p) => p.developer_id === selectedDeveloperId)
+  }, [projects, selectedDeveloperId])
 
   const showToast = useCallback((variant: Toast["variant"], message: string) => {
     const id = ++toastIdRef.current
@@ -81,6 +151,7 @@ export function AgentListingsClient({
     if (!modalOpen) return
     if (form.project_id == null) {
       setProjectGalleryUrls([])
+      setProjectPickerExtras(null)
       return
     }
     let cancelled = false
@@ -88,12 +159,20 @@ export function AgentListingsClient({
     void (async () => {
       try {
         const res = await fetch(`/api/agent-listings/project-gallery?projectId=${form.project_id}`)
-        const data = (await res.json()) as { urls?: string[] }
+        const data = (await res.json()) as ProjectGalleryApi
         if (!cancelled) {
           setProjectGalleryUrls(res.ok && data.urls ? data.urls : [])
+          if (res.ok) {
+            setProjectPickerExtras(extrasFromProjectGalleryPayload(data))
+          } else {
+            setProjectPickerExtras(null)
+          }
         }
       } catch {
-        if (!cancelled) setProjectGalleryUrls([])
+        if (!cancelled) {
+          setProjectGalleryUrls([])
+          setProjectPickerExtras(null)
+        }
       } finally {
         if (!cancelled) setProjectGalleryLoading(false)
       }
@@ -106,9 +185,11 @@ export function AgentListingsClient({
   const openCreate = () => {
     setEditing(null)
     setForm(emptyForm)
+    setSelectedDeveloperId("")
     setAiHint("")
     setAiDescError(null)
     setProjectGalleryUrls([])
+    setProjectPickerExtras(null)
     setGalleryUrls([])
     setModalOpen(true)
   }
@@ -121,21 +202,32 @@ export function AgentListingsClient({
       title: row.title,
       description: row.description ?? "",
       listing_kind: row.listing_kind,
-      price: row.price,
-      currency: row.currency || "AED",
       project_id: row.project_id,
       status: row.status,
+      unit_type: row.unit_type ?? null,
     })
+    const p = row.projects
+    if (row.project_id != null && p && typeof p === "object") {
+      const did = "developer_id" in p ? (p as { developer_id?: string | null }).developer_id : null
+      setSelectedDeveloperId(
+        did != null && String(did).trim() !== "" ? String(did) : UNASSIGNED_DEVELOPER_KEY,
+      )
+    } else {
+      setSelectedDeveloperId("")
+    }
     const imgs = row.agent_listing_images ?? []
     setGalleryUrls(imgs.map((i) => i.url))
     setModalOpen(true)
   }
 
-  const handleGalleryFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    e.target.value = ""
-    if (!files?.length) return
-    for (const file of Array.from(files)) {
+  const handleGalleryFiles = async (e: ChangeEvent<HTMLInputElement>) => {
+    const input = e.target
+    const picked = input.files
+    if (!picked?.length) return
+    // Copy before clearing: `FileList` is live — resetting the input can empty it immediately.
+    const files = Array.from(picked)
+    input.value = ""
+    for (const file of files) {
       if (!file.type.startsWith("image/")) {
         showToast("error", `${file.name} is not an image`)
         continue
@@ -164,8 +256,37 @@ export function AgentListingsClient({
     }
     setAiDescError(null)
     setAiDescLoading(true)
+    let extras = projectPickerExtras
+    if (form.project_id != null && extras == null) {
+      try {
+        const res = await fetch(`/api/agent-listings/project-gallery?projectId=${form.project_id}`)
+        if (res.ok) {
+          const data = (await res.json()) as ProjectGalleryApi
+          extras = extrasFromProjectGalleryPayload(data)
+        }
+      } catch {
+        /* keep extras null */
+      }
+    }
     const projectName =
       form.project_id != null ? projects.find((p) => p.id === form.project_id)?.name ?? null : null
+    const pricingNote = (() => {
+      if (form.project_id == null) return null
+      const from = extras?.launchPriceFrom
+      const to = extras?.launchPriceTo
+      const cur = (extras?.currency ?? "AED").trim() || "AED"
+      if (from == null && to == null) {
+        return "Pricing follows the linked developer project (launch prices on the project record)."
+      }
+      const locale = cur === "AED" ? "en-AE" : "en-US"
+      const fmt = (n: number) => n.toLocaleString(locale, { maximumFractionDigits: 0 })
+      if (from != null && to != null && to !== from) {
+        return `Developer launch pricing: ${cur} ${fmt(from)} – ${fmt(to)}`
+      }
+      if (from != null) return `Developer launch pricing from: ${cur} ${fmt(from)}`
+      if (to != null) return `Developer launch pricing: ${cur} ${fmt(to)}`
+      return null
+    })()
     try {
       const res = await fetch("/api/ai/listing-description", {
         method: "POST",
@@ -173,9 +294,11 @@ export function AgentListingsClient({
         body: JSON.stringify({
           title: form.title.trim(),
           listing_kind: form.listing_kind,
-          price: form.price,
-          currency: form.currency,
           projectName,
+          unitType: form.unit_type,
+          pricingNote,
+          projectDescription: extras?.projectDescription ?? null,
+          projectAbout: extras?.projectAbout ?? null,
           customPrompt: aiHint.trim(),
         }),
       })
@@ -195,7 +318,7 @@ export function AgentListingsClient({
     }
   }
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (!form.title.trim()) {
       showToast("error", "Title is required")
@@ -263,8 +386,8 @@ export function AgentListingsClient({
           <div>
             <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117]">My listings</h1>
             <p className="text-sm text-[#6b7280] mt-1">
-              Agents, team leaders, and unit managers can publish sale or rent listings here. Optionally link a
-              published developer project for photos and map location.
+              Create a listing by title and type, then choose a developer, one of their published projects, and an
+              optional unit type they configured. Photos and pricing follow the project record.
             </p>
           </div>
           <div className="flex gap-2">
@@ -307,7 +430,9 @@ export function AgentListingsClient({
                 <thead>
                   <tr className="border-b border-[#f0f0f0] bg-[#fafafa] text-left text-xs font-semibold uppercase tracking-wide text-[#6b7280]">
                     <th className="px-4 py-3">Title</th>
+                    <th className="px-4 py-3">Developer</th>
                     <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">Unit type</th>
                     <th className="px-4 py-3">Price</th>
                     <th className="px-4 py-3">Project</th>
                     <th className="px-4 py-3">Status</th>
@@ -318,12 +443,26 @@ export function AgentListingsClient({
                   {rows.map((row) => {
                     const p = row.projects
                     const pname = p && typeof p === "object" && "name" in p ? String((p as { name?: string }).name ?? "—") : "—"
+                    const dname =
+                      p && typeof p === "object" && "developers" in p
+                        ? String(
+                            (p as { developers?: { name?: string | null } | null }).developers?.name ?? "",
+                          ).trim() || "—"
+                        : "—"
                     return (
                       <tr key={row.id} className="border-b border-[#f5f5f5] hover:bg-[#fafafa]/80">
                         <td className="px-4 py-3 font-medium text-[#111827]">{row.title}</td>
+                        <td className="px-4 py-3 text-[#6b7280] max-w-[140px] truncate">{dname}</td>
                         <td className="px-4 py-3 capitalize">{row.listing_kind}</td>
-                        <td className="px-4 py-3">
-                          {row.price != null ? `${Number(row.price).toLocaleString()} ${row.currency}` : "—"}
+                        <td className="px-4 py-3 text-[#6b7280] max-w-[140px] truncate">
+                          {row.unit_type?.trim() || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-[#6b7280]">
+                          {row.project_id != null
+                            ? "Developer project"
+                            : row.price != null
+                              ? `${Number(row.price).toLocaleString()} ${row.currency}`
+                              : "—"}
                         </td>
                         <td className="px-4 py-3 text-[#6b7280] max-w-[180px] truncate">{pname}</td>
                         <td className="px-4 py-3">
@@ -391,94 +530,134 @@ export function AgentListingsClient({
                   required
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[#6b7280] mb-1">Listing type</label>
-                  <select
-                    value={form.listing_kind}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, listing_kind: e.target.value as AgentListingFormInput["listing_kind"] }))
-                    }
-                    className="w-full border border-[#e5e5e5] rounded-xl px-3 py-2 text-sm bg-white"
-                  >
-                    <option value="sale">Sale</option>
-                    <option value="rent">Rent</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#6b7280] mb-1">Status</label>
-                  <select
-                    value={form.status}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, status: e.target.value as AgentListingFormInput["status"] }))
-                    }
-                    className="w-full border border-[#e5e5e5] rounded-xl px-3 py-2 text-sm bg-white"
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="published">Published</option>
-                    <option value="archived">Archived</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[#6b7280] mb-1">Price</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    value={form.price ?? ""}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        price: e.target.value === "" ? null : Number(e.target.value),
-                      }))
-                    }
-                    className="w-full border border-[#e5e5e5] rounded-xl px-3 py-2 text-sm"
-                    placeholder="Optional"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#6b7280] mb-1">Currency</label>
-                  <input
-                    value={form.currency}
-                    onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
-                    className="w-full border border-[#e5e5e5] rounded-xl px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
               <div>
-                <label className="block text-xs font-semibold text-[#6b7280] mb-1">Developer project (optional)</label>
+                <label className="block text-xs font-semibold text-[#6b7280] mb-1">Listing type</label>
                 <select
-                  value={form.project_id ?? ""}
+                  value={form.listing_kind}
                   onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      project_id: e.target.value === "" ? null : Number(e.target.value),
-                    }))
+                    setForm((f) => ({ ...f, listing_kind: e.target.value as AgentListingFormInput["listing_kind"] }))
                   }
                   className="w-full border border-[#e5e5e5] rounded-xl px-3 py-2 text-sm bg-white"
                 >
-                  <option value="">— None —</option>
-                  {projects.map((p) => (
+                  <option value="sale">Sale</option>
+                  <option value="rent">Rent</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#6b7280] mb-1">Developer</label>
+                <select
+                  value={selectedDeveloperId}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setSelectedDeveloperId(v)
+                    setForm((f) => ({ ...f, project_id: null, unit_type: null }))
+                  }}
+                  className="w-full border border-[#e5e5e5] rounded-xl px-3 py-2 text-sm bg-white"
+                >
+                  <option value="">— No developer project —</option>
+                  {developerOptions.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                  {hasUnassignedDeveloperProjects ? (
+                    <option value={UNASSIGNED_DEVELOPER_KEY}>Other (project not tied to a developer)</option>
+                  ) : null}
+                </select>
+                <p className="text-[10px] text-[#9ca3af] mt-1">
+                  Choose the developer first. Their published projects appear in the next step.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#6b7280] mb-1">Project</label>
+                <select
+                  disabled={selectedDeveloperId === ""}
+                  value={form.project_id ?? ""}
+                  onChange={(e) => {
+                    const raw = e.target.value
+                    const id = raw === "" ? null : Number(raw)
+                    setForm((f) => ({
+                      ...f,
+                      project_id: id,
+                      unit_type: id === null || id !== f.project_id ? null : f.unit_type,
+                    }))
+                  }}
+                  className="w-full border border-[#e5e5e5] rounded-xl px-3 py-2 text-sm bg-white disabled:bg-[#f9fafb] disabled:text-[#9ca3af]"
+                >
+                  <option value="">
+                    {selectedDeveloperId === ""
+                      ? "Select a developer first"
+                      : filteredProjects.length === 0
+                        ? "No published projects for this developer"
+                        : "— Select project —"}
+                  </option>
+                  {filteredProjects.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
                     </option>
                   ))}
                 </select>
                 <p className="text-[10px] text-[#9ca3af] mt-1">
-                  When you pick a project, developer photos load below. They are included on the public listing
-                  automatically.
+                  Launch price, currency, photos, and AI context follow the project you select.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#6b7280] mb-1">Unit type (optional)</label>
+                {form.project_id == null ? (
+                  <p className="text-xs text-[#9ca3af] border border-[#e5e5e5] rounded-xl px-3 py-2 bg-[#fafafa]">
+                    Select a project to choose a unit type from the developer&apos;s inventory.
+                  </p>
+                ) : (projectPickerExtras?.unitTypes.length ?? 0) > 0 ? (
+                  <select
+                    value={form.unit_type ?? ""}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, unit_type: e.target.value === "" ? null : e.target.value }))
+                    }
+                    className="w-full border border-[#e5e5e5] rounded-xl px-3 py-2 text-sm bg-white"
+                  >
+                    <option value="">— Not specified —</option>
+                    {(projectPickerExtras?.unitTypes ?? []).map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-xs text-[#9ca3af] border border-[#e5e5e5] rounded-xl px-3 py-2 bg-[#fafafa]">
+                    This project has no unit lines yet in the developer portal.
+                  </p>
+                )}
+                <p className="text-[10px] text-[#9ca3af] mt-1">
+                  Unit options are defined on the project by the developer.
                 </p>
               </div>
 
               {form.project_id != null && (
                 <div className="rounded-xl border border-[#e8eaed] bg-[#fafafa] p-3">
-                  <p className="text-xs font-semibold text-[#374151] mb-2">Developer project photos</p>
+                  <p className="text-xs font-semibold text-[#374151] mb-1">Developer project photos</p>
+                  <p className="text-[10px] text-[#9ca3af] mb-2 leading-relaxed">
+                    Read-only preview from the developer&apos;s project record (main image + project gallery in the
+                    developer portal). Files you upload on this form do{" "}
+                    <span className="font-semibold text-[#6b7280]">not</span> appear here — they go in{" "}
+                    <span className="font-semibold text-[#6b7280]">Your unit / room photos</span> below.
+                  </p>
                   {projectGalleryLoading ? (
                     <p className="text-xs text-[#9ca3af]">Loading gallery…</p>
                   ) : projectGalleryUrls.length === 0 ? (
-                    <p className="text-xs text-[#9ca3af]">No images in this project gallery yet.</p>
+                    <div className="text-xs text-[#9ca3af] space-y-1.5">
+                      <p>No images are stored on this project in the database yet (no main image / gallery rows).</p>
+                      {galleryUrls.length > 0 ? (
+                        <p className="text-[#6b7280]">
+                          Your folder uploads are in <span className="font-semibold">Your unit / room photos</span>{" "}
+                          below; they still show on the public listing after you save.
+                        </p>
+                      ) : (
+                        <p>
+                          The developer (or admin) needs to add images under that project&apos;s media in the
+                          dashboard. Your own listing photos can be added in the next section.
+                        </p>
+                      )}
+                    </div>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {projectGalleryUrls.map((url) => (
@@ -497,8 +676,9 @@ export function AgentListingsClient({
 
               <div className="rounded-xl border border-[#e8eaed] p-3">
                 <p className="text-xs font-semibold text-[#374151] mb-1">Your unit / room photos (optional)</p>
-                <p className="text-[10px] text-[#9ca3af] mb-2">
-                  Add extra images for your listing. Public pages show developer photos first, then these.
+                <p className="text-[10px] text-[#9ca3af] mb-2 leading-relaxed">
+                  Upload from your device here — these are saved on <span className="font-semibold">this agent listing</span>{" "}
+                  only. On the public site, developer project photos (above) show first when present, then these.
                 </p>
                 <input
                   ref={galleryFileRef}
@@ -567,8 +747,9 @@ export function AgentListingsClient({
                   </p>
                 )}
                 <p className="text-[10px] text-[#9ca3af] mb-1.5">
-                  Uses Gemini (<code className="text-[#6b7280]">GEMINI_API_KEY</code> in .env). Fill title, type, price,
-                  and project first for best results.
+                  Uses Gemini (<code className="text-[#6b7280]">GEMINI_API_KEY</code> in .env). With a linked project,
+                  the model uses the developer&apos;s project description and about text (plus launch pricing) to
+                  create or refine your copy; add title, unit type, and notes for best results.
                 </p>
                 <textarea
                   value={form.description}

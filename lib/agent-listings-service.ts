@@ -19,10 +19,16 @@ export type AgentListing = {
   price: number | null
   currency: string
   status: AgentListingStatus
+  unit_type: string | null
   created_at: string
   updated_at: string
   deleted_at: string | null
-  projects?: { id: number; name: string } | null
+  projects?: {
+    id: number
+    name: string
+    developer_id?: string | null
+    developers?: { name?: string | null } | null
+  } | null
   agent_listing_images?: AgentListingImage[] | null
 }
 
@@ -30,13 +36,39 @@ export type AgentListingFormInput = {
   title: string
   description: string
   listing_kind: AgentListingKind
-  price: number | null
-  currency: string
   project_id: number | null
   status: AgentListingStatus
+  unit_type: string | null
 }
 
-export type ProjectPickerOption = { id: number; name: string }
+export type ProjectPickerOption = {
+  id: number
+  name: string
+  developer_id: string | null
+  developerName: string | null
+}
+
+const UNASSIGNED_DEVELOPER_KEY = "__unassigned__"
+export { UNASSIGNED_DEVELOPER_KEY }
+
+async function resolveListingMoneyFields(
+  supabase: ReturnType<typeof createClient>,
+  projectId: number | null,
+): Promise<{ price: number | null; currency: string }> {
+  if (projectId == null) {
+    return { price: null, currency: "AED" }
+  }
+  const { data } = await supabase
+    .from("projects")
+    .select("currency")
+    .eq("id", projectId)
+    .maybeSingle()
+
+  const cur = data && typeof (data as { currency?: unknown }).currency === "string"
+    ? (data as { currency: string }).currency.trim() || "AED"
+    : "AED"
+  return { price: null, currency: cur }
+}
 
 export async function fetchMyAgentListings(agentId: string): Promise<{
   data: AgentListing[] | null
@@ -45,7 +77,9 @@ export async function fetchMyAgentListings(agentId: string): Promise<{
   const supabase = createClient()
   const { data, error } = await supabase
     .from("agent_listings")
-    .select("*, projects ( id, name ), agent_listing_images ( id, url, sort_order )")
+    .select(
+      "*, projects ( id, name, developer_id, developers ( name ) ), agent_listing_images ( id, url, sort_order )",
+    )
     .eq("agent_id", agentId)
     .is("deleted_at", null)
     .order("updated_at", { ascending: false })
@@ -67,7 +101,7 @@ export async function fetchPublishedProjectsForListingForm(): Promise<{
   const supabase = createClient()
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name")
+    .select("id, name, developer_id, developers ( name )")
     .eq("is_published", true)
     .eq("is_active", true)
     .is("deleted_at", null)
@@ -76,7 +110,17 @@ export async function fetchPublishedProjectsForListingForm(): Promise<{
 
   if (error) return { data: null, error: error.message }
   return {
-    data: (data ?? []).map((r) => ({ id: Number(r.id), name: String(r.name ?? "") })),
+    data: (data ?? []).map((r) => {
+      const dev = r.developers as { name?: string | null } | null | undefined
+      const devName = dev && typeof dev.name === "string" ? dev.name.trim() || null : null
+      const did = r.developer_id != null ? String(r.developer_id) : null
+      return {
+        id: Number(r.id),
+        name: String(r.name ?? ""),
+        developer_id: did,
+        developerName: devName,
+      }
+    }),
     error: null,
   }
 }
@@ -86,6 +130,7 @@ export async function createAgentListing(
   input: AgentListingFormInput,
 ): Promise<{ data: AgentListing | null; error: string | null }> {
   const supabase = createClient()
+  const money = await resolveListingMoneyFields(supabase, input.project_id)
   const now = new Date().toISOString()
   const { data, error } = await supabase
     .from("agent_listings")
@@ -95,12 +140,15 @@ export async function createAgentListing(
       title: input.title.trim(),
       description: input.description.trim() || null,
       listing_kind: input.listing_kind,
-      price: input.price,
-      currency: input.currency.trim() || "AED",
+      price: money.price,
+      currency: money.currency,
       status: input.status,
+      unit_type: input.unit_type?.trim() || null,
       updated_at: now,
     })
-    .select("*, projects ( id, name ), agent_listing_images ( id, url, sort_order )")
+    .select(
+      "*, projects ( id, name, developer_id, developers ( name ) ), agent_listing_images ( id, url, sort_order )",
+    )
     .single()
 
   if (error) return { data: null, error: error.message }
@@ -117,6 +165,7 @@ export async function updateAgentListing(
   input: AgentListingFormInput,
 ): Promise<{ data: AgentListing | null; error: string | null }> {
   const supabase = createClient()
+  const money = await resolveListingMoneyFields(supabase, input.project_id)
   const now = new Date().toISOString()
   const { data, error } = await supabase
     .from("agent_listings")
@@ -125,14 +174,17 @@ export async function updateAgentListing(
       title: input.title.trim(),
       description: input.description.trim() || null,
       listing_kind: input.listing_kind,
-      price: input.price,
-      currency: input.currency.trim() || "AED",
+      price: money.price,
+      currency: money.currency,
       status: input.status,
+      unit_type: input.unit_type?.trim() || null,
       updated_at: now,
     })
     .eq("id", listingId)
     .eq("agent_id", agentId)
-    .select("*, projects ( id, name ), agent_listing_images ( id, url, sort_order )")
+    .select(
+      "*, projects ( id, name, developer_id, developers ( name ) ), agent_listing_images ( id, url, sort_order )",
+    )
     .single()
 
   if (error) return { data: null, error: error.message }

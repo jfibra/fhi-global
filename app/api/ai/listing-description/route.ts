@@ -9,6 +9,19 @@ type Body = {
   currency?: string
   projectName?: string | null
   customPrompt?: string
+  unitType?: string | null
+  /** Full sentence for pricing (e.g. developer launch range); overrides price/currency when set */
+  pricingNote?: string | null
+  /** Developer short listing description from the linked project */
+  projectDescription?: string | null
+  /** Developer long-form “about project” copy from the linked project */
+  projectAbout?: string | null
+}
+
+function clampDevCopy(s: string, maxChars: number): string {
+  const t = s.trim().replace(/\s+/g, " ")
+  if (t.length <= maxChars) return t
+  return `${t.slice(0, maxChars)}…`
 }
 
 export async function POST(req: NextRequest) {
@@ -35,26 +48,47 @@ export async function POST(req: NextRequest) {
     }
 
     const kind = String(body.listing_kind ?? "sale").toLowerCase() === "rent" ? "rent" : "sale"
+    const pricingNote = String(body.pricingNote ?? "").trim()
     const priceLine =
-      body.price != null && Number.isFinite(Number(body.price))
+      pricingNote ||
+      (body.price != null && Number.isFinite(Number(body.price))
         ? `Price: ${Number(body.price).toLocaleString()} ${String(body.currency ?? "AED").trim() || "AED"}`
-        : ""
+        : "")
     const projectLine = body.projectName?.trim() ? `Linked development: ${body.projectName.trim()}` : ""
+    const unitLine = String(body.unitType ?? "").trim() ? `Unit type: ${String(body.unitType).trim()}` : ""
     const custom = String(body.customPrompt ?? "").trim()
+
+    const shortDev = String(body.projectDescription ?? "").trim()
+    const longDev = String(body.projectAbout ?? "").trim()
+    const devShortBlock = shortDev ? clampDevCopy(shortDev, 3200) : ""
+    const devLongBlock = longDev ? clampDevCopy(longDev, 4800) : ""
+    const developerCopySection =
+      devShortBlock || devLongBlock
+        ? [
+            "Official developer project copy (treat as the factual source for the development; align with it and do not invent amenities, handover dates, or policies that contradict it):",
+            devShortBlock ? `Project summary (developer):\n${devShortBlock}` : "",
+            devLongBlock ? `About the project (developer):\n${devLongBlock}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n\n")
+        : ""
 
     const facts = [
       `Listing title: ${title}`,
       `Listing type: ${kind === "rent" ? "For rent" : "For sale"}`,
       priceLine,
       projectLine,
+      unitLine,
     ]
       .filter(Boolean)
       .join("\n")
 
     const system =
-      "You are a senior UAE real-estate copywriter. Write one polished listing description for an agent's property listing. Tone: premium, clear, trustworthy. No emoji, no markdown, no bullet lists. Output must be exactly one paragraph: a single continuous block of prose with no line breaks and no multiple paragraphs."
+      "You are a senior UAE real-estate copywriter. Write one polished listing description for an agent's property listing. Tone: premium, clear, trustworthy. No emoji, no markdown, no bullet lists. Output must be exactly one paragraph: a single continuous block of prose with no line breaks and no multiple paragraphs. When official developer project copy is provided, base claims on it and the listing title or unit notes; synthesize and adapt wording for this agent listing rather than pasting the brochure verbatim, but do not contradict the developer material."
 
-    const userPrompt = `Write 90–180 words in a single paragraph only (no blank lines, no second paragraph) suitable for a web listing detail page.\n\n${facts}\n\nExtra direction from the agent: ${custom || "None — use best judgment."}`
+    const userPrompt = `Write 90–180 words in a single paragraph only (no blank lines, no second paragraph) suitable for a web listing detail page.\n\n${facts}${
+      developerCopySection ? `\n\n${developerCopySection}` : ""
+    }\n\nExtra direction from the agent: ${custom || "None — use best judgment."}`
 
     const rawModel = process.env.GEMINI_MODEL?.trim() || "gemini-2.0-flash"
     const model = rawModel.replace(/^models\//, "")

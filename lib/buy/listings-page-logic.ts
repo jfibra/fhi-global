@@ -94,6 +94,7 @@ function agentMatchesFilters(row: PublicAgentListingRow, sp: Awaited<ListingSear
 
   const type = (sp.type ?? "").trim().toLowerCase()
   if (type) {
+    const agentUnit = (row.unit_type ?? "").toLowerCase().includes(type)
     if (proj) {
       const units = proj.project_units ?? []
       const matchUnit = units.some((u) => (u.unit_type ?? "").toLowerCase().includes(type))
@@ -101,10 +102,12 @@ function agentMatchesFilters(row: PublicAgentListingRow, sp: Awaited<ListingSear
         .map((r) => r.property_types?.name)
         .filter((n): n is string => Boolean(n?.trim()))
       const matchPt = linked.some((name) => name.toLowerCase().includes(type))
-      if (!matchUnit && !matchPt) return false
+      if (!matchUnit && !matchPt && !agentUnit) return false
     } else {
-      const blob = `${row.title} ${row.description ?? ""}`.toLowerCase()
-      if (!blob.includes(type)) return false
+      if (!agentUnit) {
+        const blob = `${row.title} ${row.description ?? ""}`.toLowerCase()
+        if (!blob.includes(type)) return false
+      }
     }
   }
 
@@ -165,6 +168,7 @@ function agentListingToCard(row: PublicAgentListingRow): BuyPropertyCardData {
   const fromPrice = own ?? proj?.launch_price_from ?? null
   const toPrice = own ?? proj?.launch_price_to ?? null
   const gallery = mergedListingGalleryUrls(proj, row.agent_listing_images)
+  const unitLabel = row.unit_type?.trim() || u?.unit_type || null
   return {
     id: `agent:${row.id}`,
     name: row.title,
@@ -179,7 +183,7 @@ function agentListingToCard(row: PublicAgentListingRow): BuyPropertyCardData {
     launch_price_to: toPrice,
     currency: row.currency?.trim() || proj?.currency || "AED",
     developers: proj?.developers ?? null,
-    unit_type: u?.unit_type ?? null,
+    unit_type: unitLabel,
     bedrooms: u?.bedrooms ?? null,
     bathrooms: u?.bathrooms ?? null,
     size_sqft: u?.size_sqft ?? null,

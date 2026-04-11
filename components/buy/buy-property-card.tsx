@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type MouseEvent } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { MapPin, Building2, Mail, Phone, Bed, Bath } from "lucide-react"
+import { MapPin, Building2, Mail, Phone, Bed, Bath, ChevronLeft, ChevronRight } from "lucide-react"
 
 export type BuyPropertyCardData = {
   id: string
@@ -73,7 +73,18 @@ export function BuyPropertyCard({ property }: { property: BuyPropertyCardData })
         ? [property.main_image]
         : []
   const n = Math.max(images.length, 1)
+  const canSlide = images.length > 1
   const src = images[imgIndex] ?? null
+  const goPrev = (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setImgIndex((i) => (i - 1 + images.length) % images.length)
+  }
+  const goNext = (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setImgIndex((i) => (i + 1) % images.length)
+  }
   const detailHref = property.detail_path?.trim() || `/projects/${property.slug}`
 
   const loc = [property.city, property.location].filter(Boolean).join(", ") || "United Arab Emirates"
@@ -105,6 +116,27 @@ export function BuyPropertyCard({ property }: { property: BuyPropertyCardData })
             <Building2 className="w-12 h-12" />
             <span className="text-xs font-medium">No image</span>
           </div>
+        )}
+
+        {canSlide && (
+          <>
+            <button
+              type="button"
+              aria-label="Previous image"
+              onClick={goPrev}
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#0f2940] shadow-md ring-1 ring-black/5 transition hover:bg-white hover:text-[#d6b357] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d6b357]"
+            >
+              <ChevronLeft className="h-5 w-5 shrink-0" strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              aria-label="Next image"
+              onClick={goNext}
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#0f2940] shadow-md ring-1 ring-black/5 transition hover:bg-white hover:text-[#d6b357] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d6b357]"
+            >
+              <ChevronRight className="h-5 w-5 shrink-0" strokeWidth={2.25} />
+            </button>
+          </>
         )}
 
         <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">

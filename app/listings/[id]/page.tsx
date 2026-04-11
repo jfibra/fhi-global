@@ -104,7 +104,7 @@ export default async function PublicAgentListingPage({ params }: Props) {
   const galleryUrls = mergedListingGalleryUrls(proj, row.agent_listing_images)
   const galleryItems = galleryUrls.map((image_url, i) => ({ id: i + 1, image_url }))
   const loc = [proj?.city, proj?.location].filter(Boolean).join(", ") || "United Arab Emirates"
-  const typeLabel = (u?.unit_type || "Property").replace(/\b\w/g, (c) => c.toUpperCase())
+  const typeLabel = (row.unit_type?.trim() || u?.unit_type || "Property").replace(/\b\w/g, (c) => c.toUpperCase())
   const backHref = row.listing_kind === "rent" ? "/rent" : "/buy"
 
   return (
