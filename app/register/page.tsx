@@ -21,7 +21,7 @@ export default async function RegisterPage({
 }) {
   const sp = await searchParams
   const requestedType = (sp.type ?? sp.role ?? "").toLowerCase()
-  const defaultAccountType = requestedType === "developer" ? "developer" : "salesperson"
+  const defaultAccountType = requestedType === "developer" ? "developer" : "member"
 
   // If already logged in, redirect to dashboard
   if (hasServerSupabaseEnv()) {

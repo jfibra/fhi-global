@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/client"
 import {
   isAdminStaffRole,
   isSalesPipelineRole,
+  isSecretaryLikeRole,
   ROLES_SALE_AGENT_PROFILES,
 } from "@/lib/app-roles"
 
@@ -209,6 +210,7 @@ export function canEditSaleForRole(role: string | undefined | null, sale: SaleRe
 export function canManageSaleAttachmentsForRole(role: string | undefined | null, sale: SaleRecord | null) {
   if (!sale) return false
   if (isAdminRole(role)) return true
+  if (isSecretaryLikeRole(role) && EDITABLE_REVIEW_STATUSES.includes(sale.validation_status)) return true
   return isAgentScopedRole(role) && EDITABLE_REVIEW_STATUSES.includes(sale.validation_status)
 }
 
@@ -594,6 +596,10 @@ export async function createSale(
   const firstError = Object.values(validationErrors)[0]
   if (firstError) return { data: null, error: firstError }
 
+  if (!isAdminStaffRole(currentRole) && !isSalesPipelineRole(currentRole)) {
+    return { data: null, error: "You are not allowed to record new sales" }
+  }
+
   // 1. Upsert client
   const clientPayload = {
     first_name: form.client.first_name.trim(),
@@ -915,6 +921,11 @@ export async function insertSaleAttachment(payload: {
     if (!isOwner || !canManage) {
       return { data: null, error: "You can only manage attachments while this sale is Invalid Sale or Under Review" }
     }
+  } else if (isSecretaryLikeRole(payload.uploaded_role)) {
+    const canManage = EDITABLE_REVIEW_STATUSES.includes(String(saleRaw.validation_status) as ValidationStatus)
+    if (!canManage) {
+      return { data: null, error: "You can only add attachments while this sale is Invalid Sale or Under Review" }
+    }
   }
 
   const { data, error } = await supabase
@@ -961,23 +972,36 @@ export async function deleteSaleAttachment(
   if (attachmentError || !attachment) return { error: attachmentError?.message ?? "Attachment not found" }
 
   if (!isAdminRole(currentRoleNormalized)) {
-    if (!isAgentScopedRole(currentRoleNormalized)) {
+    if (isSecretaryLikeRole(currentRoleNormalized)) {
+      const { data: saleRaw, error: saleError } = await supabase
+        .from("sales_reports")
+        .select("agent_id, validation_status")
+        .eq("id", attachment.sales_report_id)
+        .single()
+
+      if (saleError || !saleRaw) return { error: saleError?.message ?? "Sale not found" }
+
+      const canManage = EDITABLE_REVIEW_STATUSES.includes(String(saleRaw.validation_status) as ValidationStatus)
+      if (!canManage) {
+        return { error: "You can only manage attachments while this sale is Invalid Sale or Under Review" }
+      }
+    } else if (isAgentScopedRole(currentRoleNormalized)) {
+      const { data: saleRaw, error: saleError } = await supabase
+        .from("sales_reports")
+        .select("agent_id, validation_status")
+        .eq("id", attachment.sales_report_id)
+        .single()
+
+      if (saleError || !saleRaw) return { error: saleError?.message ?? "Sale not found" }
+
+      const isOwner = String(saleRaw.agent_id) === currentUserId
+      const canManage = EDITABLE_REVIEW_STATUSES.includes(String(saleRaw.validation_status) as ValidationStatus)
+
+      if (!isOwner || !canManage) {
+        return { error: "You can only manage attachments while this sale is Invalid Sale or Under Review" }
+      }
+    } else {
       return { error: "You are not allowed to delete attachments" }
-    }
-
-    const { data: saleRaw, error: saleError } = await supabase
-      .from("sales_reports")
-      .select("agent_id, validation_status")
-      .eq("id", attachment.sales_report_id)
-      .single()
-
-    if (saleError || !saleRaw) return { error: saleError?.message ?? "Sale not found" }
-
-    const isOwner = String(saleRaw.agent_id) === currentUserId
-    const canManage = EDITABLE_REVIEW_STATUSES.includes(String(saleRaw.validation_status) as ValidationStatus)
-
-    if (!isOwner || !canManage) {
-      return { error: "You can only manage attachments while this sale is Invalid Sale or Under Review" }
     }
   }
 

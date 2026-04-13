@@ -11,8 +11,23 @@ VALUES
   ('team_leader', 'Team Leader'),
   ('unit_manager', 'Unit Manager'),
   ('agent', 'Agent'),
+  ('developer', 'Developer'),
+  ('secretary', 'Secretary'),
   ('team_secretary', 'Team Secretary'),
-  ('secretary', 'Secretary');
+  ('member', 'Member');
+
+-- 1b. Existing database: add any roles missing from an older seed (run in Supabase SQL editor; safe to re-run)
+INSERT INTO public.user_roles (name, label) VALUES
+  ('super_admin', 'Super Admin'),
+  ('admin', 'Admin'),
+  ('team_leader', 'Team Leader'),
+  ('unit_manager', 'Unit Manager'),
+  ('agent', 'Agent'),
+  ('developer', 'Developer'),
+  ('secretary', 'Secretary'),
+  ('team_secretary', 'Team Secretary'),
+  ('member', 'Member')
+ON CONFLICT (name) DO UPDATE SET label = EXCLUDED.label;
 
 -- 2. Create the Profile Table (without the GENERATED column)
 CREATE TABLE public.profiles (

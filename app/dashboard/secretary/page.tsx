@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardShell } from "@/components/dashboard/shell"
+import { SecretaryLikeOverview } from "@/components/dashboard/secretary-like-overview"
 import { useAuth } from "@/context/auth-context"
 import { roleToLabel } from "@/lib/auth"
 import { getRoleColor } from "@/components/dashboard/sidebar-config"
@@ -16,10 +17,11 @@ export default function SecretaryDashboard() {
       roleColor={getRoleColor("secretary")}
       userName={displayName}
     >
-      <div className="mb-6">
-        <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117]">Welcome, {displayName}</h2>
-        <p className="text-sm text-[#9ca3af] mt-0.5">Your workspace is getting an update soon.</p>
-      </div>
+      <SecretaryLikeOverview
+        displayName={displayName}
+        businessCardHref="/dashboard/secretary/business-card"
+        intro="Company-wide visibility into sales, support for IT and operations, and your business card. Attach documents to deals that are under review or marked invalid so agents can complete validation."
+      />
     </DashboardShell>
   )
 }

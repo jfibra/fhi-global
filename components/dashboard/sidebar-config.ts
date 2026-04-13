@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   LayoutDashboard, Users, Building2, Layers, Images,
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
-  Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList,
+  Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound, User,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -138,13 +138,48 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
 
   if (roleInList(normalizedRole, ROLES_SECRETARY_LIKE)) {
     return [
-      { type: "item", item: { icon: LayoutDashboard, label: "Overview",       href: basePath } },
-      { type: "item", item: { icon: LifeBuoy,        label: "Support Tickets", href: "/dashboard/support" } },
-      { type: "item", item: { icon: CreditCard,      label: "Business Card",   href: `${basePath}/business-card` } },
+      { type: "item", item: { icon: LayoutDashboard, label: "Overview", href: basePath } },
+      {
+        type: "group",
+        label: "Sales Management",
+        items: [
+          { icon: TrendingUp, label: "Sales Reports", href: "/dashboard/sales" },
+        ],
+      },
+      {
+        type: "group",
+        label: "Support",
+        items: [
+          { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support" },
+        ],
+      },
+      { type: "item", item: { icon: CreditCard, label: "Business Card", href: `${basePath}/business-card` } },
     ]
   }
 
-  // All other roles — flat overview only
+  if (normalizedRole === "member") {
+    return [
+      { type: "item", item: { icon: LayoutDashboard, label: "Overview", href: basePath } },
+      {
+        type: "group",
+        label: "Browse listings",
+        items: [
+          { icon: Building2, label: "Buy", href: "/buy" },
+          { icon: KeyRound, label: "Rent", href: "/rent" },
+        ],
+      },
+      { type: "item", item: { icon: User, label: "Profile", href: "/dashboard/profile" } },
+      {
+        type: "group",
+        label: "Support",
+        items: [
+          { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support" },
+        ],
+      },
+    ]
+  }
+
+  // Unknown roles resolve to member in UI; if we ever hit here with another id, keep minimal nav
   return [
     { type: "item", item: { icon: LayoutDashboard, label: "Overview", href: basePath } },
     { type: "item", item: { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support" } },

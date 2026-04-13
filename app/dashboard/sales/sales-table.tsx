@@ -32,6 +32,7 @@ import {
   type DeveloperOption,
   type AgentOption,
 } from "@/lib/sales-service"
+import { isSalesPipelineRole, isSecretaryLikeRole } from "@/lib/app-roles"
 import { SaleActions } from "./sale-actions"
 import { SaleAttachmentsDialog } from "./sale-attachments-dialog"
 import { SaleFormDialog } from "./sale-form-dialog"
@@ -223,6 +224,7 @@ export function SalesTable({
   const toastIdRef = useRef(0)
 
   const isAdminUser = isAdminRole(currentRole)
+  const canEncodeSale = isAdminUser || isSalesPipelineRole(currentRole)
 
   const addToast = (type: ToastType, text: string) => {
     const id = ++toastIdRef.current
@@ -342,18 +344,24 @@ export function SalesTable({
               <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">
                 Sales Reports
               </h1>
-              <p className="text-sm text-[#6b7280]">Record and manage property sales transactions</p>
+              <p className="text-sm text-[#6b7280]">
+                {isSecretaryLikeRole(currentRole)
+                  ? "Monitor deals org-wide, join validation discussion, and attach documents while a sale is under review or marked invalid."
+                  : "Record and manage property sales transactions"}
+              </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-4 py-2.5 rounded-full text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all duration-200"
-          >
-            <Plus className="w-4 h-4" />
-            Encode Sale
-          </button>
+          {canEncodeSale && (
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-4 py-2.5 rounded-full text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all duration-200"
+            >
+              <Plus className="w-4 h-4" />
+              Encode Sale
+            </button>
+          )}
         </div>
 
         {/* Filters bar */}

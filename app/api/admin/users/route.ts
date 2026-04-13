@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { isAdminStaffRole, isKnownAppRoleId } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import type { CreateUserPayload, UsersListResponse, UserRecord } from "@/lib/user-service"
@@ -113,10 +113,19 @@ export async function POST(req: NextRequest) {
   if (!caller) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const body = (await req.json()) as CreateUserPayload
-  const { email, password, fname, mname, lname, role, developer_id, timezone, status } = body
+  const { email: emailRaw, password, fname, mname, lname, role, developer_id, timezone, status } = body
+  const email = String(emailRaw ?? "").trim().toLowerCase()
 
   if (!email || !password || !fname || !lname) {
     return NextResponse.json({ error: "Required fields missing." }, { status: 400 })
+  }
+
+  const normalizedRole = String(role ?? "member").toLowerCase().trim()
+  if (!isKnownAppRoleId(normalizedRole)) {
+    return NextResponse.json(
+      { error: `Invalid role "${normalizedRole}". Use a role defined in the app and in public.user_roles.` },
+      { status: 400 },
+    )
   }
 
   const admin = createAdminSupabase()
@@ -135,7 +144,6 @@ export async function POST(req: NextRequest) {
   const newUserId = authData.user.id
   const fullname  = [fname, mname, lname].filter(Boolean).join(" ")
 
-  const normalizedRole = String(role ?? "member").toLowerCase().trim()
   const linkedDeveloperId = normalizedRole === "developer"
     ? (typeof developer_id === "string" && developer_id.trim() ? developer_id.trim() : null)
     : null

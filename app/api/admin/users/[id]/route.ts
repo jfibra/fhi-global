@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { isAdminStaffRole, isKnownAppRoleId } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import type { UpdateUserPayload } from "@/lib/user-service"
@@ -51,6 +51,16 @@ export async function PATCH(
 
   const { id } = await params
   const body = (await req.json()) as UpdateUserPayload & { activate?: boolean; deactivate?: boolean }
+
+  if (body.role !== undefined) {
+    const r = String(body.role).toLowerCase().trim()
+    if (!isKnownAppRoleId(r)) {
+      return NextResponse.json(
+        { error: `Invalid role "${r}". Use a role defined in the app and in public.user_roles.` },
+        { status: 400 },
+      )
+    }
+  }
 
   const admin = createAdminSupabase()
 

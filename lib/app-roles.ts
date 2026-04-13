@@ -147,18 +147,20 @@ export const ROLES_SALES_PIPELINE: readonly AppRoleId[] = ["agent", "team_leader
 
 export const ROLES_SECRETARY_LIKE: readonly AppRoleId[] = ["secretary", "team_secretary"]
 
-/** `/dashboard/sales` and sale file uploads. */
+/** `/dashboard/sales`, sale detail, and sale file uploads (view / assist with paperwork, not encode new sales). */
 export const ROLES_SALES_REPORTS_ACCESS: readonly AppRoleId[] = [
   "super_admin",
   "admin",
   "team_leader",
   "unit_manager",
   "agent",
+  "secretary",
+  "team_secretary",
 ]
 
 /**
- * Roles that historically matched the sales-led listing workspace. **`/buy` and `/rent` are public**
- * in the app proxy; this list remains useful if you gate specific tools or CTAs by role later.
+ * Roles that may use buy/rent listing experiences (portal CTAs, future gated APIs).
+ * **`/buy` and `/rent` are public**; members are included so the app treats them like other browsers here.
  */
 export const ROLES_BUY_RENT_LISTINGS_ACCESS: readonly AppRoleId[] = [
   "super_admin",
@@ -166,6 +168,7 @@ export const ROLES_BUY_RENT_LISTINGS_ACCESS: readonly AppRoleId[] = [
   "agent",
   "team_leader",
   "unit_manager",
+  "member",
 ]
 
 export function canAccessBuyRentListings(role: string | null | undefined): boolean {
@@ -181,6 +184,8 @@ export const ROLES_SUPPORT_REPORTER_POOL: readonly AppRoleId[] = [
   "team_leader",
   "unit_manager",
   "admin",
+  "secretary",
+  "team_secretary",
 ]
 
 /** Internal assignees in support pickers (admin + developer). */
@@ -206,6 +211,10 @@ export function isDeveloperRole(role: string | null | undefined): boolean {
 
 export function isSalesPipelineRole(role: string | null | undefined): boolean {
   return roleInList(role, ROLES_SALES_PIPELINE)
+}
+
+export function isSecretaryLikeRole(role: string | null | undefined): boolean {
+  return roleInList(role, ROLES_SECRETARY_LIKE)
 }
 
 export function canAccessSalesReportsArea(role: string | null | undefined): boolean {
