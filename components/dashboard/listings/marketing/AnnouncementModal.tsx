@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { X, Download, Loader2, Printer, Link2, Check, Facebook, MessageCircle, Plus, Trash2, GripVertical, RotateCw } from "lucide-react"
+import { X, Download, Loader2, Printer, Plus, Trash2, GripVertical, RotateCw } from "lucide-react"
 import AnnouncementPoster, {
   POSTER_W,
   POSTER_HEIGHTS,
@@ -104,7 +104,6 @@ export default function AnnouncementModal({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [printing, setPrinting] = useState(false)
-  const [copied, setCopied] = useState(false)
   const [scale, setScale] = useState(1)
 
   const posterRef = useRef<HTMLDivElement>(null)
@@ -381,15 +380,6 @@ export default function AnnouncementModal({
     }
   }, [data, captureDataUrl, posterH])
 
-  const copyLink = () => {
-    void navigator.clipboard?.writeText(listingUrl).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1800)
-    })
-  }
-  const shareFacebook = () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(listingUrl)}`, "_blank", "noopener,width=680,height=640")
-  const shareWhatsApp = () => window.open(`https://wa.me/?text=${encodeURIComponent(`${listingTitle} — ${listingUrl}`)}`, "_blank", "noopener")
-
   const panelSkin = skinTheme === "light" || skinTheme === "railnavy"
   const fadeSkin = skinTheme === "black" || skinTheme === "green"
   const handleStyle = (pos: HandlePos): React.CSSProperties => {
@@ -415,11 +405,6 @@ export default function AnnouncementModal({
             <p className="text-xs text-[#6b7280] truncate max-w-md">{listingTitle}</p>
           </div>
           <div className="flex items-center gap-1.5">
-            <button type="button" onClick={copyLink} title="Copy listing link" className="p-2 rounded-lg border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f]">
-              {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Link2 className="w-4 h-4" />}
-            </button>
-            <button type="button" onClick={shareFacebook} title="Share on Facebook" className="p-2 rounded-lg border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f]"><Facebook className="w-4 h-4" /></button>
-            <button type="button" onClick={shareWhatsApp} title="Share on WhatsApp" className="p-2 rounded-lg border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f]"><MessageCircle className="w-4 h-4" /></button>
             <button type="button" onClick={() => void handlePrint()} disabled={loading || printing || !data} title="Print" className="p-2 rounded-lg border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f] disabled:opacity-50">
               {printing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
             </button>
