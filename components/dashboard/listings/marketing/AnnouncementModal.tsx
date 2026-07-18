@@ -53,7 +53,7 @@ function Slider({ label, value, min, max, step, unit, onChange }: { label: strin
     <div className="mb-2">
       <div className="flex items-center justify-between text-[11px] text-[#6b7280] mb-0.5">
         <span>{label}</span>
-        <span className="font-mono text-[#9ca3af]">{value}{unit}</span>
+        <span className="font-mono text-[#9ca3af]">{Number.isInteger(value) ? value : value.toFixed(1)}{unit}</span>
       </div>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-[#001f3f]" />
     </div>
@@ -113,15 +113,6 @@ export default function AnnouncementModal({
   const areaRef = useRef<HTMLDivElement>(null)
   const layerCounter = useRef(0)
   const dragLayerId = useRef<string | null>(null)
-  const dragRef = useRef<
-    | { mode: "move"; x: number; y: number; tx: number; ty: number }
-    | { mode: "resize"; pos: HandlePos; x: number; y: number; sx: number; sy: number; tx: number; ty: number }
-    | { mode: "rotate" }
-    | null
-  >(null)
-  // Latest transform during a drag (applied to the DOM directly, committed to
-  // React state only on pointer-up so the poster doesn't re-render every frame).
-  const pendingRef = useRef<{ tx: number; ty: number; sx: number; sy: number; rot: number } | null>(null)
 
   const posterH = POSTER_HEIGHTS[size]
   const listingUrl = `${SITE_URL}/listings/${listingId}`
@@ -237,111 +228,109 @@ export default function AnnouncementModal({
   const frameTop = posterH / 2 + (sel?.ty ?? 0) - frameH / 2
 
   // ── Move / resize / rotate ──
-  const startMove = (e: React.PointerEvent) => {
-    if (!sel) return
+  // Window-listener drag: grab a layer and slide it in ONE gesture. The DOM is
+  // updated directly on every pointer move (no React re-render → silky on any
+  // skin), and committed to state once on release.
+  const patchLayer = (id: string, patch: Partial<Layer>) =>
+    setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)))
+
+  const beginDrag = (
+    e: React.PointerEvent,
+    spec: { mode: "move" | "resize" | "rotate"; layer: Layer; pos?: HandlePos },
+  ) => {
+    e.preventDefault()
     e.stopPropagation()
-    dragRef.current = { mode: "move", x: e.clientX, y: e.clientY, tx: sel.tx, ty: sel.ty }
-    frameRef.current?.setPointerCapture(e.pointerId)
-  }
-  const startResize = (pos: HandlePos) => (e: React.PointerEvent) => {
-    if (!sel) return
-    e.stopPropagation()
-    dragRef.current = { mode: "resize", pos, x: e.clientX, y: e.clientY, sx: sel.sx, sy: sel.sy, tx: sel.tx, ty: sel.ty }
-    frameRef.current?.setPointerCapture(e.pointerId)
-  }
-  const startRotate = (e: React.PointerEvent) => {
-    if (!sel) return
-    e.stopPropagation()
-    dragRef.current = { mode: "rotate" }
-    frameRef.current?.setPointerCapture(e.pointerId)
-  }
-  // Apply a transform to the DOM directly (no React state change) so a drag is
-  // silky regardless of how heavy the skin is. The frame chrome follows too.
-  const applyDragToDom = (t: { tx: number; ty: number; sx: number; sy: number; rot: number }) => {
-    if (!sel) return
-    const img = posterRef.current?.querySelector(`[data-layer-id="${sel.id}"]`) as HTMLElement | null
-    if (img) img.style.transform = `translate(${t.tx}px, ${t.ty}px) rotate(${t.rot}deg) scale(${t.sx}, ${t.sy})`
-    const f = frameRef.current
-    if (f) {
-      const fw = selBase.w * t.sx
-      const fh = selBase.h * t.sy
-      f.style.width = `${fw}px`
-      f.style.height = `${fh}px`
-      f.style.left = `${POSTER_W / 2 + t.tx - fw / 2}px`
-      f.style.top = `${posterH / 2 + t.ty - fh / 2}px`
-      f.style.transform = `rotate(${t.rot}deg)`
-    }
-    pendingRef.current = t
-  }
-  const commitPending = () => {
-    if (pendingRef.current) {
-      patchSel(pendingRef.current)
-      pendingRef.current = null
-    }
-  }
-  const onFrameMove = (e: React.PointerEvent) => {
-    const d = dragRef.current
-    if (!d || !sel) return
-    if (e.buttons === 0) {
-      commitPending()
-      dragRef.current = null
-      return
-    }
-    if (d.mode === "rotate") {
-      const el = frameRef.current
-      if (!el) return
-      const r = el.getBoundingClientRect()
-      const cx = r.left + r.width / 2
-      const cy = r.top + r.height / 2
-      let ang = (Math.atan2(e.clientY - cy, e.clientX - cx) * 180) / Math.PI + 90
-      const snap = Math.round(ang / 15) * 15
-      if (Math.abs(snap - ang) < 4) ang = snap
-      applyDragToDom({ tx: sel.tx, ty: sel.ty, sx: sel.sx, sy: sel.sy, rot: Math.round(ang) })
-      return
-    }
-    const dx = (e.clientX - d.x) / scale
-    const dy = (e.clientY - d.y) / scale
-    if (d.mode === "move") {
-      applyDragToDom({ tx: d.tx + dx, ty: d.ty + dy, sx: sel.sx, sy: sel.sy, rot: sel.rot })
-      return
-    }
-    const rad = (sel.rot * Math.PI) / 180
-    const cos = Math.cos(rad)
-    const sin = Math.sin(rad)
-    const ldx = dx * cos + dy * sin
-    const ldy = -dx * sin + dy * cos
-    let nsx = d.sx
-    let nsy = d.sy
-    let lcx = 0
-    let lcy = 0
-    const bw = selBase.w
-    const bh = selBase.h
-    if (d.pos.includes("e")) {
-      nsx = clampScale(d.sx + ldx / bw)
-      lcx = (bw * (nsx - d.sx)) / 2
-    } else if (d.pos.includes("w")) {
-      nsx = clampScale(d.sx - ldx / bw)
-      lcx = -(bw * (nsx - d.sx)) / 2
-    }
-    if (d.pos.includes("s")) {
-      nsy = clampScale(d.sy + ldy / bh)
-      lcy = (bh * (nsy - d.sy)) / 2
-    } else if (d.pos.includes("n")) {
-      nsy = clampScale(d.sy - ldy / bh)
-      lcy = -(bh * (nsy - d.sy)) / 2
-    }
-    applyDragToDom({ sx: nsx, sy: nsy, tx: d.tx + (lcx * cos - lcy * sin), ty: d.ty + (lcx * sin + lcy * cos), rot: sel.rot })
-  }
-  const onFrameUp = (e?: React.PointerEvent) => {
-    commitPending()
-    dragRef.current = null
-    if (e) {
-      try {
-        frameRef.current?.releasePointerCapture(e.pointerId)
-      } catch {
-        /* ignore */
+    const { mode, layer, pos } = spec
+    const startX = e.clientX
+    const startY = e.clientY
+    const startScale = scale || 1
+    const base = layerBase(layer.aspect || ratio, posterH)
+    const imgEl = posterRef.current?.querySelector(`[data-layer-id="${layer.id}"]`) as HTMLElement | null
+    let pending = { tx: layer.tx, ty: layer.ty, sx: layer.sx, sy: layer.sy, rot: layer.rot }
+
+    const apply = (t: typeof pending) => {
+      pending = t
+      if (imgEl) imgEl.style.transform = `translate(${t.tx}px, ${t.ty}px) rotate(${t.rot}deg) scale(${t.sx}, ${t.sy})`
+      const f = frameRef.current
+      if (f) {
+        const fw = base.w * t.sx
+        const fh = base.h * t.sy
+        f.style.width = `${fw}px`
+        f.style.height = `${fh}px`
+        f.style.left = `${POSTER_W / 2 + t.tx - fw / 2}px`
+        f.style.top = `${posterH / 2 + t.ty - fh / 2}px`
+        f.style.transform = `rotate(${t.rot}deg)`
       }
     }
+
+    const move = (ev: PointerEvent) => {
+      if (ev.buttons === 0) return up()
+      if (mode === "rotate") {
+        const f = frameRef.current
+        if (!f) return
+        const r = f.getBoundingClientRect()
+        let ang = (Math.atan2(ev.clientY - (r.top + r.height / 2), ev.clientX - (r.left + r.width / 2)) * 180) / Math.PI + 90
+        const snap = Math.round(ang / 15) * 15
+        if (Math.abs(snap - ang) < 4) ang = snap
+        apply({ tx: layer.tx, ty: layer.ty, sx: layer.sx, sy: layer.sy, rot: Math.round(ang) })
+        return
+      }
+      const dx = (ev.clientX - startX) / startScale
+      const dy = (ev.clientY - startY) / startScale
+      if (mode === "move") {
+        apply({ tx: layer.tx + dx, ty: layer.ty + dy, sx: layer.sx, sy: layer.sy, rot: layer.rot })
+        return
+      }
+      const rad = (layer.rot * Math.PI) / 180
+      const cos = Math.cos(rad)
+      const sin = Math.sin(rad)
+      const ldx = dx * cos + dy * sin
+      const ldy = -dx * sin + dy * cos
+      let nsx = layer.sx
+      let nsy = layer.sy
+      let lcx = 0
+      let lcy = 0
+      const p = pos ?? "se"
+      if (p.includes("e")) {
+        nsx = clampScale(layer.sx + ldx / base.w)
+        lcx = (base.w * (nsx - layer.sx)) / 2
+      } else if (p.includes("w")) {
+        nsx = clampScale(layer.sx - ldx / base.w)
+        lcx = -(base.w * (nsx - layer.sx)) / 2
+      }
+      if (p.includes("s")) {
+        nsy = clampScale(layer.sy + ldy / base.h)
+        lcy = (base.h * (nsy - layer.sy)) / 2
+      } else if (p.includes("n")) {
+        nsy = clampScale(layer.sy - ldy / base.h)
+        lcy = -(base.h * (nsy - layer.sy)) / 2
+      }
+      apply({ sx: nsx, sy: nsy, tx: layer.tx + (lcx * cos - lcy * sin), ty: layer.ty + (lcx * sin + lcy * cos), rot: layer.rot })
+    }
+    const up = () => {
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", up)
+      patchLayer(layer.id, pending)
+    }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", up)
+  }
+
+  // One-gesture drag straight from the photo: select + start moving at once.
+  const startLayerDrag = (id: string, e: React.PointerEvent) => {
+    const layer = layers.find((l) => l.id === id)
+    if (!layer) return
+    setSelectedId(id)
+    beginDrag(e, { mode: "move", layer })
+  }
+  const startMove = (e: React.PointerEvent) => {
+    if (sel) beginDrag(e, { mode: "move", layer: sel })
+  }
+  const startResize = (pos: HandlePos) => (e: React.PointerEvent) => {
+    if (sel) beginDrag(e, { mode: "resize", layer: sel, pos })
+  }
+  const startRotate = (e: React.PointerEvent) => {
+    if (sel) beginDrag(e, { mode: "rotate", layer: sel })
   }
 
   const captureDataUrl = useCallback(async (): Promise<string | null> => {
@@ -460,7 +449,7 @@ export default function AnnouncementModal({
                     text={text}
                     interactive
                     selectedId={selectedId}
-                    onLayerPointerDown={(id) => setSelectedId(id)}
+                    onLayerPointerDown={startLayerDrag}
                     onBackgroundPointerDown={() => setSelectedId(null)}
                     onLayerAspect={setLayerAspect}
                   />
@@ -469,9 +458,6 @@ export default function AnnouncementModal({
                     <div
                       ref={frameRef}
                       onPointerDown={startMove}
-                      onPointerMove={onFrameMove}
-                      onPointerUp={onFrameUp}
-                      onPointerCancel={onFrameUp}
                       style={{
                         position: "absolute",
                         left: frameLeft,
@@ -530,8 +516,8 @@ export default function AnnouncementModal({
                     )
                   })}
                 </div>
-                <Slider label="Size" value={logoSize} min={28} max={120} step={1} unit="px" onChange={setLogoSize} />
-                <Slider label="White outline" value={logoOutline} min={0} max={16} step={1} unit="px" onChange={setLogoOutline} />
+                <Slider label="Size" value={logoSize} min={28} max={120} step={0.01} unit="px" onChange={setLogoSize} />
+                <Slider label="White outline" value={logoOutline} min={0} max={16} step={0.01} unit="px" onChange={setLogoOutline} />
               </Section>
 
               {/* Announcement */}

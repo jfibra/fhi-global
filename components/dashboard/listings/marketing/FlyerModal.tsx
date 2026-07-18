@@ -473,16 +473,16 @@ export default function FlyerModal({
                 <div className="mt-2">
                   <div className="flex items-center justify-between text-[11px] text-[#6b7280] mb-0.5">
                     <span>Size</span>
-                    <span className="font-mono text-[#9ca3af]">{logoSize}px</span>
+                    <span className="font-mono text-[#9ca3af]">{Math.round(logoSize)}px</span>
                   </div>
-                  <input type="range" min={24} max={110} step={1} value={logoSize} onChange={(e) => setLogoSize(Number(e.target.value))} className="w-full accent-[#001f3f]" />
+                  <input type="range" min={24} max={110} step={0.01} value={logoSize} onChange={(e) => setLogoSize(Number(e.target.value))} className="w-full accent-[#001f3f]" />
                 </div>
                 <div className="mt-1.5">
                   <div className="flex items-center justify-between text-[11px] text-[#6b7280] mb-0.5">
                     <span>White outline</span>
-                    <span className="font-mono text-[#9ca3af]">{logoOutline === 0 ? "Off" : `${logoOutline}px`}</span>
+                    <span className="font-mono text-[#9ca3af]">{logoOutline === 0 ? "Off" : `${logoOutline.toFixed(1)}px`}</span>
                   </div>
-                  <input type="range" min={0} max={16} step={1} value={logoOutline} onChange={(e) => setLogoOutline(Number(e.target.value))} className="w-full accent-[#001f3f]" />
+                  <input type="range" min={0} max={16} step={0.01} value={logoOutline} onChange={(e) => setLogoOutline(Number(e.target.value))} className="w-full accent-[#001f3f]" />
                 </div>
               </div>
 
