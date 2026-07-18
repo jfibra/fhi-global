@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { X, FileImage, Megaphone, Clapperboard } from "lucide-react"
+import { X, FileImage, Megaphone, Clapperboard, Pencil, Trash2 } from "lucide-react"
 import FlyerModal from "./FlyerModal"
 import AnnouncementModal from "./AnnouncementModal"
 
@@ -11,19 +11,29 @@ type View = "menu" | "flyer" | "announce"
 export default function MarketingActionsModal({
   listingId,
   listingTitle,
+  initialView = "menu",
   onClose,
+  onEdit,
+  onDelete,
 }: {
   listingId: string
   listingTitle: string
+  initialView?: View
   onClose: () => void
+  onEdit?: () => void
+  onDelete?: () => void
 }) {
-  const [view, setView] = useState<View>("menu")
+  const [view, setView] = useState<View>(initialView)
+
+  // If the tool was opened straight from a card chip, closing it exits fully;
+  // if it was reached via the menu (dots), closing returns to the menu.
+  const closeTool = () => (initialView === "menu" ? setView("menu") : onClose())
 
   if (view === "flyer") {
-    return <FlyerModal listingId={listingId} listingTitle={listingTitle} onClose={() => setView("menu")} />
+    return <FlyerModal listingId={listingId} listingTitle={listingTitle} onClose={closeTool} />
   }
   if (view === "announce") {
-    return <AnnouncementModal listingId={listingId} listingTitle={listingTitle} onClose={() => setView("menu")} />
+    return <AnnouncementModal listingId={listingId} listingTitle={listingTitle} onClose={closeTool} />
   }
 
   return (
@@ -55,7 +65,7 @@ export default function MarketingActionsModal({
             onClick={() => setView("announce")}
             className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-[#e8eaed] bg-white p-5 hover:border-[#d6b357] hover:shadow-md transition-all"
           >
-            <span className="w-12 h-12 rounded-xl bg-[#001f3f]/5 text-[#001f3f] flex items-center justify-center">
+            <span className="w-12 h-12 rounded-xl bg-[#0891b2]/10 text-[#0e7490] flex items-center justify-center">
               <Megaphone className="w-6 h-6" />
             </span>
             <span className="text-sm font-semibold text-[#111827] text-center leading-tight">Just Listed / Sold</span>
@@ -70,6 +80,32 @@ export default function MarketingActionsModal({
             </span>
             <span className="text-sm font-semibold text-[#111827]">Reels</span>
           </Link>
+
+          {onEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-[#e8eaed] bg-white p-5 hover:border-[#001f3f] hover:shadow-md transition-all"
+            >
+              <span className="w-12 h-12 rounded-xl bg-[#001f3f]/5 text-[#001f3f] flex items-center justify-center">
+                <Pencil className="w-6 h-6" />
+              </span>
+              <span className="text-sm font-semibold text-[#111827]">Edit</span>
+            </button>
+          )}
+
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-[#e8eaed] bg-white p-5 hover:border-rose-300 hover:shadow-md transition-all"
+            >
+              <span className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                <Trash2 className="w-6 h-6" />
+              </span>
+              <span className="text-sm font-semibold text-[#111827]">Delete</span>
+            </button>
+          )}
         </div>
       </div>
     </div>
