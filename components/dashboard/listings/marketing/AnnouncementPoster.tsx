@@ -1,11 +1,11 @@
 "use client"
 
 import type React from "react"
-import { forwardRef } from "react"
+import { forwardRef, useMemo } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { Phone, Mail, Globe, Bed, Bath, Car, Maximize, LandPlot } from "lucide-react"
 import { type FlyerData, formatPrice } from "@/lib/flyer/theme"
-import { LOGOS, type LogoOption } from "@/lib/flyer/logos"
+import { LOGOS, type LogoOption, outlineFilter } from "@/lib/flyer/logos"
 
 export { LOGOS, type LogoOption }
 
@@ -259,29 +259,23 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
 
   const contentPb = sk.layout === "overlay" ? 170 : sk.priceBox ? 272 : 242
   const logoSrc = logo.url ?? (sk.logo === "white" ? "/FHI_Branding_White.png" : "/FHI_Branding.png")
-  // White logo artwork disappears on a light copy panel — sit it on a dark chip
-  // there (mirrors the Reel Maker's logoIsWhite behaviour).
+  // White logo artwork disappears on a light copy panel — trace a dark outline
+  // around its SHAPE there so it stays visible (mirrors the Reel Maker's
+  // logoIsWhite behaviour, but silhouette-based, not a rectangular chip).
   const logoIsWhite = logo.url ? LOGOS.find((l) => l.url === logo.url)?.tone === "light" : sk.logo === "white"
   const logoNeedsChip = logoIsWhite && sk.layout !== "overlay" && isLightHex(sk.panelFront || sk.posterBg)
-  const logoBg = logoNeedsChip ? NAVY_INK : logo.outline > 0 ? "#ffffff" : "transparent"
-  const logoPad = logoNeedsChip ? 10 : logo.outline
+  const logoFilter = [logoNeedsChip ? outlineFilter(3, NAVY_INK) : "", outlineFilter(logo.outline)]
+    .filter(Boolean)
+    .join(" ") || undefined
   const railBg =
     sk.layout === "rail"
       ? `linear-gradient(180deg, ${lighten(sk.panelFront, 0.1)} 0%, ${sk.panelFront} 34%, ${darken(sk.panelFront, 0.22)} 100%)`
       : sk.panelFront
 
   const LogoEl = (
-    <div
-      style={{
-        alignSelf: "flex-start",
-        display: "inline-flex",
-        padding: logoPad > 0 ? logoPad : 0,
-        backgroundColor: logoBg,
-        borderRadius: logoPad > 0 ? 10 : 0,
-      }}
-    >
+    <div style={{ alignSelf: "flex-start", display: "inline-flex" }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={logoSrc} alt="" crossOrigin="anonymous" style={{ height: logo.size, width: "auto", objectFit: "contain", display: "block" }} />
+      <img src={logoSrc} alt="" crossOrigin="anonymous" style={{ height: logo.size, width: "auto", objectFit: "contain", display: "block", filter: logoFilter }} />
     </div>
   )
 
@@ -301,11 +295,17 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
 
   const priceStr = formatPrice(data.price, currency)
 
-  const QR = qr.on ? (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: 12, backgroundColor: "#fff", borderRadius: 14, border: "1px solid rgba(0,0,0,0.08)" }}>
-      <QRCodeSVG value={listingUrl} size={qr.size} bgColor="#ffffff" fgColor={NAVY_INK} level="H" />
-    </div>
-  ) : null
+  // Memoized so dragging a photo layer (which re-renders the whole poster on
+  // every pointer move) does NOT recompute the QR matrix each frame.
+  const QR = useMemo(
+    () =>
+      qr.on ? (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: 12, backgroundColor: "#fff", borderRadius: 14, border: "1px solid rgba(0,0,0,0.08)" }}>
+          <QRCodeSVG value={listingUrl} size={qr.size} bgColor="#ffffff" fgColor={NAVY_INK} level="H" />
+        </div>
+      ) : null,
+    [qr.on, qr.size, listingUrl],
+  )
 
   const ratio = POSTER_W / posterH
 

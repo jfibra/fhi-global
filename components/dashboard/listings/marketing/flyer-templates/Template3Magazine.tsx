@@ -138,38 +138,6 @@ const Template3Magazine = forwardRef<HTMLDivElement, TemplateProps>(function Tem
         <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <FlyerLogo src={logoSrc} height={56} size={logoSize} outline={logoOutline} />
-          {/* Category pill — accent bg with a dot + label in a two-child flex row. */}
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 7.2,
-              marginTop: 20,
-              paddingLeft: 16,
-              paddingRight: 16,
-              paddingTop: 7.2,
-              paddingBottom: 7.2,
-              borderRadius: 999,
-              backgroundColor: accent,
-              boxShadow: `0 6px 16px ${withAlpha(accent, 0.45)}`,
-            }}
-          >
-            <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: onAccent, flexShrink: 0 }} />
-            <span
-              style={{
-                display: "block",
-                color: onAccent,
-                fontSize: 14.4,
-                fontWeight: 900,
-                letterSpacing: "0.16em",
-                textTransform: "uppercase",
-                lineHeight: 1.3,
-                whiteSpace: "nowrap",
-              }}
-            >
-              {category}
-            </span>
-          </div>
         </div>
 
         {/* QR — top right, larger. White card, never themed; dark fg for scannability. */}
@@ -228,6 +196,39 @@ const Template3Magazine = forwardRef<HTMLDivElement, TemplateProps>(function Tem
           }}
         >
           {data.title}
+        </div>
+
+        {/* Category (FOR SALE / RENT) — below the title. */}
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 7.2,
+            marginBottom: 14,
+            paddingLeft: 16,
+            paddingRight: 16,
+            paddingTop: 7.2,
+            paddingBottom: 7.2,
+            borderRadius: 999,
+            backgroundColor: accent,
+            boxShadow: `0 6px 16px ${withAlpha(accent, 0.45)}`,
+          }}
+        >
+          <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: onAccent, flexShrink: 0 }} />
+          <span
+            style={{
+              display: "block",
+              color: onAccent,
+              fontSize: 14.4,
+              fontWeight: 900,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+              lineHeight: 1.3,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {category}
+          </span>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 6.4, marginBottom: 20 }}>

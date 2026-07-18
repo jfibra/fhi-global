@@ -83,7 +83,7 @@ const Template7Duotone = forwardRef<HTMLDivElement, TemplateProps>(function Temp
                   backgroundPosition: "center",
                 }}
               />
-              <div style={{ position: "absolute", inset: 0, backgroundColor: withAlpha(inkScrim, 0.4) }} />
+              <div style={{ position: "absolute", inset: 0, backgroundColor: withAlpha(inkScrim, 0.2) }} />
               {/* The whole photo — uncropped */}
               <div
                 style={{
@@ -127,10 +127,10 @@ const Template7Duotone = forwardRef<HTMLDivElement, TemplateProps>(function Temp
         style={{
           position: "absolute",
           inset: 0,
-          background: `linear-gradient(135deg, ${withAlpha(accentTop, 0.66)} 0%, ${withAlpha(
+          background: `linear-gradient(135deg, ${withAlpha(accentTop, 0.42)} 0%, ${withAlpha(
             shade(accent, -0.4),
-            0.4,
-          )} 44%, ${withAlpha(shade(bg, -0.1), 0.9)} 100%)`,
+            0.24,
+          )} 44%, ${withAlpha(shade(bg, -0.1), 0.62)} 100%)`,
           pointerEvents: "none",
         }}
       />

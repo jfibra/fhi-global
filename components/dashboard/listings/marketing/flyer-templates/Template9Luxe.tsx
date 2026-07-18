@@ -89,7 +89,7 @@ const Template9Luxe = forwardRef<HTMLDivElement, TemplateProps>(function Templat
               backgroundPosition: "center",
             }}
           />
-          <div style={{ position: "absolute", inset: 0, backgroundColor: withAlpha(inkDeep, 0.55) }} />
+          <div style={{ position: "absolute", inset: 0, backgroundColor: withAlpha(inkDeep, 0.3) }} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={photo}
@@ -135,7 +135,7 @@ const Template9Luxe = forwardRef<HTMLDivElement, TemplateProps>(function Templat
           position: "absolute",
           inset: 0,
           pointerEvents: "none",
-          background: `linear-gradient(180deg, ${withAlpha(ink, 0.82)} 0%, ${withAlpha(ink, 0.2)} 22%, ${withAlpha(ink, 0.28)} 48%, ${withAlpha(ink, 0.9)} 100%)`,
+          background: `linear-gradient(180deg, ${withAlpha(ink, 0.6)} 0%, ${withAlpha(ink, 0.12)} 22%, ${withAlpha(ink, 0.16)} 48%, ${withAlpha(ink, 0.72)} 100%)`,
         }}
       />
       {/* Left-side cinematic vignette */}
@@ -144,7 +144,7 @@ const Template9Luxe = forwardRef<HTMLDivElement, TemplateProps>(function Templat
           position: "absolute",
           inset: 0,
           pointerEvents: "none",
-          background: `linear-gradient(90deg, ${withAlpha(ink, 0.72)} 0%, ${withAlpha(ink, 0)} 46%)`,
+          background: `linear-gradient(90deg, ${withAlpha(ink, 0.5)} 0%, ${withAlpha(ink, 0)} 46%)`,
         }}
       />
 

@@ -22,3 +22,20 @@ export const LOGOS: LogoOption[] = (
 
 export const logoTone = (url: string | null): "dark" | "light" =>
   (url ? LOGOS.find((l) => l.url === url)?.tone : undefined) ?? "dark"
+
+// A CSS `filter` string that draws an outline hugging the logo artwork's SHAPE
+// (its alpha silhouette) rather than a rectangular plate — by stacking hard
+// drop-shadows around a circle. Renders natively through html-to-image's
+// <foreignObject>, so it survives PNG export. Returns undefined for px<=0.
+export function outlineFilter(px: number, color = "#ffffff"): string | undefined {
+  if (!px || px <= 0) return undefined
+  const dirs = 12
+  const parts: string[] = []
+  for (let i = 0; i < dirs; i++) {
+    const a = (i / dirs) * Math.PI * 2
+    const dx = +(Math.cos(a) * px).toFixed(2)
+    const dy = +(Math.sin(a) * px).toFixed(2)
+    parts.push(`drop-shadow(${dx}px ${dy}px 0 ${color})`)
+  }
+  return parts.join(" ")
+}

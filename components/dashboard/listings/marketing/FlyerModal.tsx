@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { X, Download, Loader2, ImageIcon, Palette, Printer, RotateCcw } from "lucide-react"
 import {
   type FlyerData,
@@ -14,6 +14,7 @@ import {
   proxied,
 } from "@/lib/flyer/theme"
 import { LOGOS } from "@/lib/flyer/logos"
+import { capturePng, warmFontEmbedCSS } from "@/lib/flyer/capture"
 import Template1Classic from "./flyer-templates/Template1Classic"
 import Template2Modern from "./flyer-templates/Template2Modern"
 import Template3Magazine from "./flyer-templates/Template3Magazine"
@@ -42,6 +43,61 @@ const TEMPLATE_COMPONENTS: Record<number, typeof Template1Classic> = {
 
 // Debounced color picker — the swatch updates instantly, the (expensive) live
 // preview commit is debounced so dragging the OS picker stays smooth.
+const THUMB_SCALE = 0.19
+const sameGallery = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i])
+
+// One template thumbnail, memoized so a control change only re-renders the
+// thumbnail(s) that actually changed — not all nine. Thumbnails deliberately
+// ignore the logo controls (Auto logo) so logo sliders re-render only the main
+// preview, keeping dragging smooth.
+const TemplateThumb = memo(
+  function TemplateThumb({
+    id,
+    name,
+    selected,
+    Comp,
+    data,
+    listingUrl,
+    theme,
+    onSelect,
+  }: {
+    id: number
+    name: string
+    selected: boolean
+    Comp: typeof Template1Classic
+    data: MarketingData
+    listingUrl: string
+    theme: FlyerTheme
+    onSelect: (id: number) => void
+  }) {
+    return (
+      <button
+        type="button"
+        onClick={() => onSelect(id)}
+        className={`relative shrink-0 rounded-lg overflow-hidden border-2 ${selected ? "border-[#d6b357]" : "border-[#e5e5e5] hover:border-[#001f3f]/40"}`}
+        style={{ width: FLYER_W * THUMB_SCALE, height: FLYER_H * THUMB_SCALE }}
+        title={name}
+      >
+        <div style={{ width: FLYER_W, height: FLYER_H, transform: `scale(${THUMB_SCALE})`, transformOrigin: "top left", pointerEvents: "none" }}>
+          <Comp data={data} listingUrl={listingUrl} theme={theme} />
+        </div>
+        <span className="absolute bottom-0 inset-x-0 bg-black/55 text-white text-[9px] font-semibold text-center py-0.5">{name}</span>
+      </button>
+    )
+  },
+  (a, b) =>
+    a.id === b.id &&
+    a.selected === b.selected &&
+    a.Comp === b.Comp &&
+    a.listingUrl === b.listingUrl &&
+    a.theme.accent === b.theme.accent &&
+    a.theme.bg === b.theme.bg &&
+    a.theme.text === b.theme.text &&
+    a.theme.mode === b.theme.mode &&
+    a.data.image === b.data.image &&
+    sameGallery(a.data.gallery, b.data.gallery),
+)
+
 function ColorField({ label, value, onCommit }: { label: string; value: string; onCommit: (v: string) => void }) {
   const [local, setLocal] = useState(value)
   const draggingRef = useRef(false)
@@ -153,6 +209,12 @@ export default function FlyerModal({
     setActiveSlot(0)
   }, [selectedTemplate])
 
+  // Warm the (cached) font-embed CSS once the flyer has rendered, so the first
+  // Download/Print doesn't pay the font-inlining cost.
+  useEffect(() => {
+    if (data) warmFontEmbedCSS(flyerRef.current)
+  }, [data])
+
   const slotsForCurrent = useMemo(
     () => TEMPLATE_META.find((t) => t.id === selectedTemplate)?.slots ?? 1,
     [selectedTemplate],
@@ -213,40 +275,16 @@ export default function FlyerModal({
       return next
     })
 
-  // Rasterize the flyer to a PNG data URL. html-to-image renders via the
-  // browser's own engine (SVG <foreignObject>), so Tailwind v4 oklch() colors,
-  // gradients and the loaded web fonts all render natively — unlike
-  // html2canvas which reimplements CSS and chokes on oklch. Images (served
-  // same-origin through /api/image-proxy) are fetched + inlined as data URLs.
+  // Rasterize the flyer to a PNG data URL via the shared capture helper
+  // (cached font-embed CSS + no cacheBust → fast and no partial-render race).
   const captureDataUrl = useCallback(async (): Promise<string | null> => {
     const node = flyerRef.current
     if (!node) return null
-    const wrap = scaleWrapRef.current
-    const prev = wrap?.style.transform ?? ""
     try {
-      if (wrap) wrap.style.transform = "none"
-      await new Promise((r) => requestAnimationFrame(() => r(null)))
-      if (typeof document !== "undefined" && document.fonts?.ready) await document.fonts.ready
-      await Promise.all(
-        Array.from(node.querySelectorAll("img")).map(async (img) => {
-          if (img.complete && img.naturalWidth > 0) return
-          await new Promise<void>((resolve) => {
-            img.addEventListener("load", () => resolve(), { once: true })
-            img.addEventListener("error", () => resolve(), { once: true })
-          })
-        }),
-      )
-      const { toPng } = await import("html-to-image")
-      return await toPng(node, {
-        width: FLYER_W,
-        height: FLYER_H,
-        pixelRatio: 2,
-        cacheBust: true,
-        backgroundColor: "#ffffff",
-        style: { transform: "none", margin: "0" },
-      })
-    } finally {
-      if (wrap) wrap.style.transform = prev
+      return await capturePng(node, { width: FLYER_W, height: FLYER_H })
+    } catch (e) {
+      console.error("Flyer capture failed", e)
+      return null
     }
   }, [])
 
@@ -301,7 +339,6 @@ export default function FlyerModal({
   const currentTheme = resolveTheme(selectedTemplate)
   const currentData = dataForTemplate(selectedTemplate)
   const CurrentTemplate = TEMPLATE_COMPONENTS[selectedTemplate]
-  const thumbScale = 0.19
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-2 sm:p-4">
@@ -349,23 +386,17 @@ export default function FlyerModal({
                   const td = dataForTemplate(meta.id)
                   if (!Comp || !td) return null
                   return (
-                    <button
+                    <TemplateThumb
                       key={meta.id}
-                      type="button"
-                      onClick={() => setSelectedTemplate(meta.id)}
-                      className={`relative shrink-0 rounded-lg overflow-hidden border-2 ${
-                        selectedTemplate === meta.id ? "border-[#d6b357]" : "border-[#e5e5e5] hover:border-[#001f3f]/40"
-                      }`}
-                      style={{ width: FLYER_W * thumbScale, height: FLYER_H * thumbScale }}
-                      title={meta.name}
-                    >
-                      <div style={{ width: FLYER_W, height: FLYER_H, transform: `scale(${thumbScale})`, transformOrigin: "top left", pointerEvents: "none" }}>
-                        <Comp data={td} listingUrl={listingUrl} theme={resolveTheme(meta.id)} logoUrl={logoUrl} logoSize={logoSize} logoOutline={logoOutline} />
-                      </div>
-                      <span className="absolute bottom-0 inset-x-0 bg-black/55 text-white text-[9px] font-semibold text-center py-0.5">
-                        {meta.name}
-                      </span>
-                    </button>
+                      id={meta.id}
+                      name={meta.name}
+                      selected={selectedTemplate === meta.id}
+                      Comp={Comp}
+                      data={td}
+                      listingUrl={listingUrl}
+                      theme={resolveTheme(meta.id)}
+                      onSelect={setSelectedTemplate}
+                    />
                   )
                 })}
               </div>

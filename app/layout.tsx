@@ -11,7 +11,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"], display: "swap", variable: "
 // Outfit font for display headings (matches Figma design)
 const _outfit = Outfit({ subsets: ["latin"], display: "swap", variable: "--font-outfit" })
 // Urbanist — used by the marketing flyer / announcement templates.
-const _urbanist = Urbanist({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800", "900"], display: "swap", variable: "--font-urbanist" })
+const _urbanist = Urbanist({ subsets: ["latin"], weight: ["800", "900"], display: "swap", variable: "--font-urbanist" })
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 

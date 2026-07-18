@@ -20,6 +20,7 @@ import AnnouncementPoster, {
   type Layer,
 } from "./AnnouncementPoster"
 import { type FlyerData, proxied } from "@/lib/flyer/theme"
+import { capturePng, warmFontEmbedCSS } from "@/lib/flyer/capture"
 
 type MarketingData = FlyerData & { currency: string }
 
@@ -176,6 +177,11 @@ export default function AnnouncementModal({
     return () => ro.disconnect()
   }, [data, posterH])
 
+  // Warm the cached font-embed CSS once the poster renders (fast first export).
+  useEffect(() => {
+    if (data) warmFontEmbedCSS(posterRef.current)
+  }, [data])
+
   const skin = useMemo(() => resolveSkin(skinTheme, { accent, bgColor, railColor, backDark }), [skinTheme, accent, bgColor, railColor, backDark])
 
   const posterData: MarketingData | null = data
@@ -312,25 +318,11 @@ export default function AnnouncementModal({
   const captureDataUrl = useCallback(async (): Promise<string | null> => {
     const node = posterRef.current
     if (!node) return null
-    const wrap = scaleWrapRef.current
-    const prev = wrap?.style.transform ?? ""
     try {
-      if (wrap) wrap.style.transform = "none"
-      await new Promise((r) => requestAnimationFrame(() => r(null)))
-      if (typeof document !== "undefined" && document.fonts?.ready) await document.fonts.ready
-      await Promise.all(
-        Array.from(node.querySelectorAll("img")).map(async (img) => {
-          if (img.complete && img.naturalWidth > 0) return
-          await new Promise<void>((resolve) => {
-            img.addEventListener("load", () => resolve(), { once: true })
-            img.addEventListener("error", () => resolve(), { once: true })
-          })
-        }),
-      )
-      const { toPng } = await import("html-to-image")
-      return await toPng(node, { width: POSTER_W, height: posterH, pixelRatio: 2, cacheBust: true, backgroundColor: "#ffffff", style: { transform: "none", margin: "0" } })
-    } finally {
-      if (wrap) wrap.style.transform = prev
+      return await capturePng(node, { width: POSTER_W, height: posterH })
+    } catch (e) {
+      console.error("Announcement capture failed", e)
+      return null
     }
   }, [posterH])
 

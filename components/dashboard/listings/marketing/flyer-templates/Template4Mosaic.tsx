@@ -290,24 +290,24 @@ const Template4Mosaic = forwardRef<HTMLDivElement, TemplateProps>(function Templ
               <div
                 key={i}
                 style={{
+                  position: "relative",
                   width: 92,
                   height: 70,
                   borderRadius: 8,
                   overflow: "hidden",
                   border: "2px solid rgba(255,255,255,0.9)",
                   boxShadow: "0 6px 16px rgba(0,0,0,0.4)",
-                  backgroundImage: `url("${t}")`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
                 }}
               >
+                {/* Real <img> (not a background-image) so the capture helper
+                    awaits it and html-to-image reliably inlines it → the export
+                    matches the preview. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={t}
                   alt=""
-                  aria-hidden
                   crossOrigin="anonymous"
-                  style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                 />
               </div>
             ))}

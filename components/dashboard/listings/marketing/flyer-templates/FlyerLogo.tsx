@@ -1,7 +1,9 @@
 import type React from "react"
+import { outlineFilter } from "@/lib/flyer/logos"
 
 // Shared logo element for every flyer template. Applies the studio's logo Size
-// override and White-outline (a white sticker plate behind the artwork). The
+// override and White-outline. The outline follows the artwork's SHAPE (its
+// alpha silhouette) via stacked drop-shadows — not a rectangular plate. The
 // wrapper accepts a `style` for templates that position the logo (e.g. Modern's
 // absolutely-placed mark).
 export default function FlyerLogo({
@@ -18,17 +20,14 @@ export default function FlyerLogo({
   style?: React.CSSProperties
 }) {
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        padding: outline > 0 ? outline : 0,
-        backgroundColor: outline > 0 ? "#ffffff" : "transparent",
-        borderRadius: outline > 0 ? 8 : 0,
-        ...style,
-      }}
-    >
+    <span style={{ display: "inline-flex", ...style }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="" crossOrigin="anonymous" style={{ height: size ?? height, width: "auto", objectFit: "contain", display: "block" }} />
+      <img
+        src={src}
+        alt=""
+        crossOrigin="anonymous"
+        style={{ height: size ?? height, width: "auto", objectFit: "contain", display: "block", filter: outlineFilter(outline) }}
+      />
     </span>
   )
 }
