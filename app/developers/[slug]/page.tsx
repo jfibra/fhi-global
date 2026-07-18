@@ -17,7 +17,7 @@ type Props = { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
   const supabase = createPublicSupabaseClient()
   const { data } = await supabase
     .from("developers")

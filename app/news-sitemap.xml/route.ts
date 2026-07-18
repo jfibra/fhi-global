@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { fetchArticles } from "@/lib/news-service"
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
 async function fetchPublishedNews(maxPages = 8) {
   const all = [] as Awaited<ReturnType<typeof fetchArticles>>

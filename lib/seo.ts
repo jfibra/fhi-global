@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 export const DEFAULT_PREVIEW_IMAGE_URL =
   "https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/fhi_global/fhi%20global.jpg"
 
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
 function buildCanonical(pathname: string | undefined) {
   if (!pathname) return undefined

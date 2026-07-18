@@ -11,7 +11,7 @@ HOMESPH_NEWS_API_KEY=<your-key>
 
 Optional (for canonical URLs and share links):
 ```
-NEXT_PUBLIC_SITE_URL=https://fhiglobal.com
+NEXT_PUBLIC_SITE_URL=https://fhiglobal.ae
 ```
 
 ## Proxy Security

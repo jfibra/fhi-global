@@ -11,7 +11,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"], display: "swap", variable: "
 // Outfit font for display headings (matches Figma design)
 const _outfit = Outfit({ subsets: ["latin"], display: "swap", variable: "--font-outfit" })
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

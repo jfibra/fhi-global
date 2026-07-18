@@ -3,8 +3,11 @@
 const isProd = process.env.NODE_ENV === "production"
 
 // ── External origins used by the app ────────────────────────────────────────
-// Supabase project (storage + API + realtime)
-const SUPABASE_HOST  = "hefwmaoborpfuyhbguzv.supabase.co"
+// Supabase project (storage + API + realtime). Derived from the env so local dev
+// and production can point at different Supabase projects without editing the CSP.
+const SUPABASE_HOST = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).host
+  : "hefwmaoborpfuyhbguzv.supabase.co"
 // Vercel Analytics
 const VERCEL_SCRIPTS = "va.vercel-scripts.com"
 const VERCEL_VITALS  = "vitals.vercel-insights.com"
@@ -184,6 +187,14 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Base security headers for every route. This catch-all MUST stay first:
+        // when several entries match a path, Next.js applies them in order and the
+        // LAST matching value wins per header key — so the noindex overrides below
+        // only take effect if this entry comes before them.
+        source: "/(.*)",
+        headers: SECURITY_HEADERS,
+      },
+      {
         source: "/dashboard/:path*",
         headers: PRIVATE_NOINDEX_HEADERS,
       },
@@ -210,11 +221,6 @@ const nextConfig = {
       {
         source: "/internal/:path*",
         headers: PRIVATE_NOINDEX_HEADERS,
-      },
-      {
-        // Apply to every route
-        source: "/(.*)",
-        headers: SECURITY_HEADERS,
       },
     ]
   },

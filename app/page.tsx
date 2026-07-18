@@ -129,7 +129,7 @@ export default async function HomePage() {
     name: d.name,
   }));
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae";
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -330,7 +330,7 @@ export default async function HomePage() {
                 </div>
                 <div className="mt-auto pt-2">
                   <span className="text-xs font-mono text-[#d6b357] opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    fhiglobal.com
+                    fhiglobal.ae
                   </span>
                 </div>
               </div>

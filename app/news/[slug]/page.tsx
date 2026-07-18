@@ -15,7 +15,7 @@ type PageProps = { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
   const article = await fetchArticleBySlug(slug)
   if (!article) {
@@ -170,7 +170,7 @@ function ArticleContent({ content }: { content: string }) {
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default async function NewsDetailPage({ params }: PageProps) {
   const { slug } = await params
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
   // Fetch in parallel
   const [article, latestNews] = await Promise.all([

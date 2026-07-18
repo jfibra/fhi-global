@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next"
 import { createClient } from "@/lib/supabase/server"
 import { fetchArticles } from "@/lib/news-service"
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.com"
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
 type PublicRoute = {
   path: string
@@ -12,6 +12,8 @@ type PublicRoute = {
 
 const STATIC_PUBLIC_ROUTES: PublicRoute[] = [
   { path: "/",           priority: 1.0, changeFrequency: "daily" },
+  { path: "/buy",        priority: 0.9, changeFrequency: "daily" },
+  { path: "/rent",       priority: 0.9, changeFrequency: "daily" },
   { path: "/projects",   priority: 0.9, changeFrequency: "daily" },
   { path: "/developers", priority: 0.7, changeFrequency: "weekly" },
   { path: "/news",       priority: 0.7, changeFrequency: "daily" },
@@ -41,7 +43,7 @@ async function fetchPublishedNews(maxPages = 8) {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = await createClient()
 
-  const [{ data: projects }, { data: developers }, news] = await Promise.all([
+  const [{ data: projects }, { data: developers }, { data: agentListings }, news] = await Promise.all([
     supabase
       .from("projects")
       .select("slug, updated_at")
@@ -52,6 +54,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .from("developers")
       .select("slug, updated_at")
       .eq("is_active", true)
+      .is("deleted_at", null),
+    supabase
+      .from("agent_listings")
+      .select("id, updated_at")
+      .eq("status", "published")
       .is("deleted_at", null),
     fetchPublishedNews(),
   ])
@@ -83,6 +90,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     }))
 
+  const listingEntries: MetadataRoute.Sitemap = (agentListings ?? []).map((row) => ({
+    url: `${SITE_URL}/listings/${row.id}`,
+    lastModified: row.updated_at ? new Date(row.updated_at) : now,
+    changeFrequency: "weekly",
+    priority: 0.8,
+  }))
+
   const newsEntries: MetadataRoute.Sitemap = news.map((article) => ({
     url: `${SITE_URL}/news/${article.slug}`,
     lastModified: article.updatedAt ? new Date(article.updatedAt) : now,
@@ -94,6 +108,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...staticEntries,
     ...projectEntries,
     ...developerEntries,
+    ...listingEntries,
     ...newsEntries,
   ]
 }
