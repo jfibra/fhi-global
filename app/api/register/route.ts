@@ -10,6 +10,8 @@ function slugify(text: string) {
     .replace(/-+/g, "-")
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 export async function POST(req: NextRequest) {
   try {
     const fd = await req.formData()
@@ -51,7 +53,28 @@ export async function POST(req: NextRequest) {
 
     const userId = authData.user.id
 
-    await supabase.from("profiles").update({ role, status: "pending" }).eq("id", userId)
+    // Invite QR / referral link: ?ref=<inviter profile id>. Attribution is
+    // best-effort — an invalid or unknown ref never blocks registration.
+    const refRaw = String(fd.get("ref") ?? "").trim()
+    let invitedBy: string | null = null
+    if (refRaw && UUID_RE.test(refRaw)) {
+      const { data: inviter } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", refRaw)
+        .eq("is_deleted", false)
+        .maybeSingle()
+      if (inviter) invitedBy = refRaw
+    }
+
+    await supabase
+      .from("profiles")
+      .update({
+        role,
+        status: "pending",
+        ...(invitedBy ? { metadata: { invited_by: invitedBy } } : {}),
+      })
+      .eq("id", userId)
 
     if (isDeveloper && companyName?.trim()) {
       const baseSlug = slugify(companyName)

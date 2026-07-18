@@ -185,7 +185,13 @@ function Field({ label, children, error }: { label: string; children: React.Reac
 const inputCls =
   "w-full px-4 py-3 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all duration-200"
 
-export function RegisterUI({ defaultAccountType = "member" }: { defaultAccountType?: "member" | "developer" }) {
+export function RegisterUI({
+  defaultAccountType = "member",
+  inviteRef = null,
+}: {
+  defaultAccountType?: "member" | "developer"
+  inviteRef?: string | null
+}) {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [step, setStep] = useState(0)
@@ -234,6 +240,7 @@ export function RegisterUI({ defaultAccountType = "member" }: { defaultAccountTy
       fd.append("email", form.email)
       fd.append("password", form.password)
       fd.append("companyName", form.companyName)
+      if (inviteRef) fd.append("ref", inviteRef)
       const res = await fetch("/api/register", { method: "POST", body: fd })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Registration failed")

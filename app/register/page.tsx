@@ -17,11 +17,12 @@ export const metadata: Metadata = createPageMetadata({
 export default async function RegisterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; role?: string }>
+  searchParams: Promise<{ type?: string; role?: string; ref?: string }>
 }) {
   const sp = await searchParams
   const requestedType = (sp.type ?? sp.role ?? "").toLowerCase()
   const defaultAccountType = requestedType === "developer" ? "developer" : "member"
+  const inviteRef = typeof sp.ref === "string" ? sp.ref : null
 
   // If already logged in, redirect to dashboard
   if (hasServerSupabaseEnv()) {
@@ -52,7 +53,7 @@ export default async function RegisterPage({
     <>
       <TopBar />
       <Header />
-      <RegisterUI defaultAccountType={defaultAccountType} />
+      <RegisterUI defaultAccountType={defaultAccountType} inviteRef={inviteRef} />
       <Footer />
     </>
   )
