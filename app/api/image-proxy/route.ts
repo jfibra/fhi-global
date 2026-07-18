@@ -1,31 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
+import { isAllowedImageHost } from "@/lib/image-hosts"
 
 // Same-origin image passthrough. The marketing generators (Flyer /
 // Announcement) rasterize a DOM node to a canvas with html2canvas; remote S3
 // images would taint that canvas (cross-origin) and make the PNG export throw.
 // Serving them back through our own origin sidesteps CORS entirely.
 //
-// Locked to an allowlist of image hosts we actually serve from so this can't
-// be turned into an open proxy / SSRF vector.
+// Locked to an allowlist of image hosts we actually serve from (shared with
+// /og/listing in lib/image-hosts.ts) so this can't be turned into an open
+// proxy / SSRF vector.
 
 export const runtime = "nodejs"
-
-function allowedHost(host: string): boolean {
-  const h = host.toLowerCase()
-  let s3Host = ""
-  try {
-    s3Host = process.env.S3_PUBLIC_URL ? new URL(process.env.S3_PUBLIC_URL).host.toLowerCase() : ""
-  } catch {
-    s3Host = ""
-  }
-  return (
-    h === s3Host ||
-    h.endsWith(".amazonaws.com") ||
-    h.endsWith(".cloudfront.net") ||
-    h.endsWith(".supabase.co") ||
-    h.endsWith(".supabase.in")
-  )
-}
 
 export async function GET(req: NextRequest) {
   const raw = req.nextUrl.searchParams.get("url")
@@ -40,7 +25,7 @@ export async function GET(req: NextRequest) {
   if (target.protocol !== "https:") {
     return new NextResponse("Only https is allowed", { status: 400 })
   }
-  if (!allowedHost(target.host)) {
+  if (!isAllowedImageHost(target.host)) {
     return new NextResponse("Host not allowed", { status: 403 })
   }
 

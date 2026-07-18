@@ -3,7 +3,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { MapPin, Building2, ArrowLeft, Mail, Phone } from "lucide-react"
-import { createPageMetadata } from "@/lib/seo"
+import { createPageMetadata, SITE_URL } from "@/lib/seo"
 import { fetchPublicAgentListingById } from "@/lib/buy/agent-listings-public"
 import { pickUnit } from "@/lib/buy/listings-page-logic"
 import { mergedListingGalleryUrls } from "@/lib/listing-gallery-urls"
@@ -64,10 +64,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description =
     row.description?.trim().slice(0, 155) ||
     `${row.title} — Browse this listing on FHI Global.`
+  // The customized share card (see ShareCardModal / /og/listing). The
+  // updated_at version param makes scrapers re-fetch after every save.
+  const ogImageVersion = Date.parse(row.updated_at) || 0
   return createPageMetadata({
     title: `${row.title} | FHI Global`,
     description,
     pathname: `/listings/${row.id}`,
+    imageUrl: `${SITE_URL.replace(/\/$/, "")}/og/listing/${row.id}?v=${ogImageVersion}`,
     keywords: [row.title, "UAE property", row.listing_kind === "rent" ? "rent" : "sale", "FHI Global"],
   })
 }

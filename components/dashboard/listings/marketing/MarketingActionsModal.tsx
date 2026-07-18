@@ -2,19 +2,32 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { X, FileImage, Megaphone, Clapperboard } from "lucide-react"
+import { X, FileImage, Megaphone, Clapperboard, Share2 } from "lucide-react"
 import FlyerModal from "./FlyerModal"
 import AnnouncementModal from "./AnnouncementModal"
+import ShareCardModal from "./ShareCardModal"
+import type { AgentListingStatus } from "@/lib/agent-listings-service"
+import type { OgCardOptions } from "@/lib/flyer/og-card"
 
-type View = "menu" | "flyer" | "announce"
+type View = "menu" | "flyer" | "announce" | "sharecard"
 
 export default function MarketingActionsModal({
   listingId,
   listingTitle,
+  listingStatus,
+  listingKind,
+  agentId,
+  initialOgOptions,
+  onOgSaved,
   onClose,
 }: {
   listingId: string
   listingTitle: string
+  listingStatus: AgentListingStatus
+  listingKind: "sale" | "rent"
+  agentId: string
+  initialOgOptions: unknown | null
+  onOgSaved: (options: OgCardOptions) => void
   onClose: () => void
 }) {
   const [view, setView] = useState<View>("menu")
@@ -24,6 +37,20 @@ export default function MarketingActionsModal({
   }
   if (view === "announce") {
     return <AnnouncementModal listingId={listingId} listingTitle={listingTitle} onClose={() => setView("menu")} />
+  }
+  if (view === "sharecard") {
+    return (
+      <ShareCardModal
+        listingId={listingId}
+        listingTitle={listingTitle}
+        listingStatus={listingStatus}
+        listingKind={listingKind}
+        agentId={agentId}
+        initialOptions={initialOgOptions}
+        onSaved={onOgSaved}
+        onClose={() => setView("menu")}
+      />
+    )
   }
 
   return (
@@ -59,6 +86,17 @@ export default function MarketingActionsModal({
               <Megaphone className="w-6 h-6" />
             </span>
             <span className="text-sm font-semibold text-[#111827] text-center leading-tight">Just Listed / Sold</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setView("sharecard")}
+            className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-[#e8eaed] bg-white p-5 hover:border-[#d6b357] hover:shadow-md transition-all"
+          >
+            <span className="w-12 h-12 rounded-xl bg-[#d6b357]/10 text-[#b48a2c] flex items-center justify-center">
+              <Share2 className="w-6 h-6" />
+            </span>
+            <span className="text-sm font-semibold text-[#111827] text-center leading-tight">Share card</span>
           </button>
 
           <Link

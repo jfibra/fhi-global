@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client"
+import type { OgCardOptions } from "@/lib/flyer/og-card"
 
 export type AgentListingKind = "sale" | "rent"
 export type AgentListingStatus = "draft" | "published" | "archived"
@@ -23,6 +24,8 @@ export type AgentListing = {
   created_at: string
   updated_at: string
   deleted_at: string | null
+  /** Saved share-card customization (see lib/flyer/og-card.ts); parse with sanitizeOgCardOptions. */
+  og_card_options?: unknown | null
   projects?: {
     id: number
     name: string
@@ -223,6 +226,23 @@ export async function replaceAgentListingImages(
   const { error: insErr } = await supabase.from("agent_listing_images").insert(rows)
   if (insErr) return { error: insErr.message }
   return { error: null }
+}
+
+/** Persist the share-card customization. Bumping updated_at also refreshes the
+ *  versioned /og/listing image URL in the listing page metadata (cache-bust). */
+export async function saveAgentListingOgCard(
+  listingId: string,
+  agentId: string,
+  options: OgCardOptions,
+): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from("agent_listings")
+    .update({ og_card_options: options, updated_at: new Date().toISOString() })
+    .eq("id", listingId)
+    .eq("agent_id", agentId)
+
+  return { error: error?.message ?? null }
 }
 
 export async function softDeleteAgentListing(

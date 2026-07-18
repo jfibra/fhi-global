@@ -819,11 +819,20 @@ export function AgentListingsClient({
         <MarketingActionsModal
           listingId={marketingListing.id}
           listingTitle={marketingListing.title}
+          listingStatus={marketingListing.status}
+          listingKind={marketingListing.listing_kind}
+          agentId={userId}
+          initialOgOptions={marketingListing.og_card_options ?? null}
+          onOgSaved={(opts) => {
+            setRows((rs) => rs.map((r) => (r.id === marketingListing.id ? { ...r, og_card_options: opts } : r)))
+            setMarketingListing((m) => (m ? { ...m, og_card_options: opts } : m))
+            showToast("success", "Share card saved")
+          }}
           onClose={() => setMarketingListing(null)}
         />
       )}
 
-      <div className="fixed bottom-4 right-4 z-[70] flex flex-col gap-2 pointer-events-none">
+      <div className="fixed bottom-4 right-4 z-[90] flex flex-col gap-2 pointer-events-none">
         {toasts.map((t) => (
           <div
             key={t.id}
