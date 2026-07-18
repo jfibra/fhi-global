@@ -39,7 +39,10 @@ export async function POST(req: NextRequest) {
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
-      email_confirm: false,
+      // Must be true: admin-created users are never sent a confirmation email,
+      // so `false` leaves them permanently unable to sign in. Vetting happens
+      // via the app's own pending→active approval gate, not email confirmation.
+      email_confirm: true,
       user_metadata: {
         first_name: firstName,
         last_name: lastName,

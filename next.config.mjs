@@ -16,6 +16,9 @@ const SUPABASE_CONNECT = SUPABASE_HOSTS.map((h) => `https://${h} wss://${h}`).jo
 // Vercel Analytics
 const VERCEL_SCRIPTS = "va.vercel-scripts.com"
 const VERCEL_VITALS  = "vitals.vercel-insights.com"
+// Cloudflare Web Analytics (beacon injected by the Cloudflare proxy in front of the site)
+const CF_INSIGHTS_SCRIPT = "static.cloudflareinsights.com"
+const CF_INSIGHTS_API    = "cloudflareinsights.com"
 // Flag images (hero section)
 const FLAGCDN        = "flagcdn.com"
 // Google Maps JavaScript API (buy page map)
@@ -31,7 +34,7 @@ const CSP = [
   `default-src 'self'`,
 
   // JS: own scripts + Next.js inline chunks + Vercel Analytics + Google Maps
-  `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://${MAPS_API} https://${MAPS_GSTATIC} ${VERCEL_SCRIPTS}`,
+  `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://${MAPS_API} https://${MAPS_GSTATIC} ${VERCEL_SCRIPTS} https://${CF_INSIGHTS_SCRIPT}`,
 
   // CSS: Tailwind / Next.js injects inline styles
   `style-src 'self' 'unsafe-inline'`,
@@ -43,7 +46,7 @@ const CSP = [
   `font-src 'self' data:`,
 
   // XHR / fetch: Supabase REST + Auth + Realtime, Vercel Analytics, Google Maps
-  `connect-src 'self' ${SUPABASE_CONNECT} https://${VERCEL_VITALS} https://${VERCEL_SCRIPTS} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.googleapis.com`,
+  `connect-src 'self' ${SUPABASE_CONNECT} https://${VERCEL_VITALS} https://${VERCEL_SCRIPTS} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.googleapis.com https://${CF_INSIGHTS_API}`,
 
   // Camera / microphone captured media (face-verify & ID-capture steps)
   `media-src 'self' blob:`,
