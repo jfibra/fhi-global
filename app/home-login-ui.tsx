@@ -60,7 +60,7 @@ function LoginCard({
             <input
               name="email"
               type="email"
-              placeholder="you@fhiglobal.com"
+              placeholder="you@fhiglobal.ae"
               required
               autoComplete="email"
               className="w-full pl-11 pr-5 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all duration-200"

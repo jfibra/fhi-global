@@ -41,19 +41,19 @@ export function TopBar() {
         {/* Left — contact info */}
         <div className="flex items-center gap-5">
           <a
-            href="tel:+97143001234"
+            href="tel:+971567428288"
             className="flex items-center gap-1.5 hover:text-[#d6b357] transition-colors duration-200"
           >
             <Phone className="w-3 h-3" />
-            <span>+971 4 300 1234</span>
+            <span>+971 56 742 8288</span>
           </a>
           <span className="hidden sm:block w-px h-3 bg-white/15" />
           <a
-            href="mailto:info@fhiglobal.com"
+            href="mailto:info@fhiglobal.ae"
             className="hidden sm:flex items-center gap-1.5 hover:text-[#d6b357] transition-colors duration-200"
           >
             <Mail className="w-3 h-3" />
-            <span>info@fhiglobal.com</span>
+            <span>info@fhiglobal.ae</span>
           </a>
         </div>
 

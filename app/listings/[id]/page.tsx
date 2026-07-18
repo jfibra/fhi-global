@@ -16,9 +16,9 @@ export const revalidate = 120
 
 type Props = { params: Promise<{ id: string }> }
 
-const TEL = "+97143001234"
-const EMAIL = "info@fhiglobal.com"
-const WA = "97143001234"
+const TEL = "+971567428288"
+const EMAIL = "info@fhiglobal.ae"
+const WA = "971567428288"
 
 const lightYellowBtn =
   "inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#fff8e1] border border-[#f5e6a8] text-[#0f2940] text-sm font-semibold hover:bg-[#fff3cc] transition-colors"

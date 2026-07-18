@@ -24,15 +24,15 @@ const OFFICES = [
   {
     city: "Dubai (HQ)",
     address: "Level 12, DIFC Gate Building, Dubai International Financial Centre, Dubai, UAE",
-    phone: "+971 4 300 1234",
-    email: "info@fhiglobal.com",
+    phone: "+971 56 742 8288",
+    email: "info@fhiglobal.ae",
     hours: "Sun–Thu: 9:00 AM – 6:00 PM",
   },
   {
     city: "Abu Dhabi",
     address: "Suite 501, Al Bateen Investment Complex, Abu Dhabi, UAE",
-    phone: "+971 2 400 5678",
-    email: "abudhabi@fhiglobal.com",
+    phone: "+971 56 742 8288",
+    email: "abudhabi@fhiglobal.ae",
     hours: "Sun–Thu: 9:00 AM – 6:00 PM",
   },
 ]
@@ -42,19 +42,19 @@ const DEPARTMENTS = [
     icon: Building2,
     name:  "Developer Relations",
     desc:  "Partner with us to list and sell your projects on the FHI Global platform.",
-    email: "developers@fhiglobal.com",
+    email: "developers@fhiglobal.ae",
   },
   {
     icon: MessageSquare,
     name:  "Agent Onboarding",
     desc:  "Join our network of high-performing agents across the UAE and beyond.",
-    email: "agents@fhiglobal.com",
+    email: "agents@fhiglobal.ae",
   },
   {
     icon: Mail,
     name:  "Press & Media",
     desc:  "Media enquiries, press releases, and partnership announcements.",
-    email: "press@fhiglobal.com",
+    email: "press@fhiglobal.ae",
   },
 ]
 
@@ -129,8 +129,8 @@ export default function ContactPage() {
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-4">Quick Contact</p>
                 {[
-                  { icon: Phone, label: "Main Office", value: "+971 4 300 1234", href: "tel:+97143001234" },
-                  { icon: Mail,  label: "Email Us",    value: "info@fhiglobal.com", href: "mailto:info@fhiglobal.com" },
+                  { icon: Phone, label: "Main Office", value: "+971 56 742 8288", href: "tel:+971567428288" },
+                  { icon: Mail,  label: "Email Us",    value: "info@fhiglobal.ae", href: "mailto:info@fhiglobal.ae" },
                   { icon: MapPin, label: "HQ Location", value: "DIFC, Dubai, UAE", href: "#offices" },
                   { icon: Clock,  label: "Working Hours", value: "Sun–Thu, 9AM–6PM GST" },
                 ].map(({ icon: Icon, label, value, href }) => (

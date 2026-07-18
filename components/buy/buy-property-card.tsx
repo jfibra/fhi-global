@@ -48,9 +48,9 @@ function formatPrice(from: number | null, to: number | null, currency = "AED") {
   return `${prefix} ${fmt(from)}`
 }
 
-const TEL = "+97143001234"
-const EMAIL = "info@fhiglobal.com"
-const WA = "97143001234"
+const TEL = "+971567428288"
+const EMAIL = "info@fhiglobal.ae"
+const WA = "971567428288"
 
 /** Reference: light yellow buttons (Email / Call). */
 const lightYellowBtn =

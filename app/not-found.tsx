@@ -41,10 +41,10 @@ export default function NotFound() {
           <span>
             Contact{" "}
             <a
-              href="mailto:admin@fhiglobal.com"
+              href="mailto:info@fhiglobal.ae"
               className="font-semibold text-[#001f3f] hover:underline"
             >
-              admin@fhiglobal.com
+              info@fhiglobal.ae
             </a>{" "}
             for assistance
           </span>

@@ -132,22 +132,22 @@ export function Footer() {
             {/* Contact details */}
             <div className="space-y-2.5">
               <a
-                href="tel:+97143001234"
+                href="tel:+971567428288"
                 className="flex items-center gap-3 text-sm hover:text-[#d6b357] transition-colors duration-200 group"
               >
                 <div className="w-8 h-8 rounded-full bg-white/8 group-hover:bg-[#d6b357]/15 flex items-center justify-center transition-colors shrink-0">
                   <Phone className="w-3.5 h-3.5 text-[#d6b357]" />
                 </div>
-                +971 4 300 1234
+                +971 56 742 8288
               </a>
               <a
-                href="mailto:info@fhiglobal.com"
+                href="mailto:info@fhiglobal.ae"
                 className="flex items-center gap-3 text-sm hover:text-[#d6b357] transition-colors duration-200 group"
               >
                 <div className="w-8 h-8 rounded-full bg-white/8 group-hover:bg-[#d6b357]/15 flex items-center justify-center transition-colors shrink-0">
                   <Mail className="w-3.5 h-3.5 text-[#d6b357]" />
                 </div>
-                info@fhiglobal.com
+                info@fhiglobal.ae
               </a>
               <div className="flex items-start gap-3 text-sm">
                 <div className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center shrink-0 mt-0.5">
