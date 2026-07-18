@@ -3,6 +3,7 @@ import {
   LayoutDashboard, Users, Building2, Layers, Images,
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound, User,
+  Clapperboard,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -99,6 +100,10 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
       },
       {
         type: "item",
+        item: { icon: Clapperboard, label: "Reels Maker", href: "/dashboard/reels-maker" },
+      },
+      {
+        type: "item",
         item: { icon: CreditCard, label: "Business Card", href: `${basePath}/business-card` },
       },
     ]
@@ -118,6 +123,7 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
     return [
       { type: "item", item: { icon: LayoutDashboard, label: "Overview", href: basePath } },
       { type: "item", item: { icon: ClipboardList, label: "My listings", href: "/dashboard/listings" } },
+      { type: "item", item: { icon: Clapperboard, label: "Reels Maker", href: "/dashboard/reels-maker" } },
       {
         type: "group",
         label: "Sales Management",
