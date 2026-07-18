@@ -1,13 +1,15 @@
 "use client"
 
+import type React from "react"
 import { forwardRef } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { Phone, Mail, Globe, Bed, Bath, Car, Maximize, LandPlot } from "lucide-react"
 import { type FlyerData, formatPrice } from "@/lib/flyer/theme"
 
 // Faithful multi-skin rebuild of filipinohomes-final's PropertyAnnouncementModal
-// poster. 1200×(800|630), exported 1:1. Four skins × three layouts, with
-// custom accent / background / panel color, matching the source design.
+// poster. 1200×(800|630), exported 1:1. Four skins × three layouts, custom
+// accent / background / panel color, logo selection, resizable/rotatable photo
+// layers, adjustable text sizes and QR.
 
 export const POSTER_W = 1200
 export type PosterSize = "default" | "og"
@@ -20,6 +22,24 @@ const BLUE_INK = "#2563eb"
 
 export type PosterTheme = "light" | "black" | "green" | "railnavy"
 export type AnnouncementType = "just_listed" | "just_sold" | "officially_sold"
+
+// A placed photo on the poster. Multiple layers stack (later = on top); each is
+// selectable and has its own transform.
+export type Layer = {
+  id: string
+  name: string
+  url: string
+  tx: number
+  ty: number
+  sx: number
+  sy: number
+  rot: number
+  aspect: number
+}
+
+export type LogoConfig = { url: string | null; size: number; outline: number }
+export type QrConfig = { on: boolean; size: number }
+export type TextScales = { title: number; tagline: number; spec: number; price: number }
 
 export const ANNOUNCEMENT_TYPES: Record<
   AnnouncementType,
@@ -36,6 +56,21 @@ export const SKIN_LABELS: Record<PosterTheme, string> = {
   green: "Transparent",
   railnavy: "Rail",
 }
+
+// Selectable brand logos — the SAME assets the Reel Maker uses (public/logos
+// + the root FHI branding). "Auto" (url:null) uses the skin's black/white FHI
+// mark. `tone: "light"` = white artwork (needs a dark chip on light panels).
+export type LogoOption = { label: string; url: string | null; tone: "dark" | "light" }
+export const LOGOS: LogoOption[] = ([
+  { label: "Auto", url: null, tone: "dark" },
+  { label: "Filipino Homes", url: "/logos/Filipinohomes-logo-side-left-white.png", tone: "light" },
+  { label: "Homes PH", url: "/logos/homesph-logo.png", tone: "dark" },
+  { label: "Rent PH", url: "/logos/RentPh new colored logo.png", tone: "dark" },
+  { label: "FH Global Partners", url: "/logos/global_partner.png", tone: "dark" },
+  { label: "FHI Global", url: "/FHI_Branding_White.png", tone: "light" },
+  { label: "Rentsouq AE", url: "/logos/RENTSOUQ_AE LOGO.png", tone: "dark" },
+  { label: "FHI Branding", url: "/logos/FHI_Branding Set_PNG Copies-02.png", tone: "dark" },
+] as LogoOption[]).map((l) => (l.url ? { ...l, url: encodeURI(l.url) } : l))
 
 type Skin = {
   layout: "classic" | "overlay" | "rail"
@@ -149,9 +184,9 @@ const DARK_PANEL_INK: Partial<Skin> = {
 
 export function resolveSkin(
   theme: PosterTheme,
-  opts: { accent?: string; bgColor?: string; railColor?: string },
+  opts: { accent?: string; bgColor?: string; railColor?: string; backDark?: number },
 ): Skin {
-  const { accent, bgColor, railColor } = opts
+  const { accent, bgColor, railColor, backDark = 35 } = opts
   let base = SKINS[theme]
   const panelSkin = base.layout === "rail" || (base.layout === "classic" && base.panel === "panel")
   if (panelSkin && railColor) {
@@ -179,12 +214,18 @@ export function resolveSkin(
     sk = { ...sk, scrimRGB: hexToRgb(bgColor), posterBg: bgColor, footerBg: bgColor }
   }
   if (sk.layout === "classic" && sk.panel === "panel") {
-    sk = { ...sk, panelBack: darken(sk.panelFront, 0.24) }
+    sk = { ...sk, panelBack: darken(sk.panelFront, (backDark / 100) * 0.6) }
   }
   return sk
 }
 
-export type PhotoTransform = { tx: number; ty: number; scale: number; rot: number }
+// Contained rect a layer occupies inside the poster (before its own transform).
+export function layerBase(aspect: number, posterH: number) {
+  const ratio = POSTER_W / posterH
+  const w = aspect >= ratio ? POSTER_W : posterH * aspect
+  const h = aspect >= ratio ? POSTER_W / aspect : posterH
+  return { w, h }
+}
 
 type Props = {
   data: FlyerData & { currency?: string }
@@ -192,22 +233,32 @@ type Props = {
   listingUrl: string
   size: PosterSize
   skin: Skin
-  photo?: PhotoTransform
+  layers: Layer[]
+  logo: LogoConfig
+  qr: QrConfig
+  text: TextScales
+  interactive?: boolean
+  selectedId?: string | null
+  onLayerPointerDown?: (id: string, e: React.PointerEvent<HTMLImageElement>) => void
+  onBackgroundPointerDown?: (e: React.PointerEvent<HTMLDivElement>) => void
+  onLayerAspect?: (id: string, aspect: number) => void
 }
 
 const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function AnnouncementPoster(
-  { data, type, listingUrl, size, skin: sk, photo = { tx: 0, ty: 0, scale: 1, rot: 0 } },
+  { data, type, listingUrl, size, skin: sk, layers, logo, qr, text, interactive = false, selectedId = null, onLayerPointerDown, onBackgroundPointerDown, onLayerAspect },
   ref,
 ) {
   const posterH = POSTER_HEIGHTS[size]
   const t = ANNOUNCEMENT_TYPES[type]
   const currency = data.currency ?? "AED"
-  const image = data.image
   const agentAvatar = data.agent.imageUrl
+  const sz = (base: number, pct: number) => Math.round((base * pct) / 100)
 
   const headlineMax = Math.max(t.line1.length, t.line2.length)
-  const headlineSize = headlineMax >= 10 ? 76 : headlineMax >= 8 ? 90 : 100
-  const railHeadlineSize = headlineMax >= 10 ? 46 : headlineMax >= 8 ? 54 : 62
+  const headlineBase = headlineMax >= 10 ? 76 : headlineMax >= 8 ? 90 : 100
+  const headlineSize = sz(headlineBase, text.title)
+  const railHeadlineBase = headlineMax >= 10 ? 46 : headlineMax >= 8 ? 54 : 62
+  const railHeadlineSize = sz(railHeadlineBase, text.title)
   const categoryLabel = (data.category || "").toUpperCase()
 
   const specDefs = [
@@ -219,17 +270,31 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
   ].filter((s) => s.value > 0)
 
   const contentPb = sk.layout === "overlay" ? 170 : sk.priceBox ? 272 : 242
-  const logoSrc = sk.logo === "white" ? "/FHI_Branding_White.png" : "/FHI_Branding.png"
+  const logoSrc = logo.url ?? (sk.logo === "white" ? "/FHI_Branding_White.png" : "/FHI_Branding.png")
+  // White logo artwork disappears on a light copy panel — sit it on a dark chip
+  // there (mirrors the Reel Maker's logoIsWhite behaviour).
+  const logoIsWhite = logo.url ? LOGOS.find((l) => l.url === logo.url)?.tone === "light" : sk.logo === "white"
+  const logoNeedsChip = logoIsWhite && sk.layout !== "overlay" && isLightHex(sk.panelFront || sk.posterBg)
+  const logoBg = logoNeedsChip ? NAVY_INK : logo.outline > 0 ? "#ffffff" : "transparent"
+  const logoPad = logoNeedsChip ? 10 : logo.outline
   const railBg =
     sk.layout === "rail"
       ? `linear-gradient(180deg, ${lighten(sk.panelFront, 0.1)} 0%, ${sk.panelFront} 34%, ${darken(sk.panelFront, 0.22)} 100%)`
       : sk.panelFront
 
-  const Logo = (
-    <>
+  const LogoEl = (
+    <div
+      style={{
+        alignSelf: "flex-start",
+        display: "inline-flex",
+        padding: logoPad > 0 ? logoPad : 0,
+        backgroundColor: logoBg,
+        borderRadius: logoPad > 0 ? 10 : 0,
+      }}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={logoSrc} alt="" crossOrigin="anonymous" style={{ height: 46, width: "auto", objectFit: "contain", display: "block", alignSelf: "flex-start" }} />
-    </>
+      <img src={logoSrc} alt="" crossOrigin="anonymous" style={{ height: logo.size, width: "auto", objectFit: "contain", display: "block" }} />
+    </div>
   )
 
   const Chip = categoryLabel ? (
@@ -248,37 +313,54 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
 
   const priceStr = formatPrice(data.price, currency)
 
-  const QR = (
+  const QR = qr.on ? (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: 12, backgroundColor: "#fff", borderRadius: 14, border: "1px solid rgba(0,0,0,0.08)" }}>
-      <QRCodeSVG value={listingUrl} size={sk.layout === "rail" ? 116 : 132} bgColor="#ffffff" fgColor={NAVY_INK} level="H" />
+      <QRCodeSVG value={listingUrl} size={qr.size} bgColor="#ffffff" fgColor={NAVY_INK} level="H" />
     </div>
-  )
-
-  const photoEl = image ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={image}
-      alt=""
-      crossOrigin="anonymous"
-      draggable={false}
-      style={{
-        position: "absolute",
-        inset: 0,
-        width: "100%",
-        height: "100%",
-        objectFit: "cover",
-        transform: `translate(${photo.tx}px, ${photo.ty}px) scale(${photo.scale}) rotate(${photo.rot}deg)`,
-        transformOrigin: "center",
-        userSelect: "none",
-        pointerEvents: "none",
-      }}
-    />
   ) : null
+
+  const ratio = POSTER_W / posterH
 
   return (
     <div ref={ref} style={{ width: POSTER_W, height: posterH, position: "relative", overflow: "hidden", backgroundColor: sk.posterBg, fontFamily: "var(--font-outfit), system-ui, sans-serif" }}>
-      {/* Photo (cover, transformable) */}
-      <div style={{ position: "absolute", inset: 0, backgroundColor: sk.posterBg, overflow: "hidden" }}>{photoEl}</div>
+      {/* Photo layers (later = on top). objectFit contain so the whole photo
+          shows; sized to its contained rect then transformed. */}
+      <div
+        onPointerDown={interactive ? onBackgroundPointerDown : undefined}
+        style={{ position: "absolute", inset: 0, backgroundColor: sk.posterBg, overflow: "hidden" }}
+      >
+        {layers.map((layer) => {
+          const { w, h } = layerBase(layer.aspect || ratio, posterH)
+          return (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={layer.id}
+              src={layer.url}
+              alt=""
+              crossOrigin="anonymous"
+              draggable={false}
+              onLoad={(e) => {
+                const el = e.currentTarget
+                if (el.naturalWidth && el.naturalHeight) onLayerAspect?.(layer.id, el.naturalWidth / el.naturalHeight)
+              }}
+              onPointerDown={interactive ? (e) => { e.stopPropagation(); onLayerPointerDown?.(layer.id, e) } : undefined}
+              style={{
+                position: "absolute",
+                left: (POSTER_W - w) / 2,
+                top: (posterH - h) / 2,
+                width: w,
+                height: h,
+                transform: `translate(${layer.tx}px, ${layer.ty}px) rotate(${layer.rot}deg) scale(${layer.sx}, ${layer.sy})`,
+                transformOrigin: "center",
+                userSelect: "none",
+                pointerEvents: interactive ? "auto" : "none",
+                cursor: interactive ? "pointer" : "default",
+                outline: interactive && selectedId === layer.id ? "0" : undefined,
+              }}
+            />
+          )
+        })}
+      </div>
 
       {/* Separation: panels or fade */}
       {sk.layout !== "rail" && (
@@ -297,8 +379,8 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
 
       {sk.layout === "rail" ? (
         /* ===== RAIL ===== */
-        <div style={{ position: "absolute", top: 0, left: 0, width: RAIL_W, height: "100%", background: railBg, borderRight: sk.footerBorder ? `1px solid ${sk.footerBorder}` : "none", paddingLeft: 46, paddingRight: 46, paddingTop: 42, paddingBottom: 40, display: "flex", flexDirection: "column" }}>
-          {Logo}
+        <div style={{ position: "absolute", top: 0, left: 0, width: RAIL_W, height: "100%", background: railBg, borderRight: sk.footerBorder ? `1px solid ${sk.footerBorder}` : "none", paddingLeft: 46, paddingRight: 46, paddingTop: 42, paddingBottom: 40, display: "flex", flexDirection: "column", pointerEvents: "none" }}>
+          {LogoEl}
           {categoryLabel && (
             <div style={{ alignSelf: "flex-start", marginTop: 16, paddingLeft: 14, paddingRight: 14, paddingTop: 5, paddingBottom: 5, borderRadius: 999, backgroundColor: `rgba(${hexToRgb(sk.underline || sk.line2)},0.16)`, color: sk.underline || sk.line2, fontWeight: 800, fontSize: 15, lineHeight: 1, letterSpacing: "0.5px", textTransform: "uppercase", whiteSpace: "nowrap" }}>{categoryLabel}</div>
           )}
@@ -306,22 +388,22 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
             <div style={{ fontFamily: "var(--font-urbanist), sans-serif", fontWeight: 900, fontSize: railHeadlineSize, lineHeight: 0.92, color: sk.line1, letterSpacing: "-1px" }}>{t.line1}</div>
             <div style={{ fontFamily: "var(--font-urbanist), sans-serif", fontWeight: 900, fontSize: railHeadlineSize, lineHeight: 0.92, color: sk.line2, letterSpacing: "-1px" }}>{t.line2}</div>
           </div>
-          <div style={{ fontSize: 21, color: sk.tagline, marginTop: 12 }}>{t.tagline}</div>
+          <div style={{ fontSize: sz(21, text.tagline), color: sk.tagline, marginTop: 12 }}>{t.tagline}</div>
           {sk.underline && <div style={{ width: 90, height: 5, backgroundColor: sk.underline, borderRadius: 3, marginTop: 8 }} />}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 12, paddingTop: 18, paddingBottom: 18 }}>
             {specDefs.map((s, i) => {
               const Icon = s.Icon
               return (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 13 }}>
-                  <div style={{ color: sk.specIcon, display: "flex", flexShrink: 0 }}><Icon size={24} strokeWidth={2} /></div>
-                  <div style={{ fontWeight: 600, fontSize: 23, color: sk.specValue, lineHeight: 1, whiteSpace: "nowrap" }}>{s.pill}</div>
+                  <div style={{ color: sk.specIcon, display: "flex", flexShrink: 0 }}><Icon size={sz(24, text.spec)} strokeWidth={2} /></div>
+                  <div style={{ fontWeight: 600, fontSize: sz(23, text.spec), color: sk.specValue, lineHeight: 1, whiteSpace: "nowrap" }}>{s.pill}</div>
                 </div>
               )
             })}
           </div>
           <div style={{ ...(sk.priceBox ? { border: `1.5px solid ${sk.priceBox}`, borderRadius: 12, paddingLeft: 20, paddingRight: 20, paddingTop: 12, paddingBottom: 12, alignSelf: "flex-start" } : {}) }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: sk.priceLabel, letterSpacing: "1.5px" }}>{t.priceLabel}</div>
-            <div style={{ fontFamily: "var(--font-urbanist), sans-serif", fontWeight: 900, fontSize: 44, color: sk.priceValue, lineHeight: 1, marginTop: 5 }}>{priceStr}</div>
+            <div style={{ fontSize: sz(18, text.price), fontWeight: 700, color: sk.priceLabel, letterSpacing: "1.5px" }}>{t.priceLabel}</div>
+            <div style={{ fontFamily: "var(--font-urbanist), sans-serif", fontWeight: 900, fontSize: sz(44, text.price), color: sk.priceValue, lineHeight: 1, marginTop: 5 }}>{priceStr}</div>
           </div>
           <div style={{ paddingTop: 18 }}>
             <div style={{ height: 1, backgroundColor: sk.footerDivider, marginBottom: 16 }} />
@@ -346,14 +428,14 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
       ) : (
         <>
           {/* Copy panel */}
-          <div style={{ position: "absolute", top: 0, left: 0, width: "58%", height: "100%", paddingLeft: 60, paddingRight: 60, paddingTop: 50, paddingBottom: contentPb, display: "flex", flexDirection: "column" }}>
-            {Logo}
+          <div style={{ position: "absolute", top: 0, left: 0, width: "58%", height: "100%", paddingLeft: 60, paddingRight: 60, paddingTop: 50, paddingBottom: contentPb, display: "flex", flexDirection: "column", pointerEvents: "none" }}>
+            {LogoEl}
             {Chip}
             <div style={{ marginTop: 18 }}>
               <div style={{ fontFamily: "var(--font-urbanist), sans-serif", fontWeight: 900, fontSize: headlineSize, lineHeight: 0.9, color: sk.line1, letterSpacing: "-2px" }}>{t.line1}</div>
               <div style={{ fontFamily: "var(--font-urbanist), sans-serif", fontWeight: 900, fontSize: headlineSize, lineHeight: 0.9, color: sk.line2, letterSpacing: "-2px" }}>{t.line2}</div>
             </div>
-            <div style={{ fontSize: 25, color: sk.tagline, marginTop: 14, fontStyle: sk.layout === "overlay" ? "italic" : "normal" }}>{t.tagline}</div>
+            <div style={{ fontSize: sz(25, text.tagline), color: sk.tagline, marginTop: 14, fontStyle: sk.layout === "overlay" ? "italic" : "normal" }}>{t.tagline}</div>
             {sk.underline && <div style={{ width: 110, height: 6, backgroundColor: sk.underline, borderRadius: 3, marginTop: 10 }} />}
 
             {specDefs.length > 0 && (sk.layout === "overlay" ? (
@@ -362,16 +444,16 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
                   const Icon = s.Icon
                   return (
                     <div key={i} style={{ display: "inline-flex", alignItems: "center", gap: 12, backgroundColor: sk.pillBg, borderRadius: 10, paddingLeft: 20, paddingRight: 20, paddingTop: 11, paddingBottom: 11 }}>
-                      <div style={{ color: sk.specIcon, display: "flex" }}><Icon size={26} strokeWidth={2} /></div>
-                      <div style={{ fontWeight: 600, fontSize: 26, color: sk.specValue, lineHeight: 1, whiteSpace: "nowrap" }}>{s.pill}</div>
+                      <div style={{ color: sk.specIcon, display: "flex" }}><Icon size={sz(26, text.spec)} strokeWidth={2} /></div>
+                      <div style={{ fontWeight: 600, fontSize: sz(26, text.spec), color: sk.specValue, lineHeight: 1, whiteSpace: "nowrap" }}>{s.pill}</div>
                     </div>
                   )
                 })}
               </div>
             ) : (() => {
               const n = specDefs.length
-              const sc = n >= 6 ? 0.62 : n === 5 ? 0.78 : 1
-              const r = (v: number) => Math.round(v * sc)
+              const scl = n >= 6 ? 0.62 : n === 5 ? 0.78 : 1
+              const r = (v: number) => Math.round(v * scl * (text.spec / 100))
               return (
                 <div style={{ display: "flex", alignItems: "center", marginTop: "auto", marginBottom: "auto" }}>
                   {specDefs.map((s, i) => {
@@ -394,13 +476,11 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
 
           {sk.layout === "classic" ? (
             <>
-              {/* Price */}
-              <div style={{ position: "absolute", left: 60, bottom: sk.priceBox ? 150 : 156, ...(sk.priceBox ? { border: `1.5px solid ${sk.priceBox}`, borderRadius: 14, paddingLeft: 26, paddingRight: 26, paddingTop: 16, paddingBottom: 16 } : {}) }}>
-                <div style={{ fontSize: 20, fontWeight: 700, color: sk.priceLabel, letterSpacing: "1.5px" }}>{t.priceLabel}</div>
-                <div style={{ fontFamily: "var(--font-urbanist), sans-serif", fontWeight: 900, fontSize: 54, color: sk.priceValue, lineHeight: 1, marginTop: 6 }}>{priceStr}</div>
+              <div style={{ position: "absolute", left: 60, bottom: sk.priceBox ? 150 : 156, pointerEvents: "none", ...(sk.priceBox ? { border: `1.5px solid ${sk.priceBox}`, borderRadius: 14, paddingLeft: 26, paddingRight: 26, paddingTop: 16, paddingBottom: 16 } : {}) }}>
+                <div style={{ fontSize: sz(20, text.price), fontWeight: 700, color: sk.priceLabel, letterSpacing: "1.5px" }}>{t.priceLabel}</div>
+                <div style={{ fontFamily: "var(--font-urbanist), sans-serif", fontWeight: 900, fontSize: sz(54, text.price), color: sk.priceValue, lineHeight: 1, marginTop: 6 }}>{priceStr}</div>
               </div>
-              {/* Footer bar */}
-              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 140, backgroundColor: sk.footerBg, borderTop: `1px solid ${sk.footerBorder}`, paddingLeft: 60, paddingRight: 60, display: "flex", alignItems: "center", gap: 32 }}>
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 140, backgroundColor: sk.footerBg, borderTop: `1px solid ${sk.footerBorder}`, paddingLeft: 60, paddingRight: 60, display: "flex", alignItems: "center", gap: 32, pointerEvents: "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 18, flexShrink: 0 }}>
                   <div style={{ width: 82, height: 82, borderRadius: "50%", flexShrink: 0, border: `3px solid ${sk.contactIcon}`, backgroundImage: agentAvatar ? `url("${agentAvatar}")` : undefined, backgroundColor: "#cbd5e1", backgroundSize: "cover", backgroundPosition: "center" }} />
                   <div style={{ minWidth: 0 }}>
@@ -421,11 +501,10 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
               </div>
             </>
           ) : (
-            /* Overlay footer */
-            <div style={{ position: "absolute", left: 60, right: 60, bottom: 50, display: "flex", alignItems: "flex-end", gap: 36 }}>
+            <div style={{ position: "absolute", left: 60, right: 60, bottom: 50, display: "flex", alignItems: "flex-end", gap: 36, pointerEvents: "none" }}>
               <div style={{ backgroundColor: sk.pillBg, borderRadius: 12, paddingLeft: 26, paddingRight: 26, paddingTop: 16, paddingBottom: 16, flexShrink: 0 }}>
-                <div style={{ fontSize: 18, fontWeight: 700, color: sk.priceLabel, letterSpacing: "1.5px" }}>{t.priceLabel}</div>
-                <div style={{ fontFamily: "var(--font-urbanist), sans-serif", fontWeight: 900, fontSize: 46, color: sk.priceValue, lineHeight: 1, marginTop: 4 }}>{priceStr}</div>
+                <div style={{ fontSize: sz(18, text.price), fontWeight: 700, color: sk.priceLabel, letterSpacing: "1.5px" }}>{t.priceLabel}</div>
+                <div style={{ fontFamily: "var(--font-urbanist), sans-serif", fontWeight: 900, fontSize: sz(46, text.price), color: sk.priceValue, lineHeight: 1, marginTop: 4 }}>{priceStr}</div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0, paddingBottom: 6 }}>
                 <div style={{ width: 74, height: 74, borderRadius: "50%", flexShrink: 0, border: `3px solid ${sk.contactIcon}`, backgroundImage: agentAvatar ? `url("${agentAvatar}")` : undefined, backgroundColor: "#cbd5e1", backgroundSize: "cover", backgroundPosition: "center" }} />
@@ -449,7 +528,7 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
       )}
 
       {/* QR */}
-      <div style={{ position: "absolute", right: 60, bottom: sk.layout === "overlay" ? 172 : sk.layout === "rail" ? 60 : 156 }}>{QR}</div>
+      {QR && <div style={{ position: "absolute", right: 60, bottom: sk.layout === "overlay" ? 172 : sk.layout === "rail" ? 60 : 156, pointerEvents: "none" }}>{QR}</div>}
     </div>
   )
 })

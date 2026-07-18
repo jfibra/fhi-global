@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { X, Download, Loader2, ImageIcon, Printer, Link2, Check, Facebook, MessageCircle, Move, RotateCcw, ZoomIn, RotateCw } from "lucide-react"
+import { X, Download, Loader2, Printer, Link2, Check, Facebook, MessageCircle, Plus, Trash2, GripVertical, RotateCw } from "lucide-react"
 import AnnouncementPoster, {
   POSTER_W,
   POSTER_HEIGHTS,
@@ -11,11 +11,13 @@ import AnnouncementPoster, {
   ACCENTS,
   BACKGROUNDS,
   RAIL_COLORS,
+  LOGOS,
   resolveSkin,
+  layerBase,
   type AnnouncementType,
   type PosterTheme,
   type PosterSize,
-  type PhotoTransform,
+  type Layer,
 } from "./AnnouncementPoster"
 import { type FlyerData, proxied } from "@/lib/flyer/theme"
 
@@ -28,19 +30,43 @@ const SIZE_ORDER: { key: PosterSize; label: string }[] = [
   { key: "default", label: "1200 × 800" },
   { key: "og", label: "Link · 1200 × 630" },
 ]
+const MIN_SCALE = 0.4
+const MAX_SCALE = 4
+const HANDLES = ["nw", "ne", "sw", "se", "n", "s", "e", "w"] as const
+type HandlePos = (typeof HANDLES)[number]
 
-function Swatches({ colors, value, onPick }: { colors: string[]; value?: string; onPick: (c: string) => void }) {
+function Section({ label, right, children }: { label: string; right?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-bold uppercase tracking-wide text-[#6b7280]">{label}</p>
+        {right}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function Slider({ label, value, min, max, step, unit, onChange }: { label: string; value: number; min: number; max: number; step: number; unit: string; onChange: (v: number) => void }) {
+  return (
+    <div className="mb-2">
+      <div className="flex items-center justify-between text-[11px] text-[#6b7280] mb-0.5">
+        <span>{label}</span>
+        <span className="font-mono text-[#9ca3af]">{value}{unit}</span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-[#001f3f]" />
+    </div>
+  )
+}
+
+function Swatches({ colors, value, auto, onPick }: { colors: string[]; value?: string; auto?: boolean; onPick: (c: string | undefined) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">
+      {auto && (
+        <button type="button" onClick={() => onPick(undefined)} className={`w-6 h-6 rounded-md border-2 text-[9px] font-bold flex items-center justify-center ${value === undefined ? "border-[#001f3f] text-[#001f3f]" : "border-[#e5e5e5] text-[#9ca3af]"}`} title="Auto">A</button>
+      )}
       {colors.map((c) => (
-        <button
-          key={c}
-          type="button"
-          onClick={() => onPick(c)}
-          className={`w-6 h-6 rounded-md border-2 ${value === c ? "border-[#001f3f]" : "border-white shadow-sm"}`}
-          style={{ backgroundColor: c }}
-          title={c}
-        />
+        <button key={c} type="button" onClick={() => onPick(c)} className={`w-6 h-6 rounded-md border-2 ${value === c ? "border-[#001f3f]" : "border-white shadow-sm"}`} style={{ backgroundColor: c }} title={c} />
       ))}
     </div>
   )
@@ -59,26 +85,44 @@ export default function AnnouncementModal({
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<MarketingData | null>(null)
   const [photos, setPhotos] = useState<string[]>([])
-  const [heroIndex, setHeroIndex] = useState(0)
   const [type, setType] = useState<AnnouncementType>("just_listed")
   const [skinTheme, setSkinTheme] = useState<PosterTheme>("light")
   const [size, setSize] = useState<PosterSize>("default")
   const [accent, setAccent] = useState<string | undefined>()
   const [bgColor, setBgColor] = useState<string | undefined>()
   const [railColor, setRailColor] = useState<string | undefined>()
+  const [backDark, setBackDark] = useState(35)
+  // Logo / QR / text.
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [logoSize, setLogoSize] = useState(54)
+  const [logoOutline, setLogoOutline] = useState(0)
+  const [qrOn, setQrOn] = useState(true)
+  const [qrSize, setQrSize] = useState(116)
+  const [text, setText] = useState({ title: 100, tagline: 100, spec: 100, price: 100 })
+  // Photo layers.
+  const [layers, setLayers] = useState<Layer[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [copied, setCopied] = useState(false)
   const [scale, setScale] = useState(1)
-  const [photoT, setPhotoT] = useState<PhotoTransform>({ tx: 0, ty: 0, scale: 1, rot: 0 })
 
   const posterRef = useRef<HTMLDivElement>(null)
   const scaleWrapRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLDivElement>(null)
-  const dragRef = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null)
+  const areaRef = useRef<HTMLDivElement>(null)
+  const layerCounter = useRef(0)
+  const dragLayerId = useRef<string | null>(null)
+  const dragRef = useRef<
+    | { mode: "move"; x: number; y: number; tx: number; ty: number }
+    | { mode: "resize"; pos: HandlePos; x: number; y: number; sx: number; sy: number; tx: number; ty: number }
+    | { mode: "rotate" }
+    | null
+  >(null)
 
   const posterH = POSTER_HEIGHTS[size]
   const listingUrl = `${SITE_URL}/listings/${listingId}`
+  const ratio = POSTER_W / posterH
 
   useEffect(() => {
     let cancelled = false
@@ -98,8 +142,14 @@ export default function AnnouncementModal({
             agent: { ...json.data.agent, imageUrl: json.data.agent.imageUrl ? proxied(json.data.agent.imageUrl) : "" },
           }
           setData(pd)
-          setPhotos(pd.gallery.length ? pd.gallery : pd.image ? [pd.image] : [])
-          setHeroIndex(0)
+          const g = pd.gallery.length ? pd.gallery : pd.image ? [pd.image] : []
+          setPhotos(g)
+          // Seed the poster with the first photo as "Photo 1".
+          if (g[0]) {
+            layerCounter.current = 1
+            setLayers([{ id: "layer-1", name: "Photo 1", url: g[0], tx: 0, ty: 0, sx: 1, sy: 1, rot: 0, aspect: ratio }])
+            setSelectedId("layer-1")
+          }
         }
       } catch {
         if (!cancelled) setError("Network error — please try again")
@@ -110,54 +160,156 @@ export default function AnnouncementModal({
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listingId])
 
   useEffect(() => {
-    const el = frameRef.current
+    const el = areaRef.current
     if (!el) return
-    const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width ?? POSTER_W
-      setScale(w / POSTER_W)
-    })
+    const measure = () => {
+      const w = el.clientWidth - 48
+      const h = el.clientHeight - 72
+      if (w > 0 && h > 0) setScale(Math.max(0.12, Math.min(w / POSTER_W, h / posterH)))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [data, size])
+  }, [data, posterH])
 
-  const skin = useMemo(() => resolveSkin(skinTheme, { accent, bgColor, railColor }), [skinTheme, accent, bgColor, railColor])
+  const skin = useMemo(() => resolveSkin(skinTheme, { accent, bgColor, railColor, backDark }), [skinTheme, accent, bgColor, railColor, backDark])
 
-  // Re-center the photo transform when the chosen photo or poster size changes.
-  useEffect(() => {
-    setPhotoT({ tx: 0, ty: 0, scale: 1, rot: 0 })
-  }, [heroIndex, size])
+  const posterData: MarketingData | null = data
+  const sel = layers.find((l) => l.id === selectedId) ?? null
 
-  const heroUrl = photos.length ? photos[Math.min(heroIndex, photos.length - 1)] : null
-  const posterData: MarketingData | null = data ? { ...data, image: heroUrl } : null
-
-  // Drag to pan the photo (Canva-style). Screen-pixel deltas are divided by the
-  // preview scale to convert back to poster coordinates.
-  const onPhotoPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId)
-    dragRef.current = { x: e.clientX, y: e.clientY, tx: photoT.tx, ty: photoT.ty }
+  // ── Layer ops ──
+  const patchSel = (p: Partial<Layer>) => setLayers((prev) => prev.map((l) => (l.id === selectedId ? { ...l, ...p } : l)))
+  const setLayerAspect = (id: string, aspect: number) =>
+    setLayers((prev) => {
+      const l = prev.find((x) => x.id === id)
+      if (!l || Math.abs(l.aspect - aspect) < 0.001) return prev
+      return prev.map((x) => (x.id === id ? { ...x, aspect } : x))
+    })
+  const addLayer = (url: string) => {
+    if (!url) return
+    const existing = layers.find((l) => l.url === url)
+    if (existing) {
+      setSelectedId(existing.id)
+      return
+    }
+    const n = (layerCounter.current += 1)
+    const id = `layer-${n}`
+    setLayers((prev) => [...prev, { id, name: `Photo ${n}`, url, tx: 0, ty: 0, sx: 1, sy: 1, rot: 0, aspect: ratio }])
+    setSelectedId(id)
   }
-  const onPhotoPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+  const removeLayer = (id: string) => {
+    setLayers((prev) => prev.filter((l) => l.id !== id))
+    setSelectedId((cur) => (cur === id ? null : cur))
+  }
+  const moveLayer = (fromId: string, toId: string) => {
+    if (fromId === toId) return
+    setLayers((prev) => {
+      const from = prev.findIndex((l) => l.id === fromId)
+      const to = prev.findIndex((l) => l.id === toId)
+      if (from < 0 || to < 0) return prev
+      const next = [...prev]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return next
+    })
+  }
+  const resetSel = () => patchSel({ tx: 0, ty: 0, sx: 1, sy: 1, rot: 0 })
+  const clampScale = (n: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, n))
+
+  // ── Frame geometry (poster px) ──
+  const selBase = sel ? layerBase(sel.aspect || ratio, posterH) : { w: 0, h: 0 }
+  const frameW = selBase.w * (sel?.sx ?? 1)
+  const frameH = selBase.h * (sel?.sy ?? 1)
+  const frameLeft = POSTER_W / 2 + (sel?.tx ?? 0) - frameW / 2
+  const frameTop = posterH / 2 + (sel?.ty ?? 0) - frameH / 2
+
+  // ── Move / resize / rotate ──
+  const startMove = (e: React.PointerEvent) => {
+    if (!sel) return
+    e.stopPropagation()
+    dragRef.current = { mode: "move", x: e.clientX, y: e.clientY, tx: sel.tx, ty: sel.ty }
+    frameRef.current?.setPointerCapture(e.pointerId)
+  }
+  const startResize = (pos: HandlePos) => (e: React.PointerEvent) => {
+    if (!sel) return
+    e.stopPropagation()
+    dragRef.current = { mode: "resize", pos, x: e.clientX, y: e.clientY, sx: sel.sx, sy: sel.sy, tx: sel.tx, ty: sel.ty }
+    frameRef.current?.setPointerCapture(e.pointerId)
+  }
+  const startRotate = (e: React.PointerEvent) => {
+    if (!sel) return
+    e.stopPropagation()
+    dragRef.current = { mode: "rotate" }
+    frameRef.current?.setPointerCapture(e.pointerId)
+  }
+  const onFrameMove = (e: React.PointerEvent) => {
     const d = dragRef.current
     if (!d) return
-    const s = scale || 1
-    setPhotoT((p) => ({ ...p, tx: d.tx + (e.clientX - d.x) / s, ty: d.ty + (e.clientY - d.y) / s }))
+    if (e.buttons === 0) {
+      dragRef.current = null
+      return
+    }
+    if (d.mode === "rotate") {
+      const el = frameRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      const cx = r.left + r.width / 2
+      const cy = r.top + r.height / 2
+      let ang = (Math.atan2(e.clientY - cy, e.clientX - cx) * 180) / Math.PI + 90
+      const snap = Math.round(ang / 15) * 15
+      if (Math.abs(snap - ang) < 4) ang = snap
+      patchSel({ rot: Math.round(ang) })
+      return
+    }
+    const dx = (e.clientX - d.x) / scale
+    const dy = (e.clientY - d.y) / scale
+    if (d.mode === "move") {
+      patchSel({ tx: d.tx + dx, ty: d.ty + dy })
+      return
+    }
+    const rad = ((sel?.rot ?? 0) * Math.PI) / 180
+    const cos = Math.cos(rad)
+    const sin = Math.sin(rad)
+    const ldx = dx * cos + dy * sin
+    const ldy = -dx * sin + dy * cos
+    let nsx = d.sx
+    let nsy = d.sy
+    let lcx = 0
+    let lcy = 0
+    const bw = selBase.w
+    const bh = selBase.h
+    if (d.pos.includes("e")) {
+      nsx = clampScale(d.sx + ldx / bw)
+      lcx = (bw * (nsx - d.sx)) / 2
+    } else if (d.pos.includes("w")) {
+      nsx = clampScale(d.sx - ldx / bw)
+      lcx = -(bw * (nsx - d.sx)) / 2
+    }
+    if (d.pos.includes("s")) {
+      nsy = clampScale(d.sy + ldy / bh)
+      lcy = (bh * (nsy - d.sy)) / 2
+    } else if (d.pos.includes("n")) {
+      nsy = clampScale(d.sy - ldy / bh)
+      lcy = -(bh * (nsy - d.sy)) / 2
+    }
+    patchSel({ sx: nsx, sy: nsy, tx: d.tx + (lcx * cos - lcy * sin), ty: d.ty + (lcx * sin + lcy * cos) })
   }
-  const onPhotoPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+  const onFrameUp = (e?: React.PointerEvent) => {
     dragRef.current = null
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId)
-    } catch {
-      /* ignore */
+    if (e) {
+      try {
+        frameRef.current?.releasePointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
     }
   }
-  const resetPhoto = () => setPhotoT({ tx: 0, ty: 0, scale: 1, rot: 0 })
 
-  // Rasterize via html-to-image (SVG <foreignObject>) so Tailwind v4 oklch()
-  // colors, gradients and the loaded web fonts render natively; images (served
-  // same-origin through /api/image-proxy) are fetched + inlined.
   const captureDataUrl = useCallback(async (): Promise<string | null> => {
     const node = posterRef.current
     if (!node) return null
@@ -177,14 +329,7 @@ export default function AnnouncementModal({
         }),
       )
       const { toPng } = await import("html-to-image")
-      return await toPng(node, {
-        width: POSTER_W,
-        height: posterH,
-        pixelRatio: 2,
-        cacheBust: true,
-        backgroundColor: "#ffffff",
-        style: { transform: "none", margin: "0" },
-      })
+      return await toPng(node, { width: POSTER_W, height: posterH, pixelRatio: 2, cacheBust: true, backgroundColor: "#ffffff", style: { transform: "none", margin: "0" } })
     } finally {
       if (wrap) wrap.style.transform = prev
     }
@@ -222,9 +367,7 @@ export default function AnnouncementModal({
       const doc = iframe.contentWindow?.document
       if (!doc) return
       doc.open()
-      doc.write(
-        `<html><head><style>@page{size:${POSTER_W}px ${posterH}px;margin:0}html,body{margin:0}img{width:${POSTER_W}px;height:${posterH}px;display:block}</style></head><body><img src="${dataUrl}"/></body></html>`,
-      )
+      doc.write(`<html><head><style>@page{size:${POSTER_W}px ${posterH}px;margin:0}html,body{margin:0}img{width:${POSTER_W}px;height:${posterH}px;display:block}</style></head><body><img src="${dataUrl}"/></body></html>`)
       doc.close()
       iframe.onload = () => {
         iframe.contentWindow?.focus()
@@ -244,18 +387,27 @@ export default function AnnouncementModal({
       setTimeout(() => setCopied(false), 1800)
     })
   }
-  const shareFacebook = () =>
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(listingUrl)}`, "_blank", "noopener,width=680,height=640")
-  const shareWhatsApp = () =>
-    window.open(`https://wa.me/?text=${encodeURIComponent(`${listingTitle} — ${listingUrl}`)}`, "_blank", "noopener")
+  const shareFacebook = () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(listingUrl)}`, "_blank", "noopener,width=680,height=640")
+  const shareWhatsApp = () => window.open(`https://wa.me/?text=${encodeURIComponent(`${listingTitle} — ${listingUrl}`)}`, "_blank", "noopener")
 
   const panelSkin = skinTheme === "light" || skinTheme === "railnavy"
   const fadeSkin = skinTheme === "black" || skinTheme === "green"
+  const handleStyle = (pos: HandlePos): React.CSSProperties => {
+    const s: React.CSSProperties = { position: "absolute", width: 14 / scale, height: 14 / scale, borderRadius: 4 / scale, background: "#fff", border: `${2 / scale}px solid #2563eb`, boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }
+    const off = -7 / scale
+    if (pos.includes("n")) s.top = off
+    if (pos.includes("s")) s.bottom = off
+    if (pos.includes("e")) s.right = off
+    if (pos.includes("w")) s.left = off
+    if (pos === "n" || pos === "s") { s.left = "50%"; s.marginLeft = -7 / scale }
+    if (pos === "e" || pos === "w") { s.top = "50%"; s.marginTop = -7 / scale }
+    return s
+  }
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-2 sm:p-4">
       <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-label="Close" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl border border-[#e8eaed] shadow-2xl w-full max-w-6xl h-[94vh] overflow-hidden flex flex-col">
+      <div className="relative bg-white rounded-2xl border border-[#e8eaed] shadow-2xl w-full max-w-6xl h-[95vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-[#f0f0f0] gap-3">
           <div className="min-w-0">
@@ -266,192 +418,228 @@ export default function AnnouncementModal({
             <button type="button" onClick={copyLink} title="Copy listing link" className="p-2 rounded-lg border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f]">
               {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Link2 className="w-4 h-4" />}
             </button>
-            <button type="button" onClick={shareFacebook} title="Share on Facebook" className="p-2 rounded-lg border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f]">
-              <Facebook className="w-4 h-4" />
-            </button>
-            <button type="button" onClick={shareWhatsApp} title="Share on WhatsApp" className="p-2 rounded-lg border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f]">
-              <MessageCircle className="w-4 h-4" />
-            </button>
+            <button type="button" onClick={shareFacebook} title="Share on Facebook" className="p-2 rounded-lg border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f]"><Facebook className="w-4 h-4" /></button>
+            <button type="button" onClick={shareWhatsApp} title="Share on WhatsApp" className="p-2 rounded-lg border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f]"><MessageCircle className="w-4 h-4" /></button>
             <button type="button" onClick={() => void handlePrint()} disabled={loading || printing || !data} title="Print" className="p-2 rounded-lg border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f] disabled:opacity-50">
               {printing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
             </button>
-            <button
-              type="button"
-              onClick={() => void handleDownload()}
-              disabled={loading || downloading || !data}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white text-sm font-semibold shadow-md hover:shadow-lg disabled:opacity-50 transition-all"
-            >
+            <button type="button" onClick={() => void handleDownload()} disabled={loading || downloading || !data} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white text-sm font-semibold shadow-md hover:shadow-lg disabled:opacity-50 transition-all">
               {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
               {downloading ? "Exporting…" : "Download"}
             </button>
-            <button type="button" onClick={onClose} className="p-2 rounded-lg text-[#6b7280] hover:bg-[#f5f5f5]" aria-label="Close">
-              <X className="w-5 h-5" />
-            </button>
+            <button type="button" onClick={onClose} className="p-2 rounded-lg text-[#6b7280] hover:bg-[#f5f5f5]" aria-label="Close"><X className="w-5 h-5" /></button>
           </div>
         </div>
 
         {loading ? (
-          <div className="flex-1 flex items-center justify-center gap-2 text-sm text-[#9ca3af]">
-            <Loader2 className="w-5 h-5 animate-spin" /> Loading listing…
-          </div>
+          <div className="flex-1 flex items-center justify-center gap-2 text-sm text-[#9ca3af]"><Loader2 className="w-5 h-5 animate-spin" /> Loading listing…</div>
         ) : error ? (
           <div className="flex-1 flex items-center justify-center text-sm text-rose-600">{error}</div>
         ) : data && posterData ? (
           <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
             {/* Center: preview */}
-            <div className="flex-1 min-w-0 order-2 lg:order-1 overflow-auto p-5 bg-[#f1f2f4] flex items-start justify-center">
-              <div ref={frameRef} className="rounded-xl overflow-hidden shadow-lg" style={{ width: "100%", maxWidth: POSTER_W }}>
-                <div style={{ position: "relative", width: "100%", height: posterH * scale }}>
-                  <div ref={scaleWrapRef} style={{ position: "absolute", top: 0, left: 0, width: POSTER_W, height: posterH, transformOrigin: "top left", transform: `scale(${scale})` }}>
-                    <AnnouncementPoster ref={posterRef} data={posterData} type={type} listingUrl={listingUrl} size={size} skin={skin} photo={photoT} />
-                  </div>
-                  {/* Drag layer (preview-only) — pan the photo behind the design. */}
-                  <div
-                    onPointerDown={onPhotoPointerDown}
-                    onPointerMove={onPhotoPointerMove}
-                    onPointerUp={onPhotoPointerUp}
-                    onPointerCancel={onPhotoPointerUp}
-                    className="absolute inset-0 cursor-grab active:cursor-grabbing touch-none"
-                    title="Drag to reposition the photo"
+            <div ref={areaRef} className="flex-1 min-w-0 order-2 lg:order-1 overflow-auto p-6 bg-[#f1f2f4] flex items-center justify-center">
+              <div style={{ position: "relative", width: POSTER_W * scale, height: posterH * scale, flexShrink: 0 }}>
+                <div ref={scaleWrapRef} style={{ position: "absolute", top: 0, left: 0, width: POSTER_W, height: posterH, transformOrigin: "top left", transform: `scale(${scale})` }}>
+                  <AnnouncementPoster
+                    ref={posterRef}
+                    data={posterData}
+                    type={type}
+                    listingUrl={listingUrl}
+                    size={size}
+                    skin={skin}
+                    layers={layers}
+                    logo={{ url: logoUrl, size: logoSize, outline: logoOutline }}
+                    qr={{ on: qrOn, size: qrSize }}
+                    text={text}
+                    interactive
+                    selectedId={selectedId}
+                    onLayerPointerDown={(id) => setSelectedId(id)}
+                    onBackgroundPointerDown={() => setSelectedId(null)}
+                    onLayerAspect={setLayerAspect}
                   />
+                  {/* Selection frame (preview-only; sibling of the exported poster). */}
+                  {sel && (
+                    <div
+                      ref={frameRef}
+                      onPointerDown={startMove}
+                      onPointerMove={onFrameMove}
+                      onPointerUp={onFrameUp}
+                      onPointerCancel={onFrameUp}
+                      style={{
+                        position: "absolute",
+                        left: frameLeft,
+                        top: frameTop,
+                        width: frameW,
+                        height: frameH,
+                        transform: `rotate(${sel.rot}deg)`,
+                        transformOrigin: "center",
+                        border: `${2 / scale}px dashed rgba(37,99,235,0.9)`,
+                        cursor: "grab",
+                        touchAction: "none",
+                        zIndex: 40,
+                      }}
+                    >
+                      {HANDLES.map((pos) => (
+                        <div key={pos} onPointerDown={startResize(pos)} style={handleStyle(pos)} />
+                      ))}
+                      {/* Rotate handle */}
+                      <div style={{ position: "absolute", left: "50%", top: -34 / scale, width: 2 / scale, height: 26 / scale, marginLeft: -1 / scale, background: "rgba(37,99,235,0.9)" }} />
+                      <div
+                        onPointerDown={startRotate}
+                        style={{ position: "absolute", left: "50%", top: -34 / scale, width: 26 / scale, height: 26 / scale, marginLeft: -13 / scale, marginTop: -26 / scale, borderRadius: "50%", background: "#fff", border: `${2 / scale}px solid #2563eb`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "grab", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }}
+                      >
+                        <RotateCw style={{ width: 14 / scale, height: 14 / scale, color: "#2563eb" }} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Right: controls */}
-            <div className="lg:w-72 shrink-0 order-1 lg:order-2 border-b lg:border-b-0 lg:border-l border-[#f0f0f0] overflow-auto p-4 space-y-5 bg-[#fafafa]">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-2">Announcement</p>
+            <div className="lg:w-80 shrink-0 order-1 lg:order-2 border-b lg:border-b-0 lg:border-l border-[#f0f0f0] overflow-auto p-4 space-y-5 bg-[#fafafa]">
+              {/* Logo */}
+              <Section label="Logo">
+                <div className="flex gap-2 overflow-x-auto pb-1 mb-2">
+                  {LOGOS.map((l) => {
+                    const active = (l.url ?? null) === logoUrl
+                    const darkTile = l.tone === "light" // white artwork → dark tile so it shows
+                    return (
+                      <button
+                        key={l.label}
+                        type="button"
+                        onClick={() => setLogoUrl(l.url ?? null)}
+                        title={l.label}
+                        className={`shrink-0 h-12 min-w-[64px] px-2 rounded-lg border-2 flex items-center justify-center ${active ? "border-[#001f3f]" : "border-[#e5e5e5]"}`}
+                        style={{ backgroundColor: l.url ? (darkTile ? "#0f2c5c" : "#ffffff") : active ? "rgba(0,31,63,0.05)" : "#ffffff" }}
+                      >
+                        {l.url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={l.url} alt={l.label} className="max-h-8 max-w-[80px] object-contain" />
+                        ) : (
+                          <span className="text-xs font-bold text-[#001f3f]">Auto</span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+                <Slider label="Size" value={logoSize} min={28} max={120} step={1} unit="px" onChange={setLogoSize} />
+                <Slider label="White outline" value={logoOutline} min={0} max={16} step={1} unit="px" onChange={setLogoOutline} />
+              </Section>
+
+              {/* Announcement */}
+              <Section label="Announcement">
                 <div className="grid grid-cols-1 gap-2">
                   {TYPE_ORDER.map((k) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setType(k)}
-                      className={`px-3 py-2 rounded-xl text-sm font-semibold text-left border ${type === k ? "border-[#001f3f] bg-[#001f3f]/5 text-[#001f3f]" : "border-[#e5e5e5] text-[#374151] hover:border-[#001f3f]/40"}`}
-                    >
+                    <button key={k} type="button" onClick={() => setType(k)} className={`px-3 py-2 rounded-xl text-sm font-semibold text-left border ${type === k ? "border-[#001f3f] bg-[#001f3f]/5 text-[#001f3f]" : "border-[#e5e5e5] text-[#374151] hover:border-[#001f3f]/40"}`}>
                       {ANNOUNCEMENT_TYPES[k].label}
                     </button>
                   ))}
                 </div>
-              </div>
+              </Section>
 
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-2">Style</p>
+              {/* Style + size */}
+              <Section label="Style">
                 <div className="grid grid-cols-2 gap-2">
                   {SKIN_ORDER.map((k) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setSkinTheme(k)}
-                      className={`px-3 py-2 rounded-xl text-sm font-semibold border ${skinTheme === k ? "border-[#001f3f] bg-[#001f3f]/5 text-[#001f3f]" : "border-[#e5e5e5] text-[#374151] hover:border-[#001f3f]/40"}`}
-                    >
-                      {SKIN_LABELS[k]}
-                    </button>
+                    <button key={k} type="button" onClick={() => setSkinTheme(k)} className={`px-3 py-2 rounded-xl text-sm font-semibold border ${skinTheme === k ? "border-[#001f3f] bg-[#001f3f]/5 text-[#001f3f]" : "border-[#e5e5e5] text-[#374151] hover:border-[#001f3f]/40"}`}>{SKIN_LABELS[k]}</button>
                   ))}
                 </div>
-              </div>
-
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-2">Size</p>
+              </Section>
+              <Section label="Size">
                 <div className="grid grid-cols-2 gap-2">
                   {SIZE_ORDER.map((s) => (
-                    <button
-                      key={s.key}
-                      type="button"
-                      onClick={() => setSize(s.key)}
-                      className={`px-2 py-2 rounded-xl text-xs font-semibold border ${size === s.key ? "border-[#001f3f] bg-[#001f3f]/5 text-[#001f3f]" : "border-[#e5e5e5] text-[#374151] hover:border-[#001f3f]/40"}`}
-                    >
-                      {s.label}
-                    </button>
+                    <button key={s.key} type="button" onClick={() => setSize(s.key)} className={`px-2 py-2 rounded-xl text-xs font-semibold border ${size === s.key ? "border-[#001f3f] bg-[#001f3f]/5 text-[#001f3f]" : "border-[#e5e5e5] text-[#374151] hover:border-[#001f3f]/40"}`}>{s.label}</button>
                   ))}
                 </div>
-              </div>
+              </Section>
 
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold uppercase tracking-wide text-[#6b7280]">Accent</p>
-                  <input type="color" value={accent ?? "#d4af6a"} onChange={(e) => setAccent(e.target.value)} className="w-7 h-6 p-0 rounded-md border border-[#e5e5e5] bg-transparent cursor-pointer" />
-                </div>
-                <Swatches colors={ACCENTS} value={accent} onPick={setAccent} />
-              </div>
+              {/* Text sizes */}
+              <Section label="Text size">
+                <Slider label="Title" value={text.title} min={50} max={150} step={1} unit="%" onChange={(v) => setText((t) => ({ ...t, title: v }))} />
+                <Slider label="Subtitle" value={text.tagline} min={50} max={150} step={1} unit="%" onChange={(v) => setText((t) => ({ ...t, tagline: v }))} />
+                <Slider label="Attributes" value={text.spec} min={50} max={150} step={1} unit="%" onChange={(v) => setText((t) => ({ ...t, spec: v }))} />
+                <Slider label="Price" value={text.price} min={50} max={150} step={1} unit="%" onChange={(v) => setText((t) => ({ ...t, price: v }))} />
+              </Section>
 
+              {/* Colors */}
+              <Section label="Color" right={<input type="color" value={accent ?? "#d4af6a"} onChange={(e) => setAccent(e.target.value)} className="w-7 h-6 p-0 rounded-md border border-[#e5e5e5] bg-transparent cursor-pointer" />}>
+                <Swatches colors={ACCENTS} value={accent} auto onPick={setAccent} />
+              </Section>
               {fadeSkin && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-2">Background</p>
-                  <Swatches colors={BACKGROUNDS} value={bgColor} onPick={setBgColor} />
-                </div>
+                <Section label="Background">
+                  <Swatches colors={BACKGROUNDS} value={bgColor} auto onPick={setBgColor} />
+                </Section>
               )}
-
               {panelSkin && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-2">Panel color</p>
-                  <Swatches colors={RAIL_COLORS} value={railColor} onPick={setRailColor} />
-                </div>
+                <Section label="Panel color">
+                  <Swatches colors={RAIL_COLORS} value={railColor} auto onPick={setRailColor} />
+                </Section>
+              )}
+              {skinTheme === "light" && (
+                <Slider label="Back panel darkness" value={backDark} min={0} max={100} step={1} unit="%" onChange={setBackDark} />
               )}
 
-              <div>
-                <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-2">
-                  <ImageIcon className="w-3.5 h-3.5" /> Photo
-                </p>
+              {/* Add photo */}
+              <Section label="Add photo">
                 {photos.length === 0 ? (
                   <p className="text-xs text-[#9ca3af]">No photos on this listing yet.</p>
                 ) : (
                   <div className="grid grid-cols-4 gap-2">
-                    {photos.map((url, i) => (
-                      <button
-                        key={`${url}-${i}`}
-                        type="button"
-                        onClick={() => setHeroIndex(i)}
-                        className={`relative aspect-square rounded-lg overflow-hidden border-2 ${i === heroIndex ? "border-[#d6b357]" : "border-transparent hover:border-[#e5e5e5]"}`}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt="" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
+                    {photos.map((url, i) => {
+                      const used = layers.some((l) => l.url === url)
+                      return (
+                        <button key={`${url}-${i}`} type="button" onClick={() => addLayer(url)} className={`relative aspect-square rounded-lg overflow-hidden border-2 ${used ? "border-[#d6b357]" : "border-transparent hover:border-[#e5e5e5]"}`}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt="" className="w-full h-full object-cover" />
+                          {!used && (
+                            <span className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/20">
+                              <Plus className="w-4 h-4 text-white opacity-0 hover:opacity-100" />
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
-              </div>
+              </Section>
 
-              {photos.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-[#6b7280]">
-                      <Move className="w-3.5 h-3.5" /> Photo position
-                    </p>
-                    <button type="button" onClick={resetPhoto} title="Reset photo" className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#6b7280] hover:text-[#001f3f]">
-                      <RotateCcw className="w-3 h-3" /> Reset
-                    </button>
+              {/* Photo layers */}
+              {layers.length > 0 && (
+                <Section label="Photo layers" right={sel ? <button type="button" onClick={resetSel} className="text-[10px] font-semibold text-[#2563eb]">Reset</button> : undefined}>
+                  <p className="text-[10px] text-[#9ca3af] mb-2 -mt-1">Drag on the preview to move; use the handles to resize/rotate. Drag rows to reorder.</p>
+                  <div className="space-y-1.5">
+                    {[...layers].reverse().map((l) => (
+                      <div
+                        key={l.id}
+                        draggable
+                        onDragStart={() => { dragLayerId.current = l.id }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => { if (dragLayerId.current) moveLayer(dragLayerId.current, l.id); dragLayerId.current = null }}
+                        onClick={() => setSelectedId(l.id)}
+                        className={`flex items-center gap-2 p-1.5 rounded-lg border cursor-pointer ${selectedId === l.id ? "border-[#2563eb] bg-[#2563eb]/5" : "border-[#e5e5e5] bg-white"}`}
+                      >
+                        <GripVertical className="w-4 h-4 text-[#c4c4c4] shrink-0" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={l.url} alt="" className="w-9 h-9 rounded object-cover shrink-0" />
+                        <span className="text-sm font-medium text-[#374151] flex-1 truncate">{l.name}</span>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); removeLayer(l.id) }} className="p-1 rounded text-rose-600 hover:bg-rose-50 shrink-0"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-[10px] text-[#9ca3af] mb-2 -mt-1">Drag the preview to reposition, or use the sliders.</p>
-                  <label className="flex items-center gap-2 mb-2">
-                    <ZoomIn className="w-4 h-4 text-[#6b7280] shrink-0" />
-                    <input
-                      type="range"
-                      min={0.5}
-                      max={3}
-                      step={0.01}
-                      value={photoT.scale}
-                      onChange={(e) => setPhotoT((p) => ({ ...p, scale: Number(e.target.value) }))}
-                      className="w-full accent-[#001f3f]"
-                    />
-                    <span className="text-[10px] font-mono text-[#9ca3af] w-9 text-right">{photoT.scale.toFixed(2)}×</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <RotateCw className="w-4 h-4 text-[#6b7280] shrink-0" />
-                    <input
-                      type="range"
-                      min={-180}
-                      max={180}
-                      step={1}
-                      value={photoT.rot}
-                      onChange={(e) => setPhotoT((p) => ({ ...p, rot: Number(e.target.value) }))}
-                      className="w-full accent-[#001f3f]"
-                    />
-                    <span className="text-[10px] font-mono text-[#9ca3af] w-9 text-right">{photoT.rot}°</span>
-                  </label>
-                </div>
+                </Section>
               )}
+
+              {/* QR */}
+              <Section label="QR code" right={
+                <div className="flex gap-1">
+                  <button type="button" onClick={() => setQrOn(true)} className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${qrOn ? "border-[#2563eb] text-[#2563eb]" : "border-[#e5e5e5] text-[#9ca3af]"}`}>Show</button>
+                  <button type="button" onClick={() => setQrOn(false)} className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${!qrOn ? "border-[#2563eb] text-[#2563eb]" : "border-[#e5e5e5] text-[#9ca3af]"}`}>Hide</button>
+                </div>
+              }>
+                {qrOn && <Slider label="Size" value={qrSize} min={80} max={200} step={1} unit="px" onChange={setQrSize} />}
+              </Section>
             </div>
           </div>
         ) : null}
