@@ -530,7 +530,7 @@ export function AgentListingsClient({
                       <button
                         type="button"
                         onClick={() => setMarketing({ row, view: "menu" })}
-                        className="p-2 rounded-lg text-[#6b7280] hover:bg-[#f0f0f0]"
+                        className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[#e5e5e5] bg-[#fafafa] text-[#374151] shadow-sm hover:border-[#001f3f] hover:bg-white hover:text-[#001f3f] transition-colors"
                         aria-label="More actions"
                         title="More (edit, delete)"
                       >
