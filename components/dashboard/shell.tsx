@@ -48,6 +48,7 @@ export function DashboardShell({
   const effectiveRole = profile?.role ?? role
   const effectiveRoleLabel = profile?.role ? roleToLabel(profile.role) : roleLabel
   const displayName = profile?.fullname || userName || user?.email || "User"
+  const avatarUrl = userAvatar || profile?.profile_url || null
 
   // Resolve sections: prop override → flat navItems override wrapped → auto from role
   const resolvedSections: NavSection[] = navSectionsProp
@@ -238,12 +239,21 @@ export function DashboardShell({
 
           {/* User identity card */}
           <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/8">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 shadow-lg"
-              style={{ background: `linear-gradient(135deg, ${roleColor}, #d6b357)`, color: "#fff" }}
-            >
-              {displayName.charAt(0).toUpperCase()}
-            </div>
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatarUrl}
+                alt={displayName}
+                className="w-14 h-14 rounded-full object-cover shrink-0 shadow-lg border-2 border-[#d6b357]/60"
+              />
+            ) : (
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold shrink-0 shadow-lg"
+                style={{ background: `linear-gradient(135deg, ${roleColor}, #d6b357)`, color: "#fff" }}
+              >
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="overflow-hidden flex-1">
               <p className="text-sm font-bold text-white font-['Outfit'] truncate">{displayName}</p>
               <div className={`mt-0.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${badgeCls}`}>
@@ -348,12 +358,21 @@ export function DashboardShell({
                 </div>
               )}
             </div>
-            <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white shadow-md"
-              style={{ backgroundColor: "#001f3f" }}
-            >
-              {displayName.charAt(0).toUpperCase()}
-            </div>
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatarUrl}
+                alt={displayName}
+                className="w-8 h-8 rounded-xl object-cover shadow-md border border-[#e8eaed]"
+              />
+            ) : (
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white shadow-md"
+                style={{ backgroundColor: "#001f3f" }}
+              >
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+            )}
           </div>
         </header>
 
