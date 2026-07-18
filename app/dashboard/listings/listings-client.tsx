@@ -524,7 +524,7 @@ export function AgentListingsClient({
                           title="Just Listed / Sold poster"
                         >
                           <Megaphone className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Listed/Sold</span>
+                          <span className="hidden sm:inline">Just Listed/Sold</span>
                         </button>
                       </div>
                       <button
