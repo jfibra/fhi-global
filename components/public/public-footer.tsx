@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Building2, Mail, Phone, MapPin, Instagram, Linkedin, Twitter } from "lucide-react"
+import { Building2, Mail, Phone, MapPin, Facebook, Instagram, Linkedin, Twitter } from "lucide-react"
 
 const FOOTER_LINKS = {
   Company: [
@@ -52,14 +52,17 @@ export function PublicFooter() {
             </div>
             <div className="flex items-center gap-3 pt-2">
               {[
-                { icon: Instagram, label: "Instagram" },
-                { icon: Linkedin, label: "LinkedIn" },
-                { icon: Twitter, label: "Twitter" },
-              ].map(({ icon: Icon, label }) => (
+                { icon: Facebook, label: "Facebook", href: "https://www.facebook.com/share/1Bp8xq1oyA/" },
+                { icon: Instagram, label: "Instagram", href: "#" },
+                { icon: Linkedin, label: "LinkedIn", href: "#" },
+                { icon: Twitter, label: "Twitter", href: "#" },
+              ].map(({ icon: Icon, label, href }) => (
                 <a
                   key={label}
-                  href="#"
+                  href={href}
                   aria-label={label}
+                  target={href.startsWith("http") ? "_blank" : undefined}
+                  rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
                   className="w-9 h-9 rounded-xl bg-white/8 hover:bg-[#d6b357]/20 border border-white/10 hover:border-[#d6b357]/30 flex items-center justify-center transition-all"
                 >
                   <Icon className="w-4 h-4 text-white/60" />

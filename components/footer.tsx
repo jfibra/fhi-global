@@ -162,7 +162,7 @@ export function Footer() {
             {/* Social icons */}
             <div className="flex items-center gap-2 pt-1">
               {[
-                { label: "Facebook",  href: "#", Icon: FacebookIcon },
+                { label: "Facebook",  href: "https://www.facebook.com/share/1Bp8xq1oyA/", Icon: FacebookIcon },
                 { label: "Instagram", href: "#", Icon: InstagramIcon },
                 { label: "LinkedIn",  href: "#", Icon: LinkedInIcon },
                 { label: "Twitter/X", href: "#", Icon: TwitterXIcon },
@@ -171,6 +171,8 @@ export function Footer() {
                   key={label}
                   href={href}
                   aria-label={label}
+                  target={href.startsWith("http") ? "_blank" : undefined}
+                  rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
                   className="w-9 h-9 flex items-center justify-center rounded-full bg-white/8 border border-white/10 hover:bg-[#d6b357]/20 hover:border-[#d6b357]/30 hover:text-[#d6b357] transition-all duration-200"
                 >
                   <Icon />
