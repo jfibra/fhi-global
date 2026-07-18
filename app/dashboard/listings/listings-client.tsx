@@ -9,8 +9,9 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react"
-import { Plus, Pencil, Trash2, RefreshCw, Sparkles, ImagePlus, X } from "lucide-react"
+import { Plus, Pencil, Trash2, RefreshCw, Sparkles, ImagePlus, X, Megaphone } from "lucide-react"
 import { DashboardShell } from "@/components/dashboard/shell"
+import MarketingActionsModal from "@/components/dashboard/listings/marketing/MarketingActionsModal"
 import { getRoleColor } from "@/components/dashboard/sidebar-config"
 import { roleToLabel } from "@/lib/auth"
 import {
@@ -86,6 +87,7 @@ export function AgentListingsClient({
   const [saving, setSaving] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<AgentListing | null>(null)
+  const [marketingListing, setMarketingListing] = useState<AgentListing | null>(null)
   const [form, setForm] = useState<AgentListingFormInput>(emptyForm)
   const [aiHint, setAiHint] = useState("")
   const [aiDescLoading, setAiDescLoading] = useState(false)
@@ -482,6 +484,15 @@ export function AgentListingsClient({
                           <div className="flex gap-1">
                             <button
                               type="button"
+                              onClick={() => setMarketingListing(row)}
+                              className="p-2 rounded-lg text-[#d6b357] hover:bg-[#d6b357]/10"
+                              aria-label="Marketing (flyer, just listed/sold)"
+                              title="Marketing"
+                            >
+                              <Megaphone className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => openEdit(row)}
                               className="p-2 rounded-lg text-[#001f3f] hover:bg-[#001f3f]/10"
                               aria-label="Edit"
@@ -778,6 +789,14 @@ export function AgentListingsClient({
             </form>
           </div>
         </div>
+      )}
+
+      {marketingListing && (
+        <MarketingActionsModal
+          listingId={marketingListing.id}
+          listingTitle={marketingListing.title}
+          onClose={() => setMarketingListing(null)}
+        />
       )}
 
       <div className="fixed bottom-4 right-4 z-[70] flex flex-col gap-2 pointer-events-none">
