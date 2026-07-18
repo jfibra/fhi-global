@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { forwardRef, memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { X, Download, Loader2, ImageIcon, Palette, Printer, RotateCcw } from "lucide-react"
 import {
   type FlyerData,
@@ -45,6 +45,35 @@ const TEMPLATE_COMPONENTS: Record<number, typeof Template1Classic> = {
 // preview commit is debounced so dragging the OS picker stays smooth.
 const THUMB_SCALE = 0.19
 const sameGallery = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i])
+const sameTheme = (a: FlyerTheme, b: FlyerTheme) => a.accent === b.accent && a.bg === b.bg && a.text === b.text && a.mode === b.mode
+
+type PreviewProps = {
+  Comp: typeof Template1Classic
+  data: MarketingData
+  listingUrl: string
+  theme: FlyerTheme
+  logoUrl: string | null
+  logoSize: number
+  logoOutline: number
+}
+
+// Main preview, memoized so only a change that alters the flyer's OUTPUT
+// re-renders the (heavy) template — not unrelated state like the active photo
+// slot, download/print flags, etc.
+const FlyerPreview = memo(
+  forwardRef<HTMLDivElement, PreviewProps>(function FlyerPreview({ Comp, data, listingUrl, theme, logoUrl, logoSize, logoOutline }, ref) {
+    return <Comp ref={ref} data={data} listingUrl={listingUrl} theme={theme} logoUrl={logoUrl} logoSize={logoSize} logoOutline={logoOutline} />
+  }),
+  (a, b) =>
+    a.Comp === b.Comp &&
+    a.listingUrl === b.listingUrl &&
+    a.logoUrl === b.logoUrl &&
+    a.logoSize === b.logoSize &&
+    a.logoOutline === b.logoOutline &&
+    sameTheme(a.theme, b.theme) &&
+    a.data.image === b.data.image &&
+    sameGallery(a.data.gallery, b.data.gallery),
+)
 
 // One template thumbnail, memoized so a control change only re-renders the
 // thumbnail(s) that actually changed — not all nine. Thumbnails deliberately
@@ -407,7 +436,7 @@ export default function FlyerModal({
               <div ref={frameRef} className="rounded-xl overflow-hidden shadow-lg" style={{ width: "100%", maxWidth: FLYER_W }}>
                 <div style={{ position: "relative", width: "100%", height: FLYER_H * scale }}>
                   <div ref={scaleWrapRef} style={{ position: "absolute", top: 0, left: 0, width: FLYER_W, height: FLYER_H, transformOrigin: "top left", transform: `scale(${scale})` }}>
-                    <CurrentTemplate ref={flyerRef} data={currentData} listingUrl={listingUrl} theme={currentTheme} logoUrl={logoUrl} logoSize={logoSize} logoOutline={logoOutline} />
+                    <FlyerPreview ref={flyerRef} Comp={CurrentTemplate} data={currentData} listingUrl={listingUrl} theme={currentTheme} logoUrl={logoUrl} logoSize={logoSize} logoOutline={logoOutline} />
                   </div>
                 </div>
               </div>

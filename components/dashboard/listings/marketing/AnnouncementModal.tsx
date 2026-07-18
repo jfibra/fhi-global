@@ -119,6 +119,9 @@ export default function AnnouncementModal({
     | { mode: "rotate" }
     | null
   >(null)
+  // Latest transform during a drag (applied to the DOM directly, committed to
+  // React state only on pointer-up so the poster doesn't re-render every frame).
+  const pendingRef = useRef<{ tx: number; ty: number; sx: number; sy: number; rot: number } | null>(null)
 
   const posterH = POSTER_HEIGHTS[size]
   const listingUrl = `${SITE_URL}/listings/${listingId}`
@@ -252,10 +255,35 @@ export default function AnnouncementModal({
     dragRef.current = { mode: "rotate" }
     frameRef.current?.setPointerCapture(e.pointerId)
   }
+  // Apply a transform to the DOM directly (no React state change) so a drag is
+  // silky regardless of how heavy the skin is. The frame chrome follows too.
+  const applyDragToDom = (t: { tx: number; ty: number; sx: number; sy: number; rot: number }) => {
+    if (!sel) return
+    const img = posterRef.current?.querySelector(`[data-layer-id="${sel.id}"]`) as HTMLElement | null
+    if (img) img.style.transform = `translate(${t.tx}px, ${t.ty}px) rotate(${t.rot}deg) scale(${t.sx}, ${t.sy})`
+    const f = frameRef.current
+    if (f) {
+      const fw = selBase.w * t.sx
+      const fh = selBase.h * t.sy
+      f.style.width = `${fw}px`
+      f.style.height = `${fh}px`
+      f.style.left = `${POSTER_W / 2 + t.tx - fw / 2}px`
+      f.style.top = `${posterH / 2 + t.ty - fh / 2}px`
+      f.style.transform = `rotate(${t.rot}deg)`
+    }
+    pendingRef.current = t
+  }
+  const commitPending = () => {
+    if (pendingRef.current) {
+      patchSel(pendingRef.current)
+      pendingRef.current = null
+    }
+  }
   const onFrameMove = (e: React.PointerEvent) => {
     const d = dragRef.current
-    if (!d) return
+    if (!d || !sel) return
     if (e.buttons === 0) {
+      commitPending()
       dragRef.current = null
       return
     }
@@ -268,16 +296,16 @@ export default function AnnouncementModal({
       let ang = (Math.atan2(e.clientY - cy, e.clientX - cx) * 180) / Math.PI + 90
       const snap = Math.round(ang / 15) * 15
       if (Math.abs(snap - ang) < 4) ang = snap
-      patchSel({ rot: Math.round(ang) })
+      applyDragToDom({ tx: sel.tx, ty: sel.ty, sx: sel.sx, sy: sel.sy, rot: Math.round(ang) })
       return
     }
     const dx = (e.clientX - d.x) / scale
     const dy = (e.clientY - d.y) / scale
     if (d.mode === "move") {
-      patchSel({ tx: d.tx + dx, ty: d.ty + dy })
+      applyDragToDom({ tx: d.tx + dx, ty: d.ty + dy, sx: sel.sx, sy: sel.sy, rot: sel.rot })
       return
     }
-    const rad = ((sel?.rot ?? 0) * Math.PI) / 180
+    const rad = (sel.rot * Math.PI) / 180
     const cos = Math.cos(rad)
     const sin = Math.sin(rad)
     const ldx = dx * cos + dy * sin
@@ -302,9 +330,10 @@ export default function AnnouncementModal({
       nsy = clampScale(d.sy - ldy / bh)
       lcy = -(bh * (nsy - d.sy)) / 2
     }
-    patchSel({ sx: nsx, sy: nsy, tx: d.tx + (lcx * cos - lcy * sin), ty: d.ty + (lcx * sin + lcy * cos) })
+    applyDragToDom({ sx: nsx, sy: nsy, tx: d.tx + (lcx * cos - lcy * sin), ty: d.ty + (lcx * sin + lcy * cos), rot: sel.rot })
   }
   const onFrameUp = (e?: React.PointerEvent) => {
+    commitPending()
     dragRef.current = null
     if (e) {
       try {

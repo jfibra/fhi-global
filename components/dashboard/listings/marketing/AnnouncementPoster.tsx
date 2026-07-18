@@ -323,6 +323,7 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
             // eslint-disable-next-line @next/next/no-img-element
             <img
               key={layer.id}
+              data-layer-id={layer.id}
               src={layer.url}
               alt=""
               crossOrigin="anonymous"
