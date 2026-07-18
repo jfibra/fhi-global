@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { X, FileImage, Megaphone, Clapperboard } from "lucide-react"
 import FlyerModal from "./FlyerModal"
 import AnnouncementModal from "./AnnouncementModal"
@@ -60,20 +61,15 @@ export default function MarketingActionsModal({
             <span className="text-sm font-semibold text-[#111827] text-center leading-tight">Just Listed / Sold</span>
           </button>
 
-          <button
-            type="button"
-            disabled
-            title="Coming soon"
-            className="relative flex flex-col items-center justify-center gap-2 rounded-2xl border border-[#e8eaed] bg-[#fafafa] p-5 cursor-not-allowed opacity-70"
+          <Link
+            href={`/dashboard/reels-maker?listing=${listingId}`}
+            className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-[#e8eaed] bg-white p-5 hover:border-[#7c3aed] hover:shadow-md transition-all"
           >
-            <span className="w-12 h-12 rounded-xl bg-[#9ca3af]/10 text-[#9ca3af] flex items-center justify-center">
+            <span className="w-12 h-12 rounded-xl bg-[#7c3aed]/10 text-[#7c3aed] flex items-center justify-center">
               <Clapperboard className="w-6 h-6" />
             </span>
-            <span className="text-sm font-semibold text-[#6b7280]">Reels</span>
-            <span className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide text-[#9ca3af] bg-white border border-[#e5e5e5] rounded-full px-1.5 py-0.5">
-              Soon
-            </span>
-          </button>
+            <span className="text-sm font-semibold text-[#111827]">Reels</span>
+          </Link>
         </div>
       </div>
     </div>

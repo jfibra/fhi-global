@@ -19,6 +19,7 @@ import {
 import { DashboardShell } from "@/components/dashboard/shell"
 import { getRoleColor } from "@/components/dashboard/sidebar-config"
 import { roleToLabel } from "@/lib/auth"
+import { fetchMyAgentListings, type AgentListing } from "@/lib/agent-listings-service"
 
 // ─── Canvas + timeline constants ───────────────────────────────────────────────
 
@@ -2550,14 +2551,27 @@ function nextId() {
   return `p${idCounter}-${idCounter * 7919}`
 }
 
+/**
+ * Listing photos live on S3/Supabase; drawing them straight onto the canvas
+ * would taint it and break video export. The existing same-origin image proxy
+ * (built for map markers, host-allowlisted) solves that.
+ */
+function proxiedListingPhoto(url: string) {
+  return `/api/map-marker-image?url=${encodeURIComponent(url)}`
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export function ReelsMakerClient({
+  userId,
   userName,
   currentRole,
+  initialListingId,
 }: {
+  userId: string
   userName: string
   currentRole: string
+  initialListingId?: string | null
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -2589,6 +2603,11 @@ export function ReelsMakerClient({
   const [recording, setRecording] = useState(false)
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
+
+  const [myListings, setMyListings] = useState<AgentListing[]>([])
+  const [listingsLoading, setListingsLoading] = useState(true)
+  const [selectedListingId, setSelectedListingId] = useState<string>("")
+  const appliedInitialRef = useRef(false)
 
   const slides = useMemo(() => buildTimeline(photos.length), [photos.length])
   const totalS = useMemo(() => slides.reduce((a, s) => a + s.dur, 0), [slides])
@@ -2639,6 +2658,61 @@ export function ReelsMakerClient({
       audioRef.current.pause()
     }
   }, [])
+
+  // ── One-click reel from the agent's own listings. ──
+  useEffect(() => {
+    let alive = true
+    void fetchMyAgentListings(userId).then(({ data }) => {
+      if (!alive) return
+      setMyListings((data ?? []).filter((l) => l.status !== "archived"))
+      setListingsLoading(false)
+    })
+    return () => {
+      alive = false
+    }
+  }, [userId])
+
+  const applyListing = useCallback(
+    (listing: AgentListing) => {
+      stopPlayback()
+      pausedAtRef.current = 0
+      setProgress(0)
+      setSelectedListingId(listing.id)
+      setMarket(listing.listing_kind)
+      setTitle(listing.title)
+      setLocation(listing.projects?.name ?? "")
+      if (listing.price != null) {
+        const amount = Number(listing.price).toLocaleString()
+        setPrice(`${listing.currency} ${amount}${listing.listing_kind === "rent" ? " / month" : ""}`)
+      } else {
+        setPrice("")
+      }
+      const imgs = (listing.agent_listing_images ?? []).slice(0, 8)
+      setPhotos((prev) => {
+        for (const p of prev) if (p.src.startsWith("blob:")) URL.revokeObjectURL(p.src)
+        if (imgs.length === 0) {
+          // Listing has no photos yet — fall back to the sample set so the reel still renders.
+          return SAMPLE_PHOTOS.map((src, i) => ({ id: nextId(), src, name: `Sample house ${i + 1}` }))
+        }
+        return imgs.map((im, i) => ({
+          id: nextId(),
+          src: proxiedListingPhoto(im.url),
+          name: `Listing photo ${i + 1}`,
+        }))
+      })
+    },
+    [stopPlayback],
+  )
+
+  // Deep link from My listings: /dashboard/reels-maker?listing=<id>
+  useEffect(() => {
+    if (appliedInitialRef.current || !initialListingId || listingsLoading) return
+    const match = myListings.find((l) => l.id === initialListingId)
+    if (match) {
+      appliedInitialRef.current = true
+      applyListing(match)
+    }
+  }, [initialListingId, listingsLoading, myListings, applyListing])
 
   // Draw a static frame whenever anything changes and we're idle.
   useEffect(() => {
@@ -2850,6 +2924,75 @@ export function ReelsMakerClient({
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-6 items-start">
           {/* ── Controls ── */}
           <div className="space-y-5">
+            {/* One-click reel from a listing */}
+            <div className="bg-white rounded-2xl border border-[#e8eaed] p-5">
+              <p className={labelCls}>One-click reel — pick one of my listings</p>
+              {listingsLoading ? (
+                <p className="text-sm text-[#9ca3af] flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading your listings…
+                </p>
+              ) : myListings.length === 0 ? (
+                <p className="text-sm text-[#9ca3af]">
+                  No listings yet — create one in <span className="font-semibold">My listings</span>, or build a
+                  reel manually below.
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {myListings.map((l) => {
+                      const cover = l.agent_listing_images?.[0]?.url ?? null
+                      const selected = l.id === selectedListingId
+                      return (
+                        <button
+                          key={l.id}
+                          type="button"
+                          onClick={() => applyListing(l)}
+                          className={`text-left rounded-xl border-2 overflow-hidden transition-all ${
+                            selected ? "border-[#001f3f] shadow-md" : "border-[#e5e5e5] hover:border-[#9ca3af]"
+                          }`}
+                        >
+                          <div className="relative h-20 bg-[#eef1f5]">
+                            {cover ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={cover} alt={l.title} className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center text-[#b8bfc9]">
+                                <ImagePlus className="w-5 h-5" />
+                              </div>
+                            )}
+                            <span
+                              className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold text-white ${
+                                l.listing_kind === "rent" ? "bg-[#2f6fe4]" : "bg-[#d6b357]"
+                              }`}
+                            >
+                              {l.listing_kind === "rent" ? "RENT" : "SALE"}
+                            </span>
+                            {selected && (
+                              <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-[#001f3f] text-white text-[9px] font-bold">
+                                SELECTED
+                              </span>
+                            )}
+                          </div>
+                          <div className="p-2">
+                            <p className="text-xs font-bold text-[#111827] truncate">{l.title}</p>
+                            <p className="text-[10px] text-[#6b7280] truncate">
+                              {(l.agent_listing_images?.length ?? 0) > 0
+                                ? `${l.agent_listing_images?.length} photo${(l.agent_listing_images?.length ?? 0) > 1 ? "s" : ""}`
+                                : "no photos"}
+                              {l.status === "draft" ? " · draft" : ""}
+                            </p>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <p className="mt-2 text-[11px] text-[#9ca3af]">
+                    Click a listing — photos, title, price, and sale/rent fill in automatically and stay editable below.
+                  </p>
+                </>
+              )}
+            </div>
+
             {/* Brand picker */}
             <div className="bg-white rounded-2xl border border-[#e8eaed] p-5">
               <p className={labelCls}>Brand</p>

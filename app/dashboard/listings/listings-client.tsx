@@ -9,7 +9,8 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react"
-import { Plus, Pencil, Trash2, RefreshCw, Sparkles, ImagePlus, X, Megaphone } from "lucide-react"
+import Link from "next/link"
+import { Plus, Pencil, Trash2, RefreshCw, Sparkles, ImagePlus, X, Megaphone, Clapperboard } from "lucide-react"
 import { DashboardShell } from "@/components/dashboard/shell"
 import MarketingActionsModal from "@/components/dashboard/listings/marketing/MarketingActionsModal"
 import { getRoleColor } from "@/components/dashboard/sidebar-config"
@@ -412,111 +413,134 @@ export function AgentListingsClient({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[#e8eaed] bg-white overflow-hidden shadow-sm">
-          {loading ? (
-            <div className="p-12 text-center text-sm text-[#9ca3af]">Loading…</div>
-          ) : rows.length === 0 ? (
-            <div className="p-12 text-center">
-              <p className="text-[#6b7280] mb-4">No listings yet.</p>
-              <button
-                type="button"
-                onClick={openCreate}
-                className="text-sm font-semibold text-[#001f3f] hover:underline"
-              >
-                Create your first listing
-              </button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#f0f0f0] bg-[#fafafa] text-left text-xs font-semibold uppercase tracking-wide text-[#6b7280]">
-                    <th className="px-4 py-3">Title</th>
-                    <th className="px-4 py-3">Developer</th>
-                    <th className="px-4 py-3">Type</th>
-                    <th className="px-4 py-3">Unit type</th>
-                    <th className="px-4 py-3">Price</th>
-                    <th className="px-4 py-3">Project</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 w-28" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => {
-                    const p = row.projects
-                    const pname = p && typeof p === "object" && "name" in p ? String((p as { name?: string }).name ?? "—") : "—"
-                    const dname =
-                      p && typeof p === "object" && "developers" in p
-                        ? String(
-                            (p as { developers?: { name?: string | null } | null }).developers?.name ?? "",
-                          ).trim() || "—"
-                        : "—"
-                    return (
-                      <tr key={row.id} className="border-b border-[#f5f5f5] hover:bg-[#fafafa]/80">
-                        <td className="px-4 py-3 font-medium text-[#111827]">{row.title}</td>
-                        <td className="px-4 py-3 text-[#6b7280] max-w-[140px] truncate">{dname}</td>
-                        <td className="px-4 py-3 capitalize">{row.listing_kind}</td>
-                        <td className="px-4 py-3 text-[#6b7280] max-w-[140px] truncate">
-                          {row.unit_type?.trim() || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-[#6b7280]">
-                          {row.project_id != null
-                            ? "Developer project"
-                            : row.price != null
-                              ? `${Number(row.price).toLocaleString()} ${row.currency}`
-                              : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-[#6b7280] max-w-[180px] truncate">{pname}</td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
-                              row.status === "published"
-                                ? "bg-emerald-50 text-emerald-800"
-                                : row.status === "draft"
-                                  ? "bg-amber-50 text-amber-800"
-                                  : "bg-slate-100 text-slate-600"
-                            }`}
-                          >
-                            {row.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setMarketingListing(row)}
-                              className="p-2 rounded-lg text-[#d6b357] hover:bg-[#d6b357]/10"
-                              aria-label="Marketing (flyer, just listed/sold)"
-                              title="Marketing"
-                            >
-                              <Megaphone className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openEdit(row)}
-                              className="p-2 rounded-lg text-[#001f3f] hover:bg-[#001f3f]/10"
-                              aria-label="Edit"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void archive(row)}
-                              className="p-2 rounded-lg text-rose-600 hover:bg-rose-50"
-                              aria-label="Archive"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        {loading ? (
+          <div className="rounded-2xl border border-[#e8eaed] bg-white shadow-sm p-12 text-center text-sm text-[#9ca3af]">
+            Loading…
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="rounded-2xl border border-[#e8eaed] bg-white shadow-sm p-12 text-center">
+            <p className="text-[#6b7280] mb-4">No listings yet.</p>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="text-sm font-semibold text-[#001f3f] hover:underline"
+            >
+              Create your first listing
+            </button>
+          </div>
+        ) : (
+          /* Photo-first cards so agents see each listing's pictures at a glance. */
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+            {rows.map((row) => {
+              const p = row.projects
+              const pname = p && typeof p === "object" && "name" in p ? String((p as { name?: string }).name ?? "—") : "—"
+              const dname =
+                p && typeof p === "object" && "developers" in p
+                  ? String(
+                      (p as { developers?: { name?: string | null } | null }).developers?.name ?? "",
+                    ).trim() || "—"
+                  : "—"
+              const cover = row.agent_listing_images?.[0]?.url ?? null
+              const photoCount = row.agent_listing_images?.length ?? 0
+              return (
+                <div
+                  key={row.id}
+                  className="group rounded-2xl border border-[#e8eaed] bg-white overflow-hidden shadow-sm hover:shadow-lg hover:border-[#d6b357]/60 transition-all"
+                >
+                  <div className="relative h-44 bg-[#eef1f5] overflow-hidden">
+                    {cover ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={cover}
+                        alt={row.title}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                      />
+                    ) : (
+                      <div className="h-full w-full flex flex-col items-center justify-center gap-1.5 text-[#b8bfc9]">
+                        <ImagePlus className="w-7 h-7" />
+                        <span className="text-xs font-medium">No photos yet</span>
+                      </div>
+                    )}
+                    <span
+                      className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-bold text-white shadow ${
+                        row.listing_kind === "rent" ? "bg-[#2f6fe4]" : "bg-[#d6b357]"
+                      }`}
+                    >
+                      {row.listing_kind === "rent" ? "FOR RENT" : "FOR SALE"}
+                    </span>
+                    <span
+                      className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-semibold shadow ${
+                        row.status === "published"
+                          ? "bg-emerald-50 text-emerald-800"
+                          : row.status === "draft"
+                            ? "bg-amber-50 text-amber-800"
+                            : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {row.status}
+                    </span>
+                    {photoCount > 1 && (
+                      <span className="absolute bottom-3 right-3 px-2 py-0.5 rounded-md bg-black/55 text-white text-[11px] font-semibold">
+                        {photoCount} photos
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-[#111827] truncate">{row.title}</h3>
+                    <p className="mt-0.5 text-xs text-[#6b7280] truncate">
+                      {dname} · {pname}
+                    </p>
+                    <p className="mt-1 text-xs text-[#6b7280] truncate">
+                      {row.unit_type?.trim() || "—"} ·{" "}
+                      {row.project_id != null
+                        ? "Developer project"
+                        : row.price != null
+                          ? `${Number(row.price).toLocaleString()} ${row.currency}`
+                          : "—"}
+                    </p>
+                    <div className="mt-3 flex items-center justify-between border-t border-[#f0f0f0] pt-3">
+                      <Link
+                        href={`/dashboard/reels-maker?listing=${row.id}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#7c3aed]/10 text-[#7c3aed] text-xs font-bold hover:bg-[#7c3aed]/20 transition-colors"
+                        title="Create reel from this listing"
+                      >
+                        <Clapperboard className="w-3.5 h-3.5" />
+                        Reel
+                      </Link>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setMarketingListing(row)}
+                          className="p-2 rounded-lg text-[#d6b357] hover:bg-[#d6b357]/10"
+                          aria-label="Marketing (flyer, just listed/sold)"
+                          title="Marketing"
+                        >
+                          <Megaphone className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(row)}
+                          className="p-2 rounded-lg text-[#001f3f] hover:bg-[#001f3f]/10"
+                          aria-label="Edit"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void archive(row)}
+                          className="p-2 rounded-lg text-rose-600 hover:bg-rose-50"
+                          aria-label="Archive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {modalOpen && (

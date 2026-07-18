@@ -6,7 +6,11 @@ import { ReelsMakerClient } from "./reels-maker-client"
 
 export const dynamic = "force-dynamic"
 
-export default async function ReelsMakerPage() {
+export default async function ReelsMakerPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ listing?: string | string[] }>
+}) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -23,10 +27,15 @@ export default async function ReelsMakerPage() {
     redirect("/dashboard")
   }
 
+  const sp = searchParams ? await searchParams : {}
+  const listingParam = typeof sp.listing === "string" ? sp.listing : Array.isArray(sp.listing) ? sp.listing[0] : null
+
   return (
     <ReelsMakerClient
+      userId={user.id}
       userName={profile.fullname ?? user.email ?? "User"}
       currentRole={profile.role ?? "agent"}
+      initialListingId={listingParam}
     />
   )
 }

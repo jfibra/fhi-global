@@ -112,27 +112,27 @@ export function DashboardShell({
         key={href}
         href={href}
         onClick={() => setSidebarOpen(false)}
-        className={`group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-all duration-200 relative
+        className={`group flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] transition-all duration-200 relative
           ${indented ? "ml-2" : ""}
           ${isActive
-            ? "bg-gradient-to-r from-white/15 to-white/5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
-            : "text-white/50 hover:bg-white/8 hover:text-white/85"
+            ? "bg-gradient-to-r from-white/20 to-white/5 text-white font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+            : "text-white/85 font-semibold hover:bg-white/10 hover:text-white"
           }`}
       >
         {/* Active left accent */}
         {isActive && (
           <span
-            className="absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-full"
+            className="absolute left-0 top-2.5 bottom-2.5 w-[4px] rounded-full"
             style={{ background: `linear-gradient(to bottom, ${roleColor}, #d6b357)` }}
           />
         )}
         {/* Icon bubble */}
         <span
-          className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${
-            isActive ? "bg-white/15 shadow-sm" : "bg-white/5 group-hover:bg-white/10"
+          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${
+            isActive ? "bg-white/20 shadow-sm" : "bg-white/10 group-hover:bg-white/15"
           }`}
         >
-          <Icon className={`w-3.5 h-3.5 transition-colors ${isActive ? "text-white" : "text-white/40 group-hover:text-white/70"}`} />
+          <Icon className={`w-[18px] h-[18px] transition-colors ${isActive ? "text-[#d6b357]" : "text-white/80 group-hover:text-white"}`} />
         </span>
         <span className="flex-1 font-['Outfit']">{label}</span>
         {badge != null && badge > 0 && (
@@ -165,15 +165,15 @@ export function DashboardShell({
               className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl group/hdr hover:bg-white/4 transition-colors duration-150"
             >
               <span
-                className={`text-[9.5px] font-bold uppercase tracking-[0.14em] transition-colors duration-150 ${
-                  hasActiveChild ? "text-[#d6b357]/70" : "text-white/25 group-hover/hdr:text-white/40"
+                className={`text-[11px] font-bold uppercase tracking-[0.14em] transition-colors duration-150 ${
+                  hasActiveChild ? "text-[#d6b357]" : "text-white/60 group-hover/hdr:text-white/85"
                 }`}
               >
                 {label}
               </span>
               <ChevronRight
-                className={`w-3 h-3 transition-all duration-200 ${
-                  hasActiveChild ? "text-[#d6b357]/50" : "text-white/20"
+                className={`w-4 h-4 transition-all duration-200 ${
+                  hasActiveChild ? "text-[#d6b357]" : "text-white/50"
                 } ${isOpen ? "rotate-90" : "rotate-0"}`}
               />
             </button>
@@ -181,7 +181,7 @@ export function DashboardShell({
             {/* Collapsible items — CSS max-height transition */}
             <div
               className="overflow-hidden transition-all duration-200 ease-in-out"
-              style={{ maxHeight: isOpen ? `${items.length * 52}px` : "0px" }}
+              style={{ maxHeight: isOpen ? `${items.length * 60}px` : "0px" }}
             >
               <div className="space-y-0.5 pt-0.5 pb-1">
                 {items.map(item => renderNavItem(item, true))}
@@ -214,7 +214,7 @@ export function DashboardShell({
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 flex flex-col bg-[#001228] shadow-2xl transition-transform duration-300 ease-in-out
+        className={`fixed inset-y-0 left-0 z-40 w-72 flex flex-col bg-[#001228] shadow-2xl transition-transform duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:relative lg:translate-x-0`}
       >
         {/* Top gradient accent bar */}
@@ -245,7 +245,7 @@ export function DashboardShell({
               {displayName.charAt(0).toUpperCase()}
             </div>
             <div className="overflow-hidden flex-1">
-              <p className="text-xs font-bold text-white font-['Outfit'] truncate">{displayName}</p>
+              <p className="text-sm font-bold text-white font-['Outfit'] truncate">{displayName}</p>
               <div className={`mt-0.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${badgeCls}`}>
                 <span className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: roleColor }} />
                 {effectiveRoleLabel}
@@ -273,22 +273,22 @@ export function DashboardShell({
         <div className="shrink-0 px-3 py-4 space-y-0.5">
           <Link
             href="/dashboard/profile"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-white/50 hover:text-white/85 hover:bg-white/8 text-sm transition-all duration-200 group"
+            className="flex items-center gap-3 px-3 py-3 rounded-2xl text-white/85 hover:text-white hover:bg-white/10 transition-all duration-200 group"
           >
-            <span className="w-7 h-7 rounded-xl bg-white/5 group-hover:bg-white/10 flex items-center justify-center shrink-0 transition-all">
-              <Settings className="w-3.5 h-3.5 text-white/40 group-hover:text-white/70" />
+            <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-white/15 flex items-center justify-center shrink-0 transition-all">
+              <Settings className="w-[18px] h-[18px] text-white/80 group-hover:text-white" />
             </span>
-            <span className="font-['Outfit'] font-medium text-sm">Profile Settings</span>
+            <span className="font-['Outfit'] font-semibold text-[15px]">Profile Settings</span>
           </Link>
           <button
             type="button"
             onClick={handleSignOut}
-            className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-2xl text-white/50 hover:text-rose-400 hover:bg-rose-500/8 text-sm transition-all duration-200 group"
+            className="w-full text-left flex items-center gap-3 px-3 py-3 rounded-2xl text-white/85 hover:text-rose-300 hover:bg-rose-500/10 transition-all duration-200 group"
           >
-            <span className="w-7 h-7 rounded-xl bg-white/5 group-hover:bg-rose-500/15 flex items-center justify-center shrink-0 transition-all">
-              <LogOut className="w-3.5 h-3.5 text-white/40 group-hover:text-rose-400" />
+            <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-rose-500/20 flex items-center justify-center shrink-0 transition-all">
+              <LogOut className="w-[18px] h-[18px] text-white/80 group-hover:text-rose-300" />
             </span>
-            <span className="font-['Outfit'] font-medium text-sm">Sign Out</span>
+            <span className="font-['Outfit'] font-semibold text-[15px]">Sign Out</span>
           </button>
         </div>
       </aside>
@@ -306,10 +306,10 @@ export function DashboardShell({
           </button>
 
           <div className="flex-1 min-w-0">
-            <h1 className="font-['Outfit'] text-base font-bold text-[#0d1117] truncate">
+            <h1 className="font-['Outfit'] text-lg font-bold text-[#0d1117] truncate">
               {effectiveRoleLabel} Dashboard
             </h1>
-            <p className="text-[11px] text-[#9ca3af]">
+            <p className="text-xs text-[#6b7280]">
               FHI Global &bull; Dubai Operations
             </p>
           </div>
