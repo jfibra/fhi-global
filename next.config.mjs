@@ -3,11 +3,16 @@
 const isProd = process.env.NODE_ENV === "production"
 
 // ── External origins used by the app ────────────────────────────────────────
-// Supabase project (storage + API + realtime). Derived from the env so local dev
-// and production can point at different Supabase projects without editing the CSP.
-const SUPABASE_HOST = process.env.NEXT_PUBLIC_SUPABASE_URL
+// Supabase projects (storage + API + realtime). The env-configured project is
+// allowed alongside the legacy project, which still hosts uploaded media
+// (hero background, logos, default OG image) referenced by hardcoded URLs.
+const SUPABASE_LEGACY_HOST = "hefwmaoborpfuyhbguzv.supabase.co"
+const SUPABASE_ENV_HOST = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).host
-  : "hefwmaoborpfuyhbguzv.supabase.co"
+  : SUPABASE_LEGACY_HOST
+const SUPABASE_HOSTS = [...new Set([SUPABASE_ENV_HOST, SUPABASE_LEGACY_HOST])]
+const SUPABASE_HTTPS = SUPABASE_HOSTS.map((h) => `https://${h}`).join(" ")
+const SUPABASE_CONNECT = SUPABASE_HOSTS.map((h) => `https://${h} wss://${h}`).join(" ")
 // Vercel Analytics
 const VERCEL_SCRIPTS = "va.vercel-scripts.com"
 const VERCEL_VITALS  = "vitals.vercel-insights.com"
@@ -32,13 +37,13 @@ const CSP = [
   `style-src 'self' 'unsafe-inline'`,
 
   // Images: own assets, data URIs, blob previews, Supabase, flag CDN, maps, S3/CloudFront (listing + project media)
-  `img-src 'self' data: blob: https://${SUPABASE_HOST} https://${FLAGCDN} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://*.amazonaws.com https://*.cloudfront.net`,
+  `img-src 'self' data: blob: ${SUPABASE_HTTPS} https://${FLAGCDN} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://*.amazonaws.com https://*.cloudfront.net`,
 
   // Fonts: self-hosted via next/font – no external font CDN required
   `font-src 'self' data:`,
 
   // XHR / fetch: Supabase REST + Auth + Realtime, Vercel Analytics, Google Maps
-  `connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST} https://${VERCEL_VITALS} https://${VERCEL_SCRIPTS} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.googleapis.com`,
+  `connect-src 'self' ${SUPABASE_CONNECT} https://${VERCEL_VITALS} https://${VERCEL_SCRIPTS} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.googleapis.com`,
 
   // Camera / microphone captured media (face-verify & ID-capture steps)
   `media-src 'self' blob:`,
@@ -155,10 +160,10 @@ const nextConfig = {
     deviceSizes: [400, 640, 750, 828, 1080, 1200, 1600, 1920],
     imageSizes: [32, 48, 64, 96, 128, 256, 384, 400, 800],
     remotePatterns: [
-      {
+      ...SUPABASE_HOSTS.map((hostname) => ({
         protocol: "https",
-        hostname: SUPABASE_HOST,
-      },
+        hostname,
+      })),
       {
         protocol: "https",
         hostname: FLAGCDN,
