@@ -29,6 +29,17 @@ type ProjectRow = {
   sales_contact_phone: string | null
   sales_contact_email: string | null
   project_images?: { url: string; is_main: boolean; rank: number | null }[] | null
+  project_units?: ProjectUnitRow[] | null
+}
+
+type ProjectUnitRow = {
+  unit_type: string | null
+  bedrooms: number | string | null
+  bathrooms: number | string | null
+  size_sqm: number | string | null
+  size_sqft: number | string | null
+  price_from: number | string | null
+  price_to: number | string | null
 }
 
 const num = (v: unknown): number => {
@@ -91,7 +102,7 @@ export async function GET(req: NextRequest) {
     const { data: proj } = await supabase
       .from("projects")
       .select(
-        "id, location, region, community, sub_community, city, country, launch_price_from, launch_price_to, currency, main_image, sales_contact_phone, sales_contact_email, project_images ( url, is_main, rank )",
+        "id, location, region, community, sub_community, city, country, launch_price_from, launch_price_to, currency, main_image, sales_contact_phone, sales_contact_email, project_images ( url, is_main, rank ), project_units ( unit_type, bedrooms, bathrooms, size_sqm, size_sqft, price_from, price_to )",
       )
       .eq("id", row.project_id)
       .maybeSingle()
@@ -125,11 +136,23 @@ export async function GET(req: NextRequest) {
   const projectPhotos = project ? orderedProjectGalleryUrls(project as unknown as BuyRawProject) : []
   const gallery = Array.from(new Set([...agentPhotos, ...projectPhotos]))
 
-  // Price/currency follow the linked project when present, else the listing.
+  // Attributes (bed/bath/area) come from the developer's project unit
+  // definition. Prefer the exact unit the agent linked (matching unit_type),
+  // else fall back to the project's first unit so the flyer still shows specs.
+  const units = project?.project_units ?? []
+  const wantType = (row.unit_type ?? "").trim().toLowerCase()
+  const matchedUnit =
+    (wantType ? units.find((u) => (u.unit_type ?? "").trim().toLowerCase() === wantType) : null) ??
+    units[0] ??
+    null
+
+  // Currency follows the project; price prefers the matched unit, then the
+  // project's launch price, then the listing's own price.
   const currency = (project?.currency ?? row.currency ?? "AED").trim() || "AED"
-  const price = project
-    ? num(project.launch_price_from) || num(project.launch_price_to)
-    : num(row.price)
+  const price =
+    num(matchedUnit?.price_from) ||
+    num(matchedUnit?.price_to) ||
+    (project ? num(project.launch_price_from) || num(project.launch_price_to) : num(row.price))
 
   const category = row.listing_kind === "rent" ? "FOR RENT" : "FOR SALE"
 
@@ -144,12 +167,13 @@ export async function GET(req: NextRequest) {
     image: gallery[0] ?? null,
     gallery,
     specs: {
-      // fhi-global listings/projects don't carry bed/bath/area counts; these
-      // stay empty and the spec row is omitted gracefully.
-      bedrooms: null,
-      bathrooms: null,
+      // Sourced from the linked developer project unit (project_units).
+      // Garage / lot area aren't tracked here, so they stay empty and the
+      // spec cards for them are omitted gracefully.
+      bedrooms: num(matchedUnit?.bedrooms) || null,
+      bathrooms: num(matchedUnit?.bathrooms) || null,
       lotArea: null,
-      floorArea: null,
+      floorArea: num(matchedUnit?.size_sqm) || null,
       garage: null,
     },
     agent: {

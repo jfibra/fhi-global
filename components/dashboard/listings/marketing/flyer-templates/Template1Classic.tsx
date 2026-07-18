@@ -18,8 +18,7 @@ import {
   Layers2,
 } from "lucide-react"
 import {
-  type FlyerData,
-  type FlyerTheme,
+  type TemplateProps,
   FLYER_W,
   FLYER_H,
   formatPrice,
@@ -27,7 +26,6 @@ import {
   readableOn,
   shade,
   withAlpha,
-  proxied,
 } from "@/lib/flyer/theme"
 
 // Faithful Tailwind/inline-styled rebuild of filipinohomes-final's
@@ -38,15 +36,8 @@ import {
 const W = FLYER_W
 const H = FLYER_H
 
-type Props = {
-  data: FlyerData & { currency?: string }
-  listingUrl: string
-  theme: FlyerTheme
-  heroUrl: string | null
-}
-
-const ClassicFlyer = forwardRef<HTMLDivElement, Props>(function ClassicFlyer(
-  { data, listingUrl, theme, heroUrl },
+const Template1Classic = forwardRef<HTMLDivElement, TemplateProps>(function Template1Classic(
+  { data, listingUrl, theme },
   ref,
 ) {
   const { accent, bg, text, mode } = theme
@@ -61,7 +52,7 @@ const ClassicFlyer = forwardRef<HTMLDivElement, Props>(function ClassicFlyer(
 
   const category = (data.category || "FOR SALE").toUpperCase()
   const agentInitials = getAgentInitials(data.agent.name)
-  const image = heroUrl ? proxied(heroUrl) : null
+  const image = data.image
 
   const specs = [
     { value: data.specs.bedrooms, label: "Beds", icon: <Bed size={22} /> },
@@ -86,7 +77,7 @@ const ClassicFlyer = forwardRef<HTMLDivElement, Props>(function ClassicFlyer(
         height: H,
         backgroundColor: "#ffffff",
         overflow: "hidden",
-        fontFamily: "'Urbanist', 'Outfit', system-ui, sans-serif",
+        fontFamily: "var(--font-urbanist), var(--font-outfit), system-ui, sans-serif",
         position: "relative",
         display: "flex",
         flexDirection: "column",
@@ -410,7 +401,7 @@ const ClassicFlyer = forwardRef<HTMLDivElement, Props>(function ClassicFlyer(
             {data.agent.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={proxied(data.agent.imageUrl)}
+                src={data.agent.imageUrl}
                 alt={data.agent.name}
                 crossOrigin="anonymous"
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
@@ -522,4 +513,4 @@ const ClassicFlyer = forwardRef<HTMLDivElement, Props>(function ClassicFlyer(
   )
 })
 
-export default ClassicFlyer
+export default Template1Classic

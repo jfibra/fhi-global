@@ -142,3 +142,47 @@ export const CLASSIC_DEFAULT_THEME: FlyerTheme = {
   text: "#001f3f",
   mode: "dark",
 }
+
+// The agent-editable subset (what presets and the custom pickers set).
+export type FlyerThemeOverride = Partial<FlyerTheme>
+
+// Props every flyer template receives. Per-slot photo picks are baked into
+// data.image (hero) + data.gallery (remaining slots) by the studio before
+// render, so templates just read those.
+export type TemplateProps = {
+  data: FlyerData & { currency?: string }
+  listingUrl: string
+  theme: FlyerTheme
+}
+
+// Template registry metadata (component wiring lives in the studio). `slots` =
+// how many photos the template lays out; `defaultTheme` mirrors the
+// filipinohomes-final defaults so ported templates render identically.
+export type TemplateMeta = {
+  id: number
+  name: string
+  description: string
+  slots: number
+  defaultTheme: FlyerTheme
+}
+
+export const TEMPLATE_META: TemplateMeta[] = [
+  { id: 1, name: "Classic", description: "Bold navy header, hero image with price tag", slots: 1, defaultTheme: { accent: "#c9a24b", bg: "#0e2148", text: "#0e2148", mode: "dark" } },
+  { id: 2, name: "Modern", description: "Clean minimalist white layout", slots: 2, defaultTheme: { accent: "#EE3434", bg: "#0e2148", text: "#0e2148", mode: "dark" } },
+  { id: 3, name: "Magazine", description: "Full-bleed photo with overlay text", slots: 1, defaultTheme: { accent: "#EE3434", bg: "#0d0d0d", text: "#ffffff", mode: "dark" } },
+  { id: 4, name: "Mosaic", description: "Multi-photo grid layout", slots: 4, defaultTheme: { accent: "#c9a24b", bg: "#0e2148", text: "#0e2148", mode: "dark" } },
+  { id: 5, name: "Luxury", description: "Dark elegant theme with gold accents", slots: 1, defaultTheme: { accent: "#d4af37", bg: "#0c1422", text: "#0c1422", mode: "dark" } },
+  { id: 6, name: "Editorial", description: "Minimalist magazine editorial", slots: 1, defaultTheme: { accent: "#b5674a", bg: "#e7e1d6", text: "#26221c", mode: "light" } },
+  { id: 7, name: "Duotone", description: "Bold duotone gradient poster", slots: 1, defaultTheme: { accent: "#ff2d78", bg: "#0b1440", text: "#0b1440", mode: "dark" } },
+  { id: 8, name: "Portrait", description: "Split photo & color panel", slots: 1, defaultTheme: { accent: "#c0894a", bg: "#141a24", text: "#141a24", mode: "dark" } },
+  { id: 9, name: "Dark Luxe", description: "Cinematic glass-panel showcase", slots: 3, defaultTheme: { accent: "#d4af37", bg: "#0c1422", text: "#f4efe6", mode: "dark" } },
+]
+
+// Merge a template's default palette with the agent's overrides, then sync
+// `mode` to the effective background luminance so templates pick correct
+// scrims / on-surface contrast even for custom colors.
+export function resolveFlyerTheme(meta: TemplateMeta, override: FlyerThemeOverride | undefined): FlyerTheme {
+  const merged: FlyerTheme = { ...meta.defaultTheme, ...(override ?? {}) }
+  merged.mode = readableOn(merged.bg) === "#ffffff" ? "dark" : "light"
+  return merged
+}
