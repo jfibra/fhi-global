@@ -10,7 +10,7 @@ import {
   type FormEvent,
 } from "react"
 import Link from "next/link"
-import { Plus, Pencil, Trash2, RefreshCw, Sparkles, ImagePlus, X, Megaphone, Clapperboard } from "lucide-react"
+import { Plus, RefreshCw, Sparkles, ImagePlus, X, Megaphone, Clapperboard, FileImage, MoreHorizontal } from "lucide-react"
 import { DashboardShell } from "@/components/dashboard/shell"
 import MarketingActionsModal from "@/components/dashboard/listings/marketing/MarketingActionsModal"
 import { getRoleColor } from "@/components/dashboard/sidebar-config"
@@ -88,7 +88,7 @@ export function AgentListingsClient({
   const [saving, setSaving] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<AgentListing | null>(null)
-  const [marketingListing, setMarketingListing] = useState<AgentListing | null>(null)
+  const [marketing, setMarketing] = useState<{ row: AgentListing; view: "menu" | "flyer" | "announce" } | null>(null)
   const [form, setForm] = useState<AgentListingFormInput>(emptyForm)
   const [aiHint, setAiHint] = useState("")
   const [aiDescLoading, setAiDescLoading] = useState(false)
@@ -498,42 +498,44 @@ export function AgentListingsClient({
                           ? `${Number(row.price).toLocaleString()} ${row.currency}`
                           : "—"}
                     </p>
-                    <div className="mt-3 flex items-center justify-between border-t border-[#f0f0f0] pt-3">
-                      <Link
-                        href={`/dashboard/reels-maker?listing=${row.id}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#7c3aed]/10 text-[#7c3aed] text-xs font-bold hover:bg-[#7c3aed]/20 transition-colors"
-                        title="Create reel from this listing"
-                      >
-                        <Clapperboard className="w-3.5 h-3.5" />
-                        Reel
-                      </Link>
-                      <div className="flex gap-1">
+                    <div className="mt-3 flex items-center justify-between gap-1 border-t border-[#f0f0f0] pt-3">
+                      <div className="flex items-center gap-1.5">
+                        <Link
+                          href={`/dashboard/reels-maker?listing=${row.id}`}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#7c3aed]/10 text-[#7c3aed] text-xs font-bold hover:bg-[#7c3aed]/20 transition-colors"
+                          title="Create a reel from this listing"
+                        >
+                          <Clapperboard className="w-3.5 h-3.5" />
+                          Reel
+                        </Link>
                         <button
                           type="button"
-                          onClick={() => setMarketingListing(row)}
-                          className="p-2 rounded-lg text-[#d6b357] hover:bg-[#d6b357]/10"
-                          aria-label="Marketing (flyer, just listed/sold)"
-                          title="Marketing"
+                          onClick={() => setMarketing({ row, view: "flyer" })}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#001f3f]/10 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f]/20 transition-colors"
+                          title="Create a flyer"
                         >
-                          <Megaphone className="w-4 h-4" />
+                          <FileImage className="w-3.5 h-3.5" />
+                          Flyer
                         </button>
                         <button
                           type="button"
-                          onClick={() => openEdit(row)}
-                          className="p-2 rounded-lg text-[#001f3f] hover:bg-[#001f3f]/10"
-                          aria-label="Edit"
+                          onClick={() => setMarketing({ row, view: "announce" })}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0891b2]/10 text-[#0e7490] text-xs font-bold hover:bg-[#0891b2]/20 transition-colors"
+                          title="Just Listed / Sold poster"
                         >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void archive(row)}
-                          className="p-2 rounded-lg text-rose-600 hover:bg-rose-50"
-                          aria-label="Archive"
-                        >
-                          <Trash2 className="w-4 h-4" />
+                          <Megaphone className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Just Listed/Sold</span>
                         </button>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setMarketing({ row, view: "menu" })}
+                        className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[#e5e5e5] bg-[#fafafa] text-[#374151] shadow-sm hover:border-[#001f3f] hover:bg-white hover:text-[#001f3f] transition-colors"
+                        aria-label="More actions"
+                        title="More (edit, delete)"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -815,20 +817,31 @@ export function AgentListingsClient({
         </div>
       )}
 
-      {marketingListing && (
+      {marketing && (
         <MarketingActionsModal
-          listingId={marketingListing.id}
-          listingTitle={marketingListing.title}
-          listingStatus={marketingListing.status}
-          listingKind={marketingListing.listing_kind}
+          listingId={marketing.row.id}
+          listingTitle={marketing.row.title}
+          listingStatus={marketing.row.status}
+          listingKind={marketing.row.listing_kind}
           agentId={userId}
-          initialOgOptions={marketingListing.og_card_options ?? null}
+          initialOgOptions={marketing.row.og_card_options ?? null}
+          initialView={marketing.view}
           onOgSaved={(opts) => {
-            setRows((rs) => rs.map((r) => (r.id === marketingListing.id ? { ...r, og_card_options: opts } : r)))
-            setMarketingListing((m) => (m ? { ...m, og_card_options: opts } : m))
+            setRows((rs) => rs.map((r) => (r.id === marketing.row.id ? { ...r, og_card_options: opts } : r)))
+            setMarketing((m) => (m ? { ...m, row: { ...m.row, og_card_options: opts } } : m))
             showToast("success", "Share card saved")
           }}
-          onClose={() => setMarketingListing(null)}
+          onClose={() => setMarketing(null)}
+          onEdit={() => {
+            const r = marketing.row
+            setMarketing(null)
+            openEdit(r)
+          }}
+          onDelete={() => {
+            const r = marketing.row
+            setMarketing(null)
+            void archive(r)
+          }}
         />
       )}
 
