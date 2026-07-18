@@ -154,7 +154,7 @@ export function Footer() {
                   <MapPin className="w-3.5 h-3.5 text-[#d6b357]" />
                 </div>
                 <span className="text-white/40 text-sm leading-snug">
-                  Level 12, DIFC Gate Building,<br />Dubai, UAE
+                  Office 98, 3rd Floor, Rigga Business Center<br />(Ibis Hotel Building), Al Rigga, Deira, Dubai, UAE
                 </span>
               </div>
             </div>

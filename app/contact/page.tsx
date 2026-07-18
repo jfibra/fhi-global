@@ -23,7 +23,7 @@ export const metadata: Metadata = createPageMetadata({
 const OFFICES = [
   {
     city: "Dubai (HQ)",
-    address: "Level 12, DIFC Gate Building, Dubai International Financial Centre, Dubai, UAE",
+    address: "Office 98, 3rd Floor, Rigga Business Center (Ibis Hotel Building), Al Rigga, Deira, Dubai, UAE",
     phone: "+971 56 742 8288",
     email: "info@fhiglobal.ae",
     hours: "Sun–Thu: 9:00 AM – 6:00 PM",
@@ -131,7 +131,7 @@ export default function ContactPage() {
                 {[
                   { icon: Phone, label: "Main Office", value: "+971 56 742 8288", href: "tel:+971567428288" },
                   { icon: Mail,  label: "Email Us",    value: "info@fhiglobal.ae", href: "mailto:info@fhiglobal.ae" },
-                  { icon: MapPin, label: "HQ Location", value: "DIFC, Dubai, UAE", href: "#offices" },
+                  { icon: MapPin, label: "HQ Location", value: "Al Rigga, Deira, Dubai, UAE", href: "#offices" },
                   { icon: Clock,  label: "Working Hours", value: "Sun–Thu, 9AM–6PM GST" },
                 ].map(({ icon: Icon, label, value, href }) => (
                   <div key={label} className="flex items-start gap-4 py-3.5 border-b border-white/8 last:border-0">

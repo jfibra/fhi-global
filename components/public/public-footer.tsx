@@ -47,7 +47,7 @@ export function PublicFooter() {
                 <Mail className="w-4 h-4 text-[#d6b357]" /> info@fhiglobal.ae
               </a>
               <span className="flex items-center gap-2.5 text-sm text-white/50">
-                <MapPin className="w-4 h-4 text-[#d6b357]" /> Downtown Dubai, UAE
+                <MapPin className="w-4 h-4 text-[#d6b357]" /> Al Rigga, Deira, Dubai, UAE
               </span>
             </div>
             <div className="flex items-center gap-3 pt-2">
