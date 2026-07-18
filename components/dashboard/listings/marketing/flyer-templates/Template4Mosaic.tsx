@@ -1,6 +1,7 @@
 "use client"
 
 import { forwardRef } from "react"
+import FlyerLogo from "./FlyerLogo"
 import { QRCodeSVG } from "qrcode.react"
 import {
   MapPin,
@@ -38,7 +39,7 @@ const W = FLYER_W
 const H = FLYER_H
 
 const Template4Mosaic = forwardRef<HTMLDivElement, TemplateProps>(function Template4Mosaic(
-  { data, listingUrl, theme },
+  { data, listingUrl, theme, logoUrl, logoSize, logoOutline },
   ref,
 ) {
   const { accent, bg, text, mode } = theme
@@ -46,7 +47,8 @@ const Template4Mosaic = forwardRef<HTMLDivElement, TemplateProps>(function Templ
 
   // Derived tokens
   const onBg = readableOn(bg) // text/icons on the dark navy surface (bar / agent card / footer)
-  const logoSrc = onBg === "#ffffff" ? "/FHI_Branding_White.png" : "/FHI_Branding.png" // logo sits on `bg` surfaces
+  // logo sits on `bg` surfaces
+  const logoSrc = logoUrl ?? (onBg === "#ffffff" ? "/FHI_Branding_White.png" : "/FHI_Branding.png")
   const placeholderBg = shade(bg, 0.85) // neutral tint when no photo
   const placeholderInk = readableOn(placeholderBg)
   // QR foreground must stay dark for scannability; reuse bg when it is already dark, else a safe ink.
@@ -108,7 +110,7 @@ const Template4Mosaic = forwardRef<HTMLDivElement, TemplateProps>(function Templ
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logoSrc} alt="" style={{ height: 40, objectFit: "contain" }} crossOrigin="anonymous" />
+        <FlyerLogo src={logoSrc} height={40} size={logoSize} outline={logoOutline} />
         <div
           style={{
             display: "flex",

@@ -1,6 +1,7 @@
 "use client"
 
 import { forwardRef } from "react"
+import FlyerLogo from "./FlyerLogo"
 import { QRCodeSVG } from "qrcode.react"
 import { MapPin, Phone, Mail, Bed, Bath, SquareParking, Scan, Layers2 } from "lucide-react"
 import {
@@ -23,7 +24,7 @@ const W = FLYER_W
 const H = FLYER_H
 
 const Template3Magazine = forwardRef<HTMLDivElement, TemplateProps>(function Template3Magazine(
-  { data, listingUrl, theme },
+  { data, listingUrl, theme, logoUrl, logoSize, logoOutline },
   ref,
 ) {
   const { accent, bg } = theme
@@ -38,7 +39,7 @@ const Template3Magazine = forwardRef<HTMLDivElement, TemplateProps>(function Tem
   const scrim = shade(bg, -0.55) // very dark, faintly bg-tinted → photo overlays
   const placeholderBg = shade(bg, 0.06) // slightly lifted base for the null-photo case
   // Logo sits on the dark top gradient over the photo → white logo on dark surface.
-  const logoSrc = readableOn(scrim) === "#ffffff" ? "/FHI_Branding_White.png" : "/FHI_Branding.png"
+  const logoSrc = logoUrl ?? (readableOn(scrim) === "#ffffff" ? "/FHI_Branding_White.png" : "/FHI_Branding.png")
 
   const category = (data.category || "FOR SALE").toUpperCase()
   const agentInitials = getAgentInitials(data.agent.name)
@@ -136,7 +137,7 @@ const Template3Magazine = forwardRef<HTMLDivElement, TemplateProps>(function Tem
       >
         <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logoSrc} alt="" crossOrigin="anonymous" style={{ height: 56, display: "block" }} />
+          <FlyerLogo src={logoSrc} height={56} size={logoSize} outline={logoOutline} />
           {/* Category pill — accent bg with a dot + label in a two-child flex row. */}
           <div
             style={{

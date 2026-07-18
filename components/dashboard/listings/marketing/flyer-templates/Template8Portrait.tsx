@@ -1,6 +1,7 @@
 "use client"
 
 import { forwardRef } from "react"
+import FlyerLogo from "./FlyerLogo"
 import { QRCodeSVG } from "qrcode.react"
 import { MapPin, Phone, Mail, Bed, Bath, SquareParking, Scan, Layers2 } from "lucide-react"
 import {
@@ -29,7 +30,7 @@ const PAD = 32 // right-panel inner padding
 const QR_SIZE = 104
 
 const Template8Portrait = forwardRef<HTMLDivElement, TemplateProps>(function Template8Portrait(
-  { data, listingUrl, theme },
+  { data, listingUrl, theme, logoUrl, logoSize, logoOutline },
   ref,
 ) {
   const { accent, bg, text, mode } = theme
@@ -42,7 +43,7 @@ const Template8Portrait = forwardRef<HTMLDivElement, TemplateProps>(function Tem
   const soft = withAlpha(onBg, 0.62)
   const faint = withAlpha(onBg, 0.42)
   const placeholder = shade(bg, mode === "dark" ? 0.14 : -0.1)
-  const logoSrc = onBg === "#ffffff" ? "/FHI_Branding_White.png" : "/FHI_Branding.png"
+  const logoSrc = logoUrl ?? (onBg === "#ffffff" ? "/FHI_Branding_White.png" : "/FHI_Branding.png")
 
   const category = (data.category || "For Sale").toUpperCase()
   const agentInitials = getAgentInitials(data.agent.name)
@@ -201,7 +202,7 @@ const Template8Portrait = forwardRef<HTMLDivElement, TemplateProps>(function Tem
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logoSrc} alt="" crossOrigin="anonymous" style={{ height: 32, display: "block", marginTop: 4 }} />
+          <FlyerLogo src={logoSrc} height={32} size={logoSize} outline={logoOutline} style={{ marginTop: 4 }} />
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4.8 }}>
             <div style={{ padding: 8, backgroundColor: "#ffffff", borderRadius: 12, boxShadow: "0 10px 26px rgba(0,0,0,0.28)" }}>
               <QRCodeSVG value={listingUrl} size={QR_SIZE} fgColor="#111318" level="H" />

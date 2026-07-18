@@ -1,6 +1,7 @@
 "use client"
 
 import { forwardRef } from "react"
+import FlyerLogo from "./FlyerLogo"
 import { QRCodeSVG } from "qrcode.react"
 import { MapPin, Phone, Mail, Bed, Bath, SquareParking, Scan, Layers2 } from "lucide-react"
 import {
@@ -24,7 +25,7 @@ const H = FLYER_H
 const QR_SIZE = 126
 
 const Template7Duotone = forwardRef<HTMLDivElement, TemplateProps>(function Template7Duotone(
-  { data, listingUrl, theme },
+  { data, listingUrl, theme, logoUrl, logoSize, logoOutline },
   ref,
 ) {
   const { accent, bg, text, mode } = theme
@@ -41,7 +42,7 @@ const Template7Duotone = forwardRef<HTMLDivElement, TemplateProps>(function Temp
   // when the theme bg is a light surface. If bg is already dark, reuse it.
   const inkScrim = onBg === "#ffffff" ? bg : shade(bg, -0.85)
   // White FH logo sits over a dark bottom scrim → always the white mark.
-  const logoSrc = "/FHI_Branding_White.png"
+  const logoSrc = logoUrl ?? ("/FHI_Branding_White.png")
   const accentTop = shade(accent, mode === "dark" ? 0.08 : -0.04)
   const placeholderBg = shade(bg, mode === "dark" ? -0.18 : -0.4)
 
@@ -186,7 +187,7 @@ const Template7Duotone = forwardRef<HTMLDivElement, TemplateProps>(function Temp
         >
           <div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoSrc} alt="" crossOrigin="anonymous" style={{ height: 46, display: "block" }} />
+            <FlyerLogo src={logoSrc} height={46} size={logoSize} outline={logoOutline} />
             <div
               style={{
                 marginTop: 16,

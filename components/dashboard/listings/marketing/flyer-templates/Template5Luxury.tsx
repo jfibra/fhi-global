@@ -1,6 +1,7 @@
 "use client"
 
 import { forwardRef } from "react"
+import FlyerLogo from "./FlyerLogo"
 import { QRCodeSVG } from "qrcode.react"
 import { Bed, Bath, SquareParking, Scan, Layers2, MapPin, Phone, Mail } from "lucide-react"
 import {
@@ -24,7 +25,7 @@ const H = FLYER_H
 const HERO_H = 430
 
 const Template5Luxury = forwardRef<HTMLDivElement, TemplateProps>(function Template5Luxury(
-  { data, listingUrl, theme },
+  { data, listingUrl, theme, logoUrl, logoSize, logoOutline },
   ref,
 ) {
   const { accent, bg, mode } = theme
@@ -35,7 +36,7 @@ const Template5Luxury = forwardRef<HTMLDivElement, TemplateProps>(function Templ
   const accentLight = shade(accent, 0.32) // brighter accent for the price + QR frame sheen
   const panel = shade(bg, 0.07) // slightly-raised secondary panel
   const scrimBase = mode === "dark" ? bg : shade(bg, -0.82) // keep photo scrims dark for legibility in any mode
-  const logoSrc = readableOn(scrimBase) === "#ffffff" ? "/FHI_Branding_White.png" : "/FHI_Branding.png"
+  const logoSrc = logoUrl ?? (readableOn(scrimBase) === "#ffffff" ? "/FHI_Branding_White.png" : "/FHI_Branding.png")
   const qrFg = onBg === "#ffffff" ? bg : "#141821"
 
   const category = (data.category || "FOR SALE").toUpperCase()
@@ -141,7 +142,7 @@ const Template5Luxury = forwardRef<HTMLDivElement, TemplateProps>(function Templ
         {/* Logo + Exclusive/category — masthead lockup at hero top-left */}
         <div style={{ position: "absolute", top: 32, left: 40, zIndex: 2 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logoSrc} alt="" crossOrigin="anonymous" style={{ height: 50, display: "block" }} />
+          <FlyerLogo src={logoSrc} height={50} size={logoSize} outline={logoOutline} />
           <div style={{ marginTop: 16 }}>
             <div
               style={{

@@ -153,6 +153,13 @@ export type TemplateProps = {
   data: FlyerData & { currency?: string }
   listingUrl: string
   theme: FlyerTheme
+  /** Selected brand logo URL (from the logo picker). Null/undefined = the
+   *  template's own black/white FHI mark chosen by background contrast. */
+  logoUrl?: string | null
+  /** Logo height override in px (undefined = the template's default). */
+  logoSize?: number
+  /** White plate (sticker) padding around the logo, in px (0 = none). */
+  logoOutline?: number
 }
 
 // Template registry metadata (component wiring lives in the studio). `slots` =

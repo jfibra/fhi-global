@@ -1,6 +1,7 @@
 "use client"
 
 import { forwardRef } from "react"
+import FlyerLogo from "./FlyerLogo"
 import { QRCodeSVG } from "qrcode.react"
 import { Bed, Bath, SquareParking, Scan, Layers2, MapPin, Phone, Mail } from "lucide-react"
 import {
@@ -30,7 +31,7 @@ const W = FLYER_W
 const H = FLYER_H
 
 const Template6Editorial = forwardRef<HTMLDivElement, TemplateProps>(function Template6Editorial(
-  { data, listingUrl, theme },
+  { data, listingUrl, theme, logoUrl, logoSize, logoOutline },
   ref,
 ) {
   const { accent, bg, text, mode } = theme
@@ -44,7 +45,7 @@ const Template6Editorial = forwardRef<HTMLDivElement, TemplateProps>(function Te
   const ruleSoft = withAlpha(accent, 0.28) // whisper-thin divider
   const onMat = readableOn(bg) // colophon text sits on the mat
   // The sheet is always a light paper → dark logo. (Both mapped per contract.)
-  const logoSrc = readableOn(SHEET) === "#ffffff" ? "/FHI_Branding_White.png" : "/FHI_Branding.png"
+  const logoSrc = logoUrl ?? (readableOn(SHEET) === "#ffffff" ? "/FHI_Branding_White.png" : "/FHI_Branding.png")
   const placeholderBg = shade(SHEET, mode === "dark" ? -0.08 : -0.05)
 
   const category = (data.category || "For Sale").toUpperCase()
@@ -119,7 +120,7 @@ const Template6Editorial = forwardRef<HTMLDivElement, TemplateProps>(function Te
           {/* ── Masthead ── */}
           <div style={{ flexShrink: 0, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoSrc} alt="" crossOrigin="anonymous" style={{ height: 30, display: "block" }} />
+            <FlyerLogo src={logoSrc} height={30} size={logoSize} outline={logoOutline} />
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ width: 6, height: 6, backgroundColor: accent, flexShrink: 0 }} />
               <span

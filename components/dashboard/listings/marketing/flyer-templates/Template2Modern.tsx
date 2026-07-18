@@ -1,6 +1,7 @@
 "use client"
 
 import { forwardRef } from "react"
+import FlyerLogo from "./FlyerLogo"
 import { QRCodeSVG } from "qrcode.react"
 import {
   BedDouble,
@@ -36,7 +37,7 @@ const H = FLYER_H
 const HERO_H = 330
 
 const Template2Modern = forwardRef<HTMLDivElement, TemplateProps>(function Template2Modern(
-  { data, listingUrl, theme },
+  { data, listingUrl, theme, logoUrl, logoSize, logoOutline },
   ref,
 ) {
   const { accent, bg, text, mode } = theme
@@ -47,7 +48,7 @@ const Template2Modern = forwardRef<HTMLDivElement, TemplateProps>(function Templ
   const scrim = shade(bg, -0.45) // darkened base of bg for photo scrims
 
   // The hero logo sits over a dark photo scrim → pick the readable variant.
-  const logoSrc = readableOn(scrim) === "#ffffff" ? "/FHI_Branding_White.png" : "/FHI_Branding.png"
+  const logoSrc = logoUrl ?? (readableOn(scrim) === "#ffffff" ? "/FHI_Branding_White.png" : "/FHI_Branding.png")
 
   const bodyText = withAlpha(text, 0.62)
   const hairline = withAlpha(text, 0.12)
@@ -143,12 +144,7 @@ const Template2Modern = forwardRef<HTMLDivElement, TemplateProps>(function Templ
           />
           {/* Logo */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={logoSrc}
-            alt=""
-            crossOrigin="anonymous"
-            style={{ position: "absolute", top: 26, left: 30, height: 42, zIndex: 2 }}
-          />
+          <FlyerLogo src={logoSrc} height={42} size={logoSize} outline={logoOutline} style={{ position: "absolute", top: 26, left: 30, zIndex: 2 }} />
           {/* FOR SALE pill */}
           <div
             style={{

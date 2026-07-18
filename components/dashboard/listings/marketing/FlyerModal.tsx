@@ -13,6 +13,7 @@ import {
   resolveFlyerTheme,
   proxied,
 } from "@/lib/flyer/theme"
+import { LOGOS } from "@/lib/flyer/logos"
 import Template1Classic from "./flyer-templates/Template1Classic"
 import Template2Modern from "./flyer-templates/Template2Modern"
 import Template3Magazine from "./flyer-templates/Template3Magazine"
@@ -89,6 +90,9 @@ export default function FlyerModal({
   const [selectedPhotos, setSelectedPhotos] = useState<Record<number, number[]>>({})
   const [activeSlot, setActiveSlot] = useState(0)
   const [themeByTemplate, setThemeByTemplate] = useState<Record<number, FlyerThemeOverride>>({})
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [logoSize, setLogoSize] = useState(46)
+  const [logoOutline, setLogoOutline] = useState(0)
   const [downloading, setDownloading] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -377,7 +381,7 @@ export default function FlyerModal({
                       title={meta.name}
                     >
                       <div style={{ width: FLYER_W, height: FLYER_H, transform: `scale(${thumbScale})`, transformOrigin: "top left", pointerEvents: "none" }}>
-                        <Comp data={td} listingUrl={listingUrl} theme={resolveTheme(meta.id)} />
+                        <Comp data={td} listingUrl={listingUrl} theme={resolveTheme(meta.id)} logoUrl={logoUrl} logoSize={logoSize} logoOutline={logoOutline} />
                       </div>
                       <span className="absolute bottom-0 inset-x-0 bg-black/55 text-white text-[9px] font-semibold text-center py-0.5">
                         {meta.name}
@@ -393,7 +397,7 @@ export default function FlyerModal({
               <div ref={frameRef} className="rounded-xl overflow-hidden shadow-lg" style={{ width: "100%", maxWidth: FLYER_W }}>
                 <div style={{ position: "relative", width: "100%", height: FLYER_H * scale }}>
                   <div ref={scaleWrapRef} style={{ position: "absolute", top: 0, left: 0, width: FLYER_W, height: FLYER_H, transformOrigin: "top left", transform: `scale(${scale})` }}>
-                    <CurrentTemplate ref={flyerRef} data={currentData} listingUrl={listingUrl} theme={currentTheme} />
+                    <CurrentTemplate ref={flyerRef} data={currentData} listingUrl={listingUrl} theme={currentTheme} logoUrl={logoUrl} logoSize={logoSize} logoOutline={logoOutline} />
                   </div>
                 </div>
               </div>
@@ -401,6 +405,48 @@ export default function FlyerModal({
 
             {/* Right: controls */}
             <div className="lg:w-64 shrink-0 border-t lg:border-t-0 lg:border-l border-[#f0f0f0] overflow-auto p-4 space-y-5 bg-[#fafafa]">
+              {/* Logo picker (same lineup as the Reel Maker) */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-2">Logo</p>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {LOGOS.map((l) => {
+                    const active = (l.url ?? null) === logoUrl
+                    const darkTile = l.tone === "light"
+                    return (
+                      <button
+                        key={l.label}
+                        type="button"
+                        onClick={() => setLogoUrl(l.url ?? null)}
+                        title={l.label}
+                        className={`shrink-0 h-11 min-w-[60px] px-2 rounded-lg border-2 flex items-center justify-center ${active ? "border-[#001f3f]" : "border-[#e5e5e5]"}`}
+                        style={{ backgroundColor: l.url ? (darkTile ? "#0f2c5c" : "#ffffff") : active ? "rgba(0,31,63,0.05)" : "#ffffff" }}
+                      >
+                        {l.url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={l.url} alt={l.label} className="max-h-7 max-w-[72px] object-contain" />
+                        ) : (
+                          <span className="text-xs font-bold text-[#001f3f]">Auto</span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="mt-2">
+                  <div className="flex items-center justify-between text-[11px] text-[#6b7280] mb-0.5">
+                    <span>Size</span>
+                    <span className="font-mono text-[#9ca3af]">{logoSize}px</span>
+                  </div>
+                  <input type="range" min={24} max={110} step={1} value={logoSize} onChange={(e) => setLogoSize(Number(e.target.value))} className="w-full accent-[#001f3f]" />
+                </div>
+                <div className="mt-1.5">
+                  <div className="flex items-center justify-between text-[11px] text-[#6b7280] mb-0.5">
+                    <span>White outline</span>
+                    <span className="font-mono text-[#9ca3af]">{logoOutline === 0 ? "Off" : `${logoOutline}px`}</span>
+                  </div>
+                  <input type="range" min={0} max={16} step={1} value={logoOutline} onChange={(e) => setLogoOutline(Number(e.target.value))} className="w-full accent-[#001f3f]" />
+                </div>
+              </div>
+
               {/* Photo slots */}
               <div>
                 <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-2">

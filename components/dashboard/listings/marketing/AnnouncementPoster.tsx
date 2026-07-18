@@ -5,6 +5,9 @@ import { forwardRef } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { Phone, Mail, Globe, Bed, Bath, Car, Maximize, LandPlot } from "lucide-react"
 import { type FlyerData, formatPrice } from "@/lib/flyer/theme"
+import { LOGOS, type LogoOption } from "@/lib/flyer/logos"
+
+export { LOGOS, type LogoOption }
 
 // Faithful multi-skin rebuild of filipinohomes-final's PropertyAnnouncementModal
 // poster. 1200×(800|630), exported 1:1. Four skins × three layouts, custom
@@ -56,21 +59,6 @@ export const SKIN_LABELS: Record<PosterTheme, string> = {
   green: "Transparent",
   railnavy: "Rail",
 }
-
-// Selectable brand logos — the SAME assets the Reel Maker uses (public/logos
-// + the root FHI branding). "Auto" (url:null) uses the skin's black/white FHI
-// mark. `tone: "light"` = white artwork (needs a dark chip on light panels).
-export type LogoOption = { label: string; url: string | null; tone: "dark" | "light" }
-export const LOGOS: LogoOption[] = ([
-  { label: "Auto", url: null, tone: "dark" },
-  { label: "Filipino Homes", url: "/logos/Filipinohomes-logo-side-left-white.png", tone: "light" },
-  { label: "Homes PH", url: "/logos/homesph-logo.png", tone: "dark" },
-  { label: "Rent PH", url: "/logos/RentPh new colored logo.png", tone: "dark" },
-  { label: "FH Global Partners", url: "/logos/global_partner.png", tone: "dark" },
-  { label: "FHI Global", url: "/FHI_Branding_White.png", tone: "light" },
-  { label: "Rentsouq AE", url: "/logos/RENTSOUQ_AE LOGO.png", tone: "dark" },
-  { label: "FHI Branding", url: "/logos/FHI_Branding Set_PNG Copies-02.png", tone: "dark" },
-] as LogoOption[]).map((l) => (l.url ? { ...l, url: encodeURI(l.url) } : l))
 
 type Skin = {
   layout: "classic" | "overlay" | "rail"

@@ -1,6 +1,7 @@
 "use client"
 
 import { forwardRef } from "react"
+import FlyerLogo from "./FlyerLogo"
 import { QRCodeSVG } from "qrcode.react"
 import {
   MapPin,
@@ -37,14 +38,14 @@ const W = FLYER_W
 const H = FLYER_H
 
 const Template1Classic = forwardRef<HTMLDivElement, TemplateProps>(function Template1Classic(
-  { data, listingUrl, theme },
+  { data, listingUrl, theme, logoUrl, logoSize, logoOutline },
   ref,
 ) {
   const { accent, bg, text, mode } = theme
   const currency = data.currency ?? "AED"
 
   const onBg = readableOn(bg)
-  const logoSrc = onBg === "#ffffff" ? "/FHI_Branding_White.png" : "/FHI_Branding.png"
+  const logoSrc = logoUrl ?? (onBg === "#ffffff" ? "/FHI_Branding_White.png" : "/FHI_Branding.png")
   const qrFg = onBg === "#ffffff" ? bg : "#141821"
   const bodyText = withAlpha(text, 0.62)
   const hairline = withAlpha(text, 0.12)
@@ -98,7 +99,7 @@ const Template1Classic = forwardRef<HTMLDivElement, TemplateProps>(function Temp
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logoSrc} alt="" style={{ height: 40, objectFit: "contain" }} crossOrigin="anonymous" />
+        <FlyerLogo src={logoSrc} height={40} size={logoSize} outline={logoOutline} />
         <div
           style={{
             display: "flex",
