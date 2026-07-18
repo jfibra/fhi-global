@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react"
 import { Eye, EyeOff, Mail, Lock, ArrowRight, ShieldCheck, Star, MapPin } from "lucide-react"
 import { loginAction, type LoginState } from "@/app/login/actions"
+import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
 
 const initialState: LoginState = {}
 
@@ -146,9 +147,14 @@ function LoginCard({
 
       <div className="flex items-center gap-3 my-6">
         <div className="flex-1 h-px bg-[#f0f0f0]" />
-        <span className="text-[10px] text-[#bbb] uppercase tracking-widest font-semibold">Private Access</span>
+        <span className="text-[10px] text-[#bbb] uppercase tracking-widest font-semibold">Or continue with</span>
         <div className="flex-1 h-px bg-[#f0f0f0]" />
       </div>
+
+      {/* Google sign-in (auto-imports Leuterio Realty agent details) */}
+      <GoogleAuthFlow variant="login" nextRedirect={nextRedirect} />
+
+      <div className="h-px bg-[#f0f0f0] my-6" />
 
       {/* Access note */}
       <div className="flex items-start gap-3 p-4 rounded-2xl bg-[#f8faff] border border-[#e0e7ff]">

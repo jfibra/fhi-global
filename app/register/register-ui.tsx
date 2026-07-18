@@ -7,6 +7,7 @@ import {
   Building2, TrendingUp, DollarSign, CheckCircle2, ShieldCheck,
   User, Mail, Lock, AlertCircle, FileText,
 } from "lucide-react"
+import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
 
 type AccountType = "member" | "developer" | ""
 
@@ -393,6 +394,15 @@ export function RegisterUI({
                 hideBack
               >
                 <div className="space-y-4">
+                  {/* Google sign-up (auto-imports Leuterio Realty agent details) */}
+                  <GoogleAuthFlow variant="register" />
+
+                  <div className="flex items-center gap-3 py-1">
+                    <div className="flex-1 h-px bg-[#f0f0f0]" />
+                    <span className="text-[10px] text-[#bbb] uppercase tracking-widest font-semibold">Or register manually</span>
+                    <div className="flex-1 h-px bg-[#f0f0f0]" />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="First name" error={errors.firstName}>
                       <input
