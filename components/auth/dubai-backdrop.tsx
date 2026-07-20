@@ -16,8 +16,8 @@ export function DubaiBackdrop() {
         sizes="100vw"
         className="object-cover"
       />
-      {/* Light navy wash: just enough on the left for text legibility, photo stays bright */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/55 via-[#001f3f]/25 to-transparent" />
+      {/* Navy wash: stronger on the left so large light text reads clearly, photo stays visible on the right */}
+      <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/72 via-[#001f3f]/35 to-transparent" />
       {/* Soft bottom fade for footer-adjacent text */}
       <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-[#000d1c]/50 to-transparent" />
       {/* Gold top rule */}

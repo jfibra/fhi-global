@@ -249,7 +249,7 @@ export function HomeLoginUI({ nextRedirect }: { nextRedirect?: string }) {
                     Properties Begin.
                   </span>
                 </h1>
-                <p className="text-white/90 text-lg leading-relaxed max-w-lg drop-shadow-[0_2px_10px_rgba(0,10,30,0.8)]">
+                <p className="text-white text-xl leading-relaxed max-w-lg font-medium drop-shadow-[0_2px_12px_rgba(0,10,30,0.9)]">
                   A private portal connecting real estate professionals with premium developments across the UAE.
                   Everything you need — and nothing you don&apos;t.
                 </p>
@@ -258,20 +258,20 @@ export function HomeLoginUI({ nextRedirect }: { nextRedirect?: string }) {
               {/* Pillars — horizontal row, like the mockup */}
               <div className="grid grid-cols-3 gap-6 max-w-2xl">
                 {PILLARS.map(({ icon: Icon, label, desc }) => (
-                  <div key={label} className="flex items-start gap-3 group">
-                    <div className="w-11 h-11 rounded-full bg-white/10 border border-white/25 backdrop-blur-sm flex items-center justify-center shrink-0 group-hover:bg-[#d6b357]/20 group-hover:border-[#d6b357]/40 transition-all duration-300">
-                      <Icon className="w-[18px] h-[18px] text-[#d6b357]" />
+                  <div key={label} className="flex items-start gap-3.5 group">
+                    <div className="w-12 h-12 rounded-full bg-white/15 border border-white/30 backdrop-blur-sm flex items-center justify-center shrink-0 group-hover:bg-[#d6b357]/20 group-hover:border-[#d6b357]/40 transition-all duration-300">
+                      <Icon className="w-5 h-5 text-[#d6b357]" />
                     </div>
                     <div>
-                      <p className="text-[15px] font-bold text-white drop-shadow-[0_2px_8px_rgba(0,10,30,0.8)]">{label}</p>
-                      <p className="text-xs text-white/85 mt-1 leading-relaxed drop-shadow-[0_1px_6px_rgba(0,10,30,0.8)]">{desc}</p>
+                      <p className="text-[17px] font-bold text-white drop-shadow-[0_2px_10px_rgba(0,10,30,0.95)]">{label}</p>
+                      <p className="text-[15px] text-white mt-1 leading-relaxed drop-shadow-[0_2px_8px_rgba(0,10,30,0.95)]">{desc}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="pt-5 border-t border-white/15 max-w-2xl">
-                <p className="text-white/55 text-sm leading-relaxed italic">
+              <div className="pt-5 border-t border-white/20 max-w-2xl">
+                <p className="text-white/85 text-base leading-relaxed italic drop-shadow-[0_2px_8px_rgba(0,10,30,0.9)]">
                   &quot;Access is earned, not given. Once inside, the full picture becomes clear.&quot;
                 </p>
                 <span className="block w-12 h-[3px] rounded-full bg-[#d6b357]/80 mt-3" />
