@@ -24,9 +24,6 @@ const FLAGCDN        = "flagcdn.com"
 // Google Maps JavaScript API (buy page map)
 const MAPS_API       = "maps.googleapis.com"
 const MAPS_GSTATIC   = "maps.gstatic.com"
-// Google Identity Services (Sign in with Google) + Leuterio Realty agent API
-const GSI_HOST       = "accounts.google.com"
-const LR_API         = "api.leuteriorealty.com"
 
 // ── Content-Security-Policy ──────────────────────────────────────────────────
 // next/font/google self-hosts fonts at build-time → no fonts.googleapis.com needed.
@@ -36,11 +33,11 @@ const CSP = [
   // Fallback for anything not matched below
   `default-src 'self'`,
 
-  // JS: own scripts + Next.js inline chunks + Vercel Analytics + Google Maps + Google Identity Services
-  `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://${MAPS_API} https://${MAPS_GSTATIC} https://${GSI_HOST} ${VERCEL_SCRIPTS} https://${CF_INSIGHTS_SCRIPT}`,
+  // JS: own scripts + Next.js inline chunks + Vercel Analytics + Google Maps
+  `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://${MAPS_API} https://${MAPS_GSTATIC} ${VERCEL_SCRIPTS} https://${CF_INSIGHTS_SCRIPT}`,
 
-  // CSS: Tailwind / Next.js inline styles + Google Identity Services button stylesheet (gsi/style)
-  `style-src 'self' 'unsafe-inline' https://${GSI_HOST}`,
+  // CSS: Tailwind / Next.js injects inline styles
+  `style-src 'self' 'unsafe-inline'`,
 
   // Images: own assets, data URIs, blob previews, Supabase, flag CDN, maps, Google avatars, S3/CloudFront (listing + project media)
   `img-src 'self' data: blob: ${SUPABASE_HTTPS} https://${FLAGCDN} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://*.googleusercontent.com https://*.amazonaws.com https://*.cloudfront.net`,
@@ -48,8 +45,8 @@ const CSP = [
   // Fonts: self-hosted via next/font – no external font CDN required
   `font-src 'self' data:`,
 
-  // XHR / fetch: Supabase REST + Auth + Realtime, Vercel Analytics, Google Maps, Google Identity Services, Leuterio Realty API
-  `connect-src 'self' ${SUPABASE_CONNECT} https://${VERCEL_VITALS} https://${VERCEL_SCRIPTS} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.googleapis.com https://${GSI_HOST} https://${LR_API} https://${CF_INSIGHTS_API}`,
+  // XHR / fetch: Supabase REST + Auth + Realtime, Vercel Analytics, Google Maps
+  `connect-src 'self' ${SUPABASE_CONNECT} https://${VERCEL_VITALS} https://${VERCEL_SCRIPTS} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.googleapis.com https://${CF_INSIGHTS_API}`,
 
   // Camera / microphone captured media (face-verify & ID-capture steps)
   `media-src 'self' blob:`,
@@ -60,8 +57,8 @@ const CSP = [
   // No plugins / Flash / PDFs embedded via <object>/<embed>
   `object-src 'none'`,
 
-  // Google Identity Services renders its button / One-Tap in an iframe from accounts.google.com
-  `frame-src https://${GSI_HOST}`,
+  // No third-party iframes (Google sign-in uses a full-page redirect, not a frame)
+  `frame-src 'none'`,
   // Prevent this app from being embedded in iframes elsewhere
   `frame-ancestors 'none'`,
 

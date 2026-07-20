@@ -1,38 +1,38 @@
-import { NextRequest, NextResponse } from "next/server"
-import { verifyGoogleCredential } from "@/lib/google/verify-id-token"
+import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 import { lookupLrAgent } from "@/lib/lr/lr-api"
 import { roleToLabel } from "@/lib/app-roles"
 
-// Pre-sign-in inspection for the Google flow: given a verified Google
-// credential, look up the email in Leuterio Realty and return what the modal
-// should show. This creates NO account — provisioning happens at
-// /api/auth/google/finalize after the user confirms. Verifying the credential
-// (and using its email, never a client-supplied one) keeps this from being an
-// open LR-scraping proxy.
+// Session-based Leuterio Realty lookup for the post-Google-redirect modal.
+// Runs as the signed-in user (the OAuth redirect already established the
+// session) and looks up their Supabase-verified email — no client input is
+// trusted. Read-only; provisioning happens in /api/auth/google/finalize.
 
 export const runtime = "nodejs"
 
-export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => null)) as { credential?: unknown } | null
-  const credential = typeof body?.credential === "string" ? body.credential : ""
-  if (!credential) {
-    return NextResponse.json({ error: "Missing credential" }, { status: 400 })
+export async function POST() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
   }
 
-  const identity = await verifyGoogleCredential(credential)
-  if (!identity) {
-    return NextResponse.json({ error: "Invalid Google credential" }, { status: 401 })
-  }
-
-  const result = await lookupLrAgent(identity.email)
+  const email = (user.email ?? "").toLowerCase()
+  const result = await lookupLrAgent(email)
   const lr = result.kind === "agent" ? result.agent : null
   const mappedRole = lr ? lr.mappedFhiRole : "member"
 
+  const meta = user.user_metadata ?? {}
+  const picture =
+    typeof meta.avatar_url === "string" ? meta.avatar_url : typeof meta.picture === "string" ? meta.picture : null
+
   return NextResponse.json({
     google: {
-      email: identity.email,
-      name: identity.name,
-      picture: identity.picture,
+      email,
+      name: typeof meta.name === "string" ? meta.name : null,
+      picture,
     },
     lr,
     mappedRole,
