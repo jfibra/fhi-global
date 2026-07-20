@@ -280,22 +280,29 @@ export default async function HomePage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-end justify-between mb-14">
               <div>
-                <div className="inline-flex items-center px-3 py-1.5 bg-white border border-[#e5e5e5] rounded-full text-xs font-semibold uppercase tracking-wider mb-5 shadow-sm">
-                  <span className="w-2 h-2 bg-[#d6b357] rounded-full mr-2 animate-pulse" />
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-[#d6b357]/50 rounded-full text-xs font-bold uppercase tracking-wider text-[#001f3f] mb-5 shadow-sm">
+                  <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" />
                   Hand-Picked Selection
                 </div>
                 <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight">
-                  Featured{" "}
+                  <span className="text-[#0d1117]">Featured</span>{" "}
                   <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
                     Projects
                   </span>
                 </h2>
+                <p className="text-[#4b5563] text-base leading-relaxed mt-4 max-w-xl">
+                  A curated selection of Dubai&apos;s most sought-after developments,
+                  hand-picked by our team for quality, location, and returns.
+                </p>
               </div>
               <Link
                 href="/projects?featured=true"
-                className="hidden sm:inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md"
+                className="hidden sm:inline-flex items-center gap-3 bg-[#001f3f] text-white pl-6 pr-2 py-2 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-[0_10px_30px_-6px_rgba(0,31,63,0.5)] shadow-md shrink-0"
               >
-                Browse All <ChevronRight className="w-4 h-4" />
+                Browse All Projects
+                <span className="w-8 h-8 rounded-full bg-gradient-to-br from-[#d6b357] to-[#b8913f] flex items-center justify-center">
+                  <ArrowRight className="w-4 h-4 text-[#001f3f]" />
+                </span>
               </Link>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
