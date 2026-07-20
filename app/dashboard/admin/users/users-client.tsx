@@ -152,8 +152,18 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
       body: JSON.stringify({ status: next }),
     })
     if (res.ok) {
-      handleUserUpdated({ ...user, status: next })
-      setBanner({ type: "success", msg: `User ${next === "active" ? "activated" : "deactivated"}.` })
+      const restoring = next === "active" && user.is_deleted === true
+      // Activating also restores a soft-deleted user — mirror the server so the
+      // row stops showing "Deleted" without a refetch.
+      handleUserUpdated({
+        ...user,
+        status: next,
+        ...(next === "active" ? { is_deleted: false, deleted_at: null } : {}),
+      })
+      setBanner({
+        type: "success",
+        msg: restoring ? "User restored." : `User ${next === "active" ? "activated" : "deactivated"}.`,
+      })
     } else {
       setBanner({ type: "error", msg: "Failed to update status." })
     }
@@ -514,7 +524,7 @@ function UserRow({
                   { label: "View Details", action: () => { onOpen(user); setMenuOpen(false) } },
                   { label: "Edit Profile",  action: () => { onEdit(user); setMenuOpen(false) } },
                   {
-                    label: user.status === "active" ? "Deactivate" : "Activate",
+                    label: isDeleted ? "Restore User" : user.status === "active" ? "Deactivate" : "Activate",
                     action: () => { onToggleStatus(user); setMenuOpen(false) },
                     cls: user.status === "active" ? "text-amber-600" : "text-green-600",
                   },

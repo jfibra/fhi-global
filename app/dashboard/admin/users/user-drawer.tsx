@@ -193,7 +193,7 @@ export function UserDrawer({
           <div className="grid grid-cols-2 gap-2">
             <ActionBtn
               icon={isActive ? UserX : UserCheck}
-              label={isActive ? "Deactivate" : "Activate"}
+              label={isDeleted ? "Restore" : isActive ? "Deactivate" : "Activate"}
               variant={isActive ? "warn" : "success"}
               onClick={() => { onToggleStatus(user); onClose() }}
             />

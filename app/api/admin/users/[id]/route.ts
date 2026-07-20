@@ -50,7 +50,7 @@ export async function PATCH(
   if (!caller) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id } = await params
-  const body = (await req.json()) as UpdateUserPayload & { activate?: boolean; deactivate?: boolean }
+  const body = (await req.json()) as UpdateUserPayload
 
   if (body.role !== undefined) {
     const r = String(body.role).toLowerCase().trim()
@@ -74,7 +74,16 @@ export async function PATCH(
   if (body.gender     !== undefined) profileUpdate.gender     = body.gender || null
   if (body.timezone   !== undefined) profileUpdate.timezone   = body.timezone
   if (body.role       !== undefined) profileUpdate.role       = body.role
-  if (body.status     !== undefined) profileUpdate.status     = body.status
+  if (body.status     !== undefined) {
+    profileUpdate.status = body.status
+    // Activating restores a soft-deleted user: clearing the soft-delete flags
+    // is required, otherwise isInactiveProfile (status !== 'active' ||
+    // is_deleted) still blocks login and the row keeps showing "Deleted".
+    if (String(body.status).toLowerCase().trim() === "active") {
+      profileUpdate.is_deleted = false
+      profileUpdate.deleted_at = null
+    }
+  }
 
   // Rebuild fullname when name parts change
   if (body.fname !== undefined || body.mname !== undefined || body.lname !== undefined) {
