@@ -276,8 +276,20 @@ export default async function HomePage() {
       {/* FEATURED PROJECTS                               */}
       {/* ----------------------------------------------- */}
       {featuredProjects && featuredProjects.length > 0 && (
-        <section className="py-24 bg-[#f5f3ef]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="relative py-24 overflow-hidden">
+          {/* Faint skyline backdrop — heavy white wash so the cards stay the focus */}
+          <div className="absolute inset-0">
+            <Image
+              src="/background/home.webp"
+              alt=""
+              fill
+              sizes="100vw"
+              className="object-cover object-center"
+              aria-hidden="true"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/85 to-white/92" />
+          </div>
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-end justify-between mb-14">
               <div>
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-[#d6b357]/50 rounded-full text-xs font-bold uppercase tracking-wider text-[#001f3f] mb-5 shadow-sm">
