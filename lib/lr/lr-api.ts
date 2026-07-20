@@ -10,15 +10,17 @@ import type { AppRoleId } from "@/lib/app-roles"
 const LR_V1_AGENT = "https://api.leuteriorealty.com/lr/v1/public/api/agent"
 const LR_V2_AGENTS = "https://api.leuteriorealty.com/lr/v2/public/api/agents"
 
-// LR roleId → FHI role. Only genuine LR staff/agent roles are elevated; anyone
-// else (LR clients, unknown roleIds, or emails not in LR) becomes a member.
-// LR admin (1) is intentionally NOT auto-granted FHI admin.
+// LR roleId → FHI role, mapped faithfully to whatever LR reports. Only genuine
+// LR staff/agent roles are elevated; anyone else (LR clients, unknown roleIds,
+// or emails not in LR) becomes a member. Note: an LR admin therefore receives
+// FHI admin on first Google sign-in — this is intentional (LR admins are
+// trusted), gated to verified LR members via the server-side lookup.
 const LR_ROLE_TO_FHI: Record<number, AppRoleId> = {
   7: "unit_manager",
   6: "team_leader",
   4: "agent",
   3: "secretary",
-  1: "agent",
+  1: "admin",
 }
 
 const LR_ROLE_LABELS: Record<number, string> = {
