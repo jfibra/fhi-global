@@ -1,11 +1,28 @@
 "use client"
 
-import { useActionState, useState } from "react"
+import { useActionState, useState, useSyncExternalStore } from "react"
 import { Eye, EyeOff, Mail, Lock, ArrowRight, ShieldCheck, Star, MapPin } from "lucide-react"
 import { loginAction, type LoginState } from "@/app/login/actions"
 import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
 
 const initialState: LoginState = {}
+
+// The login card is rendered twice (mobile + desktop layouts). Google Identity
+// Services registers a single global callback, so mounting the button in both
+// would let them fight over it. Mount the Google flow only in the card for the
+// active breakpoint so exactly one GIS instance exists.
+const DESKTOP_MQ = "(min-width: 1024px)"
+function useIsDesktop() {
+  return useSyncExternalStore(
+    (onChange) => {
+      const mq = window.matchMedia(DESKTOP_MQ)
+      mq.addEventListener("change", onChange)
+      return () => mq.removeEventListener("change", onChange)
+    },
+    () => window.matchMedia(DESKTOP_MQ).matches,
+    () => false,
+  )
+}
 
 const PILLARS = [
   { icon: Star,   label: "Exclusive Access",  desc: "Curated properties unavailable to the general market." },
@@ -24,6 +41,7 @@ function LoginCard({
   formAction,
   pending,
   nextRedirect,
+  showGoogle,
 }: {
   showPassword: boolean
   togglePassword: () => void
@@ -33,6 +51,7 @@ function LoginCard({
   formAction: (payload: FormData) => void
   pending: boolean
   nextRedirect?: string
+  showGoogle: boolean
 }) {
   return (
     <div className="bg-white rounded-[28px] border border-[#e8eaed] shadow-[0_8px_48px_-8px_rgba(0,31,63,0.12)] p-8 lg:p-10">
@@ -145,16 +164,20 @@ function LoginCard({
         </button>
       </form>
 
-      <div className="flex items-center gap-3 my-6">
-        <div className="flex-1 h-px bg-[#f0f0f0]" />
-        <span className="text-[10px] text-[#bbb] uppercase tracking-widest font-semibold">Or continue with</span>
-        <div className="flex-1 h-px bg-[#f0f0f0]" />
-      </div>
+      {showGoogle && (
+        <>
+          <div className="flex items-center gap-3 my-6">
+            <div className="flex-1 h-px bg-[#f0f0f0]" />
+            <span className="text-[10px] text-[#bbb] uppercase tracking-widest font-semibold">Or continue with</span>
+            <div className="flex-1 h-px bg-[#f0f0f0]" />
+          </div>
 
-      {/* Google sign-in (auto-imports Leuterio Realty agent details) */}
-      <GoogleAuthFlow variant="login" nextRedirect={nextRedirect} />
+          {/* Google sign-in (auto-imports Leuterio Realty agent details) */}
+          <GoogleAuthFlow variant="login" nextRedirect={nextRedirect} />
 
-      <div className="h-px bg-[#f0f0f0] my-6" />
+          <div className="h-px bg-[#f0f0f0] my-6" />
+        </>
+      )}
 
       {/* Access note */}
       <div className="flex items-start gap-3 p-4 rounded-2xl bg-[#f8faff] border border-[#e0e7ff]">
@@ -175,6 +198,7 @@ export function HomeLoginUI({ nextRedirect }: { nextRedirect?: string }) {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe]     = useState(false)
   const [state, formAction, pending]    = useActionState(loginAction, initialState)
+  const isDesktop = useIsDesktop()
 
   const cardProps = {
     showPassword,  togglePassword: () => setShowPassword(p => !p),
@@ -221,7 +245,7 @@ export function HomeLoginUI({ nextRedirect }: { nextRedirect?: string }) {
         {/* Card floats over the navy band */}
         <div className="relative z-10 -mt-12 px-4 pb-10 flex-1 bg-transparent">
           <div className="max-w-sm mx-auto">
-            <LoginCard {...cardProps} />
+            <LoginCard {...cardProps} showGoogle={!isDesktop} />
             <p className="text-center text-[11px] text-[#9ca3af] mt-5 tracking-wide">
               © {new Date().getFullYear()} FHI Global Â· Dubai, UAE Â· All rights reserved
             </p>
@@ -287,7 +311,7 @@ export function HomeLoginUI({ nextRedirect }: { nextRedirect?: string }) {
 
             {/* Right: login card */}
             <div>
-              <LoginCard {...cardProps} />
+              <LoginCard {...cardProps} showGoogle={isDesktop} />
               <p className="text-center text-[11px] text-[#bbb] mt-5 tracking-wide">
                 © {new Date().getFullYear()} FHI Global Â· Dubai, UAE Â· All rights reserved
               </p>

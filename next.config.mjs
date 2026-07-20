@@ -39,8 +39,8 @@ const CSP = [
   // JS: own scripts + Next.js inline chunks + Vercel Analytics + Google Maps + Google Identity Services
   `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://${MAPS_API} https://${MAPS_GSTATIC} https://${GSI_HOST} ${VERCEL_SCRIPTS} https://${CF_INSIGHTS_SCRIPT}`,
 
-  // CSS: Tailwind / Next.js injects inline styles
-  `style-src 'self' 'unsafe-inline'`,
+  // CSS: Tailwind / Next.js inline styles + Google Identity Services button stylesheet (gsi/style)
+  `style-src 'self' 'unsafe-inline' https://${GSI_HOST}`,
 
   // Images: own assets, data URIs, blob previews, Supabase, flag CDN, maps, Google avatars, S3/CloudFront (listing + project media)
   `img-src 'self' data: blob: ${SUPABASE_HTTPS} https://${FLAGCDN} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://*.googleusercontent.com https://*.amazonaws.com https://*.cloudfront.net`,
