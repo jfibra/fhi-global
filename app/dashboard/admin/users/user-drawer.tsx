@@ -29,6 +29,7 @@ export function UserDrawer({
   onClose,
   onEdit,
   onDelete,
+  onHardDelete,
   onToggleStatus,
   onUpdated,
   onBanner,
@@ -37,6 +38,7 @@ export function UserDrawer({
   onClose: () => void
   onEdit: (u: UserRecord) => void
   onDelete: (id: string) => void
+  onHardDelete: (id: string) => void
   onToggleStatus: (u: UserRecord) => void
   onUpdated: (u: UserRecord) => void
   onBanner: (type: BannerType, msg: string) => void
@@ -197,7 +199,14 @@ export function UserDrawer({
               variant={isActive ? "warn" : "success"}
               onClick={() => { onToggleStatus(user); onClose() }}
             />
-            {!isDeleted && (
+            {isDeleted ? (
+              <ActionBtn
+                icon={Trash2}
+                label="Delete Permanently"
+                variant="danger"
+                onClick={() => { onHardDelete(user.id); onClose() }}
+              />
+            ) : (
               <ActionBtn
                 icon={Trash2}
                 label="Delete User"

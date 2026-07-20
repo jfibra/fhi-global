@@ -151,9 +151,13 @@ export async function PATCH(
   return NextResponse.json({ ok: true })
 }
 
-// ─── DELETE /api/admin/users/[id] — soft delete ────────────────────────────────
+// ─── DELETE /api/admin/users/[id] ──────────────────────────────────────────────
+// Default: soft delete (hide + deactivate, recoverable via Activate/Restore).
+// ?hard=1: permanent delete — removes the auth user (freeing the email for
+// re-registration) and the profile. Only allowed on an already soft-deleted
+// user, so it's a deliberate two-step action.
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const caller = await requireAdmin()
@@ -161,7 +165,43 @@ export async function DELETE(
 
   const { id } = await params
   const admin = createAdminSupabase()
+  const hard = req.nextUrl.searchParams.get("hard") === "1"
 
+  if (hard) {
+    if (id === caller.id) {
+      return NextResponse.json({ error: "You can't permanently delete your own account." }, { status: 400 })
+    }
+
+    // Two-step safety: a user must be soft-deleted first.
+    const { data: prof } = await admin
+      .from("profiles")
+      .select("is_deleted")
+      .eq("id", id)
+      .maybeSingle<{ is_deleted: boolean | null }>()
+    if (prof && prof.is_deleted !== true) {
+      return NextResponse.json(
+        { error: "Soft-delete the user first, then permanently delete." },
+        { status: 400 },
+      )
+    }
+
+    // Delete the auth user — this frees the email. A profiles FK with ON DELETE
+    // CASCADE removes the profile row too; delete it explicitly as a fallback.
+    // If the user still owns data (listings, sales, …) the FK blocks this and
+    // the error is surfaced so the admin knows to reassign/remove it first.
+    const { error: authErr } = await admin.auth.admin.deleteUser(id)
+    if (authErr) {
+      return NextResponse.json(
+        { error: `Could not permanently delete this account: ${authErr.message}` },
+        { status: 500 },
+      )
+    }
+    await admin.from("profiles").delete().eq("id", id)
+
+    return NextResponse.json({ ok: true, hard: true })
+  }
+
+  // Soft delete (default).
   const { error } = await admin
     .from("profiles")
     .update({

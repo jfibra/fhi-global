@@ -144,6 +144,24 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     }
   }
 
+  const handleHardDelete = async (userId: string) => {
+    if (
+      !confirm(
+        "Permanently delete this user? This removes the account entirely and frees the email to register again. This cannot be undone.",
+      )
+    )
+      return
+    const res = await fetch(`/api/admin/users/${userId}?hard=1`, { method: "DELETE" })
+    if (res.ok) {
+      setUsers((prev) => prev.filter((u) => u.id !== userId))
+      setBanner({ type: "success", msg: "User permanently deleted." })
+      if (drawerOpen && selectedUser?.id === userId) setDrawerOpen(false)
+    } else {
+      const j = (await res.json().catch(() => ({}))) as { error?: string }
+      setBanner({ type: "error", msg: j.error ?? "Failed to permanently delete user." })
+    }
+  }
+
   const handleToggleStatus = async (user: UserRecord) => {
     const next = user.status === "active" ? "inactive" : "active"
     const res = await fetch(`/api/admin/users/${user.id}`, {
@@ -316,6 +334,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
                     onEdit={openEdit}
                     onToggleStatus={handleToggleStatus}
                     onDelete={handleDelete}
+                    onHardDelete={handleHardDelete}
                   />
                 ))
               )}
@@ -368,6 +387,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
           onClose={() => setDrawerOpen(false)}
           onEdit={openEdit}
           onDelete={handleDelete}
+          onHardDelete={handleHardDelete}
           onToggleStatus={handleToggleStatus}
           onUpdated={handleUserUpdated}
           onBanner={(type: "success" | "error", msg: string) => setBanner({ type, msg })}
@@ -394,12 +414,14 @@ function UserRow({
   onEdit,
   onToggleStatus,
   onDelete,
+  onHardDelete,
 }: {
   user: UserRecord
   onOpen: (u: UserRecord) => void
   onEdit: (u: UserRecord) => void
   onToggleStatus: (u: UserRecord) => void
   onDelete: (id: string) => void
+  onHardDelete: (id: string) => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const triggerRef = useRef<HTMLDivElement>(null)
@@ -528,11 +550,17 @@ function UserRow({
                     action: () => { onToggleStatus(user); setMenuOpen(false) },
                     cls: user.status === "active" ? "text-amber-600" : "text-green-600",
                   },
-                  ...(!isDeleted ? [{
-                    label: "Delete User",
-                    action: () => { onDelete(user.id); setMenuOpen(false) },
-                    cls: "text-rose-600",
-                  }] : []),
+                  ...(isDeleted
+                    ? [{
+                        label: "Delete Permanently",
+                        action: () => { onHardDelete(user.id); setMenuOpen(false) },
+                        cls: "text-rose-600",
+                      }]
+                    : [{
+                        label: "Delete User",
+                        action: () => { onDelete(user.id); setMenuOpen(false) },
+                        cls: "text-rose-600",
+                      }]),
                 ].map(({ label, action, cls }) => (
                   <button
                     key={label}
