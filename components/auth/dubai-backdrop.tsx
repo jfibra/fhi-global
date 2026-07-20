@@ -9,7 +9,7 @@ export function DubaiBackdrop() {
   return (
     <>
       <Image
-        src="/background/dubai.png"
+        src="/background/dubai.webp"
         alt=""
         fill
         priority

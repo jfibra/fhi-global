@@ -198,7 +198,7 @@ export default async function HomePage() {
           {/* Background photo with soft white wash (approved mockup) */}
           <div className="absolute inset-0">
             <Image
-              src="/background/developers.png"
+              src="/background/developers.webp"
               alt=""
               fill
               sizes="100vw"

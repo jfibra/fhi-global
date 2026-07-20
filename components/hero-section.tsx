@@ -24,7 +24,7 @@ const PRICE_RANGES = [
 ]
 
 // Full-bleed Dubai skyline photo (approved homepage mockup), served locally.
-const BG_IMAGE = "/background/home.png"
+const BG_IMAGE = "/background/home.webp"
 
 const HIGHLIGHTS = [
   { icon: ShieldCheck, title: "Trusted Developers",  desc: "Partnered with top UAE developers" },

@@ -73,7 +73,7 @@ export default function ContactPage() {
         {/* Background */}
         <div className="absolute inset-0">
           <Image
-            src="/background/home.png"
+            src="/background/home.webp"
             alt=""
             fill
             priority
