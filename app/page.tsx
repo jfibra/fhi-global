@@ -25,6 +25,8 @@ import {
   Globe,
   Zap,
   BadgeCheck,
+  Sparkles,
+  MessageCircle,
 } from "lucide-react";
 
 /** Revalidate homepage data from Supabase (ISR) */
@@ -311,33 +313,44 @@ export default async function HomePage() {
       {/* ----------------------------------------------- */}
       {/* WHY CHOOSE US                                   */}
       {/* ----------------------------------------------- */}
-      <section className="relative py-24 overflow-hidden">
-        {/* Background */}
+      <section className="relative pt-24 pb-24 overflow-hidden">
+        {/* Background — bright skyline photo with a navy curve rising behind the cards */}
         <div className="absolute inset-0">
           <Image
-            src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x800/3.png"
+            src="/background/developers.webp"
             alt=""
             fill
             sizes="100vw"
             className="object-cover object-center"
             aria-hidden="true"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-white/92 via-white/88 to-white/92" />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/85 via-white/45 to-transparent" />
+          {/* Gold-rimmed navy ellipse (approved mockup's curved base) */}
+          <div
+            className="absolute -bottom-[380px] left-1/2 -translate-x-1/2 w-[190%] h-[760px] rounded-[50%] border-4 border-[#d6b357]/70 bg-gradient-to-b from-[#00203f] to-[#000d1c] shadow-[0_-20px_60px_rgba(0,13,28,0.4)]"
+            aria-hidden="true"
+          />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <div className="inline-flex items-center px-3 py-1.5 bg-white border border-[#e5e5e5] rounded-full text-xs font-semibold uppercase tracking-wider mb-5 shadow-sm">
-              <span className="w-2 h-2 bg-[#001f3f] rounded-full mr-2" />
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-[#d6b357]/50 rounded-full text-xs font-bold uppercase tracking-wider text-[#001f3f] mb-5 shadow-sm">
+              <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" />
               Why FHI Global
             </div>
             <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight mb-4">
-              Your Trusted{" "}
+              <span className="text-[#0d1117]">Your Trusted</span>{" "}
               <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
                 Real Estate Partner
               </span>
             </h2>
-            <p className="text-[#6b7280] text-lg leading-relaxed">
+            {/* Gold ornamental divider (mockup) */}
+            <div className="flex items-center justify-center gap-2 mb-5" aria-hidden="true">
+              <span className="h-px w-20 bg-gradient-to-r from-transparent to-[#d6b357]/80" />
+              <Building2 className="w-4 h-4 text-[#d6b357]" />
+              <span className="h-px w-20 bg-gradient-to-l from-transparent to-[#d6b357]/80" />
+            </div>
+            <p className="text-[#374151] text-lg leading-relaxed">
               We connect serious investors with the right developers and
               projects — backed by expertise, transparency, and a proven track
               record.
@@ -348,22 +361,20 @@ export default async function HomePage() {
             {WHY_US.map(({ icon: Icon, title, desc }) => (
               <div
                 key={title}
-                className="group bg-white/40 backdrop-blur-2xl p-8 rounded-[32px] border border-white border-opacity-60 shadow-xl shadow-black/5 flex flex-col gap-5 transition-all duration-300 hover:translate-y-[-8px] hover:shadow-2xl hover:shadow-[#001f3f]/10"
+                className="group relative bg-white rounded-[24px] p-8 shadow-[0_12px_40px_-8px_rgba(0,20,40,0.25)] overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_-10px_rgba(0,20,40,0.35)]"
               >
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f]/10 to-[#001f3f]/5 group-hover:from-[#001f3f] group-hover:to-[#002a52] flex items-center justify-center transition-all duration-300 shadow-sm">
-                  <Icon className="w-5 h-5 text-[#001f3f] group-hover:text-[#d6b357] transition-colors duration-300" />
+                {/* Gold top trim */}
+                <span className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-[#d6b357]/30" aria-hidden="true" />
+                {/* Faint gold watermark */}
+                <Icon className="absolute -bottom-7 -right-7 w-36 h-36 text-[#d6b357]/10 -rotate-6" aria-hidden="true" />
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#003366] flex items-center justify-center shadow-md mb-5">
+                  <Icon className="w-6 h-6 text-[#d6b357]" />
                 </div>
-                <div>
-                  <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117] mb-2">
-                    {title}
-                  </h3>
-                  <p className="text-sm text-[#555] leading-relaxed">{desc}</p>
-                </div>
-                <div className="mt-auto pt-2">
-                  <span className="text-xs font-mono text-[#d6b357] opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    fhiglobal.ae
-                  </span>
-                </div>
+                <h3 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mb-2">
+                  {title}
+                </h3>
+                <span className="block w-9 h-[3px] rounded-full bg-[#d6b357] mb-3" aria-hidden="true" />
+                <p className="relative text-sm text-[#555] leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
@@ -374,61 +385,69 @@ export default async function HomePage() {
       {/* CALL TO ACTION                                  */}
       {/* ----------------------------------------------- */}
       <section className="relative overflow-hidden">
-        {/* Background */}
+        {/* Background — dusk marina photo, kept bright around the navy card */}
         <div className="absolute inset-0">
           <Image
-            src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/7.png"
+            src="/background/dubai.webp"
             alt=""
             fill
             sizes="100vw"
             className="object-cover object-center"
             aria-hidden="true"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f]/92 via-[#002a52]/90 to-[#001428]/95" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#001428]/40 via-[#001428]/20 to-[#001428]/50" />
         </div>
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle, #fff 1px, transparent 1px)",
-            backgroundSize: "28px 28px",
-          }}
-        />
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/50 to-transparent" />
-        <div className="absolute top-[-80px] left-[-80px] w-[500px] h-[500px] rounded-full opacity-25 blur-[120px] bg-[radial-gradient(circle,#d6b357,transparent)] pointer-events-none" />
-        <div className="absolute bottom-[-60px] right-[-60px] w-[400px] h-[400px] rounded-full opacity-15 blur-[100px] bg-[radial-gradient(circle,#60a5fa,transparent)] pointer-events-none" />
 
-        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-28 text-center">
-          {/* Glassmorphism inner card */}
-          <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[40px] px-8 md:px-16 py-14 shadow-2xl shadow-black/20">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#d6b357]/15 border border-[#d6b357]/25 rounded-full text-xs font-semibold uppercase tracking-wider text-[#d6b357] mb-8 backdrop-blur-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357] animate-pulse" />
-              Ready to Invest?
-            </div>
-            <h2 className="font-['Outfit'] text-4xl md:text-6xl font-bold text-white leading-[1.1] mb-5 tracking-tight">
-              Start Exploring
-              <br />
-              <span className="bg-gradient-to-r from-[#d6b357] to-[#f0d890] bg-clip-text text-transparent">
-                Luxury Properties.
-              </span>
-            </h2>
-            <p className="text-white/55 text-lg max-w-xl mx-auto mb-10 leading-relaxed">
-              Browse hundreds of premium developments — from off-plan launches
-              to ready-to-move investments in Dubai&apos;s finest communities.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link
-                href="/projects"
-                className="bg-gradient-to-r from-[#d6b357] to-[#f0d890] text-[#001f3f] px-9 py-[18px] rounded-full font-bold text-base transition-all duration-300 hover:translate-y-[-2px] hover:shadow-[0_12px_28px_rgba(214,179,87,0.4)] flex items-center gap-2"
-              >
-                Browse Projects <ArrowRight className="w-5 h-5" />
-              </Link>
-              <Link
-                href="/contact"
-                className="px-9 py-[18px] rounded-full font-semibold text-base bg-[rgba(255,255,255,0.08)] border border-white/20 text-white transition-all hover:bg-white/15 hover:border-white/35 flex items-center gap-2"
-              >
-                Contact Us
-              </Link>
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
+          {/* Solid navy card with gold border (approved mockup) */}
+          <div className="relative overflow-hidden bg-gradient-to-b from-[#0a1f38] to-[#04101f] border-2 border-[#d6b357]/70 rounded-[40px] px-8 md:px-16 py-14 shadow-[0_30px_90px_-20px_rgba(0,10,25,0.8)]">
+            {/* Subtle dot texture inside the card */}
+            <div
+              className="absolute inset-0 opacity-[0.05]"
+              style={{
+                backgroundImage:
+                  "radial-gradient(circle, #fff 1px, transparent 1px)",
+                backgroundSize: "26px 26px",
+              }}
+              aria-hidden="true"
+            />
+            <div className="relative">
+              <div className="inline-flex items-center gap-2 px-5 py-2 border border-[#d6b357]/60 rounded-full text-xs font-bold uppercase tracking-[0.15em] text-[#d6b357] mb-8">
+                <Sparkles className="w-3.5 h-3.5" />
+                Ready to Invest?
+              </div>
+              <h2 className="font-['Outfit'] text-4xl md:text-6xl font-bold text-white leading-[1.1] mb-6 tracking-tight">
+                Start Exploring
+                <br />
+                <span className="bg-gradient-to-r from-[#d6b357] to-[#f0d890] bg-clip-text text-transparent">
+                  Luxury Properties.
+                </span>
+              </h2>
+              {/* Gold ornamental divider */}
+              <div className="flex items-center justify-center gap-2 mb-6" aria-hidden="true">
+                <span className="h-px w-28 bg-gradient-to-r from-transparent to-[#d6b357]/70" />
+                <Building2 className="w-4 h-4 text-[#d6b357]" />
+                <span className="h-px w-28 bg-gradient-to-l from-transparent to-[#d6b357]/70" />
+              </div>
+              <p className="text-white/70 text-lg max-w-xl mx-auto mb-10 leading-relaxed">
+                Browse hundreds of premium developments — from off-plan launches
+                to ready-to-move investments in Dubai&apos;s finest communities.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Link
+                  href="/projects"
+                  className="bg-gradient-to-r from-[#d6b357] to-[#f0d890] text-[#001f3f] px-9 py-[18px] rounded-full font-bold text-base transition-all duration-300 hover:translate-y-[-2px] hover:shadow-[0_12px_28px_rgba(214,179,87,0.4)] flex items-center gap-2"
+                >
+                  <Building2 className="w-5 h-5" />
+                  Browse Projects <ArrowRight className="w-5 h-5" />
+                </Link>
+                <Link
+                  href="/contact"
+                  className="px-9 py-[18px] rounded-full font-semibold text-base border border-[#d6b357]/60 text-white transition-all hover:bg-[#d6b357]/10 hover:border-[#d6b357] flex items-center gap-2"
+                >
+                  Contact Us <MessageCircle className="w-5 h-5 text-[#d6b357]" />
+                </Link>
+              </div>
             </div>
           </div>
         </div>
