@@ -1,23 +1,17 @@
 import { redirect } from "next/navigation"
 import { isAdminStaffRole } from "@/lib/app-roles"
-import { createClient } from "@/lib/supabase/server"
+import { getSessionIdentity } from "@/lib/server-identity"
 import { AdminUsersClient } from "./users-client"
 
 export const dynamic = "force-dynamic"
 
 export default async function AdminUsersPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const identity = await getSessionIdentity()
 
-  if (!user) redirect("/login")
+  if (!identity) redirect("/login")
+  const { profile } = identity
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single()
-
-  if (!profile || !isAdminStaffRole(profile.role)) {
+  if (!isAdminStaffRole(profile.role)) {
     redirect("/dashboard")
   }
 

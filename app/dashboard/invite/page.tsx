@@ -1,21 +1,16 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { getProfileByUserId, isInactiveProfile } from "@/lib/auth"
+import { isInactiveProfile } from "@/lib/auth"
 import { isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
+import { getSessionIdentity } from "@/lib/server-identity"
 import { InviteClient } from "./invite-client"
 
 export const dynamic = "force-dynamic"
 
 export default async function InvitePage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const identity = await getSessionIdentity()
 
-  if (!user) redirect("/login")
-
-  const { profile } = await getProfileByUserId(supabase, user.id)
-  if (!profile) redirect("/login")
+  if (!identity) redirect("/login")
+  const { userId, email, profile } = identity
   if (isInactiveProfile(profile)) redirect("/account-inactive")
 
   // Recruiters: sales pipeline roles and admin staff.
@@ -25,8 +20,8 @@ export default async function InvitePage() {
 
   return (
     <InviteClient
-      userId={user.id}
-      userName={profile.fullname ?? user.email ?? "User"}
+      userId={userId}
+      userName={profile.fullname ?? email ?? "User"}
       currentRole={profile.role ?? "agent"}
     />
   )

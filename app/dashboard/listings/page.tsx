@@ -1,21 +1,16 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { getProfileByUserId, isInactiveProfile } from "@/lib/auth"
+import { isInactiveProfile } from "@/lib/auth"
 import { isSalesPipelineRole } from "@/lib/app-roles"
+import { getSessionIdentity } from "@/lib/server-identity"
 import { AgentListingsClient } from "./listings-client"
 
 export const dynamic = "force-dynamic"
 
 export default async function AgentListingsPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const identity = await getSessionIdentity()
 
-  if (!user) redirect("/login")
-
-  const { profile } = await getProfileByUserId(supabase, user.id)
-  if (!profile) redirect("/login")
+  if (!identity) redirect("/login")
+  const { userId, email, profile } = identity
   if (isInactiveProfile(profile)) redirect("/account-inactive")
 
   // Agents, team leaders, and unit managers (see ROLES_SALES_PIPELINE).
@@ -25,8 +20,8 @@ export default async function AgentListingsPage() {
 
   return (
     <AgentListingsClient
-      userId={user.id}
-      userName={profile.fullname ?? user.email ?? "User"}
+      userId={userId}
+      userName={profile.fullname ?? email ?? "User"}
       currentRole={profile.role ?? "agent"}
     />
   )

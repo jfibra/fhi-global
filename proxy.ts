@@ -6,14 +6,51 @@ import {
   isInactiveProfile,
   isPathExemptFromProfileCompletionGate,
   isProfileMissingMinimumFields,
+  type AppProfile,
 } from "@/lib/auth"
 import { isAdminStaffRole } from "@/lib/app-roles"
 import { updateSession } from "@/lib/supabase/middleware"
+import { IDENTITY_HEADERS } from "@/lib/identity-headers"
+
+/**
+ * Hands the verified identity down to server components via internal request
+ * headers (see lib/server-identity.ts), so pages skip their own duplicate
+ * Supabase auth + profile round trips. Rebuilds the pass-through response with
+ * the enriched request and re-applies any refreshed auth cookies.
+ */
+function forwardIdentity(
+  request: NextRequest,
+  response: NextResponse,
+  user: { id: string; email?: string | null },
+  profile: AppProfile,
+) {
+  const encodedProfile = encodeURIComponent(JSON.stringify(profile))
+  // Oversized profiles (e.g. a bloated metadata blob) could blow the server's
+  // header size limit — skip forwarding and let pages run their full fallback.
+  if (encodedProfile.length > 6_000) {
+    return response
+  }
+  request.headers.set(IDENTITY_HEADERS.userId, user.id)
+  // Encoded like the profile: raw non-Latin-1 characters (internationalized
+  // emails) would make Headers.set throw and 500 the whole request.
+  request.headers.set(IDENTITY_HEADERS.email, encodeURIComponent(user.email ?? ""))
+  request.headers.set(IDENTITY_HEADERS.profile, encodedProfile)
+  const forwarded = NextResponse.next({ request })
+  for (const cookie of response.cookies.getAll()) {
+    forwarded.cookies.set(cookie)
+  }
+  return forwarded
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const isDashboardRoute = pathname.startsWith("/dashboard")
   const isLoginRoute = pathname === "/login"
+
+  // Anti-forgery: never trust identity headers arriving from the outside.
+  for (const header of Object.values(IDENTITY_HEADERS)) {
+    request.headers.delete(header)
+  }
 
   const { supabase, response, user, missingEnv } = await updateSession(request)
 
@@ -91,7 +128,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  return response
+  // Authenticated pass-through: hand the already-verified identity to the page.
+  return forwardIdentity(request, response, user, profile)
 }
 
 export const config = {

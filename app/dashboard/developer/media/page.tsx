@@ -1,32 +1,21 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getSessionIdentity } from "@/lib/server-identity"
 import { DeveloperMediaClient } from "./developer-media-client"
 
 export const dynamic = "force-dynamic"
 
 export default async function DeveloperMediaPage() {
-  const supabase = await createClient()
+  const identity = await getSessionIdentity()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  if (!identity) redirect("/login")
+  const { userId, email, profile } = identity
 
-  if (!user) redirect("/login")
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role, fullname, metadata")
-    .eq("id", user.id)
-    .single<{
-      id: string
-      role: string | null
-      fullname: string | null
-      metadata: Record<string, unknown> | null
-    }>()
-
-  if (!profile || profile.role !== "developer") {
+  if (profile.role !== "developer") {
     redirect("/dashboard/developer")
   }
+
+  const supabase = await createClient()
 
   const developerId = profile.metadata?.developer_id as string | undefined
 
@@ -43,8 +32,8 @@ export default async function DeveloperMediaPage() {
 
   return (
     <DeveloperMediaClient
-      userId={user.id}
-      userName={profile.fullname || user.email || "Developer"}
+      userId={userId}
+      userName={profile.fullname || email || "Developer"}
       developerId={developerId ?? null}
       developerName={developer?.name ?? null}
       developerSlug={developer?.slug ?? null}

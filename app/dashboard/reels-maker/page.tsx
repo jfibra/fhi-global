@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { getProfileByUserId, isInactiveProfile } from "@/lib/auth"
+import { isInactiveProfile } from "@/lib/auth"
 import { isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
+import { getSessionIdentity } from "@/lib/server-identity"
 import { ReelsMakerClient } from "./reels-maker-client"
 
 export const dynamic = "force-dynamic"
@@ -11,15 +11,10 @@ export default async function ReelsMakerPage({
 }: {
   searchParams?: Promise<{ listing?: string | string[] }>
 }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const identity = await getSessionIdentity()
 
-  if (!user) redirect("/login")
-
-  const { profile } = await getProfileByUserId(supabase, user.id)
-  if (!profile) redirect("/login")
+  if (!identity) redirect("/login")
+  const { userId, email, profile } = identity
   if (isInactiveProfile(profile)) redirect("/account-inactive")
 
   // Sales pipeline roles create reels for their listings; admins can use it too.
@@ -27,13 +22,14 @@ export default async function ReelsMakerPage({
     redirect("/dashboard")
   }
 
+  // Deep link from My listings / Quick Actions: ?listing=<id> preselects the listing.
   const sp = searchParams ? await searchParams : {}
   const listingParam = typeof sp.listing === "string" ? sp.listing : Array.isArray(sp.listing) ? sp.listing[0] : null
 
   return (
     <ReelsMakerClient
-      userId={user.id}
-      userName={profile.fullname ?? user.email ?? "User"}
+      userId={userId}
+      userName={profile.fullname ?? email ?? "User"}
       currentRole={profile.role ?? "agent"}
       initialListingId={listingParam}
     />

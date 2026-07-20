@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { AuthProvider } from "@/context/auth-context"
-import { ensureProfileForUser, isInactiveProfile, type AppUser } from "@/lib/auth"
-import { createClient } from "@/lib/supabase/server"
+import { isInactiveProfile, type AppUser } from "@/lib/auth"
+import { getSessionIdentity } from "@/lib/server-identity"
 
 export const dynamic = "force-dynamic"
 
@@ -10,33 +10,23 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // proxy.ts already verified the session for /dashboard/* and forwarded it;
+  // getSessionIdentity falls back to a full Supabase check if needed.
+  const identity = await getSessionIdentity()
 
-  if (!user) {
+  if (!identity) {
     redirect("/login")
   }
 
-  const { profile } = await ensureProfileForUser(supabase, {
-    id: user.id,
-    email: user.email,
-    user_metadata: user.user_metadata,
-  })
-
-  if (!profile) {
-    await supabase.auth.signOut()
-    redirect("/login")
-  }
+  const { userId, email, profile } = identity
 
   if (isInactiveProfile(profile)) {
     redirect("/account-inactive")
   }
 
   const appUser: AppUser = {
-    id: user.id,
-    email: user.email,
+    id: userId,
+    email,
   }
 
   return (

@@ -172,6 +172,11 @@ const nextConfig = {
         protocol: "https",
         hostname: FLAGCDN,
       },
+      // Google account avatars (Google Sign-In users' profile photos)
+      {
+        protocol: "https",
+        hostname: "*.googleusercontent.com",
+      },
       {
         protocol: "https",
         hostname: "filipinohomes123.s3.ap-southeast-1.amazonaws.com",

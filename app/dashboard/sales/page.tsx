@@ -1,34 +1,26 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
 import { canAccessSalesReportsArea } from "@/lib/app-roles"
+import { getSessionIdentity } from "@/lib/server-identity"
 import { SalesTable } from "./sales-table"
 
 export const dynamic = "force-dynamic"
 
 export default async function SalesPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const identity = await getSessionIdentity()
 
-  if (!user) redirect("/login")
+  if (!identity) redirect("/login")
+  const { userId, email, profile } = identity
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role, fullname")
-    .eq("id", user.id)
-    .single()
-
-  const roleValue = String(profile?.role ?? "").toLowerCase().trim()
-  if (!profile || !canAccessSalesReportsArea(profile.role)) {
+  const roleValue = String(profile.role ?? "").toLowerCase().trim()
+  if (!canAccessSalesReportsArea(profile.role)) {
     redirect("/dashboard")
   }
 
   return (
     <SalesTable
-      currentUserId={profile.id}
+      currentUserId={userId}
       currentRole={roleValue}
-      userName={profile.fullname || user.email || "User"}
+      userName={profile.fullname || email || "User"}
     />
   )
 }

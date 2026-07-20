@@ -1,30 +1,17 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getSessionIdentity } from "@/lib/server-identity"
 import { CompanyClient } from "./company-client"
 
 export const dynamic = "force-dynamic"
 
 export default async function DeveloperCompanyPage() {
-  const supabase = await createClient()
+  const identity = await getSessionIdentity()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  if (!identity) redirect("/login")
+  const { userId, email, profile } = identity
 
-  if (!user) redirect("/login")
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role, fullname, metadata")
-    .eq("id", user.id)
-    .single<{
-      id: string
-      role: string | null
-      fullname: string | null
-      metadata: Record<string, unknown> | null
-    }>()
-
-  if (!profile || profile.role !== "developer") {
+  if (profile.role !== "developer") {
     redirect("/dashboard/developer")
   }
 
@@ -32,6 +19,7 @@ export default async function DeveloperCompanyPage() {
 
   let developer = null
   if (developerId) {
+    const supabase = await createClient()
     const { data } = await supabase
       .from("developers")
       .select("*")
@@ -43,8 +31,8 @@ export default async function DeveloperCompanyPage() {
 
   return (
     <CompanyClient
-      userId={user.id}
-      userName={profile.fullname || user.email || "Developer"}
+      userId={userId}
+      userName={profile.fullname || email || "Developer"}
       developer={developer}
     />
   )

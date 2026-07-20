@@ -1,5 +1,6 @@
 import { redirect, notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getSessionIdentity } from "@/lib/server-identity"
 import Link from "next/link"
 import {
   ArrowLeft,
@@ -97,23 +98,15 @@ export default async function SaleDetailPage({
 }) {
   const { id } = await params
 
+  const identity = await getSessionIdentity()
+  if (!identity) redirect("/login")
+  const { email, profile } = identity
+
+  const roleValue = String(profile.role ?? "").toLowerCase().trim()
+  const isAdmin = isAdminStaffRole(profile.role)
+  if (!canAccessSalesReportsArea(profile.role)) redirect("/dashboard")
+
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) redirect("/login")
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role, fullname")
-    .eq("id", user.id)
-    .single()
-
-  const roleValue = String(profile?.role ?? "").toLowerCase().trim()
-  const isAdmin = isAdminStaffRole(profile?.role)
-  if (!profile || !canAccessSalesReportsArea(profile.role)) redirect("/dashboard")
-
   const { data: sale, error } = await supabase
     .from("sales_reports")
     .select(`
@@ -157,7 +150,7 @@ export default async function SaleDetailPage({
       role={roleValue}
       roleLabel={roleToLabel(roleValue)}
       roleColor={getRoleColor(roleValue)}
-      userName={profile.fullname || user.email || "User"}
+      userName={profile.fullname || email || "User"}
     >
       <div className="space-y-6 max-w-4xl">
 

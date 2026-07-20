@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getSessionIdentity } from "@/lib/server-identity"
 import { ProfileDashboardShell } from "./profile-dashboard-shell"
 
 export const dynamic = "force-dynamic"
@@ -24,22 +25,22 @@ type ProfileRecord = {
 }
 
 export default async function DashboardProfilePage() {
-  const supabase = await createClient()
+  const identity = await getSessionIdentity()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!identity) {
     redirect("/login")
   }
+
+  const { userId, email } = identity
+
+  const supabase = await createClient()
 
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
       "id, role, fname, mname, lname, fullname, birthday, gender, profile_url, status, timezone, metadata, joined_at, updated_at, is_deleted, deleted_at",
     )
-    .eq("id", user.id)
+    .eq("id", userId)
     .single<ProfileRecord>()
 
   if (error || !profile) {
@@ -54,8 +55,8 @@ export default async function DashboardProfilePage() {
     <ProfileDashboardShell
       profile={profile}
       user={{
-        id: user.id,
-        email: user.email ?? "",
+        id: userId,
+        email: email ?? "",
       }}
     />
   )

@@ -1,26 +1,18 @@
 import { redirect } from "next/navigation"
 import { isAdminStaffRole } from "@/lib/app-roles"
-import { createClient } from "@/lib/supabase/server"
+import { getSessionIdentity } from "@/lib/server-identity"
 import { PurchaseCategoriesTable } from "./purchase-categories-table"
 
 export const dynamic = "force-dynamic"
 
 export default async function PurchaseCategoriesPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const identity = await getSessionIdentity()
 
-  if (!user) redirect("/login")
+  if (!identity) redirect("/login")
+  const { email, profile } = identity
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role, fullname")
-    .eq("id", user.id)
-    .single()
-
-  const roleValue = String(profile?.role ?? "").toLowerCase().trim()
-  if (!profile || !isAdminStaffRole(profile.role)) {
+  const roleValue = String(profile.role ?? "").toLowerCase().trim()
+  if (!isAdminStaffRole(profile.role)) {
     redirect("/dashboard")
   }
 
@@ -28,7 +20,7 @@ export default async function PurchaseCategoriesPage() {
     <PurchaseCategoriesTable
       currentUserId={profile.id}
       currentRole={roleValue}
-      userName={profile.fullname || user.email || "User"}
+      userName={profile.fullname || email || "User"}
     />
   )
 }
