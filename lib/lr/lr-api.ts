@@ -36,6 +36,23 @@ export function mapLrRoleToFhi(roleId: number | null | undefined): AppRoleId {
   return LR_ROLE_TO_FHI[roleId] ?? "member"
 }
 
+/**
+ * The FHI role a Google sign-in should resolve to, shared by the pre-sign-in
+ * modal (display) and finalize (provisioning) so they never disagree.
+ *
+ * `member` is the default assigned by self-registration and the new-user
+ * trigger, so it's treated as "un-curated" and upgraded to the LR-mapped role.
+ * Any other existing role was assigned deliberately (by an admin or an earlier
+ * provisioning) and is preserved — a Google sign-in never overrides or
+ * downgrades a curated role. Non-LR emails keep whatever they have (member for
+ * brand-new accounts).
+ */
+export function resolveGoogleRole(existingRole: string | null | undefined, lr: NormalizedLrAgent | null): string {
+  const current = (existingRole ?? "member").trim() || "member"
+  if (lr && current === "member") return lr.mappedFhiRole
+  return current
+}
+
 /** Split LR's single `name` string into first/middle/last (same rule as the PHP). */
 export function parseName(fullName: string | null | undefined): {
   first: string

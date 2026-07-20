@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { lookupLrAgent, parseName } from "@/lib/lr/lr-api"
+import { lookupLrAgent, parseName, resolveGoogleRole } from "@/lib/lr/lr-api"
 import { pickSafePostLoginRedirect } from "@/lib/auth"
 
 // Completes Google sign-in AFTER the client established the Supabase session via
@@ -84,14 +84,6 @@ export async function POST(req: NextRequest) {
   const lname = parsed.last || googleFamily || profile.lname || null
   const profileUrl = profile.profile_url || googleAvatar || null
 
-  // A pre-existing email/password account that just linked Google (Supabase
-  // auto-links matching verified emails): keep their existing role/status,
-  // only backfill blank name/avatar and stamp the flag.
-  const providers = Array.isArray(user.app_metadata?.providers)
-    ? (user.app_metadata!.providers as string[])
-    : []
-  const isPreExistingAccount = providers.includes("email")
-
   const lrMetadata = lr
     ? {
         lr_agent_id: lr.agentId,
@@ -106,21 +98,15 @@ export async function POST(req: NextRequest) {
       }
     : {}
 
-  // Decide role/status. The DB default is already the least-privilege
-  // member/pending, so we only ever UP-grant here — never rely on a client
-  // step to downgrade.
-  let finalRole: string | null
-  let finalStatus: string | null
-  if (isPreExistingAccount) {
-    finalRole = profile.role
-    finalStatus = profile.status
-  } else if (lr) {
-    finalRole = lr.mappedFhiRole // verified elevated LR agent → active
-    finalStatus = "active"
-  } else {
-    finalRole = "member" // non-LR (or temporarily unreachable) → pending, admin approves
-    finalStatus = "pending"
-  }
+  // Decide role/status (first link only; returning users returned above). An
+  // un-curated `member` (self-registration / new-user default) is upgraded to
+  // the LR role; any deliberately-assigned role is preserved (never
+  // overridden/downgraded). Activate only when we actually apply an LR role to
+  // a member; otherwise keep the account's existing status (member/pending for
+  // brand-new accounts, whatever an admin set for curated ones).
+  const finalRole = resolveGoogleRole(profile.role, lr)
+  const upgradedMember = lr != null && (profile.role ?? "member") === "member"
+  const finalStatus = upgradedMember ? "active" : profile.status ?? "pending"
 
   const nextMetadata = {
     ...metadata,

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { lookupLrAgent } from "@/lib/lr/lr-api"
+import { lookupLrAgent, resolveGoogleRole } from "@/lib/lr/lr-api"
 import { roleToLabel } from "@/lib/app-roles"
+import { getProfileByUserId } from "@/lib/auth"
 
 // Session-based Leuterio Realty lookup for the post-Google-redirect modal.
 // Runs as the signed-in user (the OAuth redirect already established the
@@ -22,7 +23,12 @@ export async function POST() {
   const email = (user.email ?? "").toLowerCase()
   const result = await lookupLrAgent(email)
   const lr = result.kind === "agent" ? result.agent : null
-  const mappedRole = lr ? lr.mappedFhiRole : "member"
+
+  // Show the role the account will actually end up with: an existing curated
+  // (non-member) role is preserved, an un-curated member is upgraded to the LR
+  // role — matching what /api/auth/google/finalize will persist.
+  const { profile } = await getProfileByUserId(supabase, user.id)
+  const mappedRole = resolveGoogleRole(profile?.role, lr)
 
   const meta = user.user_metadata ?? {}
   const picture =
