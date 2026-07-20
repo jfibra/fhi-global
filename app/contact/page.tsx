@@ -8,7 +8,7 @@ import { ContactForm } from "@/app/contact/contact-form"
 import { createPageMetadata } from "@/lib/seo"
 import {
   MapPin, Phone, Mail, Clock, Facebook, Instagram, Linkedin,
-  Twitter, Building2, MessageSquare, Send
+  Twitter, Building2, MessageSquare, Send, Headphones, ShieldCheck
 } from "lucide-react"
 
 export const metadata: Metadata = createPageMetadata({
@@ -68,36 +68,35 @@ export default function ContactPage() {
       <TopBar />
       <Header />
 
-      {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="relative pt-20 pb-24 overflow-hidden">
+      {/* ── Hero — homepage skyline photo (approved mockup) ──── */}
+      <section className="relative pt-20 pb-44 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
           <Image
-            src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/3.png"
+            src="/background/home.png"
             alt=""
             fill
+            priority
             sizes="100vw"
             className="object-cover object-center"
             aria-hidden="true"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f]/88 via-[#002a52]/85 to-[#001428]/92" />
+          {/* Light navy wash for legibility; photo stays bright like the mockup */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/60 via-[#001f3f]/30 to-[#001f3f]/10" />
+          {/* Fade into the white content area so the cards overlap the photo */}
+          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#fafafa] via-[#fafafa]/40 to-transparent" />
         </div>
-        <div
-          className="absolute inset-0 opacity-[0.05]"
-          style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }}
-        />
-        <div className="absolute top-[-80px] left-[-80px] w-[500px] h-[500px] rounded-full opacity-25 blur-[130px] bg-[radial-gradient(circle,#d6b357,transparent)]" />
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/50 to-transparent" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 border border-white/20 rounded-full text-xs font-medium text-white/80 mb-6 backdrop-blur-sm">
-            <MessageSquare className="w-3.5 h-3.5 text-[#d6b357]" />
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 border border-white/25 rounded-full text-xs font-medium text-white/90 mb-6 backdrop-blur-sm">
+            <Headphones className="w-3.5 h-3.5 text-[#d6b357]" />
             We&apos;d love to hear from you
           </div>
 
           <h1
             className="font-['Outfit'] text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight mb-5"
-            style={{ textShadow: "0 2px 30px rgba(0,0,0,0.4)" }}
+            style={{ textShadow: "0 2px 30px rgba(0,0,0,0.5)" }}
           >
             Get In{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">
@@ -105,46 +104,57 @@ export default function ContactPage() {
             </span>
           </h1>
 
-          <p className="text-white/60 text-lg md:text-xl max-w-xl mx-auto leading-relaxed">
+          {/* Gold divider with diamond (mockup) */}
+          <div className="flex items-center justify-center gap-2 mb-6" aria-hidden="true">
+            <span className="h-px w-24 bg-gradient-to-r from-transparent to-[#d6b357]/80" />
+            <span className="w-2 h-2 rotate-45 bg-[#d6b357]" />
+            <span className="h-px w-24 bg-gradient-to-l from-transparent to-[#d6b357]/80" />
+          </div>
+
+          <p
+            className="text-white/90 text-lg md:text-xl max-w-xl mx-auto leading-relaxed"
+            style={{ textShadow: "0 1px 12px rgba(0,10,30,0.7)" }}
+          >
             Our Dubai-based team is ready to help. Reach out for developer partnerships,
             agent onboarding, or any real estate inquiry.
           </p>
         </div>
       </section>
 
-      {/* ── Main content ─────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
+      {/* ── Main content — cards overlap the hero photo ──────── */}
+      <section className="relative z-10 -mt-28 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
 
         {/* ── Left: info panel ──────────────────────────────── */}
         <div className="lg:col-span-2 space-y-6">
 
           {/* Quick contact */}
-          <div className="bg-gradient-to-br from-[#001f3f] to-[#002a52] rounded-[28px] p-7 relative overflow-hidden">
+          <div className="bg-gradient-to-br from-[#001f3f] to-[#002a52] rounded-[28px] p-7 relative overflow-hidden ring-1 ring-[#d6b357]/40 shadow-[0_24px_70px_-16px_rgba(0,10,30,0.5)]">
             <div
               className="absolute inset-0 opacity-[0.06]"
               style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "24px 24px" }}
             />
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/40 to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#d6b357]/70 to-transparent" />
             <div className="relative space-y-5">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-4">Quick Contact</p>
+                <p className="text-center text-sm font-bold uppercase tracking-[0.2em] text-[#d6b357] mb-4">Quick Contact</p>
                 {[
-                  { icon: Phone, label: "Main Office", value: "+971 56 742 8288", href: "tel:+971567428288" },
-                  { icon: Mail,  label: "Email Us",    value: "info@fhiglobal.ae", href: "mailto:info@fhiglobal.ae" },
-                  { icon: MapPin, label: "HQ Location", value: "Al Rigga, Deira, Dubai, UAE", href: "#offices" },
-                  { icon: Clock,  label: "Working Hours", value: "Sun–Thu, 9AM–6PM GST" },
-                ].map(({ icon: Icon, label, value, href }) => (
-                  <div key={label} className="flex items-start gap-4 py-3.5 border-b border-white/8 last:border-0">
-                    <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0">
-                      <Icon className="w-4 h-4 text-[#d6b357]" />
+                  { icon: Phone, label: "Main Office", value: "+971 56 742 8288", sub: "Sun–Thu, 9AM–6PM GST", href: "tel:+971567428288" },
+                  { icon: Mail,  label: "Email Us",    value: "info@fhiglobal.ae", sub: "We respond within one business day.", href: "mailto:info@fhiglobal.ae" },
+                  { icon: MapPin, label: "HQ Location", value: "Al Rigga, Deira, Dubai, UAE", sub: "Visit our main office", href: "#offices" },
+                  { icon: Clock,  label: "Working Hours", value: "Sun–Thu, 9AM–6PM GST", sub: "Friday & Saturday closed" },
+                ].map(({ icon: Icon, label, value, sub, href }) => (
+                  <div key={label} className="flex items-start gap-4 py-4 border-b border-white/10 last:border-0">
+                    <div className="w-12 h-12 rounded-full border-2 border-[#d6b357]/70 bg-[#d6b357]/10 flex items-center justify-center shrink-0">
+                      <Icon className="w-5 h-5 text-[#d6b357]" />
                     </div>
                     <div>
-                      <p className="text-[11px] font-medium text-white/40 uppercase tracking-wider mb-0.5">{label}</p>
+                      <p className="text-[11px] font-bold text-[#d6b357] uppercase tracking-wider mb-0.5">{label}</p>
                       {href ? (
-                        <a href={href} className="text-sm font-semibold text-white hover:text-[#d6b357] transition-colors">{value}</a>
+                        <a href={href} className="text-base font-bold text-white hover:text-[#d6b357] transition-colors leading-snug">{value}</a>
                       ) : (
-                        <p className="text-sm font-semibold text-white">{value}</p>
+                        <p className="text-base font-bold text-white leading-snug">{value}</p>
                       )}
+                      <p className="text-xs text-white/55 mt-0.5">{sub}</p>
                     </div>
                   </div>
                 ))}
@@ -196,15 +206,30 @@ export default function ContactPage() {
 
         {/* ── Right: form ───────────────────────────────────── */}
         <div className="lg:col-span-3">
-          <div className="bg-white rounded-[28px] border border-[#e8eaed] shadow-[0_8px_40px_-8px_rgba(0,31,63,0.10)] p-8 lg:p-10">
+          <div className="bg-white rounded-[28px] border border-[#e8eaed] shadow-[0_24px_70px_-16px_rgba(0,10,30,0.25)] p-8 lg:p-10">
             <div className="mb-8">
-              <div className="w-10 h-10 rounded-2xl bg-[#001f3f] flex items-center justify-center mb-5 shadow-md">
-                <Send className="w-4 h-4 text-[#d6b357]" />
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#001f3f] to-[#003366] flex items-center justify-center shadow-md shrink-0">
+                  <Send className="w-5 h-5 text-[#d6b357]" />
+                </div>
+                <div>
+                  <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mb-0.5">Send us a message</h2>
+                  <p className="text-sm text-[#6b7280]">We respond to all enquiries within one business day.</p>
+                </div>
               </div>
-              <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mb-1">Send us a message</h2>
-              <p className="text-sm text-[#6b7280]">We respond to all enquiries within one business day.</p>
+              {/* Gold hairline with diamond end (mockup) */}
+              <div className="flex items-center gap-1.5" aria-hidden="true">
+                <span className="h-px flex-1 bg-gradient-to-r from-[#e8eaed] to-[#d6b357]/60" />
+                <span className="w-1.5 h-1.5 rotate-45 bg-[#d6b357]" />
+              </div>
             </div>
             <ContactForm />
+            <p className="mt-5 flex items-center justify-center gap-2 text-xs text-[#9ca3af]">
+              <span className="w-6 h-6 rounded-full bg-[#001f3f]/6 flex items-center justify-center">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#001f3f]" />
+              </span>
+              Your information is secure and will never be shared.
+            </p>
           </div>
         </div>
       </section>

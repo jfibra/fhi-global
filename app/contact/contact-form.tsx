@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import {
-  Mail, Phone, Send, CheckCircle2, User, MessageSquare,
+  Mail, Phone, CheckCircle2, User, MessageSquare,
   Building2, ArrowRight, Loader2
 } from "lucide-react"
 
@@ -151,14 +151,14 @@ export function ContactForm() {
       <button
         type="submit"
         disabled={status === "sending"}
-        className="group relative w-full py-4 px-4 bg-[#001f3f] hover:bg-[#002a52] text-white text-sm font-semibold rounded-xl transition-all duration-300 disabled:opacity-60 shadow-[0_4px_16px_-2px_rgba(0,31,63,0.35)] hover:shadow-[0_6px_20px_-2px_rgba(0,31,63,0.45)] hover:-translate-y-0.5 overflow-hidden"
+        className="group relative w-full sm:w-auto py-4 px-10 bg-gradient-to-r from-[#d6b357] to-[#c9a449] hover:from-[#c9a449] hover:to-[#b8913f] text-[#001f3f] text-sm font-bold rounded-xl transition-all duration-300 disabled:opacity-60 shadow-[0_6px_20px_-4px_rgba(214,179,87,0.6)] hover:shadow-[0_8px_26px_-4px_rgba(214,179,87,0.75)] hover:-translate-y-0.5 overflow-hidden"
       >
-        <span className="absolute inset-0 bg-gradient-to-r from-transparent via-[#d6b357]/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+        <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
         <span className="relative flex items-center justify-center gap-2">
           {status === "sending" ? (
             <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
           ) : (
-            <>Send Message <Send className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" /></>
+            <>Send Message <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" /></>
           )}
         </span>
       </button>

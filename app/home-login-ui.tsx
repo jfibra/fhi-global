@@ -4,6 +4,7 @@ import { useActionState, useState } from "react"
 import { Eye, EyeOff, Mail, Lock, ArrowRight, ShieldCheck, Star, MapPin } from "lucide-react"
 import { loginAction, type LoginState } from "@/app/login/actions"
 import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
+import { DubaiBackdrop } from "@/components/auth/dubai-backdrop"
 
 const initialState: LoginState = {}
 
@@ -35,21 +36,25 @@ function LoginCard({
   nextRedirect?: string
 }) {
   return (
-    <div className="bg-white rounded-[28px] border border-[#e8eaed] shadow-[0_8px_48px_-8px_rgba(0,31,63,0.12)] p-8 lg:p-10">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#003366] flex items-center justify-center mb-5 shadow-md">
-          <Lock className="w-[18px] h-[18px] text-[#d6b357]" />
-        </div>
-        <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mb-1.5">
-          Welcome back
+    <div className="bg-white/95 backdrop-blur-md rounded-[28px] ring-1 ring-white/50 shadow-[0_24px_80px_-16px_rgba(0,10,30,0.55)] p-6 lg:p-7">
+      {/* Header — brand logo, centered like the approved mockup */}
+      <div className="mb-5 text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logos/FHI_Branding Set_PNG Copies-02.png"
+          alt="FHI Global Property Dubai"
+          className="h-10 mx-auto object-contain mb-3"
+        />
+        <h2 className="font-['Outfit'] text-[22px] font-bold text-[#0d1117] mb-1">
+          Welcome Back
         </h2>
-        <p className="text-sm text-[#6b7280] leading-relaxed">
-          Sign in to access your private portal and everything waiting inside.
+        <p className="text-[13px] text-[#6b7280] leading-relaxed max-w-[300px] mx-auto">
+          Sign in to access your private portal and discover exclusive opportunities.
         </p>
+        <span className="block w-10 h-[3px] rounded-full bg-[#d6b357] mx-auto mt-3" />
       </div>
 
-      <form action={formAction} className="space-y-5">
+      <form action={formAction} className="space-y-4">
         {nextRedirect ? <input type="hidden" name="next" value={nextRedirect} /> : null}
         {/* Email */}
         <div className="space-y-1.5">
@@ -64,7 +69,7 @@ function LoginCard({
               placeholder="you@fhiglobal.ae"
               required
               autoComplete="email"
-              className="w-full pl-11 pr-5 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all duration-200"
+              className="w-full pl-11 pr-5 py-3 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all duration-200"
             />
           </div>
         </div>
@@ -82,7 +87,7 @@ function LoginCard({
               placeholder="Enter your password"
               required
               autoComplete="current-password"
-              className="w-full pl-11 pr-12 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all duration-200"
+              className="w-full pl-11 pr-12 py-3 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all duration-200"
             />
             <button
               type="button"
@@ -122,11 +127,11 @@ function LoginCard({
           </div>
         )}
 
-        {/* Submit */}
+        {/* Submit — navy bar with the mockup's gold arrow chip on the right */}
         <button
           type="submit"
           disabled={pending}
-          className="group relative w-full py-3.5 px-4 mt-1 bg-gradient-to-r from-[#001f3f] to-[#002a52] text-white text-sm font-semibold rounded-xl transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_16px_-2px_rgba(0,31,63,0.30)] hover:shadow-[0_6px_20px_-2px_rgba(0,31,63,0.40)] hover:-translate-y-0.5 overflow-hidden"
+          className="group relative w-full py-3 pl-4 pr-14 mt-0.5 bg-gradient-to-r from-[#001f3f] to-[#002a52] text-white text-sm font-semibold rounded-xl transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_16px_-2px_rgba(0,31,63,0.30)] hover:shadow-[0_6px_20px_-2px_rgba(0,31,63,0.40)] hover:-translate-y-0.5 overflow-hidden"
         >
           <span className="absolute inset-0 bg-gradient-to-r from-transparent via-[#d6b357]/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
           <span className="relative flex items-center justify-center gap-2">
@@ -136,28 +141,28 @@ function LoginCard({
                 Signing in…
               </>
             ) : (
-              <>
-                Enter Portal
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-200" />
-              </>
+              "Enter Portal"
             )}
           </span>
+          {!pending && (
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-gradient-to-br from-[#d6b357] to-[#b8913f] flex items-center justify-center shadow-md">
+              <ArrowRight className="w-4 h-4 text-[#001f3f] group-hover:translate-x-0.5 transition-transform duration-200" />
+            </span>
+          )}
         </button>
       </form>
 
-      <div className="flex items-center gap-3 my-6">
-        <div className="flex-1 h-px bg-[#f0f0f0]" />
-        <span className="text-[10px] text-[#bbb] uppercase tracking-widest font-semibold">Or continue with</span>
-        <div className="flex-1 h-px bg-[#f0f0f0]" />
+      <div className="flex items-center gap-3 my-4">
+        <div className="flex-1 h-px bg-[#eceef1]" />
+        <span className="text-[10px] text-[#adb5bd] uppercase tracking-widest font-semibold">Or continue with</span>
+        <div className="flex-1 h-px bg-[#eceef1]" />
       </div>
 
       {/* Google sign-in (auto-imports Leuterio Realty agent details) */}
       <GoogleAuthFlow variant="login" nextRedirect={nextRedirect} />
 
-      <div className="h-px bg-[#f0f0f0] my-6" />
-
       {/* Access note */}
-      <div className="flex items-start gap-3 p-4 rounded-2xl bg-[#f8faff] border border-[#e0e7ff]">
+      <div className="mt-4 flex items-start gap-3 p-3.5 rounded-2xl bg-[#f8faff] border border-[#e0e7ff]">
         <div className="w-7 h-7 rounded-xl bg-[#001f3f]/8 flex items-center justify-center shrink-0 mt-0.5">
           <ShieldCheck className="w-3.5 h-3.5 text-[#001f3f]" />
         </div>
@@ -186,113 +191,102 @@ export function HomeLoginUI({ nextRedirect }: { nextRedirect?: string }) {
   return (
     <>
       {/* ══════════════════════ MOBILE (< lg) ══════════════════════ */}
-      <div className="lg:hidden flex flex-col min-h-[calc(100dvh-56px)]">
+      <div className="lg:hidden relative flex flex-col min-h-[calc(100dvh-56px)] overflow-hidden">
+        <div className="absolute inset-0">
+          <DubaiBackdrop />
+        </div>
 
-        {/* Navy brand hero */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] px-6 pt-10 pb-24 shrink-0">
-          {/* Dot grid */}
-          <div
-            className="absolute inset-0 opacity-[0.05]"
-            style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "24px 24px" }}
-          />
-          {/* Glows */}
-          <div className="absolute top-[-80px] left-[-80px] w-[340px] h-[340px] rounded-full opacity-30 blur-[110px] bg-[radial-gradient(circle,#d6b357,transparent)]" />
-          <div className="absolute bottom-[-40px] right-[-60px] w-[280px] h-[280px] rounded-full opacity-20 blur-[90px] bg-[radial-gradient(circle,#4a9eff,transparent)]" />
-          {/* Gold top rule */}
-          <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#d6b357]/70 to-transparent" />
-
-          <div className="relative z-10 max-w-sm mx-auto">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 border border-white/20 rounded-full text-[11px] font-semibold text-white/80 backdrop-blur-sm mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357] animate-pulse" />
-              Dubai Â· UAE Real Estate
+        {/* Hero copy over the photo */}
+        <div className="relative z-10 px-6 pt-10 pb-6 shrink-0">
+          <div className="max-w-sm mx-auto">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 border border-white/25 rounded-full text-[11px] font-semibold text-white/90 backdrop-blur-sm mb-6">
+              <MapPin className="w-3 h-3 text-[#d6b357]" />
+              Dubai • UAE Real Estate
             </div>
-            <h1 className="font-['Outfit'] text-[28px] font-bold text-white leading-[1.2] mb-3">
-              Where Dubai's Finest<br />
+            <h1 className="font-['Outfit'] text-[30px] font-bold text-white leading-[1.2] mb-3 drop-shadow-[0_2px_12px_rgba(0,10,30,0.5)]">
+              Where Dubai&apos;s Finest<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">
                 Properties Begin.
               </span>
             </h1>
-            <p className="text-white/45 text-[13px] leading-relaxed">
+            <p className="text-white/70 text-[13px] leading-relaxed">
               A private portal for FHI Global real estate professionals.
             </p>
           </div>
         </div>
 
-        {/* Card floats over the navy band */}
-        <div className="relative z-10 -mt-12 px-4 pb-10 flex-1 bg-transparent">
+        {/* Card over the photo */}
+        <div className="relative z-10 px-4 pb-10 flex-1">
           <div className="max-w-sm mx-auto">
             <LoginCard {...cardProps} />
-            <p className="text-center text-[11px] text-[#9ca3af] mt-5 tracking-wide">
-              © {new Date().getFullYear()} FHI Global Â· Dubai, UAE Â· All rights reserved
+            <p className="text-center text-[11px] text-white/60 mt-5 tracking-wide">
+              © {new Date().getFullYear()} FHI Global • Dubai, UAE. All rights reserved
             </p>
           </div>
         </div>
       </div>
 
       {/* ══════════════════════ DESKTOP (lg+) ══════════════════════ */}
-      <section className="hidden lg:block bg-[#f4f6f9] py-20">
-        <div className="max-w-7xl mx-auto px-8 lg:px-10">
-          <div className="grid lg:grid-cols-[1fr_440px] xl:grid-cols-[1fr_480px] gap-10 xl:gap-16 items-center">
+      <section className="hidden lg:block relative overflow-hidden">
+        <div className="absolute inset-0">
+          <DubaiBackdrop />
+        </div>
 
-            {/* Left: editorial panel */}
-            <div className="flex flex-col justify-center relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#001f3f] via-[#002a52] to-[#001428] p-12 xl:p-16 min-h-[600px]">
-              <div
-                className="absolute inset-0 opacity-[0.05]"
-                style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }}
-              />
-              <div className="absolute top-[-80px] left-[-80px] w-[420px] h-[420px] rounded-full opacity-25 blur-[120px] bg-[radial-gradient(circle,#d6b357,transparent)]" />
-              <div className="absolute bottom-[-60px] right-[-60px] w-[380px] h-[380px] rounded-full opacity-20 blur-[100px] bg-[radial-gradient(circle,#4a9eff,transparent)]" />
-              <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-[32px] bg-gradient-to-r from-transparent via-[#d6b357]/60 to-transparent" />
+        <div className="relative z-10 max-w-7xl mx-auto px-8 lg:px-10 min-h-[calc(100dvh-128px)] flex flex-col justify-center py-8">
+          <div className="grid lg:grid-cols-[1fr_400px] xl:grid-cols-[1fr_420px] gap-12 xl:gap-16 items-center">
 
-              <div className="relative z-10 space-y-8">
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 border border-white/20 rounded-full text-xs font-medium text-white/80 backdrop-blur-sm w-fit">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357] animate-pulse" />
-                  Dubai Â· UAE Real Estate
-                </div>
+            {/* Left: hero copy directly over the photo (mockup layout) */}
+            <div className="flex flex-col justify-center space-y-9">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/25 rounded-full text-xs font-semibold text-white/90 backdrop-blur-sm w-fit">
+                <MapPin className="w-3.5 h-3.5 text-[#d6b357]" />
+                Dubai • UAE Real Estate
+              </div>
 
-                <div>
-                  <h1 className="font-['Outfit'] text-4xl xl:text-5xl font-bold text-white leading-[1.15] mb-5">
-                    Where Dubai's Finest<br />
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">
-                      Properties Begin.
-                    </span>
-                  </h1>
-                  <p className="text-white/50 text-base leading-relaxed max-w-md">
-                    A private portal connecting real estate professionals with premium developments across the UAE.
-                    Everything you need — and nothing you don't.
-                  </p>
-                </div>
+              <div>
+                <h1 className="font-['Outfit'] text-5xl xl:text-[56px] font-bold text-white leading-[1.12] mb-5 drop-shadow-[0_2px_16px_rgba(0,10,30,0.5)]">
+                  Where Dubai&apos;s Finest<br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">
+                    Properties Begin.
+                  </span>
+                </h1>
+                <p className="text-white/90 text-lg leading-relaxed max-w-lg drop-shadow-[0_2px_10px_rgba(0,10,30,0.8)]">
+                  A private portal connecting real estate professionals with premium developments across the UAE.
+                  Everything you need — and nothing you don&apos;t.
+                </p>
+              </div>
 
-                <div className="space-y-4">
-                  {PILLARS.map(({ icon: Icon, label, desc }) => (
-                    <div key={label} className="flex items-start gap-4 group">
-                      <div className="w-9 h-9 rounded-2xl bg-white/[0.08] border border-white/[0.12] flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-[#d6b357]/15 group-hover:border-[#d6b357]/30 transition-all duration-300">
-                        <Icon className="w-4 h-4 text-[#d6b357]" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-white/90">{label}</p>
-                        <p className="text-xs text-white/45 mt-0.5 leading-relaxed">{desc}</p>
-                      </div>
+              {/* Pillars — horizontal row, like the mockup */}
+              <div className="grid grid-cols-3 gap-6 max-w-2xl">
+                {PILLARS.map(({ icon: Icon, label, desc }) => (
+                  <div key={label} className="flex items-start gap-3 group">
+                    <div className="w-11 h-11 rounded-full bg-white/10 border border-white/25 backdrop-blur-sm flex items-center justify-center shrink-0 group-hover:bg-[#d6b357]/20 group-hover:border-[#d6b357]/40 transition-all duration-300">
+                      <Icon className="w-[18px] h-[18px] text-[#d6b357]" />
                     </div>
-                  ))}
-                </div>
+                    <div>
+                      <p className="text-[15px] font-bold text-white drop-shadow-[0_2px_8px_rgba(0,10,30,0.8)]">{label}</p>
+                      <p className="text-xs text-white/85 mt-1 leading-relaxed drop-shadow-[0_1px_6px_rgba(0,10,30,0.8)]">{desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-                <div className="pt-4 border-t border-white/10">
-                  <p className="text-white/30 text-xs leading-relaxed italic">
-                    "Access is earned, not given. Once inside, the full picture becomes clear."
-                  </p>
-                </div>
+              <div className="pt-5 border-t border-white/15 max-w-2xl">
+                <p className="text-white/55 text-sm leading-relaxed italic">
+                  &quot;Access is earned, not given. Once inside, the full picture becomes clear.&quot;
+                </p>
+                <span className="block w-12 h-[3px] rounded-full bg-[#d6b357]/80 mt-3" />
               </div>
             </div>
 
             {/* Right: login card */}
             <div>
               <LoginCard {...cardProps} />
-              <p className="text-center text-[11px] text-[#bbb] mt-5 tracking-wide">
-                © {new Date().getFullYear()} FHI Global Â· Dubai, UAE Â· All rights reserved
-              </p>
             </div>
           </div>
+
+          <p className="text-right text-[11px] text-white/55 mt-5 tracking-wide">
+            © {new Date().getFullYear()} FHI Global • Dubai, UAE. All rights reserved
+          </p>
         </div>
       </section>
     </>

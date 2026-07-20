@@ -8,6 +8,7 @@ import {
   User, Mail, Lock, AlertCircle, FileText,
 } from "lucide-react"
 import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
+import { DubaiBackdrop } from "@/components/auth/dubai-backdrop"
 
 type AccountType = "member" | "developer" | ""
 
@@ -83,24 +84,24 @@ function Stepper({ current, steps }: { current: number; steps: string[] }) {
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
                   done
-                    ? "bg-[#001f3f] text-white"
+                    ? "bg-[#d6b357] text-[#001f3f]"
                     : active
-                      ? "bg-[#001f3f] text-white shadow-[0_0_0_4px_rgba(0,31,63,0.12)]"
-                      : "bg-[#f0f2f5] text-[#adb5bd] border border-[#e4e7ec]"
+                      ? "bg-white text-[#001f3f] shadow-[0_0_0_4px_rgba(255,255,255,0.25)]"
+                      : "bg-white/15 text-white/70 border border-white/30 backdrop-blur-sm"
                 }`}
               >
                 {done ? <Check className="w-4 h-4" /> : <span className="text-sm">{i + 1}</span>}
               </div>
               <span
                 className={`mt-2 text-[10px] font-semibold uppercase tracking-[0.1em] whitespace-nowrap transition-colors ${
-                  active ? "text-[#001f3f]" : done ? "text-[#6b7280]" : "text-[#c4c9d4]"
+                  active ? "text-white" : done ? "text-white/80" : "text-white/50"
                 }`}
               >
                 {label}
               </span>
             </div>
             {!last && (
-              <div className={`w-12 sm:w-20 h-px mt-5 mx-1 transition-colors ${done ? "bg-[#001f3f]" : "bg-[#e4e7ec]"}`} />
+              <div className={`w-12 sm:w-20 h-px mt-5 mx-1 transition-colors ${done ? "bg-[#d6b357]" : "bg-white/30"}`} />
             )}
           </div>
         )
@@ -131,7 +132,7 @@ function StepCard({
   hideBack?: boolean
 }) {
   return (
-    <div className="bg-white rounded-[20px] border border-[#e4e7ec] shadow-[0_2px_24px_-4px_rgba(0,31,63,0.10)] overflow-hidden">
+    <div className="bg-white/95 backdrop-blur-md rounded-[20px] ring-1 ring-white/50 shadow-[0_24px_80px_-16px_rgba(0,10,30,0.45)] overflow-hidden">
       <div className="px-7 pt-7 pb-2">
         <h2 className="font-['Outfit'] text-[21px] font-bold text-[#0d1117] mb-1.5">{title}</h2>
         {subtitle && <p className="text-sm text-[#6b7280] leading-relaxed">{subtitle}</p>}
@@ -255,17 +256,19 @@ export function RegisterUI({
   const lastStep = STEPS.length - 1
 
   return (
-    <div className="relative min-h-screen bg-[#f4f6f9] font-sans overflow-x-hidden">
-      <div className="fixed top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-20 blur-[130px] -z-10 bg-[radial-gradient(circle,rgb(180,235,255)_0%,rgba(255,255,255,0)_70%)]" />
-      <div className="fixed bottom-0 right-[-5%] w-[600px] h-[600px] rounded-full opacity-20 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(255,240,200)_0%,rgba(255,255,255,0)_70%)]" />
+    <div className="relative min-h-screen font-sans overflow-x-hidden">
+      {/* Cinematic Dubai backdrop, matching the login page */}
+      <div className="fixed inset-0 -z-10">
+        <DubaiBackdrop />
+      </div>
 
-      <div className="bg-white border-b border-[#eaecf0]">
+      <div className="border-b border-white/10">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 text-center">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white border border-[#e4e7ec] rounded-full text-xs font-semibold text-[#374151] mb-5 shadow-sm">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 border border-white/25 rounded-full text-xs font-semibold text-white/90 backdrop-blur-sm mb-5">
             <span className="w-2 h-2 rounded-full bg-[#d6b357]" />
             {isDeveloper ? "Developer registration" : "Member registration"}
           </div>
-          <h1 className="font-['Outfit'] text-3xl sm:text-4xl font-bold text-[#0d1117] mb-3 leading-tight tracking-tight">
+          <h1 className="font-['Outfit'] text-3xl sm:text-4xl font-bold text-white drop-shadow-[0_2px_12px_rgba(0,10,30,0.7)] mb-3 leading-tight tracking-tight">
             {isDeveloper ? (
               <>
                 List and manage projects{" "}
@@ -290,12 +293,12 @@ export function RegisterUI({
               </>
             )}
           </h1>
-          <p className="text-[#6b7280] text-base leading-relaxed mb-8 max-w-xl mx-auto">
+          <p className="text-white/85 drop-shadow-[0_1px_8px_rgba(0,10,30,0.7)] text-base leading-relaxed mb-8 max-w-xl mx-auto">
             {isDeveloper
               ? "Create your developer account to publish projects, manage media, and track listing performance on FHI Global."
               : "Browse properties for sale and rent, manage your profile, and use support. Sales agent accounts are created by an administrator—contact us if you need CRM and listing tools."}
           </p>
-          <div className="flex items-center justify-center gap-8 sm:gap-14 mb-8 py-5 border-y border-[#f0f0f0]">
+          <div className="flex items-center justify-center gap-8 sm:gap-14 mb-8 py-5 border-y border-white/15">
             {[
               { icon: <Building2 className="w-4 h-4" />, value: "100+", label: "Developers" },
               { icon: <TrendingUp className="w-4 h-4" />, value: "500+", label: "Projects" },
@@ -304,9 +307,9 @@ export function RegisterUI({
               <div key={label} className="flex flex-col items-center gap-0.5">
                 <div className="flex items-center gap-1.5 text-[#d6b357]">
                   {icon}
-                  <span className="font-['Outfit'] text-xl font-bold text-[#001f3f]">{value}</span>
+                  <span className="font-['Outfit'] text-xl font-bold text-white drop-shadow-[0_1px_6px_rgba(0,10,30,0.7)]">{value}</span>
                 </div>
-                <span className="text-[11px] text-[#9ca3af] font-medium">{label}</span>
+                <span className="text-[11px] text-white/70 font-medium">{label}</span>
               </div>
             ))}
           </div>
@@ -348,12 +351,12 @@ export function RegisterUI({
                     },
                   ]
             ).map(({ title, desc, icon }) => (
-              <div key={title} className="flex flex-col gap-2 bg-[#fffdf3] border border-[#f0e8c8] rounded-2xl px-4 py-4 text-left">
+              <div key={title} className="flex flex-col gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl px-4 py-4 text-left">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded-full bg-[#d6b357] flex items-center justify-center shrink-0">{icon}</div>
-                  <span className="text-sm font-bold text-[#111827]">{title}</span>
+                  <span className="text-sm font-bold text-white">{title}</span>
                 </div>
-                <p className="text-xs text-[#6b7280] leading-relaxed pl-8">{desc}</p>
+                <p className="text-xs text-white/75 leading-relaxed pl-8">{desc}</p>
               </div>
             ))}
           </div>
@@ -362,7 +365,7 @@ export function RegisterUI({
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
         {success ? (
-          <div className="bg-white rounded-[20px] border border-[#e4e7ec] shadow-[0_2px_24px_-4px_rgba(0,31,63,0.10)] overflow-hidden text-center">
+          <div className="bg-white/95 backdrop-blur-md rounded-[20px] ring-1 ring-white/50 shadow-[0_24px_80px_-16px_rgba(0,10,30,0.45)] overflow-hidden text-center">
             <div className="px-8 py-10">
               <div className="w-20 h-20 rounded-full bg-[#d6b357]/12 border-2 border-[#d6b357]/30 flex items-center justify-center mx-auto mb-6">
                 <CheckCircle2 className="w-10 h-10 text-[#d6b357]" />
@@ -536,20 +539,20 @@ export function RegisterUI({
 
             <div className="text-center mt-6 space-y-1.5">
               {isDeveloper && (
-                <p className="text-sm text-[#374151]">
+                <p className="text-sm text-white/85 drop-shadow-[0_1px_6px_rgba(0,10,30,0.7)]">
                   Creating a member account instead?{" "}
-                  <Link href="/register" className="text-[#d6b357] font-semibold hover:text-[#b8972e] hover:underline transition-colors">
+                  <Link href="/register" className="text-[#d6b357] font-semibold hover:text-[#f0d890] hover:underline transition-colors">
                     Use member registration
                   </Link>
                 </p>
               )}
-              <p className="text-sm text-[#374151]">
+              <p className="text-sm text-white/85 drop-shadow-[0_1px_6px_rgba(0,10,30,0.7)]">
                 Already have an account?{" "}
-                <Link href="/login" className="text-[#d6b357] font-semibold hover:text-[#b8972e] hover:underline transition-colors">
+                <Link href="/login" className="text-[#d6b357] font-semibold hover:text-[#f0d890] hover:underline transition-colors">
                   Sign in
                 </Link>
               </p>
-              <p className="text-[11px] text-[#c4c9d4]">© {new Date().getFullYear()} FHI Global · Dubai, UAE</p>
+              <p className="text-[11px] text-white/60">© {new Date().getFullYear()} FHI Global · Dubai, UAE</p>
             </div>
           </>
         )}
