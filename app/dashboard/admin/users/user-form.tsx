@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { X, Eye, EyeOff, User, Mail, Lock, Globe, Shield, CheckCircle } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { X, Eye, EyeOff, User, Mail, Lock, Globe, Shield, CheckCircle, UserPlus, Search } from "lucide-react"
 import type { UserRecord, CreateUserPayload, UpdateUserPayload } from "@/lib/user-service"
-import { ROLE_OPTIONS, STATUS_OPTIONS, TIMEZONES, getUserDisplayName } from "@/lib/user-service"
+import { ROLE_OPTIONS, STATUS_OPTIONS, TIMEZONES, getUserDisplayName, roleToLabel } from "@/lib/user-service"
 import { UserAvatar } from "@/components/user-avatar"
 import { PhoneCountrySelect } from "@/components/phone-country-select"
 
@@ -20,6 +20,7 @@ type FormField = {
 
 type BannerType = "success" | "error"
 type DeveloperOption = { id: string; name: string; slug: string }
+type ReferrerOption = { id: string; fullname: string; role: string }
 
 // ─── Shared input styling ──────────────────────────────────────────────────────
 const INPUT = "w-full px-4 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm text-[#0d1117] bg-white focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 placeholder:text-[#9ca3af] disabled:bg-[#f9fafb] disabled:text-[#9ca3af]"
@@ -77,12 +78,14 @@ export function UserForm({
       phone_number:         s("phone_number"),
       whatsapp_country_code:s("whatsapp_country_code") || "+971",
       whatsapp_number:      s("whatsapp_number"),
+      invited_by:           s("invited_by") || null,
     }
   })
 
   const [showPwd, setShowPwd] = useState(false)
   const [busy, setBusy] = useState(false)
   const [developers, setDevelopers] = useState<DeveloperOption[]>([])
+  const [referrers, setReferrers] = useState<ReferrerOption[]>([])
 
   useEffect(() => {
     const loadDevelopers = async () => {
@@ -94,6 +97,24 @@ export function UserForm({
 
     void loadDevelopers()
   }, [])
+
+  // Referrer options power the "Referred by" picker (edit mode only). Pass the
+  // current referrer id so it's always selectable even if their role changed.
+  useEffect(() => {
+    if (!editUser) return
+    const currentRef = typeof editUser.metadata?.invited_by === "string" ? editUser.metadata.invited_by : ""
+    const loadReferrers = async () => {
+      const url = currentRef
+        ? `/api/admin/users/referrers?include=${encodeURIComponent(currentRef)}`
+        : "/api/admin/users/referrers"
+      const res = await fetch(url)
+      if (!res.ok) return
+      const data = await res.json().catch(() => ({ referrers: [] })) as { referrers?: ReferrerOption[] }
+      setReferrers((data.referrers ?? []).filter((r) => r.id !== editUser.id))
+    }
+
+    void loadReferrers()
+  }, [editUser])
 
   // ── Create handler ───────────────────────────────────────────────────────────
   const handleCreate = async () => {
@@ -385,6 +406,23 @@ export function UserForm({
               </div>
             )}
           </div>
+
+          {/* ── Referred by / Invite attribution (edit only) ── */}
+          {isEdit && (
+            <div>
+              <SectionLabel icon={UserPlus} label="Referred By" />
+              <ReferrerPicker
+                value={edit.invited_by ?? null}
+                referrers={referrers}
+                onChange={(v) => setEdit((p) => ({ ...p, invited_by: v }))}
+              />
+              <p className="text-[11px] text-[#9ca3af] mt-2 ml-1">
+                Who invited this user (their invite/referral). Set this for people who
+                registered directly instead of through an agent&apos;s invite link — they
+                then appear under that agent&apos;s <span className="font-semibold">My Recruits</span>.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -425,6 +463,91 @@ function SectionLabel({ icon: Icon, label }: { icon: React.ElementType; label: s
         <Icon className="w-3.5 h-3.5 text-[#001f3f]" />
       </div>
       <span className="text-xs font-bold uppercase tracking-wider text-[#374151]">{label}</span>
+    </div>
+  )
+}
+
+function ReferrerPicker({
+  value,
+  referrers,
+  onChange,
+}: {
+  value: string | null
+  referrers: ReferrerOption[]
+  onChange: (v: string | null) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+
+  const selected = value ? referrers.find((r) => r.id === value) ?? null : null
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const list = q
+      ? referrers.filter(
+          (r) => r.fullname.toLowerCase().includes(q) || roleToLabel(r.role).toLowerCase().includes(q),
+        )
+      : referrers
+    return list.slice(0, 50)
+  }, [query, referrers])
+
+  // Selected chip with a clear button.
+  if (selected) {
+    return (
+      <div className="flex items-center gap-2 rounded-2xl border border-[#e5e5e5] bg-[#f9fafb] px-3.5 py-2.5">
+        <UserAvatar name={selected.fullname} size={28} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-[#0d1117]">{selected.fullname}</p>
+          <p className="text-[11px] text-[#9ca3af]">{roleToLabel(selected.role)}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => { onChange(null); setQuery(""); setOpen(false) }}
+          className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-[#6b7280] transition-colors hover:bg-[#fde8e8] hover:text-rose-600"
+          aria-label="Remove referrer"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    )
+  }
+
+  // Search + inline dropdown (inline avoids clipping inside the scrollable modal).
+  return (
+    <div>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9ca3af]" />
+        <input
+          type="text"
+          className={`${INPUT} pl-10`}
+          placeholder="Search an agent, team leader, or admin…"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+        />
+      </div>
+      {open && (
+        <div className="mt-1.5 max-h-48 overflow-y-auto rounded-2xl border border-[#e5e5e5] bg-white shadow-sm">
+          {filtered.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-[#9ca3af]">No matching users.</p>
+          ) : (
+            filtered.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => { onChange(r.id); setOpen(false); setQuery("") }}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left transition-colors hover:bg-[#f4f6f9]"
+              >
+                <UserAvatar name={r.fullname} size={26} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-[#0d1117]">{r.fullname}</p>
+                  <p className="text-[11px] text-[#9ca3af]">{roleToLabel(r.role)}</p>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -6,8 +6,9 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 /**
  * People who registered through the caller's invite link (?ref=<their id> —
  * see app/api/register/route.ts, which stamps metadata.invited_by). Strictly
- * session-scoped: you can only ever see your own recruits, and only safe
- * fields (no emails/phones).
+ * session-scoped: you can only ever see your own recruits. Includes the
+ * recruit's email so the recruiter can identify/contact them (emails live in
+ * auth.users, resolved via the admin API).
  */
 export async function GET() {
   const session = await requireActiveSession()
@@ -31,9 +32,21 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to load recruits" }, { status: 500 })
   }
 
+  // Resolve emails from auth.users (not stored on profiles).
+  const emailMap = new Map<string, string>()
+  try {
+    const { data: authData } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+    for (const u of authData?.users ?? []) {
+      if (u.email) emailMap.set(u.id, u.email)
+    }
+  } catch {
+    // Non-fatal — recruits still render without emails.
+  }
+
   const recruits = (data ?? []).map((r) => ({
     id: r.id as string,
     fullname: (r.fullname as string | null) ?? "New member",
+    email: emailMap.get(r.id as string) ?? null,
     role: (r.role as string | null) ?? "member",
     status: (r.status as string | null) ?? "pending",
     joinedAt: (r.joined_at as string | null) ?? null,

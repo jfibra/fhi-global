@@ -67,10 +67,10 @@ export default function GoogleAuthFlow({
         {loading ? "Redirecting…" : variant === "register" ? "Sign up with Google" : "Continue with Google"}
       </button>
 
-      <p className="flex items-center justify-center gap-1.5 text-[11px] text-[#9ca3af] text-center leading-relaxed px-4">
+      {/* <p className="flex items-center justify-center gap-1.5 text-[11px] text-[#9ca3af] text-center leading-relaxed px-4">
         <Sparkles className="w-3 h-3 text-[#d6b357] shrink-0" />
         Using a Leuterio Realty email? Continue with Google to auto-import your agent profile.
-      </p>
+      </p> */}
 
       {error && <p className="text-center text-xs text-rose-600">{error}</p>}
     </div>

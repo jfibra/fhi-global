@@ -7,6 +7,8 @@ import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
 type AdminCaller = { id: string; name: string | null; role: string | null }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 async function requireAdmin(): Promise<AdminCaller | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -105,13 +107,19 @@ export async function PATCH(
     profileUpdate.fullname = [fname, mname, lname].filter(Boolean).join(" ")
   }
 
-  // Metadata merge for phone/whatsapp + developer link
+  // Metadata merge for phone/whatsapp + developer link + referrer (invited_by)
   const metaKeys = ["phone_country_code", "phone_number", "whatsapp_country_code", "whatsapp_number"] as const
   const hasMeta = metaKeys.some((k) => body[k] !== undefined)
   const hasDeveloperLink = body.developer_id !== undefined
   const hasRoleUpdate = body.role !== undefined
+  const hasInvitedBy = body.invited_by !== undefined
 
-  if (hasMeta || hasDeveloperLink || hasRoleUpdate) {
+  // Referrer change is tracked for the audit trail (set inside the block below).
+  let referrerBefore: string | null = null
+  let referrerAfter: string | null = null
+  let referrerChanged = false
+
+  if (hasMeta || hasDeveloperLink || hasRoleUpdate || hasInvitedBy) {
     const { data: current } = await admin
       .from("profiles")
       .select("metadata, role")
@@ -151,6 +159,45 @@ export async function PATCH(
       nextMetadata.developer_id = developerIdToUse
     } else {
       nextMetadata.developer_id = null
+    }
+
+    // Referrer (invited_by): set/change/clear who invited this user. Same
+    // metadata key the invite link stamps at registration — this lets admins
+    // fix attribution for people who registered directly (no ?ref link).
+    if (hasInvitedBy) {
+      const currentInvitedBy = typeof nextMetadata.invited_by === "string" && nextMetadata.invited_by.trim()
+        ? nextMetadata.invited_by.trim()
+        : null
+      const raw = typeof body.invited_by === "string" ? body.invited_by.trim() : ""
+
+      if (raw !== (currentInvitedBy ?? "")) {
+        if (!raw) {
+          // Clear referrer.
+          nextMetadata.invited_by = null
+          referrerBefore = currentInvitedBy
+          referrerAfter = null
+          referrerChanged = true
+        } else {
+          if (!UUID_RE.test(raw)) {
+            return NextResponse.json({ error: "Referrer id is not a valid user id." }, { status: 400 })
+          }
+          if (raw === id) {
+            return NextResponse.json({ error: "A user can't be their own referrer." }, { status: 400 })
+          }
+          const { data: referrer } = await admin
+            .from("profiles")
+            .select("id, is_deleted")
+            .eq("id", raw)
+            .maybeSingle<{ id: string; is_deleted: boolean | null }>()
+          if (!referrer || referrer.is_deleted === true) {
+            return NextResponse.json({ error: "Selected referrer was not found." }, { status: 400 })
+          }
+          nextMetadata.invited_by = raw
+          referrerBefore = currentInvitedBy
+          referrerAfter = raw
+          referrerChanged = true
+        }
+      }
     }
 
     profileUpdate.metadata = nextMetadata
@@ -197,6 +244,23 @@ export async function PATCH(
       oldValues: { status: before?.status ?? null },
       newValues: { status: newStatus },
       changedKeys: ["status"],
+      ...ctx,
+    })
+  }
+
+  if (referrerChanged) {
+    await logAuditEvent({
+      category: "user_management",
+      event: "updated",
+      source: "dashboard",
+      actor,
+      subjectType: "profiles",
+      subjectId: id,
+      subjectLabel,
+      description: `Changed referrer ${referrerBefore ?? "—"} → ${referrerAfter ?? "—"}`,
+      oldValues: { invited_by: referrerBefore },
+      newValues: { invited_by: referrerAfter },
+      changedKeys: ["invited_by"],
       ...ctx,
     })
   }

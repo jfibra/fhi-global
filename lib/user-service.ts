@@ -53,6 +53,12 @@ export type UpdateUserPayload = {
   phone_number?: string
   whatsapp_country_code?: string
   whatsapp_number?: string
+  /**
+   * Who referred/invited this user — the referrer's profile UUID, stored as
+   * `metadata.invited_by` (same field the invite link stamps at registration;
+   * see app/api/register/route.ts). Empty string / null clears the referrer.
+   */
+  invited_by?: string | null
 }
 
 // ─── Role configuration (canonical definitions in `lib/app-roles.ts`) ─────────
