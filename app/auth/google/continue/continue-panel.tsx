@@ -14,7 +14,13 @@ type LookupResponse = {
   mappedRoleLabel: string
 }
 
-export default function GoogleContinuePanel({ next }: { next: string | null }) {
+export default function GoogleContinuePanel({
+  next,
+  inviteRef,
+}: {
+  next: string | null
+  inviteRef: string | null
+}) {
   const router = useRouter()
   const [data, setData] = useState<LookupResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -51,7 +57,7 @@ export default function GoogleContinuePanel({ next }: { next: string | null }) {
       const res = await fetch("/api/auth/google/finalize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ next }),
+        body: JSON.stringify({ next, ref: inviteRef }),
       })
       const json = (await res.json()) as { redirect?: string; error?: string }
       if (!res.ok || !json.redirect) {
@@ -65,7 +71,7 @@ export default function GoogleContinuePanel({ next }: { next: string | null }) {
       setError("Something went wrong. Please try again.")
       setFinalizing(false)
     }
-  }, [next, router])
+  }, [next, inviteRef, router])
 
   // Cancel = don't provision; sign out and return to login.
   const handleCancel = useCallback(async () => {

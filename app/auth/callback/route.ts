@@ -53,6 +53,9 @@ export async function GET(req: NextRequest) {
   const url = req.nextUrl
   const code = url.searchParams.get("code")
   const next = url.searchParams.get("next") ?? ""
+  // Referral/invite id — threaded through from the register page's Google button
+  // so the continue → finalize step can credit the inviter.
+  const ref = url.searchParams.get("ref") ?? ""
   const oauthError = url.searchParams.get("error_description") || url.searchParams.get("error")
 
   if (oauthError) {
@@ -94,5 +97,6 @@ export async function GET(req: NextRequest) {
 
   const continueUrl = new URL("/auth/google/continue", url.origin)
   if (next) continueUrl.searchParams.set("next", next)
+  if (ref) continueUrl.searchParams.set("ref", ref)
   return NextResponse.redirect(continueUrl)
 }

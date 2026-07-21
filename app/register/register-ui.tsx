@@ -435,7 +435,7 @@ export function RegisterUI({
                     </div>
 
                     {/* Google sign-up (auto-imports Leuterio Realty agent details) */}
-                    <GoogleAuthFlow variant="register" />
+                    <GoogleAuthFlow variant="register" inviteRef={inviteRef} />
                   </div>
 
                   {isDeveloper && (

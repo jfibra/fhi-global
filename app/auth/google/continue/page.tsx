@@ -14,9 +14,9 @@ export const metadata = { robots: { index: false, follow: false } }
 export default async function GoogleContinuePage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>
+  searchParams: Promise<{ next?: string; ref?: string }>
 }) {
-  const { next } = await searchParams
+  const { next, ref } = await searchParams
   const supabase = await createClient()
   const {
     data: { user },
@@ -32,5 +32,5 @@ export default async function GoogleContinuePage({
     redirect(pickSafePostLoginRedirect(next ?? null, profile?.role ?? null))
   }
 
-  return <GoogleContinuePanel next={next ?? null} />
+  return <GoogleContinuePanel next={next ?? null} inviteRef={ref ?? null} />
 }

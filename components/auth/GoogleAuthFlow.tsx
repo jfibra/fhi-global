@@ -23,9 +23,14 @@ function GoogleGlyph({ className }: { className?: string }) {
 export default function GoogleAuthFlow({
   variant,
   nextRedirect,
+  inviteRef,
 }: {
   variant: "login" | "register"
   nextRedirect?: string
+  // Referral/invite id (?ref=<inviter profile id>) from the register page.
+  // Threaded through the OAuth round-trip so /api/auth/google/finalize can
+  // credit the inviter (mirrors the email/password register flow).
+  inviteRef?: string | null
 }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -36,11 +41,14 @@ export default function GoogleAuthFlow({
     try {
       const supabase = createClient()
       const origin = window.location.origin
-      const nextParam = nextRedirect ? `?next=${encodeURIComponent(nextRedirect)}` : ""
+      const qs = new URLSearchParams()
+      if (nextRedirect) qs.set("next", nextRedirect)
+      if (inviteRef) qs.set("ref", inviteRef)
+      const query = qs.toString()
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${origin}/auth/callback${nextParam}`,
+          redirectTo: `${origin}/auth/callback${query ? `?${query}` : ""}`,
           queryParams: { prompt: "select_account" },
         },
       })

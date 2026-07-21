@@ -14,6 +14,8 @@ import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
 export const runtime = "nodejs"
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 type ProfileRow = {
   role: string | null
   status: string | null
@@ -24,8 +26,11 @@ type ProfileRow = {
 }
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => null)) as { next?: unknown } | null
+  const body = (await req.json().catch(() => null)) as { next?: unknown; ref?: unknown } | null
   const nextRaw = typeof body?.next === "string" ? body.next : null
+  // Referral/invite id from the register page's Google button. Attribution is
+  // best-effort and only applied on first provision (see below).
+  const refRaw = typeof body?.ref === "string" ? body.ref.trim() : ""
 
   // Must be signed in (the client just did signInWithIdToken).
   const supabase = await createClient()
@@ -109,10 +114,26 @@ export async function POST(req: NextRequest) {
   const upgradedMember = lr != null && (profile.role ?? "member") === "member"
   const finalStatus = upgradedMember ? "active" : profile.status ?? "pending"
 
+  // Referral attribution — mirror the email/password register flow: validate the
+  // ref is a real, non-deleted profile that isn't the user themselves, and only
+  // stamp it if attribution isn't already recorded. First provision only (this
+  // whole block is skipped for returning google_provisioned users above).
+  let invitedBy: string | null = null
+  if (refRaw && UUID_RE.test(refRaw) && refRaw !== user.id && typeof metadata.invited_by !== "string") {
+    const { data: inviter } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("id", refRaw)
+      .eq("is_deleted", false)
+      .maybeSingle()
+    if (inviter) invitedBy = refRaw
+  }
+
   const nextMetadata = {
     ...metadata,
     ...lrMetadata,
     google_linked: true,
+    ...(invitedBy ? { invited_by: invitedBy } : {}),
     ...(lrUnreachable ? {} : { google_provisioned: true }),
   }
 
