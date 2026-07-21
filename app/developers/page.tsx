@@ -13,7 +13,7 @@ import { BuyFiltersLoader } from "@/app/buy/buy-filters-loader"
 import { DevelopersGoogleMap } from "@/components/developers/developers-google-map"
 import { DevelopersListToolbar } from "@/components/developers/developers-list-toolbar"
 import { buildDeveloperMapMarkers } from "@/lib/developers/map-markers"
-import { Building2, BadgeCheck, ChevronRight, Users } from "lucide-react"
+import { Building2, BadgeCheck, ChevronRight, Users, ShieldCheck } from "lucide-react"
 
 export const metadata: Metadata = createPageMetadata({
   title: "Real Estate Developers in Dubai | FHI Global",
@@ -202,68 +202,76 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
       <Header />
 
       {/* ─── Page Hero ─── */}
-      <section className="relative pt-20 pb-20 overflow-hidden">
+      <section className="relative pt-20 pb-36 overflow-hidden">
         <div className="absolute inset-0">
           <Image
-            src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/4.png"
+            src="/background/dubai.webp"
             alt=""
             fill
+            priority
             sizes="100vw"
             className="object-cover object-center"
             aria-hidden="true"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-[#001428]/94 via-[#001f3f]/90 to-[#002c58]/94" />
+          {/* Light navy wash — photo stays visible like the approved mockup */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/85 via-[#001f3f]/55 to-[#001f3f]/25" />
+          {/* Fade into the page background so the search card overlaps cleanly */}
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#f6f7f9] via-[#f6f7f9]/30 to-transparent" />
         </div>
-        {/* dot grid */}
-        <div
-          className="absolute inset-0 opacity-[0.045]"
-          style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }}
-        />
-        {/* gold glow blob */}
-        <div className="absolute top-[-80px] right-[-60px] w-[500px] h-[500px] rounded-full opacity-15 blur-[120px] bg-[radial-gradient(circle,#d6b357,transparent)] pointer-events-none" />
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/30 to-transparent" />
+        <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#d6b357]/70 to-transparent" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-8">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 border border-white/20 rounded-full text-xs font-medium text-white/80 mb-5 backdrop-blur-sm">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 border border-white/25 rounded-full text-xs font-medium text-white/90 mb-5 backdrop-blur-sm">
                 <Building2 className="w-3.5 h-3.5 text-[#d6b357]" />
                 Trusted Developers
               </div>
               <h1
                 className="font-['Outfit'] text-4xl md:text-6xl font-bold text-white leading-[1.1] mb-4 tracking-tight"
-                style={{ textShadow: "0 2px 24px rgba(0,0,0,0.35)" }}
+                style={{ textShadow: "0 2px 24px rgba(0,10,30,0.6)" }}
               >
                 Dubai&apos;s Top<br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">
                   Real Estate Developers
                 </span>
               </h1>
-              <p className="text-white/50 text-lg max-w-lg leading-relaxed">
-                Explore verified developers behind Dubai&apos;s most iconic residential and commercial projects — vetted,
-                RERA-registered, and trusted.
+              {/* Gold underline bar (mockup) */}
+              <span className="block w-14 h-1 rounded-full bg-[#d6b357] mb-5" aria-hidden="true" />
+              <p
+                className="text-white/90 text-lg max-w-lg leading-relaxed"
+                style={{ textShadow: "0 1px 10px rgba(0,10,30,0.7)" }}
+              >
+                Explore verified developers behind Dubai&apos;s most iconic residential and commercial projects —{" "}
+                <strong className="text-white">vetted,</strong> RERA-registered, and trusted.
               </p>
             </div>
 
-            {/* Quick stats */}
+            {/* Quick stats — solid navy tiles with gold icons (mockup) */}
             <div className="flex gap-4 shrink-0">
-              <div className="bg-white/8 backdrop-blur-xl border border-white/12 rounded-2xl px-5 py-4 text-center min-w-[100px]">
-                <p className="font-['Outfit'] text-3xl font-bold text-white">{developers?.length ?? 0}</p>
-                <p className="text-xs text-white/50 mt-0.5 uppercase tracking-wider">Total</p>
+              <div className="bg-[#0a1f38]/90 backdrop-blur-sm border border-[#d6b357]/40 rounded-2xl px-6 py-5 text-center min-w-[130px] shadow-[0_16px_40px_-12px_rgba(0,10,25,0.6)]">
+                <Building2 className="w-5 h-5 text-[#d6b357] mx-auto mb-2" />
+                <p className="font-['Outfit'] text-3xl font-bold text-white leading-none">{developers?.length ?? 0}</p>
+                <p className="text-[10px] font-bold text-white/65 mt-2 uppercase tracking-wider leading-tight">
+                  Total<br />Developers
+                </p>
               </div>
-              <div className="bg-[#d6b357]/12 backdrop-blur-xl border border-[#d6b357]/25 rounded-2xl px-5 py-4 text-center min-w-[100px]">
-                <p className="font-['Outfit'] text-3xl font-bold text-[#d6b357]">{verifiedCount}</p>
-                <p className="text-xs text-[#d6b357]/70 mt-0.5 uppercase tracking-wider">Verified</p>
+              <div className="bg-[#0a1f38]/90 backdrop-blur-sm border border-[#d6b357]/40 rounded-2xl px-6 py-5 text-center min-w-[130px] shadow-[0_16px_40px_-12px_rgba(0,10,25,0.6)]">
+                <ShieldCheck className="w-5 h-5 text-[#d6b357] mx-auto mb-2" />
+                <p className="font-['Outfit'] text-3xl font-bold text-[#d6b357] leading-none">{verifiedCount}</p>
+                <p className="text-[10px] font-bold text-white/65 mt-2 uppercase tracking-wider leading-tight">
+                  Verified<br />Developers
+                </p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ─── Content ─── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-        {/* Search + count + map toggle */}
-        <div className="flex flex-col gap-4 mb-10">
+      {/* ─── Content — search card overlaps the hero (mockup) ─── */}
+      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20 pb-14">
+        {/* Floating search card */}
+        <div className="bg-white rounded-[24px] border border-[#e8eaed] shadow-[0_18px_50px_-15px_rgba(0,20,40,0.25)] p-4 sm:p-5 mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center gap-4">
             <div className="flex-1 min-w-0">
               <Suspense fallback={<SearchFallback />}>
@@ -271,7 +279,7 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
               </Suspense>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 shrink-0">
-              <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#e8eaed] rounded-full shadow-sm self-start">
+              <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#f9fafb] border border-[#e8eaed] rounded-full self-start">
                 <Users className="w-3.5 h-3.5 text-[#d6b357]" />
                 <span className="text-sm font-semibold text-[#0d1117]">{developers?.length ?? 0}</span>
                 <span className="text-sm text-[#6b7280]">

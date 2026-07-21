@@ -103,6 +103,15 @@ export function DevelopersGoogleMap({
   const [scriptReady, setScriptReady] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
 
+  // The Maps script is shared across pages; when another page already loaded
+  // it, next/script dedupes by src and never fires onLoad again — detect the
+  // already-available API on mount or the map stays stuck on a gray box.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.google?.maps) {
+      setScriptReady(true)
+    }
+  }, [])
+
   if (!apiKey.trim()) {
     return (
       <div
