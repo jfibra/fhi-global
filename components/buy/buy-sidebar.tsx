@@ -1,6 +1,6 @@
-import Image from "next/image"
+﻿import Image from "next/image"
 import Link from "next/link"
-import { Bell } from "lucide-react"
+import { Bell, Star } from "lucide-react"
 import { fetchArticles } from "@/lib/news-service"
 
 function fmt(dateStr: string) {
@@ -94,7 +94,7 @@ export async function BuySidebarNews() {
   return (
     <div className="rounded-2xl border border-[#e8eaed] bg-white p-5 shadow-sm">
       <div className="flex items-center gap-2 border-b border-[#001f3f]/10 pb-3 mb-4">
-        <span className="w-1 h-4 bg-[#d6b357] rounded-full" />
+        <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" />
         <h3 className="text-xs font-bold uppercase tracking-widest text-[#001f3f]">
           UAE latest updates
         </h3>
@@ -143,7 +143,7 @@ export function BuySidebarBottom({ searchBasePath = "/buy" }: { searchBasePath?:
     <>
       <div className="rounded-2xl border border-[#e8eaed] bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2 border-b border-[#001f3f]/10 pb-3 mb-4">
-          <span className="w-1 h-4 bg-[#d6b357] rounded-full" />
+          <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" />
           <h3 className="text-xs font-bold uppercase tracking-widest text-[#001f3f]">
             Recommended searches
           </h3>
@@ -164,7 +164,7 @@ export function BuySidebarBottom({ searchBasePath = "/buy" }: { searchBasePath?:
 
       <div className="rounded-2xl border border-[#e8eaed] bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2 border-b border-[#001f3f]/10 pb-3 mb-4">
-          <span className="w-1 h-4 bg-[#d6b357] rounded-full" />
+          <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" />
           <h3 className="text-xs font-bold uppercase tracking-widest text-[#001f3f]">
             Useful links
           </h3>

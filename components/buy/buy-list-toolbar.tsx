@@ -2,8 +2,9 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useTransition } from "react"
-import { LayoutGrid, Map as MapIcon, ChevronDown, AlignJustify } from "lucide-react"
+import { LayoutGrid, Map as MapIcon, AlignJustify } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { PillSelect } from "@/components/ui/pill-select"
 
 type ViewMode = "list" | "map"
 
@@ -43,20 +44,21 @@ export function BuyListToolbar({
         className
       )}
     >
-      <div className="relative shrink-0 w-full sm:w-auto">
-        <AlignJustify className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b7280]" />
-        <select
+      <div className="shrink-0 w-full sm:w-auto">
+        <PillSelect
           value={sort}
-          onChange={(e) => setParam("sort", e.target.value)}
+          onValueChange={(v) => setParam("sort", v)}
           disabled={pending}
-          className="appearance-none w-full sm:w-auto min-w-[11rem] pl-11 pr-10 py-2.5 rounded-full border border-[#d1d5db] text-sm font-semibold text-[#0f2940] bg-white focus:outline-none focus:ring-2 focus:ring-[#d6b357]/30"
-        >
-          <option value="popular">Popular</option>
-          <option value="newest">Newest</option>
-          <option value="price_asc">Price: Low to High</option>
-          <option value="price_desc">Price: High to Low</option>
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+          ariaLabel="Sort listings"
+          leftIcon={<AlignJustify className="w-4 h-4 text-[#6b7280]" />}
+          className="sm:w-auto min-w-[11rem] font-semibold"
+          options={[
+            { label: "Popular", value: "popular" },
+            { label: "Newest", value: "newest" },
+            { label: "Price: Low to High", value: "price_asc" },
+            { label: "Price: High to Low", value: "price_desc" },
+          ]}
+        />
       </div>
 
       <div className="inline-flex rounded-full border border-[#d1d5db] bg-white p-1 self-start sm:self-auto shadow-sm">

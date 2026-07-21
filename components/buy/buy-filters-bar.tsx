@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { MapPin, ChevronDown, ChevronUp, SlidersHorizontal } from "lucide-react"
 import type { BuyPropertyTypeOption } from "@/lib/buy/property-types"
 import { cn } from "@/lib/utils"
+import { PillSelect } from "@/components/ui/pill-select"
 
 const TEXT_DEBOUNCE_MS = 450
 
@@ -53,8 +54,6 @@ type FilterSnapshot = {
 
 const pillInput =
   "w-full pl-10 pr-4 py-2.5 rounded-full border border-[#d1d5db] text-sm text-[#0f2940] placeholder:text-[#9ca3af] bg-white focus:outline-none focus:ring-2 focus:ring-[#d6b357]/30 focus:border-[#d6b357]"
-const pillSelect =
-  "appearance-none w-full pl-4 pr-10 py-2.5 rounded-full border border-[#d1d5db] text-sm text-[#0f2940] bg-white focus:outline-none focus:ring-2 focus:ring-[#d6b357]/30 focus:border-[#d6b357]"
 const linkNavy = "text-sm font-medium text-[#0f2940] hover:text-[#d6b357] hover:underline transition-colors"
 
 export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTypeOption[] }) {
@@ -200,8 +199,8 @@ export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTyp
   const hasActiveFilters = FILTER_KEYS.some((k) => Boolean(searchParams.get(k)))
 
   return (
-    <div className="flow-root w-full bg-white border-b border-[#e5e7eb]">
-      <div className="max-w-[1920px] mx-auto min-w-0 px-4 sm:px-6 lg:px-8 py-4">
+    <div className="flow-root w-full bg-gradient-to-b from-[#001f3f] to-[#002a52] border-b border-[#d6b357]/25 px-4 sm:px-6 lg:px-8 py-5">
+      <div className="max-w-[1920px] mx-auto min-w-0 rounded-2xl bg-white shadow-[0_14px_40px_-12px_rgba(0,10,30,0.5)] px-4 sm:px-6 py-4">
         {canRestore && (
           <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-[#f3f4f6]">
             <button
@@ -253,44 +252,32 @@ export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTyp
                 </Link>
               </div>
               <div className="grid w-full grid-cols-1 items-stretch gap-3 sm:grid-cols-2 xl:flex xl:flex-nowrap xl:shrink-0 xl:flex-1 xl:min-w-0">
-                <div className="relative w-full xl:w-[10rem]">
-                  <select
+                <div className="w-full xl:w-[10rem]">
+                  <PillSelect
                     value={ptype}
-                    onChange={(e) => {
-                      const v = e.target.value
+                    onValueChange={(v) => {
                       setPtype(v)
                       pushWith({ ptype: v })
                     }}
                     disabled={pending}
-                    className={pillSelect}
-                  >
-                    <option value="">Residential</option>
-                    {types.map((t) => (
-                      <option key={t.id} value={t.name.toLowerCase()}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b7280] pointer-events-none" />
+                    ariaLabel="Property type"
+                    options={[
+                      { label: "Residential", value: "" },
+                      ...types.map((t) => ({ label: t.name, value: t.name.toLowerCase() })),
+                    ]}
+                  />
                 </div>
-                <div className="relative w-full xl:w-[11rem]">
-                  <select
+                <div className="w-full xl:w-[11rem]">
+                  <PillSelect
                     value={beds}
-                    onChange={(e) => {
-                      const v = e.target.value
+                    onValueChange={(v) => {
                       setBeds(v)
                       pushWith({ beds: v })
                     }}
                     disabled={pending}
-                    className={pillSelect}
-                  >
-                    {BEDS_OPTS.map((o) => (
-                      <option key={o.value || "any"} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b7280] pointer-events-none" />
+                    ariaLabel="Bedrooms"
+                    options={BEDS_OPTS}
+                  />
                 </div>
                 <button
                   type="button"
@@ -334,24 +321,18 @@ export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTyp
                   onBlur={() => pushSnapshot(stateRef.current)}
                   className="w-full sm:w-[150px] px-4 py-2.5 rounded-full border border-[#d1d5db] text-sm text-[#0f2940] bg-white focus:outline-none focus:ring-2 focus:ring-[#d6b357]/30"
                 />
-                <div className="relative shrink-0">
-                  <select
+                <div className="shrink-0">
+                  <PillSelect
                     value={minBaths}
-                    onChange={(e) => {
-                      const v = e.target.value
+                    onValueChange={(v) => {
                       setMinBaths(v)
                       pushWith({ minBaths: v })
                     }}
                     disabled={pending}
-                    className={`${pillSelect} sm:w-[150px]`}
-                  >
-                    {BATH_OPTS.map((o) => (
-                      <option key={o.value || "anyb"} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b7280] pointer-events-none" />
+                    ariaLabel="Minimum bathrooms"
+                    options={BATH_OPTS}
+                    className="sm:w-[150px]"
+                  />
                 </div>
               </div>
             )}

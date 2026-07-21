@@ -100,7 +100,9 @@ export function BuyPropertyCard({ property }: { property: BuyPropertyCardData })
     `Spacious 1BR Apartment | High Finishing | Prime Location`
 
   return (
-    <article className="bg-white rounded-xl border border-[#d1d5db] shadow-sm overflow-hidden flex flex-col md:flex-row">
+    <article className="relative bg-white rounded-xl border border-[#d1d5db] shadow-sm overflow-hidden flex flex-col md:flex-row transition-shadow duration-300 hover:shadow-[0_16px_44px_-14px_rgba(0,20,40,0.3)]">
+      {/* Gold signature trim (site-wide card accent) */}
+      <span className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-[#d6b357]/30 z-10" aria-hidden="true" />
       <div className="relative w-full md:w-[min(44%,400px)] shrink-0 aspect-[4/3] md:aspect-auto md:min-h-[260px] bg-[#f3f4f6]">
         {src ? (
           <Image
