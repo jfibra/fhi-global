@@ -9,10 +9,26 @@
 
 import { useEffect, useRef, useState } from "react"
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react"
-import { Check, Copy, Download, MessageCircle, QrCode, ScanLine, UserPlus } from "lucide-react"
+import { Check, Copy, Download, Loader2, MessageCircle, QrCode, ScanLine, UserPlus, Users } from "lucide-react"
 import { DashboardShell } from "@/components/dashboard/shell"
 import { getRoleColor } from "@/components/dashboard/sidebar-config"
 import { roleToLabel } from "@/lib/auth"
+
+type Recruit = {
+  id: string
+  fullname: string
+  role: string
+  status: string
+  joinedAt: string | null
+}
+
+function joinedLabel(joinedAt: string | null): string {
+  if (!joinedAt) return "—"
+  const d = new Date(joinedAt)
+  return Number.isNaN(d.getTime())
+    ? "—"
+    : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+}
 
 export function InviteClient({
   userId,
@@ -27,8 +43,31 @@ export function InviteClient({
   const [copied, setCopied] = useState(false)
   const downloadRef = useRef<HTMLDivElement>(null)
 
+  const [recruits, setRecruits] = useState<Recruit[]>([])
+  const [recruitsLoading, setRecruitsLoading] = useState(true)
+  const [recruitsError, setRecruitsError] = useState(false)
+
   useEffect(() => {
     setOrigin(window.location.origin)
+  }, [])
+
+  useEffect(() => {
+    let alive = true
+    void fetch("/api/invite/recruits")
+      .then(async (res) => {
+        if (!res.ok) throw new Error("failed")
+        const data = (await res.json()) as { recruits?: Recruit[] }
+        if (alive) setRecruits(data.recruits ?? [])
+      })
+      .catch(() => {
+        if (alive) setRecruitsError(true)
+      })
+      .finally(() => {
+        if (alive) setRecruitsLoading(false)
+      })
+    return () => {
+      alive = false
+    }
   }, [])
 
   const inviteUrl = origin ? `${origin}/register?ref=${userId}` : ""
@@ -186,6 +225,60 @@ export function InviteClient({
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* ── My recruits ── */}
+            <div className="bg-white rounded-2xl border border-[#e8eaed] p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-[#6b7280] flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[#d6b357]" />
+                  My recruits
+                </p>
+                {!recruitsLoading && !recruitsError && recruits.length > 0 && (
+                  <span className="px-2.5 py-1 rounded-full bg-[#001f3f] text-white text-xs font-bold">
+                    {recruits.length}
+                  </span>
+                )}
+              </div>
+
+              {recruitsLoading ? (
+                <p className="text-sm text-[#9ca3af] flex items-center gap-2 py-4">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading your recruits…
+                </p>
+              ) : recruitsError ? (
+                <p className="text-sm text-[#9ca3af] py-4">
+                  Couldn&apos;t load recruits right now — refresh to try again.
+                </p>
+              ) : recruits.length === 0 ? (
+                <p className="text-sm text-[#9ca3af] py-4">
+                  No sign-ups through your link yet — share your QR and they&apos;ll appear here.
+                </p>
+              ) : (
+                <ul className="divide-y divide-[#f0f2f5]">
+                  {recruits.map((r) => (
+                    <li key={r.id} className="flex items-center gap-3 py-3">
+                      <span className="w-9 h-9 rounded-full bg-gradient-to-br from-[#001f3f] to-[#003366] text-white text-sm font-bold flex items-center justify-center shrink-0">
+                        {r.fullname.charAt(0).toUpperCase()}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-[#111827] truncate">{r.fullname}</p>
+                        <p className="text-xs text-[#6b7280]">
+                          {roleToLabel(r.role)} · joined {joinedLabel(r.joinedAt)}
+                        </p>
+                      </div>
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${
+                          r.status === "active"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {r.status === "active" ? "Active" : "Pending"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>
