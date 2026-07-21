@@ -3,6 +3,7 @@ import type { User } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { parseName } from "@/lib/lr/lr-api"
+import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
 // OAuth redirect landing. Supabase sends the browser here with ?code=... after
 // Google sign-in; we exchange it for a cookie session, then hand off to
@@ -74,6 +75,21 @@ export async function GET(req: NextRequest) {
     } catch {
       /* ignore */
     }
+    const meta = data.user.user_metadata ?? {}
+    const name =
+      (typeof meta.full_name === "string" && meta.full_name) ||
+      (typeof meta.name === "string" && meta.name) ||
+      data.user.email ||
+      null
+    const ctx = requestContextFromRequest(req)
+    await logAuditEvent({
+      category: "auth",
+      event: "login",
+      source: "auth",
+      actor: { id: data.user.id, name, role: null },
+      description: "Signed in with Google",
+      ...ctx,
+    })
   }
 
   const continueUrl = new URL("/auth/google/continue", url.origin)

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation"
 import { ensureProfileForUser, isInactiveProfile, pickSafePostLoginRedirect } from "@/lib/auth"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
+import { logAuditEvent, requestContextFromHeaders } from "@/lib/audit-log"
 
 export type LoginState = {
   error?: string
@@ -49,6 +50,14 @@ export async function loginAction(_: LoginState, formData: FormData): Promise<Lo
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   if (error || !data.user) {
+    const ctx = await requestContextFromHeaders()
+    await logAuditEvent({
+      category: "auth",
+      event: "login_failed",
+      source: "auth",
+      description: `Failed email sign-in for ${email}`,
+      ...ctx,
+    })
     return { error: signInErrorMessage(error) }
   }
 
@@ -70,6 +79,16 @@ export async function loginAction(_: LoginState, formData: FormData): Promise<Lo
     await supabase.auth.signOut()
     redirect("/account-inactive")
   }
+
+  const ctx = await requestContextFromHeaders()
+  await logAuditEvent({
+    category: "auth",
+    event: "login",
+    source: "auth",
+    actor: { id: data.user.id, name: profile.fullname, role: profile.role },
+    description: "Signed in with email",
+    ...ctx,
+  })
 
   const nextRaw = String(formData.get("next") ?? "").trim()
   redirect(pickSafePostLoginRedirect(nextRaw, profile.role))

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { lookupLrAgent, parseName, resolveGoogleRole } from "@/lib/lr/lr-api"
 import { pickSafePostLoginRedirect } from "@/lib/auth"
+import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
 // Completes Google sign-in AFTER the client established the Supabase session via
 // signInWithIdToken. Runs as the newly-signed-in user (cookie session), reads
@@ -135,6 +136,29 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     )
   }
+
+  // Security-relevant: first-link provisioning applied a role/status. The
+  // profiles trigger records the data change (as "System"); this row names the
+  // event, carries request info, and flags a genuine privilege elevation.
+  const roleElevated = finalRole !== (profile.role ?? "member") && finalRole !== "member"
+  const displayName = [fname, lname].filter(Boolean).join(" ") || user.email || null
+  const ctx = requestContextFromRequest(req)
+  await logAuditEvent({
+    category: "security",
+    event: roleElevated ? "role_granted" : "user_provisioned",
+    source: "auth",
+    actor: { id: user.id, name: displayName, role: finalRole },
+    subjectType: "profiles",
+    subjectId: user.id,
+    subjectLabel: displayName,
+    description: lr
+      ? `Google sign-in linked Leuterio Realty agent → ${finalRole}`
+      : `Google sign-in provisioned account → ${finalRole}`,
+    oldValues: { role: profile.role ?? null, status: profile.status ?? null },
+    newValues: { role: finalRole, status: finalStatus },
+    changedKeys: ["role", "status"],
+    ...ctx,
+  })
 
   return NextResponse.json({ redirect: pickSafePostLoginRedirect(nextRaw, finalRole) })
 }

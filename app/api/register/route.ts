@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
 function slugify(text: string) {
   return text
@@ -90,6 +91,19 @@ export async function POST(req: NextRequest) {
         is_verified: false,
       })
     }
+
+    const ctx = requestContextFromRequest(req)
+    await logAuditEvent({
+      category: "auth",
+      event: "register",
+      source: "auth",
+      actor: { id: userId, name: `${firstName} ${lastName}`.trim(), role },
+      subjectType: "profiles",
+      subjectId: userId,
+      subjectLabel: `${firstName} ${lastName}`.trim(),
+      description: `Self-registered as ${role} (pending approval)`,
+      ...ctx,
+    })
 
     return NextResponse.json({ success: true })
   } catch (err: unknown) {

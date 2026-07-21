@@ -3,18 +3,21 @@ import { isAdminStaffRole, isKnownAppRoleId } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import type { UpdateUserPayload } from "@/lib/user-service"
+import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
-async function requireAdmin() {
+type AdminCaller = { id: string; name: string | null; role: string | null }
+
+async function requireAdmin(): Promise<AdminCaller | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, fullname")
     .eq("id", user.id)
     .single()
   if (!profile || !isAdminStaffRole(profile.role)) return null
-  return user
+  return { id: user.id, name: profile.fullname ?? user.email ?? null, role: profile.role }
 }
 
 // ─── GET /api/admin/users/[id] ─────────────────────────────────────────────────
@@ -63,6 +66,14 @@ export async function PATCH(
   }
 
   const admin = createAdminSupabase()
+
+  // Snapshot the target before the change so audit rows can show old→new and a
+  // human subject label.
+  const { data: before } = await admin
+    .from("profiles")
+    .select("role, status, fullname")
+    .eq("id", id)
+    .maybeSingle<{ role: string | null; status: string | null; fullname: string | null }>()
 
   // Build profile update payload
   const profileUpdate: Record<string, unknown> = {}
@@ -148,6 +159,48 @@ export async function PATCH(
   const { error } = await admin.from("profiles").update(profileUpdate).eq("id", id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Audit (app-level, carries the human admin + IP). The profiles trigger also
+  // records the raw data diff as "System"; these rows add who/where/why for the
+  // sensitive transitions.
+  const ctx = requestContextFromRequest(req)
+  const actor = caller
+  const subjectLabel = before?.fullname ?? null
+  const newRole = body.role !== undefined ? String(body.role).toLowerCase().trim() : undefined
+  const newStatus = body.status !== undefined ? String(body.status).toLowerCase().trim() : undefined
+
+  if (newRole && newRole !== (before?.role ?? null)) {
+    await logAuditEvent({
+      category: "security",
+      event: "role_granted",
+      source: "dashboard",
+      actor,
+      subjectType: "profiles",
+      subjectId: id,
+      subjectLabel,
+      description: `Changed role ${before?.role ?? "—"} → ${newRole}`,
+      oldValues: { role: before?.role ?? null },
+      newValues: { role: newRole },
+      changedKeys: ["role"],
+      ...ctx,
+    })
+  }
+  if (newStatus && newStatus !== (before?.status ?? null)) {
+    await logAuditEvent({
+      category: "user_management",
+      event: newStatus === "active" ? "activated" : "deactivated",
+      source: "dashboard",
+      actor,
+      subjectType: "profiles",
+      subjectId: id,
+      subjectLabel,
+      description: `Set status ${before?.status ?? "—"} → ${newStatus}`,
+      oldValues: { status: before?.status ?? null },
+      newValues: { status: newStatus },
+      changedKeys: ["status"],
+      ...ctx,
+    })
+  }
+
   return NextResponse.json({ ok: true })
 }
 
@@ -175,9 +228,9 @@ export async function DELETE(
     // Two-step safety: a user must be soft-deleted first.
     const { data: prof } = await admin
       .from("profiles")
-      .select("is_deleted")
+      .select("is_deleted, fullname, role")
       .eq("id", id)
-      .maybeSingle<{ is_deleted: boolean | null }>()
+      .maybeSingle<{ is_deleted: boolean | null; fullname: string | null; role: string | null }>()
     if (prof && prof.is_deleted !== true) {
       return NextResponse.json(
         { error: "Soft-delete the user first, then permanently delete." },
@@ -198,10 +251,30 @@ export async function DELETE(
     }
     await admin.from("profiles").delete().eq("id", id)
 
+    // The profiles trigger can't record this (the row is gone) — the app row is
+    // the only trace of a permanent deletion, so it's high-value.
+    await logAuditEvent({
+      category: "security",
+      event: "hard_deleted",
+      source: "dashboard",
+      actor: caller,
+      subjectType: "profiles",
+      subjectId: id,
+      subjectLabel: prof?.fullname ?? null,
+      description: `Permanently deleted user ${prof?.fullname ?? id} (${prof?.role ?? "—"})`,
+      ...requestContextFromRequest(req),
+    })
+
     return NextResponse.json({ ok: true, hard: true })
   }
 
   // Soft delete (default).
+  const { data: target } = await admin
+    .from("profiles")
+    .select("fullname, role")
+    .eq("id", id)
+    .maybeSingle<{ fullname: string | null; role: string | null }>()
+
   const { error } = await admin
     .from("profiles")
     .update({
@@ -212,6 +285,18 @@ export async function DELETE(
     .eq("id", id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await logAuditEvent({
+    category: "user_management",
+    event: "deleted",
+    source: "dashboard",
+    actor: caller,
+    subjectType: "profiles",
+    subjectId: id,
+    subjectLabel: target?.fullname ?? null,
+    description: `Soft-deleted user ${target?.fullname ?? id}`,
+    ...requestContextFromRequest(req),
+  })
 
   return NextResponse.json({ ok: true })
 }

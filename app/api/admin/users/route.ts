@@ -3,19 +3,22 @@ import { isAdminStaffRole, isKnownAppRoleId } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import type { CreateUserPayload, UsersListResponse, UserRecord } from "@/lib/user-service"
+import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
+
+type AdminCaller = { id: string; name: string | null; role: string | null }
 
 // ─── Auth guard helper ─────────────────────────────────────────────────────────
-async function requireAdmin() {
+async function requireAdmin(): Promise<AdminCaller | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, fullname")
     .eq("id", user.id)
     .single()
   if (!profile || !isAdminStaffRole(profile.role)) return null
-  return user
+  return { id: user.id, name: profile.fullname ?? user.email ?? null, role: profile.role }
 }
 
 // ─── GET /api/admin/users ──────────────────────────────────────────────────────
@@ -187,6 +190,20 @@ export async function POST(req: NextRequest) {
     await admin.auth.admin.deleteUser(newUserId)
     return NextResponse.json({ error: profileError.message }, { status: 500 })
   }
+
+  await logAuditEvent({
+    category: "user_management",
+    event: "created",
+    source: "dashboard",
+    actor: caller,
+    subjectType: "profiles",
+    subjectId: newUserId,
+    subjectLabel: fullname,
+    description: `Created user ${fullname} (${normalizedRole || "member"})`,
+    newValues: { role: normalizedRole || "member", status: status || "active" },
+    changedKeys: ["role", "status"],
+    ...requestContextFromRequest(req),
+  })
 
   return NextResponse.json({ id: newUserId }, { status: 201 })
 }
