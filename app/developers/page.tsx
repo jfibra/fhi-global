@@ -214,7 +214,7 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
             aria-hidden="true"
           />
           {/* Light navy wash — photo stays visible like the approved mockup */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/85 via-[#001f3f]/55 to-[#001f3f]/25" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/60 via-[#001f3f]/35 to-[#001f3f]/15" />
           {/* Fade into the page background so the search card overlaps cleanly */}
           <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#f6f7f9] via-[#f6f7f9]/30 to-transparent" />
         </div>

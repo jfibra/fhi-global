@@ -135,7 +135,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
             aria-hidden="true"
           />
           {/* Heavier on the left where the identity sits; skyline glows on the right */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/75 via-[#001f3f]/50 to-[#001f3f]/10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/60 via-[#001f3f]/30 to-[#001f3f]/10" />
           <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#000d1c]/40 to-transparent" />
         </div>
         {/* Gold accents: top rule + faint arcs on the left (mockup's line art) */}
