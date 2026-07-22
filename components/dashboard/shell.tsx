@@ -6,7 +6,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useRouter } from "next/navigation"
 import {
-  Menu, X, Bell, LogOut, Settings, ChevronRight,
+  Menu, X, Bell, LogOut, Settings, ChevronRight, Home,
 } from "lucide-react"
 import { createClient as createSupabaseClient } from "@/lib/supabase/client"
 import { roleToLabel } from "@/lib/auth"
@@ -228,7 +228,9 @@ export function DashboardShell({
         <div className="shrink-0 px-5 pt-6 pb-4">
           {/* Logo row */}
           <div className="flex items-center justify-between mb-5">
-            <Image src="/FHI_Branding_White.png" alt="FHI Global" width={110} height={32} className="object-contain h-auto" />
+            <Link href="/" aria-label="FHI Global home" className="transition-opacity hover:opacity-80">
+              <Image src="/FHI_Branding_White.png" alt="FHI Global" width={110} height={32} className="object-contain h-auto" />
+            </Link>
             <button
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden w-7 h-7 flex items-center justify-center rounded-xl bg-white/8 hover:bg-white/15 text-white/50 hover:text-white transition-all"
@@ -281,6 +283,15 @@ export function DashboardShell({
 
         {/* ── FIXED: Footer actions ── */}
         <div className="shrink-0 px-3 py-4 space-y-0.5">
+          <Link
+            href="/"
+            className="flex items-center gap-3 px-3 py-3 rounded-2xl text-white/85 hover:text-white hover:bg-white/10 transition-all duration-200 group"
+          >
+            <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-[#d6b357]/20 flex items-center justify-center shrink-0 transition-all">
+              <Home className="w-[18px] h-[18px] text-white/80 group-hover:text-[#d6b357]" />
+            </span>
+            <span className="font-['Outfit'] font-semibold text-[15px]">Home</span>
+          </Link>
           <Link
             href="/dashboard/profile"
             className="flex items-center gap-3 px-3 py-3 rounded-2xl text-white/85 hover:text-white hover:bg-white/10 transition-all duration-200 group"
