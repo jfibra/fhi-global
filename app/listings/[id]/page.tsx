@@ -2,12 +2,12 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { MapPin, Building2, ArrowLeft, Mail, Phone } from "lucide-react"
+import { MapPin, Building2, ArrowLeft, Mail, Phone, ChevronRight } from "lucide-react"
 import { createPageMetadata, SITE_URL } from "@/lib/seo"
 import { fetchPublicAgentListingById } from "@/lib/buy/agent-listings-public"
 import { pickUnit } from "@/lib/buy/listings-page-logic"
 import { mergedListingGalleryUrls } from "@/lib/listing-gallery-urls"
-import { ProjectGallery } from "@/components/public/project-gallery"
+import { ListingPhotoMosaic } from "@/components/public/listing-photo-mosaic"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -19,9 +19,6 @@ type Props = { params: Promise<{ id: string }> }
 const TEL = "+971567428288"
 const EMAIL = "info@fhiglobal.ae"
 const WA = "971567428288"
-
-const lightYellowBtn =
-  "inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#fff8e1] border border-[#f5e6a8] text-[#0f2940] text-sm font-semibold hover:bg-[#fff3cc] transition-colors"
 
 function WhatsAppGlyph({ className }: { className?: string }) {
   return (
@@ -116,38 +113,77 @@ export default async function PublicAgentListingPage({ params }: Props) {
       <TopBar />
       <Header />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
+      {/* Photo mosaic — full-bleed, flush under the header (homes.com style) */}
+      <div className="relative">
+        {galleryItems.length > 0 ? (
+          <ListingPhotoMosaic images={galleryItems} fullBleed />
+        ) : (
+          <div className="relative w-full aspect-[16/9] max-h-[420px] bg-[#f3f4f6]">
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-[#94a3b8] gap-2">
+              <Building2 className="w-16 h-16" />
+              <span className="text-sm font-medium">No image</span>
+            </div>
+          </div>
+        )}
+        {/* Floating back chip over the photos */}
         <Link
           href={backHref}
-          className="inline-flex items-center gap-2 text-sm font-medium text-[#0f2940] hover:text-[#d6b357] mb-6"
+          className="absolute top-4 left-4 z-10 inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-sm font-bold text-[#0f2940] shadow-md hover:bg-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to {row.listing_kind === "rent" ? "rent" : "buy"}
         </Link>
+      </div>
 
-        <div className="bg-white rounded-2xl border border-[#e8eaed] shadow-sm overflow-hidden">
-          {galleryItems.length > 0 ? (
-            <div className="p-4 sm:p-6 border-b border-[#e8eaed]">
-              <ProjectGallery images={galleryItems} />
-            </div>
-          ) : (
-            <div className="relative w-full aspect-[16/9] max-h-[420px] bg-[#f3f4f6]">
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-[#94a3b8] gap-2">
-                <Building2 className="w-16 h-16" />
-                <span className="text-sm font-medium">No image</span>
-              </div>
-            </div>
-          )}
+      <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-16">
+        {/* Breadcrumbs — visible trail + BreadcrumbList structured data for SEO */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "BreadcrumbList",
+              itemListElement: [
+                { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+                {
+                  "@type": "ListItem",
+                  position: 2,
+                  name: row.listing_kind === "rent" ? "Rent" : "Buy",
+                  item: `${SITE_URL.replace(/\/$/, "")}${backHref}`,
+                },
+                { "@type": "ListItem", position: 3, name: row.title },
+              ],
+            }),
+          }}
+        />
+        <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1 text-sm text-[#6b7280] mb-5">
+          <Link href="/" className="text-[#0f2940] hover:text-[#d6b357] transition-colors">
+            Home
+          </Link>
+          <ChevronRight className="w-4 h-4 shrink-0 text-[#9ca3af]" />
+          <Link href={backHref} className="text-[#0f2940] hover:text-[#d6b357] transition-colors">
+            {row.listing_kind === "rent" ? "Rent" : "Buy"}
+          </Link>
+          <ChevronRight className="w-4 h-4 shrink-0 text-[#9ca3af]" />
+          <span className="text-[#d6b357] font-semibold truncate max-w-[60vw]">{row.title}</span>
+        </nav>
 
-          <div className="p-6 sm:p-8">
-            <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-6 items-start">
+          {/* ── Main details ── */}
+          <div className="bg-white rounded-2xl border border-[#e8eaed] shadow-sm p-6 sm:p-8 min-w-0">
+            <div className="flex flex-wrap items-start justify-between gap-4 mb-3">
               <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-widest text-[#d6b357] mb-2">
                   {row.listing_kind === "rent" ? "For rent" : "For sale"} · Agent listing
                 </p>
-                <h1 className="font-['Outfit'] text-2xl sm:text-3xl font-bold text-[#0f2940] leading-tight">
-                  {row.title}
-                </h1>
+                <p className="font-['Outfit'] text-3xl sm:text-4xl font-bold text-[#0f2940] leading-tight">
+                  {formatPriceLine(
+                    ownOk,
+                    proj?.launch_price_from ?? null,
+                    proj?.launch_price_to ?? null,
+                    row.currency?.trim() || proj?.currency || "AED",
+                  )}
+                </p>
               </div>
               {proj?.developers?.logo_url && (
                 <Image
@@ -160,31 +196,54 @@ export default async function PublicAgentListingPage({ params }: Props) {
               )}
             </div>
 
-            <p className="text-xl sm:text-2xl font-bold text-[#0f2940] mb-4">
-              {formatPriceLine(
-                ownOk,
-                proj?.launch_price_from ?? null,
-                proj?.launch_price_to ?? null,
-                row.currency?.trim() || proj?.currency || "AED",
-              )}
+            <h1 className="text-lg sm:text-xl font-semibold text-[#374151] leading-snug mb-1.5">{row.title}</h1>
+            <p className="inline-flex items-center gap-1.5 text-sm text-[#4b5563] mb-6">
+              <MapPin className="w-4 h-4 text-[#d6b357]" />
+              {loc}
             </p>
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[#4b5563] mb-6">
-              <span className="font-semibold text-[#0f2940]">{typeLabel}</span>
-              {u?.bedrooms != null && <span>{u.bedrooms} bed{u.bedrooms === 1 ? "" : "s"}</span>}
-              {u?.bathrooms != null && <span>{u.bathrooms} bath{u.bathrooms === 1 ? "" : "s"}</span>}
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-[#d6b357]" />
-                {loc}
-              </span>
+            {/* Specs strip — divided columns like the reference */}
+            <div className="flex flex-wrap divide-x divide-[#e8eaed] rounded-xl border border-[#e8eaed] overflow-hidden mb-7">
+              <div className="flex-1 min-w-[110px] px-4 py-3 text-center">
+                <p className="font-['Outfit'] text-lg font-bold text-[#0f2940] leading-tight">{typeLabel}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6b7280] mt-0.5">Type</p>
+              </div>
+              {u?.bedrooms != null && (
+                <div className="flex-1 min-w-[110px] px-4 py-3 text-center">
+                  <p className="font-['Outfit'] text-lg font-bold text-[#0f2940] leading-tight">{u.bedrooms}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6b7280] mt-0.5">
+                    Bed{u.bedrooms === 1 ? "" : "s"}
+                  </p>
+                </div>
+              )}
+              {u?.bathrooms != null && (
+                <div className="flex-1 min-w-[110px] px-4 py-3 text-center">
+                  <p className="font-['Outfit'] text-lg font-bold text-[#0f2940] leading-tight">{u.bathrooms}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6b7280] mt-0.5">
+                    Bath{u.bathrooms === 1 ? "" : "s"}
+                  </p>
+                </div>
+              )}
+              {(u?.size_sqft != null || u?.size_sqm != null) && (
+                <div className="flex-1 min-w-[110px] px-4 py-3 text-center">
+                  <p className="font-['Outfit'] text-lg font-bold text-[#0f2940] leading-tight">
+                    {u?.size_sqft != null
+                      ? Number(u.size_sqft).toLocaleString()
+                      : Number(u?.size_sqm).toLocaleString()}
+                  </p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6b7280] mt-0.5">
+                    {u?.size_sqft != null ? "Sq Ft" : "Sqm"}
+                  </p>
+                </div>
+              )}
             </div>
 
             {row.description?.trim() && (
-              <p className="text-[#374151] leading-relaxed whitespace-pre-wrap mb-8">{row.description.trim()}</p>
+              <p className="text-[#374151] leading-relaxed whitespace-pre-wrap mb-7">{row.description.trim()}</p>
             )}
 
             {proj?.slug && (
-              <p className="mb-8">
+              <p>
                 <Link
                   href={`/projects/${proj.slug}`}
                   className="text-sm font-semibold text-[#001f3f] hover:text-[#d6b357] underline underline-offset-2"
@@ -193,27 +252,47 @@ export default async function PublicAgentListingPage({ params }: Props) {
                 </Link>
               </p>
             )}
+          </div>
 
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-[#e8eaed]">
-              <a href={`mailto:${EMAIL}?subject=Inquiry:%20${encodeURIComponent(row.title)}`} className={lightYellowBtn}>
-                <Mail className="w-4 h-4 text-[#0f2940]" />
-                Email
-              </a>
-              <a href={`tel:${TEL}`} className={lightYellowBtn}>
-                <Phone className="w-4 h-4 text-[#0f2940]" />
-                Call
-              </a>
+          {/* ── Contact card (sticky, like the reference's agent panel) ── */}
+          <aside className="lg:sticky lg:top-24 bg-white rounded-2xl border border-[#e8eaed] shadow-[0_16px_44px_-16px_rgba(0,20,40,0.18)] overflow-hidden">
+            <div className="bg-gradient-to-r from-[#001f3f] to-[#002a52] px-5 py-4 flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/FHI_Branding_White.png" alt="FHI Global" className="h-8 w-auto object-contain" />
+              <div>
+                <p className="text-white text-sm font-bold leading-tight">FHI Global</p>
+                <p className="text-[#d6b357] text-[11px] font-bold uppercase tracking-wider">Listing Team</p>
+              </div>
+            </div>
+            <div className="p-5 space-y-2.5">
+              <p className="rounded-xl bg-[#f8faff] border border-[#e0e7ff] px-4 py-3 text-sm text-[#4b5563] leading-relaxed">
+                Hi, I&apos;m interested in <span className="font-semibold text-[#0f2940]">{row.title}</span>.
+              </p>
               <a
                 href={`https://wa.me/${WA}?text=${encodeURIComponent(`Hi, I'm interested in ${row.title}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#d8f5e4] border border-[#86efac] text-[#166534] text-sm font-semibold hover:bg-[#c4eed8] transition-colors"
+                className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl bg-[#25d366] text-white text-sm font-bold hover:bg-[#1fb457] transition-colors"
               >
-                <WhatsAppGlyph className="w-[18px] h-[18px] text-[#25d366]" />
+                <WhatsAppGlyph className="w-[18px] h-[18px]" />
                 WhatsApp
               </a>
+              <a
+                href={`tel:${TEL}`}
+                className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl bg-gradient-to-r from-[#d6b357] to-[#c9a449] text-[#001f3f] text-sm font-bold hover:from-[#c9a449] hover:to-[#b8913f] transition-colors"
+              >
+                <Phone className="w-4 h-4" />
+                Call
+              </a>
+              <a
+                href={`mailto:${EMAIL}?subject=Inquiry:%20${encodeURIComponent(row.title)}`}
+                className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl border border-[#d1d5db] text-[#0f2940] text-sm font-bold hover:border-[#001f3f] transition-colors"
+              >
+                <Mail className="w-4 h-4" />
+                Email
+              </a>
             </div>
-          </div>
+          </aside>
         </div>
       </div>
 

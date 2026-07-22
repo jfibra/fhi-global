@@ -56,13 +56,15 @@ export function SocialShare({ title, text, variant = "light" }: SocialShareProps
 
   const isDark = variant === "dark"
   const wrapClass = isDark
-    ? "mt-4 rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xl p-4"
+    ? "mt-4 rounded-2xl bg-[#0a1f38]/90 backdrop-blur-md ring-1 ring-[#d6b357]/30 shadow-[0_16px_44px_-16px_rgba(0,10,25,0.6)] p-4 sm:p-5"
     : "rounded-2xl border border-[#e8eaed] bg-white p-4"
-  const titleClass = isDark ? "text-xs font-bold uppercase tracking-widest text-white/70" : "text-xs font-bold uppercase tracking-widest text-[#6b7280]"
+  const titleClass = isDark
+    ? "text-xs font-bold uppercase tracking-[0.2em] text-[#d6b357]"
+    : "text-xs font-bold uppercase tracking-widest text-[#6b7280]"
   const btnBase = isDark
-    ? "inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold text-white/90 hover:bg-white/15 transition-colors"
+    ? "inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/[0.06] px-4 py-2 text-xs font-semibold text-white hover:border-[#d6b357]/70 hover:bg-[#d6b357]/15 hover:text-[#f0d890] transition-colors"
     : "inline-flex items-center gap-2 rounded-xl border border-[#e8eaed] bg-white px-3 py-2 text-xs font-semibold text-[#0d1117] hover:bg-[#fafafa] transition-colors"
-  const iconClass = isDark ? "w-3.5 h-3.5 text-white/80" : "w-3.5 h-3.5 text-[#001f3f]"
+  const iconClass = isDark ? "w-3.5 h-3.5 text-[#d6b357]" : "w-3.5 h-3.5 text-[#001f3f]"
 
   async function onCopy() {
     if (!url) return
@@ -78,7 +80,7 @@ export function SocialShare({ title, text, variant = "light" }: SocialShareProps
     <div className={wrapClass}>
       <div className="flex items-center justify-between gap-4 mb-3">
         <p className={titleClass}>Share</p>
-        <div className={isDark ? "text-[11px] text-white/50" : "text-[11px] text-[#9ca3af]"}>
+        <div className={isDark ? "text-[11px] text-white/60" : "text-[11px] text-[#9ca3af]"}>
           {url ? (
             <span className="inline-flex items-center gap-1.5">
               <LinkIcon className="w-3.5 h-3.5" /> {url.replace(/^https?:\/\//, "")}

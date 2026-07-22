@@ -179,11 +179,12 @@ export default async function ProjectDetailPage({ params }: Props) {
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f] to-[#002a52]" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#001428]/95 via-[#001428]/35 to-[#001428]/10" />
+        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#d6b357]/70 to-transparent" />
 
         <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 pt-16">
           {/* Back */}
-          <Link href="/projects" className="inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white transition-colors mb-6">
+          <Link href="/projects" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#d6b357] hover:text-[#f0d890] transition-colors mb-6">
             <ArrowLeft className="w-4 h-4" /> All Projects
           </Link>
 
@@ -207,41 +208,57 @@ export default async function ProjectDetailPage({ params }: Props) {
                 ))}
               </div>
 
-              <h1 className="font-['Outfit'] text-4xl md:text-5xl font-bold text-white leading-tight mb-3" style={{ textShadow: "0 2px 30px rgba(0,0,0,0.5)" }}>
+              <h1
+                className="font-['Outfit'] text-5xl md:text-6xl font-bold text-white leading-[1.05] mb-3"
+                style={{ textShadow: "0 2px 30px rgba(0,10,30,0.6)" }}
+              >
                 {project.name}
               </h1>
+              <span className="block w-14 h-1 rounded-full bg-[#d6b357] mb-4" aria-hidden="true" />
 
               {developer && (
-                <p className="text-white/70 text-base mb-2">by <span className="font-semibold text-white">{developer.name}</span></p>
+                <p className="text-white/80 text-base mb-2" style={{ textShadow: "0 1px 8px rgba(0,10,30,0.7)" }}>
+                  by{" "}
+                  {developer.slug ? (
+                    <Link
+                      href={`/developers/${developer.slug}`}
+                      className="font-bold text-[#d6b357] hover:text-[#f0d890] transition-colors"
+                    >
+                      {developer.name}
+                    </Link>
+                  ) : (
+                    <span className="font-bold text-white">{developer.name}</span>
+                  )}
+                </p>
               )}
 
               {locationStr && (
-                <div className="flex items-center gap-1.5 text-white/60 text-sm">
-                  <MapPin className="w-4 h-4" /> {locationStr}
+                <div className="flex items-center gap-1.5 text-white/85 text-sm" style={{ textShadow: "0 1px 8px rgba(0,10,30,0.7)" }}>
+                  <MapPin className="w-4 h-4 text-[#d6b357]" /> {locationStr}
                 </div>
               )}
             </div>
 
-            {/* Price + CTA */}
-            <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[20px] p-6 min-w-[260px]">
+            {/* Price + CTA — solid navy card with gold ring (premium look) */}
+            <div className="bg-[#0a1f38]/95 backdrop-blur-md ring-1 ring-[#d6b357]/40 rounded-[20px] p-6 min-w-[280px] shadow-[0_30px_80px_-20px_rgba(0,10,25,0.8)]">
               {price ? (
-                <div className="mb-4">
-                  <p className="text-xs text-white/50 uppercase tracking-widest font-medium mb-1">Starting From</p>
-                  <p className="font-['Outfit'] text-2xl font-bold text-white">{price}</p>
+                <div className="mb-5">
+                  <p className="text-xs text-[#d6b357] uppercase tracking-[0.2em] font-bold mb-1.5">Starting From</p>
+                  <p className="font-['Outfit'] text-3xl font-bold text-white leading-none">{price}</p>
                 </div>
               ) : null}
               <div className="flex flex-col gap-2.5">
                 {developer?.phone && (
                   <a
                     href={`tel:${developer.phone}`}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#d6b357] hover:bg-[#c9a449] text-[#001f3f] text-sm font-bold transition-all"
+                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[#d6b357] to-[#c9a449] hover:from-[#c9a449] hover:to-[#b8913f] text-[#001f3f] text-sm font-bold transition-all shadow-[0_8px_24px_-6px_rgba(214,179,87,0.5)]"
                   >
                     <Phone className="w-3.5 h-3.5" /> Contact Agent
                   </a>
                 )}
                 <a
                   href="#units"
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/20 border border-white/20 text-white text-sm font-semibold transition-all"
+                  className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-[#d6b357]/50 text-white text-sm font-semibold hover:bg-[#d6b357]/15 hover:border-[#d6b357] transition-all"
                 >
                   View Units
                 </a>
@@ -257,9 +274,9 @@ export default async function ProjectDetailPage({ params }: Props) {
         </div>
       </section>
 
-      {/* ── Quick stats bar ───────────────────────────────── */}
-      <div className="bg-white border-b border-[#e8eaed] shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-wrap gap-6 md:gap-10">
+      {/* ── Quick stats band — navy with gold-ringed icons (premium) ── */}
+      <div className="bg-gradient-to-r from-[#001f3f] to-[#002a52] border-b border-[#d6b357]/25">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-wrap gap-x-10 gap-y-5">
           {[
             { icon: Calendar, label: "Completion", value: project.delivery_quarter ?? (project.expected_completion_date ? new Date(project.expected_completion_date).toLocaleDateString("en-AE", { month: "short", year: "numeric" }) : null) },
             { icon: Home, label: "Total Units", value: project.total_units?.toLocaleString() },
@@ -271,13 +288,13 @@ export default async function ProjectDetailPage({ params }: Props) {
           ]
             .filter((s) => s.value)
             .map(({ icon: Icon, label, value }) => (
-              <div key={label} className="flex items-center gap-3 pl-4 border-l-2 border-[#d6b357]/35">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#001f3f]/8 to-[#d6b357]/8 flex items-center justify-center shrink-0">
-                  <Icon className="w-4 h-4 text-[#001f3f]" />
+              <div key={label} className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full border-2 border-[#d6b357]/60 bg-[#d6b357]/10 flex items-center justify-center shrink-0">
+                  <Icon className="w-[18px] h-[18px] text-[#d6b357]" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-[#9ca3af] font-semibold uppercase tracking-widest">{label}</p>
-                  <p className="text-sm font-bold text-[#0d1117]">{value}</p>
+                  <p className="text-[10px] text-white/60 font-bold uppercase tracking-widest">{label}</p>
+                  <p className="font-['Outfit'] text-lg font-bold text-white leading-tight">{value}</p>
                 </div>
               </div>
             ))}
