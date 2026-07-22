@@ -507,7 +507,7 @@ export function DevelopersClient({ currentRole }: Props) {
                   {/* Date added / last updated */}
                   <div className="min-w-0">
                     <p className="text-xs text-[#374151] truncate" title={`Added ${formatDateTime(dev.created_at)}`}>{formatDate(dev.created_at)}</p>
-                    <p className="text-[11px] text-[#9ca3af] truncate" title={`Updated ${formatDateTime(dev.updated_at)}`}>Updated {relativeTime(dev.updated_at)}</p>
+                    <p className="text-[11px] text-[#9ca3af] truncate" title={`Updated ${formatDateTime(dev.updated_at)}`}>Updated {formatDate(dev.updated_at)} · {relativeTime(dev.updated_at)}</p>
                   </div>
 
                   {/* Actions */}
@@ -570,7 +570,7 @@ export function DevelopersClient({ currentRole }: Props) {
                         }
                       </div>
                       <p className="text-[11px] text-[#9ca3af] mt-2" title={`Added ${formatDateTime(dev.created_at)} · Updated ${formatDateTime(dev.updated_at)}`}>
-                        Added {formatDate(dev.created_at)} · Updated {relativeTime(dev.updated_at)}
+                        Added {formatDate(dev.created_at)} · Updated {formatDate(dev.updated_at)} · {relativeTime(dev.updated_at)}
                       </p>
                     </div>
                   </div>

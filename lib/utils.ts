@@ -47,3 +47,17 @@ export function relativeTime(iso: string | null | undefined): string {
   if (months < 12) return `${months}mo ago`
   return `${Math.round(months / 12)}y ago`
 }
+
+/**
+ * Format an instant in a specific IANA time zone, e.g. "7/22/2026 at 3:45 PM".
+ * Passing an explicit `timeZone` makes the output identical on server and
+ * client, so it is safe against SSR hydration mismatches.
+ */
+export function formatDateAtTimeInZone(iso: string | null | undefined, timeZone: string): string {
+  if (!iso) return "—"
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return "—"
+  const date = d.toLocaleDateString("en-US", { timeZone, month: "numeric", day: "numeric", year: "numeric" })
+  const time = d.toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit" })
+  return `${date} at ${time}`
+}

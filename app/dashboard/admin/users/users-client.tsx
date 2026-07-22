@@ -15,6 +15,7 @@ import { UserDrawer } from "./user-drawer"
 import { UserForm } from "./user-form"
 import type { UserRecord, UsersListResponse } from "@/lib/user-service"
 import { ROLE_OPTIONS, STATUS_OPTIONS, getUserDisplayName } from "@/lib/user-service"
+import { formatDateAtTimeInZone } from "@/lib/utils"
 
 const ACCENT = "#0ea5e9"
 
@@ -518,9 +519,19 @@ function UserRow({
         <StatusBadge status={user.status} isDeleted={user.is_deleted} />
       </td>
 
-      {/* Joined */}
+      {/* Joined — shown in Dubai (Arabian) time; hover to see Philippine time */}
       <td className="px-5 py-3.5 text-[#9ca3af] whitespace-nowrap text-xs">
-        {user.joined_at ? new Date(user.joined_at).toLocaleDateString() : "—"}
+        {user.joined_at ? (
+          <span
+            className="cursor-help underline decoration-dotted decoration-[#d0d5dd] underline-offset-2"
+            title={`Philippine time: ${formatDateAtTimeInZone(user.joined_at, "Asia/Manila")}`}
+          >
+            {formatDateAtTimeInZone(user.joined_at, "Asia/Dubai")}
+            <span className="ml-1 text-[10px] uppercase tracking-wide text-[#c0c5cd]">Arabian time</span>
+          </span>
+        ) : (
+          "—"
+        )}
       </td>
 
       {/* Actions */}
