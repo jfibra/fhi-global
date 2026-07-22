@@ -6,7 +6,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useRouter } from "next/navigation"
 import {
-  Menu, X, Bell, LogOut, Settings, ChevronRight, Home,
+  Menu, X, Bell, LogOut, Settings, ChevronRight, ChevronDown, Home,
 } from "lucide-react"
 import { createClient as createSupabaseClient } from "@/lib/supabase/client"
 import { roleToLabel } from "@/lib/auth"
@@ -42,6 +42,7 @@ export function DashboardShell({
 }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const notificationsRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
   const router = useRouter()
@@ -244,8 +245,14 @@ export function DashboardShell({
             </button>
           </div>
 
-          {/* User identity card */}
-          <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/8">
+          {/* User identity card — click to reveal account actions */}
+          <button
+            type="button"
+            onClick={() => setProfileMenuOpen((o) => !o)}
+            aria-expanded={profileMenuOpen}
+            aria-label="Account menu"
+            className="w-full text-left flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/8 hover:bg-white/8 transition-all"
+          >
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -268,6 +275,46 @@ export function DashboardShell({
                 {effectiveRoleLabel}
               </div>
             </div>
+            <ChevronDown className={`w-4 h-4 text-white/50 shrink-0 transition-transform duration-200 ${profileMenuOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {/* Account dropdown — Home / Profile Settings / Sign Out */}
+          <div
+            className="overflow-hidden transition-all duration-200 ease-in-out"
+            style={{ maxHeight: profileMenuOpen ? "220px" : "0px" }}
+          >
+            <div className="pt-2 space-y-0.5">
+              <Link
+                href="/"
+                onClick={() => { setProfileMenuOpen(false); setSidebarOpen(false) }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-white/85 hover:text-white hover:bg-white/10 transition-all duration-200 group"
+              >
+                <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-[#d6b357]/20 flex items-center justify-center shrink-0 transition-all">
+                  <Home className="w-[18px] h-[18px] text-white/80 group-hover:text-[#d6b357]" />
+                </span>
+                <span className="font-['Outfit'] font-semibold text-[15px]">Home</span>
+              </Link>
+              <Link
+                href="/dashboard/profile"
+                onClick={() => { setProfileMenuOpen(false); setSidebarOpen(false) }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-white/85 hover:text-white hover:bg-white/10 transition-all duration-200 group"
+              >
+                <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-white/15 flex items-center justify-center shrink-0 transition-all">
+                  <Settings className="w-[18px] h-[18px] text-white/80 group-hover:text-white" />
+                </span>
+                <span className="font-['Outfit'] font-semibold text-[15px]">Profile Settings</span>
+              </Link>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-2xl text-white/85 hover:text-rose-300 hover:bg-rose-500/10 transition-all duration-200 group"
+              >
+                <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-rose-500/20 flex items-center justify-center shrink-0 transition-all">
+                  <LogOut className="w-[18px] h-[18px] text-white/80 group-hover:text-rose-300" />
+                </span>
+                <span className="font-['Outfit'] font-semibold text-[15px]">Sign Out</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -279,44 +326,6 @@ export function DashboardShell({
 
         {/* ── SCROLLABLE: Nav ── */}
         <NavLinks />
-
-        {/* Gradient divider */}
-        <div
-          className="mx-4 mt-1 h-px shrink-0"
-          style={{ background: "linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)" }}
-        />
-
-        {/* ── FIXED: Footer actions ── */}
-        <div className="shrink-0 px-3 py-4 space-y-0.5">
-          <Link
-            href="/"
-            className="flex items-center gap-3 px-3 py-3 rounded-2xl text-white/85 hover:text-white hover:bg-white/10 transition-all duration-200 group"
-          >
-            <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-[#d6b357]/20 flex items-center justify-center shrink-0 transition-all">
-              <Home className="w-[18px] h-[18px] text-white/80 group-hover:text-[#d6b357]" />
-            </span>
-            <span className="font-['Outfit'] font-semibold text-[15px]">Home</span>
-          </Link>
-          <Link
-            href="/dashboard/profile"
-            className="flex items-center gap-3 px-3 py-3 rounded-2xl text-white/85 hover:text-white hover:bg-white/10 transition-all duration-200 group"
-          >
-            <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-white/15 flex items-center justify-center shrink-0 transition-all">
-              <Settings className="w-[18px] h-[18px] text-white/80 group-hover:text-white" />
-            </span>
-            <span className="font-['Outfit'] font-semibold text-[15px]">Profile Settings</span>
-          </Link>
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className="w-full text-left flex items-center gap-3 px-3 py-3 rounded-2xl text-white/85 hover:text-rose-300 hover:bg-rose-500/10 transition-all duration-200 group"
-          >
-            <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-rose-500/20 flex items-center justify-center shrink-0 transition-all">
-              <LogOut className="w-[18px] h-[18px] text-white/80 group-hover:text-rose-300" />
-            </span>
-            <span className="font-['Outfit'] font-semibold text-[15px]">Sign Out</span>
-          </button>
-        </div>
       </aside>
 
       {/* ── Main content ──────────────────────────────────────────────── */}
