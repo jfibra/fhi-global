@@ -156,6 +156,18 @@ DECLARE
     'account_number','account_name','iban','swift_code','routing_number','tax_registration_number'
   ];
 BEGIN
+  -- Service-role / system writes to profiles (admin user management, register,
+  -- Google provisioning, the handle_new_user bootstrap) have no auth.uid(), so
+  -- the trigger could only attribute them to "System". Every such path already
+  -- emits an app-level audit row via logAuditEvent() naming the real actor with
+  -- IP + a friendly description, so this trigger row would be a confusing
+  -- duplicate ("System updated roles"). Skip it. Authenticated self-service
+  -- profile edits (auth.uid() present) are still audited and correctly
+  -- attributed below.
+  IF TG_TABLE_NAME = 'profiles' AND v_actor IS NULL THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
   IF TG_OP = 'INSERT' THEN
     v_new := to_jsonb(NEW);
     v_event := 'created';
