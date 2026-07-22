@@ -8,6 +8,7 @@ import { ROLE_OPTIONS } from "@/lib/app-roles"
 import {
   type AuditLogRow,
   type AuditListResponse,
+  CATEGORY_META,
   categoryMeta,
   eventColor,
   humanizeEvent,
@@ -77,7 +78,15 @@ export function AllLogsTab({ scope, categoryCounts }: { scope?: "security"; cate
   }, [debounced, category, event, role, source, from, to])
 
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE))
-  const categoryEntries = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])
+  // On the main All Logs tab, surface every known category (e.g. "Developers") so
+  // it's always filterable — even before it has any log rows yet. The scoped
+  // Security tab keeps only the categories actually present in its data.
+  const mergedCounts: Record<string, number> = scope
+    ? categoryCounts
+    : { ...Object.fromEntries(Object.keys(CATEGORY_META).map((k) => [k, 0])), ...categoryCounts }
+  const categoryEntries = Object.entries(mergedCounts).sort((a, b) =>
+    b[1] !== a[1] ? b[1] - a[1] : categoryMeta(a[0]).label.localeCompare(categoryMeta(b[0]).label),
+  )
 
   return (
     <div className="space-y-4">
@@ -87,7 +96,7 @@ export function AllLogsTab({ scope, categoryCounts }: { scope?: "security"; cate
           <option value="">{scope === "security" ? "All in scope" : "All categories"}</option>
           {categoryEntries.map(([c, n]) => (
             <option key={c} value={c}>
-              {categoryMeta(c).label} ({n})
+              {categoryMeta(c).label}{n > 0 ? ` (${n})` : ""}
             </option>
           ))}
         </select>

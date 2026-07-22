@@ -16,6 +16,7 @@ COMMENT ON TABLE public.agent_listing_images IS 'Sales-uploaded photos for a lis
 
 ALTER TABLE public.agent_listing_images ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "agent_listing_images_select_public" ON public.agent_listing_images;
 CREATE POLICY "agent_listing_images_select_public"
   ON public.agent_listing_images FOR SELECT
   USING (
@@ -27,6 +28,7 @@ CREATE POLICY "agent_listing_images_select_public"
     )
   );
 
+DROP POLICY IF EXISTS "agent_listing_images_select_owner" ON public.agent_listing_images;
 CREATE POLICY "agent_listing_images_select_owner"
   ON public.agent_listing_images FOR SELECT
   USING (
@@ -38,6 +40,7 @@ CREATE POLICY "agent_listing_images_select_owner"
     )
   );
 
+DROP POLICY IF EXISTS "agent_listing_images_insert_own_listing" ON public.agent_listing_images;
 CREATE POLICY "agent_listing_images_insert_own_listing"
   ON public.agent_listing_images FOR INSERT
   WITH CHECK (
@@ -49,6 +52,7 @@ CREATE POLICY "agent_listing_images_insert_own_listing"
     )
   );
 
+DROP POLICY IF EXISTS "agent_listing_images_update_own_listing" ON public.agent_listing_images;
 CREATE POLICY "agent_listing_images_update_own_listing"
   ON public.agent_listing_images FOR UPDATE
   USING (
@@ -68,6 +72,7 @@ CREATE POLICY "agent_listing_images_update_own_listing"
     )
   );
 
+DROP POLICY IF EXISTS "agent_listing_images_delete_own_listing" ON public.agent_listing_images;
 CREATE POLICY "agent_listing_images_delete_own_listing"
   ON public.agent_listing_images FOR DELETE
   USING (

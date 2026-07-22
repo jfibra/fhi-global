@@ -1,6 +1,7 @@
 -- Allow anonymous (anon key) read of published agent listings for public /buy and /rent.
 BEGIN;
 
+DROP POLICY IF EXISTS "agent_listings_select_public_published" ON public.agent_listings;
 CREATE POLICY "agent_listings_select_public_published"
   ON public.agent_listings FOR SELECT
   USING (

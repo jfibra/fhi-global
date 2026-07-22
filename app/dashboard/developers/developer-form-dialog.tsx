@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import {
   X, Check, Building2, Globe, Phone, Mail, MapPin,
-  Star, Landmark, Plus, Pencil,
+  Star, Landmark, Plus, Pencil, CalendarPlus, CalendarClock,
 } from "lucide-react"
 import {
   type Developer,
@@ -13,6 +13,7 @@ import {
   createDeveloper,
   updateDeveloper,
 } from "@/lib/developer-service"
+import { formatDateTime, relativeTime } from "@/lib/utils"
 
 // ─── Portal ────────────────────────────────────────────────────────────────────
 function Portal({ children }: { children: React.ReactNode }) {
@@ -260,6 +261,32 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
                 </label>
               ))}
             </div>
+
+            {/* Record info (edit only) — read-only audit timestamps */}
+            {editDeveloper && (
+              <div className="rounded-2xl border border-[#eef0f2] bg-[#f9fafb] px-5 py-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af] mb-3">Record Info</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex items-start gap-2.5">
+                    <CalendarPlus className="w-4 h-4 text-[#9ca3af] mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-[#9ca3af]">Date added</p>
+                      <p className="text-sm font-semibold text-[#374151]">{formatDateTime(editDeveloper.created_at)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <CalendarClock className="w-4 h-4 text-[#9ca3af] mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-[#9ca3af]">Last updated</p>
+                      <p className="text-sm font-semibold text-[#374151]">
+                        {formatDateTime(editDeveloper.updated_at)}
+                        <span className="font-normal text-[#9ca3af]"> · {relativeTime(editDeveloper.updated_at)}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer */}

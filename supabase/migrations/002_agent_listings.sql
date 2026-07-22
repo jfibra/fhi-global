@@ -31,10 +31,12 @@ COMMENT ON TABLE public.agent_listings IS 'Listings created by agents (sale/rent
 ALTER TABLE public.agent_listings ENABLE ROW LEVEL SECURITY;
 
 -- Policies are OR'd: own rows OR staff read-all
+DROP POLICY IF EXISTS "agent_listings_select_own" ON public.agent_listings;
 CREATE POLICY "agent_listings_select_own"
   ON public.agent_listings FOR SELECT
   USING (deleted_at IS NULL AND agent_id = auth.uid());
 
+DROP POLICY IF EXISTS "agent_listings_select_staff" ON public.agent_listings;
 CREATE POLICY "agent_listings_select_staff"
   ON public.agent_listings FOR SELECT
   USING (
@@ -47,10 +49,12 @@ CREATE POLICY "agent_listings_select_staff"
     )
   );
 
+DROP POLICY IF EXISTS "agent_listings_insert_own" ON public.agent_listings;
 CREATE POLICY "agent_listings_insert_own"
   ON public.agent_listings FOR INSERT
   WITH CHECK (agent_id = auth.uid());
 
+DROP POLICY IF EXISTS "agent_listings_update_own" ON public.agent_listings;
 CREATE POLICY "agent_listings_update_own"
   ON public.agent_listings FOR UPDATE
   USING (agent_id = auth.uid())

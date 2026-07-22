@@ -19,6 +19,7 @@ import {
   toggleDeveloperVerified,
 } from "@/lib/developer-service"
 import { isAdminStaffRole } from "@/lib/app-roles"
+import { formatDate, formatDateTime, relativeTime } from "@/lib/utils"
 import { DeveloperFormDialog } from "./developer-form-dialog"
 import { DeveloperLogoUpload } from "./developer-logo-upload"
 
@@ -420,9 +421,10 @@ export function DevelopersClient({ currentRole }: Props) {
 
         {/* Table */}
         <div className="bg-white/60 backdrop-blur-2xl rounded-[24px] border border-white/60 shadow-xl shadow-black/5 overflow-hidden">
+          <div className="overflow-x-auto">
           {/* Table header */}
-          <div className="hidden lg:grid grid-cols-[44px_1fr_140px_1fr_100px_90px_88px_40px] gap-4 px-6 py-3 border-b border-[#f0f0f0]">
-            {["", "Name", "Slug", "Contact", "Rating", "Verified", "Status", ""].map((h, i) => (
+          <div className="hidden lg:grid grid-cols-[44px_1fr_140px_1fr_100px_90px_88px_150px_40px] lg:min-w-[1140px] gap-4 px-6 py-3 border-b border-[#f0f0f0]">
+            {["", "Name", "Slug", "Contact", "Rating", "Verified", "Status", "Added", ""].map((h, i) => (
               <span key={i} className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">{h}</span>
             ))}
           </div>
@@ -443,7 +445,7 @@ export function DevelopersClient({ currentRole }: Props) {
             <div className="divide-y divide-[#f0f0f0]">
               {devs.map((dev) => (
                 <div key={dev.id}
-                  className={`hidden lg:grid grid-cols-[44px_1fr_140px_1fr_100px_90px_88px_40px] gap-4 items-center px-6 py-4 hover:bg-[#f8fafc] transition-colors ${
+                  className={`hidden lg:grid grid-cols-[44px_1fr_140px_1fr_100px_90px_88px_150px_40px] lg:min-w-[1140px] gap-4 items-center px-6 py-4 hover:bg-[#f8fafc] transition-colors ${
                     dev.deleted_at ? "opacity-50" : ""
                   }`}>
                   {/* Logo */}
@@ -501,6 +503,12 @@ export function DevelopersClient({ currentRole }: Props) {
                       {dev.is_active ? "Active" : "Inactive"}
                     </span>
                   )}
+
+                  {/* Date added / last updated */}
+                  <div className="min-w-0">
+                    <p className="text-xs text-[#374151] truncate" title={`Added ${formatDateTime(dev.created_at)}`}>{formatDate(dev.created_at)}</p>
+                    <p className="text-[11px] text-[#9ca3af] truncate" title={`Updated ${formatDateTime(dev.updated_at)}`}>Updated {relativeTime(dev.updated_at)}</p>
+                  </div>
 
                   {/* Actions */}
                   {isAdmin && (
@@ -561,12 +569,16 @@ export function DevelopersClient({ currentRole }: Props) {
                           : <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${dev.is_active ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"}`}>{dev.is_active ? "Active" : "Inactive"}</span>
                         }
                       </div>
+                      <p className="text-[11px] text-[#9ca3af] mt-2" title={`Added ${formatDateTime(dev.created_at)} · Updated ${formatDateTime(dev.updated_at)}`}>
+                        Added {formatDate(dev.created_at)} · Updated {relativeTime(dev.updated_at)}
+                      </p>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
+          </div>
         </div>
 
         {/* Pagination */}
