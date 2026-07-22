@@ -5,7 +5,7 @@ import { createPortal } from "react-dom"
 import Image from "next/image"
 import {
   Search, Plus, RefreshCw, MoreHorizontal, Pencil, ImageIcon,
-  CheckCircle2, XCircle, Archive, ArchiveRestore, Eye,
+  CheckCircle2, XCircle, Archive, ArchiveRestore, Eye, ExternalLink,
   Building2, ChevronLeft, ChevronRight, Star, Globe,
   Phone, Mail, Filter, SortAsc, Trash2,
 } from "lucide-react"
@@ -140,6 +140,11 @@ function RowActions({ dev, onEdit, onLogo, onToggleVerified, onToggleActive, onD
           <div className="fixed z-[140]" style={{ top: menuPosition.top, left: menuPosition.left }}>
             <div ref={menuRef} className="bg-white rounded-2xl border border-[#f0f0f0] shadow-2xl py-1.5 min-w-[180px] mt-1">
               {[
+                ...(dev.deleted_at ? [] : [{
+                  label: "View public page",
+                  icon: <Eye className="w-3.5 h-3.5" />,
+                  action: () => { window.open(`/developers/${dev.slug}`, "_blank", "noopener,noreferrer") },
+                }]),
                 { label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, action: onEdit },
                 { label: "Upload Logo", icon: <ImageIcon className="w-3.5 h-3.5" />, action: onLogo },
                 { label: dev.is_verified ? "Unverify" : "Verify", icon: dev.is_verified ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />, action: onToggleVerified },
@@ -446,7 +451,20 @@ export function DevelopersClient({ currentRole }: Props) {
 
                   {/* Name */}
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[#0d1117] truncate">{dev.name}</p>
+                    {dev.deleted_at ? (
+                      <p className="text-sm font-semibold text-[#0d1117] truncate">{dev.name}</p>
+                    ) : (
+                      <a
+                        href={`/developers/${dev.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`View ${dev.name} public page`}
+                        className="group/name flex items-center gap-1 w-fit max-w-full text-sm font-semibold text-[#0d1117] hover:text-[#001f3f] transition-colors"
+                      >
+                        <span className="truncate group-hover/name:underline">{dev.name}</span>
+                        <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-0 group-hover/name:opacity-60 transition-opacity" />
+                      </a>
+                    )}
                     {dev.description && <p className="text-xs text-[#9ca3af] truncate">{dev.description}</p>}
                   </div>
 
@@ -506,8 +524,20 @@ export function DevelopersClient({ currentRole }: Props) {
                     <DeveloperLogo url={dev.logo_url} name={dev.name} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-semibold text-[#0d1117]">{dev.name}</p>
+                        <div className="min-w-0">
+                          {dev.deleted_at ? (
+                            <p className="text-sm font-semibold text-[#0d1117]">{dev.name}</p>
+                          ) : (
+                            <a
+                              href={`/developers/${dev.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-sm font-semibold text-[#0d1117] hover:text-[#001f3f] hover:underline transition-colors"
+                            >
+                              {dev.name}
+                              <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-60" />
+                            </a>
+                          )}
                           <p className="text-xs font-mono text-[#9ca3af]">{dev.slug}</p>
                         </div>
                         {isAdmin && (
