@@ -1,28 +1,20 @@
-import { redirect } from "next/navigation"
-import { isInactiveProfile } from "@/lib/auth"
+"use client"
+
+import { useAuth } from "@/context/auth-context"
 import { isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
-import { getSessionIdentity } from "@/lib/server-identity"
+import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { InviteClient } from "./invite-client"
 
-export const dynamic = "force-dynamic"
-
-export default async function InvitePage() {
-  const identity = await getSessionIdentity()
-
-  if (!identity) redirect("/login")
-  const { userId, email, profile } = identity
-  if (isInactiveProfile(profile)) redirect("/account-inactive")
-
-  // Recruiters: sales pipeline roles and admin staff.
-  if (!isSalesPipelineRole(profile.role) && !isAdminStaffRole(profile.role)) {
-    redirect("/dashboard")
-  }
+export default function InvitePage() {
+  const { user, profile, role } = useAuth()
+  const allowed = useRequireAllowed(isSalesPipelineRole(role) || isAdminStaffRole(role))
+  if (!allowed) return null
 
   return (
     <InviteClient
-      userId={userId}
-      userName={profile.fullname ?? email ?? "User"}
-      currentRole={profile.role ?? "agent"}
+      userId={user?.id ?? ""}
+      userName={profile?.fullname ?? user?.email ?? "User"}
+      currentRole={role ?? "agent"}
     />
   )
 }
