@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import type { DashboardProfile } from "./profile-form"
 import { BankAccountsTab } from "./bank-accounts-tab"
 import { PhoneCountrySelect } from "@/components/phone-country-select"
+import { NATIONALITIES } from "@/lib/nationalities"
 
 type TabKey = "profile" | "account" | "bank_accounts"
 
@@ -114,6 +115,7 @@ type MetadataShape = {
   facebook?: string
   linkedin?: string
   license_number?: string
+  nationality?: string
 }
 
 function toMetadata(metadata: Record<string, unknown> | null): MetadataShape {
@@ -128,6 +130,7 @@ function toMetadata(metadata: Record<string, unknown> | null): MetadataShape {
     facebook:              s("facebook"),
     linkedin:              s("linkedin"),
     license_number:        s("license_number"),
+    nationality:           s("nationality"),
   }
 }
 
@@ -238,6 +241,7 @@ export function ProfileTabs({
       facebook:              profileInfo.facebook?.trim() || null,
       linkedin:              profileInfo.linkedin?.trim() || null,
       license_number:        profileInfo.license_number?.trim() || null,
+      nationality:           profileInfo.nationality?.trim() || null,
     }
 
     const payload = {
@@ -389,8 +393,8 @@ export function ProfileTabs({
               </span>
             </div>
 
-            {/* Birthday, Gender, Timezone */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Birthday, Gender, Nationality, Timezone */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Birthday</label>
                 <input
@@ -413,6 +417,22 @@ export function ProfileTabs({
                     <option value="female">Female</option>
                     <option value="other">Other</option>
                     <option value="prefer_not_to_say">Prefer not to say</option>
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Nationality</label>
+                <div className="relative">
+                  <select
+                    className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm appearance-none cursor-pointer"
+                    value={profileInfo.nationality ?? ""}
+                    onChange={(e) => handleProfileFieldChange("nationality", e.target.value)}
+                  >
+                    <option value="">Select nationality</option>
+                    {NATIONALITIES.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
                   </select>
                   <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
                 </div>
