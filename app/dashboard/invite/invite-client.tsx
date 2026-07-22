@@ -7,9 +7,12 @@
  * tracked per agent.
  */
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react"
-import { Check, ChevronDown, Copy, Download, Loader2, MessageCircle, QrCode, RefreshCw, Users } from "lucide-react"
+import {
+  Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet,
+  FileText, Loader2, MessageCircle, QrCode, RefreshCw, Search, Users,
+} from "lucide-react"
 import { roleToLabel } from "@/lib/auth"
 import { ROLE_COLORS } from "@/lib/app-roles"
 
@@ -58,6 +61,23 @@ export function InviteClient({
   const [refreshing, setRefreshing] = useState(false)
   // Role chosen for each pending recruit at approval time (member | agent).
   const [roleChoice, setRoleChoice] = useState<Record<string, "member" | "agent">>({})
+
+  // Search + pagination over the recruits list.
+  const PAGE_SIZE = 10
+  const [query, setQuery] = useState("")
+  const [page, setPage] = useState(1)
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return recruits
+    return recruits.filter(
+      (r) => r.fullname.toLowerCase().includes(q) || (r.email ?? "").toLowerCase().includes(q),
+    )
+  }, [recruits, query])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   useEffect(() => {
     setOrigin(window.location.origin)
@@ -154,6 +174,80 @@ export function InviteClient({
     } finally {
       setRefreshing(false)
     }
+  }
+
+  // ── Exports (always the full filtered list, not just the visible page) ──
+
+  const exportExcel = () => {
+    const rows = [
+      ["Name", "Email", "Role", "Status", "Date Joined"],
+      ...filtered.map((r) => [r.fullname, r.email ?? "", roleToLabel(r.role), r.status, joinedLabel(r.joinedAt)]),
+    ]
+    // BOM so Excel opens UTF-8 names (ñ, Arabic, …) correctly.
+    const csv = "﻿" + rows.map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+    const a = document.createElement("a")
+    a.href = URL.createObjectURL(blob)
+    a.download = `my-recruits-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
+  const exportPdf = () => {
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    const w = window.open("", "_blank", "width=900,height=700")
+    if (!w) return
+    const generated = new Date().toLocaleDateString("en-AE", { year: "numeric", month: "long", day: "numeric" })
+    const body = filtered
+      .map(
+        (r, i) => `<tr>
+          <td class="n">${i + 1}</td>
+          <td><strong>${esc(r.fullname)}</strong></td>
+          <td>${esc(r.email ?? "—")}</td>
+          <td>${esc(roleToLabel(r.role))}</td>
+          <td><span class="pill ${r.status === "active" ? "ok" : "wait"}">${r.status === "active" ? "Active" : "Pending"}</span></td>
+          <td>${esc(joinedLabel(r.joinedAt))}</td>
+        </tr>`,
+      )
+      .join("")
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>My Recruits — ${esc(userName)}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; padding: 32px; }
+  .band { background: #001f3f; border-bottom: 4px solid #d6b357; border-radius: 12px 12px 0 0; padding: 22px 28px; }
+  .band h1 { color: #ffffff; font-size: 22px; }
+  .band .gold { color: #d6b357; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+  .meta { display: flex; gap: 24px; padding: 14px 28px; background: #f6f8fb; border: 1px solid #e8eaed; border-top: 0; font-size: 12px; color: #4b5563; }
+  .meta strong { color: #001f3f; }
+  table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 12.5px; }
+  th { background: #001f3f; color: #ffffff; text-align: left; padding: 9px 12px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+  td { padding: 9px 12px; border-bottom: 1px solid #eef0f3; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .n { color: #9ca3af; width: 34px; }
+  .pill { padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .ok { background: #d1fae5; color: #065f46; }
+  .wait { background: #fef3c7; color: #92400e; }
+  .foot { margin-top: 22px; text-align: center; font-size: 11px; color: #9ca3af; }
+  .foot b { color: #b8913f; }
+  @page { margin: 14mm; }
+</style></head><body>
+  <div class="band"><p class="gold">FHI Global · Recruitment Report</p><h1>My Recruits</h1></div>
+  <div class="meta">
+    <span>Recruiter: <strong>${esc(userName)}</strong></span>
+    <span>Generated: <strong>${esc(generated)}</strong></span>
+    <span>Total recruits: <strong>${filtered.length}</strong></span>
+    ${query.trim() ? `<span>Filter: <strong>“${esc(query.trim())}”</strong></span>` : ""}
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Date Joined</th></tr></thead>
+    <tbody>${body}</tbody>
+  </table>
+  <p class="foot">Generated from the FHI Global dashboard · <b>fhiglobal.ae</b></p>
+</body></html>`)
+    w.document.close()
+    w.focus()
+    // Give the new window a beat to render before the print dialog opens.
+    setTimeout(() => w.print(), 350)
   }
 
   const handleApprove = async (id: string) => {
@@ -300,6 +394,46 @@ export function InviteClient({
                 </button>
               </div>
 
+              {/* ── Search + exports toolbar ── */}
+              {!recruitsLoading && !recruitsError && recruits.length > 0 && (
+                <div className="flex flex-col sm:flex-row gap-2 mb-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+                    <input
+                      value={query}
+                      onChange={(e) => {
+                        setQuery(e.target.value)
+                        setPage(1)
+                      }}
+                      placeholder="Search by name or email…"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#e5e5e5] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] transition-colors"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={exportExcel}
+                      disabled={filtered.length === 0}
+                      title="Download as Excel (CSV)"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-bold hover:bg-emerald-100 transition-colors disabled:opacity-40"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      Excel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={exportPdf}
+                      disabled={filtered.length === 0}
+                      title="Download report as PDF"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f]/10 transition-colors disabled:opacity-40"
+                    >
+                      <FileText className="w-4 h-4" />
+                      PDF
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {recruitsLoading ? (
                 <p className="text-sm text-[#9ca3af] flex items-center gap-2 py-4">
                   <Loader2 className="w-4 h-4 animate-spin" /> Loading your recruits…
@@ -312,9 +446,13 @@ export function InviteClient({
                 <p className="text-sm text-[#9ca3af] py-4">
                   No sign-ups through your link yet — share your QR and they&apos;ll appear here.
                 </p>
+              ) : filtered.length === 0 ? (
+                <p className="text-sm text-[#9ca3af] py-4">
+                  No recruits match <span className="font-semibold text-[#374151]">&ldquo;{query.trim()}&rdquo;</span> — try another name or email.
+                </p>
               ) : (
                 <ul className="divide-y divide-[#f0f2f5]">
-                  {recruits.map((r) => {
+                  {pageItems.map((r) => {
                     const editRole = canEditRole(r)
                     const showApprove = editRole && r.status !== "active"
                     const busy = approvingId === r.id
@@ -390,6 +528,39 @@ export function InviteClient({
                     )
                   })}
                 </ul>
+              )}
+
+              {/* ── Pagination ── */}
+              {!recruitsLoading && !recruitsError && totalPages > 1 && (
+                <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-[#f0f2f5]">
+                  <p className="text-xs text-[#9ca3af]">
+                    Showing <span className="font-bold text-[#374151]">{(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)}</span> of{" "}
+                    <span className="font-bold text-[#374151]">{filtered.length}</span>
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPage(safePage - 1)}
+                      disabled={safePage <= 1}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#e5e5e5] text-xs font-bold text-[#374151] hover:border-[#001f3f] transition-colors disabled:opacity-40"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      Prev
+                    </button>
+                    <span className="text-xs font-bold text-[#001f3f] px-1">
+                      Page {safePage} of {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPage(safePage + 1)}
+                      disabled={safePage >= totalPages}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#e5e5e5] text-xs font-bold text-[#374151] hover:border-[#001f3f] transition-colors disabled:opacity-40"
+                    >
+                      Next
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               )}
 
               {approveError && (
