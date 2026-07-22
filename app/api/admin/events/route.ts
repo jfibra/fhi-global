@@ -15,7 +15,7 @@ export async function GET() {
   const admin = createAdminSupabase()
   const { data, error } = await admin
     .from("events")
-    .select("id, title, description, brand, image_url, event_date, venue, status, created_at, view_count, qr_scan_count, event_registrations(count)")
+    .select("id, slug, title, description, brand, image_url, event_date, venue, status, created_at, view_count, qr_scan_count, event_registrations(count)")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
 
@@ -27,6 +27,7 @@ export async function GET() {
     const counts = e.event_registrations as unknown as { count: number }[] | null
     return {
       id: e.id as string,
+      slug: (e.slug as string | null) ?? null,
       title: e.title as string,
       description: (e.description as string | null) ?? null,
       brand: (e.brand as string) ?? "fhiglobal",
@@ -44,6 +45,19 @@ export async function GET() {
   return NextResponse.json({ events })
 }
 
+// URL slug from the title ("FHI Global Summit 2026" -> "fhi-global-summit-2026").
+// Generated once at creation and kept stable afterwards so shared links and
+// printed QR codes never break when the title is edited.
+function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80)
+}
+
 /** Create an event — admin only. */
 export async function POST(req: NextRequest) {
   const session = await requireActiveSession()
@@ -59,15 +73,28 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminSupabase()
-  const { data, error } = await admin
+  const base = slugify(input.title)
+  let slug: string | null = base || null
+
+  let result = await admin
     .from("events")
-    .insert({ ...input, created_by: session.context.userId })
+    .insert({ ...input, slug, created_by: session.context.userId })
     .select("id")
     .single()
 
-  if (error || !data) {
+  // Slug taken by another event — retry once with a short suffix.
+  if (result.error?.code === "23505" && slug) {
+    slug = `${base}-${Math.random().toString(36).slice(2, 7)}`
+    result = await admin
+      .from("events")
+      .insert({ ...input, slug, created_by: session.context.userId })
+      .select("id")
+      .single()
+  }
+
+  if (result.error || !result.data) {
     return NextResponse.json({ error: "Failed to create event" }, { status: 500 })
   }
 
-  return NextResponse.json({ id: data.id })
+  return NextResponse.json({ id: result.data.id })
 }

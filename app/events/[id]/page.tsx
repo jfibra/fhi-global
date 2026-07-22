@@ -20,16 +20,19 @@ type Props = { params: Promise<{ id: string }> }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-async function fetchEvent(id: string) {
-  if (!UUID_RE.test(id)) return null
+// The segment accepts the human slug (/events/fhi-global-summit-2026) or the
+// legacy uuid (/events/3df3ff47-…) — old shared links and printed QR codes
+// keep working. The canonical URL in metadata always points at the slug.
+async function fetchEvent(idOrSlug: string) {
   const supabase = createPublicSupabaseClient()
-  const { data } = await supabase
+  const query = supabase
     .from("events")
-    .select("id, title, description, brand, image_url, event_date, venue")
-    .eq("id", id)
+    .select("id, slug, title, description, brand, image_url, event_date, venue")
     .eq("status", "published")
     .is("deleted_at", null)
-    .maybeSingle()
+  const { data } = UUID_RE.test(idOrSlug)
+    ? await query.eq("id", idOrSlug).maybeSingle()
+    : await query.eq("slug", idOrSlug).maybeSingle()
   return data ?? null
 }
 
@@ -41,7 +44,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${event.title} | FHI Global Events`,
     description: event.description?.trim().slice(0, 155) || `Register for ${event.title} — an FHI Global event.`,
     imageUrl: event.image_url,
-    pathname: `/events/${event.id}`,
+    pathname: `/events/${event.slug ?? event.id}`,
     keywords: [event.title, "FHI Global event", "Dubai real estate event"],
   })
 }

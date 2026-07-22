@@ -16,6 +16,7 @@ import { EVENT_BRANDS, eventBrand } from "@/lib/events/brands"
 
 type AdminEvent = {
   id: string
+  slug: string | null
   title: string
   description: string | null
   brand: string

@@ -40,7 +40,7 @@ export default async function EventsPage() {
   const supabase = createPublicSupabaseClient()
   const { data: events } = await supabase
     .from("events")
-    .select("id, title, description, brand, image_url, event_date, venue")
+    .select("id, slug, title, description, brand, image_url, event_date, venue")
     .eq("status", "published")
     .is("deleted_at", null)
     .order("event_date", { ascending: true, nullsFirst: false })
@@ -102,7 +102,7 @@ export default async function EventsPage() {
               return (
                 <Link
                   key={e.id}
-                  href={`/events/${e.id}`}
+                  href={`/events/${e.slug ?? e.id}`}
                   className="group relative bg-white rounded-2xl border border-[#e8eaed] overflow-hidden shadow-[0_10px_36px_-14px_rgba(0,20,40,0.25)] hover:shadow-[0_20px_56px_-16px_rgba(0,20,40,0.4)] hover:-translate-y-1.5 transition-all duration-300"
                 >
                   <span className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-[#d6b357]/30 z-10" aria-hidden="true" />

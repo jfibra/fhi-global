@@ -36,6 +36,7 @@ const ZONE_BOTTOM = SCAN_Y - 44 // text stack must stay above this
 
 type FlyerEvent = {
   id: string
+  slug: string | null
   title: string
   brand: string
   imageUrl: string | null
@@ -554,7 +555,7 @@ export function EventFlyerModal({
         <div ref={qrRef} className="hidden" aria-hidden>
           {origin && (
             <QRCodeCanvas
-              value={`${origin}/events/${event.id}?src=qr#register`}
+              value={`${origin}/events/${event.slug ?? event.id}?src=qr#register`}
               size={512}
               level="M"
               fgColor="#001f3f"
