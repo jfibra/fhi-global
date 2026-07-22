@@ -56,6 +56,10 @@ export async function GET(req: NextRequest) {
   // Referral/invite id — threaded through from the register page's Google button
   // so the continue → finalize step can credit the inviter.
   const ref = url.searchParams.get("ref") ?? ""
+  // Developer-invite token (+ chosen developer for generic links) — threaded
+  // from the /join Google button. Routes to the LR-free developer finalize.
+  const devInvite = url.searchParams.get("dev_invite") ?? ""
+  const dev = url.searchParams.get("dev") ?? ""
   const oauthError = url.searchParams.get("error_description") || url.searchParams.get("error")
 
   if (oauthError) {
@@ -93,6 +97,14 @@ export async function GET(req: NextRequest) {
       description: "Signed in with Google",
       ...ctx,
     })
+  }
+
+  // Developer-invite Google flow → LR-free continue (never the agent-provisioning path).
+  if (devInvite) {
+    const joinUrl = new URL("/join/continue", url.origin)
+    joinUrl.searchParams.set("dev_invite", devInvite)
+    if (dev) joinUrl.searchParams.set("dev", dev)
+    return NextResponse.redirect(joinUrl)
   }
 
   const continueUrl = new URL("/auth/google/continue", url.origin)

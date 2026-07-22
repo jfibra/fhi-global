@@ -7,7 +7,7 @@ import {
   Search, Plus, RefreshCw, MoreHorizontal, Pencil, ImageIcon,
   CheckCircle2, XCircle, Archive, ArchiveRestore, Eye, ExternalLink,
   Building2, ChevronLeft, ChevronRight, Star, Globe,
-  Phone, Mail, Filter, SortAsc, Trash2,
+  Phone, Mail, Filter, SortAsc, Trash2, QrCode,
 } from "lucide-react"
 import {
   type Developer,
@@ -22,6 +22,7 @@ import { isAdminStaffRole } from "@/lib/app-roles"
 import { formatDate, formatDateTime, relativeTime } from "@/lib/utils"
 import { DeveloperFormDialog } from "./developer-form-dialog"
 import { DeveloperLogoUpload } from "./developer-logo-upload"
+import { DeveloperInviteDialog } from "./developer-invite-dialog"
 
 // ─── Toast ─────────────────────────────────────────────────────────────────────
 function Portal({ children }: { children: React.ReactNode }) {
@@ -73,13 +74,14 @@ interface RowActionsProps {
   dev: Developer
   onEdit: () => void
   onLogo: () => void
+  onInviteLink: () => void
   onToggleVerified: () => void
   onToggleActive: () => void
   onDelete: () => void
   onRestore: () => void
 }
 
-function RowActions({ dev, onEdit, onLogo, onToggleVerified, onToggleActive, onDelete, onRestore }: RowActionsProps) {
+function RowActions({ dev, onEdit, onLogo, onInviteLink, onToggleVerified, onToggleActive, onDelete, onRestore }: RowActionsProps) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -148,6 +150,11 @@ function RowActions({ dev, onEdit, onLogo, onToggleVerified, onToggleActive, onD
                 }]),
                 { label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, action: onEdit },
                 { label: "Upload Logo", icon: <ImageIcon className="w-3.5 h-3.5" />, action: onLogo },
+                ...(dev.deleted_at ? [] : [{
+                  label: "Invite link",
+                  icon: <QrCode className="w-3.5 h-3.5" />,
+                  action: onInviteLink,
+                }]),
                 { label: dev.is_verified ? "Unverify" : "Verify", icon: dev.is_verified ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />, action: onToggleVerified },
                 { label: dev.is_active ? "Deactivate" : "Activate", icon: dev.is_active ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />, action: onToggleActive },
               ].map((item) => (
@@ -247,6 +254,8 @@ export function DevelopersClient({ currentRole }: Props) {
   const [editDev, setEditDev]           = useState<Developer | null>(null)
   const [showLogo, setShowLogo]         = useState(false)
   const [logoTarget, setLogoTarget]     = useState<Developer | null>(null)
+  const [showInvite, setShowInvite]     = useState(false)
+  const [invitePreset, setInvitePreset] = useState<Developer | null>(null)
   const [confirm, setConfirm]           = useState<{ message: string; action: () => void } | null>(null)
   const [toasts, setToasts]             = useState<ToastMsg[]>([])
 
@@ -344,10 +353,16 @@ export function DevelopersClient({ currentRole }: Props) {
             </div>
           </div>
           {isAdmin && (
-            <button type="button" onClick={() => { setEditDev(null); setShowForm(true) }}
-              className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md flex items-center gap-2 self-start sm:self-auto">
-              <Plus className="w-4 h-4" /> Add Developer
-            </button>
+            <div className="flex items-center gap-3 self-start sm:self-auto">
+              <button type="button" onClick={() => { setInvitePreset(null); setShowInvite(true) }}
+                className="inline-flex items-center gap-2 border border-[#e5e5e5] text-[#374151] px-5 py-3 rounded-full font-semibold text-sm transition-all hover:border-[#001f3f] hover:text-[#001f3f]">
+                <QrCode className="w-4 h-4" /> Invite Registration
+              </button>
+              <button type="button" onClick={() => { setEditDev(null); setShowForm(true) }}
+                className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md flex items-center gap-2">
+                <Plus className="w-4 h-4" /> Add Developer
+              </button>
+            </div>
           )}
         </div>
 
@@ -516,6 +531,7 @@ export function DevelopersClient({ currentRole }: Props) {
                       dev={dev}
                       onEdit={() => { setEditDev(dev); setShowForm(true) }}
                       onLogo={() => { setLogoTarget(dev); setShowLogo(true) }}
+                      onInviteLink={() => { setInvitePreset(dev); setShowInvite(true) }}
                       onToggleVerified={() => void handleToggleVerified(dev)}
                       onToggleActive={() => void handleToggleActive(dev)}
                       onDelete={() => handleDelete(dev)}
@@ -553,6 +569,7 @@ export function DevelopersClient({ currentRole }: Props) {
                             dev={dev}
                             onEdit={() => { setEditDev(dev); setShowForm(true) }}
                             onLogo={() => { setLogoTarget(dev); setShowLogo(true) }}
+                            onInviteLink={() => { setInvitePreset(dev); setShowInvite(true) }}
                             onToggleVerified={() => void handleToggleVerified(dev)}
                             onToggleActive={() => void handleToggleActive(dev)}
                             onDelete={() => handleDelete(dev)}
@@ -659,6 +676,13 @@ export function DevelopersClient({ currentRole }: Props) {
           onCancel={() => setConfirm(null)}
         />
       )}
+
+      <DeveloperInviteDialog
+        open={showInvite}
+        presetDeveloper={invitePreset}
+        onClose={() => setShowInvite(false)}
+        onError={(msg) => addToast("error", msg)}
+      />
 
       <Portal>
         <Toast toasts={toasts} remove={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
