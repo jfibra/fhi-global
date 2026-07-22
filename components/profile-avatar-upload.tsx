@@ -5,44 +5,7 @@ import Image from "next/image"
 import Cropper from "react-easy-crop"
 import type { Area, Point } from "react-easy-crop"
 import { Trash2, ZoomIn, ZoomOut, X, Check, Upload } from "lucide-react"
-
-// ─── canvas helper ────────────────────────────────────────────────────────────
-async function getCroppedBlob(imageSrc: string, pixelCrop: Area): Promise<Blob> {
-  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new window.Image()
-    img.addEventListener("load", () => resolve(img))
-    img.addEventListener("error", (e) => reject(e))
-    img.src = imageSrc
-  })
-
-  const canvas = document.createElement("canvas")
-  canvas.width = pixelCrop.width
-  canvas.height = pixelCrop.height
-  const ctx = canvas.getContext("2d")!
-
-  ctx.drawImage(
-    image,
-    pixelCrop.x,
-    pixelCrop.y,
-    pixelCrop.width,
-    pixelCrop.height,
-    0,
-    0,
-    pixelCrop.width,
-    pixelCrop.height,
-  )
-
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (blob) resolve(blob)
-        else reject(new Error("Canvas to Blob failed"))
-      },
-      "image/jpeg",
-      0.92,
-    )
-  })
-}
+import { getCroppedBlob } from "@/lib/crop-image"
 
 // ─── component ────────────────────────────────────────────────────────────────
 export function ProfileAvatarUpload({
@@ -125,7 +88,7 @@ export function ProfileAvatarUpload({
     onClose()
 
     try {
-      const blob = await getCroppedBlob(srcToUpload, croppedAreaPixels)
+      const blob = await getCroppedBlob(srcToUpload, croppedAreaPixels, "image/jpeg", 0.92)
       const formData = new FormData()
       formData.append("file", blob, "avatar.jpg")
       formData.append("userId", userId)
