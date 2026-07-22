@@ -106,15 +106,15 @@ export function LogDetailDrawer({ row, onClose }: { row: AuditLogRow; onClose: (
   const hasRequestInfo = Boolean(ip || ua || url)
 
   return createPortal(
-    <>
+    <div className="fixed inset-0 z-[210] flex items-center justify-center p-3 sm:p-6">
       <button
         type="button"
         aria-label="Close"
-        className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <aside className="fixed inset-y-0 right-0 z-[210] w-full max-w-md bg-white shadow-2xl flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#f0f2f5]">
+      <div className="relative w-full max-w-2xl max-h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-[#f0f2f5]">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-[#001f3f]" />
             <h2 className="font-['Outfit'] text-base font-bold text-[#0d1117]">Audit Log Details</h2>
@@ -124,8 +124,8 @@ export function LogDetailDrawer({ row, onClose }: { row: AuditLogRow; onClose: (
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af] mb-1.5">Action</p>
               <span
@@ -193,8 +193,8 @@ export function LogDetailDrawer({ row, onClose }: { row: AuditLogRow; onClose: (
             </>
           )}
         </div>
-      </aside>
-    </>,
+      </div>
+    </div>,
     document.body,
   )
 }

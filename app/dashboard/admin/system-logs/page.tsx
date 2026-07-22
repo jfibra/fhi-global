@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { isAdminStaffRole, isSuperAdminRole } from "@/lib/app-roles"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { getSessionIdentity } from "@/lib/server-identity"
 import { SystemLogsClient } from "@/components/dashboard/system-logs/system-logs-client"
 
@@ -15,10 +15,6 @@ export default async function SystemLogsPage() {
     redirect("/dashboard")
   }
 
-  return (
-    <SystemLogsClient
-      currentRole={profile.role ?? "admin"}
-      canClear={isSuperAdminRole(profile.role)}
-    />
-  )
+  // Any admin-staff role that can reach this page may clear logs.
+  return <SystemLogsClient currentRole={profile.role ?? "admin"} canClear />
 }
