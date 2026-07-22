@@ -553,7 +553,13 @@ export function EventFlyerModal({
         {/* Hidden QR source for the canvas composition */}
         <div ref={qrRef} className="hidden" aria-hidden>
           {origin && (
-            <QRCodeCanvas value={`${origin}/events/${event.id}`} size={512} level="M" fgColor="#001f3f" marginSize={2} />
+            <QRCodeCanvas
+              value={`${origin}/events/${event.id}?src=qr#register`}
+              size={512}
+              level="M"
+              fgColor="#001f3f"
+              marginSize={2}
+            />
           )}
         </div>
 

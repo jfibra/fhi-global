@@ -8,7 +8,8 @@ export function EventPageQr() {
   const [url, setUrl] = useState("")
 
   useEffect(() => {
-    setUrl(window.location.href)
+    // ?src=qr marks the visit as a scan; #register lands right on the form
+    setUrl(`${window.location.origin}${window.location.pathname}?src=qr#register`)
   }, [])
 
   if (!url) return null

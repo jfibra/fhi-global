@@ -10,7 +10,7 @@ export default async function EventsAdminPage() {
   const identity = await getSessionIdentity()
 
   if (!identity) redirect("/login")
-  const { email, profile } = identity
+  const { profile } = identity
   if (isInactiveProfile(profile)) redirect("/account-inactive")
 
   // Event management is admin-staff only.
@@ -18,10 +18,5 @@ export default async function EventsAdminPage() {
     redirect("/dashboard")
   }
 
-  return (
-    <EventsClient
-      userName={profile.fullname ?? email ?? "Admin"}
-      currentRole={profile.role ?? "admin"}
-    />
-  )
+  return <EventsClient />
 }

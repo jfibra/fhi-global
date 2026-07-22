@@ -8,6 +8,7 @@ import { eventBrand } from "@/lib/events/brands"
 import { EventRegisterForm } from "@/components/public/event-register-form"
 import { EventPageQr } from "@/components/public/event-page-qr"
 import { EventHeroQr } from "@/components/public/event-hero-qr"
+import { EventViewPing } from "@/components/public/event-view-ping"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -65,6 +66,7 @@ export default async function EventDetailPage({ params }: Props) {
 
   return (
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
+      <EventViewPing eventId={event.id} />
       <TopBar />
       <Header />
 
@@ -173,8 +175,11 @@ export default async function EventDetailPage({ params }: Props) {
             </p>
           </div>
 
-          {/* ── Registration card (sticky) ── */}
-          <aside className="lg:sticky lg:top-24 bg-white rounded-2xl border border-[#e8eaed] shadow-[0_16px_44px_-16px_rgba(0,20,40,0.18)] overflow-hidden">
+          {/* ── Registration card (sticky) — #register is the QR landing anchor ── */}
+          <aside
+            id="register"
+            className="scroll-mt-24 lg:sticky lg:top-24 bg-white rounded-2xl border border-[#e8eaed] shadow-[0_16px_44px_-16px_rgba(0,20,40,0.18)] overflow-hidden"
+          >
             <div className="bg-gradient-to-r from-[#001f3f] to-[#002a52] px-5 py-4 flex items-center gap-3">
               <span className="w-10 h-10 rounded-full bg-[#d6b357]/20 border border-[#d6b357]/40 flex items-center justify-center shrink-0">
                 <Ticket className="w-5 h-5 text-[#d6b357]" />

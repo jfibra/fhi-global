@@ -8,13 +8,10 @@
 
 import { useCallback, useEffect, useState } from "react"
 import {
-  CalendarDays, FileImage, ImagePlus, Loader2, MapPin, Pencil, Plus,
-  RefreshCw, Trash2, Users, X,
+  CalendarDays, Eye, FileImage, ImagePlus, Loader2, MapPin, Pencil, Plus,
+  RefreshCw, ScanLine, Trash2, Users, X,
 } from "lucide-react"
 import { EventFlyerModal } from "./event-flyer-modal"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
-import { roleToLabel } from "@/lib/auth"
 import { EVENT_BRANDS, eventBrand } from "@/lib/events/brands"
 
 type AdminEvent = {
@@ -28,6 +25,8 @@ type AdminEvent = {
   status: string
   createdAt: string
   registrationCount: number
+  viewCount: number
+  qrScanCount: number
 }
 
 type Registration = {
@@ -87,7 +86,7 @@ function eventDateLabel(iso: string | null): string {
     " · " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dubai" }) + " GST"
 }
 
-export function EventsClient({ userName, currentRole }: { userName: string; currentRole: string }) {
+export function EventsClient() {
   const [events, setEvents] = useState<AdminEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -252,18 +251,14 @@ export function EventsClient({ userName, currentRole }: { userName: string; curr
     }
   }
 
-  const roleValue = currentRole.toLowerCase().trim()
   const inputCls =
     "w-full px-4 py-3 rounded-xl border border-[#e5e5e5] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] transition-colors"
   const labelCls = "block text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-1.5"
 
+  // The dashboard shell (sidebar + header) is rendered once by
+  // app/dashboard/layout.tsx — this page renders only its content.
   return (
-    <DashboardShell
-      role={roleValue}
-      roleLabel={roleToLabel(currentRole)}
-      roleColor={getRoleColor(currentRole)}
-      userName={userName}
-    >
+    <>
       <div className="w-full space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -354,6 +349,17 @@ export function EventsClient({ userName, currentRole }: { userName: string; curr
                         <MapPin className="w-3 h-3 text-[#d6b357]" /> {e.venue}
                       </p>
                     )}
+                    {/* Visit stats: page views + how many arrived via QR scan */}
+                    <div className="mt-2 flex items-center gap-3 text-xs text-[#6b7280]">
+                      <span className="inline-flex items-center gap-1" title="Page visits">
+                        <Eye className="w-3.5 h-3.5 text-[#001f3f]" />
+                        <span className="font-bold text-[#111827]">{e.viewCount}</span> visits
+                      </span>
+                      <span className="inline-flex items-center gap-1" title="Visits from QR scans">
+                        <ScanLine className="w-3.5 h-3.5 text-[#b8913f]" />
+                        <span className="font-bold text-[#111827]">{e.qrScanCount}</span> QR scans
+                      </span>
+                    </div>
                     <div className="mt-3 flex items-center justify-between border-t border-[#f0f0f0] pt-3">
                       <button
                         type="button"
@@ -625,6 +631,6 @@ export function EventsClient({ userName, currentRole }: { userName: string; curr
           </div>
         </div>
       )}
-    </DashboardShell>
+    </>
   )
 }
