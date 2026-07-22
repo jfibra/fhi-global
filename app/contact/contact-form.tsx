@@ -32,10 +32,24 @@ export function ContactForm() {
     setStatus("sending")
     setError("")
 
-    // Simulate async send — replace with real API route or email service
-    await new Promise((r) => setTimeout(r, 1400))
-    setStatus("success")
-    form.reset()
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
+      const json = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) {
+        setError(json.error ?? "Something went wrong. Please try again.")
+        setStatus("error")
+        return
+      }
+      setStatus("success")
+      form.reset()
+    } catch {
+      setError("Network error. Please check your connection and try again.")
+      setStatus("error")
+    }
   }
 
   if (status === "success") {
@@ -59,7 +73,15 @@ export function ContactForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="relative space-y-5">
+      {/* Honeypot — hidden from users; bots that fill it are silently dropped */}
+      <div className="absolute left-[-9999px] top-0 h-0 w-0 overflow-hidden" aria-hidden="true">
+        <label>
+          Website
+          <input name="website" type="text" tabIndex={-1} autoComplete="off" />
+        </label>
+      </div>
+
       {/* Name + Email row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">

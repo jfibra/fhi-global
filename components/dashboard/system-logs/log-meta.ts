@@ -59,6 +59,7 @@ export const CATEGORY_META: Record<string, { label: string; bg: string; text: st
   sales: { label: "Sales", bg: "bg-teal-50", text: "text-teal-700" },
   finance: { label: "Finance", bg: "bg-lime-50", text: "text-lime-700" },
   support: { label: "Support", bg: "bg-orange-50", text: "text-orange-700" },
+  contact: { label: "Contact", bg: "bg-cyan-50", text: "text-cyan-700" },
   auth: { label: "Auth", bg: "bg-rose-50", text: "text-rose-700" },
   security: { label: "Security", bg: "bg-red-50", text: "text-red-700" },
   system: { label: "System", bg: "bg-slate-100", text: "text-slate-600" },

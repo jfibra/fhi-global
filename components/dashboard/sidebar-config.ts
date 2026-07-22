@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Building2, Layers, Images,
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound, User,
-  Clapperboard, QrCode, ScrollText,
+  Clapperboard, QrCode, ScrollText, Inbox,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -96,7 +96,8 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
         type: "group",
         label: "Support",
         items: [
-          { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support" },
+          { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support"              },
+          { icon: Inbox,    label: "Contact Inbox",   href: "/dashboard/admin/contact-inbox"  },
         ],
       },
       {
