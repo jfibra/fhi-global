@@ -1,17 +1,17 @@
-import { redirect } from "next/navigation"
+"use client"
+
+import { useParams } from "next/navigation"
+import { useAuth } from "@/context/auth-context"
 import { isAdminStaffRole } from "@/lib/app-roles"
-import { getSessionIdentity } from "@/lib/server-identity"
+import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { ContactDetailClient } from "./contact-detail-client"
 
-export const dynamic = "force-dynamic"
-export const metadata = { robots: { index: false, follow: false } }
+export default function ContactDetailPage() {
+  const params = useParams<{ id: string }>()
+  const id = params?.id ?? ""
+  const { role } = useAuth()
+  const allowed = useRequireAllowed(isAdminStaffRole(role))
+  if (!allowed) return null
 
-export default async function ContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const identity = await getSessionIdentity()
-  if (!identity) redirect("/login")
-  if (!isAdminStaffRole(identity.profile.role)) redirect("/dashboard")
-
-  const { id } = await params
-  // The dashboard shell (sidebar + header) is rendered once by app/dashboard/layout.tsx.
   return <ContactDetailClient id={id} />
 }
