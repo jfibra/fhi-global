@@ -2,12 +2,15 @@
 
 import Link from "next/link"
 import { Building2, KeyRound, LifeBuoy, User, ArrowRight, Sparkles } from "lucide-react"
+import { useAuth } from "@/context/auth-context"
+import { getDashboardRouteByRole } from "@/lib/auth"
 
 type Props = {
   displayName: string
 }
 
 export function MemberOverview({ displayName }: Props) {
+  const base = getDashboardRouteByRole(useAuth().role)
   const cards = [
     {
       href: "/buy",
@@ -24,14 +27,14 @@ export function MemberOverview({ displayName }: Props) {
       accent: "from-[#001f3f] to-[#003d7a]",
     },
     {
-      href: "/dashboard/profile",
+      href: `${base}/profile`,
       title: "Profile",
       desc: "Keep your name, timezone, and contact details up to date so we can reach you easily.",
       icon: User,
       accent: "from-[#001f3f] to-[#003d7a]",
     },
     {
-      href: "/dashboard/support",
+      href: `${base}/support`,
       title: "Support",
       desc: "Open a ticket for account help, IT, or general questions.",
       icon: LifeBuoy,

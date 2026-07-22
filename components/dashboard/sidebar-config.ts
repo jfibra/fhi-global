@@ -64,60 +64,60 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
         label: "User Management",
         items: [
           { icon: Users,      label: "Users", href: `${basePath}/users` },
-          { icon: Network,    label: "Teams", href: "/dashboard/teams"  },
+          { icon: Network,    label: "Teams", href: `${basePath}/teams`  },
         ],
       },
       {
         type: "group",
         label: "Developer Management",
         items: [
-          { icon: Building2,     label: "Developers",   href: "/dashboard/developers"      },
-          { icon: FolderOpen,    label: "Projects",     href: "/dashboard/projects"        },
-          { icon: ClipboardList, label: "All Listings", href: "/dashboard/admin/listings"  },
+          { icon: Building2,     label: "Developers",   href: `${basePath}/developers`      },
+          { icon: FolderOpen,    label: "Projects",     href: `${basePath}/projects`        },
+          { icon: ClipboardList, label: "All Listings", href: `${basePath}/listings`  },
         ],
       },
       {
         type: "group",
         label: "Finance",
         items: [
-          { icon: Landmark,      label: "Tax Entities",        href: "/dashboard/tax-entities"       },
-          { icon: ShoppingCart,  label: "Purchases",           href: "/dashboard/purchases"          },
-          { icon: Tag,           label: "Purchase Categories", href: "/dashboard/purchase-categories" },
+          { icon: Landmark,      label: "Tax Entities",        href: `${basePath}/tax-entities`       },
+          { icon: ShoppingCart,  label: "Purchases",           href: `${basePath}/purchases`          },
+          { icon: Tag,           label: "Purchase Categories", href: `${basePath}/purchase-categories` },
         ],
       },
       {
         type: "group",
         label: "Sales Management",
         items: [
-          { icon: TrendingUp, label: "Sales Reports", href: "/dashboard/sales" },
+          { icon: TrendingUp, label: "Sales Reports", href: `${basePath}/sales` },
         ],
       },
       {
         type: "item",
-        item: { icon: CalendarDays, label: "Events", href: "/dashboard/events" },
+        item: { icon: CalendarDays, label: "Events", href: `${basePath}/events` },
       },
       {
         type: "group",
         label: "Support",
         items: [
-          { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support"              },
-          { icon: Inbox,    label: "Contact Inbox",   href: "/dashboard/admin/contact-inbox"  },
+          { icon: LifeBuoy, label: "Support Tickets", href: `${basePath}/support`              },
+          { icon: Inbox,    label: "Contact Inbox",   href: `${basePath}/contact-inbox`  },
         ],
       },
       {
         type: "group",
         label: "System",
         items: [
-          { icon: ScrollText, label: "System Logs", href: "/dashboard/admin/system-logs" },
+          { icon: ScrollText, label: "System Logs", href: `${basePath}/system-logs` },
         ],
       },
       {
         type: "item",
-        item: { icon: Clapperboard, label: "Reels Maker", href: "/dashboard/reels-maker" },
+        item: { icon: Clapperboard, label: "Reels Maker", href: `${basePath}/reels-maker` },
       },
       {
         type: "item",
-        item: { icon: QrCode, label: "Invite", href: "/dashboard/invite" },
+        item: { icon: QrCode, label: "Invite", href: `${basePath}/invite` },
       },
       {
         type: "item",
@@ -132,28 +132,28 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
       { type: "item", item: { icon: Briefcase,       label: "Company Info",  href: `${basePath}/company`   } },
       { type: "item", item: { icon: Layers,          label: "My Projects",   href: `${basePath}/projects`  } },
       { type: "item", item: { icon: Images,          label: "Media / Files", href: `${basePath}/media`     } },
-      { type: "item", item: { icon: LifeBuoy,        label: "Support Tickets", href: "/dashboard/support" } },
+      { type: "item", item: { icon: LifeBuoy,        label: "Support Tickets", href: `${basePath}/support` } },
     ]
   }
 
   if (roleInList(normalizedRole, ROLES_SALES_PIPELINE)) {
     return [
       { type: "item", item: { icon: LayoutDashboard, label: "Overview", href: basePath } },
-      { type: "item", item: { icon: ClipboardList, label: "My listings", href: "/dashboard/listings" } },
-      { type: "item", item: { icon: Clapperboard, label: "Reels Maker", href: "/dashboard/reels-maker" } },
-      { type: "item", item: { icon: QrCode, label: "Invite", href: "/dashboard/invite" } },
+      { type: "item", item: { icon: ClipboardList, label: "My listings", href: `${basePath}/listings` } },
+      { type: "item", item: { icon: Clapperboard, label: "Reels Maker", href: `${basePath}/reels-maker` } },
+      { type: "item", item: { icon: QrCode, label: "Invite", href: `${basePath}/invite` } },
       {
         type: "group",
         label: "Sales Management",
         items: [
-          { icon: TrendingUp, label: "Sales Reports", href: "/dashboard/sales" },
+          { icon: TrendingUp, label: "Sales Reports", href: `${basePath}/sales` },
         ],
       },
       {
         type: "group",
         label: "Support",
         items: [
-          { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support" },
+          { icon: LifeBuoy, label: "Support Tickets", href: `${basePath}/support` },
         ],
       },
       { type: "item", item: { icon: CreditCard, label: "Business Card", href: `${basePath}/business-card` } },
@@ -167,14 +167,14 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
         type: "group",
         label: "Sales Management",
         items: [
-          { icon: TrendingUp, label: "Sales Reports", href: "/dashboard/sales" },
+          { icon: TrendingUp, label: "Sales Reports", href: `${basePath}/sales` },
         ],
       },
       {
         type: "group",
         label: "Support",
         items: [
-          { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support" },
+          { icon: LifeBuoy, label: "Support Tickets", href: `${basePath}/support` },
         ],
       },
       { type: "item", item: { icon: CreditCard, label: "Business Card", href: `${basePath}/business-card` } },
@@ -192,12 +192,12 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
           { icon: KeyRound, label: "Rent", href: "/rent" },
         ],
       },
-      { type: "item", item: { icon: User, label: "Profile", href: "/dashboard/profile" } },
+      { type: "item", item: { icon: User, label: "Profile", href: `${basePath}/profile` } },
       {
         type: "group",
         label: "Support",
         items: [
-          { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support" },
+          { icon: LifeBuoy, label: "Support Tickets", href: `${basePath}/support` },
         ],
       },
     ]
@@ -206,7 +206,7 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
   // Unknown roles resolve to member in UI; if we ever hit here with another id, keep minimal nav
   return [
     { type: "item", item: { icon: LayoutDashboard, label: "Overview", href: basePath } },
-    { type: "item", item: { icon: LifeBuoy, label: "Support Tickets", href: "/dashboard/support" } },
+    { type: "item", item: { icon: LifeBuoy, label: "Support Tickets", href: `${basePath}/support` } },
   ]
 }
 

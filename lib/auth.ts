@@ -1,9 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   ROLE_DASHBOARD_MAP,
+  ROLE_SLUGS,
   roleToLabel,
+  roleToSlug,
+  roleInList,
+  normalizeAppRole,
   isSuperAdminRole,
   isDeveloperRole,
+  ROLES_SALES_REPORTS_ACCESS,
 } from "@/lib/app-roles"
 
 export type AppUser = {
@@ -26,27 +31,36 @@ export type AppProfile = {
 
 export { ROLE_DASHBOARD_MAP, roleToLabel }
 
-const SHARED_DASHBOARD_PREFIXES = [
-  "/dashboard/profile",
-  "/dashboard/admin/users",
-  "/dashboard/developers",
-  "/dashboard/teams",
-  "/dashboard/projects",
-  "/dashboard/tax-entities",
-  "/dashboard/purchase-categories",
-  "/dashboard/purchases",
-  "/dashboard/sales",
-  "/dashboard/listings",
-  "/dashboard/reels-maker",
-  "/dashboard/invite",
-  "/dashboard/events",
-  "/dashboard/support",
-]
+const ROLE_SLUG_SET = new Set(ROLE_SLUGS)
+
+/**
+ * First sub-segment after the role slug → role ids allowed to view it.
+ * Anything not listed (the role landing, `profile`, `support`, `business-card`) is
+ * shared and allowed for every role. Mirrors the sidebar in `sidebar-config.ts`.
+ */
+const SUB_PATH_ROLES: Record<string, readonly string[]> = {
+  users: ["super_admin", "admin"],
+  teams: ["super_admin", "admin"],
+  developers: ["super_admin", "admin"],
+  events: ["super_admin", "admin"],
+  "tax-entities": ["super_admin", "admin"],
+  purchases: ["super_admin", "admin"],
+  "purchase-categories": ["super_admin", "admin"],
+  "contact-inbox": ["super_admin", "admin"],
+  "system-logs": ["super_admin", "admin"],
+  listings: ["super_admin", "admin", "agent", "team_leader", "unit_manager"],
+  projects: ["super_admin", "admin", "developer"],
+  company: ["developer"],
+  media: ["developer"],
+  sales: [...ROLES_SALES_REPORTS_ACCESS],
+  "reels-maker": ["super_admin", "admin", "agent", "team_leader", "unit_manager"],
+  invite: ["super_admin", "admin", "agent", "team_leader", "unit_manager"],
+}
 
 export function getDashboardRouteByRole(role?: string | null) {
-  const normalizedRole = String(role ?? "").toLowerCase().trim()
-  if (!normalizedRole) return "/dashboard/member"
-  return ROLE_DASHBOARD_MAP[normalizedRole] ?? "/dashboard/member"
+  const normalizedRole = normalizeAppRole(role)
+  if (!normalizedRole) return "/member"
+  return ROLE_DASHBOARD_MAP[normalizedRole] ?? "/member"
 }
 
 /** After login: allow `/buy` or `/rent` as safe relative targets (open redirect safe). */
@@ -70,25 +84,25 @@ export function pickSafePostLoginRedirect(nextRaw: string | null | undefined, ro
 }
 
 export function canAccessDashboardPath(pathname: string, role?: string | null) {
-  const normalizedRole = String(role ?? "").toLowerCase().trim()
+  const normalizedRole = normalizeAppRole(role)
+  const segments = pathname.split("/").filter(Boolean)
+  const slug = segments[0] ?? ""
 
-  if (!pathname.startsWith("/dashboard")) {
-    return true
-  }
+  // Not a role-prefixed dashboard path (e.g. the `/dashboard` redirect stub) → allow.
+  if (!ROLE_SLUG_SET.has(slug)) return true
 
-  if (pathname === "/dashboard" || pathname === "/dashboard/") {
-    return true
-  }
-
-  // Super admin can access every dashboard route
+  // Super admin can access every role's dashboard.
   if (isSuperAdminRole(normalizedRole)) return true
 
-  if (SHARED_DASHBOARD_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
-    return true
-  }
+  // Otherwise the URL's role slug must be the user's own.
+  if (slug !== roleToSlug(normalizedRole)) return false
 
-  const roleBase = getDashboardRouteByRole(normalizedRole)
-  return pathname === roleBase || pathname.startsWith(`${roleBase}/`)
+  const sub = segments[1]
+  if (!sub) return true // role landing
+
+  const allowedRoles = SUB_PATH_ROLES[sub]
+  if (!allowedRoles) return true // shared page (profile, support, business-card, …)
+  return roleInList(normalizedRole, allowedRoles)
 }
 
 export function isInactiveProfile(profile: Pick<AppProfile, "status"> & { is_deleted?: boolean | null }) {
@@ -175,16 +189,14 @@ export function isProfileMissingMinimumFields(profile: AppProfile) {
 
 /**
  * Dashboard paths allowed before personal profile is complete (fname, lname, timezone, phone).
- * Developers primarily use /dashboard/developer; forcing profile first blocked every sidebar link.
+ * Developers primarily use their own dashboard subtree; forcing profile first blocked every sidebar link.
  */
 export function isPathExemptFromProfileCompletionGate(pathname: string, role?: string | null) {
-  if (pathname.startsWith("/dashboard/profile")) return true
-  const r = String(role ?? "").toLowerCase().trim()
+  const r = normalizeAppRole(role)
+  const base = getDashboardRouteByRole(r)
+  if (pathname === `${base}/profile` || pathname.startsWith(`${base}/profile/`)) return true
   if (isDeveloperRole(r)) {
-    return (
-      pathname.startsWith("/dashboard/developer") ||
-      pathname.startsWith("/dashboard/support")
-    )
+    return pathname === base || pathname.startsWith(`${base}/`)
   }
   return false
 }

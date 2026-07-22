@@ -208,8 +208,46 @@ const nextConfig = {
         source: "/(.*)",
         headers: SECURITY_HEADERS,
       },
+      // Role-prefixed dashboards (replaces the old `/dashboard/*`). `/developer/:path*`
+      // matches `/developer` and `/developer/*` but NOT the public `/developers`.
       {
-        source: "/dashboard/:path*",
+        source: "/dashboard",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      {
+        source: "/superadmin/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      {
+        source: "/admin/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      {
+        source: "/teamleader/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      {
+        source: "/unitmanager/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      {
+        source: "/agent/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      {
+        source: "/developer/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      {
+        source: "/secretary/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      {
+        source: "/teamsecretary/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      {
+        source: "/member/:path*",
         headers: PRIVATE_NOINDEX_HEADERS,
       },
       {
@@ -222,14 +260,6 @@ const nextConfig = {
       },
       {
         source: "/register/:path*",
-        headers: PRIVATE_NOINDEX_HEADERS,
-      },
-      {
-        source: "/profile/:path*",
-        headers: PRIVATE_NOINDEX_HEADERS,
-      },
-      {
-        source: "/admin/:path*",
         headers: PRIVATE_NOINDEX_HEADERS,
       },
       {

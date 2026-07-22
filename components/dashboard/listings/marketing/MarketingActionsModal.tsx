@@ -8,6 +8,8 @@ import AnnouncementModal from "./AnnouncementModal"
 import ShareCardModal from "./ShareCardModal"
 import type { AgentListingStatus } from "@/lib/agent-listings-service"
 import type { OgCardOptions } from "@/lib/flyer/og-card"
+import { useAuth } from "@/context/auth-context"
+import { getDashboardRouteByRole } from "@/lib/auth"
 
 type View = "menu" | "flyer" | "announce" | "sharecard"
 
@@ -36,6 +38,7 @@ export default function MarketingActionsModal({
   onEdit?: () => void
   onDelete?: () => void
 }) {
+  const base = getDashboardRouteByRole(useAuth().role)
   const [view, setView] = useState<View>(initialView)
 
   // If the tool was opened straight from a card chip, closing it exits fully;
@@ -110,7 +113,7 @@ export default function MarketingActionsModal({
           </button>
 
           <Link
-            href={`/dashboard/reels-maker?listing=${listingId}`}
+            href={`${base}/reels-maker?listing=${listingId}`}
             className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-[#e8eaed] bg-white p-5 hover:border-[#7c3aed] hover:shadow-md transition-all"
           >
             <span className="w-12 h-12 rounded-xl bg-[#7c3aed]/10 text-[#7c3aed] flex items-center justify-center">

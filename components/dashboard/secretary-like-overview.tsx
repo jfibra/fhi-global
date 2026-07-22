@@ -2,6 +2,8 @@
 
 import Link from "next/link"
 import { CreditCard, LifeBuoy, TrendingUp, ArrowRight, Sparkles } from "lucide-react"
+import { useAuth } from "@/context/auth-context"
+import { getDashboardRouteByRole } from "@/lib/auth"
 
 type Props = {
   displayName: string
@@ -10,16 +12,17 @@ type Props = {
 }
 
 export function SecretaryLikeOverview({ displayName, businessCardHref, intro }: Props) {
+  const base = getDashboardRouteByRole(useAuth().role)
   const cards = [
     {
-      href: "/dashboard/sales",
+      href: `${base}/sales`,
       title: "Sales reports",
       desc: "View deals, validation status, and attach documents when a sale is under review or marked invalid.",
       icon: TrendingUp,
       accent: "from-[#001f3f] to-[#003d7a]",
     },
     {
-      href: "/dashboard/support",
+      href: `${base}/support`,
       title: "Support tickets",
       desc: "Log requests for IT, operations, or admin follow-up.",
       icon: LifeBuoy,

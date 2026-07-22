@@ -9,7 +9,7 @@ import {
   Menu, X, Bell, LogOut, Settings, ChevronRight, ChevronDown, Home,
 } from "lucide-react"
 import { createClient as createSupabaseClient } from "@/lib/supabase/client"
-import { roleToLabel } from "@/lib/auth"
+import { roleToLabel, getDashboardRouteByRole } from "@/lib/auth"
 import { useAuth } from "@/context/auth-context"
 import { getSidebarNavSections, getRoleColor, type NavItem, type NavSection } from "@/components/dashboard/sidebar-config"
 import { ROLE_SHELL_BADGE, normalizeAppRole } from "@/lib/app-roles"
@@ -49,6 +49,7 @@ export function DashboardShell({
   const { user, profile } = useAuth()
 
   const effectiveRole = profile?.role ?? role ?? "member"
+  const dashboardBase = getDashboardRouteByRole(effectiveRole)
   const effectiveRoleLabel =
     (profile?.role ? roleToLabel(profile.role) : roleLabel) ?? roleToLabel(effectiveRole)
   const displayName = profile?.fullname || userName || user?.email || "User"
@@ -295,7 +296,7 @@ export function DashboardShell({
                 <span className="font-['Outfit'] font-semibold text-[15px]">Home</span>
               </Link>
               <Link
-                href="/dashboard/profile"
+                href={`${dashboardBase}/profile`}
                 onClick={() => { setProfileMenuOpen(false); setSidebarOpen(false) }}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-white/85 hover:text-white hover:bg-white/10 transition-all duration-200 group"
               >

@@ -8,7 +8,7 @@ import {
   isProfileMissingMinimumFields,
   type AppProfile,
 } from "@/lib/auth"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { isAdminStaffRole, isKnownRoleSlug } from "@/lib/app-roles"
 import { updateSession } from "@/lib/supabase/middleware"
 import { IDENTITY_HEADERS } from "@/lib/identity-headers"
 
@@ -44,7 +44,10 @@ function forwardIdentity(
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const isDashboardRoute = pathname.startsWith("/dashboard")
+  const firstSegment = pathname.split("/").filter(Boolean)[0] ?? ""
+  // Dashboard routes are now role-prefixed (`/admin/*`, `/agent/*`, …); `/dashboard`
+  // is kept only as a role-agnostic redirect stub.
+  const isDashboardRoute = pathname === "/dashboard" || isKnownRoleSlug(firstSegment)
   const isLoginRoute = pathname === "/login"
 
   // Anti-forgery: never trust identity headers arriving from the outside.
@@ -112,7 +115,7 @@ export async function proxy(request: NextRequest) {
     !isPathExemptFromProfileCompletionGate(pathname, profile.role)
   ) {
     const url = request.nextUrl.clone()
-    url.pathname = "/dashboard/profile"
+    url.pathname = `${getDashboardRouteByRole(profile.role)}/profile`
     return NextResponse.redirect(url)
   }
 
@@ -133,5 +136,18 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/login", "/dashboard/:path*", "/account-inactive"],
+  matcher: [
+    "/login",
+    "/account-inactive",
+    "/dashboard",
+    "/superadmin/:path*",
+    "/admin/:path*",
+    "/teamleader/:path*",
+    "/unitmanager/:path*",
+    "/agent/:path*",
+    "/developer/:path*",
+    "/secretary/:path*",
+    "/teamsecretary/:path*",
+    "/member/:path*",
+  ],
 }

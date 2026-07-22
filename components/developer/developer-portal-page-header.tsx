@@ -4,7 +4,7 @@ import Link from "next/link"
 import { ChevronRight, LayoutDashboard } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-const DEVELOPER_HOME = "/dashboard/developer"
+const DEVELOPER_HOME = "/developer"
 
 export function DeveloperPortalPageHeader({
   title,

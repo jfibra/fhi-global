@@ -12,6 +12,8 @@ import {
   Sparkles,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useAuth } from "@/context/auth-context"
+import { getDashboardRouteByRole } from "@/lib/auth"
 
 type Props = {
   displayName: string
@@ -19,6 +21,7 @@ type Props = {
 }
 
 export function SalesPipelineOverview({ displayName, userId }: Props) {
+  const base = getDashboardRouteByRole(useAuth().role)
   const [totalListings, setTotalListings] = useState<number | null>(null)
   const [publishedListings, setPublishedListings] = useState<number | null>(null)
   const [draftListings, setDraftListings] = useState<number | null>(null)
@@ -62,14 +65,14 @@ export function SalesPipelineOverview({ displayName, userId }: Props) {
     accent: string
   }> = [
     {
-      href: "/dashboard/listings",
+      href: `${base}/listings`,
       title: "My listings",
       desc: "Create and manage sale or rent listings (agents, team leaders, and unit managers).",
       icon: ClipboardList,
       accent: "from-[#001f3f] to-[#003d7a]",
     },
     {
-      href: "/dashboard/sales",
+      href: `${base}/sales`,
       title: "Sales reports",
       desc: "Track sales, commissions, and validation workflow.",
       icon: TrendingUp,
@@ -90,7 +93,7 @@ export function SalesPipelineOverview({ displayName, userId }: Props) {
       accent: "from-[#001f3f] to-[#003d7a]",
     },
     {
-      href: "/dashboard/support",
+      href: `${base}/support`,
       title: "Support",
       desc: "Open tickets and get help from the team.",
       icon: LifeBuoy,

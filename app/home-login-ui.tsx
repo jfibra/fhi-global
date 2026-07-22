@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react"
 import { Eye, EyeOff, Mail, Lock, ArrowRight, ShieldCheck, Star, MapPin } from "lucide-react"
-import { loginAction, type LoginState } from "@/app/login/actions"
+import { loginAction, type LoginState } from "@/app/(public-page)/(auth)/login/actions"
 import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
 import { DubaiBackdrop } from "@/components/auth/dubai-backdrop"
 
