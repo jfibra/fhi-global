@@ -71,8 +71,9 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
         type: "group",
         label: "Developer Management",
         items: [
-          { icon: Building2,  label: "Developers", href: "/dashboard/developers" },
-          { icon: FolderOpen, label: "Projects",   href: "/dashboard/projects"   },
+          { icon: Building2,     label: "Developers",   href: "/dashboard/developers"      },
+          { icon: FolderOpen,    label: "Projects",     href: "/dashboard/projects"        },
+          { icon: ClipboardList, label: "All Listings", href: "/dashboard/admin/listings"  },
         ],
       },
       {
