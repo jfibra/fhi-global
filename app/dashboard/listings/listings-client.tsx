@@ -11,10 +11,7 @@ import {
 } from "react"
 import Link from "next/link"
 import { Plus, RefreshCw, Sparkles, ImagePlus, X, Megaphone, Clapperboard, FileImage, MoreHorizontal } from "lucide-react"
-import { DashboardShell } from "@/components/dashboard/shell"
 import MarketingActionsModal from "@/components/dashboard/listings/marketing/MarketingActionsModal"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
-import { roleToLabel } from "@/lib/auth"
 import {
   type AgentListing,
   type AgentListingFormInput,
@@ -375,15 +372,8 @@ export function AgentListingsClient({
     setRows((prev) => prev.filter((r) => r.id !== row.id))
   }
 
-  const roleValue = currentRole.toLowerCase().trim()
-
   return (
-    <DashboardShell
-      role={roleValue}
-      roleLabel={roleToLabel(currentRole)}
-      roleColor={getRoleColor(currentRole)}
-      userName={userName}
-    >
+    <>
       <div className="w-full space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -857,6 +847,6 @@ export function AgentListingsClient({
           </div>
         ))}
       </div>
-    </DashboardShell>
+    </>
   )
 }

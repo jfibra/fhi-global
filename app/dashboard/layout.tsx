@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { AuthProvider } from "@/context/auth-context"
+import { DashboardShell } from "@/components/dashboard/shell"
 import { isInactiveProfile, type AppUser } from "@/lib/auth"
 import { getSessionIdentity } from "@/lib/server-identity"
 
@@ -29,9 +30,13 @@ export default async function DashboardLayout({
     email,
   }
 
+  // The shell (sidebar + top header) is rendered ONCE here so it persists across
+  // navigation between /dashboard/* pages — React keeps the layout mounted, so the
+  // sidebar/header never re-render (collapse state and scroll are preserved).
+  // It derives role/label/color/name from the profile via AuthProvider context.
   return (
     <AuthProvider user={appUser} profile={profile}>
-      {children}
+      <DashboardShell>{children}</DashboardShell>
     </AuthProvider>
   )
 }

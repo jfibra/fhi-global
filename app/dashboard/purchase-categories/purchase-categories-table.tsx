@@ -11,9 +11,6 @@ import {
   Search,
   Tag,
 } from "lucide-react"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
-import { roleToLabel } from "@/lib/auth"
 import {
   deletePurchaseCategory,
   fetchPurchaseCategories,
@@ -281,12 +278,7 @@ export function PurchaseCategoriesTable({
   }
 
   return (
-    <DashboardShell
-      role={currentRole}
-      roleLabel={roleToLabel(currentRole)}
-      roleColor={getRoleColor(currentRole)}
-      userName={userName}
-    >
+    <>
       <div className="space-y-6">
 
         {/* Page header */}
@@ -532,6 +524,6 @@ export function PurchaseCategoriesTable({
         toasts={toasts}
         remove={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
       />
-    </DashboardShell>
+    </>
   )
 }

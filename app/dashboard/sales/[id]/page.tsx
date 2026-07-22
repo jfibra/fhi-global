@@ -10,9 +10,6 @@ import {
   Paperclip,
   User,
 } from "lucide-react"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
-import { roleToLabel } from "@/lib/auth"
 import {
   canAccessSalesReportsArea,
   isAdminStaffRole,
@@ -146,12 +143,7 @@ export default async function SaleDetailPage({
   } | null
 
   return (
-    <DashboardShell
-      role={roleValue}
-      roleLabel={roleToLabel(roleValue)}
-      roleColor={getRoleColor(roleValue)}
-      userName={profile.fullname || email || "User"}
-    >
+    <>
       <div className="space-y-6 max-w-4xl">
 
         {/* Back + header */}
@@ -264,6 +256,6 @@ export default async function SaleDetailPage({
           isAdmin={isAdmin}
         />
       </div>
-    </DashboardShell>
+    </>
   )
 }

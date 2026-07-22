@@ -4,10 +4,7 @@ import { useRouter } from "next/navigation"
 import React, {
   useState, useEffect, useRef, useCallback, ChangeEvent,
 } from "react"
-import { DashboardShell } from "@/components/dashboard/shell"
 import { useAuth } from "@/context/auth-context"
-import { roleToLabel } from "@/lib/auth"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
 import { COUNTRY_CODES } from "@/lib/user-service"
 import { PhoneCountrySelect } from "@/components/phone-country-select"
 import {
@@ -311,12 +308,7 @@ export function BusinessCardPage() {
   const shownCard = flipped ? backDataUrl : frontDataUrl
 
   return (
-    <DashboardShell
-      role={role}
-      roleLabel={roleToLabel(role)}
-      roleColor={getRoleColor(role)}
-      userName={fullName}
-    >
+    <>
       {/* ── Page header ─────────────────────────────────────────────────── */}
       <div className="mb-7">
         <div className="flex items-center gap-3">
@@ -546,6 +538,6 @@ export function BusinessCardPage() {
           </div>
         </div>
       </div>
-    </DashboardShell>
+    </>
   )
 }

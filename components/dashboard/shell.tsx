@@ -11,14 +11,16 @@ import {
 import { createClient as createSupabaseClient } from "@/lib/supabase/client"
 import { roleToLabel } from "@/lib/auth"
 import { useAuth } from "@/context/auth-context"
-import { getSidebarNavSections, type NavItem, type NavSection } from "@/components/dashboard/sidebar-config"
+import { getSidebarNavSections, getRoleColor, type NavItem, type NavSection } from "@/components/dashboard/sidebar-config"
 import { ROLE_SHELL_BADGE, normalizeAppRole } from "@/lib/app-roles"
 
 // ─── types ────────────────────────────────────────────────────────────────────
 export interface DashboardShellProps {
-  role: string
-  roleLabel: string
-  roleColor: string        // tailwind / hex for accent ring + active state
+  /** All of role/roleLabel/roleColor are optional — the shell derives them from
+   *  the logged-in profile (AuthProvider). Props remain as explicit overrides. */
+  role?: string
+  roleLabel?: string
+  roleColor?: string       // tailwind / hex for accent ring + active state
   userName?: string
   userAvatar?: string
   /** Override flat nav items (legacy). Prefer navSections. */
@@ -45,10 +47,13 @@ export function DashboardShell({
   const router = useRouter()
   const { user, profile } = useAuth()
 
-  const effectiveRole = profile?.role ?? role
-  const effectiveRoleLabel = profile?.role ? roleToLabel(profile.role) : roleLabel
+  const effectiveRole = profile?.role ?? role ?? "member"
+  const effectiveRoleLabel =
+    (profile?.role ? roleToLabel(profile.role) : roleLabel) ?? roleToLabel(effectiveRole)
   const displayName = profile?.fullname || userName || user?.email || "User"
   const avatarUrl = userAvatar || profile?.profile_url || null
+  // Accent color: explicit prop wins, else derive from the effective role.
+  const accentColor = roleColor ?? getRoleColor(effectiveRole)
 
   // Resolve sections: prop override → flat navItems override wrapped → auto from role
   const resolvedSections: NavSection[] = navSectionsProp
@@ -124,7 +129,7 @@ export function DashboardShell({
         {isActive && (
           <span
             className="absolute left-0 top-2.5 bottom-2.5 w-[4px] rounded-full"
-            style={{ background: `linear-gradient(to bottom, ${roleColor}, #d6b357)` }}
+            style={{ background: `linear-gradient(to bottom, ${accentColor}, #d6b357)` }}
           />
         )}
         {/* Icon bubble */}
@@ -221,7 +226,7 @@ export function DashboardShell({
         {/* Top gradient accent bar */}
         <div
           className="absolute top-0 left-0 right-0 h-[2px] shrink-0"
-          style={{ background: `linear-gradient(to right, transparent, ${roleColor}, #d6b357, transparent)` }}
+          style={{ background: `linear-gradient(to right, transparent, ${accentColor}, #d6b357, transparent)` }}
         />
 
         {/* ── FIXED: Logo + role header ── */}
@@ -251,7 +256,7 @@ export function DashboardShell({
             ) : (
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold shrink-0 shadow-lg"
-                style={{ background: `linear-gradient(135deg, ${roleColor}, #d6b357)`, color: "#fff" }}
+                style={{ background: `linear-gradient(135deg, ${accentColor}, #d6b357)`, color: "#fff" }}
               >
                 {displayName.charAt(0).toUpperCase()}
               </div>
@@ -259,7 +264,7 @@ export function DashboardShell({
             <div className="overflow-hidden flex-1">
               <p className="text-sm font-bold text-white font-['Outfit'] truncate">{displayName}</p>
               <div className={`mt-0.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${badgeCls}`}>
-                <span className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: roleColor }} />
+                <span className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
                 {effectiveRoleLabel}
               </div>
             </div>

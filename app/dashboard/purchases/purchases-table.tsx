@@ -13,9 +13,6 @@ import {
   ShoppingCart,
   Trash2,
 } from "lucide-react"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
-import { roleToLabel } from "@/lib/auth"
 import {
   fetchCategoriesForPurchase,
   fetchPurchases,
@@ -286,12 +283,7 @@ export function PurchasesTable({
   }
 
   return (
-    <DashboardShell
-      role={currentRole}
-      roleLabel={roleToLabel(currentRole)}
-      roleColor={getRoleColor(currentRole)}
-      userName={userName}
-    >
+    <>
       <div className="space-y-6">
 
         {/* Page header */}
@@ -571,6 +563,6 @@ export function PurchasesTable({
         toasts={toasts}
         remove={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
       />
-    </DashboardShell>
+    </>
   )
 }
