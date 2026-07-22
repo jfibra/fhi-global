@@ -15,9 +15,6 @@ import {
   TrendingUp,
   X,
 } from "lucide-react"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
-import { roleToLabel } from "@/lib/auth"
 import {
   canEditSaleForRole,
   canManageSaleAttachmentsForRole,
@@ -326,12 +323,7 @@ export function SalesTable({
   }
 
   return (
-    <DashboardShell
-      role={currentRole}
-      roleLabel={roleToLabel(currentRole)}
-      roleColor={getRoleColor(currentRole)}
-      userName={userName}
-    >
+    <>
       <div className="space-y-6">
 
         {/* Page header */}
@@ -722,6 +714,6 @@ export function SalesTable({
         toasts={toasts}
         remove={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
       />
-    </DashboardShell>
+    </>
   )
 }

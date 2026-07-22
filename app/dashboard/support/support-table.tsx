@@ -18,9 +18,6 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
-import { roleToLabel } from "@/lib/auth"
 import { isAdminStaffRole } from "@/lib/app-roles"
 import {
   fetchSupportAssignableUsers,
@@ -305,7 +302,7 @@ export function SupportTable({
   )
 
   return (
-    <DashboardShell role={currentRole} roleLabel={roleToLabel(currentRole)} roleColor={getRoleColor(currentRole)} userName={userName}>
+    <>
       <div className="space-y-6">
         {currentRole === "developer" ? (
           <DeveloperPortalPageHeader
@@ -616,6 +613,6 @@ export function SupportTable({
       </ShortcutModal>
 
       <ToastStack toasts={toasts} remove={(id) => setToasts((prev) => prev.filter((item) => item.id !== id))} />
-    </DashboardShell>
+    </>
   )
 }

@@ -6,8 +6,6 @@ import {
   Users, Search, Plus, ChevronLeft, ChevronRight,
   Filter, RefreshCw, Trash2, EyeOff, Eye, MoreHorizontal, X,
 } from "lucide-react"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { roleToLabel } from "@/lib/auth"
 import { UserAvatar } from "@/components/user-avatar"
 import { RoleBadge } from "@/components/role-badge"
 import { StatusBadge } from "@/components/status-badge"
@@ -201,12 +199,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
 
   // ── render ─────────────────────────────────────────────────────────────────
   return (
-    <DashboardShell
-      role={currentRole}
-      roleLabel={roleLabel ?? roleToLabel(currentRole)}
-      roleColor={roleColor ?? ACCENT}
-      userName="Admin"
-    >
+    <>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117]">User Management</h2>
@@ -404,7 +397,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
           onBanner={(type: "success" | "error", msg: string) => setBanner({ type, msg })}
         />
       )}
-    </DashboardShell>
+    </>
   )
 }
 

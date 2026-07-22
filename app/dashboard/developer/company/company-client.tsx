@@ -14,9 +14,6 @@ import {
   Save,
   ExternalLink,
 } from "lucide-react"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
-import { roleToLabel } from "@/lib/auth"
 import { DeveloperLogoUpload } from "@/app/dashboard/developers/developer-logo-upload"
 import { DeveloperPortalPageHeader } from "@/components/developer/developer-portal-page-header"
 import { updateDeveloperCompany, type DeveloperCompanyFormData } from "@/lib/developer-portal-service"
@@ -168,12 +165,7 @@ export function CompanyClient({
   }
 
   return (
-    <DashboardShell
-      role="developer"
-      roleLabel={roleToLabel("developer")}
-      roleColor={getRoleColor("developer")}
-      userName={userName}
-    >
+    <>
       {!developer ? (
         <NoDeveloperLinked />
       ) : (
@@ -387,6 +379,6 @@ export function CompanyClient({
       )}
 
       <ToastList toasts={toasts} remove={removeToast} />
-    </DashboardShell>
+    </>
   )
 }

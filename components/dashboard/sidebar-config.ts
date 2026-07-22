@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Building2, Layers, Images,
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound, User,
-  Clapperboard, QrCode, ScrollText, Inbox,
+  Clapperboard, QrCode, ScrollText, Inbox, CalendarDays,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -91,6 +91,10 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
         items: [
           { icon: TrendingUp, label: "Sales Reports", href: "/dashboard/sales" },
         ],
+      },
+      {
+        type: "item",
+        item: { icon: CalendarDays, label: "Events", href: "/dashboard/events" },
       },
       {
         type: "group",

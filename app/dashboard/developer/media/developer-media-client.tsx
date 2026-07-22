@@ -17,9 +17,6 @@ import {
   Globe,
   Filter,
 } from "lucide-react"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
-import { roleToLabel } from "@/lib/auth"
 import {
   fetchDeveloperMedia,
   type MediaFile,
@@ -270,7 +267,7 @@ function UploadModal({
 // ─── No developer placeholder ─────────────────────────────────────────────────
 function NoDeveloperLinked({ userName }: { userName: string }) {
   return (
-    <DashboardShell role="developer" roleLabel={roleToLabel("developer")} roleColor={getRoleColor("developer")} userName={userName}>
+    <>
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center py-24">
         <div className="w-16 h-16 rounded-[28px] bg-indigo-50 flex items-center justify-center mb-5">
           <Building2 className="w-8 h-8 text-indigo-400" />
@@ -278,7 +275,7 @@ function NoDeveloperLinked({ userName }: { userName: string }) {
         <p className="font-semibold text-[#374151] mb-1">No Developer Linked</p>
         <p className="text-sm text-[#9ca3af]">Contact an administrator to set up your account.</p>
       </div>
-    </DashboardShell>
+    </>
   )
 }
 
@@ -355,12 +352,7 @@ export function DeveloperMediaClient({
   })
 
   return (
-    <DashboardShell
-      role="developer"
-      roleLabel={roleToLabel("developer")}
-      roleColor={getRoleColor("developer")}
-      userName={userName}
-    >
+    <>
       <div className="space-y-6">
         <DeveloperPortalPageHeader
           segmentLabel="Media / files"
@@ -513,6 +505,6 @@ export function DeveloperMediaClient({
       </div>
 
       <ToastList toasts={toasts} remove={removeToast} />
-    </DashboardShell>
+    </>
   )
 }

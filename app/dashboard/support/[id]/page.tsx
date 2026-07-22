@@ -1,8 +1,5 @@
 import { notFound, redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
-import { roleToLabel } from "@/lib/auth"
 import { getSessionIdentity } from "@/lib/server-identity"
 import { canAccessSupportRole, isSupportAdmin } from "@/lib/support-service"
 import { TicketDetails } from "./ticket-details"
@@ -41,13 +38,8 @@ export default async function SupportTicketDetailPage({
   }
 
   return (
-    <DashboardShell
-      role={roleValue}
-      roleLabel={roleToLabel(roleValue)}
-      roleColor={getRoleColor(roleValue)}
-      userName={profile.fullname || email || "User"}
-    >
+    <>
       <TicketDetails ticketId={id} currentUserId={userId} currentRole={roleValue} />
-    </DashboardShell>
+    </>
   )
 }

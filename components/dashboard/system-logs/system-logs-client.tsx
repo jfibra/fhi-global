@@ -2,9 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { BarChart3, FileText, ShieldCheck, SlidersHorizontal } from "lucide-react"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
-import { roleToLabel } from "@/lib/auth"
 import { OverviewTab } from "./overview-tab"
 import { AllLogsTab } from "./all-logs-tab"
 import { ManagementTab } from "./management-tab"
@@ -60,12 +57,7 @@ export function SystemLogsClient({ currentRole, canClear }: { currentRole: strin
   }
 
   return (
-    <DashboardShell
-      role={currentRole}
-      roleLabel={roleToLabel(currentRole)}
-      roleColor={getRoleColor(currentRole)}
-      userName="Admin"
-    >
+    <>
       <div className="mb-6">
         <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117]">System Logs</h1>
         <p className="text-sm text-[#6b7280] mt-0.5">Full audit trail — trace every action, change, and security event.</p>
@@ -107,6 +99,6 @@ export function SystemLogsClient({ currentRole, canClear }: { currentRole: strin
       {tab === "all" && <AllLogsTab categoryCounts={categoryCounts} />}
       {tab === "security" && <AllLogsTab scope="security" categoryCounts={categoryCounts} />}
       {tab === "management" && <ManagementTab canClear={canClear} onBanner={(type, msg) => setBanner({ type, msg })} />}
-    </DashboardShell>
+    </>
   )
 }

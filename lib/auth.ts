@@ -39,6 +39,7 @@ const SHARED_DASHBOARD_PREFIXES = [
   "/dashboard/listings",
   "/dashboard/reels-maker",
   "/dashboard/invite",
+  "/dashboard/events",
   "/dashboard/support",
 ]
 

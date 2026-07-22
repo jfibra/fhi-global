@@ -15,9 +15,6 @@ import {
   ArrowRight,
   Boxes,
 } from "lucide-react"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
-import { roleToLabel } from "@/lib/auth"
 import {
   fetchDeveloperStats,
   fetchRecentDeveloperProjects,
@@ -151,12 +148,7 @@ export function DeveloperDashboardShell({
   useEffect(() => { void loadData() }, [loadData])
 
   return (
-    <DashboardShell
-      role="developer"
-      roleLabel={roleToLabel("developer")}
-      roleColor={getRoleColor("developer")}
-      userName={userName}
-    >
+    <>
       {!developerId ? (
         <NoDeveloperLinked />
       ) : (
@@ -337,6 +329,6 @@ export function DeveloperDashboardShell({
           </div>
         </div>
       )}
-    </DashboardShell>
+    </>
   )
 }

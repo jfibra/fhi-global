@@ -1,4 +1,4 @@
--- 011_contact_submissions.sql
+-- 012_contact_submissions.sql
 -- Public /contact form submissions, surfaced in the admin Contact Inbox.
 -- Writes happen through the service-role client (public POST /api/contact and
 -- the admin routes); regular clients get no write path. RLS enables admin read.

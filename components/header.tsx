@@ -16,6 +16,7 @@ const NAV_LINKS = [
   { label: "Buy", href: "/buy" },
   { label: "Rent", href: "/rent" },
   { label: "Developers", href: "/developers" },
+  { label: "Events", href: "/events" },
   { label: "News", href: "/news" },
   { label: "Contact", href: "/contact" },
 ]

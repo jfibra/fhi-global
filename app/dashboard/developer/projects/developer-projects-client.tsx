@@ -17,9 +17,6 @@ import {
   toggleProjectPublish,
   softDeleteDeveloperProject,
 } from "@/lib/developer-portal-service"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
-import { roleToLabel } from "@/lib/auth"
 import { ProjectDataTab }          from "@/app/dashboard/projects/project-data-tab"
 import { ProjectOverviewTab }      from "@/app/dashboard/projects/project-overview-tab"
 import { ProjectUnitsTab }         from "@/app/dashboard/projects/project-units-tab"
@@ -209,7 +206,7 @@ const STATUS_LABEL: Record<string, string> = {
 // ─── No developer placeholder ─────────────────────────────────────────────────
 function NoDeveloperLinked({ userName }: { userName: string }) {
   return (
-    <DashboardShell role="developer" roleLabel={roleToLabel("developer")} roleColor={getRoleColor("developer")} userName={userName}>
+    <>
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center py-24">
         <div className="w-16 h-16 rounded-[28px] bg-indigo-50 flex items-center justify-center mb-5">
           <Building2 className="w-8 h-8 text-indigo-400" />
@@ -217,7 +214,7 @@ function NoDeveloperLinked({ userName }: { userName: string }) {
         <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mb-2">No Developer Company Linked</h2>
         <p className="text-sm text-[#6b7280] max-w-sm">Contact an administrator to link your account to a developer company.</p>
       </div>
-    </DashboardShell>
+    </>
   )
 }
 
@@ -333,12 +330,7 @@ export function DeveloperProjectsClient({
   }
 
   return (
-    <DashboardShell
-      role="developer"
-      roleLabel={roleToLabel("developer")}
-      roleColor={getRoleColor("developer")}
-      userName={userName}
-    >
+    <>
       <div className="space-y-5 mb-5">
         <DeveloperPortalPageHeader
           segmentLabel="My projects"
@@ -570,6 +562,6 @@ export function DeveloperProjectsClient({
       <Portal>
         <ToastList toasts={toasts} remove={removeToast} />
       </Portal>
-    </DashboardShell>
+    </>
   )
 }

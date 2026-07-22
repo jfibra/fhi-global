@@ -2,8 +2,6 @@ import Link from "next/link"
 import { ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
 import { Building2, FileText, LifeBuoy, ShoppingCart, Users } from "lucide-react"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
 import { createClient } from "@/lib/supabase/server"
 import { fetchSales } from "@/lib/sales-service"
 import { AdminAnalyticsCharts } from "./charts-client"
@@ -348,12 +346,7 @@ export async function AdminDashboardContent({
   ]
 
   return (
-    <DashboardShell
-      role={roleValue}
-      roleLabel={roleLabel}
-      roleColor={getRoleColor(roleValue)}
-      userName={userName}
-    >
+    <>
       <div className="space-y-10 pb-12">
 
 
@@ -534,7 +527,7 @@ export async function AdminDashboardContent({
         </section>
 
       </div>
-    </DashboardShell>
+    </>
   )
 }
 

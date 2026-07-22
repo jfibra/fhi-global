@@ -16,9 +16,6 @@ import {
   Clapperboard, Download, ImagePlus, Loader2, Music, Pause, Play,
   RotateCcw, Trash2, ArrowLeft, ArrowRight,
 } from "lucide-react"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { getRoleColor } from "@/components/dashboard/sidebar-config"
-import { roleToLabel } from "@/lib/auth"
 import { fetchMyAgentListings, type AgentListing } from "@/lib/agent-listings-service"
 
 // ─── Canvas + timeline constants ───────────────────────────────────────────────
@@ -2903,12 +2900,7 @@ export function ReelsMakerClient({
   const labelCls = "block text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-1.5"
 
   return (
-    <DashboardShell
-      role={roleValue}
-      roleLabel={roleToLabel(currentRole)}
-      roleColor={getRoleColor(currentRole)}
-      userName={userName}
-    >
+    <>
       <div className="w-full space-y-6">
         <div>
           <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] flex items-center gap-2">
@@ -3196,6 +3188,6 @@ export function ReelsMakerClient({
           </div>
         </div>
       </div>
-    </DashboardShell>
+    </>
   )
 }
