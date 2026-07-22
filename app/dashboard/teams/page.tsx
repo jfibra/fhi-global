@@ -1,25 +1,20 @@
-import { redirect } from "next/navigation"
+"use client"
+
+import { useAuth } from "@/context/auth-context"
 import { isAdminStaffRole } from "@/lib/app-roles"
-import { getSessionIdentity } from "@/lib/server-identity"
+import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { TeamsDashboardShell } from "./teams-dashboard-shell"
 
-export const dynamic = "force-dynamic"
-
-export default async function TeamsPage() {
-  const identity = await getSessionIdentity()
-  if (!identity) redirect("/login")
-  const { userId, email, profile } = identity
-
-  const roleValue = String(profile.role ?? "").toLowerCase().trim()
-  if (!isAdminStaffRole(profile.role)) {
-    redirect("/dashboard")
-  }
+export default function TeamsPage() {
+  const { user, profile, role } = useAuth()
+  const allowed = useRequireAllowed(isAdminStaffRole(role))
+  if (!allowed) return null
 
   return (
     <TeamsDashboardShell
-      role={roleValue}
-      userName={profile.fullname || email || "User"}
-      userId={userId}
+      role={(role ?? "").toLowerCase().trim()}
+      userName={profile?.fullname || user?.email || "User"}
+      userId={user?.id ?? ""}
     />
   )
 }

@@ -1,8 +1,10 @@
+"use client"
+
 import Link from "next/link"
-import { ReactNode } from "react"
+import { ReactNode, useEffect, useState } from "react"
 import type { LucideIcon } from "lucide-react"
 import { Building2, FileText, LifeBuoy, ShoppingCart, Users } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/client"
 import { fetchSales } from "@/lib/sales-service"
 import { AdminAnalyticsCharts } from "./charts-client"
 
@@ -137,18 +139,8 @@ function buildMonthlySeries(
 
 // ─── Public page component ────────────────────────────────────────────────────
 
-export async function AdminDashboardContent({
-  roleValue,
-  roleLabel,
-  userName,
-  userId,
-}: {
-  roleValue: string
-  roleLabel: string
-  userName: string
-  userId: string
-}) {
-  const supabase = await createClient()
+async function loadAdminDashboard(roleValue: string, userId: string) {
+  const supabase = createClient()
 
   const monthlyWindowStart = new Date()
   monthlyWindowStart.setUTCDate(1)
@@ -344,6 +336,57 @@ export async function AdminDashboardContent({
     { label: "Pending Commissions",  value: fmtNumber(pendingCommissions), detail: "Awaiting payout"     },
     { label: "Active Teams",         value: fmtNumber(activeTeams),        detail: "Currently active"    },
   ]
+
+  return {
+    kpiCards, opsCards, monthlySeries, developerChartData,
+    projectStatusSeries, validationStatusSeries,
+    supportTickets, purchaseList, activityFeed, recentSales,
+  }
+}
+
+type AdminDashboardData = Awaited<ReturnType<typeof loadAdminDashboard>>
+
+function AdminDashboardSkeleton() {
+  return (
+    <div className="space-y-4 pb-12">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-32 rounded-2xl bg-black/5 animate-pulse" />
+        ))}
+      </div>
+      <div className="h-72 rounded-2xl bg-black/5 animate-pulse" />
+    </div>
+  )
+}
+
+export function AdminDashboardContent({
+  roleValue,
+  userId,
+}: {
+  roleValue: string
+  roleLabel: string
+  userName: string
+  userId: string
+}) {
+  const [data, setData] = useState<AdminDashboardData | null>(null)
+
+  useEffect(() => {
+    let active = true
+    loadAdminDashboard(roleValue, userId).then((d) => {
+      if (active) setData(d)
+    })
+    return () => {
+      active = false
+    }
+  }, [roleValue, userId])
+
+  if (!data) return <AdminDashboardSkeleton />
+
+  const {
+    kpiCards, opsCards, monthlySeries, developerChartData,
+    projectStatusSeries, validationStatusSeries,
+    supportTickets, purchaseList, activityFeed, recentSales,
+  } = data
 
   return (
     <>

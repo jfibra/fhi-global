@@ -1,40 +1,38 @@
-import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { getSessionIdentity } from "@/lib/server-identity"
+"use client"
+
+import { useEffect, useState } from "react"
+import { useAuth } from "@/context/auth-context"
+import { createClient } from "@/lib/supabase/client"
 import { DeveloperProjectsClient } from "./developer-projects-client"
 
-export const dynamic = "force-dynamic"
+type DeveloperRow = { id: string; name: string; slug: string }
 
-export default async function DeveloperProjectsPage() {
-  const identity = await getSessionIdentity()
+export default function DeveloperProjectsPage() {
+  const { user, profile } = useAuth()
+  const developerId = (profile?.metadata?.developer_id as string | undefined) ?? null
+  const [developer, setDeveloper] = useState<DeveloperRow | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  if (!identity) redirect("/login")
-  const { userId, email, profile } = identity
-
-  if (profile.role !== "developer") {
-    redirect("/dashboard/developer")
-  }
-
-  const supabase = await createClient()
-
-  const developerId = profile.metadata?.developer_id as string | undefined
-
-  let developer = null
-  if (developerId) {
-    const { data } = await supabase
+  useEffect(() => {
+    let active = true
+    if (!developerId) { setLoading(false); return }
+    createClient()
       .from("developers")
-      .select("id, name, slug, logo_url")
+      .select("id, name, slug")
       .eq("id", developerId)
       .is("deleted_at", null)
       .single()
-    developer = data
-  }
+      .then(({ data }) => { if (active) { setDeveloper(data as DeveloperRow | null); setLoading(false) } })
+    return () => { active = false }
+  }, [developerId])
+
+  if (loading) return <div className="p-6"><div className="h-48 rounded-2xl bg-black/5 animate-pulse" /></div>
 
   return (
     <DeveloperProjectsClient
-      userId={userId}
-      userName={profile.fullname || email || "Developer"}
-      developerId={developerId ?? null}
+      userId={user?.id ?? ""}
+      userName={profile?.fullname || user?.email || "Developer"}
+      developerId={developerId}
       developerName={developer?.name ?? null}
       developerSlug={developer?.slug ?? null}
     />

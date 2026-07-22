@@ -1,11 +1,11 @@
-import { redirect, notFound } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { getSessionIdentity } from "@/lib/server-identity"
+"use client"
+
+import { useEffect, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   ArrowLeft,
   Building2,
-  Calendar,
   DollarSign,
   Paperclip,
   User,
@@ -15,9 +15,9 @@ import {
   isAdminStaffRole,
   isSalesPipelineRole,
 } from "@/lib/app-roles"
+import { useAuth } from "@/context/auth-context"
+import { createClient } from "@/lib/supabase/client"
 import { ValidationDiscussion } from "./validation-discussion"
-
-export const dynamic = "force-dynamic"
 
 function formatDate(value: string | null) {
   if (!value) return "—"
@@ -88,41 +88,80 @@ function SectionCard({
   )
 }
 
-export default async function SaleDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const { id } = await params
+export default function SaleDetailPage() {
+  const params = useParams<{ id: string }>()
+  const id = params?.id ?? ""
+  const router = useRouter()
+  const { user, profile, role } = useAuth()
+  const roleValue = (role ?? "").toLowerCase().trim()
+  const isAdmin = isAdminStaffRole(role)
 
-  const identity = await getSessionIdentity()
-  if (!identity) redirect("/login")
-  const { email, profile } = identity
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [sale, setSale] = useState<any>(null)
+  const [state, setState] = useState<"loading" | "ready" | "notfound">("loading")
 
-  const roleValue = String(profile.role ?? "").toLowerCase().trim()
-  const isAdmin = isAdminStaffRole(profile.role)
-  if (!canAccessSalesReportsArea(profile.role)) redirect("/dashboard")
+  useEffect(() => {
+    if (!canAccessSalesReportsArea(role)) {
+      router.replace("/dashboard")
+      return
+    }
+    if (!id) return
+    let active = true
+    createClient()
+      .from("sales_reports")
+      .select(`
+        *,
+        developers(name),
+        projects(name),
+        project_units(unit_type),
+        clients(first_name,middle_name,last_name,email,phone,age,gender,occupation,street,city,state_province,country),
+        profiles:agent_id(fullname),
+        sales_attachments(id)
+      `)
+      .eq("id", id)
+      .single()
+      .then(({ data, error }) => {
+        if (!active) return
+        if (error || !data) {
+          setState("notfound")
+          return
+        }
+        // Agent, team leader, and unit manager can only view their own sales.
+        if (isSalesPipelineRole(roleValue) && data.agent_id !== profile?.id) {
+          router.replace("/dashboard/sales")
+          return
+        }
+        setSale(data)
+        setState("ready")
+      })
+    return () => {
+      active = false
+    }
+  }, [id, role, roleValue, profile?.id, router])
 
-  const supabase = await createClient()
-  const { data: sale, error } = await supabase
-    .from("sales_reports")
-    .select(`
-      *,
-      developers(name),
-      projects(name),
-      project_units(unit_type),
-      clients(first_name,middle_name,last_name,email,phone,age,gender,occupation,street,city,state_province,country),
-      profiles:agent_id(fullname),
-      sales_attachments(id)
-    `)
-    .eq("id", id)
-    .single()
+  if (state === "notfound") {
+    return (
+      <div className="max-w-4xl">
+        <Link
+          href="/dashboard/sales"
+          className="inline-flex items-center gap-1.5 text-xs text-[#6b7280] hover:text-[#001f3f] transition-colors mb-4"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back to Sales Reports
+        </Link>
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+          Sale not found.
+        </div>
+      </div>
+    )
+  }
 
-  if (!sale || error) notFound()
-
-  // Agent, team leader, and unit manager can only view their own sales
-  if (isSalesPipelineRole(roleValue) && sale.agent_id !== profile.id) {
-    redirect("/dashboard/sales")
+  if (state === "loading" || !sale) {
+    return (
+      <div className="p-6">
+        <div className="h-64 rounded-2xl bg-black/5 animate-pulse" />
+      </div>
+    )
   }
 
   const clientName = sale.clients
@@ -250,7 +289,7 @@ export default async function SaleDetailPage({
 
         <ValidationDiscussion
           saleId={sale.id}
-          currentUserId={profile.id}
+          currentUserId={profile?.id ?? ""}
           currentRole={roleValue}
           validationStatus={sale.validation_status}
           isAdmin={isAdmin}

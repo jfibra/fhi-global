@@ -1,28 +1,22 @@
-import { redirect } from "next/navigation"
-import { getSessionIdentity } from "@/lib/server-identity"
-import { SupportTable } from "./support-table"
+"use client"
+
+import { useAuth } from "@/context/auth-context"
+import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { canAccessSupportRole, isSupportAdmin } from "@/lib/support-service"
+import { SupportTable } from "./support-table"
 
-export const dynamic = "force-dynamic"
-
-export default async function SupportPage() {
-  const identity = await getSessionIdentity()
-
-  if (!identity) redirect("/login")
-  const { userId, email, profile } = identity
-
-  const roleValue = String(profile.role ?? "").toLowerCase().trim()
-  if (!canAccessSupportRole(roleValue)) {
-    redirect("/dashboard")
-  }
-  const isAdmin = isSupportAdmin(roleValue)
+export default function SupportPage() {
+  const { user, profile, role } = useAuth()
+  const roleValue = (role ?? "").toLowerCase().trim()
+  const allowed = useRequireAllowed(canAccessSupportRole(roleValue))
+  if (!allowed) return null
 
   return (
     <SupportTable
-      currentUserId={userId}
+      currentUserId={user?.id ?? ""}
       currentRole={roleValue}
-      userName={profile.fullname || email || "User"}
-      isAdminView={isAdmin}
+      userName={profile?.fullname || user?.email || "User"}
+      isAdminView={isSupportAdmin(roleValue)}
     />
   )
 }

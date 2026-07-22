@@ -1,26 +1,20 @@
-import { redirect } from "next/navigation"
+"use client"
+
+import { useAuth } from "@/context/auth-context"
 import { isAdminStaffRole } from "@/lib/app-roles"
-import { getSessionIdentity } from "@/lib/server-identity"
+import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { PurchasesTable } from "./purchases-table"
 
-export const dynamic = "force-dynamic"
-
-export default async function PurchasesPage() {
-  const identity = await getSessionIdentity()
-
-  if (!identity) redirect("/login")
-  const { userId, email, profile } = identity
-
-  const roleValue = String(profile.role ?? "").toLowerCase().trim()
-  if (!isAdminStaffRole(profile.role)) {
-    redirect("/dashboard")
-  }
+export default function PurchasesPage() {
+  const { user, profile, role } = useAuth()
+  const allowed = useRequireAllowed(isAdminStaffRole(role))
+  if (!allowed) return null
 
   return (
     <PurchasesTable
-      currentUserId={userId}
-      currentRole={roleValue}
-      userName={profile.fullname || email || "User"}
+      currentUserId={user?.id ?? ""}
+      currentRole={(role ?? "").toLowerCase().trim()}
+      userName={profile?.fullname || user?.email || "User"}
     />
   )
 }

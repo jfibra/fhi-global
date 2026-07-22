@@ -1,26 +1,20 @@
-import { redirect } from "next/navigation"
+"use client"
+
+import { useAuth } from "@/context/auth-context"
 import { canAccessSalesReportsArea } from "@/lib/app-roles"
-import { getSessionIdentity } from "@/lib/server-identity"
+import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { SalesTable } from "./sales-table"
 
-export const dynamic = "force-dynamic"
-
-export default async function SalesPage() {
-  const identity = await getSessionIdentity()
-
-  if (!identity) redirect("/login")
-  const { userId, email, profile } = identity
-
-  const roleValue = String(profile.role ?? "").toLowerCase().trim()
-  if (!canAccessSalesReportsArea(profile.role)) {
-    redirect("/dashboard")
-  }
+export default function SalesPage() {
+  const { user, profile, role } = useAuth()
+  const allowed = useRequireAllowed(canAccessSalesReportsArea(role))
+  if (!allowed) return null
 
   return (
     <SalesTable
-      currentUserId={userId}
-      currentRole={roleValue}
-      userName={profile.fullname || email || "User"}
+      currentUserId={user?.id ?? ""}
+      currentRole={(role ?? "").toLowerCase().trim()}
+      userName={profile?.fullname || user?.email || "User"}
     />
   )
 }
