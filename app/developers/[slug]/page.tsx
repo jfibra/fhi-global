@@ -135,8 +135,8 @@ export default async function DeveloperDetailPage({ params }: Props) {
             aria-hidden="true"
           />
           {/* Heavier on the left where the identity sits; skyline glows on the right */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/95 via-[#001f3f]/75 to-[#001f3f]/25" />
-          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#000d1c]/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/75 via-[#001f3f]/50 to-[#001f3f]/10" />
+          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#000d1c]/40 to-transparent" />
         </div>
         {/* Gold accents: top rule + faint arcs on the left (mockup's line art) */}
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#d6b357]/70 to-transparent" />
@@ -172,7 +172,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
               <div className="flex items-center gap-4 mb-3 flex-wrap">
                 <h1
                   className="font-['Outfit'] text-4xl md:text-5xl font-bold text-white leading-[1.08]"
-                  style={{ textShadow: "0 2px 24px rgba(0,10,30,0.6)" }}
+                  style={{ textShadow: "0 2px 12px rgba(0,10,30,0.85), 0 2px 32px rgba(0,10,30,0.6)" }}
                 >
                   {developer.name}
                 </h1>
