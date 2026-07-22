@@ -59,7 +59,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
   const [expanded,        setExpanded]         = useState<Set<string>>(new Set())
   const [toasts,          setToasts]           = useState<Toast[]>([])
   const [memberCounts,    setMemberCounts]      = useState<Record<string, number>>({})
-  const [hideEmpty,       setHideEmpty]         = useState(false)
+  const [hideEmpty,       setHideEmpty]         = useState(true)
 
   // Member table state
   const [members,         setMembers]          = useState<TeamMemberProfile[]>([])
