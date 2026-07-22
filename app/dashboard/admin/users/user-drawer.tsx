@@ -3,7 +3,7 @@
 import { useState } from "react"
 import {
   X, Mail, Shield, Clock3, CalendarDays, Phone, MessageSquare,
-  Edit3, KeyRound, UserCheck, UserX, Trash2, Eye, EyeOff, CheckCircle,
+  Edit3, KeyRound, UserCheck, UserX, Trash2, Eye, EyeOff, CheckCircle, Globe,
 } from "lucide-react"
 import type { UserRecord } from "@/lib/user-service"
 import { getUserDisplayName } from "@/lib/user-service"
@@ -57,6 +57,7 @@ export function UserDrawer({
   const whatsapp  = metaStr(user.metadata, "whatsapp_country_code") && metaStr(user.metadata, "whatsapp_number")
     ? `${metaStr(user.metadata, "whatsapp_country_code")} ${metaStr(user.metadata, "whatsapp_number")}` : null
   const linkedDeveloperId = metaStr(user.metadata, "developer_id")
+  const nationality = metaStr(user.metadata, "nationality")
 
   // ── Reset password handler ───────────────────────────────────────────────────
   const handleResetPassword = async () => {
@@ -128,6 +129,7 @@ export function UserDrawer({
             {whatsapp && <InfoRow icon={MessageSquare}  label="WhatsApp" value={whatsapp} />}
             {user.birthday && <InfoRow icon={CalendarDays} label="Birthday" value={fmt(user.birthday)} />}
             {user.gender   && <InfoRow icon={Shield}       label="Gender"   value={user.gender} />}
+            {nationality   && <InfoRow icon={Globe}        label="Nationality" value={nationality} />}
           </div>
 
           {/* ── Reset password panel ── */}

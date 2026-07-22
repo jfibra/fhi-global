@@ -1,29 +1,20 @@
-import { redirect } from "next/navigation"
-import { getDashboardRouteByRole } from "@/lib/auth"
+"use client"
+
+import { useAuth } from "@/context/auth-context"
 import { isDeveloperRole } from "@/lib/app-roles"
-import { getSessionIdentity } from "@/lib/server-identity"
+import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 
-export const dynamic = "force-dynamic"
-
-export default async function DeveloperDashboardLayout({
+// proxy.ts already restricts /dashboard/developer to the developer role (it isn't
+// a SHARED prefix, so canAccessDashboardPath falls through to the role's base path).
+// This client guard mirrors that for the UI; kept static so developer routes stay
+// prefetchable like the rest of the dashboard.
+export default function DeveloperDashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const identity = await getSessionIdentity()
-
-  if (!identity) {
-    redirect("/login")
-  }
-
-  const { profile } = identity
-
-  const role = String(profile.role ?? "").toLowerCase().trim()
-
-  // Only developer role can access this section
-  if (!isDeveloperRole(profile.role)) {
-    redirect(getDashboardRouteByRole(role))
-  }
-
+  const { role } = useAuth()
+  const allowed = useRequireAllowed(isDeveloperRole(role))
+  if (!allowed) return null
   return <>{children}</>
 }

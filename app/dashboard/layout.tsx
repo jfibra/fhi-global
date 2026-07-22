@@ -1,42 +1,14 @@
-import { redirect } from "next/navigation"
-import { AuthProvider } from "@/context/auth-context"
-import { DashboardShell } from "@/components/dashboard/shell"
-import { isInactiveProfile, type AppUser } from "@/lib/auth"
-import { getSessionIdentity } from "@/lib/server-identity"
+import { DashboardAuthGate } from "@/components/dashboard/dashboard-auth-gate"
 
-export const dynamic = "force-dynamic"
-
-export default async function DashboardLayout({
+// No force-dynamic and no server-side session read here: proxy.ts already guards
+// every /dashboard/* request (auth, inactive, role), so this layout stays static
+// and the whole dashboard tree is prefetchable → instant client-side navigation.
+// Session/profile is resolved in the browser by DashboardAuthGate, which renders
+// the persistent shell (sidebar + header) once, around every page.
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // proxy.ts already verified the session for /dashboard/* and forwarded it;
-  // getSessionIdentity falls back to a full Supabase check if needed.
-  const identity = await getSessionIdentity()
-
-  if (!identity) {
-    redirect("/login")
-  }
-
-  const { userId, email, profile } = identity
-
-  if (isInactiveProfile(profile)) {
-    redirect("/account-inactive")
-  }
-
-  const appUser: AppUser = {
-    id: userId,
-    email,
-  }
-
-  // The shell (sidebar + top header) is rendered ONCE here so it persists across
-  // navigation between /dashboard/* pages — React keeps the layout mounted, so the
-  // sidebar/header never re-render (collapse state and scroll are preserved).
-  // It derives role/label/color/name from the profile via AuthProvider context.
-  return (
-    <AuthProvider user={appUser} profile={profile}>
-      <DashboardShell>{children}</DashboardShell>
-    </AuthProvider>
-  )
+  return <DashboardAuthGate>{children}</DashboardAuthGate>
 }
