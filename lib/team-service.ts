@@ -226,6 +226,26 @@ export async function fetchTeamMembers(params: {
   }
 }
 
+export async function fetchTeamMemberCounts(): Promise<{
+  data: Record<string, number> | null
+  error: string | null
+}> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("team_memberships")
+    .select("team_id")
+    .eq("is_active", true)
+
+  if (error) return { data: null, error: error.message }
+
+  const counts: Record<string, number> = {}
+  for (const row of data ?? []) {
+    const id = (row as { team_id: string }).team_id
+    counts[id] = (counts[id] ?? 0) + 1
+  }
+  return { data: counts, error: null }
+}
+
 export async function addTeamMember(
   teamId: string,
   memberData: MemberFormData,

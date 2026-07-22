@@ -9,13 +9,14 @@ import {
   Building2, Users, Settings, Upload, Pencil, Trash2, ToggleLeft,
   ToggleRight, MoreHorizontal, UserPlus, ArrowRight, UserMinus,
   RefreshCw, Image as ImageIcon, CheckCircle2, XCircle,
-  Loader2, AlertTriangle,
+  Loader2, AlertTriangle, EyeOff, Eye,
 } from "lucide-react"
 import {
   type Team,
   type TeamMemberProfile,
   type TeamFormData,
   fetchTeams,
+  fetchTeamMemberCounts,
   createTeam,
   updateTeam,
   deleteTeam,
@@ -57,6 +58,8 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
   const [selectedId,      setSelectedId]       = useState<string | null>(null)
   const [expanded,        setExpanded]         = useState<Set<string>>(new Set())
   const [toasts,          setToasts]           = useState<Toast[]>([])
+  const [memberCounts,    setMemberCounts]      = useState<Record<string, number>>({})
+  const [hideEmpty,       setHideEmpty]         = useState(false)
 
   // Member table state
   const [members,         setMembers]          = useState<TeamMemberProfile[]>([])
@@ -86,8 +89,12 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
 
   const loadTeams = useCallback(async () => {
     setTeamsLoading(true)
-    const { data, error } = await fetchTeams()
+    const [{ data, error }, counts] = await Promise.all([
+      fetchTeams(),
+      fetchTeamMemberCounts(),
+    ])
     setTeamsLoading(false)
+    if (counts.data) setMemberCounts(counts.data)
     if (error) { addToast(error, "error"); return }
     setTeams(data ?? [])
     if (data && data.length && !selectedId) {
@@ -134,6 +141,15 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
   const { roots, byParent } = buildTree(teams)
   const selectedTeam = teams.find(t => t.id === selectedId) ?? null
 
+  // A team "has members" if it — or, for a parent, any of its subteams — has ≥1 active member.
+  const teamHasMembers = (team: Team): boolean => {
+    if ((memberCounts[team.id] ?? 0) > 0) return true
+    return (byParent[team.id] ?? []).some(child => (memberCounts[child.id] ?? 0) > 0)
+  }
+
+  const visibleRoots = hideEmpty ? roots.filter(teamHasMembers) : roots
+  const emptyCount = roots.length - roots.filter(teamHasMembers).length
+
   const toggleExpand = (id: string) =>
     setExpanded(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
@@ -179,14 +195,21 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
     addToast("Logo uploaded successfully", "success")
   }
 
+  const refreshCounts = async () => {
+    const { data } = await fetchTeamMemberCounts()
+    if (data) setMemberCounts(data)
+  }
+
   const handleTransferred = () => {
     addToast("Member transferred", "success")
     loadMembers()
+    refreshCounts()
   }
 
   const handleMemberAdded = () => {
     addToast("Member added", "success")
     loadMembers()
+    refreshCounts()
   }
 
   // ── Sorting helper ────────────────────────────────────────────────────────────
@@ -223,8 +246,23 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
 
         {/* ── Sidebar tree ─────────────────────────────────────────────────── */}
         <aside className="w-56 xl:w-64 shrink-0 flex flex-col rounded-2xl bg-white border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] overflow-hidden">
-          <div className="px-4 pt-4 pb-3 border-b border-[#f0f2f5]">
+          <div className="px-4 pt-4 pb-3 border-b border-[#f0f2f5] flex items-center justify-between gap-2">
             <p className="text-xs font-bold text-[#374151] uppercase tracking-wider">Departments</p>
+            {teams.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setHideEmpty(p => !p)}
+                title={hideEmpty ? "Show all departments" : "Hide departments with no members"}
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all ${
+                  hideEmpty
+                    ? "bg-[#001f3f]/8 text-[#001f3f]"
+                    : "text-[#9ca3af] hover:bg-[#f4f6f9] hover:text-[#374151]"
+                }`}
+              >
+                {hideEmpty ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                {hideEmpty ? "Show all" : `Hide empty${emptyCount > 0 ? ` (${emptyCount})` : ""}`}
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto py-2">
@@ -239,19 +277,29 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
                 <Building2 className="w-8 h-8 text-[#d1d5db] mx-auto mb-2" />
                 <p className="text-xs text-[#9ca3af]">No teams yet</p>
               </div>
+            ) : visibleRoots.length === 0 ? (
+              <div className="px-4 py-6 text-center">
+                <Building2 className="w-8 h-8 text-[#d1d5db] mx-auto mb-2" />
+                <p className="text-xs text-[#9ca3af]">All departments are empty</p>
+              </div>
             ) : (
               <ul className="px-2">
-                {roots.map(team => (
-                  <TreeNode
-                    key={team.id}
-                    team={team}
-                    children={byParent[team.id] ?? []}
-                    selectedId={selectedId}
-                    expanded={expanded}
-                    onSelect={selectTeam}
-                    onToggleExpand={toggleExpand}
-                  />
-                ))}
+                {visibleRoots.map(team => {
+                  const subs = byParent[team.id] ?? []
+                  return (
+                    <TreeNode
+                      key={team.id}
+                      team={team}
+                      children={hideEmpty ? subs.filter(s => (memberCounts[s.id] ?? 0) > 0) : subs}
+                      memberCount={memberCounts[team.id] ?? 0}
+                      memberCounts={memberCounts}
+                      selectedId={selectedId}
+                      expanded={expanded}
+                      onSelect={selectTeam}
+                      onToggleExpand={toggleExpand}
+                    />
+                  )
+                })}
               </ul>
             )}
           </div>
@@ -396,6 +444,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
                               const { error } = await deactivateMembership(m.id)
                               error ? addToast(error, "error") : addToast("Membership deactivated", "success")
                               loadMembers()
+                              refreshCounts()
                             }}
                             onRemove={() => setConfirmDelete({ type: "member", id: m.id, label: m.profiles?.fullname ?? "member" })}
                           />
@@ -575,6 +624,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
               const { error } = await removeMembership(confirmDelete.id)
               error ? addToast(error, "error") : addToast("Member removed", "success")
               loadMembers()
+              refreshCounts()
             }
             setConfirmDelete(null)
           }}
@@ -595,10 +645,12 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
 // ── TreeNode ─────────────────────────────────────────────────────────────────
 
 function TreeNode({
-  team, children, selectedId, expanded, onSelect, onToggleExpand,
+  team, children, memberCount, memberCounts, selectedId, expanded, onSelect, onToggleExpand,
 }: {
   team: Team
   children: Team[]
+  memberCount: number
+  memberCounts: Record<string, number>
   selectedId: string | null
   expanded: Set<string>
   onSelect: (id: string) => void
@@ -641,6 +693,9 @@ function TreeNode({
           {!team.is_active && (
             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#f0f2f5] text-[#9ca3af] font-semibold shrink-0">off</span>
           )}
+          {memberCount > 0 && (
+            <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-[#001f3f]/8 text-[#001f3f] font-semibold shrink-0">{memberCount}</span>
+          )}
         </button>
       </div>
 
@@ -651,6 +706,8 @@ function TreeNode({
               key={child.id}
               team={child}
               children={[]}
+              memberCount={memberCounts[child.id] ?? 0}
+              memberCounts={memberCounts}
               selectedId={selectedId}
               expanded={expanded}
               onSelect={onSelect}
