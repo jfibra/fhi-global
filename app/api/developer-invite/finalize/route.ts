@@ -4,8 +4,10 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import {
   resolveInviteToken,
   resolveChosenDeveloper,
+  createOrFindInviteDeveloper,
   claimInvite,
   releaseInviteClaim,
+  type InviteDeveloper,
 } from "@/lib/developer-invites"
 import { parseName } from "@/lib/lr/lr-api"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
@@ -18,8 +20,14 @@ import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 export const runtime = "nodejs"
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => null)) as { token?: unknown; developerId?: unknown } | null
+  const body = (await req.json().catch(() => null)) as {
+    token?: unknown
+    developerId?: unknown
+    newDeveloperName?: unknown
+  } | null
   const token = typeof body?.token === "string" ? body.token : ""
+  const developerId = typeof body?.developerId === "string" ? body.developerId : null
+  const newDeveloperName = typeof body?.newDeveloperName === "string" ? body.newDeveloperName.trim() : ""
 
   const supabase = await createClient()
   const { data: userData } = await supabase.auth.getUser()
@@ -58,17 +66,48 @@ export async function POST(req: NextRequest) {
   }
   const config = resolved.config
 
-  const developer = await resolveChosenDeveloper(
-    config,
-    typeof body?.developerId === "string" ? body.developerId : null,
-  )
-  if (!developer) {
-    return NextResponse.json({ error: "Please choose a valid developer." }, { status: 400 })
+  // Determine the developer: bound link fixes it; generic link picks an existing
+  // one (scope-checked) or creates a new one ("can't find yours"). Fail fast on
+  // a bad choice; defer create-new until after the claim succeeds.
+  const wantsNewDeveloper = !config.developer && !developerId && newDeveloperName.length > 0
+  let developer: InviteDeveloper | null = null
+  if (!wantsNewDeveloper) {
+    developer = await resolveChosenDeveloper(config, developerId)
+    if (!developer) {
+      return NextResponse.json({ error: "Please choose a valid developer." }, { status: 400 })
+    }
+  } else if (newDeveloperName.length < 2 || newDeveloperName.length > 120) {
+    return NextResponse.json({ error: "Enter a developer name between 2 and 120 characters." }, { status: 400 })
   }
 
   const claim = await claimInvite(token)
   if (!claim) {
     return NextResponse.json({ error: "This invite link is no longer available." }, { status: 410 })
+  }
+
+  let developerWasCreated = false
+  if (wantsNewDeveloper) {
+    const result = await createOrFindInviteDeveloper(newDeveloperName)
+    if (!result) {
+      await releaseInviteClaim(config.id)
+      return NextResponse.json({ error: "Could not create the developer. Please try again." }, { status: 500 })
+    }
+    developer = result.developer
+    developerWasCreated = result.created
+  }
+  if (!developer) {
+    // Unreachable, but keeps types sound.
+    await releaseInviteClaim(config.id)
+    return NextResponse.json({ error: "Please choose a valid developer." }, { status: 400 })
+  }
+
+  // Refund the claim and drop a just-created developer (never a deduped existing
+  // one) when provisioning doesn't complete, so no orphan developer is left.
+  const abandon = async () => {
+    if (developerWasCreated && developer) {
+      await admin.from("developers").delete().eq("id", developer.id)
+    }
+    await releaseInviteClaim(config.id)
   }
 
   // Name/avatar from the Google identity (backfilled onto the profile by the
@@ -113,12 +152,13 @@ export async function POST(req: NextRequest) {
     .select("id")
 
   if (updateError) {
-    await releaseInviteClaim(config.id)
+    await abandon()
     return NextResponse.json({ error: "Could not finish setting up your account." }, { status: 500 })
   }
   if (!updated || updated.length === 0) {
-    // A concurrent request already provisioned this account — refund our claim.
-    await releaseInviteClaim(config.id)
+    // A concurrent request already provisioned this account — refund our claim
+    // and drop the developer we just created (the winning request has its own).
+    await abandon()
     return NextResponse.json({ redirect: config.autoActivate ? "/dashboard/developer" : "/account-inactive" })
   }
 

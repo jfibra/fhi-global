@@ -23,16 +23,19 @@ function GoogleGlyph({ className }: { className?: string }) {
 export function JoinGoogleButton({
   token,
   developerId,
+  newDeveloperName,
   disabled,
 }: {
   token: string
   developerId: string | null // chosen developer for a generic link; null for bound
+  newDeveloperName?: string | null // "create new" company name for a generic link
   disabled?: boolean
 }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleClick = async () => {
+    if (disabled) return
     setLoading(true)
     setError(null)
     try {
@@ -40,6 +43,7 @@ export function JoinGoogleButton({
       const origin = window.location.origin
       const qs = new URLSearchParams({ dev_invite: token })
       if (developerId) qs.set("dev", developerId)
+      else if (newDeveloperName) qs.set("dev_new", newDeveloperName)
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -57,17 +61,28 @@ export function JoinGoogleButton({
     }
   }
 
+  const isDisabled = loading || !!disabled
+
   return (
     <div className="space-y-2">
       <button
         type="button"
         onClick={() => void handleClick()}
-        disabled={loading || disabled}
-        className="w-full inline-flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border border-[#e5e7eb] bg-white text-sm font-semibold text-[#111827] hover:border-[#001f3f]/40 hover:bg-[#fafafa] disabled:opacity-60 transition-all"
+        disabled={isDisabled}
+        aria-disabled={isDisabled}
+        title={disabled ? "Choose your developer first" : undefined}
+        className={`w-full inline-flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border text-sm font-semibold transition-all ${
+          disabled
+            ? "border-[#e5e7eb] bg-[#f3f4f6] text-[#9ca3af] cursor-not-allowed"
+            : "border-[#e5e7eb] bg-white text-[#111827] hover:border-[#001f3f]/40 hover:bg-[#fafafa]"
+        } disabled:cursor-not-allowed`}
       >
-        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <GoogleGlyph className="w-4 h-4" />}
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <GoogleGlyph className={`w-4 h-4 ${disabled ? "opacity-50" : ""}`} />}
         {loading ? "Redirecting…" : "Continue with Google"}
       </button>
+      {disabled && !loading && (
+        <p className="text-center text-[11px] text-[#9ca3af]">Choose your developer above to continue with Google.</p>
+      )}
       {error && <p className="text-center text-xs text-rose-600">{error}</p>}
     </div>
   )

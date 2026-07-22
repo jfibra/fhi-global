@@ -1,13 +1,53 @@
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { AlertTriangle } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { resolveInviteToken, type InviteDeveloper } from "@/lib/developer-invites"
+import { createPageMetadata } from "@/lib/seo"
 import { JoinRegisterUI } from "./join-register-ui"
 
 export const dynamic = "force-dynamic"
-export const metadata = { robots: { index: false, follow: false } }
+
+// OG metadata so the shared invite link unfurls with a branded "Register as
+// Developer" preview (WhatsApp/Slack/etc. read these regardless of noindex). The
+// page stays noindex — the token URL must never be indexed.
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params
+  const resolved = await resolveInviteToken(token)
+
+  // Only present an official-looking invite preview for a token that actually
+  // resolves — an invalid/expired/used/revoked token unfurls as a neutral
+  // "unavailable" card matching what the page renders, not a real invite.
+  if (resolved.status !== "valid") {
+    return {
+      ...createPageMetadata({
+        title: "Invite link unavailable",
+        description: "This developer invite link isn't available. Ask the person who invited you for a fresh one.",
+      }),
+      robots: { index: false, follow: false },
+    }
+  }
+
+  const bound = resolved.config.developer
+  // Bare title — the root layout's "%s | FHI Global" template adds the suffix.
+  const title = bound ? `Join ${bound.name}` : "Register as a Developer"
+  const description = bound
+    ? `You've been invited to create your developer account under ${bound.name} on FHI Global — Dubai's real-estate platform.`
+    : "You've been invited to register as a developer on FHI Global — Dubai's real-estate platform. Create your account to get started."
+
+  return {
+    ...createPageMetadata({
+      title,
+      description,
+      pathname: `/join/${token}`,
+      openGraphTitle: bound ? `Join ${bound.name}` : "Register as a Developer",
+    }),
+    // Private token URL — never index it, but keep the OG tags for unfurling.
+    robots: { index: false, follow: false },
+  }
+}
 
 const INVALID_COPY: Record<string, { title: string; body: string }> = {
   expired: { title: "This invite link has expired", body: "Ask the person who invited you for a fresh link." },

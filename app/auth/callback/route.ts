@@ -60,6 +60,9 @@ export async function GET(req: NextRequest) {
   // from the /join Google button. Routes to the LR-free developer finalize.
   const devInvite = url.searchParams.get("dev_invite") ?? ""
   const dev = url.searchParams.get("dev") ?? ""
+  // "Can't find your developer — create one" name, threaded from the /join
+  // Google button when the registrant is creating a new developer company.
+  const devNew = url.searchParams.get("dev_new") ?? ""
   const oauthError = url.searchParams.get("error_description") || url.searchParams.get("error")
 
   if (oauthError) {
@@ -104,6 +107,7 @@ export async function GET(req: NextRequest) {
     const joinUrl = new URL("/join/continue", url.origin)
     joinUrl.searchParams.set("dev_invite", devInvite)
     if (dev) joinUrl.searchParams.set("dev", dev)
+    if (devNew) joinUrl.searchParams.set("dev_new", devNew)
     return NextResponse.redirect(joinUrl)
   }
 

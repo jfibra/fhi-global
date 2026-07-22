@@ -32,9 +32,9 @@ function Blocked({ title, body }: { title: string; body: string }) {
 export default async function JoinContinuePage({
   searchParams,
 }: {
-  searchParams: Promise<{ dev_invite?: string; dev?: string }>
+  searchParams: Promise<{ dev_invite?: string; dev?: string; dev_new?: string }>
 }) {
-  const { dev_invite = "", dev = "" } = await searchParams
+  const { dev_invite = "", dev = "", dev_new = "" } = await searchParams
 
   const supabase = await createClient()
   const {
@@ -83,6 +83,7 @@ export default async function JoinContinuePage({
     <JoinContinuePanel
       token={dev_invite}
       chosenDeveloperId={dev || null}
+      newDeveloperName={dev_new || null}
       boundDeveloper={resolved.config.developer}
       autoActivate={resolved.config.autoActivate}
       google={google}

@@ -3,8 +3,10 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import {
   resolveInviteToken,
   resolveChosenDeveloper,
+  createOrFindInviteDeveloper,
   claimInvite,
   releaseInviteClaim,
+  type InviteDeveloper,
 } from "@/lib/developer-invites"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
@@ -19,6 +21,7 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => null)) as {
     token?: unknown
     developerId?: unknown
+    newDeveloperName?: unknown
     firstName?: unknown
     lastName?: unknown
     email?: unknown
@@ -30,6 +33,8 @@ export async function POST(req: NextRequest) {
   const lastName = typeof body?.lastName === "string" ? body.lastName.trim() : ""
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : ""
   const password = typeof body?.password === "string" ? body.password : ""
+  const developerId = typeof body?.developerId === "string" ? body.developerId : null
+  const newDeveloperName = typeof body?.newDeveloperName === "string" ? body.newDeveloperName.trim() : ""
 
   if (!firstName || !lastName || !email || !password) {
     return NextResponse.json({ error: "All fields are required." }, { status: 400 })
@@ -44,12 +49,19 @@ export async function POST(req: NextRequest) {
   }
   const config = resolved.config
 
-  const developer = await resolveChosenDeveloper(
-    config,
-    typeof body?.developerId === "string" ? body.developerId : null,
-  )
-  if (!developer) {
-    return NextResponse.json({ error: "Please choose a valid developer." }, { status: 400 })
+  // Determine the developer. A bound link fixes it; a generic link either picks
+  // an existing one (scope-checked) or creates a new one ("can't find yours").
+  // Fail fast on an obviously bad choice; defer create-new until AFTER the auth
+  // user exists so a failed sign-up doesn't leave an orphan developer.
+  const wantsNewDeveloper = !config.developer && !developerId && newDeveloperName.length > 0
+  let developer: InviteDeveloper | null = null
+  if (!wantsNewDeveloper) {
+    developer = await resolveChosenDeveloper(config, developerId)
+    if (!developer) {
+      return NextResponse.json({ error: "Please choose a valid developer." }, { status: 400 })
+    }
+  } else if (newDeveloperName.length < 2 || newDeveloperName.length > 120) {
+    return NextResponse.json({ error: "Enter a developer name between 2 and 120 characters." }, { status: 400 })
   }
 
   // Atomically claim a use (guards expiry/max/revoked against races).
@@ -75,6 +87,39 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = authData.user.id
+
+  // Create-new developer (deferred): the auth user now exists, so an orphan
+  // developer isn't possible from a dup-email failure above. Track whether we
+  // inserted a fresh row so a later failure can roll it back (never delete a
+  // deduped existing developer).
+  let developerWasCreated = false
+  if (wantsNewDeveloper) {
+    const result = await createOrFindInviteDeveloper(newDeveloperName)
+    if (!result) {
+      await admin.auth.admin.deleteUser(userId)
+      await releaseInviteClaim(config.id)
+      return NextResponse.json({ error: "Could not create the developer. Please try again." }, { status: 500 })
+    }
+    developer = result.developer
+    developerWasCreated = result.created
+  }
+  if (!developer) {
+    // Unreachable (both branches above set it or return), but keeps types sound.
+    await admin.auth.admin.deleteUser(userId)
+    await releaseInviteClaim(config.id)
+    return NextResponse.json({ error: "Please choose a valid developer." }, { status: 400 })
+  }
+
+  // Roll back everything provisioned so far, including a just-created developer
+  // (but not a deduped existing one), so a failed redemption leaves nothing behind.
+  const rollback = async () => {
+    if (developerWasCreated && developer) {
+      await admin.from("developers").delete().eq("id", developer.id)
+    }
+    await admin.auth.admin.deleteUser(userId)
+    await releaseInviteClaim(config.id)
+  }
+
   const status = config.autoActivate ? "active" : "pending"
 
   // Merge (never overwrite) the trigger-seeded metadata.
@@ -101,9 +146,8 @@ export async function POST(req: NextRequest) {
     .eq("id", userId)
 
   if (profileError) {
-    // Roll back the orphaned auth user + release the claim.
-    await admin.auth.admin.deleteUser(userId)
-    await releaseInviteClaim(config.id)
+    // Roll back the auth user, a just-created developer, and the invite claim.
+    await rollback()
     return NextResponse.json({ error: profileError.message }, { status: 500 })
   }
 

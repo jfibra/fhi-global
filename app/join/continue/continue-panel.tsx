@@ -12,12 +12,14 @@ type GoogleLite = { email: string; name: string; picture: string | null }
 export function JoinContinuePanel({
   token,
   chosenDeveloperId,
+  newDeveloperName,
   boundDeveloper,
   autoActivate,
   google,
 }: {
   token: string
   chosenDeveloperId: string | null
+  newDeveloperName: string | null
   boundDeveloper: InviteDeveloper | null
   autoActivate: boolean
   google: GoogleLite
@@ -33,7 +35,11 @@ export function JoinContinuePanel({
       const res = await fetch("/api/developer-invite/finalize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, developerId: boundDeveloper ? null : chosenDeveloperId }),
+        body: JSON.stringify({
+          token,
+          developerId: boundDeveloper ? null : chosenDeveloperId,
+          newDeveloperName: boundDeveloper ? null : newDeveloperName,
+        }),
       })
       const json = (await res.json()) as { redirect?: string; error?: string }
       if (!res.ok || !json.redirect) {
@@ -104,6 +110,17 @@ export function JoinContinuePanel({
                 <p className="text-sm font-semibold text-[#111827] truncate">{boundDeveloper.name}</p>
               </div>
               {boundDeveloper.is_verified && <ShieldCheck className="w-4 h-4 text-emerald-500 ml-auto" />}
+            </div>
+          ) : newDeveloperName ? (
+            <div className="flex items-center gap-3 rounded-2xl border border-[#e8eaed] bg-[#f9fafb] p-4">
+              <span className="w-10 h-10 rounded-xl bg-[#001f3f]/8 flex items-center justify-center shrink-0">
+                <Building2 className="w-5 h-5 text-[#001f3f]" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">New developer company</p>
+                <p className="text-sm font-semibold text-[#111827] truncate">{newDeveloperName}</p>
+                <p className="text-[11px] text-[#9ca3af]">We&apos;ll create this and an admin will verify it.</p>
+              </div>
             </div>
           ) : (
             <div className="flex items-center gap-2.5 rounded-xl bg-[#001f3f]/[0.04] border border-[#001f3f]/10 px-4 py-3">

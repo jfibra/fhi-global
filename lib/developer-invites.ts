@@ -45,6 +45,67 @@ export function generateInviteToken(): string {
   return randomBytes(24).toString("base64url")
 }
 
+const DEV_NAME_MIN = 2
+const DEV_NAME_MAX = 120
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+}
+
+/**
+ * Resolve a registrant-supplied "can't find your developer — create one" name to
+ * a developer: reuse an existing ACTIVE non-deleted developer with the same name
+ * (case-insensitive) to avoid duplicates, otherwise create a new one as inactive
+ * + unverified. Inactive keeps it out of the public /developers list (which
+ * filters is_active) until an admin reviews and activates it, while still being a
+ * valid binding target for the new member. The dedup requires is_active=true to
+ * match resolveChosenDeveloper / the picker, so a self-create can never silently
+ * rebind to a developer an admin deliberately deactivated (a fresh inactive row
+ * is created instead; admins can merge later). Callers must only reach this for
+ * generic links (a bound link's developer is fixed).
+ *
+ * Returns `{ developer, created }` where `created` is true only when a new row
+ * was inserted — callers use it to roll back the row if the surrounding
+ * redemption fails, so no orphan developer is left behind. Returns null on an
+ * invalid name or a DB failure.
+ */
+export async function createOrFindInviteDeveloper(
+  rawName: string,
+): Promise<{ developer: InviteDeveloper; created: boolean } | null> {
+  const name = (rawName ?? "").trim().replace(/\s+/g, " ")
+  if (name.length < DEV_NAME_MIN || name.length > DEV_NAME_MAX) return null
+
+  const admin = createAdminSupabase()
+
+  // Dedup against existing ACTIVE developers (case-insensitive exact match).
+  // ilike may over-match on % / _ in the name, so we re-check exact equality in JS.
+  const { data: candidates } = await admin
+    .from("developers")
+    .select("id, name, slug, logo_url, is_verified")
+    .ilike("name", name)
+    .eq("is_active", true)
+    .is("deleted_at", null)
+    .limit(10)
+  const match = (candidates as InviteDeveloper[] | null)?.find(
+    (d) => d.name.trim().toLowerCase() === name.toLowerCase(),
+  )
+  if (match) return { developer: match, created: false }
+
+  const slug = `${slugify(name) || "developer"}-${randomBytes(3).toString("hex")}`
+  const { data: created, error } = await admin
+    .from("developers")
+    .insert({ name, slug, is_active: false, is_verified: false })
+    .select("id, name, slug, logo_url, is_verified")
+    .maybeSingle<InviteDeveloper>()
+  if (error || !created) return null
+  return { developer: created, created: true }
+}
+
 /**
  * Resolve a token to a display-safe config, or a specific reason it's not
  * usable. Uses the service-role client (the table is admin-RLS). Reads only —
