@@ -65,17 +65,20 @@ export function InviteClient({
   userId,
   userName,
   currentRole,
+  initialRecruits,
 }: {
   userId: string
   userName: string
   currentRole: string
+  // Server-rendered recruits — present the list on first paint, no mount fetch.
+  initialRecruits?: Recruit[]
 }) {
   const [origin, setOrigin] = useState("")
   const [copied, setCopied] = useState(false)
   const downloadRef = useRef<HTMLDivElement>(null)
 
-  const [recruits, setRecruits] = useState<Recruit[]>(() => recruitsCache ?? [])
-  const [recruitsLoading, setRecruitsLoading] = useState(recruitsCache === null)
+  const [recruits, setRecruits] = useState<Recruit[]>(() => initialRecruits ?? recruitsCache ?? [])
+  const [recruitsLoading, setRecruitsLoading] = useState(initialRecruits === undefined && recruitsCache === null)
   const [recruitsError, setRecruitsError] = useState(false)
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [approveError, setApproveError] = useState<string | null>(null)
@@ -105,8 +108,8 @@ export function InviteClient({
   }, [])
 
   useEffect(() => {
-    // Already fetched earlier this session — reuse the cache, don't refetch.
-    if (recruitsCache !== null) return
+    // Server already provided the list (or it's cached this session) — no fetch.
+    if (initialRecruits !== undefined || recruitsCache !== null) return
     let alive = true
     void fetch("/api/invite/recruits")
       .then(async (res) => {
