@@ -6,7 +6,7 @@
  * the registration QR baked in (links to /events/<id>), and view who registered.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   CalendarDays, ChevronLeft, ChevronRight, Eye, FileImage, FileText, ImagePlus, Loader2,
   MapPin, Pencil, Plus, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
@@ -290,20 +290,38 @@ export function EventsClient() {
     }
   }
 
+  // Attendee lists already loaded this session — reopening an event shows
+  // them instantly while a fresh copy loads in the background.
+  const regsCacheRef = useRef<Record<string, Registration[]>>({})
+  // Which event's registrations the modal is currently showing (guards a slow
+  // response for event A from overwriting event B's list).
+  const regOpenIdRef = useRef<string | null>(null)
+
   const openRegistrations = async (e: AdminEvent) => {
     setRegEvent(e)
-    setRegsLoading(true)
-    setRegistrations([])
     setRegQuery("")
     setRegPage(1)
+    regOpenIdRef.current = e.id
+
+    const cached = regsCacheRef.current[e.id]
+    if (cached) {
+      setRegistrations(cached)
+      setRegsLoading(false)
+    } else {
+      setRegistrations([])
+      setRegsLoading(true)
+    }
+
     try {
       const res = await fetch(`/api/admin/events/${e.id}/registrations`, { cache: "no-store" })
       const data = (await res.json()) as { registrations?: Registration[] }
-      setRegistrations(data.registrations ?? [])
+      const fresh = data.registrations ?? []
+      regsCacheRef.current[e.id] = fresh
+      if (regOpenIdRef.current === e.id) setRegistrations(fresh)
     } catch {
-      // list stays empty; modal shows the empty state
+      // keep whatever is shown (cached list or empty state)
     } finally {
-      setRegsLoading(false)
+      if (regOpenIdRef.current === e.id) setRegsLoading(false)
     }
   }
 
@@ -319,7 +337,8 @@ export function EventsClient() {
       })
       if (!res.ok) throw new Error("failed")
       setRegistrations((prev) => prev.filter((x) => x.id !== r.id))
-      // Keep the "N registered" count on the event card in sync.
+      // Keep the session cache and the "N registered" card count in sync.
+      regsCacheRef.current[regEvent.id] = (regsCacheRef.current[regEvent.id] ?? []).filter((x) => x.id !== r.id)
       setEvents((prev) =>
         prev.map((e) =>
           e.id === regEvent.id ? { ...e, registrationCount: Math.max(0, e.registrationCount - 1) } : e,
