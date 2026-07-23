@@ -10,6 +10,7 @@ import {
   type InviteDeveloper,
 } from "@/lib/developer-invites"
 import { parseName } from "@/lib/lr/lr-api"
+import { getDashboardRouteByRole } from "@/lib/auth"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
 // Google one-click redemption. Runs AFTER the OAuth round-trip established the
@@ -159,7 +160,7 @@ export async function POST(req: NextRequest) {
     // A concurrent request already provisioned this account — refund our claim
     // and drop the developer we just created (the winning request has its own).
     await abandon()
-    return NextResponse.json({ redirect: config.autoActivate ? "/dashboard/developer" : "/account-inactive" })
+    return NextResponse.json({ redirect: config.autoActivate ? getDashboardRouteByRole("developer") : "/account-inactive" })
   }
 
   await logAuditEvent({
@@ -176,6 +177,8 @@ export async function POST(req: NextRequest) {
   })
 
   // Pending accounts can't reach the dashboard — send them to the friendly
-  // "awaiting approval" page instead of bouncing through proxy.ts.
-  return NextResponse.json({ redirect: config.autoActivate ? "/dashboard/developer" : "/account-inactive" })
+  // "awaiting approval" page instead of bouncing through proxy.ts. Active
+  // accounts go to the developer dashboard via the canonical role→path helper
+  // (the routes moved from /dashboard/* to /<role>/* in the (users) restructure).
+  return NextResponse.json({ redirect: config.autoActivate ? getDashboardRouteByRole("developer") : "/account-inactive" })
 }
