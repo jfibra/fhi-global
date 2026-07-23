@@ -88,7 +88,7 @@ export function ProfileForm({
     <div className="space-y-6">
       <div>
         <h2 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">Profile Management</h2>
-        <p className="text-sm text-[#6b7280] mt-1">Update your account profile, personal details, and password.</p>
+        <p className="text-sm text-[#6b7280] mt-1">Update your account profile and personal details.</p>
       </div>
 
       {completion < 100 && (

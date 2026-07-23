@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Eye, EyeOff, Phone, MessageCircle, Lock, Check, X, ChevronDown } from "lucide-react"
+import { Phone, MessageCircle, ChevronDown } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { DashboardProfile } from "./profile-form"
 import { BankAccountsTab } from "./bank-accounts-tab"
@@ -86,25 +86,6 @@ function PhoneField({
   )
 }
 
-// ─── Password strength ─────────────────────────────────────────────────────────
-type PwdStrength = { score: number; label: string; color: string }
-
-const PWD_RULES = [
-  { key: "length",    label: "Minimum 10 characters",          test: (p: string) => p.length >= 10 },
-  { key: "upper",     label: "At least one uppercase letter",   test: (p: string) => /[A-Z]/.test(p) },
-  { key: "lower",     label: "At least one lowercase letter",   test: (p: string) => /[a-z]/.test(p) },
-  { key: "number",    label: "At least one number",             test: (p: string) => /[0-9]/.test(p) },
-  { key: "special",   label: "At least one special character",  test: (p: string) => /[^A-Za-z0-9]/.test(p) },
-]
-
-function getStrength(password: string): PwdStrength {
-  const score = PWD_RULES.filter((r) => r.test(password)).length
-  if (score <= 1) return { score, label: "Weak",   color: "#ef4444" }
-  if (score <= 2) return { score, label: "Fair",   color: "#f59e0b" }
-  if (score <= 3) return { score, label: "Good",   color: "#3b82f6" }
-  return           { score, label: "Strong", color: "#10b981" }
-}
-
 // ─── Metadata helpers ──────────────────────────────────────────────────────────
 type MetadataShape = {
   phone_country_code?: string
@@ -155,7 +136,7 @@ export function ProfileTabs({
 }) {
   const userId = profile.id
   const [activeTab, setActiveTab] = useState<TabKey>("profile")
-  const [busySection, setBusySection] = useState<"profile" | "password" | null>(null)
+  const [busySection, setBusySection] = useState<"profile" | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   const [profileInfo, setProfileInfo] = useState(() => ({
@@ -167,14 +148,6 @@ export function ProfileTabs({
     gender: profile.gender ?? "",
     ...toMetadata(profile.metadata),
   }))
-
-  const [securityForm, setSecurityForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  })
-  const [showPwd, setShowPwd] = useState({ current: false, new: false, confirm: false })
-  const pwdStrength = useMemo(() => getStrength(securityForm.newPassword), [securityForm.newPassword])
 
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
@@ -279,53 +252,6 @@ export function ProfileTabs({
     setHasUnsavedChanges(false)
     onSuccess("Profile information updated.")
     await logActivity("profile_info_update", payload)
-  }
-
-  const handleChangePassword = async () => {
-    const { currentPassword, newPassword, confirmPassword } = securityForm
-
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      onError("Please complete all password fields.")
-      return
-    }
-
-    const failedRules = PWD_RULES.filter((r) => !r.test(newPassword))
-    if (failedRules.length > 0) {
-      onError(`Password must meet all requirements: ${failedRules.map((r) => r.label).join(", ")}.`)
-      return
-    }
-
-    if (newPassword !== confirmPassword) {
-      onError("New password and confirm password do not match.")
-      return
-    }
-
-    if (!email) {
-      onError("Email not available for password validation.")
-      return
-    }
-
-    setBusySection("password")
-    const supabase = createClient()
-
-    const { error: verifyError } = await supabase.auth.signInWithPassword({ email, password: currentPassword })
-    if (verifyError) {
-      setBusySection(null)
-      onError("Current password is incorrect.")
-      return
-    }
-
-    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
-    setBusySection(null)
-
-    if (updateError) {
-      onError(updateError.message || "Failed to update password.")
-      return
-    }
-
-    setSecurityForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
-    onSuccess("Password changed successfully.")
-    await logActivity("password_update", { updated: true })
   }
 
   return (
@@ -548,142 +474,6 @@ export function ProfileTabs({
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Joined Date</label>
                   <input className="w-full px-5 py-3.5 rounded-2xl border border-[#f0f0f0] bg-[#f8fafc] text-[#6b7280] text-sm cursor-not-allowed" value={joinedDate} readOnly />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4 pt-6 border-t border-[#f0f0f0]">
-              <h3 className="text-lg font-bold text-[#0d1117] font-['Outfit']">Change Password</h3>
-              <div className="space-y-5">
-                {/* Current password */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5 ml-1">
-                    <Lock className="w-3.5 h-3.5 text-[#6b7280]" />
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#374151]">Current Password</label>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type={showPwd.current ? "text" : "password"}
-                      className="w-full px-5 py-3.5 pr-12 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
-                      value={securityForm.currentPassword}
-                      onChange={(e) => setSecurityForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPwd((p) => ({ ...p, current: !p.current }))}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#374151] transition-colors"
-                    >
-                      {showPwd.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* New password + strength */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5 ml-1">
-                    <Lock className="w-3.5 h-3.5 text-[#6b7280]" />
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#374151]">New Password</label>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type={showPwd.new ? "text" : "password"}
-                      className="w-full px-5 py-3.5 pr-12 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
-                      value={securityForm.newPassword}
-                      onChange={(e) => setSecurityForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPwd((p) => ({ ...p, new: !p.new }))}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#374151] transition-colors"
-                    >
-                      {showPwd.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-
-                  {/* Strength bar */}
-                  {securityForm.newPassword && (
-                    <div className="space-y-2 mt-2">
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 h-1.5 rounded-full bg-[#e5e5e5] overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{
-                              width: `${(pwdStrength.score / PWD_RULES.length) * 100}%`,
-                              backgroundColor: pwdStrength.color,
-                            }}
-                          />
-                        </div>
-                        <span className="text-xs font-bold" style={{ color: pwdStrength.color }}>
-                          {pwdStrength.label}
-                        </span>
-                      </div>
-
-                      {/* Rule checklist */}
-                      <div className="grid grid-cols-1 gap-1.5 pt-1">
-                        {PWD_RULES.map((rule) => {
-                          const passed = rule.test(securityForm.newPassword)
-                          return (
-                            <div key={rule.key} className="flex items-center gap-2">
-                              <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${passed ? "bg-green-500" : "bg-[#e5e5e5]"}`}>
-                                {passed
-                                  ? <Check className="w-2.5 h-2.5 text-white" />
-                                  : <X className="w-2.5 h-2.5 text-[#9ca3af]" />}
-                              </div>
-                              <span className={`text-xs transition-colors ${passed ? "text-green-600 font-medium" : "text-[#9ca3af]"}`}>
-                                {rule.label}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Confirm password */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5 ml-1">
-                    <Lock className="w-3.5 h-3.5 text-[#6b7280]" />
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#374151]">Confirm Password</label>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type={showPwd.confirm ? "text" : "password"}
-                      className="w-full px-5 py-3.5 pr-12 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
-                      value={securityForm.confirmPassword}
-                      onChange={(e) => setSecurityForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPwd((p) => ({ ...p, confirm: !p.confirm }))}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#374151] transition-colors"
-                    >
-                      {showPwd.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  {securityForm.confirmPassword && securityForm.newPassword !== securityForm.confirmPassword && (
-                    <p className="text-xs text-rose-500 ml-1 flex items-center gap-1">
-                      <X className="w-3 h-3" /> Passwords do not match
-                    </p>
-                  )}
-                  {securityForm.confirmPassword && securityForm.newPassword === securityForm.confirmPassword && securityForm.newPassword && (
-                    <p className="text-xs text-green-600 ml-1 flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Passwords match
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex justify-end pt-1">
-                  <button
-                    type="button"
-                    onClick={() => void handleChangePassword()}
-                    disabled={busySection === "password"}
-                    className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
-                  >
-                    {busySection === "password" ? (
-                      <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Updating…</>
-                    ) : "Change Password"}
-                  </button>
                 </div>
               </div>
             </div>
