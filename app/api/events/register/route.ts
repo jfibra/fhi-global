@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
+import { sendEventRegistrationEmail } from "@/lib/mailer"
+import { SITE_URL } from "@/lib/seo"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
@@ -30,12 +32,16 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminSupabase()
 
-  const { data: event } = await admin
+  const { data: event, error: eventError } = await admin
     .from("events")
-    .select("id, status, deleted_at, event_date, registration_open")
+    .select("id, slug, title, venue, status, deleted_at, event_date, registration_open")
     .eq("id", eventId)
     .maybeSingle()
 
+  if (eventError) {
+    console.error("[events/register] event lookup failed:", eventError)
+    return NextResponse.json({ error: "Registration failed — please try again" }, { status: 500 })
+  }
   if (!event || event.status !== "published" || event.deleted_at) {
     return NextResponse.json({ error: "This event is not open for registration" }, { status: 404 })
   }
@@ -55,6 +61,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "This email is already registered for the event" }, { status: 409 })
     }
     return NextResponse.json({ error: "Registration failed — please try again" }, { status: 500 })
+  }
+
+  // Confirmation email — best effort; a mail hiccup must never undo a
+  // successful registration.
+  try {
+    await sendEventRegistrationEmail({
+      to: email,
+      fullName,
+      eventTitle: (event.title as string) ?? "FHI Global event",
+      eventDate: (event.event_date as string | null) ?? null,
+      venue: (event.venue as string | null) ?? null,
+      eventUrl: `${SITE_URL.replace(/\/$/, "")}/events/${(event.slug as string | null) ?? eventId}`,
+    })
+  } catch (e) {
+    console.error("[events/register] confirmation email failed:", e instanceof Error ? e.message : e)
   }
 
   return NextResponse.json({ ok: true })

@@ -747,6 +747,7 @@ export function EventsClient() {
       {/* ── Live raffle (full-screen, above the registrations modal) ── */}
       {raffleOpen && regEvent && (
         <EventRaffle
+          eventId={regEvent.id}
           eventTitle={regEvent.title}
           entries={registrations.map((r) => ({ id: r.id, fullName: r.fullName, email: r.email }))}
           onClose={() => setRaffleOpen(false)}

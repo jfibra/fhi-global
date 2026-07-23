@@ -14,7 +14,10 @@
  */
 
 import { useMemo, useRef, useState } from "react"
-import { Building2, Eraser, FileText, Gift, Medal, PartyPopper, RotateCcw, Trophy, Users, X } from "lucide-react"
+import {
+  Building2, Check, Eraser, FileText, Gift, Loader2, Mail, Medal, PartyPopper,
+  RotateCcw, Trophy, Users, X,
+} from "lucide-react"
 
 type RaffleEntry = {
   id: string
@@ -198,10 +201,12 @@ function StageBackdrop() {
 }
 
 export function EventRaffle({
+  eventId,
   eventTitle,
   entries,
   onClose,
 }: {
+  eventId: string
   eventTitle: string
   entries: RaffleEntry[]
   onClose: () => void
@@ -289,10 +294,35 @@ export function EventRaffle({
     setPhase("winner")
   }
 
+  // Per-winner email status (keyed by position in the winners list). The
+  // generation counter keeps an in-flight send from a cleared list from
+  // stamping its status onto a new winner at the same index.
+  const [mailStatus, setMailStatus] = useState<Record<number, "sending" | "sent" | "error">>({})
+  const mailGenRef = useRef(0)
+
+  const emailWinner = async (index: number, w: WinnerRecord) => {
+    if (mailStatus[index] === "sending" || mailStatus[index] === "sent") return
+    const gen = mailGenRef.current
+    setMailStatus((m) => ({ ...m, [index]: "sending" }))
+    try {
+      const res = await fetch(`/api/admin/events/${eventId}/notify-winner`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registrationId: w.entry.id, prize: w.prize }),
+      })
+      if (!res.ok) throw new Error("failed")
+      if (gen === mailGenRef.current) setMailStatus((m) => ({ ...m, [index]: "sent" }))
+    } catch {
+      if (gen === mailGenRef.current) setMailStatus((m) => ({ ...m, [index]: "error" }))
+    }
+  }
+
   const clearWinners = () => {
     if (winners.length === 0) return
     if (!window.confirm("Clear the winners list? The next draw starts fresh.")) return
+    mailGenRef.current++
     setWinners([])
+    setMailStatus({})
     setPhase("idle")
     setReel([])
   }
@@ -591,7 +621,7 @@ export function EventRaffle({
                     <span className="w-7 h-7 rounded-full bg-gradient-to-br from-[#f0d890] to-[#b8913f] text-[#001428] text-xs font-bold flex items-center justify-center shrink-0">
                       {i + 1}
                     </span>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-white text-sm font-bold truncate">{w.entry.fullName}</p>
                       <p className="text-white/45 text-xs truncate">{w.entry.email}</p>
                       {w.prize && (
@@ -600,6 +630,34 @@ export function EventRaffle({
                         </p>
                       )}
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => void emailWinner(i, w)}
+                      disabled={mailStatus[i] === "sending" || mailStatus[i] === "sent"}
+                      className={`shrink-0 p-2 rounded-lg transition-colors ${
+                        mailStatus[i] === "sent"
+                          ? "bg-emerald-500/20 text-emerald-300"
+                          : mailStatus[i] === "error"
+                            ? "bg-rose-500/20 text-rose-300 hover:bg-rose-500/30"
+                            : "bg-white/10 text-white/70 hover:bg-white/20"
+                      }`}
+                      aria-label={`Email ${w.entry.fullName} their winning confirmation`}
+                      title={
+                        mailStatus[i] === "sent"
+                          ? "Winning email sent"
+                          : mailStatus[i] === "error"
+                            ? "Send failed — click to retry"
+                            : "Email this winner their proof of winning"
+                      }
+                    >
+                      {mailStatus[i] === "sending" ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : mailStatus[i] === "sent" ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <Mail className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
                 ))
               )}
