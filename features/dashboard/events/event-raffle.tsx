@@ -214,6 +214,9 @@ export function EventRaffle({
   const [phase, setPhase] = useState<Phase>("idle")
   const [winners, setWinners] = useState<WinnerRecord[]>([])
   const [excludeWinners, setExcludeWinners] = useState(true)
+  // Off by default so rehearsal draws never email real people; the host ticks
+  // it when the real raffle starts.
+  const [autoEmail, setAutoEmail] = useState(false)
   // What's being raffled this draw ("Car Raffle", "iPhone 16", …) — shown on
   // the stage and stamped onto each winner in the side panel.
   const [prize, setPrize] = useState("")
@@ -290,8 +293,11 @@ export function EventRaffle({
     const winner = pendingWinnerRef.current
     if (!winner) return
     pendingWinnerRef.current = null
-    setWinners((w) => [...w, { entry: winner, prize: prize.trim() }])
+    const record: WinnerRecord = { entry: winner, prize: prize.trim() }
+    const index = winners.length // settle fires once per spin, so this is stable
+    setWinners((w) => [...w, record])
     setPhase("winner")
+    if (autoEmail) void emailWinner(index, record)
   }
 
   // Per-winner email status (keyed by position in the winners list). The
@@ -548,15 +554,27 @@ export function EventRaffle({
               </p>
             )}
             {phase !== "spinning" && (
-              <label className="flex items-center gap-2 text-white/60 text-sm cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={excludeWinners}
-                  onChange={(e) => setExcludeWinners(e.target.checked)}
-                  className="w-4 h-4 accent-[#d6b357]"
-                />
-                Exclude previous winners from the next draw
-              </label>
+              <div className="flex flex-col items-center gap-2">
+                <label className="flex items-center gap-2 text-white/60 text-sm cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={excludeWinners}
+                    onChange={(e) => setExcludeWinners(e.target.checked)}
+                    className="w-4 h-4 accent-[#d6b357]"
+                  />
+                  Exclude previous winners from the next draw
+                </label>
+                <label className="flex items-center gap-2 text-white/60 text-sm cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={autoEmail}
+                    onChange={(e) => setAutoEmail(e.target.checked)}
+                    className="w-4 h-4 accent-[#d6b357]"
+                  />
+                  Email each winner automatically
+                  <span className="text-white/35 text-xs">(keep off while testing)</span>
+                </label>
+              </div>
             )}
           </div>
         </div>
