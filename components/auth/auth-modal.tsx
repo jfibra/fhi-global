@@ -86,24 +86,25 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
         aria-label="Sign In to FHI Global Property"
         className="relative w-full max-w-[420px] my-8 bg-white rounded-2xl shadow-[0_30px_90px_-20px_rgba(0,10,30,0.6)] overflow-hidden"
       >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="absolute right-4 top-4 w-8 h-8 flex items-center justify-center rounded-full text-[#9ca3af] hover:text-[#001f3f] hover:bg-[#f2f4f7] transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <div className="px-7 pt-9 pb-8">
-          {/* Logo */}
+        {/* Navy header band with the brand logo + circular close button */}
+        <div className="relative bg-[#001f3f] px-7 py-8 flex items-center justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logos/FHI_Branding Set_PNG Copies-02.png"
+            src="/FHI_Branding_White.png"
             alt="FHI Global"
-            className="h-9 mx-auto object-contain mb-5"
+            className="h-12 w-auto object-contain"
           />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-4 top-4 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 text-white/90 hover:bg-white/20 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
+        <div className="px-7 pt-7 pb-8">
           <h2 className="text-center font-['Outfit'] text-[20px] font-bold text-[#0d1117] mb-6">
             {step === "email" ? "Sign In to FHI Global Property" : "Enter your code"}
           </h2>
