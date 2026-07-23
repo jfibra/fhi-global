@@ -90,7 +90,7 @@ export function DashboardShell({
   const handleSignOut = async () => {
     const supabase = createSupabaseClient()
     await supabase.auth.signOut()
-    router.push("/login")
+    router.push("/")
     router.refresh()
   }
 

@@ -127,6 +127,7 @@ export function Header() {
       /* ignore */
     }
     setSession(null)
+    router.push("/")
     router.refresh()
   }
 

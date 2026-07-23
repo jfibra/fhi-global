@@ -59,7 +59,7 @@ export function JoinContinuePanel({
     try {
       await createClient().auth.signOut()
     } finally {
-      router.push("/login")
+      router.push("/")
       router.refresh()
     }
   }

@@ -73,13 +73,13 @@ export default function GoogleContinuePanel({
     }
   }, [next, inviteRef, router])
 
-  // Cancel = don't provision; sign out and return to login.
+  // Cancel = don't provision; sign out and return to the homepage.
   const handleCancel = useCallback(async () => {
     try {
       const supabase = createClient()
       await supabase.auth.signOut()
     } finally {
-      router.push("/login")
+      router.push("/")
       router.refresh()
     }
   }, [router])

@@ -8,7 +8,7 @@ export default async function DashboardIndexPage() {
   const identity = await getSessionIdentity()
 
   if (!identity) {
-    redirect("/login")
+    redirect("/")
   }
 
   const { profile } = identity

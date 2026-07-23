@@ -36,13 +36,13 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
       if (!active) return
       if (!user) {
         // proxy.ts should have already redirected; this is a belt-and-suspenders fallback.
-        router.replace("/login")
+        router.replace("/")
         return
       }
       const { profile } = await getProfileByUserId(supabase, user.id)
       if (!active) return
       if (!profile) {
-        router.replace("/login")
+        router.replace("/")
         return
       }
       if (isInactiveProfile(profile)) {

@@ -22,7 +22,7 @@ export default async function GoogleContinuePage({
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) redirect("/login")
+  if (!user) redirect("/")
 
   const { profile } = await getProfileByUserId(supabase, user.id)
   const meta = (profile?.metadata ?? {}) as Record<string, unknown>

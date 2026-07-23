@@ -66,16 +66,16 @@ export async function GET(req: NextRequest) {
   const oauthError = url.searchParams.get("error_description") || url.searchParams.get("error")
 
   if (oauthError) {
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(oauthError)}`, url.origin))
+    return NextResponse.redirect(new URL(`/?authError=${encodeURIComponent(oauthError)}`, url.origin))
   }
   if (!code) {
-    return NextResponse.redirect(new URL("/login?error=missing_code", url.origin))
+    return NextResponse.redirect(new URL("/?authError=missing_code", url.origin))
   }
 
   const supabase = await createClient()
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
   if (error) {
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`, url.origin))
+    return NextResponse.redirect(new URL(`/?authError=${encodeURIComponent(error.message)}`, url.origin))
   }
 
   if (data.user) {
