@@ -23,6 +23,8 @@ type Recruit = {
   role: string
   status: string
   joinedAt: string | null
+  phone: string | null
+  birthday: string | null
 }
 
 // Module-level cache of the recruits list. Survives client-side (next/link)
@@ -35,6 +37,14 @@ let recruitsCache: Recruit[] | null = null
 function joinedLabel(joinedAt: string | null): string {
   if (!joinedAt) return "—"
   const d = new Date(joinedAt)
+  return Number.isNaN(d.getTime())
+    ? "—"
+    : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+}
+
+function birthdayLabel(birthday: string | null): string {
+  if (!birthday) return "—"
+  const d = new Date(birthday)
   return Number.isNaN(d.getTime())
     ? "—"
     : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
@@ -463,10 +473,16 @@ export function InviteClient({
                         {r.fullname.charAt(0).toUpperCase()}
                       </span>
 
-                      {/* Name + email */}
+                      {/* Name + birth date */}
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold text-[#111827] truncate">{r.fullname}</p>
+                        <p className="text-xs text-[#6b7280] truncate">Birth date: {birthdayLabel(r.birthday)}</p>
+                      </div>
+
+                      {/* Email + mobile column */}
+                      <div className="shrink-0 hidden sm:block min-w-0 w-44">
                         <p className="text-xs text-[#6b7280] truncate">{r.email ?? "—"}</p>
+                        <p className="text-xs text-[#6b7280] truncate">{r.phone ?? "—"}</p>
                       </div>
 
                       {/* Joined column */}
@@ -476,14 +492,14 @@ export function InviteClient({
                       </div>
 
                       {/* Role column — colored chip-style dropdown when editable, static chip otherwise */}
-                      <div className="shrink-0 w-28 flex justify-center">
+                      <div className="shrink-0 w-20 flex justify-center">
                         {editRole ? (
-                          <div className="relative inline-flex">
+                          <div className="relative inline-flex w-full">
                             <select
                               value={roleFor(r)}
                               disabled={busy}
                               onChange={(e) => void handleRoleSelect(r, e.target.value as "member" | "agent")}
-                              className={`appearance-none cursor-pointer rounded-full text-[11px] font-bold uppercase tracking-wide pl-3 pr-7 py-1 border focus:outline-none transition-colors disabled:opacity-60 ${roleChipCls(roleFor(r))}`}
+                              className={`w-full appearance-none cursor-pointer rounded-full text-center text-[11px] font-bold capitalize pl-2.5 pr-6 py-1 border focus:outline-none transition-colors disabled:opacity-60 ${roleChipCls(roleFor(r))}`}
                             >
                               <option value="member">Member</option>
                               <option value="agent">Agent</option>
@@ -495,7 +511,7 @@ export function InviteClient({
                             )}
                           </div>
                         ) : (
-                          <span className={`px-2.5 py-1 rounded-full border text-[11px] font-bold uppercase tracking-wide ${roleChipCls(r.role)}`}>
+                          <span className={`w-full text-center px-2.5 py-1 rounded-full border text-[11px] font-bold capitalize ${roleChipCls(r.role)}`}>
                             {roleToLabel(r.role)}
                           </span>
                         )}
