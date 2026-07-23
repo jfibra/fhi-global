@@ -8,6 +8,7 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromHeaders } from "@/lib/audit-log"
 import { sendOtpEmail } from "@/lib/mailer"
 import { generateOtpCode, storeOtpChallenge, consumeOtpChallenge } from "@/lib/auth-otp"
+import { DEFAULT_ACCOUNT_PASSWORD } from "@/lib/account-password"
 
 export type LoginState = {
   error?: string
@@ -46,6 +47,53 @@ export async function sendLoginOtp(emailRaw: string): Promise<OtpResult> {
       return { error: "No account found for this email. Ask an admin to add you, or create an account." }
     }
     return { error: error?.message ?? "Could not generate a sign-in code." }
+  }
+
+  const code = generateOtpCode()
+  try {
+    await storeOtpChallenge(data.user.id, code, data.properties.hashed_token)
+    await sendOtpEmail(email, code, "login")
+  } catch (e) {
+    return { error: e instanceof Error ? `Could not send the code: ${e.message}` : "Could not send the code." }
+  }
+
+  return { ok: true, challenge: data.user.id }
+}
+
+/**
+ * Unified "continue with email" — logs in if the email already has an account,
+ * or creates a pending member account if it's new, then emails a 6-digit code.
+ * Verification uses the same verifyLoginOtp step, which routes new users to
+ * /complete-profile and pending accounts to /account-inactive.
+ */
+export async function sendAuthOtp(emailRaw: string): Promise<OtpResult> {
+  if (!hasServerSupabaseEnv()) {
+    return { error: "Supabase environment variables are not configured." }
+  }
+
+  const email = String(emailRaw ?? "").trim().toLowerCase()
+  if (!email) return { error: "Email is required." }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email address." }
+
+  const admin = createAdminSupabase()
+
+  // Create the account if this email is new; an "already exists" error just
+  // means it's a returning user (a login). New profiles default to member/pending.
+  const { error: createError } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    password: DEFAULT_ACCOUNT_PASSWORD,
+  })
+  if (createError) {
+    const m = createError.message.toLowerCase()
+    if (!m.includes("already") && !m.includes("registered") && !m.includes("exists")) {
+      return { error: createError.message }
+    }
+  }
+
+  const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email })
+  if (error || !data?.properties?.hashed_token || !data.user?.id) {
+    return { error: error?.message ?? "Could not generate a code." }
   }
 
   const code = generateOtpCode()

@@ -1,24 +1,22 @@
 "use client"
 
 import { useEffect, useRef, useState, useTransition } from "react"
-import { X, Mail, ArrowLeft, ArrowRight, Loader2, CheckCircle2 } from "lucide-react"
+import { X, Mail, ArrowLeft, ArrowRight, Loader2 } from "lucide-react"
 import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
 import { OtpInput } from "@/components/auth/otp-input"
-import { sendLoginOtp, verifyLoginOtp } from "@/app/(public-page)/(auth)/login/actions"
-import { sendRegisterOtp, verifyRegisterOtp } from "@/app/(public-page)/(auth)/register/actions"
+import { sendAuthOtp, verifyLoginOtp } from "@/app/(public-page)/(auth)/login/actions"
 
 const RESEND_COOLDOWN = 60
 
-type Mode = "login" | "register"
-type Step = "email" | "code" | "done"
+type Step = "email" | "code"
 
 /**
- * Public auth modal (navbar). Passwordless: email 6-digit OTP + Google, with a
- * login/register toggle. Password sign-in lives on /login for admins only.
+ * Public auth modal (navbar). One passwordless flow that logs in an existing
+ * email or creates a new account, via a 6-digit email code + Google. Password
+ * sign-in lives on /login for admins only.
  * Mounted only while open (by the parent), so state starts fresh each time.
  */
 export function AuthModal({ onClose }: { onClose: () => void }) {
-  const [mode, setMode] = useState<Mode>("login")
   const [step, setStep] = useState<Step>("email")
   const [email, setEmail] = useState("")
   const [code, setCode] = useState("")
@@ -52,9 +50,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     if (pending) return
     startTransition(async () => {
       setError(null)
-      const res = mode === "register"
-        ? await sendRegisterOtp(email)
-        : await sendLoginOtp(email)
+      const res = await sendAuthOtp(email)
       if (res?.error) {
         setError(res.error)
       } else {
@@ -70,28 +66,13 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     if (pending) return
     startTransition(async () => {
       setError(null)
-      if (mode === "register") {
-        const res = await verifyRegisterOtp(email, code, challenge)
-        if (res?.error) setError(res.error)
-        else if (res?.success) setStep("done")
-      } else {
-        const res = await verifyLoginOtp(email, code, challenge)
-        // Login success redirects server-side; only errors return here.
-        if (res?.error) setError(res.error)
-      }
+      // Verify redirects on success (dashboard / complete-profile / account-inactive).
+      const res = await verifyLoginOtp(email, code, challenge)
+      if (res?.error) setError(res.error)
     })
   }
 
   const resend = () => { if (cooldown === 0 && !pending) sendCode() }
-
-  const switchMode = (next: Mode) => {
-    setMode(next); setStep("email"); setError(null); setCode("")
-  }
-
-  const title =
-    step === "done" ? "Check your inbox"
-    : mode === "register" ? "Create your FHI Global account"
-    : "Log in to your FHI Global account"
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-start sm:items-center justify-center p-4 overflow-y-auto">
@@ -102,7 +83,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-label="Sign In to FHI Global Property"
         className="relative w-full max-w-[420px] my-8 bg-white rounded-2xl shadow-[0_30px_90px_-20px_rgba(0,10,30,0.6)] overflow-hidden"
       >
         <button
@@ -124,27 +105,10 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
           />
 
           <h2 className="text-center font-['Outfit'] text-[20px] font-bold text-[#0d1117] mb-6">
-            {title}
+            {step === "email" ? "Sign In to FHI Global Property" : "Enter your code"}
           </h2>
 
-          {/* ── Success ── */}
-          {step === "done" ? (
-            <div className="text-center py-2">
-              <div className="w-16 h-16 rounded-full bg-[#d6b357]/12 border-2 border-[#d6b357]/30 flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 className="w-8 h-8 text-[#d6b357]" />
-              </div>
-              <p className="text-sm text-[#4b5563] leading-relaxed mb-6">
-                Your account was created and is pending approval. An administrator will activate it before you can sign in.
-              </p>
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full py-3 rounded-xl bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold transition-colors"
-              >
-                Done
-              </button>
-            </div>
-          ) : step === "email" ? (
+          {step === "email" ? (
             <div className="space-y-4">
               {/* Email first */}
               <form onSubmit={(e) => { e.preventDefault(); sendCode() }} className="space-y-4">
@@ -164,7 +128,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
 
                 {error && <ErrorBox message={error} />}
 
-                <SubmitButton pending={pending} label={mode === "register" ? "Sign up with Email" : "Continue with Email"} busy="Sending code…" />
+                <SubmitButton pending={pending} label="Continue with Email" busy="Sending code…" />
               </form>
 
               {/* Divider + Google below */}
@@ -174,18 +138,10 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
                 <div className="flex-1 h-px bg-[#eceef1]" />
               </div>
 
-              <GoogleAuthFlow variant={mode} />
+              <GoogleAuthFlow variant="login" />
 
-              <p className="text-center text-sm text-[#6b7280] pt-2">
-                {mode === "register" ? (
-                  <>Already have an account?{" "}
-                    <button type="button" onClick={() => switchMode("login")} className="text-[#001f3f] font-bold hover:underline">Log in</button>
-                  </>
-                ) : (
-                  <>New to FHI Global?{" "}
-                    <button type="button" onClick={() => switchMode("register")} className="text-[#001f3f] font-bold hover:underline">Create an account</button>
-                  </>
-                )}
+              <p className="text-center text-xs text-[#9ca3af] pt-1 leading-relaxed">
+                New here? Just enter your email — we&apos;ll create your account.
               </p>
             </div>
           ) : (
@@ -194,11 +150,12 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
               <p className="text-center text-[13px] text-[#6b7280] -mt-2 mb-1">
                 We emailed a 6-digit code to <span className="font-semibold text-[#374151]">{email}</span>.
               </p>
+
               <OtpInput value={code} onChange={setCode} disabled={pending} autoFocus />
 
               {error && <ErrorBox message={error} />}
 
-              <SubmitButton pending={pending} label={mode === "register" ? "Create account" : "Log in"} busy="Verifying…" />
+              <SubmitButton pending={pending} label="Continue" busy="Verifying…" />
 
               <div className="flex items-center justify-between text-xs pt-0.5">
                 <button
