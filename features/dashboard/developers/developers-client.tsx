@@ -19,7 +19,7 @@ import {
   toggleDeveloperVerified,
 } from "@/lib/developer-service"
 import { isAdminStaffRole } from "@/lib/app-roles"
-import { formatDate, formatDateTime, relativeTime } from "@/lib/utils"
+import { formatDateTime, formatLongDateAtTime, relativeTime } from "@/lib/utils"
 import { DeveloperFormDialog } from "./developer-form-dialog"
 import { DeveloperLogoUpload } from "./developer-logo-upload"
 import { DeveloperInviteDialog } from "./developer-invite-dialog"
@@ -438,8 +438,8 @@ export function DevelopersClient({ currentRole }: Props) {
         <div className="bg-white/60 backdrop-blur-2xl rounded-[24px] border border-white/60 shadow-xl shadow-black/5 overflow-hidden">
           <div className="overflow-x-auto">
           {/* Table header */}
-          <div className="hidden lg:grid grid-cols-[44px_1fr_140px_1fr_100px_90px_88px_150px_40px] lg:min-w-[1140px] gap-4 px-6 py-3 border-b border-[#f0f0f0]">
-            {["", "Name", "Slug", "Contact", "Rating", "Verified", "Status", "Added", ""].map((h, i) => (
+          <div className="hidden lg:grid grid-cols-[44px_1fr_1fr_100px_90px_88px_170px_170px_40px] lg:min-w-[1200px] gap-4 px-6 py-3 border-b border-[#f0f0f0]">
+            {["", "Name", "Contact", "Rating", "Verified", "Status", "Added", "Updated", ""].map((h, i) => (
               <span key={i} className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">{h}</span>
             ))}
           </div>
@@ -460,7 +460,7 @@ export function DevelopersClient({ currentRole }: Props) {
             <div className="divide-y divide-[#f0f0f0]">
               {devs.map((dev) => (
                 <div key={dev.id}
-                  className={`hidden lg:grid grid-cols-[44px_1fr_140px_1fr_100px_90px_88px_150px_40px] lg:min-w-[1140px] gap-4 items-center px-6 py-4 hover:bg-[#f8fafc] transition-colors ${
+                  className={`hidden lg:grid grid-cols-[44px_1fr_1fr_100px_90px_88px_170px_170px_40px] lg:min-w-[1200px] gap-4 items-center px-6 py-4 hover:bg-[#f8fafc] transition-colors ${
                     dev.deleted_at ? "opacity-50" : ""
                   }`}>
                   {/* Logo */}
@@ -484,9 +484,6 @@ export function DevelopersClient({ currentRole }: Props) {
                     )}
                     {dev.description && <p className="text-xs text-[#9ca3af] truncate">{dev.description}</p>}
                   </div>
-
-                  {/* Slug */}
-                  <span className="text-xs font-mono text-[#6b7280] truncate">{dev.slug}</span>
 
                   {/* Contact */}
                   <div className="min-w-0 space-y-0.5">
@@ -519,10 +516,15 @@ export function DevelopersClient({ currentRole }: Props) {
                     </span>
                   )}
 
-                  {/* Date added / last updated */}
+                  {/* Added */}
                   <div className="min-w-0">
-                    <p className="text-xs text-[#374151] truncate" title={`Added ${formatDateTime(dev.created_at)}`}>{formatDate(dev.created_at)}</p>
-                    <p className="text-[11px] text-[#9ca3af] truncate" title={`Updated ${formatDateTime(dev.updated_at)}`}>Updated {formatDate(dev.updated_at)} · {relativeTime(dev.updated_at)}</p>
+                    <p className="text-xs text-[#374151] leading-tight" title={formatDateTime(dev.created_at)}>{formatLongDateAtTime(dev.created_at)}</p>
+                  </div>
+
+                  {/* Updated */}
+                  <div className="min-w-0">
+                    <p className="text-xs text-[#374151] leading-tight" title={formatDateTime(dev.updated_at)}>{formatLongDateAtTime(dev.updated_at)}</p>
+                    <p className="text-[11px] text-[#9ca3af] mt-0.5">{relativeTime(dev.updated_at)}</p>
                   </div>
 
                   {/* Actions */}
@@ -562,7 +564,7 @@ export function DevelopersClient({ currentRole }: Props) {
                               <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-60" />
                             </a>
                           )}
-                          <p className="text-xs font-mono text-[#9ca3af]">{dev.slug}</p>
+                          {dev.description && <p className="text-xs text-[#9ca3af] truncate">{dev.description}</p>}
                         </div>
                         {isAdmin && (
                           <RowActions
@@ -586,9 +588,10 @@ export function DevelopersClient({ currentRole }: Props) {
                           : <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${dev.is_active ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"}`}>{dev.is_active ? "Active" : "Inactive"}</span>
                         }
                       </div>
-                      <p className="text-[11px] text-[#9ca3af] mt-2" title={`Added ${formatDateTime(dev.created_at)} · Updated ${formatDateTime(dev.updated_at)}`}>
-                        Added {formatDate(dev.created_at)} · Updated {formatDate(dev.updated_at)} · {relativeTime(dev.updated_at)}
-                      </p>
+                      <div className="text-[11px] text-[#9ca3af] mt-2 space-y-0.5">
+                        <p>Added {formatLongDateAtTime(dev.created_at)}</p>
+                        <p>Updated {formatLongDateAtTime(dev.updated_at)} · {relativeTime(dev.updated_at)}</p>
+                      </div>
                     </div>
                   </div>
                 </div>

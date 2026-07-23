@@ -30,6 +30,16 @@ export function formatDateTime(iso: string | null | undefined): string {
   })
 }
 
+/** e.g. "July 22, 2026 at 5:30 AM" (viewer's local zone, full month name) */
+export function formatLongDateAtTime(iso: string | null | undefined): string {
+  if (!iso) return "—"
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return "—"
+  const date = d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+  return `${date} at ${time}`
+}
+
 /** e.g. "just now", "5m ago", "3h ago", "2d ago", "4mo ago", "1y ago" */
 export function relativeTime(iso: string | null | undefined): string {
   if (!iso) return "—"

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import Cropper from "react-easy-crop"
 import type { Area, Point } from "react-easy-crop"
-import { Upload, X, Check, ImageIcon, Trash2, ZoomIn, ZoomOut, ArrowLeft } from "lucide-react"
+import { Upload, X, Check, ImageIcon, Trash2, ZoomIn, ZoomOut, ArrowLeft, Crop } from "lucide-react"
 import Image from "next/image"
 import { updateDeveloperLogoUrl } from "@/lib/developer-service"
 import { getCroppedBlob } from "@/lib/crop-image"
@@ -101,6 +101,18 @@ export function DeveloperLogoUpload({
   }, [loadFile])
 
   const onCropComplete = useCallback((_: Area, px: Area) => setCroppedAreaPixels(px), [])
+
+  // Crop the EXISTING logo without re-uploading. Loaded through our same-origin
+  // /api/image-proxy so drawing the remote (S3) image to a canvas doesn't taint
+  // it — a tainted canvas makes the cropped-blob export throw a SecurityError.
+  const loadCurrentForCrop = useCallback(() => {
+    if (!currentLogoUrl) return
+    setImageSrc(`/api/image-proxy?url=${encodeURIComponent(currentLogoUrl)}`)
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
+    setAspectKey("original")
+    setCroppedAreaPixels(null)
+  }, [currentLogoUrl])
 
   const handleUpload = async () => {
     if (!imageSrc || !croppedAreaPixels) return
@@ -235,23 +247,45 @@ export function DeveloperLogoUpload({
             ) : (
               /* ── Select mode ── */
               <>
-                <div
-                  onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={handleDrop}
-                  onClick={() => inputRef.current?.click()}
-                  className={`relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 cursor-pointer transition-all ${
-                    dragOver ? "border-[#001f3f] bg-[#001f3f]/5" : "border-[#e5e5e5] hover:border-[#001f3f]/40 hover:bg-[#f8fafc]"
-                  }`}
-                >
-                  {currentLogoUrl ? (
-                    <div className="relative w-32 h-32 rounded-2xl overflow-hidden border border-[#e5e5e5]">
+                {currentLogoUrl ? (
+                  /* Existing logo: replace with a new file, or crop the current one */
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    className={`flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed p-8 transition-all ${
+                      dragOver ? "border-[#001f3f] bg-[#001f3f]/5" : "border-[#e5e5e5]"
+                    }`}
+                  >
+                    <div className="relative w-32 h-32 rounded-2xl overflow-hidden border border-[#e5e5e5] bg-white">
                       <Image src={currentLogoUrl} alt="Current logo" fill className="object-contain p-2" />
-                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-2xl">
-                        <span className="text-white text-xs font-semibold">Replace</span>
-                      </div>
                     </div>
-                  ) : (
+                    <div className="flex items-center gap-2.5">
+                      <button type="button" onClick={() => inputRef.current?.click()} disabled={busy}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] transition-all disabled:opacity-50">
+                        <Upload className="w-3.5 h-3.5" /> Replace
+                      </button>
+                      {/* SVG logos have no intrinsic pixel size, so they can't be reliably cropped — offer Replace only. */}
+                      {!/\.svg(\?|#|$)/i.test(currentLogoUrl) && (
+                        <button type="button" onClick={loadCurrentForCrop} disabled={busy}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold bg-[#001f3f] text-white hover:bg-[#002952] transition-all disabled:opacity-50">
+                          <Crop className="w-3.5 h-3.5" /> Crop current
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-[#9ca3af] text-center">Upload a new image to replace it, or crop the current logo. Drag &amp; drop works too.</p>
+                  </div>
+                ) : (
+                  /* No logo yet: drag-and-drop / click to upload */
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    onClick={() => inputRef.current?.click()}
+                    className={`relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 cursor-pointer transition-all ${
+                      dragOver ? "border-[#001f3f] bg-[#001f3f]/5" : "border-[#e5e5e5] hover:border-[#001f3f]/40 hover:bg-[#f8fafc]"
+                    }`}
+                  >
                     <div className="flex flex-col items-center gap-3 text-[#9ca3af]">
                       <div className="w-14 h-14 rounded-2xl bg-[#f3f4f6] flex items-center justify-center">
                         <Upload className="w-7 h-7" />
@@ -261,10 +295,11 @@ export function DeveloperLogoUpload({
                         <p className="text-xs mt-1">PNG, JPG, WEBP, SVG • Max 10 MB • crop before saving</p>
                       </div>
                     </div>
-                  )}
-                  <input ref={inputRef} type="file" accept="image/*" className="hidden"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) loadFile(f); e.target.value = "" }} />
-                </div>
+                  </div>
+                )}
+
+                <input ref={inputRef} type="file" accept="image/*" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) loadFile(f); e.target.value = "" }} />
 
                 <p className="text-[11px] text-[#9ca3af] font-mono px-1">
                   Path: FHI_GLOBAL / {developerSlug} / [timestamp]-logo.png
