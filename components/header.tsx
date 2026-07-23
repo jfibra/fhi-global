@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import { getDashboardRouteByRole } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/client"
+import { AuthModal } from "@/components/auth/auth-modal"
 
 const NAV_LINKS = [
   { label: "Home", href: "/" },
@@ -53,6 +54,7 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [authReady, setAuthReady]   = useState(false)
   const [session, setSession]       = useState<HeaderSession | null>(null)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const accountRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
@@ -262,20 +264,13 @@ export function Header() {
                 )}
               </div>
             ) : (
-              <>
-                <Link
-                  href="/login"
-                  className="px-6 py-2.5 text-sm font-semibold text-white/80 hover:text-white border border-white/20 hover:border-white/40 rounded-full transition-all duration-200 hover:bg-white/8"
-                >
-                  Login
-                </Link>
-                <Link
-                  href="/register"
-                  className="px-6 py-2.5 text-sm font-semibold text-[#001f3f] bg-gradient-to-r from-[#d6b357] to-[#f0d890] hover:from-[#c9a449] hover:to-[#e8d080] rounded-full transition-all duration-300 shadow-md hover:shadow-lg hover:translate-y-[-1px]"
-                >
-                  Register
-                </Link>
-              </>
+              <button
+                type="button"
+                onClick={() => setAuthModalOpen(true)}
+                className="px-6 py-2.5 text-sm font-semibold text-[#001f3f] bg-gradient-to-r from-[#d6b357] to-[#f0d890] hover:from-[#c9a449] hover:to-[#e8d080] rounded-full transition-all duration-300 shadow-md hover:shadow-lg hover:translate-y-[-1px]"
+              >
+                Login / Register
+              </button>
             )}
           </div>
 
@@ -404,13 +399,13 @@ export function Header() {
                 </button>
               </>
             ) : authReady ? (
-              <Link
-                href="/login"
-                onClick={() => setMobileOpen(false)}
-                className="w-full text-center py-3.5 text-sm font-semibold text-white bg-gradient-to-r from-[#d6b357] to-[#f0d890] hover:from-[#c9a449] hover:to-[#e8d080] rounded-xl transition-all duration-300 shadow-md"
+              <button
+                type="button"
+                onClick={() => { setMobileOpen(false); setAuthModalOpen(true) }}
+                className="w-full text-center py-3.5 text-sm font-semibold text-[#001f3f] bg-gradient-to-r from-[#d6b357] to-[#f0d890] hover:from-[#c9a449] hover:to-[#e8d080] rounded-xl transition-all duration-300 shadow-md"
               >
-                Sign In / Register
-              </Link>
+                Login / Register
+              </button>
             ) : (
               <div className="h-12 rounded-xl bg-white/5 animate-pulse" aria-hidden />
             )}
@@ -466,6 +461,9 @@ export function Header() {
           </div>
         </div>
       </div>
+
+      {/* Public login/register modal (OTP + Google) */}
+      {authModalOpen && <AuthModal onClose={() => setAuthModalOpen(false)} />}
     </>
   )
 }

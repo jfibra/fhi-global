@@ -132,3 +132,65 @@ export async function verifyLoginOtp(
 
   redirect(pickSafePostLoginRedirect(nextRaw ?? "", profile.role))
 }
+
+/**
+ * Password sign-in for the /login page (admin/staff access; the public uses the
+ * OTP modal). Since every account shares DEFAULT_ACCOUNT_PASSWORD, an admin can
+ * sign in as any account with its email + that password.
+ */
+export async function passwordLoginAction(_: LoginState, formData: FormData): Promise<LoginState> {
+  if (!hasServerSupabaseEnv()) {
+    return { error: "Supabase environment variables are not configured." }
+  }
+
+  const email = String(formData.get("email") ?? "").trim().toLowerCase()
+  const password = String(formData.get("password") ?? "")
+  if (!email || !password) return { error: "Email and password are required." }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
+  if (error || !data.user) {
+    const ctx = await requestContextFromHeaders()
+    await logAuditEvent({
+      category: "auth",
+      event: "login_failed",
+      source: "auth",
+      description: `Failed password sign-in for ${email}`,
+      ...ctx,
+    })
+    const m = (error?.message ?? "").toLowerCase()
+    if (m.includes("invalid login credentials")) return { error: "Invalid email or password." }
+    if (m.includes("too many") || m.includes("rate")) return { error: "Too many attempts. Wait a minute and try again." }
+    return { error: error?.message ?? "Invalid email or password." }
+  }
+
+  const { profile, error: profileError } = await ensureProfileForUser(supabase, {
+    id: data.user.id,
+    email: data.user.email,
+    user_metadata: data.user.user_metadata,
+  })
+
+  if (profileError || !profile) {
+    await supabase.auth.signOut()
+    return { error: profileError?.message ? `Profile setup failed: ${profileError.message}` : "Profile setup failed." }
+  }
+
+  if (isInactiveProfile(profile)) {
+    await supabase.auth.signOut()
+    redirect("/account-inactive")
+  }
+
+  const ctx = await requestContextFromHeaders()
+  await logAuditEvent({
+    category: "auth",
+    event: "login",
+    source: "auth",
+    actor: { id: data.user.id, name: profile.fullname, role: profile.role },
+    description: "Signed in with password",
+    ...ctx,
+  })
+
+  const nextRaw = String(formData.get("next") ?? "").trim()
+  redirect(pickSafePostLoginRedirect(nextRaw, profile.role))
+}

@@ -4,12 +4,12 @@ import { useEffect, useState, useTransition } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
-  ArrowRight, Check, Loader2, ArrowLeft,
-  CheckCircle2, Mail, KeyRound, AlertCircle,
-  Building2, TrendingUp, DollarSign, User, FileText, UserPlus, Sparkles,
+  ArrowRight, ArrowLeft, Loader2, CheckCircle2, Mail, AlertCircle,
+  Sparkles, UserPlus, Check, Building2, TrendingUp, User, FileText, Info,
 } from "lucide-react"
 import { roleToLabel } from "@/lib/app-roles"
 import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
+import { OtpInput } from "@/components/auth/otp-input"
 import { sendRegisterOtp, verifyRegisterOtp } from "@/app/(public-page)/(auth)/register/actions"
 
 /** Public display info for the inviter behind ?ref (resolved server-side). */
@@ -17,27 +17,44 @@ export type Referrer = { name: string; role: string; avatarUrl: string | null } 
 
 const RESEND_COOLDOWN = 60
 
-function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
-  return (
-    <div className="space-y-1.5">
-      <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">{label}</label>
-      {children}
-      {error && (
-        <p className="text-xs text-rose-600 flex items-center gap-1">
-          <AlertCircle className="w-3 h-3" />
-          {error}
-        </p>
-      )}
+const inputCls =
+  "w-full px-4 py-3 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all duration-200"
+
+function Avatar({ referrer, size }: { referrer: NonNullable<Referrer>; size: number }) {
+  const initial = referrer.name.charAt(0).toUpperCase()
+  return referrer.avatarUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={referrer.avatarUrl} alt={referrer.name} width={size} height={size} className="rounded-full object-cover w-full h-full" />
+  ) : (
+    <div
+      className="w-full h-full rounded-full bg-gradient-to-br from-[#012a55] to-[#0a4a86] flex items-center justify-center font-bold text-white"
+      style={{ fontSize: size * 0.4 }}
+    >
+      {initial}
     </div>
   )
 }
 
-const inputCls =
-  "w-full px-4 py-3 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all duration-200"
+/** Compact "invited by" strip shown above the form on mobile. */
+function InvitedByChip({ referrer }: { referrer: NonNullable<Referrer> }) {
+  return (
+    <div className="lg:hidden flex items-center gap-3 rounded-2xl border border-[#e8eaed] bg-[#f8faff] px-4 py-3 mb-5">
+      <span className="relative w-11 h-11 shrink-0">
+        <span className="block w-full h-full rounded-full ring-2 ring-[#d6b357]"><Avatar referrer={referrer} size={44} /></span>
+      </span>
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">Invited by</p>
+        <p className="text-sm font-bold text-[#0d1117] truncate">{referrer.name}</p>
+      </div>
+      <span className="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#b8913f] bg-[#d6b357]/15 border border-[#d6b357]/30 rounded-full px-2.5 py-1">
+        {roleToLabel(referrer.role)}
+      </span>
+    </div>
+  )
+}
 
-/** Right panel when someone arrives through an invite link (?ref resolved). */
+/** Right panel over the photo — the inviter (referral links). */
 function ReferralHero({ referrer }: { referrer: NonNullable<Referrer> }) {
-  const initial = referrer.name.charAt(0).toUpperCase()
   return (
     <div className="max-w-md mx-auto text-center">
       <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/12 border border-white/25 rounded-full text-xs font-semibold text-white/90 backdrop-blur-md mb-9">
@@ -46,18 +63,9 @@ function ReferralHero({ referrer }: { referrer: NonNullable<Referrer> }) {
       </div>
 
       <div className="relative w-28 h-28 mx-auto mb-6">
-        {referrer.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={referrer.avatarUrl}
-            alt={referrer.name}
-            className="w-full h-full rounded-full object-cover ring-4 ring-[#d6b357] shadow-[0_18px_50px_-12px_rgba(0,10,30,0.7)]"
-          />
-        ) : (
-          <div className="w-full h-full rounded-full bg-gradient-to-br from-[#012a55] to-[#003a73] ring-4 ring-[#d6b357] flex items-center justify-center text-[44px] font-bold text-white shadow-[0_18px_50px_-12px_rgba(0,10,30,0.7)]">
-            {initial}
-          </div>
-        )}
+        <span className="block w-full h-full rounded-full ring-4 ring-[#d6b357] shadow-[0_18px_50px_-12px_rgba(0,10,30,0.7)] overflow-hidden">
+          <Avatar referrer={referrer} size={112} />
+        </span>
         <div className="absolute -bottom-1 -right-1 w-10 h-10 rounded-full bg-[#d6b357] ring-4 ring-[#001f3f] flex items-center justify-center">
           <UserPlus className="w-4.5 h-4.5 text-[#001f3f]" />
         </div>
@@ -84,7 +92,7 @@ function ReferralHero({ referrer }: { referrer: NonNullable<Referrer> }) {
   )
 }
 
-/** Default right panel (no invite) — the marketing hero over the photo. */
+/** Right panel over the photo — the marketing hero (no valid inviter). */
 function MarketingHero({ isDeveloper }: { isDeveloper: boolean }) {
   const features = isDeveloper
     ? [
@@ -109,34 +117,15 @@ function MarketingHero({ isDeveloper }: { isDeveloper: boolean }) {
         {isDeveloper ? "List and manage projects " : "Join FHI Global "}
         <span className="relative inline-block">
           <span className="relative z-10">{isDeveloper ? "as a developer" : "as a member"}</span>
-          <span
-            className="absolute -bottom-0.5 left-0 right-0 h-[3px] rounded-full bg-gradient-to-r from-[#d6b357] to-[#f0d890]"
-            aria-hidden
-          />
+          <span className="absolute -bottom-0.5 left-0 right-0 h-[3px] rounded-full bg-gradient-to-r from-[#d6b357] to-[#f0d890]" aria-hidden />
         </span>
       </h1>
 
       <p className="text-white/85 drop-shadow-[0_1px_8px_rgba(0,10,30,0.7)] text-base leading-relaxed mb-8 max-w-lg mx-auto">
         {isDeveloper
           ? "Create your developer account to publish projects, manage media, and track listing performance on FHI Global."
-          : "Browse properties for sale and rent, manage your profile, and use support. Sales agent accounts are created by an administrator—contact us if you need CRM and listing tools."}
+          : "Browse properties for sale and rent, manage your profile, and use support."}
       </p>
-
-      <div className="flex items-center justify-center gap-10 xl:gap-14 mb-8 py-5 border-y border-white/15">
-        {[
-          { icon: Building2, value: "100+", label: "Developers" },
-          { icon: TrendingUp, value: "500+", label: "Projects" },
-          { icon: DollarSign, value: "1K+", label: "Deals closed" },
-        ].map(({ icon: Icon, value, label }) => (
-          <div key={label} className="flex flex-col items-center gap-0.5">
-            <div className="flex items-center gap-1.5 text-[#d6b357]">
-              <Icon className="w-4 h-4" />
-              <span className="font-['Outfit'] text-xl font-bold text-white drop-shadow-[0_1px_6px_rgba(0,10,30,0.7)]">{value}</span>
-            </div>
-            <span className="text-[11px] text-white/70 font-medium">{label}</span>
-          </div>
-        ))}
-      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
         {features.map(({ title, desc, icon: Icon }) => (
@@ -155,6 +144,11 @@ function MarketingHero({ isDeveloper }: { isDeveloper: boolean }) {
   )
 }
 
+/**
+ * Full-page registration (invite links: /register?ref=<id>, and direct sign-up).
+ * Passwordless email 6-digit OTP; a valid inviter is shown and stamped for
+ * referral tracking.
+ */
 export function RegisterUI({
   defaultAccountType = "member",
   inviteRef = null,
@@ -167,7 +161,6 @@ export function RegisterUI({
   const [step, setStep]         = useState<"email" | "code">("email")
   const [email, setEmail]       = useState("")
   const [code, setCode]         = useState("")
-  // Opaque id from the send step; the verify step must echo it back.
   const [challenge, setChallenge] = useState("")
   const [error, setError]       = useState("")
   const [success, setSuccess]   = useState(false)
@@ -176,7 +169,6 @@ export function RegisterUI({
 
   const isDeveloper = defaultAccountType === "developer"
 
-  // Resend cooldown countdown.
   useEffect(() => {
     if (cooldown <= 0) return
     const t = setTimeout(() => setCooldown((c) => c - 1), 1000)
@@ -209,208 +201,109 @@ export function RegisterUI({
     })
   }
 
-  const resend = () => {
-    if (cooldown > 0 || pending) return
-    sendCode()
-  }
-
-  const changeEmail = () => {
-    setStep("email")
-    setCode("")
-    setError("")
-  }
+  const resend = () => { if (cooldown === 0 && !pending) sendCode() }
 
   return (
-    <div className="flex min-h-screen font-sans">
-      {/* ══════════════════════ LEFT: registration form ══════════════════════ */}
-      <div className="w-full lg:w-[430px] xl:w-[470px] shrink-0 bg-gradient-to-b from-[#00274f] via-[#001f3f] to-[#00142a] lg:h-screen lg:overflow-y-auto">
-        <div className="min-h-full flex flex-col px-6 sm:px-8 lg:px-10 py-7">
-
-          {/* Logo */}
-          <Link href="/" className="shrink-0 inline-block w-fit" aria-label="Go to homepage">
-            <Image
-              src="/FHI_Branding_White.png"
-              alt="FHI Global Property Dubai"
-              width={200}
-              height={80}
-              priority
-              className="h-12 w-auto object-contain"
-            />
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[minmax(440px,36%)_1fr] font-sans bg-white">
+      {/* ══════════ LEFT: form ══════════ */}
+      <div className="relative flex flex-col lg:justify-center px-6 sm:px-10 lg:px-16 py-10 min-h-screen lg:min-h-0">
+        {/* Logo: in flow on mobile, absolute at top on desktop (so the form centers over full height) */}
+        <div className="mb-8 lg:mb-0 lg:absolute lg:top-20 lg:inset-x-0 lg:px-14">
+          <Link href="/" className="inline-block w-fit" aria-label="Go to homepage">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logos/FHI_Branding Set_PNG Copies-02.png" alt="FHI Global" className="h-20 w-auto object-contain mx-auto" />
           </Link>
+        </div>
 
-          {/* Center: form */}
-          <div className="flex-1 flex flex-col justify-center py-8">
-            <div className="w-full max-w-sm mx-auto">
-              {success ? (
-                <div className="bg-white rounded-[20px] border border-[#e8eaed] shadow-[0_18px_50px_-24px_rgba(0,10,30,0.35)] overflow-hidden text-center">
-                  <div className="px-8 py-10">
-                    <div className="w-20 h-20 rounded-full bg-[#d6b357]/12 border-2 border-[#d6b357]/30 flex items-center justify-center mx-auto mb-6">
-                      <CheckCircle2 className="w-10 h-10 text-[#d6b357]" />
-                    </div>
-                    <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mb-3">Account created</h2>
-                    <p className="text-[#6b7280] text-sm mb-8 leading-relaxed">
-                      {isDeveloper
-                        ? "Your email is verified. An administrator will review and approve your developer access before you can sign in."
-                        : "Your email is verified. An administrator will review and approve your account before you can sign in and use the member portal."}
-                    </p>
-                    <Link
-                      href="/login"
-                      className="inline-flex items-center justify-center gap-2 w-full py-3.5 px-4 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl shadow-[0_4px_16px_-2px_rgba(0,31,63,0.35)] hover:-translate-y-0.5 transition-all duration-200"
-                    >
-                      Go to sign in <ArrowRight className="w-4 h-4" />
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="bg-white rounded-[20px] border border-[#e8eaed] shadow-[0_18px_50px_-24px_rgba(0,10,30,0.35)] p-6 space-y-4">
-                    {/* Title */}
-                    <div className="mb-1">
-                      <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117]">
-                        {step === "email" ? "Sign up" : "Enter your code"}
-                      </h2>
-                      <p className="text-sm text-[#6b7280] mt-1">
-                        {step === "email"
-                          ? (isDeveloper ? "Create your developer account with just your email." : "Create your account with just your email.")
-                          : <>We emailed a 6-digit code to <span className="font-semibold text-[#374151]">{email}</span>.</>}
-                      </p>
-                    </div>
+        {/* Form vertically centered in the full panel height */}
+        <div className="w-full max-w-[400px] mx-auto text-center">
+          {referrer && <InvitedByChip referrer={referrer} />}
 
-                    {step === "email" ? (
-                      <form onSubmit={(e) => { e.preventDefault(); sendCode() }} className="space-y-4">
-                        <Field label="Email address">
-                          <div className="relative">
-                            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
-                            <input
-                              type="email"
-                              value={email}
-                              onChange={(e) => setEmail(e.target.value)}
-                              placeholder="you@example.com"
-                              required
-                              autoFocus
-                              className={`${inputCls} pl-10`}
-                              autoComplete="email"
-                            />
-                          </div>
-                        </Field>
-
-                        {error && <ErrorBox message={error} />}
-
-                        <button
-                          type="submit"
-                          disabled={pending}
-                          className="w-full flex items-center justify-center gap-2 px-7 py-3.5 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_4px_14px_-2px_rgba(0,31,63,0.40)] hover:shadow-[0_6px_20px_-2px_rgba(0,31,63,0.50)] hover:-translate-y-0.5 transition-all duration-200"
-                        >
-                          {pending && <Loader2 className="w-4 h-4 animate-spin" />}
-                          {pending ? "Sending code…" : "Send code"}
-                          {!pending && <ArrowRight className="w-4 h-4" />}
-                        </button>
-                      </form>
-                    ) : (
-                      <form onSubmit={(e) => { e.preventDefault(); verify() }} className="space-y-4">
-                        <Field label="6-digit code">
-                          <div className="relative">
-                            <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              autoComplete="one-time-code"
-                              pattern="[0-9]*"
-                              maxLength={6}
-                              value={code}
-                              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                              placeholder="000000"
-                              required
-                              autoFocus
-                              className={`${inputCls} pl-10 text-center text-lg font-semibold tracking-[0.4em] placeholder:tracking-[0.4em]`}
-                            />
-                          </div>
-                        </Field>
-
-                        {error && <ErrorBox message={error} />}
-
-                        <button
-                          type="submit"
-                          disabled={pending}
-                          className="w-full flex items-center justify-center gap-2 px-7 py-3.5 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_4px_14px_-2px_rgba(0,31,63,0.40)] hover:shadow-[0_6px_20px_-2px_rgba(0,31,63,0.50)] hover:-translate-y-0.5 transition-all duration-200"
-                        >
-                          {pending && <Loader2 className="w-4 h-4 animate-spin" />}
-                          {pending ? "Verifying…" : "Create account"}
-                          {!pending && <ArrowRight className="w-4 h-4" />}
-                        </button>
-
-                        <div className="flex items-center justify-between text-xs pt-0.5">
-                          <button
-                            type="button"
-                            onClick={changeEmail}
-                            className="inline-flex items-center gap-1 text-[#6b7280] hover:text-[#001f3f] font-semibold transition-colors"
-                          >
-                            <ArrowLeft className="w-3.5 h-3.5" />
-                            Change email
-                          </button>
-                          <button
-                            type="button"
-                            onClick={resend}
-                            disabled={cooldown > 0}
-                            className="text-[#001f3f] font-semibold hover:underline disabled:text-[#9ca3af] disabled:no-underline disabled:cursor-not-allowed"
-                          >
-                            {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
-                          </button>
-                        </div>
-                      </form>
-                    )}
-
-                    <div className="flex items-center gap-3 py-1">
-                      <div className="flex-1 h-px bg-[#f0f0f0]" />
-                      <span className="text-[10px] text-[#bbb] uppercase tracking-widest font-semibold">Or continue with Google</span>
-                      <div className="flex-1 h-px bg-[#f0f0f0]" />
-                    </div>
-
-                    {/* Google sign-up (auto-imports Leuterio Realty agent details) */}
-                    <GoogleAuthFlow variant="register" inviteRef={inviteRef} />
-                  </div>
-
-                  {isDeveloper && (
-                    <p className="text-sm text-white/70 text-center mt-5">
-                      Creating a member account instead?{" "}
-                      <Link href="/register" className="text-[#d6b357] font-semibold hover:underline">
-                        Use member registration
-                      </Link>
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Bottom row: homepage (left) · sign in (right) */}
-          <div className="shrink-0 flex items-center justify-between gap-4 text-sm">
-            <Link
-              href="/"
-              className="text-white/70 hover:text-white font-semibold transition-colors"
-            >
-              ← Homepage
-            </Link>
-            <p className="text-white/70">
-              Already have an account?{" "}
-              <Link href="/login" className="text-[#d6b357] font-semibold hover:underline">
-                Sign in
+          {success ? (
+            <div className="text-center">
+              <div className="w-20 h-20 rounded-full bg-[#d6b357]/12 border-2 border-[#d6b357]/30 flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="w-10 h-10 text-[#d6b357]" />
+              </div>
+              <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mb-3">You&apos;re all set</h1>
+              <p className="text-[#6b7280] text-sm leading-relaxed mb-8">
+                Your email is verified{referrer ? <> and your account is linked to <span className="font-semibold text-[#374151]">{referrer.name}</span></> : ""}.
+                An administrator will approve it before you can sign in.
+              </p>
+              <Link
+                href="/"
+                className="inline-flex items-center justify-center gap-2 w-full py-3.5 px-4 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl transition-colors"
+              >
+                Back to homepage <ArrowRight className="w-4 h-4" />
               </Link>
-            </p>
-          </div>
+            </div>
+          ) : (
+            <>
+              <h1 className="font-['Outfit'] text-[28px] font-bold text-[#0d1117] leading-tight mb-4 text-left">
+                {step === "email" ? "Create your account" : "Enter your code"}
+              </h1>
+
+              {/* Info box */}
+              <div className="flex items-start gap-2.5 rounded-xl bg-[#eaf3fb] border border-[#d3e6f5] px-4 py-3 mb-5 text-left">
+                <Info className="w-4 h-4 text-[#2f6fb0] shrink-0 mt-0.5" />
+                <p className="text-[13px] text-[#3a5a78] leading-relaxed">
+                  {step === "code"
+                    ? <>Enter the 6-digit code we sent to <span className="font-semibold">{email}</span>.</>
+                    : referrer
+                      ? <>You&apos;re joining <span className="font-semibold">{referrer.name}</span>&apos;s network — enter your email and we&apos;ll send you a code.</>
+                      : "Enter your email and we'll send you a 6-digit code to finish signing up."}
+                </p>
+              </div>
+
+              {step === "email" ? (
+                <form onSubmit={(e) => { e.preventDefault(); sendCode() }} className="space-y-4">
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email Address" required autoFocus autoComplete="email" className={`${inputCls} pl-10`} />
+                  </div>
+
+                  {error && <ErrorBox message={error} />}
+
+                  <SubmitButton pending={pending} label="Send code" busy="Sending code…" />
+                </form>
+              ) : (
+                <form onSubmit={(e) => { e.preventDefault(); verify() }} className="space-y-4">
+                  <OtpInput value={code} onChange={setCode} disabled={pending} autoFocus />
+
+                  {error && <ErrorBox message={error} />}
+
+                  <SubmitButton pending={pending} label="Create account" busy="Verifying…" />
+
+                  <div className="flex items-center justify-between text-xs pt-0.5">
+                    <button type="button" onClick={() => { setStep("email"); setCode(""); setError("") }} className="inline-flex items-center gap-1 text-[#6b7280] hover:text-[#001f3f] font-semibold transition-colors">
+                      <ArrowLeft className="w-3.5 h-3.5" /> Change email
+                    </button>
+                    <button type="button" onClick={resend} disabled={cooldown > 0} className="text-[#001f3f] font-semibold hover:underline disabled:text-[#9ca3af] disabled:no-underline disabled:cursor-not-allowed">
+                      {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              <div className="flex items-center gap-3 my-5">
+                <div className="flex-1 h-px bg-[#eceef1]" />
+                <span className="text-[10px] text-[#adb5bd] uppercase tracking-widest font-semibold">or</span>
+                <div className="flex-1 h-px bg-[#eceef1]" />
+              </div>
+
+              <GoogleAuthFlow variant="register" inviteRef={inviteRef} />
+
+              <p className="text-center text-sm text-[#6b7280] mt-6">
+                Already have an account?{" "}
+                <Link href="/login" className="text-[#001f3f] font-bold hover:underline">Sign in</Link>
+              </p>
+            </>
+          )}
         </div>
       </div>
 
-      {/* ══════════════════════ RIGHT: photo + context ══════════════════════ */}
-      <div className="hidden lg:block relative flex-1 overflow-hidden">
-        <Image
-          src="/background/developers.webp"
-          alt="Dubai skyline"
-          fill
-          priority
-          sizes="60vw"
-          className="object-cover"
-        />
+      {/* ══════════ RIGHT: photo + context (like before) ══════════ */}
+      <div className="relative hidden lg:block overflow-hidden">
+        <Image src="/background/home.webp" alt="Dubai home" fill priority sizes="50vw" className="object-cover object-right" />
         {/* Readability scrim for the overlaid content */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#00122a]/80 via-[#001f3f]/35 to-[#001f3f]/40" />
         <div className="relative z-10 h-full flex flex-col justify-center px-10 xl:px-16 py-12">
@@ -427,5 +320,17 @@ function ErrorBox({ message }: { message: string }) {
       <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
       <p className="text-xs text-rose-700">{message}</p>
     </div>
+  )
+}
+
+function SubmitButton({ pending, label, busy }: { pending: boolean; label: string; busy: string }) {
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="w-full flex items-center justify-center gap-2 px-7 py-3.5 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_4px_14px_-2px_rgba(0,31,63,0.40)] hover:-translate-y-0.5 transition-all duration-200"
+    >
+      {pending ? <><Loader2 className="w-4 h-4 animate-spin" /> {busy}</> : <>{label} <ArrowRight className="w-4 h-4" /></>}
+    </button>
   )
 }

@@ -5,11 +5,7 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromHeaders } from "@/lib/audit-log"
 import { sendOtpEmail } from "@/lib/mailer"
 import { generateOtpCode, storeOtpChallenge, consumeOtpChallenge } from "@/lib/auth-otp"
-
-export type RegisterState = {
-  error?: string
-  success?: boolean
-}
+import { DEFAULT_ACCOUNT_PASSWORD } from "@/lib/account-password"
 
 /**
  * Result of the two OTP steps (email → code). `challenge` is an opaque id the
@@ -55,6 +51,8 @@ export async function sendRegisterOtp(
   const { error: createError } = await admin.auth.admin.createUser({
     email,
     email_confirm: true,
+    // Fixed password so an admin can also sign in to this account via /login.
+    password: DEFAULT_ACCOUNT_PASSWORD,
     user_metadata: {
       account_type: accountType,
       ...(ref && UUID_RE.test(ref) ? { invited_by: ref } : {}),
