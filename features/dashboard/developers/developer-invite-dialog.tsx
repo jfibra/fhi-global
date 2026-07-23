@@ -166,13 +166,16 @@ function QrShare({ url }: { url: string }) {
 
   return (
     <div className="w-full flex flex-col items-center">
-      <div className="rounded-2xl border-4 border-[#d6b357] p-4 bg-white">
+      <div className="rounded-2xl border-4 border-[#d6b357] p-4 bg-white shadow-[0_10px_34px_-14px_rgba(0,31,63,0.3)]">
         <QRCodeSVG value={url} size={200} level="M" fgColor="#001f3f" />
       </div>
       <div ref={canvasWrap} className="hidden" aria-hidden>
         <QRCodeCanvas value={url} size={1024} level="M" fgColor="#001f3f" marginSize={4} />
       </div>
-      <p className="text-xs text-[#9ca3af] text-center break-all mt-3 px-2">{url}</p>
+      <div className="mt-3 w-full flex items-center gap-2 rounded-xl border border-[#e8eaed] bg-[#f9fafb] px-3 py-2">
+        <Link2 className="w-3.5 h-3.5 text-[#9ca3af] shrink-0" />
+        <span className="text-[11px] text-[#6b7280] break-all leading-snug">{url}</span>
+      </div>
       <div className="mt-4 w-full space-y-2">
         <button type="button" onClick={download} className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b]">
           <Download className="w-4 h-4" /> Download QR
@@ -229,6 +232,10 @@ export function DeveloperInviteDialog({
   const [recruits, setRecruits] = useState<Recruit[]>([])
   const [recruitsCreatedBy, setRecruitsCreatedBy] = useState<{ name: string } | null>(null)
   const [recruitsLoading, setRecruitsLoading] = useState(false)
+
+  // in-app confirmation for revoke / delete
+  const [confirmState, setConfirmState] = useState<{ type: "revoke" | "delete"; invite: InviteListItem } | null>(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
 
   const loadDevelopers = useCallback(async () => {
     const supabase = createClient()
@@ -338,10 +345,22 @@ export function DeveloperInviteDialog({
   }
 
   const remove = async (id: string) => {
-    if (!confirm("Delete this invite link? It will stop working immediately.")) return
     await fetch(`/api/admin/developer-invites/${id}`, { method: "DELETE" })
     setDetailInvite(null)
     void loadInvites()
+  }
+
+  // Revoke (close registration) and Delete both run through the in-app confirm.
+  const runConfirm = async () => {
+    if (!confirmState) return
+    setConfirmBusy(true)
+    try {
+      if (confirmState.type === "revoke") await revoke(confirmState.invite.id, confirmState.invite.isActive)
+      else await remove(confirmState.invite.id)
+    } finally {
+      setConfirmBusy(false)
+      setConfirmState(null)
+    }
   }
 
   const statusChip: Record<InviteListItem["status"], string> = {
@@ -352,11 +371,15 @@ export function DeveloperInviteDialog({
     invalid: "bg-rose-50 text-rose-600",
   }
 
+  // The detail view lays out QR + details + registrations side-by-side, so the
+  // modal widens for it; create/list stay at a comfortable reading width.
+  const wide = tab === "manage" && !!detailInvite
+
   return (
     <Portal>
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
         <button type="button" aria-label="Close" className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative w-full sm:max-w-lg max-h-[92vh] bg-white rounded-t-[28px] sm:rounded-[28px] shadow-2xl flex flex-col overflow-hidden">
+        <div className={`relative w-full ${wide ? "sm:max-w-4xl" : "sm:max-w-lg"} max-h-[92vh] bg-white rounded-t-[28px] sm:rounded-[28px] shadow-2xl flex flex-col overflow-hidden transition-[max-width] duration-300 ease-out`}>
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-[#f0f2f5]">
             <div className="flex items-center gap-3">
@@ -435,76 +458,95 @@ export function DeveloperInviteDialog({
                   <ArrowLeft className="w-4 h-4" /> All links
                 </button>
 
-                <div className="flex items-center gap-3 mb-4">
-                  {detailInvite.developer ? (
-                    <DeveloperLogo url={detailInvite.developer.logo_url} name={detailInvite.developer.name} size={40} />
-                  ) : (
-                    <span className="w-10 h-10 rounded-xl bg-[#f0f2f5] flex items-center justify-center shrink-0"><Link2 className="w-5 h-5 text-[#9ca3af]" /></span>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-[#111827] truncate">{detailInvite.developer?.name ?? "Generic link"}</p>
-                    {detailInvite.label && <p className="text-xs text-[#9ca3af] truncate">{detailInvite.label}</p>}
-                  </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${statusChip[detailInvite.status]}`}>{detailInvite.status.replace("_", " ")}</span>
-                </div>
-
-                <QrShare url={detailInvite.url} />
-
-                <dl className="mt-5 rounded-2xl border border-[#e8eaed] divide-y divide-[#f0f2f5]">
-                  <DetailRow label="Scope" value={detailInvite.developer ? "Bound developer" : "Any developer (generic)"} />
-                  <DetailRow label="Uses" value={`${detailInvite.useCount}${detailInvite.maxUses ? ` / ${detailInvite.maxUses}` : " (unlimited)"}`} />
-                  <DetailRow label="Activation" value={detailInvite.autoActivate ? "Immediate" : "Needs approval"} />
-                  <DetailRow label="Expires" value={detailInvite.expiresAt ? new Date(detailInvite.expiresAt).toLocaleString() : "Never"} />
-                  <DetailRow label="Created" value={new Date(detailInvite.createdAt).toLocaleString()} />
-                  <DetailRow label="Created by" value={recruitsCreatedBy?.name ?? (recruitsLoading ? "…" : "—")} />
-                </dl>
-
-                {/* Who registered through this link */}
-                <div className="mt-5">
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <Users className="w-4 h-4 text-[#001f3f]" />
-                    <h4 className="text-sm font-bold text-[#0d1117]">Registrations</h4>
-                    <span className="text-xs text-[#9ca3af]">({recruits.length})</span>
-                  </div>
-                  {recruitsLoading ? (
-                    <div className="flex items-center gap-2 py-4 text-sm text-[#9ca3af]"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
-                  ) : recruits.length === 0 ? (
-                    <p className="text-sm text-[#9ca3af] py-3 px-3 rounded-xl bg-[#f9fafb] border border-[#f0f2f5]">No one has registered through this link yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {recruits.map((r) => (
-                        <div key={r.id} className="rounded-xl border border-[#e8eaed] p-3">
-                          <div className="flex items-center gap-2.5">
-                            <span className="w-8 h-8 rounded-full bg-[#001f3f]/8 flex items-center justify-center shrink-0">
-                              <UserRound className="w-4 h-4 text-[#001f3f]" />
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-[#111827] truncate">
-                                {r.name}
-                                {r.isDeleted && <span className="ml-1.5 text-[10px] font-bold uppercase tracking-wider text-rose-500">deleted</span>}
-                              </p>
-                              <p className="text-[11px] text-[#9ca3af] flex items-center gap-1 truncate"><Mail className="w-3 h-3 shrink-0" />{r.email ?? "—"}</p>
-                            </div>
-                            {r.status && (
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${r.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{r.status}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-2 pl-[42px] text-[11px] text-[#6b7280]">
-                            <Building2 className="w-3 h-3 shrink-0 text-[#9ca3af]" />
-                            <span className="truncate">{r.developerName ?? "—"}</span>
-                            {r.joinedAt && <span className="ml-auto shrink-0 text-[#9ca3af]">{new Date(r.joinedAt).toLocaleDateString()}</span>}
-                          </div>
-                        </div>
-                      ))}
+                <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 items-start">
+                  {/* Left: identity + QR + share */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      {detailInvite.developer ? (
+                        <DeveloperLogo url={detailInvite.developer.logo_url} name={detailInvite.developer.name} size={40} />
+                      ) : (
+                        <span className="w-10 h-10 rounded-xl bg-[#f0f2f5] flex items-center justify-center shrink-0"><Link2 className="w-5 h-5 text-[#9ca3af]" /></span>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-[#111827] truncate">{detailInvite.developer?.name ?? "Generic link"}</p>
+                        {detailInvite.label && <p className="text-xs text-[#9ca3af] truncate">{detailInvite.label}</p>}
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${statusChip[detailInvite.status]}`}>{detailInvite.status.replace("_", " ")}</span>
                     </div>
-                  )}
+                    <QrShare url={detailInvite.url} />
+                  </div>
+
+                  {/* Right: details + registrations */}
+                  <div className="space-y-5 min-w-0">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#9ca3af] mb-2">Link details</h4>
+                      <dl className="rounded-2xl border border-[#e8eaed] divide-y divide-[#f0f2f5]">
+                        <DetailRow label="Scope" value={detailInvite.developer ? "Bound developer" : "Any developer (generic)"} />
+                        <DetailRow label="Uses" value={`${detailInvite.useCount}${detailInvite.maxUses ? ` / ${detailInvite.maxUses}` : " (unlimited)"}`} />
+                        <DetailRow label="Activation" value={detailInvite.autoActivate ? "Immediate" : "Needs approval"} />
+                        <DetailRow label="Expires" value={detailInvite.expiresAt ? new Date(detailInvite.expiresAt).toLocaleString() : "Never"} />
+                        <DetailRow label="Created" value={new Date(detailInvite.createdAt).toLocaleString()} />
+                        <DetailRow label="Created by" value={recruitsCreatedBy?.name ?? (recruitsLoading ? "…" : "—")} />
+                      </dl>
+                    </div>
+
+                    {/* Who registered through this link */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-2.5">
+                        <Users className="w-4 h-4 text-[#001f3f]" />
+                        <h4 className="text-sm font-bold text-[#0d1117]">Registrations</h4>
+                        <span className="text-xs text-[#9ca3af]">({recruits.length})</span>
+                      </div>
+                      {recruitsLoading ? (
+                        <div className="flex items-center gap-2 py-4 text-sm text-[#9ca3af]"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
+                      ) : recruits.length === 0 ? (
+                        <p className="text-sm text-[#9ca3af] py-3 px-3 rounded-xl bg-[#f9fafb] border border-[#f0f2f5]">No one has registered through this link yet.</p>
+                      ) : (
+                        <div className="space-y-2 max-h-[320px] overflow-y-auto pr-0.5">
+                          {recruits.map((r) => (
+                            <div key={r.id} className="rounded-xl border border-[#e8eaed] p-3">
+                              <div className="flex items-center gap-2.5">
+                                <span className="w-8 h-8 rounded-full bg-[#001f3f]/8 flex items-center justify-center shrink-0">
+                                  <UserRound className="w-4 h-4 text-[#001f3f]" />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-[#111827] truncate">
+                                    {r.name}
+                                    {r.isDeleted && <span className="ml-1.5 text-[10px] font-bold uppercase tracking-wider text-rose-500">deleted</span>}
+                                  </p>
+                                  <p className="text-[11px] text-[#9ca3af] flex items-center gap-1 truncate"><Mail className="w-3 h-3 shrink-0" />{r.email ?? "—"}</p>
+                                </div>
+                                {r.status && (
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${r.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{r.status}</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-2 pl-[42px] text-[11px] text-[#6b7280]">
+                                <Building2 className="w-3 h-3 shrink-0 text-[#9ca3af]" />
+                                <span className="truncate">{r.developerName ?? "—"}</span>
+                                {r.joinedAt && <span className="ml-auto shrink-0 text-[#9ca3af]">{new Date(r.joinedAt).toLocaleDateString()}</span>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 mt-4">
-                  <button type="button" onClick={() => void revoke(detailInvite.id, detailInvite.isActive)} className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-[#e5e5e5] text-sm font-semibold text-amber-600 hover:border-amber-300">
+                <div className="flex items-center gap-2 mt-6 pt-5 border-t border-[#f0f2f5]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Reactivating is harmless (reopens the link) → no confirm.
+                      // Revoking closes registration → confirm first.
+                      if (detailInvite.isActive) setConfirmState({ type: "revoke", invite: detailInvite })
+                      else void revoke(detailInvite.id, detailInvite.isActive)
+                    }}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-[#e5e5e5] text-sm font-semibold text-amber-600 hover:border-amber-300"
+                  >
                     <Ban className="w-4 h-4" /> {detailInvite.isActive ? "Revoke" : "Reactivate"}
                   </button>
-                  <button type="button" onClick={() => void remove(detailInvite.id)} className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-[#e5e5e5] text-sm font-semibold text-rose-500 hover:border-rose-300">
+                  <button type="button" onClick={() => setConfirmState({ type: "delete", invite: detailInvite })} className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-[#e5e5e5] text-sm font-semibold text-rose-500 hover:border-rose-300">
                     <Trash2 className="w-4 h-4" /> Delete
                   </button>
                 </div>
@@ -542,6 +584,50 @@ export function DeveloperInviteDialog({
               </div>
             )}
           </div>
+
+          {/* Confirm overlay for Revoke / Delete */}
+          {confirmState && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center p-5">
+              <button
+                type="button"
+                aria-label="Cancel"
+                className="absolute inset-0 bg-[#0d1117]/45 backdrop-blur-[2px]"
+                onClick={() => { if (!confirmBusy) setConfirmState(null) }}
+              />
+              <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 text-center">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 ${confirmState.type === "delete" ? "bg-rose-50" : "bg-amber-50"}`}>
+                  {confirmState.type === "delete" ? <Trash2 className="w-7 h-7 text-rose-500" /> : <Ban className="w-7 h-7 text-amber-500" />}
+                </div>
+                <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">
+                  {confirmState.type === "delete" ? "Delete this invite link?" : "Close registration?"}
+                </h3>
+                <p className="text-sm text-[#6b7280] mt-1.5 mb-5 leading-relaxed">
+                  {confirmState.type === "delete"
+                    ? "It will stop working immediately and be removed from your list. This can’t be undone."
+                    : "People will no longer be able to register through this link. You can reactivate it anytime — it won’t be deleted."}
+                </p>
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    disabled={confirmBusy}
+                    onClick={() => setConfirmState(null)}
+                    className="flex-1 py-2.5 rounded-xl border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:bg-[#f5f5f5] disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={confirmBusy}
+                    onClick={() => void runConfirm()}
+                    className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-60 ${confirmState.type === "delete" ? "bg-rose-500 hover:bg-rose-600" : "bg-amber-500 hover:bg-amber-600"}`}
+                  >
+                    {confirmBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : confirmState.type === "delete" ? <Trash2 className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
+                    {confirmState.type === "delete" ? "Delete" : "Revoke link"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Portal>
