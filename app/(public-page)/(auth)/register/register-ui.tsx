@@ -1,77 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState, useTransition } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
-  Eye, EyeOff, ArrowRight, Check, X, Loader2,
-  CheckCircle2, Mail, Lock, AlertCircle,
+  ArrowRight, Check, Loader2, ArrowLeft,
+  CheckCircle2, Mail, KeyRound, AlertCircle,
   Building2, TrendingUp, DollarSign, User, FileText, UserPlus, Sparkles,
 } from "lucide-react"
 import { roleToLabel } from "@/lib/app-roles"
 import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
+import { sendRegisterOtp, verifyRegisterOtp } from "@/app/(public-page)/(auth)/register/actions"
 
 /** Public display info for the inviter behind ?ref (resolved server-side). */
 export type Referrer = { name: string; role: string; avatarUrl: string | null } | null
 
-type AccountType = "member" | "developer" | ""
-
-interface FormState {
-  accountType: AccountType
-  firstName: string
-  lastName: string
-  email: string
-  password: string
-  confirmPassword: string
-  companyName: string
-}
-
-const INITIAL_STATE: FormState = {
-  accountType: "",
-  firstName: "",
-  lastName: "",
-  email: "",
-  password: "",
-  confirmPassword: "",
-  companyName: "",
-}
-
-const PWD_RULES = [
-  { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
-  { label: "Contains a number", test: (p: string) => /\d/.test(p) },
-  { label: "Contains uppercase letter", test: (p: string) => /[A-Z]/.test(p) },
-  { label: "Contains special character", test: (p: string) => /[^A-Za-z0-9]/.test(p) },
-]
-
-function PasswordStrength({ password }: { password: string }) {
-  if (!password) return null
-  return (
-    <div className="mt-3 rounded-xl border border-[#e8eaed] bg-[#f9fafb] px-4 py-3 space-y-2">
-      <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#9ca3af]">Password Requirements</p>
-      {PWD_RULES.map((rule) => {
-        const ok = rule.test(password)
-        return (
-          <div key={rule.label} className="flex items-center gap-2">
-            <span
-              className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                ok ? "bg-emerald-500" : "bg-[#e5e7eb]"
-              }`}
-            >
-              {ok ? <Check className="w-2.5 h-2.5 text-white" /> : <X className="w-2 h-2 text-[#9ca3af]" />}
-            </span>
-            <span className={`text-xs transition-colors ${ok ? "text-emerald-700 font-medium" : "text-[#6b7280]"}`}>
-              {rule.label}
-            </span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function allPwdRulesPassed(p: string) {
-  return PWD_RULES.every((r) => r.test(p))
-}
+const RESEND_COOLDOWN = 60
 
 function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
   return (
@@ -220,52 +164,57 @@ export function RegisterUI({
   inviteRef?: string | null
   referrer?: Referrer
 }) {
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [form, setForm] = useState<FormState>({ ...INITIAL_STATE, accountType: defaultAccountType })
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [globalError, setGlobalError] = useState("")
-  const [submitting, setSubmitting] = useState(false)
-  const [success, setSuccess] = useState(false)
+  const [step, setStep]         = useState<"email" | "code">("email")
+  const [email, setEmail]       = useState("")
+  const [code, setCode]         = useState("")
+  const [error, setError]       = useState("")
+  const [success, setSuccess]   = useState(false)
+  const [cooldown, setCooldown] = useState(0)
+  const [pending, startTransition] = useTransition()
 
-  const isDeveloper = form.accountType === "developer"
+  const isDeveloper = defaultAccountType === "developer"
 
-  const set = (key: keyof FormState, value: unknown) => setForm((f) => ({ ...f, [key]: value }))
+  // Resend cooldown countdown.
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [cooldown])
 
-  const validate = (): boolean => {
-    const e: Record<string, string> = {}
-    if (!form.firstName.trim()) e.firstName = "Required"
-    if (!form.lastName.trim()) e.lastName = "Required"
-    if (!form.email.trim()) e.email = "Required"
-    if (!form.password) e.password = "Required"
-    else if (!allPwdRulesPassed(form.password)) e.password = "Password does not meet requirements"
-    if (form.password !== form.confirmPassword) e.confirmPassword = "Passwords do not match"
-    if (form.accountType === "developer" && !form.companyName.trim()) e.companyName = "Required"
-    setErrors(e)
-    return Object.keys(e).length === 0
+  const sendCode = () => {
+    if (pending) return
+    startTransition(async () => {
+      setError("")
+      const res = await sendRegisterOtp(email, defaultAccountType, inviteRef ?? undefined)
+      if (res?.error) {
+        setError(res.error)
+      } else {
+        setStep("code")
+        setCode("")
+        setCooldown(RESEND_COOLDOWN)
+      }
+    })
   }
 
-  const submit = async () => {
-    if (!validate()) return
-    setSubmitting(true)
-    setGlobalError("")
-    try {
-      const fd = new FormData()
-      fd.append("accountType", form.accountType)
-      fd.append("firstName", form.firstName)
-      fd.append("lastName", form.lastName)
-      fd.append("email", form.email)
-      fd.append("password", form.password)
-      fd.append("companyName", form.companyName)
-      if (inviteRef) fd.append("ref", inviteRef)
-      const res = await fetch("/api/register", { method: "POST", body: fd })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? "Registration failed")
-      setSuccess(true)
-    } catch (err: unknown) {
-      setGlobalError(err instanceof Error ? err.message : "Something went wrong")
-    }
-    setSubmitting(false)
+  const verify = () => {
+    if (pending) return
+    startTransition(async () => {
+      setError("")
+      const res = await verifyRegisterOtp(email, code, defaultAccountType, inviteRef ?? undefined)
+      if (res?.error) setError(res.error)
+      else if (res?.success) setSuccess(true)
+    })
+  }
+
+  const resend = () => {
+    if (cooldown > 0 || pending) return
+    sendCode()
+  }
+
+  const changeEmail = () => {
+    setStep("email")
+    setCode("")
+    setError("")
   }
 
   return (
@@ -298,8 +247,8 @@ export function RegisterUI({
                     <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mb-3">Account created</h2>
                     <p className="text-[#6b7280] text-sm mb-8 leading-relaxed">
                       {isDeveloper
-                        ? "Check your email to confirm your account. An administrator will review and approve your developer access before you can sign in."
-                        : "Check your email to confirm your account. After approval, you can sign in to browse buy/rent listings and use the member portal. Ask your admin if you need a sales agent account."}
+                        ? "Your email is verified. An administrator will review and approve your developer access before you can sign in."
+                        : "Your email is verified. An administrator will review and approve your account before you can sign in and use the member portal."}
                     </p>
                     <Link
                       href="/login"
@@ -311,122 +260,102 @@ export function RegisterUI({
                 </div>
               ) : (
                 <>
-                  {/* <h1 className="font-['Outfit'] text-[26px] sm:text-3xl font-bold text-[#0d1117] leading-tight mb-6">
-                    {isDeveloper ? "List & manage your projects" : "Create your account"}
-                  </h1> */}
-
                   <div className="bg-white rounded-[20px] border border-[#e8eaed] shadow-[0_18px_50px_-24px_rgba(0,10,30,0.35)] p-6 space-y-4">
                     {/* Title */}
                     <div className="mb-1">
-                      <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117]">Sign up</h2>
+                      <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117]">
+                        {step === "email" ? "Sign up" : "Enter your code"}
+                      </h2>
                       <p className="text-sm text-[#6b7280] mt-1">
-                        {isDeveloper ? "Create your developer account." : "Create your account to get started."}
+                        {step === "email"
+                          ? (isDeveloper ? "Create your developer account with just your email." : "Create your account with just your email.")
+                          : <>We emailed a verification code to <span className="font-semibold text-[#374151]">{email}</span>.</>}
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="First name" error={errors.firstName}>
-                        <input
-                          value={form.firstName}
-                          onChange={(e) => set("firstName", e.target.value)}
-                          placeholder="Ahmed"
-                          className={inputCls}
-                          autoComplete="given-name"
-                        />
-                      </Field>
-                      <Field label="Last name" error={errors.lastName}>
-                        <input
-                          value={form.lastName}
-                          onChange={(e) => set("lastName", e.target.value)}
-                          placeholder="Al Rashidi"
-                          className={inputCls}
-                          autoComplete="family-name"
-                        />
-                      </Field>
-                    </div>
-                    <Field label="Email address" error={errors.email}>
-                      <div className="relative">
-                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
-                        <input
-                          type="email"
-                          value={form.email}
-                          onChange={(e) => set("email", e.target.value)}
-                          placeholder="you@example.com"
-                          className={`${inputCls} pl-10`}
-                          autoComplete="email"
-                        />
-                      </div>
-                    </Field>
-                    {form.accountType === "developer" && (
-                      <Field label="Company name" error={errors.companyName}>
-                        <input
-                          value={form.companyName}
-                          onChange={(e) => set("companyName", e.target.value)}
-                          placeholder="EMAAR Properties"
-                          className={inputCls}
-                          autoComplete="organization"
-                        />
-                      </Field>
-                    )}
-                    <Field label="Password" error={errors.password}>
-                      <div className="relative">
-                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          value={form.password}
-                          onChange={(e) => set("password", e.target.value)}
-                          placeholder="Min. 8 characters"
-                          className={`${inputCls} pl-10 pr-11`}
-                          autoComplete="new-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword((p) => !p)}
-                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#001f3f] transition-colors"
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                      <PasswordStrength password={form.password} />
-                    </Field>
-                    <Field label="Confirm password" error={errors.confirmPassword}>
-                      <div className="relative">
-                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
-                        <input
-                          type={showConfirm ? "text" : "password"}
-                          value={form.confirmPassword}
-                          onChange={(e) => set("confirmPassword", e.target.value)}
-                          placeholder="Re-enter password"
-                          className={`${inputCls} pl-10 pr-11`}
-                          autoComplete="new-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirm((p) => !p)}
-                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#001f3f] transition-colors"
-                        >
-                          {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </Field>
+                    {step === "email" ? (
+                      <form onSubmit={(e) => { e.preventDefault(); sendCode() }} className="space-y-4">
+                        <Field label="Email address">
+                          <div className="relative">
+                            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+                            <input
+                              type="email"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              placeholder="you@example.com"
+                              required
+                              autoFocus
+                              className={`${inputCls} pl-10`}
+                              autoComplete="email"
+                            />
+                          </div>
+                        </Field>
 
-                    {globalError && (
-                      <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200">
-                        <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                        <p className="text-xs text-rose-700">{globalError}</p>
-                      </div>
-                    )}
+                        {error && <ErrorBox message={error} />}
 
-                    <button
-                      type="button"
-                      onClick={submit}
-                      disabled={submitting}
-                      className="w-full flex items-center justify-center gap-2 px-7 py-3.5 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_4px_14px_-2px_rgba(0,31,63,0.40)] hover:shadow-[0_6px_20px_-2px_rgba(0,31,63,0.50)] hover:-translate-y-0.5 transition-all duration-200"
-                    >
-                      {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                      Create account
-                      {!submitting && <ArrowRight className="w-4 h-4" />}
-                    </button>
+                        <button
+                          type="submit"
+                          disabled={pending}
+                          className="w-full flex items-center justify-center gap-2 px-7 py-3.5 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_4px_14px_-2px_rgba(0,31,63,0.40)] hover:shadow-[0_6px_20px_-2px_rgba(0,31,63,0.50)] hover:-translate-y-0.5 transition-all duration-200"
+                        >
+                          {pending && <Loader2 className="w-4 h-4 animate-spin" />}
+                          {pending ? "Sending code…" : "Send code"}
+                          {!pending && <ArrowRight className="w-4 h-4" />}
+                        </button>
+                      </form>
+                    ) : (
+                      <form onSubmit={(e) => { e.preventDefault(); verify() }} className="space-y-4">
+                        <Field label="Verification code">
+                          <div className="relative">
+                            <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              autoComplete="one-time-code"
+                              pattern="[0-9]*"
+                              maxLength={10}
+                              value={code}
+                              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                              placeholder="Enter code"
+                              required
+                              autoFocus
+                              className={`${inputCls} pl-10 text-center text-lg font-semibold tracking-[0.3em]`}
+                            />
+                          </div>
+                        </Field>
+
+                        {error && <ErrorBox message={error} />}
+
+                        <button
+                          type="submit"
+                          disabled={pending}
+                          className="w-full flex items-center justify-center gap-2 px-7 py-3.5 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_4px_14px_-2px_rgba(0,31,63,0.40)] hover:shadow-[0_6px_20px_-2px_rgba(0,31,63,0.50)] hover:-translate-y-0.5 transition-all duration-200"
+                        >
+                          {pending && <Loader2 className="w-4 h-4 animate-spin" />}
+                          {pending ? "Verifying…" : "Create account"}
+                          {!pending && <ArrowRight className="w-4 h-4" />}
+                        </button>
+
+                        <div className="flex items-center justify-between text-xs pt-0.5">
+                          <button
+                            type="button"
+                            onClick={changeEmail}
+                            className="inline-flex items-center gap-1 text-[#6b7280] hover:text-[#001f3f] font-semibold transition-colors"
+                          >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            Change email
+                          </button>
+                          <button
+                            type="button"
+                            onClick={resend}
+                            disabled={cooldown > 0}
+                            className="text-[#001f3f] font-semibold hover:underline disabled:text-[#9ca3af] disabled:no-underline disabled:cursor-not-allowed"
+                          >
+                            {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
+                          </button>
+                        </div>
+                      </form>
+                    )}
 
                     <div className="flex items-center gap-3 py-1">
                       <div className="flex-1 h-px bg-[#f0f0f0]" />
@@ -485,6 +414,15 @@ export function RegisterUI({
           {referrer ? <ReferralHero referrer={referrer} /> : <MarketingHero isDeveloper={isDeveloper} />}
         </div>
       </div>
+    </div>
+  )
+}
+
+function ErrorBox({ message }: { message: string }) {
+  return (
+    <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200">
+      <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+      <p className="text-xs text-rose-700">{message}</p>
     </div>
   )
 }
