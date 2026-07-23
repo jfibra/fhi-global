@@ -25,6 +25,7 @@ type AdminEvent = {
   eventDate: string | null
   venue: string | null
   status: string
+  registrationOpen: boolean
   createdAt: string
   registrationCount: number
   viewCount: number
@@ -47,6 +48,7 @@ type FormState = {
   eventDate: string // datetime-local value
   venue: string
   status: string
+  registrationOpen: boolean
 }
 
 const EMPTY_FORM: FormState = {
@@ -57,6 +59,7 @@ const EMPTY_FORM: FormState = {
   eventDate: "",
   venue: "",
   status: "draft",
+  registrationOpen: true,
 }
 
 // Event times are always Dubai time (GST, UTC+4 — no DST), regardless of the
@@ -173,6 +176,7 @@ export function EventsClient() {
       eventDate: toDubaiInput(e.eventDate),
       venue: e.venue ?? "",
       status: e.status,
+      registrationOpen: e.registrationOpen,
     })
     setFormError(null)
     setModalOpen(true)
@@ -212,6 +216,7 @@ export function EventsClient() {
         event_date: form.eventDate ? fromDubaiInput(form.eventDate) : "",
         venue: form.venue,
         status: form.status,
+        registration_open: form.registrationOpen,
       }
       const res = editing
         ? await fetch(`/api/admin/events/${editing.id}`, {
@@ -256,9 +261,33 @@ export function EventsClient() {
         event_date: e.eventDate ?? "",
         venue: e.venue ?? "",
         status,
+        registration_open: e.registrationOpen,
       }),
     })
     if (res.ok) setEvents((prev) => prev.map((x) => (x.id === e.id ? { ...x, status } : x)))
+  }
+
+  // Open/close registration without touching anything else on the event.
+  const toggleRegistration = async (e: AdminEvent) => {
+    const registrationOpen = !e.registrationOpen
+    const res = await fetch(`/api/admin/events/${e.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: e.title,
+        description: e.description ?? "",
+        brand: e.brand,
+        image_url: e.imageUrl ?? "",
+        event_date: e.eventDate ?? "",
+        venue: e.venue ?? "",
+        status: e.status,
+        registration_open: registrationOpen,
+      }),
+    })
+    if (res.ok) {
+      setEvents((prev) => prev.map((x) => (x.id === e.id ? { ...x, registrationOpen } : x)))
+      setRegEvent((prev) => (prev && prev.id === e.id ? { ...prev, registrationOpen } : prev))
+    }
   }
 
   const openRegistrations = async (e: AdminEvent) => {
@@ -440,16 +469,23 @@ export function EventsClient() {
                         <CalendarDays className="w-8 h-8" />
                       </div>
                     )}
-                    <span
-                      className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-bold shadow ${
-                        e.status === "published"
-                          ? "bg-emerald-50 text-emerald-800"
-                          : e.status === "draft"
-                            ? "bg-amber-50 text-amber-800"
-                            : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {e.status}
+                    <span className="absolute top-3 right-3 flex flex-col items-end gap-1.5">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-bold shadow ${
+                          e.status === "published"
+                            ? "bg-emerald-50 text-emerald-800"
+                            : e.status === "draft"
+                              ? "bg-amber-50 text-amber-800"
+                              : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {e.status}
+                      </span>
+                      {!e.registrationOpen && (
+                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold shadow bg-rose-50 text-rose-700">
+                          Registration closed
+                        </span>
+                      )}
                     </span>
                     <span
                       className="absolute bottom-3 left-3 rounded-lg px-2 py-1.5 flex items-center shadow"
@@ -634,21 +670,49 @@ export function EventsClient() {
                 </div>
               </div>
 
-              <div>
-                <p className={labelCls}>Status</p>
-                <div className="inline-flex rounded-xl border border-[#e5e5e5] overflow-hidden">
-                  {["draft", "published"].map((s) => (
+              <div className="flex flex-wrap gap-6">
+                <div>
+                  <p className={labelCls}>Status</p>
+                  <div className="inline-flex rounded-xl border border-[#e5e5e5] overflow-hidden">
+                    {["draft", "published"].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, status: s }))}
+                        className={`px-4 py-2 text-sm font-bold capitalize transition-colors ${
+                          form.status === s ? "bg-[#001f3f] text-white" : "bg-white text-[#374151] hover:bg-[#f3f4f6]"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className={labelCls}>Registration</p>
+                  <div className="inline-flex rounded-xl border border-[#e5e5e5] overflow-hidden">
                     <button
-                      key={s}
                       type="button"
-                      onClick={() => setForm((f) => ({ ...f, status: s }))}
-                      className={`px-4 py-2 text-sm font-bold capitalize transition-colors ${
-                        form.status === s ? "bg-[#001f3f] text-white" : "bg-white text-[#374151] hover:bg-[#f3f4f6]"
+                      onClick={() => setForm((f) => ({ ...f, registrationOpen: true }))}
+                      className={`px-4 py-2 text-sm font-bold transition-colors ${
+                        form.registrationOpen ? "bg-emerald-600 text-white" : "bg-white text-[#374151] hover:bg-[#f3f4f6]"
                       }`}
                     >
-                      {s}
+                      Open
                     </button>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, registrationOpen: false }))}
+                      className={`px-4 py-2 text-sm font-bold transition-colors ${
+                        !form.registrationOpen ? "bg-rose-600 text-white" : "bg-white text-[#374151] hover:bg-[#f3f4f6]"
+                      }`}
+                    >
+                      Closed
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[#9ca3af] mt-1.5">
+                    Also closes automatically the day after the event.
+                  </p>
                 </div>
               </div>
 
@@ -702,6 +766,18 @@ export function EventsClient() {
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => void toggleRegistration(regEvent)}
+                  title={regEvent.registrationOpen ? "Stop accepting new registrations" : "Accept registrations again"}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors ${
+                    regEvent.registrationOpen
+                      ? "border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                      : "border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                  }`}
+                >
+                  {regEvent.registrationOpen ? "Close registration" : "Reopen registration"}
+                </button>
                 <button
                   type="button"
                   onClick={exportRegistrationsPdf}

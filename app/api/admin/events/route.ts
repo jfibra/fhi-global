@@ -15,7 +15,7 @@ export async function GET() {
   const admin = createAdminSupabase()
   const { data, error } = await admin
     .from("events")
-    .select("id, slug, title, description, brand, image_url, event_date, venue, status, created_at, view_count, qr_scan_count, event_registrations(count)")
+    .select("id, slug, title, description, brand, image_url, event_date, venue, status, registration_open, created_at, view_count, qr_scan_count, event_registrations(count)")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
 
@@ -35,6 +35,7 @@ export async function GET() {
       eventDate: (e.event_date as string | null) ?? null,
       venue: (e.venue as string | null) ?? null,
       status: (e.status as string) ?? "draft",
+      registrationOpen: (e.registration_open as boolean | null) !== false,
       createdAt: e.created_at as string,
       registrationCount: counts?.[0]?.count ?? 0,
       viewCount: (e.view_count as number | null) ?? 0,

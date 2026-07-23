@@ -4,6 +4,7 @@ import Link from "next/link"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
 import { eventBrand } from "@/lib/events/brands"
+import { isEventRegistrationOpen } from "@/lib/events/registration"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -40,7 +41,7 @@ export default async function EventsPage() {
   const supabase = createPublicSupabaseClient()
   const { data: events } = await supabase
     .from("events")
-    .select("id, slug, title, description, brand, image_url, event_date, venue")
+    .select("id, slug, title, description, brand, image_url, event_date, venue, registration_open")
     .eq("status", "published")
     .is("deleted_at", null)
     .order("event_date", { ascending: true, nullsFirst: false })
@@ -150,7 +151,7 @@ export default async function EventsPage() {
                     )}
                     <div className="mt-4 pt-4 border-t border-[#f0f0f0] flex items-center justify-between">
                       <span className="text-sm font-bold text-[#001f3f] group-hover:text-[#b8913f] transition-colors">
-                        Register now
+                        {isEventRegistrationOpen(e) ? "Register now" : "View details"}
                       </span>
                       <span className="w-8 h-8 rounded-full bg-gradient-to-br from-[#d6b357] to-[#b8913f] flex items-center justify-center shadow-sm">
                         <ArrowRight className="w-4 h-4 text-[#001f3f] group-hover:translate-x-0.5 transition-transform" />

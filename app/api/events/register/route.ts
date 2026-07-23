@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { isEventRegistrationOpen } from "@/lib/events/registration"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
@@ -31,12 +32,15 @@ export async function POST(req: NextRequest) {
 
   const { data: event } = await admin
     .from("events")
-    .select("id, status, deleted_at, event_date")
+    .select("id, status, deleted_at, event_date, registration_open")
     .eq("id", eventId)
     .maybeSingle()
 
   if (!event || event.status !== "published" || event.deleted_at) {
     return NextResponse.json({ error: "This event is not open for registration" }, { status: 404 })
+  }
+  if (!isEventRegistrationOpen(event)) {
+    return NextResponse.json({ error: "Registration for this event has closed" }, { status: 403 })
   }
 
   const { error } = await admin.from("event_registrations").insert({

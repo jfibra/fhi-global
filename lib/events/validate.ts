@@ -19,5 +19,16 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
     const d = new Date(body.event_date)
     if (!Number.isNaN(d.getTime())) event_date = d.toISOString()
   }
-  return { title, description: description || null, brand, image_url: image_url || null, venue: venue || null, status, event_date }
+  // Manual registration toggle; anything but an explicit false means open.
+  const registration_open = body.registration_open !== false
+  return {
+    title,
+    description: description || null,
+    brand,
+    image_url: image_url || null,
+    venue: venue || null,
+    status,
+    event_date,
+    registration_open,
+  }
 }

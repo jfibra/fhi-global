@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
 import { eventBrand } from "@/lib/events/brands"
+import { isEventRegistrationOpen } from "@/lib/events/registration"
 import { EventRegisterForm } from "@/components/public/event-register-form"
 import { EventPageQr } from "@/components/public/event-page-qr"
 import { EventHeroQr } from "@/components/public/event-hero-qr"
@@ -27,7 +28,7 @@ async function fetchEvent(idOrSlug: string) {
   const supabase = createPublicSupabaseClient()
   const query = supabase
     .from("events")
-    .select("id, slug, title, description, brand, image_url, event_date, venue")
+    .select("id, slug, title, description, brand, image_url, event_date, venue, registration_open")
     .eq("status", "published")
     .is("deleted_at", null)
   const { data } = UUID_RE.test(idOrSlug)
@@ -55,6 +56,7 @@ export default async function EventDetailPage({ params }: Props) {
   if (!event) notFound()
 
   const brand = eventBrand(event.brand)
+  const registrationOpen = isEventRegistrationOpen(event)
   const d = event.event_date ? new Date(event.event_date) : null
   // Event times are Dubai time (GST) — force the zone; this renders on the
   // server, whose clock is usually UTC.
@@ -126,8 +128,8 @@ export default async function EventDetailPage({ params }: Props) {
             </span>
           </span>
         </span>
-        {/* Big venue-screen QR on the hero (desktop only) */}
-        <EventHeroQr />
+        {/* Big venue-screen QR on the hero (desktop only) — only while open */}
+        {registrationOpen && <EventHeroQr />}
       </div>
 
       <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-16">
@@ -191,10 +193,29 @@ export default async function EventDetailPage({ params }: Props) {
                 <p className="text-white text-base font-bold leading-tight">Registration</p>
               </div>
             </div>
-            <div className="p-5">
-              <EventRegisterForm eventId={event.id} eventTitle={event.title} />
-              <EventPageQr />
-            </div>
+            {registrationOpen ? (
+              <div className="p-5">
+                <EventRegisterForm eventId={event.id} eventTitle={event.title} />
+                <EventPageQr />
+              </div>
+            ) : (
+              <div className="p-6 text-center">
+                <span className="mx-auto w-14 h-14 rounded-full bg-[#001f3f]/5 border border-[#001f3f]/10 flex items-center justify-center mb-4">
+                  <Ticket className="w-6 h-6 text-[#9ca3af]" />
+                </span>
+                <p className="font-['Outfit'] text-lg font-bold text-[#0f2940] mb-1.5">Registration closed</p>
+                <p className="text-sm text-[#6b7280] leading-relaxed mb-5">
+                  This event is no longer accepting registrations. Follow our upcoming events — new
+                  showcases and investor nights are announced regularly.
+                </p>
+                <Link
+                  href="/events"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors"
+                >
+                  See upcoming events
+                </Link>
+              </div>
+            )}
           </aside>
         </div>
       </div>
