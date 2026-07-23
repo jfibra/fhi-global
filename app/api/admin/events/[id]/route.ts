@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { canManageEvents } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { sanitizeEventInput } from "@/lib/events/validate"
 
@@ -9,7 +9,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 async function guard() {
   const session = await requireActiveSession()
   if (!session.ok) return { ok: false as const, response: session.response }
-  if (!isAdminStaffRole(session.context.profile.role)) {
+  if (!canManageEvents(session.context.profile.role)) {
     return { ok: false as const, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
   }
   return { ok: true as const }

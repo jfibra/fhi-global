@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { isInactiveProfile } from "@/lib/auth"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { canManageEvents } from "@/lib/app-roles"
 import { getSessionIdentity } from "@/lib/server-identity"
 import { EventsClient } from "./events-client"
 
@@ -13,8 +13,8 @@ export default async function EventsAdminPage() {
   const { profile } = identity
   if (isInactiveProfile(profile)) redirect("/account-inactive")
 
-  // Event management is admin-staff only.
-  if (!isAdminStaffRole(profile.role)) {
+  // Event management: admin staff + team leaders (see ROLES_EVENT_MANAGERS).
+  if (!canManageEvents(profile.role)) {
     redirect("/dashboard")
   }
 

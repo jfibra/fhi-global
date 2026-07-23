@@ -8,10 +8,11 @@
 
 import { useCallback, useEffect, useState } from "react"
 import {
-  CalendarDays, Eye, FileImage, ImagePlus, Loader2, MapPin, Pencil, Plus,
-  RefreshCw, ScanLine, Trash2, Users, X,
+  CalendarDays, Eye, FileImage, FileText, ImagePlus, Loader2, MapPin, Pencil, Plus,
+  RefreshCw, ScanLine, Trash2, Trophy, Users, X,
 } from "lucide-react"
 import { EventFlyerModal } from "./event-flyer-modal"
+import { EventRaffle } from "./event-raffle"
 import { EVENT_BRANDS, eventBrand } from "@/lib/events/brands"
 
 type AdminEvent = {
@@ -108,6 +109,12 @@ export function EventsClient() {
   const [regEvent, setRegEvent] = useState<AdminEvent | null>(null)
   const [registrations, setRegistrations] = useState<Registration[]>([])
   const [regsLoading, setRegsLoading] = useState(false)
+
+  // Raffle (full-screen, drawn from the open event's registrations)
+  const [raffleOpen, setRaffleOpen] = useState(false)
+
+  // Registration row being deleted (dummy/test sign-ups cleanup)
+  const [deletingRegId, setDeletingRegId] = useState<string | null>(null)
 
   useEffect(() => {
     setOrigin(window.location.origin)
@@ -250,6 +257,86 @@ export function EventsClient() {
     } finally {
       setRegsLoading(false)
     }
+  }
+
+  const deleteRegistration = async (r: Registration) => {
+    if (!regEvent) return
+    if (!window.confirm(`Remove "${r.fullName}" from this event's registrations? They could register again later.`)) return
+    setDeletingRegId(r.id)
+    try {
+      const res = await fetch(`/api/admin/events/${regEvent.id}/registrations`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registrationId: r.id }),
+      })
+      if (!res.ok) throw new Error("failed")
+      setRegistrations((prev) => prev.filter((x) => x.id !== r.id))
+      // Keep the "N registered" count on the event card in sync.
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === regEvent.id ? { ...e, registrationCount: Math.max(0, e.registrationCount - 1) } : e,
+        ),
+      )
+    } catch {
+      // row stays; nothing worse to do here
+    } finally {
+      setDeletingRegId(null)
+    }
+  }
+
+  // Branded print view of the attendee list — the browser's print dialog
+  // offers "Save as PDF" (and direct printing for the venue check-in desk).
+  const exportRegistrationsPdf = () => {
+    if (!regEvent || registrations.length === 0) return
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    const w = window.open("", "_blank", "width=900,height=700")
+    if (!w) return
+    const generated = new Date().toLocaleDateString("en-AE", { year: "numeric", month: "long", day: "numeric" })
+    const body = registrations
+      .map(
+        (r, i) => `<tr>
+          <td class="n">${i + 1}</td>
+          <td><strong>${esc(r.fullName)}</strong></td>
+          <td>${esc(r.email)}</td>
+          <td>${esc(r.whatsapp ?? "—")}</td>
+          <td>${esc(new Date(r.createdAt).toLocaleDateString("en-AE", { month: "short", day: "numeric", year: "numeric" }))}</td>
+        </tr>`,
+      )
+      .join("")
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Attendees — ${esc(regEvent.title)}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; padding: 32px; }
+  .band { background: #001f3f; border-bottom: 4px solid #d6b357; border-radius: 12px 12px 0 0; padding: 22px 28px; }
+  .band h1 { color: #ffffff; font-size: 22px; }
+  .band .gold { color: #d6b357; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+  .meta { display: flex; flex-wrap: wrap; gap: 20px; padding: 14px 28px; background: #f6f8fb; border: 1px solid #e8eaed; border-top: 0; font-size: 12px; color: #4b5563; }
+  .meta strong { color: #001f3f; }
+  table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 12.5px; }
+  th { background: #001f3f; color: #ffffff; text-align: left; padding: 9px 12px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+  td { padding: 9px 12px; border-bottom: 1px solid #eef0f3; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .n { color: #9ca3af; width: 34px; }
+  .foot { margin-top: 22px; text-align: center; font-size: 11px; color: #9ca3af; }
+  .foot b { color: #b8913f; }
+  @page { margin: 14mm; }
+</style></head><body>
+  <div class="band"><p class="gold">FHI Global · Event Attendees</p><h1>${esc(regEvent.title)}</h1></div>
+  <div class="meta">
+    <span>Event date: <strong>${esc(eventDateLabel(regEvent.eventDate))}</strong></span>
+    ${regEvent.venue ? `<span>Venue: <strong>${esc(regEvent.venue)}</strong></span>` : ""}
+    <span>Total registered: <strong>${registrations.length}</strong></span>
+    <span>Generated: <strong>${esc(generated)}</strong></span>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>Name</th><th>Email</th><th>WhatsApp</th><th>Registered</th></tr></thead>
+    <tbody>${body}</tbody>
+  </table>
+  <p class="foot">Generated from the FHI Global dashboard · <b>fhiglobal.ae</b></p>
+</body></html>`)
+    w.document.close()
+    w.focus()
+    setTimeout(() => w.print(), 350)
   }
 
   const inputCls =
@@ -563,21 +650,52 @@ export function EventsClient() {
         <EventFlyerModal event={flyerEvent} origin={origin} onClose={() => setFlyerEvent(null)} />
       )}
 
+      {/* ── Live raffle (full-screen, above the registrations modal) ── */}
+      {raffleOpen && regEvent && (
+        <EventRaffle
+          eventTitle={regEvent.title}
+          entries={registrations.map((r) => ({ id: r.id, fullName: r.fullName, email: r.email }))}
+          onClose={() => setRaffleOpen(false)}
+        />
+      )}
+
       {/* ── Registrations modal ── */}
       {regEvent && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <button type="button" className="absolute inset-0 bg-black/45 backdrop-blur-sm" aria-label="Close" onClick={() => setRegEvent(null)} />
           <div className="relative bg-white rounded-2xl border border-[#e8eaed] shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="font-['Outfit'] font-bold text-[#001f3f]">{regEvent.title}</h3>
+            <div className="flex items-start justify-between mb-4 gap-3">
+              <div className="min-w-0">
+                <h3 className="font-['Outfit'] font-bold text-[#001f3f] truncate">{regEvent.title}</h3>
                 <p className="text-xs text-[#6b7280] mt-0.5">
                   {regsLoading ? "Loading…" : `${registrations.length} registration${registrations.length !== 1 ? "s" : ""}`}
                 </p>
               </div>
-              <button type="button" onClick={() => setRegEvent(null)} className="p-2 -mr-2 -mt-2 rounded-lg text-[#6b7280] hover:bg-[#f5f5f5]" aria-label="Close">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={exportRegistrationsPdf}
+                  disabled={regsLoading || registrations.length === 0}
+                  title="Download attendee list as PDF"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f]/10 transition-colors disabled:opacity-40"
+                >
+                  <FileText className="w-4 h-4" />
+                  PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRaffleOpen(true)}
+                  disabled={regsLoading || registrations.length === 0}
+                  title="Start a live raffle — pick a random winner"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#d6b357] to-[#b8913f] text-[#001428] text-xs font-bold shadow-sm hover:shadow-md transition-shadow disabled:opacity-40"
+                >
+                  <Trophy className="w-4 h-4" />
+                  Raffle
+                </button>
+                <button type="button" onClick={() => setRegEvent(null)} className="p-2 -mr-2 -mt-2 rounded-lg text-[#6b7280] hover:bg-[#f5f5f5]" aria-label="Close">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {regsLoading ? (
@@ -597,6 +715,7 @@ export function EventsClient() {
                       <th className="px-3 py-2">Email</th>
                       <th className="px-3 py-2">WhatsApp</th>
                       <th className="px-3 py-2">Registered</th>
+                      <th className="px-3 py-2" aria-label="Actions" />
                     </tr>
                   </thead>
                   <tbody>
@@ -622,6 +741,22 @@ export function EventsClient() {
                         </td>
                         <td className="px-3 py-2.5 text-[#6b7280]">
                           {new Date(r.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => void deleteRegistration(r)}
+                            disabled={deletingRegId === r.id}
+                            className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50"
+                            aria-label={`Remove ${r.fullName}`}
+                            title="Remove this registration"
+                          >
+                            {deletingRegId === r.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
                         </td>
                       </tr>
                     ))}

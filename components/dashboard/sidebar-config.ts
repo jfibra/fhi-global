@@ -142,6 +142,11 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
       { type: "item", item: { icon: ClipboardList, label: "My listings", href: `${basePath}/listings` } },
       { type: "item", item: { icon: Clapperboard, label: "Reels Maker", href: `${basePath}/reels-maker` } },
       { type: "item", item: { icon: QrCode, label: "Invite", href: `${basePath}/invite` } },
+      // Team leaders manage events too (see ROLES_EVENT_MANAGERS); agents and
+      // unit managers in this same branch do not.
+      ...(normalizedRole === "team_leader"
+        ? [{ type: "item" as const, item: { icon: CalendarDays, label: "Events", href: `${basePath}/events` } }]
+        : []),
       {
         type: "group",
         label: "Sales Management",

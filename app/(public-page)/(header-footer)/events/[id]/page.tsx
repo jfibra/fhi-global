@@ -188,8 +188,7 @@ export default async function EventDetailPage({ params }: Props) {
                 <Ticket className="w-5 h-5 text-[#d6b357]" />
               </span>
               <div>
-                <p className="text-white text-sm font-bold leading-tight">Reserve your seat</p>
-                <p className="text-[#d6b357] text-[11px] font-bold uppercase tracking-wider">Free registration</p>
+                <p className="text-white text-base font-bold leading-tight">Registration</p>
               </div>
             </div>
             <div className="p-5">

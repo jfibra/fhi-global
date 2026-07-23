@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import { requireActiveSession } from "@/lib/auth-guard"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { canManageEvents } from "@/lib/app-roles"
 
 const s3 = new S3Client({
   region: process.env.S3_REGION!,
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   if (!session.ok) {
     return session.response
   }
-  if (!isAdminStaffRole(session.context.profile.role)) {
+  if (!canManageEvents(session.context.profile.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 

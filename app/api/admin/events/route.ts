@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { canManageEvents } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { sanitizeEventInput } from "@/lib/events/validate"
 
@@ -8,7 +8,7 @@ import { sanitizeEventInput } from "@/lib/events/validate"
 export async function GET() {
   const session = await requireActiveSession()
   if (!session.ok) return session.response
-  if (!isAdminStaffRole(session.context.profile.role)) {
+  if (!canManageEvents(session.context.profile.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
@@ -62,7 +62,7 @@ function slugify(title: string): string {
 export async function POST(req: NextRequest) {
   const session = await requireActiveSession()
   if (!session.ok) return session.response
-  if (!isAdminStaffRole(session.context.profile.role)) {
+  if (!canManageEvents(session.context.profile.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
