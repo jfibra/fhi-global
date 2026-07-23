@@ -49,7 +49,7 @@ function LoginCard(s: LoginCardState) {
         <p className="text-[13px] text-[#6b7280] leading-relaxed max-w-[300px] mx-auto">
           {s.step === "email"
             ? "Sign in to access your private portal and discover exclusive opportunities."
-            : <>We emailed a verification code to <span className="font-semibold text-[#374151]">{s.email}</span>.</>}
+            : <>We emailed a 6-digit code to <span className="font-semibold text-[#374151]">{s.email}</span>.</>}
         </p>
         <span className="block w-10 h-[3px] rounded-full bg-[#d6b357] mx-auto mt-3" />
       </div>
@@ -92,7 +92,7 @@ function LoginCard(s: LoginCardState) {
           {/* Code */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">
-              Verification code
+              6-digit code
             </label>
             <div className="relative">
               <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
@@ -102,13 +102,13 @@ function LoginCard(s: LoginCardState) {
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 pattern="[0-9]*"
-                maxLength={10}
+                maxLength={6}
                 value={s.code}
-                onChange={(e) => s.setCode(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                placeholder="Enter code"
+                onChange={(e) => s.setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000"
                 required
                 autoFocus
-                className="w-full pl-11 pr-5 py-3 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-center text-lg font-semibold tracking-[0.3em] text-[#111827] placeholder:text-[#d1d5db] placeholder:tracking-normal focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all duration-200"
+                className="w-full pl-11 pr-5 py-3 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-center text-lg font-semibold tracking-[0.4em] text-[#111827] placeholder:text-[#d1d5db] placeholder:tracking-[0.4em] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all duration-200"
               />
             </div>
           </div>
@@ -202,6 +202,8 @@ export function HomeLoginUI({ nextRedirect }: { nextRedirect?: string }) {
   const [step, setStep]         = useState<"email" | "code">("email")
   const [email, setEmail]       = useState("")
   const [code, setCode]         = useState("")
+  // Opaque id from the send step; the verify step must echo it back.
+  const [challenge, setChallenge] = useState("")
   const [error, setError]       = useState<string | null>(null)
   const [cooldown, setCooldown] = useState(0)
   const [pending, startTransition] = useTransition()
@@ -221,6 +223,7 @@ export function HomeLoginUI({ nextRedirect }: { nextRedirect?: string }) {
       if (res?.error) {
         setError(res.error)
       } else {
+        setChallenge(res?.challenge ?? "")
         setStep("code")
         setCode("")
         setCooldown(RESEND_COOLDOWN)
@@ -232,7 +235,7 @@ export function HomeLoginUI({ nextRedirect }: { nextRedirect?: string }) {
     if (pending) return
     startTransition(async () => {
       setError(null)
-      const res = await verifyLoginOtp(email, code, nextRedirect)
+      const res = await verifyLoginOtp(email, code, challenge, nextRedirect)
       // On success the action redirects; only errors return here.
       if (res?.error) setError(res.error)
     })

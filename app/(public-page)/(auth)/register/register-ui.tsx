@@ -167,6 +167,8 @@ export function RegisterUI({
   const [step, setStep]         = useState<"email" | "code">("email")
   const [email, setEmail]       = useState("")
   const [code, setCode]         = useState("")
+  // Opaque id from the send step; the verify step must echo it back.
+  const [challenge, setChallenge] = useState("")
   const [error, setError]       = useState("")
   const [success, setSuccess]   = useState(false)
   const [cooldown, setCooldown] = useState(0)
@@ -189,6 +191,7 @@ export function RegisterUI({
       if (res?.error) {
         setError(res.error)
       } else {
+        setChallenge(res?.challenge ?? "")
         setStep("code")
         setCode("")
         setCooldown(RESEND_COOLDOWN)
@@ -200,7 +203,7 @@ export function RegisterUI({
     if (pending) return
     startTransition(async () => {
       setError("")
-      const res = await verifyRegisterOtp(email, code, defaultAccountType, inviteRef ?? undefined)
+      const res = await verifyRegisterOtp(email, code, challenge, defaultAccountType, inviteRef ?? undefined)
       if (res?.error) setError(res.error)
       else if (res?.success) setSuccess(true)
     })
@@ -269,7 +272,7 @@ export function RegisterUI({
                       <p className="text-sm text-[#6b7280] mt-1">
                         {step === "email"
                           ? (isDeveloper ? "Create your developer account with just your email." : "Create your account with just your email.")
-                          : <>We emailed a verification code to <span className="font-semibold text-[#374151]">{email}</span>.</>}
+                          : <>We emailed a 6-digit code to <span className="font-semibold text-[#374151]">{email}</span>.</>}
                       </p>
                     </div>
 
@@ -305,7 +308,7 @@ export function RegisterUI({
                       </form>
                     ) : (
                       <form onSubmit={(e) => { e.preventDefault(); verify() }} className="space-y-4">
-                        <Field label="Verification code">
+                        <Field label="6-digit code">
                           <div className="relative">
                             <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
                             <input
@@ -313,13 +316,13 @@ export function RegisterUI({
                               inputMode="numeric"
                               autoComplete="one-time-code"
                               pattern="[0-9]*"
-                              maxLength={10}
+                              maxLength={6}
                               value={code}
-                              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                              placeholder="Enter code"
+                              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                              placeholder="000000"
                               required
                               autoFocus
-                              className={`${inputCls} pl-10 text-center text-lg font-semibold tracking-[0.3em]`}
+                              className={`${inputCls} pl-10 text-center text-lg font-semibold tracking-[0.4em] placeholder:tracking-[0.4em]`}
                             />
                           </div>
                         </Field>

@@ -4,14 +4,18 @@ import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromHeaders } from "@/lib/audit-log"
 import { sendOtpEmail } from "@/lib/mailer"
+import { generateOtpCode, storeOtpChallenge, consumeOtpChallenge } from "@/lib/auth-otp"
 
 export type RegisterState = {
   error?: string
   success?: boolean
 }
 
-/** Result of the two OTP steps (email → code). */
-export type RegisterOtpResult = { error?: string; ok?: boolean; success?: boolean }
+/**
+ * Result of the two OTP steps (email → code). `challenge` is an opaque id the
+ * client must echo back to the verify step.
+ */
+export type RegisterOtpResult = { error?: string; ok?: boolean; success?: boolean; challenge?: string }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -62,32 +66,32 @@ export async function sendRegisterOtp(
     if (!alreadyExists) return { error: createError.message }
   }
 
-  // Generate the code (no email sent by Supabase). generateLink also returns the
-  // user, so we can block re-registration of an ACTIVE account (send them to
-  // sign in) while still letting a pending/unfinished signup resend its code.
+  // Mint the single-use session token (no email sent by Supabase). generateLink
+  // also returns the user, so we can block re-registration of an ACTIVE account
+  // (send them to sign in) while still letting a pending signup resend its code.
   const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email })
-  if (error || !data?.properties?.email_otp) {
+  if (error || !data?.properties?.hashed_token || !data.user?.id) {
     return { error: error?.message ?? "Could not generate a verification code." }
   }
 
-  if (data.user?.id) {
-    const { data: existing } = await admin
-      .from("profiles")
-      .select("status")
-      .eq("id", data.user.id)
-      .maybeSingle<{ status: string | null }>()
-    if (existing?.status === "active") {
-      return { error: "An account with this email already exists. Please sign in instead." }
-    }
+  const { data: existing } = await admin
+    .from("profiles")
+    .select("status")
+    .eq("id", data.user.id)
+    .maybeSingle<{ status: string | null }>()
+  if (existing?.status === "active") {
+    return { error: "An account with this email already exists. Please sign in instead." }
   }
 
+  const code = generateOtpCode()
   try {
-    await sendOtpEmail(email, data.properties.email_otp, "register")
+    await storeOtpChallenge(data.user.id, code, data.properties.hashed_token)
+    await sendOtpEmail(email, code, "register")
   } catch (e) {
     return { error: e instanceof Error ? `Could not send the code: ${e.message}` : "Could not send the code." }
   }
 
-  return { ok: true }
+  return { ok: true, challenge: data.user.id }
 }
 
 /**
@@ -97,7 +101,8 @@ export async function sendRegisterOtp(
  */
 export async function verifyRegisterOtp(
   emailRaw: string,
-  tokenRaw: string,
+  codeRaw: string,
+  challengeRaw?: string,
   accountTypeRaw?: string,
   refRaw?: string,
 ): Promise<RegisterOtpResult> {
@@ -106,23 +111,25 @@ export async function verifyRegisterOtp(
   }
 
   const email = String(emailRaw ?? "").trim().toLowerCase()
-  const token = String(tokenRaw ?? "").trim()
-  if (!email || !token) return { error: "Enter the code we emailed you." }
+  const code = String(codeRaw ?? "").trim()
+  const challenge = String(challengeRaw ?? "").trim()
+  if (!email || !code) return { error: "Enter the code we emailed you." }
+  if (!challenge) return { error: "This code is no longer valid. Request a new one." }
 
   const accountType = normalizeAccountType(accountTypeRaw)
   const role = accountType === "developer" ? "developer" : "member"
   const ref = String(refRaw ?? "").trim()
 
+  const result = await consumeOtpChallenge(challenge, code)
+  if ("error" in result) return { error: result.error }
+
   const supabase = await createClient()
-  const { data, error } = await supabase.auth.verifyOtp({ email, token, type: "email" })
+  const { data, error } = await supabase.auth.verifyOtp({ token_hash: result.tokenHash, type: "email" })
 
   if (error || !data.user) {
     const m = (error?.message ?? "").toLowerCase()
     if (m.includes("expired")) return { error: "That code has expired. Request a new one." }
-    if (m.includes("invalid") || m.includes("token")) {
-      return { error: "Invalid code. Check the digits and try again." }
-    }
-    return { error: error?.message ?? "Invalid code." }
+    return { error: error?.message ?? "Couldn't verify the code. Request a new one." }
   }
 
   const userId = data.user.id
