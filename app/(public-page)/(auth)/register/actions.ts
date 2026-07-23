@@ -1,5 +1,6 @@
 "use server"
 
+import { redirect } from "next/navigation"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromHeaders } from "@/lib/audit-log"
@@ -189,8 +190,7 @@ export async function verifyRegisterOtp(
     ...ctx,
   })
 
-  // New accounts are pending — sign out so they can't enter until approved.
-  await supabase.auth.signOut()
-
-  return { success: true }
+  // New accounts are pending — keep the session so they can finish their
+  // profile now; afterwards they're held on /account-inactive for approval.
+  redirect("/complete-profile")
 }

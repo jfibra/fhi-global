@@ -27,6 +27,8 @@ export type AppProfile = {
   metadata: Record<string, unknown> | null
   is_deleted?: boolean | null
   timezone: string | null
+  birthday?: string | null
+  gender?: string | null
 }
 
 export { ROLE_DASHBOARD_MAP, roleToLabel }
@@ -115,7 +117,7 @@ export async function getProfileByUserId(
 ) {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, role, fullname, status, profile_url, metadata, is_deleted, fname, lname, timezone")
+    .select("id, role, fullname, status, profile_url, metadata, is_deleted, fname, lname, timezone, birthday, gender")
     .eq("id", userId)
     .single<AppProfile>()
 
@@ -178,12 +180,16 @@ export async function ensureProfileForUser(
 
 export function isProfileMissingMinimumFields(profile: AppProfile) {
   const metadata = profile.metadata ?? {}
-  const phone = typeof metadata.phone_number === "string" ? metadata.phone_number.trim() : ""
+  const meta = (k: string) => (typeof metadata[k] === "string" ? (metadata[k] as string).trim() : "")
   return (
     !profile.fname?.trim() ||
     !profile.lname?.trim() ||
     !profile.timezone?.trim() ||
-    !phone
+    !profile.birthday?.trim() ||
+    !profile.gender?.trim() ||
+    !meta("nationality") ||
+    !meta("phone_number") ||
+    !meta("whatsapp_number")
   )
 }
 

@@ -1,7 +1,8 @@
 "use server"
 
 import { redirect } from "next/navigation"
-import { ensureProfileForUser, isInactiveProfile, pickSafePostLoginRedirect } from "@/lib/auth"
+import { ensureProfileForUser, isInactiveProfile, isProfileMissingMinimumFields, pickSafePostLoginRedirect } from "@/lib/auth"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromHeaders } from "@/lib/audit-log"
@@ -115,8 +116,13 @@ export async function verifyLoginOtp(
     return { error: "Profile setup failed. Please contact administrator." }
   }
 
+  // Incomplete profile → finish it first, even while the account is pending.
+  if (!isAdminStaffRole(profile.role) && isProfileMissingMinimumFields(profile)) {
+    redirect("/complete-profile")
+  }
+
+  // Complete but still pending → hold on the awaiting-approval screen.
   if (isInactiveProfile(profile)) {
-    await supabase.auth.signOut()
     redirect("/account-inactive")
   }
 
@@ -176,8 +182,13 @@ export async function passwordLoginAction(_: LoginState, formData: FormData): Pr
     return { error: profileError?.message ? `Profile setup failed: ${profileError.message}` : "Profile setup failed." }
   }
 
+  // Incomplete profile → finish it first, even while the account is pending.
+  if (!isAdminStaffRole(profile.role) && isProfileMissingMinimumFields(profile)) {
+    redirect("/complete-profile")
+  }
+
+  // Complete but still pending → hold on the awaiting-approval screen.
   if (isInactiveProfile(profile)) {
-    await supabase.auth.signOut()
     redirect("/account-inactive")
   }
 

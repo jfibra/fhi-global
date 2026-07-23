@@ -97,6 +97,14 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isInactiveProfile(profile)) {
+    // Inactive users may still finish their profile first; once it's complete
+    // they're held on /account-inactive until an admin activates them.
+    if (!isAdminStaffRole(profile.role) && isProfileMissingMinimumFields(profile)) {
+      const url = request.nextUrl.clone()
+      url.pathname = "/complete-profile"
+      return NextResponse.redirect(url)
+    }
+
     if (pathname !== "/account-inactive") {
       const url = request.nextUrl.clone()
       url.pathname = "/account-inactive"
@@ -115,7 +123,7 @@ export async function proxy(request: NextRequest) {
     !isPathExemptFromProfileCompletionGate(pathname, profile.role)
   ) {
     const url = request.nextUrl.clone()
-    url.pathname = `${getDashboardRouteByRole(profile.role)}/profile`
+    url.pathname = "/complete-profile"
     return NextResponse.redirect(url)
   }
 
