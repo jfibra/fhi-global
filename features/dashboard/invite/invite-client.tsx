@@ -65,20 +65,17 @@ export function InviteClient({
   userId,
   userName,
   currentRole,
-  initialRecruits,
 }: {
   userId: string
   userName: string
   currentRole: string
-  // Server-rendered recruits — present the list on first paint, no mount fetch.
-  initialRecruits?: Recruit[]
 }) {
   const [origin, setOrigin] = useState("")
   const [copied, setCopied] = useState(false)
   const downloadRef = useRef<HTMLDivElement>(null)
 
-  const [recruits, setRecruits] = useState<Recruit[]>(() => initialRecruits ?? recruitsCache ?? [])
-  const [recruitsLoading, setRecruitsLoading] = useState(initialRecruits === undefined && recruitsCache === null)
+  const [recruits, setRecruits] = useState<Recruit[]>(() => recruitsCache ?? [])
+  const [recruitsLoading, setRecruitsLoading] = useState(recruitsCache === null)
   const [recruitsError, setRecruitsError] = useState(false)
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [approveError, setApproveError] = useState<string | null>(null)
@@ -108,8 +105,8 @@ export function InviteClient({
   }, [])
 
   useEffect(() => {
-    // Server already provided the list (or it's cached this session) — no fetch.
-    if (initialRecruits !== undefined || recruitsCache !== null) return
+    // Already fetched earlier this session — reuse the cache, don't refetch.
+    if (recruitsCache !== null) return
     let alive = true
     void fetch("/api/invite/recruits")
       .then(async (res) => {
@@ -339,20 +336,19 @@ export function InviteClient({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[352px_1fr] gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
           {/* ── QR card (stays in view while the recruits list scrolls) ── */}
-          <div className="bg-white rounded-2xl border border-[#e8eaed] p-8 flex flex-col items-center self-start lg:sticky lg:top-0">
-            <div className="rounded-2xl border-4 border-[#d6b357] p-5 bg-white">
+          <div className="bg-white rounded-2xl border border-[#e8eaed] p-6 flex flex-col items-center self-start lg:sticky lg:top-0">
+            <div className="rounded-2xl border-4 border-[#d6b357] p-4 bg-white">
               {inviteUrl ? (
-                <QRCodeSVG value={inviteUrl} size={240} level="M" fgColor="#001f3f" />
+                <QRCodeSVG value={inviteUrl} size={190} level="M" fgColor="#001f3f" />
               ) : (
-                <div className="w-[240px] h-[240px] animate-pulse bg-[#f3f4f6] rounded-xl" />
+                <div className="w-[190px] h-[190px] animate-pulse bg-[#f3f4f6] rounded-xl" />
               )}
             </div>
             <p className="mt-4 font-['Outfit'] font-bold text-[#001f3f] text-lg text-center">
               Scan to join FHI Global
             </p>
-            <p className="text-xs text-[#9ca3af] text-center">Invited by {userName}</p>
 
             {/* Hidden high-resolution canvas used for the PNG download. */}
             <div ref={downloadRef} className="hidden" aria-hidden>
@@ -514,11 +510,14 @@ export function InviteClient({
                         </p>
                       </div>
 
-                      {/* Birth date column */}
-                      <div className="shrink-0 hidden sm:block text-right w-24">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-[#9ca3af]">Date of Birth</p>
-                        <p className="text-xs text-[#6b7280]">{birthdayLabel(r.birthday)}</p>
-                      </div>
+                      {/* Birth date column — hidden when the Approve button is
+                          shown, so pending rows stay column-aligned. */}
+                      {!showApprove && (
+                        <div className="shrink-0 hidden sm:block text-right w-24">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#9ca3af]">Date of Birth</p>
+                          <p className="text-xs text-[#6b7280]">{birthdayLabel(r.birthday)}</p>
+                        </div>
+                      )}
 
                       {/* Role column — colored chip-style dropdown when editable, static chip otherwise */}
                       <div className="shrink-0 w-20 flex justify-center">
