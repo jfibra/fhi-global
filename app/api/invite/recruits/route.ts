@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { isProfileMissingMinimumFields, type AppProfile } from "@/lib/auth"
 
 /**
  * People who registered through the caller's invite link (?ref=<their id> —
@@ -22,7 +23,7 @@ export async function GET() {
   const admin = createAdminSupabase()
   const { data, error } = await admin
     .from("profiles")
-    .select("id, fullname, role, status, joined_at, birthday, metadata")
+    .select("id, fullname, role, status, joined_at, birthday, gender, fname, lname, timezone, metadata")
     .eq("metadata->>invited_by", userId)
     .eq("is_deleted", false)
     .order("joined_at", { ascending: false })
@@ -51,6 +52,11 @@ export async function GET() {
     const combined = [str(m.phone_country_code), str(m.phone_number)].filter(Boolean).join(" ")
     return combined || str(m.phone) || null
   }
+  const whatsappFrom = (metadata: Record<string, unknown> | null) => {
+    const m = metadata ?? {}
+    const combined = [str(m.whatsapp_country_code), str(m.whatsapp_number)].filter(Boolean).join(" ")
+    return combined || null
+  }
 
   const recruits = (data ?? []).map((r) => ({
     id: r.id as string,
@@ -60,7 +66,10 @@ export async function GET() {
     status: (r.status as string | null) ?? "pending",
     joinedAt: (r.joined_at as string | null) ?? null,
     phone: phoneFrom(r.metadata as Record<string, unknown> | null),
+    whatsapp: whatsappFrom(r.metadata as Record<string, unknown> | null),
     birthday: (r.birthday as string | null) ?? null,
+    // Flags recruits who still need to fill required profile fields.
+    incomplete: isProfileMissingMinimumFields(r as unknown as AppProfile),
   }))
 
   return NextResponse.json({ recruits })

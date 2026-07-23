@@ -10,8 +10,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react"
 import {
-  Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet,
-  FileText, Loader2, MessageCircle, QrCode, RefreshCw, Search, Users,
+  AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet,
+  FileText, Loader2, MessageCircle, Phone, QrCode, RefreshCw, Search, Users,
 } from "lucide-react"
 import { roleToLabel } from "@/lib/auth"
 import { ROLE_COLORS } from "@/lib/app-roles"
@@ -24,7 +24,9 @@ type Recruit = {
   status: string
   joinedAt: string | null
   phone: string | null
+  whatsapp: string | null
   birthday: string | null
+  incomplete?: boolean
 }
 
 // Module-level cache of the recruits list. Survives client-side (next/link)
@@ -468,27 +470,42 @@ export function InviteClient({
                     const busy = approvingId === r.id
                     return (
                     <li key={r.id} className="flex items-center gap-3 py-3">
-                      {/* Avatar */}
-                      <span className="w-9 h-9 rounded-full bg-gradient-to-br from-[#001f3f] to-[#003366] text-white text-sm font-bold flex items-center justify-center shrink-0">
-                        {r.fullname.charAt(0).toUpperCase()}
-                      </span>
+                      {/* Avatar — turns amber with a warning icon when the recruit's profile is incomplete */}
+                      {r.incomplete ? (
+                        <span
+                          title="This recruit hasn't completed their required profile details yet."
+                          className="w-9 h-9 rounded-full bg-amber-100 text-amber-600 border border-amber-300 flex items-center justify-center shrink-0"
+                        >
+                          <AlertTriangle className="w-4 h-4" />
+                        </span>
+                      ) : (
+                        <span className="w-9 h-9 rounded-full bg-gradient-to-br from-[#001f3f] to-[#003366] text-white text-sm font-bold flex items-center justify-center shrink-0">
+                          {r.fullname.charAt(0).toUpperCase()}
+                        </span>
+                      )}
 
-                      {/* Name + birth date */}
+                      {/* Name + email */}
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold text-[#111827] truncate">{r.fullname}</p>
-                        <p className="text-xs text-[#6b7280] truncate">Birth date: {birthdayLabel(r.birthday)}</p>
-                      </div>
-
-                      {/* Email + mobile column */}
-                      <div className="shrink-0 hidden sm:block min-w-0 w-44">
                         <p className="text-xs text-[#6b7280] truncate">{r.email ?? "—"}</p>
-                        <p className="text-xs text-[#6b7280] truncate">{r.phone ?? "—"}</p>
                       </div>
 
-                      {/* Joined column */}
+                      {/* Phone + WhatsApp column */}
+                      <div className="shrink-0 hidden sm:block min-w-0 w-44 space-y-0.5">
+                        <p className="text-xs text-[#6b7280] truncate flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-[#9ca3af] shrink-0" />
+                          {r.phone ?? "—"}
+                        </p>
+                        <p className="text-xs text-[#6b7280] truncate flex items-center gap-1.5">
+                          <MessageCircle className="w-3.5 h-3.5 text-[#25d366] shrink-0" />
+                          {r.whatsapp ?? "—"}
+                        </p>
+                      </div>
+
+                      {/* Birth date column */}
                       <div className="shrink-0 hidden sm:block text-right w-24">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-[#9ca3af]">Date Joined</p>
-                        <p className="text-xs text-[#6b7280]">{joinedLabel(r.joinedAt)}</p>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-[#9ca3af]">Date of Birth</p>
+                        <p className="text-xs text-[#6b7280]">{birthdayLabel(r.birthday)}</p>
                       </div>
 
                       {/* Role column — colored chip-style dropdown when editable, static chip otherwise */}
