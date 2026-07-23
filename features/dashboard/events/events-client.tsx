@@ -6,10 +6,10 @@
  * the registration QR baked in (links to /events/<id>), and view who registered.
  */
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  CalendarDays, Eye, FileImage, FileText, ImagePlus, Loader2, MapPin, Pencil, Plus,
-  RefreshCw, ScanLine, Trash2, Trophy, Users, X,
+  CalendarDays, ChevronLeft, ChevronRight, Eye, FileImage, FileText, ImagePlus, Loader2,
+  MapPin, Pencil, Plus, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
 } from "lucide-react"
 import { EventFlyerModal } from "./event-flyer-modal"
 import { EventRaffle } from "./event-raffle"
@@ -109,6 +109,23 @@ export function EventsClient() {
   const [regEvent, setRegEvent] = useState<AdminEvent | null>(null)
   const [registrations, setRegistrations] = useState<Registration[]>([])
   const [regsLoading, setRegsLoading] = useState(false)
+
+  // Search + pagination over the registrations table
+  const REG_PAGE_SIZE = 10
+  const [regQuery, setRegQuery] = useState("")
+  const [regPage, setRegPage] = useState(1)
+
+  const filteredRegs = useMemo(() => {
+    const q = regQuery.trim().toLowerCase()
+    if (!q) return registrations
+    return registrations.filter(
+      (r) => r.fullName.toLowerCase().includes(q) || r.email.toLowerCase().includes(q),
+    )
+  }, [registrations, regQuery])
+
+  const regTotalPages = Math.max(1, Math.ceil(filteredRegs.length / REG_PAGE_SIZE))
+  const regSafePage = Math.min(regPage, regTotalPages)
+  const regPageItems = filteredRegs.slice((regSafePage - 1) * REG_PAGE_SIZE, regSafePage * REG_PAGE_SIZE)
 
   // Raffle (full-screen, drawn from the open event's registrations)
   const [raffleOpen, setRaffleOpen] = useState(false)
@@ -248,6 +265,8 @@ export function EventsClient() {
     setRegEvent(e)
     setRegsLoading(true)
     setRegistrations([])
+    setRegQuery("")
+    setRegPage(1)
     try {
       const res = await fetch(`/api/admin/events/${e.id}/registrations`, { cache: "no-store" })
       const data = (await res.json()) as { registrations?: Registration[] }
@@ -287,12 +306,12 @@ export function EventsClient() {
   // Branded print view of the attendee list — the browser's print dialog
   // offers "Save as PDF" (and direct printing for the venue check-in desk).
   const exportRegistrationsPdf = () => {
-    if (!regEvent || registrations.length === 0) return
+    if (!regEvent || filteredRegs.length === 0) return
     const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     const w = window.open("", "_blank", "width=900,height=700")
     if (!w) return
     const generated = new Date().toLocaleDateString("en-AE", { year: "numeric", month: "long", day: "numeric" })
-    const body = registrations
+    const body = filteredRegs
       .map(
         (r, i) => `<tr>
           <td class="n">${i + 1}</td>
@@ -325,8 +344,9 @@ export function EventsClient() {
   <div class="meta">
     <span>Event date: <strong>${esc(eventDateLabel(regEvent.eventDate))}</strong></span>
     ${regEvent.venue ? `<span>Venue: <strong>${esc(regEvent.venue)}</strong></span>` : ""}
-    <span>Total registered: <strong>${registrations.length}</strong></span>
+    <span>Total registered: <strong>${filteredRegs.length}</strong></span>
     <span>Generated: <strong>${esc(generated)}</strong></span>
+    ${regQuery.trim() ? `<span>Filter: <strong>“${esc(regQuery.trim())}”</strong></span>` : ""}
   </div>
   <table>
     <thead><tr><th>#</th><th>Name</th><th>Email</th><th>WhatsApp</th><th>Registered</th></tr></thead>
@@ -401,10 +421,20 @@ export function EventsClient() {
               return (
                 <div key={e.id} className="group relative bg-white rounded-2xl border border-[#e8eaed] overflow-hidden shadow-sm hover:shadow-lg transition-all">
                   <span className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-[#d6b357]/30 z-10" aria-hidden="true" />
-                  <div className="relative h-40 bg-[#eef1f5]">
+                  {/* Whole poster shown (contained) over a blurred fill — faces never cropped */}
+                  <div className="relative h-60 bg-[#0d1b2e] overflow-hidden">
                     {e.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={e.imageUrl} alt={e.title} className="h-full w-full object-cover" />
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={e.imageUrl}
+                          alt=""
+                          aria-hidden="true"
+                          className="absolute inset-0 h-full w-full object-cover blur-xl scale-110 opacity-50"
+                        />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={e.imageUrl} alt={e.title} className="relative h-full w-full object-contain" />
+                      </>
                     ) : (
                       <div className="h-full w-full flex items-center justify-center text-[#b8bfc9]">
                         <CalendarDays className="w-8 h-8" />
@@ -675,7 +705,7 @@ export function EventsClient() {
                 <button
                   type="button"
                   onClick={exportRegistrationsPdf}
-                  disabled={regsLoading || registrations.length === 0}
+                  disabled={regsLoading || filteredRegs.length === 0}
                   title="Download attendee list as PDF"
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f]/10 transition-colors disabled:opacity-40"
                 >
@@ -698,6 +728,22 @@ export function EventsClient() {
               </div>
             </div>
 
+            {/* Search — filters the table, the PDF export follows it */}
+            {!regsLoading && registrations.length > 0 && (
+              <div className="relative mb-4">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+                <input
+                  value={regQuery}
+                  onChange={(e) => {
+                    setRegQuery(e.target.value)
+                    setRegPage(1)
+                  }}
+                  placeholder="Search by name or email…"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#e5e5e5] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] transition-colors"
+                />
+              </div>
+            )}
+
             {regsLoading ? (
               <p className="text-sm text-[#9ca3af] py-8 text-center flex items-center justify-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading registrations…
@@ -705,6 +751,10 @@ export function EventsClient() {
             ) : registrations.length === 0 ? (
               <p className="text-sm text-[#9ca3af] py-8 text-center">
                 No one has registered yet — share the QR code to get sign-ups.
+              </p>
+            ) : filteredRegs.length === 0 ? (
+              <p className="text-sm text-[#9ca3af] py-8 text-center">
+                No registrations match <span className="font-semibold text-[#374151]">&ldquo;{regQuery.trim()}&rdquo;</span> — try another name or email.
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -719,7 +769,7 @@ export function EventsClient() {
                     </tr>
                   </thead>
                   <tbody>
-                    {registrations.map((r) => (
+                    {regPageItems.map((r) => (
                       <tr key={r.id} className="border-b border-[#f7f7f7]">
                         <td className="px-3 py-2.5 font-semibold text-[#111827]">{r.fullName}</td>
                         <td className="px-3 py-2.5 text-[#374151]">
@@ -762,6 +812,39 @@ export function EventsClient() {
                     ))}
                   </tbody>
                 </table>
+
+                {/* Pagination */}
+                {regTotalPages > 1 && (
+                  <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-[#f0f2f5]">
+                    <p className="text-xs text-[#9ca3af]">
+                      Showing <span className="font-bold text-[#374151]">{(regSafePage - 1) * REG_PAGE_SIZE + 1}–{Math.min(regSafePage * REG_PAGE_SIZE, filteredRegs.length)}</span> of{" "}
+                      <span className="font-bold text-[#374151]">{filteredRegs.length}</span>
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRegPage(regSafePage - 1)}
+                        disabled={regSafePage <= 1}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#e5e5e5] text-xs font-bold text-[#374151] hover:border-[#001f3f] transition-colors disabled:opacity-40"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                        Prev
+                      </button>
+                      <span className="text-xs font-bold text-[#001f3f] px-1">
+                        Page {regSafePage} of {regTotalPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setRegPage(regSafePage + 1)}
+                        disabled={regSafePage >= regTotalPages}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#e5e5e5] text-xs font-bold text-[#374151] hover:border-[#001f3f] transition-colors disabled:opacity-40"
+                      >
+                        Next
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
