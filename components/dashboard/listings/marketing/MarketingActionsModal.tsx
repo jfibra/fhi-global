@@ -15,6 +15,7 @@ type View = "menu" | "flyer" | "announce" | "sharecard"
 
 export default function MarketingActionsModal({
   listingId,
+  listingSlug,
   listingTitle,
   listingStatus,
   listingKind,
@@ -27,6 +28,7 @@ export default function MarketingActionsModal({
   onDelete,
 }: {
   listingId: string
+  listingSlug?: string | null
   listingTitle: string
   listingStatus: AgentListingStatus
   listingKind: "sale" | "rent"
@@ -46,15 +48,16 @@ export default function MarketingActionsModal({
   const closeTool = () => (initialView === "menu" ? setView("menu") : onClose())
 
   if (view === "flyer") {
-    return <FlyerModal listingId={listingId} listingTitle={listingTitle} onClose={closeTool} />
+    return <FlyerModal listingId={listingId} listingSlug={listingSlug} listingTitle={listingTitle} onClose={closeTool} />
   }
   if (view === "announce") {
-    return <AnnouncementModal listingId={listingId} listingTitle={listingTitle} onClose={closeTool} />
+    return <AnnouncementModal listingId={listingId} listingSlug={listingSlug} listingTitle={listingTitle} onClose={closeTool} />
   }
   if (view === "sharecard") {
     return (
       <ShareCardModal
         listingId={listingId}
+        listingSlug={listingSlug}
         listingTitle={listingTitle}
         listingStatus={listingStatus}
         listingKind={listingKind}

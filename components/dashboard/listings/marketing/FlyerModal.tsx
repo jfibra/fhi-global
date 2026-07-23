@@ -160,10 +160,12 @@ function ColorField({ label, value, onCommit }: { label: string; value: string; 
 
 export default function FlyerModal({
   listingId,
+  listingSlug,
   listingTitle,
   onClose,
 }: {
   listingId: string
+  listingSlug?: string | null
   listingTitle: string
   onClose: () => void
 }) {
@@ -186,7 +188,7 @@ export default function FlyerModal({
   const scaleWrapRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLDivElement>(null)
 
-  const listingUrl = `${SITE_URL}/listings/${listingId}`
+  const listingUrl = `${SITE_URL}/listings/${listingSlug ?? listingId}`
 
   useEffect(() => {
     let cancelled = false

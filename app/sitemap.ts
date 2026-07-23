@@ -57,7 +57,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .is("deleted_at", null),
     supabase
       .from("agent_listings")
-      .select("id, updated_at")
+      .select("id, slug, updated_at")
       .eq("status", "published")
       .is("deleted_at", null),
     fetchPublishedNews(),
@@ -91,7 +91,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }))
 
   const listingEntries: MetadataRoute.Sitemap = (agentListings ?? []).map((row) => ({
-    url: `${SITE_URL}/listings/${row.id}`,
+    url: `${SITE_URL}/listings/${row.slug ?? row.id}`,
     lastModified: row.updated_at ? new Date(row.updated_at) : now,
     changeFrequency: "weekly",
     priority: 0.8,

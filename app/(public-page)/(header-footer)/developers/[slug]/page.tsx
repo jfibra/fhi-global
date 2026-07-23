@@ -71,6 +71,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
   // market right now" view — bridges the projects catalog to buy/rent).
   type DevListing = {
     id: string
+    slug: string | null
     title: string
     listing_kind: "sale" | "rent"
     price: number | string | null
@@ -83,7 +84,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
   if (projectIds.length > 0) {
     const { data: listingRows } = await supabase
       .from("agent_listings")
-      .select("id, title, listing_kind, price, currency, project_id, agent_listing_images(url, sort_order)")
+      .select("id, slug, title, listing_kind, price, currency, project_id, agent_listing_images(url, sort_order)")
       .in("project_id", projectIds)
       .eq("status", "published")
       .is("deleted_at", null)
@@ -279,7 +280,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
                 return (
                   <Link
                     key={l.id}
-                    href={`/listings/${l.id}`}
+                    href={`/listings/${l.slug ?? l.id}`}
                     className="group relative bg-white rounded-2xl border border-[#e8eaed] overflow-hidden shadow-sm hover:shadow-[0_16px_44px_-14px_rgba(0,20,40,0.3)] hover:-translate-y-1 transition-all duration-300"
                   >
                     <span className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-[#d6b357]/30 z-10" aria-hidden="true" />

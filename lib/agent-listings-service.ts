@@ -12,6 +12,8 @@ export type AgentListingImage = {
 
 export type AgentListing = {
   id: string
+  /** URL slug generated from the title by the DB (migration 013); public link is /listings/<slug>. */
+  slug?: string | null
   agent_id: string
   project_id: number | null
   title: string

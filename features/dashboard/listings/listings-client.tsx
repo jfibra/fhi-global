@@ -812,6 +812,7 @@ export function AgentListingsClient({
       {marketing && (
         <MarketingActionsModal
           listingId={marketing.row.id}
+          listingSlug={marketing.row.slug ?? null}
           listingTitle={marketing.row.title}
           listingStatus={marketing.row.status}
           listingKind={marketing.row.listing_kind}

@@ -29,6 +29,7 @@ function withDevTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
 /** Row shape from public fetch (nested project matches BuyRawProject when linked). */
 export type PublicAgentListingRow = {
   id: string
+  slug: string | null
   title: string
   description: string | null
   listing_kind: "sale" | "rent"
@@ -59,7 +60,7 @@ async function fetchPublishedAgentListings(market: ListingMarket): Promise<{
   const { data, error } = await supabase
     .from("agent_listings")
     .select(
-      `id, title, description, listing_kind, price, currency, unit_type, created_at, updated_at, projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
+      `id, slug, title, description, listing_kind, price, currency, unit_type, created_at, updated_at, projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
     )
     .eq("status", "published")
     .is("deleted_at", null)
@@ -90,25 +91,30 @@ export async function getPublicAgentListingsCached(market: ListingMarket): Promi
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-export async function fetchPublicAgentListingById(id: string): Promise<{
+/**
+ * Fetch by the human slug (/listings/luxury-2br-marina) or the legacy uuid
+ * (/listings/410ba775-…) — old shared links keep working forever.
+ */
+export async function fetchPublicAgentListingById(idOrSlug: string): Promise<{
   row: PublicAgentListingRow | null
   error: boolean
 }> {
-  const trimmed = id.trim()
-  if (!UUID_RE.test(trimmed)) {
+  const trimmed = idOrSlug.trim()
+  if (!trimmed) {
     return { row: null, error: false }
   }
 
   const supabase = createPublicSupabaseClient()
-  const { data, error } = await supabase
+  const query = supabase
     .from("agent_listings")
     .select(
-      `id, title, description, listing_kind, price, currency, unit_type, created_at, updated_at, projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
+      `id, slug, title, description, listing_kind, price, currency, unit_type, created_at, updated_at, projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
     )
-    .eq("id", trimmed)
     .eq("status", "published")
     .is("deleted_at", null)
-    .maybeSingle()
+  const { data, error } = UUID_RE.test(trimmed)
+    ? await query.eq("id", trimmed).maybeSingle()
+    : await query.eq("slug", trimmed).maybeSingle()
 
   if (error != null) {
     return { row: null, error: true }

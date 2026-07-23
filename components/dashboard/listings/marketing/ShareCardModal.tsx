@@ -59,6 +59,7 @@ function Chip({
 
 export default function ShareCardModal({
   listingId,
+  listingSlug,
   listingTitle,
   listingStatus,
   listingKind,
@@ -68,6 +69,7 @@ export default function ShareCardModal({
   onClose,
 }: {
   listingId: string
+  listingSlug?: string | null
   listingTitle: string
   listingStatus: AgentListingStatus
   listingKind: "sale" | "rent"
@@ -93,7 +95,7 @@ export default function ShareCardModal({
 
   const isRent = listingKind === "rent"
   const isPublished = listingStatus === "published"
-  const listingUrl = `${SITE_URL}/listings/${listingId}`
+  const listingUrl = `${SITE_URL}/listings/${listingSlug ?? listingId}`
 
   // The modal is mounted fresh per listing (from MarketingActionsModal), so
   // loading/error start from their initial state — no synchronous reset here.

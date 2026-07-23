@@ -75,10 +75,12 @@ function Swatches({ colors, value, auto, onPick }: { colors: string[]; value?: s
 
 export default function AnnouncementModal({
   listingId,
+  listingSlug,
   listingTitle,
   onClose,
 }: {
   listingId: string
+  listingSlug?: string | null
   listingTitle: string
   onClose: () => void
 }) {
@@ -115,7 +117,7 @@ export default function AnnouncementModal({
   const dragLayerId = useRef<string | null>(null)
 
   const posterH = POSTER_HEIGHTS[size]
-  const listingUrl = `${SITE_URL}/listings/${listingId}`
+  const listingUrl = `${SITE_URL}/listings/${listingSlug ?? listingId}`
   const ratio = POSTER_W / posterH
 
   useEffect(() => {

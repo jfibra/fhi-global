@@ -67,7 +67,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return createPageMetadata({
     title: `${row.title} | FHI Global`,
     description,
-    pathname: `/listings/${row.id}`,
+    pathname: `/listings/${row.slug ?? row.id}`,
     imageUrl: `${SITE_URL.replace(/\/$/, "")}/og/listing/${row.id}?v=${ogImageVersion}`,
     keywords: [row.title, "UAE property", row.listing_kind === "rent" ? "rent" : "sale", "FHI Global"],
   })
