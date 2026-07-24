@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  Users, ChevronLeft, ChevronRight, ChevronDown,
-  Trash2, Eye, X, Phone,
+  Users, ChevronDown, Trash2, Eye, X, Phone,
 } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
 import { HeaderToolbar, ToolbarIconButton, TOOLBAR_GRADIENT } from "@/components/common/header-toolbar"
+import { DataTable } from "@/components/common/data-table"
 import { UserProfileModal } from "./user-profile-modal"
 import type { UserRecord, UsersListResponse } from "@/lib/user-service"
 import { ROLE_OPTIONS, STATUS_OPTIONS, ROLE_COLORS, STATUS_COLORS, getUserDisplayName } from "@/lib/user-service"
@@ -86,50 +86,6 @@ const ACCENT = "#0ea5e9"
 
 const DEFAULT_PER_PAGE = 10
 const PER_PAGE_OPTIONS = [10, 20, 50]
-
-// Fixed-width pager: always renders PAGE_SLOTS page cubes (first, last, "…"
-// gaps, numbers). With the prev/next buttons that's PAGE_SLOTS + 2 = 10 cubes.
-// Middle → [1, "…", 6, 7, 8, 9, "…", 100]; near an end → six consecutive pages.
-const PAGE_SLOTS = 8
-function paginationItems(current: number, total: number): (number | "…")[] {
-  // Not enough pages to need gaps — show them all.
-  if (total <= PAGE_SLOTS) {
-    return Array.from({ length: total }, (_, i) => i + 1)
-  }
-
-  const leftGap = current > 4
-  const rightGap = current < total - 3
-  const pages: (number | "…")[] = []
-
-  if (!leftGap) {
-    // Near start: 1..(SLOTS-2), …, total
-    for (let i = 1; i <= PAGE_SLOTS - 2; i++) pages.push(i)
-    pages.push("…", total)
-  } else if (!rightGap) {
-    // Near end: 1, …, last (SLOTS-2) pages
-    pages.push(1, "…")
-    for (let i = total - (PAGE_SLOTS - 3); i <= total; i++) pages.push(i)
-  } else {
-    // Middle: 1, …, [interior window], …, total
-    const interior = PAGE_SLOTS - 4 // 4 numbers between the two gaps
-    let start = current - Math.floor((interior - 1) / 2)
-    start = Math.max(2, Math.min(start, total - 1 - (interior - 1)))
-    pages.push(1, "…")
-    for (let i = 0; i < interior; i++) pages.push(start + i)
-    pages.push("…", total)
-  }
-
-  // A "…" hiding exactly one page is pointless — show that page number instead
-  // (keeps the same slot count).
-  return pages.map((p, i) => {
-    const prev = pages[i - 1]
-    const next = pages[i + 1]
-    if (p === "…" && typeof prev === "number" && typeof next === "number" && next - prev === 2) {
-      return prev + 1
-    }
-    return p
-  })
-}
 
 function buildQuery(params: {
   page: number
@@ -360,119 +316,38 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
       )}
 
       {/* User table */}
-      <div className="bg-white rounded-[18px] border border-black/[0.08] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-black/[0.08] bg-[#fafafb]">
-                {["User", "Contact", "Role", "Status", "Joined", "Referred by", "Actions"].map((h) => (
-                  <th key={h} className="text-left font-['Outfit'] text-[11px] font-bold text-black/45 uppercase tracking-wider px-3 py-3.5 whitespace-nowrap first:pl-6 last:pr-6">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-black/[0.05]">
-              {/* Skeleton only on the first load (no data yet). On refetches
-                  (filter / search / refresh) keep the current rows visible —
-                  the refresh button still spins via `refreshing={loading}`. */}
-              {loading && users.length === 0 ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}>
-                    {Array.from({ length: 7 }).map((_, j) => (
-                      <td key={j} className="px-3 py-4 first:pl-6 last:pr-6">
-                        <div className={`h-3 rounded-full bg-[#f0f2f5] animate-pulse ${j === 0 ? "w-32" : j === 6 ? "w-20" : "w-24"}`} />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : users.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center gap-2 text-[#9ca3af]">
-                      <Users className="w-8 h-8 opacity-40" />
-                      <p className="text-sm font-medium">No users found</p>
-                      <p className="text-xs">Try adjusting your search or filters</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                users.map((user) => (
-                  <UserRow
-                    key={user.id}
-                    user={user}
-                    referrers={referrers}
-                    referrerName={referrerName}
-                    onPatch={applyPatch}
-                    onOpen={openView}
-                    onDelete={handleDelete}
-                    onHardDelete={handleHardDelete}
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {total > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3.5 border-t border-black/[0.08] bg-[#fafafb]">
-            <div className="flex items-center gap-2">
-              <span className="h-8 inline-flex items-center px-3 rounded-[10px] border border-black/[0.08] bg-white text-xs font-medium text-black/55 whitespace-nowrap tabular-nums">
-                Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
-              </span>
-              {/* Rows per page */}
-              <div className="relative">
-                <select
-                  value={perPage}
-                  onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1) }}
-                  className={`h-8 pl-2.5 pr-7 rounded-[10px] border border-transparent text-xs font-medium text-white appearance-none cursor-pointer focus:outline-none transition-all hover:brightness-110 ${TOOLBAR_GRADIENT}`}
-                >
-                  {PER_PAGE_OPTIONS.map((n) => <option key={n} value={n} className="bg-white text-[#111827]">{n} / page</option>)}
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-white/80 pointer-events-none" />
-              </div>
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => goPage(page - 1)}
-                  disabled={page === 1}
-                  className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-black/[0.08] text-black/50 hover:text-[#001f3f] hover:border-[#001f3f]/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-                {paginationItems(page, totalPages).map((p, i) =>
-                  p === "…" ? (
-                    <span
-                      key={`gap-${i}`}
-                      className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-black/[0.08] text-xs font-semibold text-black/40 select-none"
-                    >
-                      …
-                    </span>
-                  ) : (
-                    <button
-                      key={p}
-                      onClick={() => goPage(p)}
-                      className={`w-8 h-8 rounded-[10px] text-xs font-semibold transition-all ${page === p ? `${TOOLBAR_GRADIENT} text-white` : "border border-black/[0.08] text-black/50 hover:border-[#001f3f]/30 hover:text-[#001f3f]"}`}
-                    >
-                      {p}
-                    </button>
-                  ),
-                )}
-                <button
-                  onClick={() => goPage(page + 1)}
-                  disabled={page === totalPages}
-                  className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-black/[0.08] text-black/50 hover:text-[#001f3f] hover:border-[#001f3f]/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
+      <DataTable
+        columns={["User", "Contact", "Role", "Status", "Joined", "Referred by", "Actions"]}
+        loading={loading}
+        empty={users.length === 0}
+        emptyState={
+          <div className="flex flex-col items-center gap-2 text-[#9ca3af]">
+            <Users className="w-8 h-8 opacity-40" />
+            <p className="text-sm font-medium">No users found</p>
+            <p className="text-xs">Try adjusting your search or filters</p>
           </div>
-        )}
-      </div>
+        }
+        page={page}
+        perPage={perPage}
+        total={total}
+        totalPages={totalPages}
+        onPageChange={goPage}
+        onPerPageChange={(n) => { setPerPage(n); setPage(1) }}
+        perPageOptions={PER_PAGE_OPTIONS}
+      >
+        {users.map((user) => (
+          <UserRow
+            key={user.id}
+            user={user}
+            referrers={referrers}
+            referrerName={referrerName}
+            onPatch={applyPatch}
+            onOpen={openView}
+            onDelete={handleDelete}
+            onHardDelete={handleHardDelete}
+          />
+        ))}
+      </DataTable>
 
       {/* View / edit profile (complete-profile look) */}
       {viewUser && (
