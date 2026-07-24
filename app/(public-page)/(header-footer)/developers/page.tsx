@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { Suspense } from "react"
-import { createPublicSupabaseClient } from "@/lib/supabase/public"
+import { getCachedDevelopersDirectory } from "@/lib/data/developers"
 import { createPageMetadata } from "@/lib/seo"
 import { DeveloperCard, type DeveloperCardData } from "@/components/developer-card"
 import { DeveloperSearch } from "./developer-search"
@@ -43,27 +43,14 @@ function ToolbarFallback() {
 export default async function DevelopersPage({ searchParams }: { searchParams: SearchParams }) {
   const { q, view } = await searchParams
   const isMap = view === "map"
-  const supabase = createPublicSupabaseClient()
 
-  let devQuery = supabase
-    .from("developers")
-    .select("id, name, slug, description, logo_url, rating, is_verified")
-    .eq("is_active", true)
-    .is("deleted_at", null)
-    .order("name")
-
-  if (q) {
-    devQuery = devQuery.ilike("name", `%${q}%`)
-  }
-
-  const coordsQuery = supabase
-    .from("projects")
-    .select("developer_id, latitude, longitude")
-    .eq("is_active", true)
-    .eq("is_published", true)
-    .is("deleted_at", null)
-
-  const [{ data: developers }, { data: projectCoords }] = await Promise.all([devQuery, coordsQuery])
+  // Directory data comes from a 120s server cache (no Supabase round-trips on
+  // the hot path); the search filter runs in memory over the small list.
+  const { developers: allDevelopers, projectCoords } = await getCachedDevelopersDirectory()
+  const needle = q?.trim().toLowerCase()
+  const developers = needle
+    ? allDevelopers.filter((d) => (d.name ?? "").toLowerCase().includes(needle))
+    : allDevelopers
 
   const verifiedCount = (developers ?? []).filter((d) => d.is_verified).length
 
