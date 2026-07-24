@@ -162,9 +162,15 @@ export function LogDetailDrawer({ row, onClose }: { row: AuditLogRow; onClose: (
 
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af] mb-1.5">Date &amp; Time</p>
-            <div className="flex items-center gap-2 text-sm text-[#374151]">
+            <div
+              className="flex items-center gap-2 text-sm text-[#374151] cursor-help w-fit"
+              title={`Philippine time: ${formatLongDateTime(row.occurred_at, "Asia/Manila")}`}
+            >
               <Clock className="w-4 h-4 text-[#9ca3af]" />
-              {formatLongDateTime(row.occurred_at)}
+              <span>
+                {formatLongDateTime(row.occurred_at, "Asia/Dubai")}
+                <span className="ml-1.5 text-xs text-[#9ca3af]">· Dubai time</span>
+              </span>
             </div>
           </div>
 

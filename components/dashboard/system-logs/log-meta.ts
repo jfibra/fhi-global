@@ -114,7 +114,7 @@ export function formatDateTime(iso: string | null): string {
   })
 }
 
-export function formatLongDateTime(iso: string | null): string {
+export function formatLongDateTime(iso: string | null, timeZone?: string): string {
   if (!iso) return "—"
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return "—"
@@ -125,6 +125,7 @@ export function formatLongDateTime(iso: string | null): string {
     hour: "numeric",
     minute: "2-digit",
     second: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
   })
 }
 
