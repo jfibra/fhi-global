@@ -34,6 +34,13 @@ export async function GET(req: NextRequest) {
   const statusFilter = sp.get("status") ?? ""
   const showDeleted  = sp.get("deleted") === "true"
 
+  const searchRaw = search.trim()
+  const isEmailSearch = searchRaw.includes("@")
+  // ilike patterns are interpolated into a PostgREST or() filter, where commas,
+  // parentheses and double quotes are syntax — strip them so a query like
+  // "a, b (x)" can't corrupt the filter. Collapse leftover whitespace.
+  const searchSafe = searchRaw.replace(/[,()"\\]/g, " ").replace(/\s+/g, " ").trim()
+
   const admin = createAdminSupabase()
 
   // ── Fetch auth users for email lookup ────────────────────────────────────────
@@ -47,11 +54,13 @@ export async function GET(req: NextRequest) {
     if (u.email) emailMap.set(u.id, u.email)
   }
 
-  // Email search: restrict to IDs whose email matches
+  // Email search: restrict to IDs whose email matches (email lives in auth.users,
+  // not profiles, so it's matched here in JS rather than in the profiles query).
   let allowedIds: Set<string> | null = null
-  if (search && search.includes("@")) {
+  if (isEmailSearch) {
+    const needle = searchRaw.toLowerCase()
     allowedIds = new Set(
-      authUsers.filter((u) => u.email?.toLowerCase().includes(search.toLowerCase())).map((u) => u.id),
+      authUsers.filter((u) => u.email?.toLowerCase().includes(needle)).map((u) => u.id),
     )
   }
 
@@ -68,15 +77,19 @@ export async function GET(req: NextRequest) {
     .range(from, to)
     .order("joined_at", { ascending: false })
 
-  // Visibility
-  if (!showDeleted) {
+  // Visibility. Toggle ON = archive view (only soft-deleted); OFF = only active
+  // (is_deleted null or false — legacy rows may have NULL).
+  if (showDeleted) {
+    query = query.eq("is_deleted", true)
+  } else {
     query = query.or("is_deleted.is.null,is_deleted.eq.false")
   }
 
-  // Name/text search (not email)
-  if (search && !search.includes("@")) {
+  // Name/text search (email is handled via allowedIds below). Skip when the
+  // sanitized term is empty (e.g. the search was only punctuation).
+  if (!isEmailSearch && searchSafe) {
     query = query.or(
-      `fullname.ilike.%${search}%,fname.ilike.%${search}%,lname.ilike.%${search}%`,
+      `fullname.ilike.%${searchSafe}%,fname.ilike.%${searchSafe}%,lname.ilike.%${searchSafe}%`,
     )
   }
 
