@@ -5,9 +5,6 @@ import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
 import { eventBrand } from "@/lib/events/brands"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
-import { TopBar } from "@/components/topbar"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
 import { ArrowRight, CalendarDays, MapPin, Star } from "lucide-react"
 
 export const revalidate = 120
@@ -48,8 +45,6 @@ export default async function EventsPage() {
 
   return (
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
-      <TopBar />
-      <Header />
 
       {/* ── Hero ── */}
       <section className="relative pt-20 pb-24 overflow-hidden">
@@ -176,7 +171,6 @@ export default async function EventsPage() {
         )}
       </section>
 
-      <Footer />
     </div>
   )
 }

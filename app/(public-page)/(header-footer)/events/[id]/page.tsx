@@ -10,9 +10,6 @@ import { EventRegisterForm } from "@/components/public/event-register-form"
 import { EventPageQr } from "@/components/public/event-page-qr"
 import { EventHeroQr } from "@/components/public/event-hero-qr"
 import { EventViewPing } from "@/components/public/event-view-ping"
-import { TopBar } from "@/components/topbar"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
 import { ArrowLeft, CalendarDays, ChevronRight, Clock, MapPin, Ticket } from "lucide-react"
 
 export const revalidate = 120
@@ -72,8 +69,6 @@ export default async function EventDetailPage({ params }: Props) {
   return (
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
       <EventViewPing eventId={event.id} />
-      <TopBar />
-      <Header />
 
       {/* ── Hero — the WHOLE poster shown (contained) over a blurred backdrop ── */}
       <div className="relative">
@@ -220,7 +215,6 @@ export default async function EventDetailPage({ params }: Props) {
         </div>
       </div>
 
-      <Footer />
     </div>
   )
 }

@@ -8,9 +8,6 @@ import {
   loadPublicAgentListings,
   type ListingSearchParams,
 } from "@/lib/buy/listings-page-logic"
-import { TopBar } from "@/components/topbar"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
 import { BuyFiltersLoader } from "./buy-filters-loader"
 import { BuyListToolbar } from "@/components/buy/buy-list-toolbar"
 import { BuyPropertyCard } from "@/components/buy/buy-property-card"
@@ -259,8 +256,6 @@ export default async function BuyPage({ searchParams }: { searchParams: ListingS
       {view !== "map" && (
         <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full opacity-20 blur-[100px] -z-10 bg-[radial-gradient(circle,rgb(200,235,255)_0%,transparent_70%)]" />
       )}
-      <TopBar />
-      <Header />
 
       <Suspense fallback={<FiltersFallback />}>
         <BuyFiltersLoader />
@@ -308,7 +303,6 @@ export default async function BuyPage({ searchParams }: { searchParams: ListingS
         </div>
       )}
 
-      <Footer />
     </div>
   )
 }

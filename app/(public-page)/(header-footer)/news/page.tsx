@@ -2,9 +2,6 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { TopBar } from "@/components/topbar"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
 import { createPageMetadata } from "@/lib/seo"
 import { fetchArticles, slugify, type NewsArticle } from "@/lib/news-service"
 import { Clock, Play, TrendingUp, Clock3, ChevronRight } from "lucide-react"
@@ -177,15 +174,12 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
   if (all.length === 0) {
     return (
       <div className="min-h-screen bg-white flex flex-col">
-        <TopBar />
-        <Header />
         <main className="flex-1 flex flex-col items-center justify-center py-24 px-4">
           <div className="text-center max-w-md">
             <h1 className="text-2xl font-bold text-gray-800 mb-3">No news available</h1>
             <p className="text-gray-500 text-sm">Check back soon for the latest real estate news and market updates.</p>
           </div>
         </main>
-        <Footer />
       </div>
     )
   }
@@ -224,8 +218,6 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
 
   return (
     <div className="min-h-screen bg-[#f5f5f5] font-sans">
-      <TopBar />
-      <Header />
 
       {/* ── TICKER ── */}
       <div className="bg-[#001428]">
@@ -405,7 +397,6 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
         </div>
       </div>
 
-      <Footer />
     </div>
   )
 }

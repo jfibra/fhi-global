@@ -2,9 +2,6 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { TopBar } from "@/components/topbar"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
 import { fetchArticleBySlug, fetchArticles, type NewsArticle } from "@/lib/news-service"
 import { Clock, Play } from "lucide-react"
 
@@ -225,8 +222,6 @@ export default async function NewsDetailPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
       />
-      <TopBar />
-      <Header />
 
       {/* ── Breadcrumb ─────────────────────────────────────────────────────── */}
       <div className="border-b border-gray-200 bg-gray-50">
@@ -418,7 +413,6 @@ export default async function NewsDetailPage({ params }: PageProps) {
         </div>
       </main>
 
-      <Footer />
     </div>
   )
 }

@@ -3,8 +3,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { getCachedHomePageData } from "@/lib/data/home";
 import { createPageMetadata } from "@/lib/seo";
-import { TopBar } from "@/components/topbar";
-import { Header } from "@/components/header";
 import { HeroSection } from "@/components/hero-section";
 import { Reveal } from "@/components/public/reveal";
 import {
@@ -12,7 +10,6 @@ import {
   type DeveloperCardData,
 } from "@/components/developer-card";
 import { ProjectCard, type ProjectCardData } from "@/components/project-card";
-import { Footer } from "@/components/footer";
 import {
   Building2,
   TrendingUp,
@@ -165,8 +162,6 @@ export default async function HomePage() {
       <div className="fixed top-[-10%] left-[-10%] w-[700px] h-[700px] rounded-full opacity-30 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />
       <div className="fixed bottom-0 right-[-5%] w-[600px] h-[600px] rounded-full opacity-25 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(250,240,210)_0%,rgba(255,255,255,0)_70%)]" />
 
-      <TopBar />
-      <Header />
       <HeroSection developers={devOptions} cities={uniqueCities} />
 
       {/* ----------------------------------------------- */}
@@ -480,7 +475,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <Footer />
     </div>
     </>
   );

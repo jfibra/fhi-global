@@ -36,6 +36,34 @@ type HeaderSession = {
   email: string | null
 }
 
+// The header remounts on every page navigation (each public page renders its
+// own <Header/>), which used to refetch auth + profile and flash the avatar.
+// Cache the resolved session for the tab: module cache covers client-side
+// navigation, sessionStorage covers full reloads. `undefined` = never loaded,
+// `null` = known logged-out. A background refresh still runs on every mount.
+let headerSessionCache: HeaderSession | null | undefined
+const SESSION_KEY = "fhi-header-session"
+
+function readCachedSession(): HeaderSession | null | undefined {
+  if (headerSessionCache !== undefined) return headerSessionCache
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY)
+    if (raw === null) return undefined
+    return raw === "null" ? null : (JSON.parse(raw) as HeaderSession)
+  } catch {
+    return undefined
+  }
+}
+
+function writeCachedSession(value: HeaderSession | null) {
+  headerSessionCache = value
+  try {
+    sessionStorage.setItem(SESSION_KEY, value === null ? "null" : JSON.stringify(value))
+  } catch {
+    // storage unavailable (private mode) — module cache still helps
+  }
+}
+
 function initialsFrom(displayName: string, email: string | null) {
   const n = displayName.trim()
   if (n) {
@@ -65,6 +93,7 @@ export function Header() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
+        writeCachedSession(null)
         setSession(null)
         return
       }
@@ -78,14 +107,16 @@ export function Header() {
         ? profile.fullname.trim()
         : (user.email?.split("@")[0] ?? "Account")
 
-      setSession({
+      const value: HeaderSession = {
         dashboardHref: getDashboardRouteByRole(profile?.role ?? null),
         displayName,
         avatarUrl: typeof profile?.profile_url === "string" && profile.profile_url.trim()
           ? profile.profile_url.trim()
           : null,
         email: user.email ?? null,
-      })
+      }
+      writeCachedSession(value)
+      setSession(value)
     } catch {
       setSession(null)
     } finally {
@@ -94,6 +125,13 @@ export function Header() {
   }, [])
 
   useEffect(() => {
+    // Cached session (this tab) shows the account chip instantly; the fetch
+    // below still revalidates in the background.
+    const cached = readCachedSession()
+    if (cached !== undefined) {
+      setSession(cached)
+      setAuthReady(true)
+    }
     void loadSession()
     try {
       const supabase = createClient()

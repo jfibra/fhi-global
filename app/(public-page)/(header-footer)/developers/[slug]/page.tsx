@@ -4,9 +4,6 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
-import { TopBar } from "@/components/topbar"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
 import { ProjectCard, type ProjectCardData } from "@/components/project-card"
 import { SocialShare } from "@/components/social-share"
 import { Building2, Globe, Phone, Mail, MapPin, Star, CheckCircle2, ArrowLeft } from "lucide-react"
@@ -120,8 +117,6 @@ export default async function DeveloperDetailPage({ params }: Props) {
       <div className="fixed top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-25 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />
       <div className="fixed bottom-0 right-[-5%] w-[500px] h-[500px] rounded-full opacity-20 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(250,240,210)_0%,rgba(255,255,255,0)_70%)]" />
 
-      <TopBar />
-      <Header />
 
       {/* Hero Banner — skyline photo with navy wash (approved mockup) */}
       <section className="relative pt-16 pb-16 overflow-hidden bg-[#001428]">
@@ -362,7 +357,6 @@ export default async function DeveloperDetailPage({ params }: Props) {
         </section>
       </div>
 
-      <Footer />
     </div>
   )
 }

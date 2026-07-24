@@ -4,9 +4,6 @@ import Link from "next/link"
 import { Suspense } from "react"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
-import { TopBar } from "@/components/topbar"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
 import { DeveloperCard, type DeveloperCardData } from "@/components/developer-card"
 import { DeveloperSearch } from "./developer-search"
 import { BuyFiltersLoader } from "@/app/(public-page)/(header-footer)/buy/buy-filters-loader"
@@ -137,8 +134,6 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
 
     return (
       <div className="relative min-h-screen bg-[#f6f7f9] font-sans">
-        <TopBar />
-        <Header />
 
         <Suspense fallback={<FiltersFallback />}>
           <BuyFiltersLoader />
@@ -187,7 +182,6 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
           </div>
         </div>
 
-        <Footer />
       </div>
     )
   }
@@ -198,8 +192,6 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
       <div className="fixed top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-25 blur-[130px] -z-10 bg-[radial-gradient(circle,rgb(200,235,255)_0%,rgba(255,255,255,0)_70%)]" />
       <div className="fixed bottom-0 right-[-5%] w-[500px] h-[500px] rounded-full opacity-20 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(250,240,210)_0%,rgba(255,255,255,0)_70%)]" />
 
-      <TopBar />
-      <Header />
 
       {/* ─── Page Hero ─── */}
       <section className="relative pt-20 pb-36 overflow-hidden">
@@ -307,7 +299,6 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
         {cardsBlock}
       </section>
 
-      <Footer />
     </div>
   )
 }

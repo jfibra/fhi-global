@@ -1,9 +1,6 @@
 import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
-import { TopBar } from "@/components/topbar"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
 import { ContactForm } from "./contact-form"
 import { createPageMetadata } from "@/lib/seo"
 import {
@@ -65,8 +62,6 @@ export default function ContactPage() {
       <div className="fixed top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-20 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />
       <div className="fixed bottom-0 right-[-5%] w-[500px] h-[500px] rounded-full opacity-15 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(250,240,210)_0%,rgba(255,255,255,0)_70%)]" />
 
-      <TopBar />
-      <Header />
 
       {/* ── Hero — homepage skyline photo (approved mockup) ──── */}
       <section className="relative pt-20 pb-44 overflow-hidden">
@@ -329,7 +324,6 @@ export default function ContactPage() {
         </div>
       </section>
 
-      <Footer />
     </div>
   )
 }
