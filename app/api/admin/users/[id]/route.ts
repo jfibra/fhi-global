@@ -43,6 +43,7 @@ export async function GET(
   return NextResponse.json({
     ...profile,
     email: authData?.user?.email ?? null,
+    last_sign_in_at: authData?.user?.last_sign_in_at ?? null,
   })
 }
 

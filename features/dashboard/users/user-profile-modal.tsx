@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
-import { X, ChevronDown, Edit3, CheckCircle, Loader2 } from "lucide-react"
+import { useEffect, useState } from "react"
+import { X, ChevronDown, Edit3, CheckCircle, Loader2, Clock, History, ChevronLeft, ChevronRight } from "lucide-react"
 import { PhoneCountrySelect } from "@/components/phone-country-select"
 import { UserAvatar } from "@/components/user-avatar"
 import { NATIONALITIES } from "@/lib/nationalities"
 import { ROLE_OPTIONS, STATUS_OPTIONS, getUserDisplayName } from "@/lib/user-service"
 import type { UserRecord } from "@/lib/user-service"
+import { formatDate, relativeTime, formatDateAtTimeInZone } from "@/lib/utils"
+import { eventColor, humanizeEvent } from "@/components/dashboard/system-logs/log-meta"
 
 type ReferrerOption = { id: string; fullname: string; role: string }
 type BannerType = "success" | "error"
@@ -27,6 +29,18 @@ const TIMEZONES = [
   { label: "Sydney (UTC +10:00)", value: "Australia/Sydney" },
   { label: "Tokyo (UTC +09:00)", value: "Asia/Tokyo" },
 ]
+
+const ACTIVITY_PER_PAGE = 8
+
+type ActivityRow = {
+  id: string
+  occurred_at: string
+  event: string
+  source: string
+  actor_name: string | null
+  subject_label: string | null
+  description: string | null
+}
 
 const fieldBase =
   "peer w-full h-12 rounded-xl border border-[#d0d5dd] bg-white text-sm text-[#111827] focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/10 transition-all disabled:bg-white disabled:text-[#111827] disabled:cursor-default"
@@ -98,6 +112,11 @@ export function UserProfileModal({
 }) {
   const [readOnly, setReadOnly] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [lastOnline, setLastOnline] = useState<string | null>(null)
+  const [activity, setActivity] = useState<ActivityRow[]>([])
+  const [activityPage, setActivityPage] = useState(1)
+  const [activityTotal, setActivityTotal] = useState(0)
+  const [loadingActivity, setLoadingActivity] = useState(true)
 
   const m = user.metadata ?? {}
   const s = (v: unknown) => (typeof v === "string" ? v : "")
@@ -121,6 +140,48 @@ export function UserProfileModal({
   const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }))
 
   const displayName = getUserDisplayName(user)
+
+  // Fetch the authoritative profile detail (adds last_sign_in_at = "last online",
+  // which the list row doesn't carry). Non-fatal on failure.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(`/api/admin/users/${user.id}`, { cache: "no-store" })
+        if (!res.ok) return
+        const d = (await res.json()) as { last_sign_in_at?: string | null }
+        if (!cancelled) setLastOnline(d.last_sign_in_at ?? null)
+      } catch {
+        /* non-fatal */
+      }
+    })()
+    return () => { cancelled = true }
+  }, [user.id])
+
+  // Paginated activity — refetched per page so the modal stays fast.
+  useEffect(() => {
+    let cancelled = false
+    setLoadingActivity(true)
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/admin/users/${user.id}/activity?page=${activityPage}&perPage=${ACTIVITY_PER_PAGE}`,
+          { cache: "no-store" },
+        )
+        const d = (await res.json()) as { rows?: ActivityRow[]; total?: number }
+        if (cancelled) return
+        setActivity(d.rows ?? [])
+        setActivityTotal(d.total ?? 0)
+      } catch {
+        if (!cancelled) { setActivity([]); setActivityTotal(0) }
+      } finally {
+        if (!cancelled) setLoadingActivity(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [user.id, activityPage])
+
+  const activityPages = Math.max(1, Math.ceil(activityTotal / ACTIVITY_PER_PAGE))
 
   const save = async () => {
     setBusy(true)
@@ -171,6 +232,24 @@ export function UserProfileModal({
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Meta strip: last online (Dubai + Philippine time) and joined date */}
+        <div className="px-6 py-3 border-b border-[#f0f2f5] bg-[#f9fafb] text-xs space-y-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[#6b7280]">
+            <Clock className="w-3.5 h-3.5 text-[#9ca3af]" />
+            <span>Last online:</span>
+            <span className="font-semibold text-[#374151]">{lastOnline ? relativeTime(lastOnline) : "Never signed in"}</span>
+            <span className="mx-1 text-[#d0d5dd]">·</span>
+            <span>Joined:</span>
+            <span className="font-semibold text-[#374151]">{formatDate(user.joined_at)}</span>
+          </div>
+          {lastOnline && (
+            <div className="flex flex-wrap gap-x-4 gap-y-0.5 pl-5 text-[11px] text-[#9ca3af]">
+              <span>Dubai: <span className="font-medium text-[#374151]">{formatDateAtTimeInZone(lastOnline, "Asia/Dubai")}</span></span>
+              <span>Philippines: <span className="font-medium text-[#374151]">{formatDateAtTimeInZone(lastOnline, "Asia/Manila")}</span></span>
+            </div>
+          )}
         </div>
 
         {/* Body */}
@@ -239,6 +318,79 @@ export function UserProfileModal({
               </div>
             </div>
           </fieldset>
+
+          {/* Activity log — paginated (kept outside the fieldset so its pager
+              works while viewing) */}
+          <div className="mt-6 pt-5 border-t border-[#f0f2f5]">
+            <div className="flex items-center gap-2 mb-3">
+              <History className="w-4 h-4 text-[#001f3f]" />
+              <h4 className="font-['Outfit'] text-sm font-bold text-[#0d1117]">Activity Log</h4>
+              {activityTotal > 0 && <span className="text-xs text-[#9ca3af]">({activityTotal})</span>}
+            </div>
+
+            {loadingActivity ? (
+              <div className="flex items-center gap-2 text-xs text-[#9ca3af] py-6">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading activity…
+              </div>
+            ) : activity.length === 0 ? (
+              <p className="text-xs text-[#9ca3af] py-6 text-center">No activity recorded for this user yet.</p>
+            ) : (
+              <>
+                <ol className="space-y-2.5">
+                  {activity.map((row) => (
+                    <li key={row.id} className="flex items-start gap-3">
+                      <span className="mt-1.5 w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: eventColor(row.event) }} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold" style={{ color: eventColor(row.event) }}>{humanizeEvent(row.event)}</span>
+                          <span className="text-[10px] text-[#9ca3af]">from {row.source}</span>
+                          <span
+                            className="text-[10px] text-[#9ca3af] ml-auto"
+                            title={`Dubai: ${formatDateAtTimeInZone(row.occurred_at, "Asia/Dubai")} · PH: ${formatDateAtTimeInZone(row.occurred_at, "Asia/Manila")}`}
+                          >
+                            {relativeTime(row.occurred_at)}
+                          </span>
+                        </div>
+                        {(row.description || row.subject_label) && (
+                          <p className="text-xs text-[#374151] mt-0.5 break-words">{row.description || row.subject_label}</p>
+                        )}
+                        {row.actor_name && <p className="text-[10px] text-[#9ca3af] mt-0.5">by {row.actor_name}</p>}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+
+                {activityTotal > ACTIVITY_PER_PAGE && (
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#f4f6f9]">
+                    <span className="text-[11px] text-[#9ca3af]">
+                      {(activityPage - 1) * ACTIVITY_PER_PAGE + 1}–{Math.min(activityPage * ACTIVITY_PER_PAGE, activityTotal)} of {activityTotal}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
+                        disabled={activityPage === 1 || loadingActivity}
+                        className="p-1.5 rounded-lg border border-[#e5e5e5] text-[#6b7280] disabled:opacity-40 hover:border-[#001f3f]/30 transition-colors"
+                        aria-label="Previous"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-[11px] font-semibold text-[#374151] px-1">{activityPage} / {activityPages}</span>
+                      <button
+                        type="button"
+                        onClick={() => setActivityPage((p) => (p < activityPages ? p + 1 : p))}
+                        disabled={activityPage >= activityPages || loadingActivity}
+                        className="p-1.5 rounded-lg border border-[#e5e5e5] text-[#6b7280] disabled:opacity-40 hover:border-[#001f3f]/30 transition-colors"
+                        aria-label="Next"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Footer */}

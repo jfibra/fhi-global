@@ -10,6 +10,7 @@ import { DataTable } from "@/components/common/data-table"
 import { UserProfileModal } from "./user-profile-modal"
 import type { UserRecord, UsersListResponse } from "@/lib/user-service"
 import { ROLE_OPTIONS, STATUS_OPTIONS, ROLE_COLORS, STATUS_COLORS, getUserDisplayName } from "@/lib/user-service"
+import { formatDateAtTimeInZone } from "@/lib/utils"
 
 type ReferrerOption = { id: string; fullname: string; role: string }
 
@@ -29,14 +30,6 @@ function roleChipCls(role: string | null): string {
 function statusChipCls(status: string | null): string {
   const c = STATUS_COLORS[(status ?? "pending").toLowerCase().trim()] ?? STATUS_COLORS.pending
   return `${c.bg} ${c.text} ${c.border}`
-}
-
-// Date only (no time) for the Joined column.
-function formatJoined(value: string | null): string {
-  if (!value) return "—"
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return "—"
-  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
 }
 
 // Inline chip-style dropdown for editing role/status directly in the table.
@@ -443,9 +436,19 @@ function UserRow({
         />
       </td>
 
-      {/* Joined — date only */}
+      {/* Joined — Dubai date & time; hover shows Philippine time */}
       <td className="px-3 py-3.5 whitespace-nowrap text-xs text-black/55 tabular-nums">
-        {formatJoined(user.joined_at)}
+        {user.joined_at ? (
+          <span
+            className="cursor-help underline decoration-dotted decoration-black/20 underline-offset-2"
+            title={`Philippine time: ${formatDateAtTimeInZone(user.joined_at, "Asia/Manila")}`}
+          >
+            {formatDateAtTimeInZone(user.joined_at, "Asia/Dubai")}
+            <span className="ml-1 text-[10px] uppercase tracking-wide text-black/35">Dubai</span>
+          </span>
+        ) : (
+          "—"
+        )}
       </td>
 
       {/* Referred by — inline editable */}
