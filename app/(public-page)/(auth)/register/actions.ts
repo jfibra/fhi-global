@@ -7,6 +7,7 @@ import { logAuditEvent, requestContextFromHeaders } from "@/lib/audit-log"
 import { sendOtpEmail } from "@/lib/mailer"
 import { generateOtpCode, storeOtpChallenge, consumeOtpChallenge } from "@/lib/auth-otp"
 import { DEFAULT_ACCOUNT_PASSWORD } from "@/lib/account-password"
+import { resolveLrProvision } from "@/lib/lr/lr-provision"
 
 /**
  * Result of the two OTP steps (email → code). `challenge` is an opaque id the
@@ -142,9 +143,9 @@ export async function verifyRegisterOtp(
   // blocks this too). Verified but active → just end the session and finish.
   const { data: current } = await admin
     .from("profiles")
-    .select("status")
+    .select("status, metadata")
     .eq("id", userId)
-    .maybeSingle<{ status: string | null }>()
+    .maybeSingle<{ status: string | null; metadata: Record<string, unknown> | null }>()
   if (current?.status === "active") {
     await supabase.auth.signOut()
     return { success: true }
@@ -161,14 +162,39 @@ export async function verifyRegisterOtp(
     if (inviter) invitedBy = ref
   }
 
+  // Parity with Google sign-in: for self-service member signups, check Leuterio
+  // Realty and provision the LR role + active status when the email is a genuine
+  // agent (shared logic — see lib/lr/lr-provision.ts). Developer signups are
+  // intentional and skip the LR mapping (they stay developer/pending).
+  let finalRole = role
+  let finalStatus = "pending"
+  let lrIsAgent = false
+  let lrMetadata: Record<string, unknown> = {}
+  if (accountType === "member") {
+    const prov = await resolveLrProvision({ email, currentRole: "member", currentStatus: "pending" })
+    finalRole = prov.role
+    finalStatus = prov.status
+    lrIsAgent = prov.isLrAgent
+    // Don't stamp LR metadata when the lookup was unreachable (unknown answer).
+    lrMetadata = prov.lrUnreachable
+      ? {}
+      : { ...prov.lrMetadata, ...(prov.isLrAgent ? { lr_provisioned: true } : {}) }
+  }
+
+  const mergedMetadata = {
+    ...(current?.metadata ?? {}),
+    ...lrMetadata,
+    ...(invitedBy ? { invited_by: invitedBy } : {}),
+  }
+
   const { error: profileError } = await admin
     .from("profiles")
     .upsert(
       {
         id: userId,
-        role,
-        status: "pending",
-        ...(invitedBy ? { metadata: { invited_by: invitedBy } } : {}),
+        role: finalRole,
+        status: finalStatus,
+        metadata: mergedMetadata,
       },
       { onConflict: "id" },
     )
@@ -182,11 +208,13 @@ export async function verifyRegisterOtp(
     category: "auth",
     event: "register",
     source: "auth",
-    actor: { id: userId, name: data.user.email ?? email, role },
+    actor: { id: userId, name: data.user.email ?? email, role: finalRole },
     subjectType: "profiles",
     subjectId: userId,
     subjectLabel: data.user.email ?? email,
-    description: `Self-registered as ${role} via email OTP (pending approval)`,
+    description: lrIsAgent
+      ? `Self-registered via email OTP → linked Leuterio Realty agent (${finalRole}, ${finalStatus})`
+      : `Self-registered as ${finalRole} via email OTP (${finalStatus})`,
     ...ctx,
   })
 
