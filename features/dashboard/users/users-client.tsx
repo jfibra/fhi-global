@@ -495,7 +495,7 @@ function UserRow({
             value={referrers.some((r) => r.id === invitedBy) ? invitedBy : ""}
             disabled={isDeleted}
             onChange={(e) => onPatch(user.id, { invited_by: e.target.value || null })}
-            className="appearance-none cursor-pointer max-w-[160px] truncate rounded-lg border border-[#e5e7eb] bg-white text-xs text-[#374151] pl-2.5 pr-7 py-1.5 focus:outline-none focus:border-[#001f3f] transition-colors disabled:opacity-50"
+            className="appearance-none cursor-pointer w-[160px] truncate rounded-lg border border-[#e5e7eb] bg-white text-xs text-[#374151] pl-2.5 pr-7 py-1.5 focus:outline-none focus:border-[#001f3f] transition-colors disabled:opacity-50"
           >
             <option value="">
               {invitedBy && !referrers.some((r) => r.id === invitedBy)
