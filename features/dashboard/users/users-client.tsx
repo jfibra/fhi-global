@@ -6,7 +6,7 @@ import {
   Trash2, Eye, X, Phone,
 } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
-import { HeaderToolbar } from "@/components/common/header-toolbar"
+import { HeaderToolbar, ToolbarIconButton, TOOLBAR_GRADIENT } from "@/components/common/header-toolbar"
 import { UserProfileModal } from "./user-profile-modal"
 import type { UserRecord, UsersListResponse } from "@/lib/user-service"
 import { ROLE_OPTIONS, STATUS_OPTIONS, ROLE_COLORS, STATUS_COLORS, getUserDisplayName } from "@/lib/user-service"
@@ -109,6 +109,9 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const [page,        setPage]        = useState(1)
   const [loading,     setLoading]     = useState(true)
   const [search,      setSearch]      = useState("")
+  const [roleFilter,  setRoleFilter]  = useState("")
+  const [statusFilter,setStatusFilter]= useState("")
+  const [showDeleted, setShowDeleted] = useState(false)
   // The eye opens a read-only profile modal (complete-profile look) with an Edit toggle.
   const [viewUser,    setViewUser]    = useState<UserRecord | null>(null)
   const [banner,      setBanner]      = useState<{ type: "success" | "error"; msg: string } | null>(null)
@@ -118,14 +121,14 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const totalPages = Math.ceil(total / PER_PAGE)
 
   // ── fetch ──────────────────────────────────────────────────────────────────
-  const fetchUsers = useCallback(async (opts?: { page?: number; search?: string }) => {
+  const fetchUsers = useCallback(async (opts?: { page?: number; search?: string; role?: string; status?: string; deleted?: boolean }) => {
     setLoading(true)
     const url = buildQuery({
-      page:        opts?.page   ?? page,
-      search:      opts?.search ?? search,
-      role:        "",
-      status:      "",
-      showDeleted: false,
+      page:        opts?.page    ?? page,
+      search:      opts?.search  ?? search,
+      role:        opts?.role    ?? roleFilter,
+      status:      opts?.status  ?? statusFilter,
+      showDeleted: opts?.deleted ?? showDeleted,
     })
     try {
       const res = await fetch(url)
@@ -137,7 +140,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     } finally {
       setLoading(false)
     }
-  }, [page, search])
+  }, [page, search, roleFilter, statusFilter, showDeleted])
 
   useEffect(() => { void fetchUsers() }, [fetchUsers])
 
@@ -192,6 +195,13 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     }, 400)
   }
 
+  const applyFilter = (key: "role" | "status" | "deleted", value: string | boolean) => {
+    setPage(1)
+    if (key === "role")    { setRoleFilter(value as string);   void fetchUsers({ page: 1, role:    value as string }) }
+    if (key === "status")  { setStatusFilter(value as string); void fetchUsers({ page: 1, status:  value as string }) }
+    if (key === "deleted") { setShowDeleted(value as boolean); void fetchUsers({ page: 1, deleted: value as boolean }) }
+  }
+
   const goPage = (p: number) => {
     setPage(p)
     void fetchUsers({ page: p })
@@ -243,6 +253,46 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
         placeholder="Search by name, email…"
         onRefresh={() => fetchUsers()}
         refreshing={loading}
+        rightSlot={
+          <>
+            {/* Role filter — width fits the "Roles" default; longer values truncate */}
+            <div className="relative inline-block">
+              <span aria-hidden className="block invisible h-10 leading-10 pl-3 pr-10 text-sm font-medium whitespace-nowrap">Roles</span>
+              <select
+                value={roleFilter}
+                onChange={(e) => applyFilter("role", e.target.value)}
+                className={`absolute inset-0 w-full h-10 pl-3 pr-9 rounded-[10px] border border-transparent text-sm font-medium text-white appearance-none cursor-pointer focus:outline-none transition-all hover:brightness-110 truncate ${TOOLBAR_GRADIENT}`}
+              >
+                <option value="" className="bg-white text-[#111827]">Roles</option>
+                {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value} className="bg-white text-[#111827]">{r.label}</option>)}
+              </select>
+              <ChevronDown className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 text-white/80 pointer-events-none" />
+            </div>
+
+            {/* Status filter — width fits the "Status" default; longer values truncate */}
+            <div className="relative inline-block">
+              <span aria-hidden className="block invisible h-10 leading-10 pl-3 pr-10 text-sm font-medium whitespace-nowrap">Status</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => applyFilter("status", e.target.value)}
+                className={`absolute inset-0 w-full h-10 pl-3 pr-9 rounded-[10px] border border-transparent text-sm font-medium text-white appearance-none cursor-pointer focus:outline-none transition-all hover:brightness-110 truncate ${TOOLBAR_GRADIENT}`}
+              >
+                <option value="" className="bg-white text-[#111827]">Status</option>
+                {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value} className="bg-white text-[#111827]">{s.label}</option>)}
+              </select>
+              <ChevronDown className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 text-white/80 pointer-events-none" />
+            </div>
+
+            {/* Show-deleted toggle */}
+            <ToolbarIconButton
+              onClick={() => applyFilter("deleted", !showDeleted)}
+              ariaLabel={showDeleted ? "Hide deleted users" : "Show deleted users"}
+              active={showDeleted}
+            >
+              <Trash2 className="h-[18px] w-[18px]" />
+            </ToolbarIconButton>
+          </>
+        }
       />
 
       {/* Banner */}

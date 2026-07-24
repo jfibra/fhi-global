@@ -29,7 +29,42 @@ export type HeaderToolbarProps = {
   className?: string
 }
 
-const GRADIENT = "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f]"
+/** Accent gradient shared by the toolbar's icon tile and its icon buttons. */
+export const TOOLBAR_GRADIENT = "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f]"
+
+/**
+ * Square gradient icon button matching the toolbar's refresh button. Exported
+ * so pages can render matching buttons (e.g. a "show deleted" toggle) outside
+ * the toolbar. `active` adds a gold ring to signal an on/pressed state.
+ */
+export function ToolbarIconButton({
+  onClick,
+  ariaLabel,
+  title,
+  active = false,
+  className = "",
+  children,
+}: {
+  onClick?: () => void
+  ariaLabel: string
+  title?: string
+  active?: boolean
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      aria-pressed={active}
+      title={title ?? ariaLabel}
+      onClick={onClick}
+      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-white transition-all hover:brightness-110 ${TOOLBAR_GRADIENT} ${active ? "ring-2 ring-[#d6b357] ring-offset-1" : ""} ${className}`}
+    >
+      {children}
+    </button>
+  )
+}
 
 /**
  * Shared dashboard header + toolbar. Tailwind counterpart of
@@ -61,7 +96,7 @@ export function HeaderToolbar({
       {/* Title block */}
       <div className="flex items-center gap-3 min-w-0">
         {icon && (
-          <div className={`flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[13px] text-white [&_svg]:h-5 [&_svg]:w-5 ${GRADIENT}`}>
+          <div className={`flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[13px] text-white [&_svg]:h-5 [&_svg]:w-5 ${TOOLBAR_GRADIENT}`}>
             {icon}
           </div>
         )}
@@ -101,14 +136,9 @@ export function HeaderToolbar({
         )}
 
         {onRefresh && (
-          <button
-            type="button"
-            aria-label="Refresh"
-            onClick={onRefresh}
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-white transition-all hover:brightness-110 ${GRADIENT}`}
-          >
+          <ToolbarIconButton onClick={onRefresh} ariaLabel="Refresh">
             <RefreshCw className={`h-[18px] w-[18px] ${refreshing ? "animate-spin" : ""}`} />
-          </button>
+          </ToolbarIconButton>
         )}
 
         {rightSlot && <div className="flex shrink-0 items-center gap-1.5">{rightSlot}</div>}
