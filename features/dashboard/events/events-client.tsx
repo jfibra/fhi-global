@@ -83,6 +83,18 @@ function fromDubaiInput(value: string): string {
   return Number.isNaN(d.getTime()) ? "" : d.toISOString()
 }
 
+/** Registration timestamp, shown in Dubai time like everything else in events. */
+function registeredLabel(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return "—"
+  return (
+    d.toLocaleDateString("en-AE", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Dubai" }) +
+    " · " +
+    d.toLocaleTimeString("en-AE", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dubai" }) +
+    " GST"
+  )
+}
+
 function eventDateLabel(iso: string | null): string {
   if (!iso) return "Date TBA"
   const d = new Date(iso)
@@ -366,7 +378,7 @@ export function EventsClient() {
           <td><strong>${esc(r.fullName)}</strong></td>
           <td>${esc(r.email)}</td>
           <td>${esc(r.whatsapp ?? "—")}</td>
-          <td>${esc(new Date(r.createdAt).toLocaleDateString("en-AE", { month: "short", day: "numeric", year: "numeric" }))}</td>
+          <td>${esc(registeredLabel(r.createdAt))}</td>
         </tr>`,
       )
       .join("")
@@ -885,8 +897,8 @@ export function EventsClient() {
                             "—"
                           )}
                         </td>
-                        <td className="px-3 py-2.5 text-[#6b7280]">
-                          {new Date(r.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                        <td className="px-3 py-2.5 text-[#6b7280] whitespace-nowrap">
+                          {registeredLabel(r.createdAt)}
                         </td>
                         <td className="px-3 py-2.5 text-right">
                           <button
