@@ -31,6 +31,14 @@ function statusChipCls(status: string | null): string {
   return `${c.bg} ${c.text} ${c.border}`
 }
 
+// Date only (no time) for the Joined column.
+function formatJoined(value: string | null): string {
+  if (!value) return "—"
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return "—"
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+}
+
 // Inline chip-style dropdown for editing role/status directly in the table.
 // A native <select> sizes to its widest option, so an invisible sizer (the
 // selected label) is stacked behind it to make each chip fit its own value.
@@ -76,10 +84,56 @@ function WhatsAppIcon({ className }: { className?: string }) {
 
 const ACCENT = "#0ea5e9"
 
-const PER_PAGE = 20
+const DEFAULT_PER_PAGE = 10
+const PER_PAGE_OPTIONS = [10, 20, 50]
+
+// Fixed-width pager: always renders PAGE_SLOTS page cubes (first, last, "…"
+// gaps, numbers). With the prev/next buttons that's PAGE_SLOTS + 2 = 10 cubes.
+// Middle → [1, "…", 6, 7, 8, 9, "…", 100]; near an end → six consecutive pages.
+const PAGE_SLOTS = 8
+function paginationItems(current: number, total: number): (number | "…")[] {
+  // Not enough pages to need gaps — show them all.
+  if (total <= PAGE_SLOTS) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+
+  const leftGap = current > 4
+  const rightGap = current < total - 3
+  const pages: (number | "…")[] = []
+
+  if (!leftGap) {
+    // Near start: 1..(SLOTS-2), …, total
+    for (let i = 1; i <= PAGE_SLOTS - 2; i++) pages.push(i)
+    pages.push("…", total)
+  } else if (!rightGap) {
+    // Near end: 1, …, last (SLOTS-2) pages
+    pages.push(1, "…")
+    for (let i = total - (PAGE_SLOTS - 3); i <= total; i++) pages.push(i)
+  } else {
+    // Middle: 1, …, [interior window], …, total
+    const interior = PAGE_SLOTS - 4 // 4 numbers between the two gaps
+    let start = current - Math.floor((interior - 1) / 2)
+    start = Math.max(2, Math.min(start, total - 1 - (interior - 1)))
+    pages.push(1, "…")
+    for (let i = 0; i < interior; i++) pages.push(start + i)
+    pages.push("…", total)
+  }
+
+  // A "…" hiding exactly one page is pointless — show that page number instead
+  // (keeps the same slot count).
+  return pages.map((p, i) => {
+    const prev = pages[i - 1]
+    const next = pages[i + 1]
+    if (p === "…" && typeof prev === "number" && typeof next === "number" && next - prev === 2) {
+      return prev + 1
+    }
+    return p
+  })
+}
 
 function buildQuery(params: {
   page: number
+  perPage: number
   search: string
   role: string
   status: string
@@ -87,7 +141,7 @@ function buildQuery(params: {
 }) {
   const qs = new URLSearchParams()
   qs.set("page",    String(params.page))
-  qs.set("perPage", String(PER_PAGE))
+  qs.set("perPage", String(params.perPage))
   if (params.search)     qs.set("search",  params.search)
   if (params.role)       qs.set("role",    params.role)
   if (params.status)     qs.set("status",  params.status)
@@ -107,6 +161,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const [users,       setUsers]       = useState<UserRecord[]>([])
   const [total,       setTotal]       = useState(0)
   const [page,        setPage]        = useState(1)
+  const [perPage,     setPerPage]     = useState(DEFAULT_PER_PAGE)
   const [loading,     setLoading]     = useState(true)
   // `searchInput` is what's typed; `search` is the debounced term used in the
   // query. Keeping them separate lets the input stay responsive while only the
@@ -122,7 +177,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const [referrers,   setReferrers]   = useState<ReferrerOption[]>([])
 
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const totalPages = Math.ceil(total / PER_PAGE)
+  const totalPages = Math.ceil(total / perPage)
 
   // ── fetch ──────────────────────────────────────────────────────────────────
   // Single source of truth: reads the current page/search/filters from state.
@@ -131,7 +186,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   // effect double-fetch).
   const fetchUsers = useCallback(async () => {
     setLoading(true)
-    const url = buildQuery({ page, search, role: roleFilter, status: statusFilter, showDeleted })
+    const url = buildQuery({ page, perPage, search, role: roleFilter, status: statusFilter, showDeleted })
     try {
       const res = await fetch(url)
       const data: UsersListResponse = await res.json()
@@ -142,7 +197,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     } finally {
       setLoading(false)
     }
-  }, [page, search, roleFilter, statusFilter, showDeleted])
+  }, [page, perPage, search, roleFilter, statusFilter, showDeleted])
 
   useEffect(() => { void fetchUsers() }, [fetchUsers])
 
@@ -305,32 +360,35 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
       )}
 
       {/* User table */}
-      <div className="bg-white/60 backdrop-blur-xl rounded-[24px] border border-white/60 shadow-sm shadow-black/5 overflow-hidden">
+      <div className="bg-white rounded-[18px] border border-black/[0.08] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#f0f2f5] bg-white/40">
-                {["User", "Contact", "Role", "Status", "Referred by", "Actions"].map((h) => (
-                  <th key={h} className="text-left text-[11px] font-bold text-[#9ca3af] uppercase tracking-wider px-5 py-3.5 whitespace-nowrap first:pl-6 last:pr-6">
+              <tr className="border-b border-black/[0.08] bg-[#fafafb]">
+                {["User", "Contact", "Role", "Status", "Joined", "Referred by", "Actions"].map((h) => (
+                  <th key={h} className="text-left font-['Outfit'] text-[11px] font-bold text-black/45 uppercase tracking-wider px-3 py-3.5 whitespace-nowrap first:pl-6 last:pr-6">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#f8f9fa]">
-              {loading ? (
+            <tbody className="divide-y divide-black/[0.05]">
+              {/* Skeleton only on the first load (no data yet). On refetches
+                  (filter / search / refresh) keep the current rows visible —
+                  the refresh button still spins via `refreshing={loading}`. */}
+              {loading && users.length === 0 ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 6 }).map((_, j) => (
-                      <td key={j} className="px-5 py-4 first:pl-6 last:pr-6">
-                        <div className={`h-3 rounded-full bg-[#f0f2f5] animate-pulse ${j === 0 ? "w-32" : j === 4 ? "w-20" : "w-24"}`} />
+                    {Array.from({ length: 7 }).map((_, j) => (
+                      <td key={j} className="px-3 py-4 first:pl-6 last:pr-6">
+                        <div className={`h-3 rounded-full bg-[#f0f2f5] animate-pulse ${j === 0 ? "w-32" : j === 6 ? "w-20" : "w-24"}`} />
                       </td>
                     ))}
                   </tr>
                 ))
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-2 text-[#9ca3af]">
                       <Users className="w-8 h-8 opacity-40" />
                       <p className="text-sm font-medium">No users found</p>
@@ -357,39 +415,61 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-3.5 border-t border-[#f0f2f5] bg-white/40">
-            <p className="text-xs text-[#9ca3af]">
-              Showing {(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, total)} of {total}
-            </p>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => goPage(page - 1)}
-                disabled={page === 1}
-                className="p-1.5 rounded-xl border border-[#e5e5e5] text-[#6b7280] hover:text-[#001f3f] hover:border-[#001f3f]/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const p = Math.max(1, Math.min(totalPages - 4, page - 2)) + i
-                return (
-                  <button
-                    key={p}
-                    onClick={() => goPage(p)}
-                    className={`w-7 h-7 rounded-xl text-xs font-semibold transition-all ${page === p ? "bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white shadow-sm" : "border border-[#e5e5e5] text-[#6b7280] hover:border-[#001f3f]/20 hover:text-[#001f3f]"}`}
-                  >
-                    {p}
-                  </button>
-                )
-              })}
-              <button
-                onClick={() => goPage(page + 1)}
-                disabled={page === totalPages}
-                className="p-1.5 rounded-xl border border-[#e5e5e5] text-[#6b7280] hover:text-[#001f3f] hover:border-[#001f3f]/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+        {total > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3.5 border-t border-black/[0.08] bg-[#fafafb]">
+            <div className="flex items-center gap-2">
+              <span className="h-8 inline-flex items-center px-3 rounded-[10px] border border-black/[0.08] bg-white text-xs font-medium text-black/55 whitespace-nowrap tabular-nums">
+                Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
+              </span>
+              {/* Rows per page */}
+              <div className="relative">
+                <select
+                  value={perPage}
+                  onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1) }}
+                  className={`h-8 pl-2.5 pr-7 rounded-[10px] border border-transparent text-xs font-medium text-white appearance-none cursor-pointer focus:outline-none transition-all hover:brightness-110 ${TOOLBAR_GRADIENT}`}
+                >
+                  {PER_PAGE_OPTIONS.map((n) => <option key={n} value={n} className="bg-white text-[#111827]">{n} / page</option>)}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-white/80 pointer-events-none" />
+              </div>
             </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => goPage(page - 1)}
+                  disabled={page === 1}
+                  className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-black/[0.08] text-black/50 hover:text-[#001f3f] hover:border-[#001f3f]/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                {paginationItems(page, totalPages).map((p, i) =>
+                  p === "…" ? (
+                    <span
+                      key={`gap-${i}`}
+                      className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-black/[0.08] text-xs font-semibold text-black/40 select-none"
+                    >
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => goPage(p)}
+                      className={`w-8 h-8 rounded-[10px] text-xs font-semibold transition-all ${page === p ? `${TOOLBAR_GRADIENT} text-white` : "border border-black/[0.08] text-black/50 hover:border-[#001f3f]/30 hover:text-[#001f3f]"}`}
+                    >
+                      {p}
+                    </button>
+                  ),
+                )}
+                <button
+                  onClick={() => goPage(page + 1)}
+                  disabled={page === totalPages}
+                  className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-black/[0.08] text-black/50 hover:text-[#001f3f] hover:border-[#001f3f]/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -435,7 +515,7 @@ function UserRow({
       className={`hover:bg-[#fafbfc] transition-colors ${isDeleted ? "opacity-50" : ""}`}
     >
       {/* User */}
-      <td className="px-5 py-3.5 pl-6 whitespace-nowrap">
+      <td className="px-3 py-3.5 pl-6 whitespace-nowrap">
         <button
           type="button"
           className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
@@ -453,7 +533,7 @@ function UserRow({
       </td>
 
       {/* Contact — phone + WhatsApp */}
-      <td className="px-5 py-3.5 whitespace-nowrap text-xs text-[#6b7280]">
+      <td className="px-3 py-3.5 whitespace-nowrap text-xs text-[#6b7280]">
         <div className="space-y-0.5">
           <p className="flex items-center gap-1.5">
             <Phone className="w-3.5 h-3.5 text-[#9ca3af] shrink-0" />
@@ -467,7 +547,7 @@ function UserRow({
       </td>
 
       {/* Role — inline editable */}
-      <td className="px-5 py-3.5 whitespace-nowrap">
+      <td className="px-3 py-3.5 whitespace-nowrap">
         <ChipSelect
           value={(user.role ?? "member").toLowerCase()}
           disabled={isDeleted}
@@ -478,7 +558,7 @@ function UserRow({
       </td>
 
       {/* Status — inline editable */}
-      <td className="px-5 py-3.5 whitespace-nowrap">
+      <td className="px-3 py-3.5 whitespace-nowrap">
         <ChipSelect
           value={(user.status ?? "pending").toLowerCase()}
           disabled={isDeleted}
@@ -488,8 +568,13 @@ function UserRow({
         />
       </td>
 
+      {/* Joined — date only */}
+      <td className="px-3 py-3.5 whitespace-nowrap text-xs text-black/55 tabular-nums">
+        {formatJoined(user.joined_at)}
+      </td>
+
       {/* Referred by — inline editable */}
-      <td className="px-5 py-3.5 whitespace-nowrap">
+      <td className="px-3 py-3.5 whitespace-nowrap">
         <div className="relative inline-flex">
           <select
             value={referrers.some((r) => r.id === invitedBy) ? invitedBy : ""}
@@ -512,14 +597,14 @@ function UserRow({
 
 
       {/* Actions — view (opens the profile drawer) + delete */}
-      <td className="px-5 py-3.5 pr-6 whitespace-nowrap">
+      <td className="px-3 py-3.5 pr-6 whitespace-nowrap">
         <div className="flex items-center gap-1">
           <button
             type="button"
             title="View profile"
             aria-label="View profile"
             onClick={() => onOpen(user)}
-            className="p-1.5 rounded-lg text-[#6b7280] hover:text-[#001f3f] hover:bg-[#f4f6f9] transition-colors"
+            className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
           >
             <Eye className="w-4 h-4" />
           </button>
@@ -528,7 +613,7 @@ function UserRow({
             title={isDeleted ? "Delete permanently" : "Delete user"}
             aria-label={isDeleted ? "Delete permanently" : "Delete user"}
             onClick={() => (isDeleted ? onHardDelete(user.id) : onDelete(user.id))}
-            className="p-1.5 rounded-lg text-[#9ca3af] hover:text-rose-600 hover:bg-rose-50 transition-colors"
+            className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
           >
             <Trash2 className="w-4 h-4" />
           </button>

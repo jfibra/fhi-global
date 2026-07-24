@@ -35,7 +35,6 @@ export async function GET(req: NextRequest) {
   const showDeleted  = sp.get("deleted") === "true"
 
   const searchRaw = search.trim()
-  const isEmailSearch = searchRaw.includes("@")
   // ilike patterns are interpolated into a PostgREST or() filter, where commas,
   // parentheses and double quotes are syntax — strip them so a query like
   // "a, b (x)" can't corrupt the filter. Collapse leftover whitespace.
@@ -43,26 +42,31 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminSupabase()
 
-  // ── Fetch auth users for email lookup ────────────────────────────────────────
-  const { data: { users: authUsers } } = await admin.auth.admin.listUsers({
-    page: 1, perPage: 1000,
-  })
-
-  // Build email map and, if email search, build allowed-id set
+  // ── Resolve emails (email lives in auth.users, not profiles) ─────────────────
+  // Build a complete id→email map by paging through ALL auth users, retrying a
+  // page once on a transient error. Previously a single listUsers call that
+  // hiccupped (rate-limit / transient error) returned no users, nulling EVERY
+  // email until the next refresh — this is the "email disappears then comes back"
+  // symptom. Paging + retry makes the map deterministic and resilient.
   const emailMap = new Map<string, string>()
-  for (const u of authUsers) {
-    if (u.email) emailMap.set(u.id, u.email)
+  const AUTH_PER_PAGE = 1000
+  for (let authPage = 1; authPage <= 50; authPage++) {
+    let res = await admin.auth.admin.listUsers({ page: authPage, perPage: AUTH_PER_PAGE })
+    if (res.error) {
+      res = await admin.auth.admin.listUsers({ page: authPage, perPage: AUTH_PER_PAGE })
+    }
+    const batch = res.data?.users ?? []
+    for (const u of batch) if (u.email) emailMap.set(u.id, u.email)
+    if (batch.length < AUTH_PER_PAGE) break
   }
 
-  // Email search: restrict to IDs whose email matches (email lives in auth.users,
-  // not profiles, so it's matched here in JS rather than in the profiles query).
-  let allowedIds: Set<string> | null = null
-  if (isEmailSearch) {
-    const needle = searchRaw.toLowerCase()
-    allowedIds = new Set(
-      authUsers.filter((u) => u.email?.toLowerCase().includes(needle)).map((u) => u.id),
-    )
-  }
+  // Email is matched here (it's not on profiles) as a case-insensitive substring
+  // — SQL ILIKE '%term%' — and folded into the name search's OR below.
+  const emailMatchIds = searchRaw
+    ? [...emailMap]
+        .filter(([, email]) => email.toLowerCase().includes(searchRaw.toLowerCase()))
+        .map(([id]) => id)
+    : []
 
   // ── Build profiles query ──────────────────────────────────────────────────────
   const from = (page - 1) * perPage
@@ -85,17 +89,21 @@ export async function GET(req: NextRequest) {
     query = query.or("is_deleted.is.null,is_deleted.eq.false")
   }
 
-  // Name/text search (email is handled via allowedIds below). Skip when the
-  // sanitized term is empty (e.g. the search was only punctuation).
-  if (!isEmailSearch && searchSafe) {
-    query = query.or(
-      `fullname.ilike.%${searchSafe}%,fname.ilike.%${searchSafe}%,lname.ilike.%${searchSafe}%`,
-    )
-  }
-
-  // Email search — restrict by allowed IDs
-  if (allowedIds) {
-    query = query.in("id", [...allowedIds])
+  // Search: name OR email as SQL ILIKE '%term%'. Name ilikes and the resolved
+  // email-match ids are combined into a single OR so one search box matches both.
+  if (searchSafe || emailMatchIds.length) {
+    const clauses: string[] = []
+    if (searchSafe) {
+      clauses.push(
+        `fullname.ilike.%${searchSafe}%`,
+        `fname.ilike.%${searchSafe}%`,
+        `lname.ilike.%${searchSafe}%`,
+      )
+    }
+    if (emailMatchIds.length) {
+      clauses.push(`id.in.(${emailMatchIds.join(",")})`)
+    }
+    query = query.or(clauses.join(","))
   }
 
   // Filters
