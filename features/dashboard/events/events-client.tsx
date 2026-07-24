@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  CalendarDays, ChevronLeft, ChevronRight, Eye, FileImage, FileText, ImagePlus, Loader2,
+  CalendarDays, ChevronLeft, ChevronRight, ExternalLink, Eye, FileImage, FileText, ImagePlus, Loader2,
   MapPin, Pencil, Plus, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
 } from "lucide-react"
 import { EventFlyerModal } from "./event-flyer-modal"
@@ -556,6 +556,18 @@ export function EventsClient() {
                         {e.registrationCount} registered
                       </button>
                       <div className="flex gap-1">
+                        {e.status === "published" && (
+                          <a
+                            href={`/events/${e.slug ?? e.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 rounded-lg text-[#001f3f] hover:bg-[#001f3f]/10"
+                            aria-label="View event page"
+                            title="View event page (opens in new tab)"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        )}
                         <button
                           type="button"
                           onClick={() => setFlyerEvent(e)}
