@@ -206,3 +206,24 @@
 .bc-face--back {
   transform: rotateY(180deg);
 }
+
+/* ─── Homepage hero entrance + cinematic zoom ─────────────────────────────── */
+@keyframes hero-fade-up {
+  from { opacity: 0; transform: translateY(26px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes hero-kenburns {
+  from { transform: scale(1); }
+  to   { transform: scale(1.09); }
+}
+.animate-hero-item {
+  opacity: 0;
+  animation: hero-fade-up 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-kenburns {
+  animation: hero-kenburns 26s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-hero-item { animation: none; opacity: 1; }
+  .animate-kenburns  { animation: none; }
+}

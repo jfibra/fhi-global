@@ -6,6 +6,7 @@ import { createPageMetadata } from "@/lib/seo";
 import { TopBar } from "@/components/topbar";
 import { Header } from "@/components/header";
 import { HeroSection } from "@/components/hero-section";
+import { Reveal } from "@/components/public/reveal";
 import {
   DeveloperCard,
   type DeveloperCardData,
@@ -212,6 +213,7 @@ export default async function HomePage() {
 
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Section header */}
+            <Reveal>
             <div className="flex items-end justify-between mb-14">
               <div>
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-[#d6b357]/50 rounded-full text-xs font-bold uppercase tracking-wider text-[#001f3f] mb-5 shadow-sm">
@@ -239,13 +241,13 @@ export default async function HomePage() {
                 </span>
               </Link>
             </div>
+            </Reveal>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {developers.map((dev) => (
-                <DeveloperCard
-                  key={dev.id}
-                  developer={dev as DeveloperCardData}
-                />
+              {developers.map((dev, i) => (
+                <Reveal key={dev.id} delay={(i % 2) * 130}>
+                  <DeveloperCard developer={dev as DeveloperCardData} />
+                </Reveal>
               ))}
             </div>
 
@@ -290,6 +292,7 @@ export default async function HomePage() {
             <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/85 to-white/92" />
           </div>
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <Reveal>
             <div className="flex items-end justify-between mb-14">
               <div>
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-[#d6b357]/50 rounded-full text-xs font-bold uppercase tracking-wider text-[#001f3f] mb-5 shadow-sm">
@@ -317,12 +320,12 @@ export default async function HomePage() {
                 </span>
               </Link>
             </div>
+            </Reveal>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {featuredProjects.map((p) => (
-                <ProjectCard
-                  key={p.id}
-                  project={p as unknown as ProjectCardData}
-                />
+              {featuredProjects.map((p, i) => (
+                <Reveal key={p.id} delay={(i % 3) * 120}>
+                  <ProjectCard project={p as unknown as ProjectCardData} />
+                </Reveal>
               ))}
             </div>
           </div>
@@ -352,6 +355,7 @@ export default async function HomePage() {
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
+          <Reveal>
           <div className="text-center max-w-2xl mx-auto mb-14">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-[#d6b357]/50 rounded-full text-xs font-bold uppercase tracking-wider text-[#001f3f] mb-5 shadow-sm">
               <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" />
@@ -375,12 +379,13 @@ export default async function HomePage() {
               record.
             </p>
           </div>
+          </Reveal>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {WHY_US.map(({ icon: Icon, title, desc }) => (
+            {WHY_US.map(({ icon: Icon, title, desc }, i) => (
+              <Reveal key={title} delay={(i % 3) * 120} className="h-full">
               <div
-                key={title}
-                className="group relative bg-white rounded-[24px] p-8 shadow-[0_12px_40px_-8px_rgba(0,20,40,0.25)] overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_-10px_rgba(0,20,40,0.35)]"
+                className="group relative h-full bg-white rounded-[24px] p-8 shadow-[0_12px_40px_-8px_rgba(0,20,40,0.25)] overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_-10px_rgba(0,20,40,0.35)]"
               >
                 {/* Gold top trim */}
                 <span className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-[#d6b357]/30" aria-hidden="true" />
@@ -395,6 +400,7 @@ export default async function HomePage() {
                 <span className="block w-9 h-[3px] rounded-full bg-[#d6b357] mb-3" aria-hidden="true" />
                 <p className="relative text-sm text-[#555] leading-relaxed">{desc}</p>
               </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -419,6 +425,7 @@ export default async function HomePage() {
 
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
           {/* Solid navy card with gold border (approved mockup) */}
+          <Reveal direction="zoom">
           <div className="relative overflow-hidden bg-gradient-to-b from-[#0a1f38] to-[#04101f] border-2 border-[#d6b357]/70 rounded-[40px] px-8 md:px-16 py-14 shadow-[0_30px_90px_-20px_rgba(0,10,25,0.8)]">
             {/* Subtle dot texture inside the card */}
             <div
@@ -469,6 +476,7 @@ export default async function HomePage() {
               </div>
             </div>
           </div>
+          </Reveal>
         </div>
       </section>
 

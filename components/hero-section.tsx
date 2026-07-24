@@ -65,7 +65,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
           priority
           sizes="100vw"
           quality={80}
-          className="object-cover object-center"
+          className="object-cover object-center animate-kenburns"
         />
         {/* Light navy wash on the left where the copy sits; skyline stays bright */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/70 via-[#001428]/30 to-transparent" />
@@ -77,7 +77,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
         {/* ═══ Hero copy + search ═══ */}
         <div className="max-w-3xl">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 border border-white/25 rounded-full text-xs font-medium text-white/90 mb-7 backdrop-blur-sm">
+          <div className="animate-hero-item inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 border border-white/25 rounded-full text-xs font-medium text-white/90 mb-7 backdrop-blur-sm" style={{ animationDelay: "0.05s" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="https://flagcdn.com/w20/ae.png"
@@ -90,7 +90,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
           </div>
 
           {/* Headline */}
-          <h1 className="font-['Outfit'] text-4xl sm:text-5xl lg:text-[3.25rem] xl:text-[3.75rem] font-bold leading-[1.08] mb-5 tracking-tight lg:whitespace-nowrap drop-shadow-[0_2px_16px_rgba(0,10,30,0.6)]">
+          <h1 className="animate-hero-item font-['Outfit'] text-4xl sm:text-5xl lg:text-[3.25rem] xl:text-[3.75rem] font-bold leading-[1.08] mb-5 tracking-tight lg:whitespace-nowrap drop-shadow-[0_2px_16px_rgba(0,10,30,0.6)]" style={{ animationDelay: "0.18s" }}>
             <span className="text-white">Discover Premium</span>
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-b from-[#f3dd89] to-[#daa843]">
@@ -98,7 +98,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
             </span>
           </h1>
 
-          <p className="text-white/85 text-base sm:text-lg leading-relaxed mb-9 max-w-xl drop-shadow-[0_1px_10px_rgba(0,10,30,0.7)]">
+          <p className="animate-hero-item text-white/85 text-base sm:text-lg leading-relaxed mb-9 max-w-xl drop-shadow-[0_1px_10px_rgba(0,10,30,0.7)]" style={{ animationDelay: "0.32s" }}>
             Explore luxury developments from the most trusted developers
             in Dubai, handpicked for discerning investors.
           </p>
@@ -106,7 +106,8 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
           {/* ── Search form ── */}
           <form
             onSubmit={handleSearch}
-            className="bg-[#06182e]/70 backdrop-blur-2xl border border-white/15 rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.45)] w-full"
+            className="animate-hero-item bg-[#06182e]/70 backdrop-blur-2xl border border-white/15 rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.45)] w-full"
+            style={{ animationDelay: "0.46s" }}
           >
             {/* 4-column field row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-white/[0.08] rounded-xl overflow-hidden mb-3">
@@ -210,7 +211,10 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
         </div>
 
         {/* ═══ Highlight band (mockup's bottom strip) ═══ */}
-        <div className="mt-12 lg:mt-14 rounded-2xl bg-[#06182e]/65 backdrop-blur-xl border border-white/10 shadow-[0_16px_50px_rgba(0,0,0,0.35)] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 lg:divide-x divide-white/10">
+        <div
+          className="animate-hero-item mt-12 lg:mt-14 rounded-2xl bg-[#06182e]/65 backdrop-blur-xl border border-white/10 shadow-[0_16px_50px_rgba(0,0,0,0.35)] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 lg:divide-x divide-white/10"
+          style={{ animationDelay: "0.62s" }}
+        >
           {HIGHLIGHTS.map(({ icon: Icon, title, desc }) => (
             <div key={title} className="flex items-center gap-4 px-6 py-5">
               <span className="w-12 h-12 rounded-full border-2 border-[#d6b357]/70 bg-[#d6b357]/10 flex items-center justify-center shrink-0">
