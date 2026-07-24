@@ -1,6 +1,17 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Tailwind v4's Preflight no longer sets a pointer cursor on buttons, so native
+   <button>s show the default arrow. Restore the pointer for all enabled buttons
+   (and role="button") app-wide. Disabled elements keep their own cursor, and any
+   explicit cursor-* utility still wins (this lives in the base layer). */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+
 /* Fallback for .prose until @tailwindcss/typography is installed */
 .prose {
   color: #374151;
