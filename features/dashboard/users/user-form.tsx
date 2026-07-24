@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { X, Eye, EyeOff, User, Mail, Lock, Globe, Shield, CheckCircle, UserPlus, Search } from "lucide-react"
+import { X, Eye, EyeOff, User, Mail, Lock, Globe, Shield, CheckCircle, UserPlus, Search, Edit3 } from "lucide-react"
 import type { UserRecord, CreateUserPayload, UpdateUserPayload } from "@/lib/user-service"
 import { ROLE_OPTIONS, STATUS_OPTIONS, TIMEZONES, getUserDisplayName, roleToLabel } from "@/lib/user-service"
 import { UserAvatar } from "@/components/user-avatar"
@@ -33,13 +33,18 @@ export function UserForm({
   onClose,
   onSaved,
   onBanner,
+  initialReadOnly = false,
 }: {
   editUser: UserRecord | null
   onClose: () => void
   onSaved: () => void
   onBanner: (type: BannerType, msg: string) => void
+  // Opens the edit form in read-only "view" mode with an Edit toggle.
+  initialReadOnly?: boolean
 }) {
   const mode: Mode = editUser ? "edit" : "create"
+  // Read-only view only applies to existing users (edit mode).
+  const [readOnly, setReadOnly] = useState(initialReadOnly && !!editUser)
 
   // Create-mode state
   const [create, setCreate] = useState<CreateUserPayload>({
@@ -180,7 +185,7 @@ export function UserForm({
             )}
             <div>
               <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">
-                {isEdit ? "Edit User" : "Create New User"}
+                {readOnly ? "View User" : isEdit ? "Edit User" : "Create New User"}
               </h3>
               <p className="text-xs text-[#9ca3af] mt-0.5">
                 {isEdit ? displayName : "Fill in the details to create an account"}
@@ -197,8 +202,9 @@ export function UserForm({
           </button>
         </div>
 
-        {/* Body */}
+        {/* Body — a disabled fieldset makes every control read-only in view mode */}
         <div className="overflow-y-auto px-7 py-6 space-y-6 flex-1">
+          <fieldset disabled={readOnly} className="contents">
 
           {/* ── Name section ── */}
           <div>
@@ -423,6 +429,7 @@ export function UserForm({
               </p>
             </div>
           )}
+          </fieldset>
         </div>
 
         {/* Footer */}
@@ -434,21 +441,32 @@ export function UserForm({
             className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-full font-semibold text-sm border border-[#e5e5e5] bg-white/50 text-[#4b5563] hover:bg-white hover:border-[#001f3f] transition-all disabled:opacity-50"
           >
             <X className="w-4 h-4" />
-            Cancel
+            {readOnly ? "Close" : "Cancel"}
           </button>
-          <button
-            type="button"
-            onClick={isEdit ? handleEdit : handleCreate}
-            disabled={busy}
-            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-70 disabled:translate-y-0"
-          >
-            {busy ? (
-              <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-            ) : (
-              <CheckCircle className="w-4 h-4" />
-            )}
-            {busy ? "Saving…" : isEdit ? "Save Changes" : "Create User"}
-          </button>
+          {readOnly ? (
+            <button
+              type="button"
+              onClick={() => setReadOnly(false)}
+              className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md"
+            >
+              <Edit3 className="w-4 h-4" />
+              Edit
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={isEdit ? handleEdit : handleCreate}
+              disabled={busy}
+              className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-70 disabled:translate-y-0"
+            >
+              {busy ? (
+                <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              ) : (
+                <CheckCircle className="w-4 h-4" />
+              )}
+              {busy ? "Saving…" : isEdit ? "Save Changes" : "Create User"}
+            </button>
+          )}
         </div>
       </div>
     </div>

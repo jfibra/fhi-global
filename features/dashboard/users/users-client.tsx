@@ -1,19 +1,78 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
-import { createPortal } from "react-dom"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  Users, Search, Plus, ChevronLeft, ChevronRight,
-  Filter, RefreshCw, Trash2, EyeOff, Eye, MoreHorizontal, X,
+  Users, Search, Plus, ChevronLeft, ChevronRight, ChevronDown,
+  Filter, RefreshCw, Trash2, Eye, X, Phone,
 } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
-import { RoleBadge } from "@/components/role-badge"
-import { StatusBadge } from "@/components/status-badge"
-import { UserDrawer } from "./user-drawer"
 import { UserForm } from "./user-form"
+import { UserProfileModal } from "./user-profile-modal"
 import type { UserRecord, UsersListResponse } from "@/lib/user-service"
-import { ROLE_OPTIONS, STATUS_OPTIONS, getUserDisplayName } from "@/lib/user-service"
-import { formatDateAtTimeInZone } from "@/lib/utils"
+import { ROLE_OPTIONS, STATUS_OPTIONS, ROLE_COLORS, STATUS_COLORS, getUserDisplayName } from "@/lib/user-service"
+
+type ReferrerOption = { id: string; fullname: string; role: string }
+
+// Phone / WhatsApp live in profile metadata (country code + number).
+function contactFrom(metadata: Record<string, unknown> | null, kind: "phone" | "whatsapp"): string | null {
+  const m = metadata ?? {}
+  const s = (v: unknown) => (typeof v === "string" ? v.trim() : "")
+  const combined = [s(m[`${kind}_country_code`]), s(m[`${kind}_number`])].filter(Boolean).join(" ")
+  return combined || (kind === "phone" ? s(m.phone) || null : null)
+}
+
+function roleChipCls(role: string | null): string {
+  const c = ROLE_COLORS[(role ?? "member").toLowerCase().trim()] ?? ROLE_COLORS.member
+  return `${c.bg} ${c.text} ${c.border}`
+}
+
+function statusChipCls(status: string | null): string {
+  const c = STATUS_COLORS[(status ?? "pending").toLowerCase().trim()] ?? STATUS_COLORS.pending
+  return `${c.bg} ${c.text} ${c.border}`
+}
+
+// Inline chip-style dropdown for editing role/status directly in the table.
+// A native <select> sizes to its widest option, so an invisible sizer (the
+// selected label) is stacked behind it to make each chip fit its own value.
+function ChipSelect({
+  value, options, onChange, colorClass, disabled,
+}: {
+  value: string
+  options: Array<{ value: string; label: string }>
+  onChange: (v: string) => void
+  colorClass: string
+  disabled?: boolean
+}) {
+  const current = options.find((o) => o.value === value)
+  const chip = "rounded-full text-[11px] font-bold capitalize pl-2.5 pr-6 py-1 border whitespace-nowrap"
+  return (
+    <div className="relative inline-block">
+      {/* In-flow sizer — its width (the selected label) sets the chip width. */}
+      <span aria-hidden className={`block invisible ${chip}`}>{current?.label ?? value}</span>
+      {/* Absolute select overlays the sizer, so it doesn't impose its widest-option width. */}
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className={`absolute inset-0 w-full appearance-none cursor-pointer focus:outline-none transition-colors disabled:opacity-50 ${chip} ${colorClass}`}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value} className="bg-white text-[#111827]">{o.label}</option>
+        ))}
+      </select>
+      <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 opacity-70 pointer-events-none" />
+    </div>
+  )
+}
+
+// lucide has no WhatsApp brand mark — inline the official glyph.
+function WhatsAppIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 18.15c-1.53 0-3.03-.41-4.34-1.19l-.31-.18-3.12.82.83-3.04-.2-.32a8.19 8.19 0 0 1-1.26-4.36c0-4.54 3.7-8.24 8.24-8.24 2.2 0 4.27.86 5.82 2.42a8.18 8.18 0 0 1 2.41 5.82c0 4.54-3.7 8.27-8.24 8.27zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.12-.17.25-.64.81-.79.98-.14.16-.29.18-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.48c-.17 0-.43.06-.66.31-.23.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.14-1.18-.06-.11-.22-.17-.47-.29z"/>
+    </svg>
+  )
+}
 
 const ACCENT = "#0ea5e9"
 
@@ -42,16 +101,6 @@ type AdminUsersClientProps = {
   roleColor?: string
 }
 
-function OverlayPortal({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) return null
-  return createPortal(children, document.body)
-}
 
 export function AdminUsersClient(props: AdminUsersClientProps) {
   const { currentRole, roleLabel, roleColor } = props
@@ -63,11 +112,12 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const [roleFilter,  setRoleFilter]  = useState("")
   const [statusFilter,setStatusFilter]= useState("")
   const [showDeleted, setShowDeleted] = useState(false)
-  const [selectedUser,setSelectedUser]= useState<UserRecord | null>(null)
-  const [drawerOpen,  setDrawerOpen]  = useState(false)
   const [formOpen,    setFormOpen]    = useState(false)
   const [editUser,    setEditUser]    = useState<UserRecord | null>(null)
+  // The eye opens a read-only profile modal (complete-profile look) with an Edit toggle.
+  const [viewUser,    setViewUser]    = useState<UserRecord | null>(null)
   const [banner,      setBanner]      = useState<{ type: "success" | "error"; msg: string } | null>(null)
+  const [referrers,   setReferrers]   = useState<ReferrerOption[]>([])
 
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const totalPages = Math.ceil(total / PER_PAGE)
@@ -95,6 +145,47 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   }, [page, search, roleFilter, statusFilter, showDeleted])
 
   useEffect(() => { void fetchUsers() }, [fetchUsers])
+
+  // Eligible "Referred by" options (sales pipeline + admin staff) for the
+  // inline picker + resolving each user's referrer name.
+  useEffect(() => {
+    let alive = true
+    void fetch("/api/admin/users/referrers")
+      .then((res) => (res.ok ? res.json() : { referrers: [] }))
+      .then((data: { referrers?: ReferrerOption[] }) => { if (alive) setReferrers(data.referrers ?? []) })
+      .catch(() => { /* non-fatal */ })
+    return () => { alive = false }
+  }, [])
+
+  const referrerName = useMemo(() => new Map(referrers.map((r) => [r.id, r.fullname])), [referrers])
+
+  // Inline edit (role / status / referrer) — optimistic, reverts on failure.
+  const applyPatch = useCallback(async (id: string, patch: Record<string, unknown>) => {
+    setUsers((list) => list.map((u) => {
+      if (u.id !== id) return u
+      const next: UserRecord = { ...u }
+      if (patch.role !== undefined) next.role = patch.role as string
+      if (patch.status !== undefined) next.status = patch.status as string
+      if (patch.invited_by !== undefined) {
+        next.metadata = { ...(u.metadata ?? {}), invited_by: patch.invited_by }
+      }
+      return next
+    }))
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      })
+      if (!res.ok) {
+        const d = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(d.error ?? "Update failed.")
+      }
+    } catch (e) {
+      setBanner({ type: "error", msg: e instanceof Error ? e.message : "Update failed." })
+      await fetchUsers() // revert optimistic change to server truth
+    }
+  }, [fetchUsers])
 
   // ── debounced search ───────────────────────────────────────────────────────
   const handleSearch = (val: string) => {
@@ -126,18 +217,12 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     void fetchUsers()
   }
 
-  const handleUserUpdated = (updated: UserRecord) => {
-    setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
-    if (selectedUser?.id === updated.id) setSelectedUser(updated)
-  }
-
   const handleDelete = async (userId: string) => {
     if (!confirm("Soft-delete this user? They will be deactivated and hidden.")) return
     const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" })
     if (res.ok) {
       setBanner({ type: "success", msg: "User deleted." })
       void fetchUsers()
-      if (drawerOpen && selectedUser?.id === userId) setDrawerOpen(false)
     } else {
       setBanner({ type: "error", msg: "Failed to delete user." })
     }
@@ -154,47 +239,15 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     if (res.ok) {
       setUsers((prev) => prev.filter((u) => u.id !== userId))
       setBanner({ type: "success", msg: "User permanently deleted." })
-      if (drawerOpen && selectedUser?.id === userId) setDrawerOpen(false)
     } else {
       const j = (await res.json().catch(() => ({}))) as { error?: string }
       setBanner({ type: "error", msg: j.error ?? "Failed to permanently delete user." })
     }
   }
 
-  const handleToggleStatus = async (user: UserRecord) => {
-    const next = user.status === "active" ? "inactive" : "active"
-    const res = await fetch(`/api/admin/users/${user.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: next }),
-    })
-    if (res.ok) {
-      const restoring = next === "active" && user.is_deleted === true
-      // Activating also restores a soft-deleted user — mirror the server so the
-      // row stops showing "Deleted" without a refetch.
-      handleUserUpdated({
-        ...user,
-        status: next,
-        ...(next === "active" ? { is_deleted: false, deleted_at: null } : {}),
-      })
-      setBanner({
-        type: "success",
-        msg: restoring ? "User restored." : `User ${next === "active" ? "activated" : "deactivated"}.`,
-      })
-    } else {
-      setBanner({ type: "error", msg: "Failed to update status." })
-    }
-  }
-
-  const openEdit = (user: UserRecord) => {
-    setEditUser(user)
-    setDrawerOpen(false)
-    setFormOpen(true)
-  }
-
-  const openDrawer = (user: UserRecord) => {
-    setSelectedUser(user)
-    setDrawerOpen(true)
+  // Eye action: open the read-only profile modal, with an Edit toggle inside.
+  const openView = (user: UserRecord) => {
+    setViewUser(user)
   }
 
   // ── render ─────────────────────────────────────────────────────────────────
@@ -291,7 +344,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#f0f2f5] bg-white/40">
-                {["User", "Email", "Role", "Status", "Joined", "Actions"].map((h) => (
+                {["User", "Contact", "Role", "Status", "Referred by", "Actions"].map((h) => (
                   <th key={h} className="text-left text-[11px] font-bold text-[#9ca3af] uppercase tracking-wider px-5 py-3.5 whitespace-nowrap first:pl-6 last:pr-6">
                     {h}
                   </th>
@@ -324,9 +377,10 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
                   <UserRow
                     key={user.id}
                     user={user}
-                    onOpen={openDrawer}
-                    onEdit={openEdit}
-                    onToggleStatus={handleToggleStatus}
+                    referrers={referrers}
+                    referrerName={referrerName}
+                    onPatch={applyPatch}
+                    onOpen={openView}
                     onDelete={handleDelete}
                     onHardDelete={handleHardDelete}
                   />
@@ -374,26 +428,23 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
         )}
       </div>
 
-      {/* User drawer */}
-      {drawerOpen && selectedUser && (
-        <UserDrawer
-          user={selectedUser}
-          onClose={() => setDrawerOpen(false)}
-          onEdit={openEdit}
-          onDelete={handleDelete}
-          onHardDelete={handleHardDelete}
-          onToggleStatus={handleToggleStatus}
-          onUpdated={handleUserUpdated}
-          onBanner={(type: "success" | "error", msg: string) => setBanner({ type, msg })}
-        />
-      )}
-
-      {/* Create / Edit form */}
+      {/* Create form (Add User) */}
       {formOpen && (
         <UserForm
           editUser={editUser}
           onClose={() => { setFormOpen(false); setEditUser(null) }}
           onSaved={handleUserSaved}
+          onBanner={(type: "success" | "error", msg: string) => setBanner({ type, msg })}
+        />
+      )}
+
+      {/* View / edit profile (complete-profile look) */}
+      {viewUser && (
+        <UserProfileModal
+          user={viewUser}
+          referrers={referrers}
+          onClose={() => setViewUser(null)}
+          onSaved={fetchUsers}
           onBanner={(type: "success" | "error", msg: string) => setBanner({ type, msg })}
         />
       )}
@@ -404,79 +455,24 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
 // ─── Row component ─────────────────────────────────────────────────────────────
 function UserRow({
   user,
+  referrers,
+  referrerName,
+  onPatch,
   onOpen,
-  onEdit,
-  onToggleStatus,
   onDelete,
   onHardDelete,
 }: {
   user: UserRecord
+  referrers: ReferrerOption[]
+  referrerName: Map<string, string>
+  onPatch: (id: string, patch: Record<string, unknown>) => void | Promise<void>
   onOpen: (u: UserRecord) => void
-  onEdit: (u: UserRecord) => void
-  onToggleStatus: (u: UserRecord) => void
   onDelete: (id: string) => void
   onHardDelete: (id: string) => void
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const triggerRef = useRef<HTMLDivElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
   const displayName = getUserDisplayName(user)
   const isDeleted   = user.is_deleted === true
-
-  useEffect(() => {
-    if (!menuOpen || !triggerRef.current) return
-
-    const computePosition = () => {
-      if (!triggerRef.current) return
-      const rect = triggerRef.current.getBoundingClientRect()
-      const menuWidth = 176
-      const estimatedMenuHeight = 220
-      const viewportPadding = 8
-
-      const placeBelow = rect.bottom + 8 + estimatedMenuHeight <= window.innerHeight - viewportPadding
-      const top = placeBelow
-        ? rect.bottom + 6
-        : Math.max(viewportPadding, rect.top - estimatedMenuHeight - 6)
-
-      const left = Math.min(
-        Math.max(viewportPadding, rect.right - menuWidth),
-        window.innerWidth - menuWidth - viewportPadding,
-      )
-
-      setMenuPos({ top, left })
-    }
-
-    computePosition()
-    window.addEventListener("resize", computePosition)
-    window.addEventListener("scroll", computePosition, true)
-    return () => {
-      window.removeEventListener("resize", computePosition)
-      window.removeEventListener("scroll", computePosition, true)
-    }
-  }, [menuOpen])
-
-  useEffect(() => {
-    if (!menuOpen) return
-
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node
-      const insideTrigger = Boolean(triggerRef.current?.contains(target))
-      const insideMenu = Boolean(menuRef.current?.contains(target))
-      if (!insideTrigger && !insideMenu) setMenuOpen(false)
-    }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenuOpen(false)
-    }
-
-    document.addEventListener("mousedown", handleClickOutside)
-    document.addEventListener("keydown", handleEscape)
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-      document.removeEventListener("keydown", handleEscape)
-    }
-  }, [menuOpen])
+  const invitedBy   = typeof user.metadata?.invited_by === "string" ? user.metadata.invited_by : ""
 
   return (
     <tr
@@ -490,94 +486,96 @@ function UserRow({
           onClick={() => onOpen(user)}
         >
           <UserAvatar name={displayName} imageUrl={user.profile_url} size={34} />
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-[#0d1117] leading-tight">{displayName}</p>
+            <p className="text-xs text-[#6b7280] leading-tight truncate">
+              {user.email ?? <span className="text-[#d0d5dd]">—</span>}
+            </p>
             {isDeleted && <span className="text-[10px] text-rose-500 font-medium">Deleted</span>}
           </div>
         </button>
       </td>
 
-      {/* Email */}
-      <td className="px-5 py-3.5 text-[#6b7280] whitespace-nowrap">
-        {user.email ?? <span className="text-[#d0d5dd]">—</span>}
+      {/* Contact — phone + WhatsApp */}
+      <td className="px-5 py-3.5 whitespace-nowrap text-xs text-[#6b7280]">
+        <div className="space-y-0.5">
+          <p className="flex items-center gap-1.5">
+            <Phone className="w-3.5 h-3.5 text-[#9ca3af] shrink-0" />
+            {contactFrom(user.metadata, "phone") ?? <span className="text-[#d0d5dd]">—</span>}
+          </p>
+          <p className="flex items-center gap-1.5">
+            <WhatsAppIcon className="w-3.5 h-3.5 text-[#25d366] shrink-0" />
+            {contactFrom(user.metadata, "whatsapp") ?? <span className="text-[#d0d5dd]">—</span>}
+          </p>
+        </div>
       </td>
 
-      {/* Role */}
+      {/* Role — inline editable */}
       <td className="px-5 py-3.5 whitespace-nowrap">
-        <RoleBadge role={user.role} />
+        <ChipSelect
+          value={(user.role ?? "member").toLowerCase()}
+          disabled={isDeleted}
+          onChange={(v) => onPatch(user.id, { role: v })}
+          options={ROLE_OPTIONS}
+          colorClass={roleChipCls(user.role)}
+        />
       </td>
 
-      {/* Status */}
+      {/* Status — inline editable */}
       <td className="px-5 py-3.5 whitespace-nowrap">
-        <StatusBadge status={user.status} isDeleted={user.is_deleted} />
+        <ChipSelect
+          value={(user.status ?? "pending").toLowerCase()}
+          disabled={isDeleted}
+          onChange={(v) => onPatch(user.id, { status: v })}
+          options={STATUS_OPTIONS}
+          colorClass={statusChipCls(user.status)}
+        />
       </td>
 
-      {/* Joined — shown in Dubai (Arabian) time; hover to see Philippine time */}
-      <td className="px-5 py-3.5 text-[#9ca3af] whitespace-nowrap text-xs">
-        {user.joined_at ? (
-          <span
-            className="cursor-help underline decoration-dotted decoration-[#d0d5dd] underline-offset-2"
-            title={`Philippine time: ${formatDateAtTimeInZone(user.joined_at, "Asia/Manila")}`}
+      {/* Referred by — inline editable */}
+      <td className="px-5 py-3.5 whitespace-nowrap">
+        <div className="relative inline-flex">
+          <select
+            value={referrers.some((r) => r.id === invitedBy) ? invitedBy : ""}
+            disabled={isDeleted}
+            onChange={(e) => onPatch(user.id, { invited_by: e.target.value || null })}
+            className="appearance-none cursor-pointer max-w-[160px] truncate rounded-lg border border-[#e5e7eb] bg-white text-xs text-[#374151] pl-2.5 pr-7 py-1.5 focus:outline-none focus:border-[#001f3f] transition-colors disabled:opacity-50"
           >
-            {formatDateAtTimeInZone(user.joined_at, "Asia/Dubai")}
-            <span className="ml-1 text-[10px] uppercase tracking-wide text-[#c0c5cd]">Arabian time</span>
-          </span>
-        ) : (
-          "—"
-        )}
+            <option value="">
+              {invitedBy && !referrers.some((r) => r.id === invitedBy)
+                ? (referrerName.get(invitedBy) ?? "Unknown")
+                : "— None —"}
+            </option>
+            {referrers.map((r) => (
+              <option key={r.id} value={r.id}>{r.fullname}</option>
+            ))}
+          </select>
+          <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-[#9ca3af] pointer-events-none" />
+        </div>
       </td>
 
-      {/* Actions */}
+
+      {/* Actions — view (opens the profile drawer) + delete */}
       <td className="px-5 py-3.5 pr-6 whitespace-nowrap">
-        <div ref={triggerRef} className="inline-block">
+        <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setMenuOpen((v) => !v)}
-            className="p-1.5 rounded-xl text-[#9ca3af] hover:text-[#001f3f] hover:bg-[#f4f6f9] transition-all"
+            title="View profile"
+            aria-label="View profile"
+            onClick={() => onOpen(user)}
+            className="p-1.5 rounded-lg text-[#6b7280] hover:text-[#001f3f] hover:bg-[#f4f6f9] transition-colors"
           >
-            <MoreHorizontal className="w-4 h-4" />
+            <Eye className="w-4 h-4" />
           </button>
-
-          {menuOpen && (
-            <OverlayPortal>
-              <div className="fixed inset-0 z-[130]" onClick={() => setMenuOpen(false)} />
-              <div
-                ref={menuRef}
-                className="fixed z-[140] w-44 bg-white rounded-2xl border border-[#e8eaed] shadow-xl shadow-black/10 py-1.5 overflow-hidden"
-                style={{ top: menuPos.top, left: menuPos.left }}
-              >
-                {[
-                  { label: "View Details", action: () => { onOpen(user); setMenuOpen(false) } },
-                  { label: "Edit Profile",  action: () => { onEdit(user); setMenuOpen(false) } },
-                  {
-                    label: isDeleted ? "Restore User" : user.status === "active" ? "Deactivate" : "Activate",
-                    action: () => { onToggleStatus(user); setMenuOpen(false) },
-                    cls: user.status === "active" ? "text-amber-600" : "text-green-600",
-                  },
-                  ...(isDeleted
-                    ? [{
-                        label: "Delete Permanently",
-                        action: () => { onHardDelete(user.id); setMenuOpen(false) },
-                        cls: "text-rose-600",
-                      }]
-                    : [{
-                        label: "Delete User",
-                        action: () => { onDelete(user.id); setMenuOpen(false) },
-                        cls: "text-rose-600",
-                      }]),
-                ].map(({ label, action, cls }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={action}
-                    className={`w-full text-left px-4 py-2 text-sm hover:bg-[#f8f9fa] transition-colors ${cls ?? "text-[#374151]"}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </OverlayPortal>
-          )}
+          <button
+            type="button"
+            title={isDeleted ? "Delete permanently" : "Delete user"}
+            aria-label={isDeleted ? "Delete permanently" : "Delete user"}
+            onClick={() => (isDeleted ? onHardDelete(user.id) : onDelete(user.id))}
+            className="p-1.5 rounded-lg text-[#9ca3af] hover:text-rose-600 hover:bg-rose-50 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </td>
     </tr>

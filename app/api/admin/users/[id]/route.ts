@@ -108,7 +108,10 @@ export async function PATCH(
   }
 
   // Metadata merge for phone/whatsapp + developer link + referrer (invited_by)
-  const metaKeys = ["phone_country_code", "phone_number", "whatsapp_country_code", "whatsapp_number"] as const
+  const metaKeys = [
+    "phone_country_code", "phone_number", "whatsapp_country_code", "whatsapp_number",
+    "nationality", "linkedin", "facebook", "license_number",
+  ] as const
   const hasMeta = metaKeys.some((k) => body[k] !== undefined)
   const hasDeveloperLink = body.developer_id !== undefined
   const hasRoleUpdate = body.role !== undefined
