@@ -1,10 +1,12 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown } from "lucide-react"
 import { TOOLBAR_GRADIENT } from "./header-toolbar"
 
-export type DataTableColumn = string | { label: string; className?: string }
+// A column is a plain label, or an object. Give it a `sortKey` (plus DataTable's
+// `sort`/`onSort` props) to make its header a clickable sort toggle.
+export type DataTableColumn = string | { label: string; className?: string; sortKey?: string }
 
 // ── Pagination page list ──────────────────────────────────────────────────────
 // Fixed-width pager: always renders PAGE_SLOTS page cubes (first, last, "…" gaps,
@@ -137,6 +139,8 @@ export function DataTable({
   onPageChange,
   onPerPageChange,
   perPageOptions,
+  sort,
+  onSort,
 }: {
   columns: DataTableColumn[]
   /** True while fetching. Shows skeleton only when there's no data yet. */
@@ -156,6 +160,10 @@ export function DataTable({
   onPageChange: (page: number) => void
   onPerPageChange: (perPage: number) => void
   perPageOptions?: number[]
+  /** Current sort (column sortKey + direction) — drives the header indicator. */
+  sort?: { key: string; dir: "asc" | "desc" } | null
+  /** Called with a column's sortKey when its (sortable) header is clicked. */
+  onSort?: (key: string) => void
 }) {
   const colCount = columns.length
 
@@ -168,12 +176,33 @@ export function DataTable({
               {columns.map((c) => {
                 const label = typeof c === "string" ? c : c.label
                 const cls = typeof c === "string" ? "" : (c.className ?? "")
+                const sortKey = typeof c === "string" ? undefined : c.sortKey
+                const sortable = Boolean(sortKey && onSort)
+                const active = sortable && sort?.key === sortKey
                 return (
                   <th
                     key={label}
                     className={`text-left font-['Outfit'] text-[11px] font-bold text-black/45 uppercase tracking-wider px-3 py-3.5 whitespace-nowrap first:pl-6 last:pr-6 ${cls}`}
                   >
-                    {label}
+                    {sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => onSort?.(sortKey as string)}
+                        className="group/sort inline-flex items-center gap-1 hover:text-[#001f3f] transition-colors"
+                        aria-label={`Sort by ${label}`}
+                      >
+                        {label}
+                        {active ? (
+                          sort?.dir === "asc"
+                            ? <ChevronUp className="w-3.5 h-3.5 text-[#001f3f]" />
+                            : <ChevronDown className="w-3.5 h-3.5 text-[#001f3f]" />
+                        ) : (
+                          <ChevronsUpDown className="w-3.5 h-3.5 text-black/20 group-hover/sort:text-black/40" />
+                        )}
+                      </button>
+                    ) : (
+                      label
+                    )}
                   </th>
                 )
               })}

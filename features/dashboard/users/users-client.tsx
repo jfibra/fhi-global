@@ -87,6 +87,8 @@ function buildQuery(params: {
   role: string
   status: string
   showDeleted: boolean
+  sort: string
+  dir: "asc" | "desc"
 }) {
   const qs = new URLSearchParams()
   qs.set("page",    String(params.page))
@@ -95,6 +97,8 @@ function buildQuery(params: {
   if (params.role)       qs.set("role",    params.role)
   if (params.status)     qs.set("status",  params.status)
   if (params.showDeleted) qs.set("deleted", "true")
+  qs.set("sort", params.sort)
+  qs.set("dir", params.dir)
   return `/api/admin/users?${qs.toString()}`
 }
 
@@ -120,6 +124,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const [roleFilter,  setRoleFilter]  = useState("")
   const [statusFilter,setStatusFilter]= useState("")
   const [showDeleted, setShowDeleted] = useState(false)
+  const [sort,        setSort]        = useState<{ key: string; dir: "asc" | "desc" }>({ key: "joined_at", dir: "desc" })
   // The eye opens a read-only profile modal (complete-profile look) with an Edit toggle.
   const [viewUser,    setViewUser]    = useState<UserRecord | null>(null)
   const [banner,      setBanner]      = useState<{ type: "success" | "error"; msg: string } | null>(null)
@@ -128,6 +133,17 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const totalPages = Math.ceil(total / perPage)
 
+  // Header sort toggle: clicking the same column flips direction; a new column
+  // starts A→Z (newest-first for the date column). Resets to page 1.
+  const handleSort = (key: string) => {
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "joined_at" ? "desc" : "asc" },
+    )
+    setPage(1)
+  }
+
   // ── fetch ──────────────────────────────────────────────────────────────────
   // Single source of truth: reads the current page/search/filters from state.
   // Handlers only update state; the effect below re-fetches when any of them
@@ -135,7 +151,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   // effect double-fetch).
   const fetchUsers = useCallback(async () => {
     setLoading(true)
-    const url = buildQuery({ page, perPage, search, role: roleFilter, status: statusFilter, showDeleted })
+    const url = buildQuery({ page, perPage, search, role: roleFilter, status: statusFilter, showDeleted, sort: sort.key, dir: sort.dir })
     try {
       const res = await fetch(url)
       const data: UsersListResponse = await res.json()
@@ -146,7 +162,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     } finally {
       setLoading(false)
     }
-  }, [page, perPage, search, roleFilter, statusFilter, showDeleted])
+  }, [page, perPage, search, roleFilter, statusFilter, showDeleted, sort])
 
   useEffect(() => { void fetchUsers() }, [fetchUsers])
 
@@ -310,7 +326,17 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
 
       {/* User table */}
       <DataTable
-        columns={["User", "Contact", "Role", "Status", "Joined", "Referred by", "Actions"]}
+        columns={[
+          { label: "User", sortKey: "fullname" },
+          "Contact",
+          { label: "Role", sortKey: "role" },
+          { label: "Status", sortKey: "status" },
+          { label: "Joined", sortKey: "joined_at" },
+          "Referred by",
+          "Actions",
+        ]}
+        sort={sort}
+        onSort={handleSort}
         loading={loading}
         empty={users.length === 0}
         emptyState={

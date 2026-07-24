@@ -34,6 +34,16 @@ export async function GET(req: NextRequest) {
   const statusFilter = sp.get("status") ?? ""
   const showDeleted  = sp.get("deleted") === "true"
 
+  // Sort — whitelist to real profile columns; default newest-joined first.
+  const SORT_COLUMNS: Record<string, string> = {
+    fullname: "fullname",
+    role: "role",
+    status: "status",
+    joined_at: "joined_at",
+  }
+  const sortCol = SORT_COLUMNS[sp.get("sort") ?? ""] ?? "joined_at"
+  const sortAsc = sp.get("dir") === "asc"
+
   const searchRaw = search.trim()
   // ilike patterns are interpolated into a PostgREST or() filter, where commas,
   // parentheses and double quotes are syntax — strip them so a query like
@@ -79,7 +89,7 @@ export async function GET(req: NextRequest) {
       { count: "exact" },
     )
     .range(from, to)
-    .order("joined_at", { ascending: false })
+    .order(sortCol, { ascending: sortAsc, nullsFirst: false })
 
   // Visibility. Toggle ON = archive view (only soft-deleted); OFF = only active
   // (is_deleted null or false — legacy rows may have NULL).
