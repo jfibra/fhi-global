@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  Users, ChevronDown, Trash2, Eye, X, Phone,
+  Users, ChevronDown, Trash2, Eye, Phone,
 } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
 import { HeaderToolbar, ToolbarIconButton, TOOLBAR_GRADIENT } from "@/components/common/header-toolbar"
 import { DataTable } from "@/components/common/data-table"
+import { Snackbar } from "@/components/common/snackbar"
 import { UserProfileModal } from "./user-profile-modal"
 import type { UserRecord, UsersListResponse } from "@/lib/user-service"
 import { ROLE_OPTIONS, STATUS_OPTIONS, ROLE_COLORS, STATUS_COLORS, getUserDisplayName } from "@/lib/user-service"
@@ -316,13 +317,8 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
         }
       />
 
-      {/* Banner */}
-      {banner && (
-        <div className={`mb-4 flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium ${banner?.type === "success" ? "bg-green-50 border-green-100 text-green-700" : "bg-rose-50 border-rose-100 text-rose-700"}`}>
-          <span className="flex-1">{banner?.msg ?? ""}</span>
-          <button onClick={() => setBanner(null)} className="text-current opacity-60 hover:opacity-100"><X className="w-3.5 h-3.5" /></button>
-        </div>
-      )}
+      {/* Toast (top-right) */}
+      <Snackbar state={banner} onClose={() => setBanner(null)} />
 
       {/* User table */}
       <DataTable
