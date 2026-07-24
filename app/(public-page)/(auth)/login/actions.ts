@@ -9,6 +9,7 @@ import { logAuditEvent, requestContextFromHeaders } from "@/lib/audit-log"
 import { sendOtpEmail } from "@/lib/mailer"
 import { generateOtpCode, storeOtpChallenge, consumeOtpChallenge } from "@/lib/auth-otp"
 import { DEFAULT_ACCOUNT_PASSWORD } from "@/lib/account-password"
+import { provisionLrForOtpLogin } from "@/lib/lr/lr-provision"
 
 export type LoginState = {
   error?: string
@@ -164,13 +165,21 @@ export async function verifyLoginOtp(
     return { error: "Profile setup failed. Please contact administrator." }
   }
 
+  // Parity with Google sign-in: on the first sign-in for an un-curated member,
+  // check Leuterio Realty and upgrade to the agent role + active status. Guarded
+  // and idempotent (see provisionLrForOtpLogin) so returning/curated accounts are
+  // never re-mapped. Reflect any change in the profile used by the gates/redirect.
+  const admin = createAdminSupabase()
+  const prov = await provisionLrForOtpLogin(admin, data.user.id, email)
+  const effProfile = prov.changed ? { ...profile, role: prov.role, status: prov.status } : profile
+
   // Incomplete profile → finish it first, even while the account is pending.
-  if (!isAdminStaffRole(profile.role) && isProfileMissingMinimumFields(profile)) {
+  if (!isAdminStaffRole(effProfile.role) && isProfileMissingMinimumFields(effProfile)) {
     redirect("/complete-profile")
   }
 
   // Complete but still pending → hold on the awaiting-approval screen.
-  if (isInactiveProfile(profile)) {
+  if (isInactiveProfile(effProfile)) {
     redirect("/account-inactive")
   }
 
@@ -179,12 +188,14 @@ export async function verifyLoginOtp(
     category: "auth",
     event: "login",
     source: "auth",
-    actor: { id: data.user.id, name: profile.fullname, role: profile.role },
-    description: "Signed in with email OTP",
+    actor: { id: data.user.id, name: effProfile.fullname, role: effProfile.role },
+    description: prov.changed
+      ? "Signed in with email OTP — linked Leuterio Realty agent"
+      : "Signed in with email OTP",
     ...ctx,
   })
 
-  redirect(pickSafePostLoginRedirect(nextRaw ?? "", profile.role))
+  redirect(pickSafePostLoginRedirect(nextRaw ?? "", effProfile.role))
 }
 
 /**
@@ -230,13 +241,19 @@ export async function passwordLoginAction(_: LoginState, formData: FormData): Pr
     return { error: profileError?.message ? `Profile setup failed: ${profileError.message}` : "Profile setup failed." }
   }
 
+  // Same guarded LR provisioning as the OTP login (accounts share a password, so
+  // a member could sign in here too). Idempotent — no-op for curated/returning.
+  const admin = createAdminSupabase()
+  const prov = await provisionLrForOtpLogin(admin, data.user.id, email)
+  const effProfile = prov.changed ? { ...profile, role: prov.role, status: prov.status } : profile
+
   // Incomplete profile → finish it first, even while the account is pending.
-  if (!isAdminStaffRole(profile.role) && isProfileMissingMinimumFields(profile)) {
+  if (!isAdminStaffRole(effProfile.role) && isProfileMissingMinimumFields(effProfile)) {
     redirect("/complete-profile")
   }
 
   // Complete but still pending → hold on the awaiting-approval screen.
-  if (isInactiveProfile(profile)) {
+  if (isInactiveProfile(effProfile)) {
     redirect("/account-inactive")
   }
 
@@ -245,11 +262,13 @@ export async function passwordLoginAction(_: LoginState, formData: FormData): Pr
     category: "auth",
     event: "login",
     source: "auth",
-    actor: { id: data.user.id, name: profile.fullname, role: profile.role },
-    description: "Signed in with password",
+    actor: { id: data.user.id, name: effProfile.fullname, role: effProfile.role },
+    description: prov.changed
+      ? "Signed in with password — linked Leuterio Realty agent"
+      : "Signed in with password",
     ...ctx,
   })
 
   const nextRaw = String(formData.get("next") ?? "").trim()
-  redirect(pickSafePostLoginRedirect(nextRaw, profile.role))
+  redirect(pickSafePostLoginRedirect(nextRaw, effProfile.role))
 }

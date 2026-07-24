@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { lookupLrAgent, parseName, resolveGoogleRole } from "@/lib/lr/lr-api"
+import { resolveLrProvision } from "@/lib/lr/lr-provision"
 import { pickSafePostLoginRedirect } from "@/lib/auth"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
@@ -68,14 +68,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ redirect: pickSafePostLoginRedirect(nextRaw, profile.role) })
   }
 
-  const result = await lookupLrAgent(email)
-  const lr = result.kind === "agent" ? result.agent : null
-  // LR couldn't be reached — the answer is unknown. Don't stamp the flag so the
-  // next sign-in retries instead of permanently downgrading a real agent.
-  const lrUnreachable = result.kind === "error"
-
   const googleName = typeof user.user_metadata?.name === "string" ? user.user_metadata.name : null
-  const parsed = parseName(lr?.name ?? googleName)
+
+  // Shared LR provisioning: look up the LR agent and decide role/status/metadata.
+  // (Same logic the email-OTP register flow uses — see lib/lr/lr-provision.ts.)
+  const prov = await resolveLrProvision({
+    email,
+    currentRole: profile.role,
+    currentStatus: profile.status,
+    nameHint: googleName,
+  })
+  const lrIsAgent = prov.isLrAgent
+  const lrUnreachable = prov.lrUnreachable
+  const lrMetadata = prov.lrMetadata
+  const finalRole = prov.role
+  const finalStatus = prov.status
 
   const googleGiven = typeof user.user_metadata?.given_name === "string" ? user.user_metadata.given_name.trim() : ""
   const googleFamily = typeof user.user_metadata?.family_name === "string" ? user.user_metadata.family_name.trim() : ""
@@ -86,33 +93,9 @@ export async function POST(req: NextRequest) {
         ? user.user_metadata.picture
         : null
 
-  const fname = parsed.first || googleGiven || profile.fname || null
-  const lname = parsed.last || googleFamily || profile.lname || null
+  const fname = prov.parsedName.first || googleGiven || profile.fname || null
+  const lname = prov.parsedName.last || googleFamily || profile.lname || null
   const profileUrl = profile.profile_url || googleAvatar || null
-
-  const lrMetadata = lr
-    ? {
-        lr_agent_id: lr.agentId,
-        lr_role_id: lr.roleId,
-        lr_role_label: lr.roleLabel,
-        lr_state: lr.state,
-        lr_mobile: lr.mobile,
-        lr_team: lr.teamName,
-        lr_upline: lr.uplineName,
-        lr_verification: lr.verification,
-        lr_status: lr.status,
-      }
-    : {}
-
-  // Decide role/status (first link only; returning users returned above). An
-  // un-curated `member` (self-registration / new-user default) is upgraded to
-  // the LR role; any deliberately-assigned role is preserved (never
-  // overridden/downgraded). Activate only when we actually apply an LR role to
-  // a member; otherwise keep the account's existing status (member/pending for
-  // brand-new accounts, whatever an admin set for curated ones).
-  const finalRole = resolveGoogleRole(profile.role, lr)
-  const upgradedMember = lr != null && (profile.role ?? "member") === "member"
-  const finalStatus = upgradedMember ? "active" : profile.status ?? "pending"
 
   // Referral attribution — mirror the email/password register flow: validate the
   // ref is a real, non-deleted profile that isn't the user themselves, and only
@@ -172,7 +155,7 @@ export async function POST(req: NextRequest) {
     subjectType: "profiles",
     subjectId: user.id,
     subjectLabel: displayName,
-    description: lr
+    description: lrIsAgent
       ? `Google sign-in linked Leuterio Realty agent → ${finalRole}`
       : `Google sign-in provisioned account → ${finalRole}`,
     oldValues: { role: profile.role ?? null, status: profile.status ?? null },
