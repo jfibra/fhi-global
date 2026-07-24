@@ -188,7 +188,7 @@ export function DataTable({
                       <button
                         type="button"
                         onClick={() => onSort?.(sortKey as string)}
-                        className="group/sort inline-flex items-center gap-1 hover:text-[#001f3f] transition-colors"
+                        className="group/sort inline-flex items-center gap-1 uppercase hover:text-[#001f3f] transition-colors"
                         aria-label={`Sort by ${label}`}
                       >
                         {label}

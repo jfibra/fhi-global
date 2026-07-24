@@ -40,6 +40,9 @@ export async function GET(req: NextRequest) {
     role: "role",
     status: "status",
     joined_at: "joined_at",
+    // Derived columns sort by their underlying metadata field.
+    contact: "metadata->>phone_number",
+    referred_by: "metadata->>invited_by",
   }
   const sortCol = SORT_COLUMNS[sp.get("sort") ?? ""] ?? "joined_at"
   const sortAsc = sp.get("dir") === "asc"
@@ -89,7 +92,16 @@ export async function GET(req: NextRequest) {
       { count: "exact" },
     )
     .range(from, to)
-    .order(sortCol, { ascending: sortAsc, nullsFirst: false })
+
+  if (sortCol === "fullname") {
+    // The displayed name is derived (fname/lname), and `fullname` is often null,
+    // so sort the User column by first then last name to match what's shown.
+    query = query
+      .order("fname", { ascending: sortAsc, nullsFirst: false })
+      .order("lname", { ascending: sortAsc, nullsFirst: false })
+  } else {
+    query = query.order(sortCol, { ascending: sortAsc, nullsFirst: false })
+  }
 
   // Visibility. Toggle ON = archive view (only soft-deleted); OFF = only active
   // (is_deleted null or false — legacy rows may have NULL).

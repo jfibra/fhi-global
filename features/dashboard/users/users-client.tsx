@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  Users, ChevronDown, Trash2, Eye, Phone,
+  Users, ChevronDown, Trash2, Eye, Phone, RotateCcw,
 } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
 import { HeaderToolbar, ToolbarIconButton, TOOLBAR_GRADIENT } from "@/components/common/header-toolbar"
@@ -11,7 +11,7 @@ import { Snackbar } from "@/components/common/snackbar"
 import { UserProfileModal } from "./user-profile-modal"
 import type { UserRecord, UsersListResponse } from "@/lib/user-service"
 import { ROLE_OPTIONS, STATUS_OPTIONS, ROLE_COLORS, STATUS_COLORS, getUserDisplayName } from "@/lib/user-service"
-import { formatDateAtTimeInZone } from "@/lib/utils"
+import { formatDateAtTimeInZone, formatDateInZone, formatTimeInZone } from "@/lib/utils"
 
 type ReferrerOption = { id: string; fullname: string; role: string }
 
@@ -230,14 +230,16 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const goPage = (p: number) => setPage(p)
 
   // ── actions ────────────────────────────────────────────────────────────────
+  // Soft delete — optimistic: the row leaves the active view instantly, the
+  // request runs in the background, and we revert to server truth on failure.
   const handleDelete = async (userId: string) => {
-    if (!confirm("Soft-delete this user? They will be deactivated and hidden.")) return
+    setUsers((prev) => prev.filter((u) => u.id !== userId))
+    setTotal((t) => Math.max(0, t - 1))
+    setBanner({ type: "success", msg: "User deleted." })
     const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" })
-    if (res.ok) {
-      setBanner({ type: "success", msg: "User deleted." })
-      void fetchUsers()
-    } else {
+    if (!res.ok) {
       setBanner({ type: "error", msg: "Failed to delete user." })
+      void fetchUsers()
     }
   }
 
@@ -248,13 +250,32 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
       )
     )
       return
+    setUsers((prev) => prev.filter((u) => u.id !== userId))
+    setTotal((t) => Math.max(0, t - 1))
+    setBanner({ type: "success", msg: "User permanently deleted." })
     const res = await fetch(`/api/admin/users/${userId}?hard=1`, { method: "DELETE" })
-    if (res.ok) {
-      setUsers((prev) => prev.filter((u) => u.id !== userId))
-      setBanner({ type: "success", msg: "User permanently deleted." })
-    } else {
+    if (!res.ok) {
       const j = (await res.json().catch(() => ({}))) as { error?: string }
       setBanner({ type: "error", msg: j.error ?? "Failed to permanently delete user." })
+      void fetchUsers()
+    }
+  }
+
+  // Restore a soft-deleted user — PATCH status:active un-deletes + reactivates
+  // (see the [id] route). Optimistic: it leaves the deleted view immediately.
+  const handleRestore = async (userId: string) => {
+    setUsers((prev) => prev.filter((u) => u.id !== userId))
+    setTotal((t) => Math.max(0, t - 1))
+    setBanner({ type: "success", msg: "User restored." })
+    const res = await fetch(`/api/admin/users/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "active" }),
+    })
+    if (!res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { error?: string }
+      setBanner({ type: "error", msg: j.error ?? "Failed to restore user." })
+      void fetchUsers()
     }
   }
 
@@ -267,7 +288,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   return (
     <>
       <HeaderToolbar
-        title="User Management"
+        title={showDeleted ? "Deleted Users" : "User Management"}
         subtitle={`${total} - Total User${total !== 1 ? "s" : ""}`}
         icon={<Users />}
         value={searchInput}
@@ -324,12 +345,12 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
       <DataTable
         columns={[
           { label: "User", sortKey: "fullname" },
-          "Contact",
+          { label: "Contact", sortKey: "contact" },
           { label: "Role", sortKey: "role" },
           { label: "Status", sortKey: "status" },
           { label: "Joined", sortKey: "joined_at" },
-          "Referred by",
-          "Actions",
+          { label: "Referred by", sortKey: "referred_by" },
+          { label: "" },
         ]}
         sort={sort}
         onSort={handleSort}
@@ -360,6 +381,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
             onOpen={openView}
             onDelete={handleDelete}
             onHardDelete={handleHardDelete}
+            onRestore={handleRestore}
           />
         ))}
       </DataTable>
@@ -387,6 +409,7 @@ function UserRow({
   onOpen,
   onDelete,
   onHardDelete,
+  onRestore,
 }: {
   user: UserRecord
   referrers: ReferrerOption[]
@@ -395,15 +418,14 @@ function UserRow({
   onOpen: (u: UserRecord) => void
   onDelete: (id: string) => void
   onHardDelete: (id: string) => void
+  onRestore: (id: string) => void
 }) {
   const displayName = getUserDisplayName(user)
   const isDeleted   = user.is_deleted === true
   const invitedBy   = typeof user.metadata?.invited_by === "string" ? user.metadata.invited_by : ""
 
   return (
-    <tr
-      className={`hover:bg-[#fafbfc] transition-colors ${isDeleted ? "opacity-50" : ""}`}
-    >
+    <tr className="hover:bg-[#fafbfc] transition-colors">
       {/* User */}
       <td className="px-3 py-3.5 pl-6 whitespace-nowrap">
         <button
@@ -440,7 +462,6 @@ function UserRow({
       <td className="px-3 py-3.5 whitespace-nowrap">
         <ChipSelect
           value={(user.role ?? "member").toLowerCase()}
-          disabled={isDeleted}
           onChange={(v) => onPatch(user.id, { role: v })}
           options={ROLE_OPTIONS}
           colorClass={roleChipCls(user.role)}
@@ -451,23 +472,25 @@ function UserRow({
       <td className="px-3 py-3.5 whitespace-nowrap">
         <ChipSelect
           value={(user.status ?? "pending").toLowerCase()}
-          disabled={isDeleted}
           onChange={(v) => onPatch(user.id, { status: v })}
           options={STATUS_OPTIONS}
           colorClass={statusChipCls(user.status)}
         />
       </td>
 
-      {/* Joined — Dubai date & time; hover shows Philippine time */}
+      {/* Joined — Dubai date on top, time below; hover shows Philippine time */}
       <td className="px-3 py-3.5 whitespace-nowrap text-xs text-black/55 tabular-nums">
         {user.joined_at ? (
-          <span
-            className="cursor-help underline decoration-dotted decoration-black/20 underline-offset-2"
+          <div
+            className="leading-tight cursor-help"
             title={`Philippine time: ${formatDateAtTimeInZone(user.joined_at, "Asia/Manila")}`}
           >
-            {formatDateAtTimeInZone(user.joined_at, "Asia/Dubai")}
-            <span className="ml-1 text-[10px] uppercase tracking-wide text-black/35">Dubai</span>
-          </span>
+            <div>{formatDateInZone(user.joined_at, "Asia/Dubai")}</div>
+            <div className="text-[11px] text-black/40">
+              {formatTimeInZone(user.joined_at, "Asia/Dubai")}
+              <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-black/30">GST</span>
+            </div>
+          </div>
         ) : (
           "—"
         )}
@@ -478,7 +501,6 @@ function UserRow({
         <div className="relative inline-flex">
           <select
             value={referrers.some((r) => r.id === invitedBy) ? invitedBy : ""}
-            disabled={isDeleted}
             onChange={(e) => onPatch(user.id, { invited_by: e.target.value || null })}
             className="appearance-none cursor-pointer w-[160px] truncate rounded-lg border border-[#e5e7eb] bg-white text-xs text-[#374151] pl-2.5 pr-7 py-1.5 focus:outline-none focus:border-[#001f3f] transition-colors disabled:opacity-50"
           >
@@ -508,6 +530,17 @@ function UserRow({
           >
             <Eye className="w-4 h-4" />
           </button>
+          {isDeleted && (
+            <button
+              type="button"
+              title="Restore user"
+              aria-label="Restore user"
+              onClick={() => onRestore(user.id)}
+              className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          )}
           <button
             type="button"
             title={isDeleted ? "Delete permanently" : "Delete user"}

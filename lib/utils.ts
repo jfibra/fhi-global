@@ -71,3 +71,19 @@ export function formatDateAtTimeInZone(iso: string | null | undefined, timeZone:
   const time = d.toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit" })
   return `${date} at ${time}`
 }
+
+/** Date only, in a timezone (e.g. "7/23/2026"). */
+export function formatDateInZone(iso: string | null | undefined, timeZone: string): string {
+  if (!iso) return "—"
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return "—"
+  return d.toLocaleDateString("en-US", { timeZone, month: "numeric", day: "numeric", year: "numeric" })
+}
+
+/** Time only, in a timezone (e.g. "3:45 PM"). */
+export function formatTimeInZone(iso: string | null | undefined, timeZone: string): string {
+  if (!iso) return "—"
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return "—"
+  return d.toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit" })
+}
