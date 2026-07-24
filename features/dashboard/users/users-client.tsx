@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  Users, Search, Plus, ChevronLeft, ChevronRight, ChevronDown,
-  Filter, RefreshCw, Trash2, Eye, X, Phone,
+  Users, ChevronLeft, ChevronRight, ChevronDown,
+  Trash2, Eye, X, Phone,
 } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
-import { UserForm } from "./user-form"
+import { HeaderToolbar } from "@/components/common/header-toolbar"
 import { UserProfileModal } from "./user-profile-modal"
 import type { UserRecord, UsersListResponse } from "@/lib/user-service"
 import { ROLE_OPTIONS, STATUS_OPTIONS, ROLE_COLORS, STATUS_COLORS, getUserDisplayName } from "@/lib/user-service"
@@ -109,11 +109,6 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const [page,        setPage]        = useState(1)
   const [loading,     setLoading]     = useState(true)
   const [search,      setSearch]      = useState("")
-  const [roleFilter,  setRoleFilter]  = useState("")
-  const [statusFilter,setStatusFilter]= useState("")
-  const [showDeleted, setShowDeleted] = useState(false)
-  const [formOpen,    setFormOpen]    = useState(false)
-  const [editUser,    setEditUser]    = useState<UserRecord | null>(null)
   // The eye opens a read-only profile modal (complete-profile look) with an Edit toggle.
   const [viewUser,    setViewUser]    = useState<UserRecord | null>(null)
   const [banner,      setBanner]      = useState<{ type: "success" | "error"; msg: string } | null>(null)
@@ -123,14 +118,14 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const totalPages = Math.ceil(total / PER_PAGE)
 
   // ── fetch ──────────────────────────────────────────────────────────────────
-  const fetchUsers = useCallback(async (opts?: { page?: number; search?: string; role?: string; status?: string; deleted?: boolean }) => {
+  const fetchUsers = useCallback(async (opts?: { page?: number; search?: string }) => {
     setLoading(true)
     const url = buildQuery({
-      page:        opts?.page        ?? page,
-      search:      opts?.search      ?? search,
-      role:        opts?.role        ?? roleFilter,
-      status:      opts?.status      ?? statusFilter,
-      showDeleted: opts?.deleted     ?? showDeleted,
+      page:        opts?.page   ?? page,
+      search:      opts?.search ?? search,
+      role:        "",
+      status:      "",
+      showDeleted: false,
     })
     try {
       const res = await fetch(url)
@@ -142,7 +137,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     } finally {
       setLoading(false)
     }
-  }, [page, search, roleFilter, statusFilter, showDeleted])
+  }, [page, search])
 
   useEffect(() => { void fetchUsers() }, [fetchUsers])
 
@@ -187,7 +182,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     }
   }, [fetchUsers])
 
-  // ── debounced search ───────────────────────────────────────────────────────
+  // Debounced search — resets to page 1.
   const handleSearch = (val: string) => {
     setSearch(val)
     setPage(1)
@@ -197,26 +192,12 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     }, 400)
   }
 
-  const applyFilter = (key: "role" | "status" | "deleted", value: string | boolean) => {
-    setPage(1)
-    if (key === "role")    { setRoleFilter(value as string);   void fetchUsers({ page: 1, role:    value as string }) }
-    if (key === "status")  { setStatusFilter(value as string); void fetchUsers({ page: 1, status:  value as string }) }
-    if (key === "deleted") { setShowDeleted(value as boolean); void fetchUsers({ page: 1, deleted: value as boolean }) }
-  }
-
   const goPage = (p: number) => {
     setPage(p)
     void fetchUsers({ page: p })
   }
 
   // ── actions ────────────────────────────────────────────────────────────────
-  const handleUserSaved = () => {
-    setBanner({ type: "success", msg: "User saved successfully." })
-    setFormOpen(false)
-    setEditUser(null)
-    void fetchUsers()
-  }
-
   const handleDelete = async (userId: string) => {
     if (!confirm("Soft-delete this user? They will be deactivated and hidden.")) return
     const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" })
@@ -253,22 +234,16 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   // ── render ─────────────────────────────────────────────────────────────────
   return (
     <>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117]">User Management</h2>
-          <p className="text-sm text-[#9ca3af] mt-0.5">
-            {total} user{total !== 1 ? "s" : ""} Â· manage roles, status and access
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => { setEditUser(null); setFormOpen(true) }}
-          className="inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-4 py-2.5 rounded-full text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all duration-200"
-        >
-          <Plus className="w-4 h-4" />
-          Add User
-        </button>
-      </div>
+      <HeaderToolbar
+        title="User Management"
+        subtitle={`${total} - Total User${total !== 1 ? "s" : ""}`}
+        icon={<Users />}
+        value={search}
+        onChange={handleSearch}
+        placeholder="Search by name, email…"
+        onRefresh={() => fetchUsers()}
+        refreshing={loading}
+      />
 
       {/* Banner */}
       {banner && (
@@ -277,66 +252,6 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
           <button onClick={() => setBanner(null)} className="text-current opacity-60 hover:opacity-100"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
-
-      {/* Search + filters */}
-      <div className="bg-white/60 backdrop-blur-xl rounded-[24px] border border-white/60 shadow-sm shadow-black/5 p-4 mb-4">
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
-            <input
-              type="text"
-              placeholder="Search by name, email…"
-              value={search}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 placeholder:text-[#9ca3af]"
-            />
-          </div>
-
-          {/* Role filter */}
-          <div className="flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-[#9ca3af] shrink-0" />
-            <select
-              value={roleFilter}
-              onChange={(e) => applyFilter("role", e.target.value)}
-              className="pl-3 pr-8 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
-            >
-              <option value="">All Roles</option>
-              {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-            </select>
-          </div>
-
-          {/* Status filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => applyFilter("status", e.target.value)}
-            className="pl-3 pr-8 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
-          >
-            <option value="">All Statuses</option>
-            {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-
-          {/* Show deleted toggle */}
-          <button
-            type="button"
-            onClick={() => applyFilter("deleted", !showDeleted)}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium border transition-all ${showDeleted ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-white/80 border-[#e5e5e5] text-[#6b7280] hover:border-[#d0d5dd]"}`}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Deleted
-          </button>
-
-          {/* Refresh */}
-          <button
-            type="button"
-            onClick={() => fetchUsers()}
-            className="p-2.5 rounded-2xl border border-[#e5e5e5] bg-white/80 text-[#6b7280] hover:text-[#001f3f] hover:border-[#001f3f]/20 transition-all"
-            title="Refresh"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
-        </div>
-      </div>
 
       {/* User table */}
       <div className="bg-white/60 backdrop-blur-xl rounded-[24px] border border-white/60 shadow-sm shadow-black/5 overflow-hidden">
@@ -427,16 +342,6 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
           </div>
         )}
       </div>
-
-      {/* Create form (Add User) */}
-      {formOpen && (
-        <UserForm
-          editUser={editUser}
-          onClose={() => { setFormOpen(false); setEditUser(null) }}
-          onSaved={handleUserSaved}
-          onBanner={(type: "success" | "error", msg: string) => setBanner({ type, msg })}
-        />
-      )}
 
       {/* View / edit profile (complete-profile look) */}
       {viewUser && (
