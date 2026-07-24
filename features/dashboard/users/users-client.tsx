@@ -108,6 +108,10 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const [total,       setTotal]       = useState(0)
   const [page,        setPage]        = useState(1)
   const [loading,     setLoading]     = useState(true)
+  // `searchInput` is what's typed; `search` is the debounced term used in the
+  // query. Keeping them separate lets the input stay responsive while only the
+  // committed term drives a fetch.
+  const [searchInput, setSearchInput] = useState("")
   const [search,      setSearch]      = useState("")
   const [roleFilter,  setRoleFilter]  = useState("")
   const [statusFilter,setStatusFilter]= useState("")
@@ -121,15 +125,13 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const totalPages = Math.ceil(total / PER_PAGE)
 
   // ── fetch ──────────────────────────────────────────────────────────────────
-  const fetchUsers = useCallback(async (opts?: { page?: number; search?: string; role?: string; status?: string; deleted?: boolean }) => {
+  // Single source of truth: reads the current page/search/filters from state.
+  // Handlers only update state; the effect below re-fetches when any of them
+  // change — so a filter change fires exactly one request (no direct calls +
+  // effect double-fetch).
+  const fetchUsers = useCallback(async () => {
     setLoading(true)
-    const url = buildQuery({
-      page:        opts?.page    ?? page,
-      search:      opts?.search  ?? search,
-      role:        opts?.role    ?? roleFilter,
-      status:      opts?.status  ?? statusFilter,
-      showDeleted: opts?.deleted ?? showDeleted,
-    })
+    const url = buildQuery({ page, search, role: roleFilter, status: statusFilter, showDeleted })
     try {
       const res = await fetch(url)
       const data: UsersListResponse = await res.json()
@@ -185,27 +187,26 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     }
   }, [fetchUsers])
 
-  // Debounced search — resets to page 1.
+  // Debounced search — commits the term to state (which drives the fetch effect)
+  // after the user stops typing, and resets to page 1.
   const handleSearch = (val: string) => {
-    setSearch(val)
-    setPage(1)
+    setSearchInput(val)
     if (searchTimeout.current) clearTimeout(searchTimeout.current)
     searchTimeout.current = setTimeout(() => {
-      void fetchUsers({ page: 1, search: val })
+      setPage(1)
+      setSearch(val)
     }, 400)
   }
 
+  // Filters only update state; the fetch effect reacts to the change.
   const applyFilter = (key: "role" | "status" | "deleted", value: string | boolean) => {
     setPage(1)
-    if (key === "role")    { setRoleFilter(value as string);   void fetchUsers({ page: 1, role:    value as string }) }
-    if (key === "status")  { setStatusFilter(value as string); void fetchUsers({ page: 1, status:  value as string }) }
-    if (key === "deleted") { setShowDeleted(value as boolean); void fetchUsers({ page: 1, deleted: value as boolean }) }
+    if (key === "role")    setRoleFilter(value as string)
+    if (key === "status")  setStatusFilter(value as string)
+    if (key === "deleted") setShowDeleted(value as boolean)
   }
 
-  const goPage = (p: number) => {
-    setPage(p)
-    void fetchUsers({ page: p })
-  }
+  const goPage = (p: number) => setPage(p)
 
   // ── actions ────────────────────────────────────────────────────────────────
   const handleDelete = async (userId: string) => {
@@ -248,7 +249,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
         title="User Management"
         subtitle={`${total} - Total User${total !== 1 ? "s" : ""}`}
         icon={<Users />}
-        value={search}
+        value={searchInput}
         onChange={handleSearch}
         placeholder="Search by name, email…"
         onRefresh={() => fetchUsers()}
@@ -498,7 +499,7 @@ function UserRow({
           >
             <option value="">
               {invitedBy && !referrers.some((r) => r.id === invitedBy)
-                ? (referrerName.get(invitedBy) ?? "Unknown")
+                ? (user.referred_by_name ?? referrerName.get(invitedBy) ?? "Unknown")
                 : "— None —"}
             </option>
             {referrers.map((r) => (

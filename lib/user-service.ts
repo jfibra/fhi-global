@@ -18,6 +18,9 @@ export type UserRecord = {
   updated_at: string | null
   is_deleted: boolean | null
   deleted_at: string | null
+  // Display name of the referrer (metadata.invited_by → profiles.fullname),
+  // resolved server-side so the "Referred by" column renders with the row.
+  referred_by_name?: string | null
 }
 
 export type UsersListResponse = {

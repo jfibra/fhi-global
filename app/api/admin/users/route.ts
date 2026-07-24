@@ -108,10 +108,33 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const users: UserRecord[] = (profiles ?? []).map((p) => ({
-    ...p,
-    email: emailMap.get(p.id) ?? null,
-  }))
+  // Resolve referrer display names (metadata.invited_by → fullname) in one
+  // query so the "Referred by" column renders with the row, instead of waiting
+  // on the separate /referrers request the client uses for the edit dropdown.
+  const invitedById = (p: (typeof profiles)[number]) => {
+    const v = (p.metadata as Record<string, unknown> | null)?.invited_by
+    return typeof v === "string" && v ? v : null
+  }
+  const referrerIds = Array.from(
+    new Set((profiles ?? []).map(invitedById).filter((v): v is string => !!v)),
+  )
+  const referrerNames = new Map<string, string>()
+  if (referrerIds.length) {
+    const { data: refs } = await admin
+      .from("profiles")
+      .select("id, fullname")
+      .in("id", referrerIds)
+    for (const r of refs ?? []) referrerNames.set(r.id, r.fullname ?? "")
+  }
+
+  const users: UserRecord[] = (profiles ?? []).map((p) => {
+    const invitedBy = invitedById(p)
+    return {
+      ...p,
+      email: emailMap.get(p.id) ?? null,
+      referred_by_name: invitedBy ? (referrerNames.get(invitedBy) ?? null) : null,
+    }
+  })
 
   const result: UsersListResponse = {
     users,
