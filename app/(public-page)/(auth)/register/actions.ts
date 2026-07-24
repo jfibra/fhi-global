@@ -5,7 +5,7 @@ import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromHeaders } from "@/lib/audit-log"
 import { sendOtpEmail } from "@/lib/mailer"
-import { generateOtpCode, storeOtpChallenge, consumeOtpChallenge } from "@/lib/auth-otp"
+import { generateOtpCode, storeOtpChallenge, checkOtpChallenge, clearOtpChallenge } from "@/lib/auth-otp"
 import { DEFAULT_ACCOUNT_PASSWORD } from "@/lib/account-password"
 import { resolveLrProvision } from "@/lib/lr/lr-provision"
 
@@ -85,7 +85,7 @@ export async function sendRegisterOtp(
 
   const code = generateOtpCode()
   try {
-    await storeOtpChallenge(data.user.id, code, data.properties.hashed_token)
+    await storeOtpChallenge(data.user.id, code)
     await sendOtpEmail(email, code, "register")
   } catch (e) {
     return { error: e instanceof Error ? `Could not send the code: ${e.message}` : "Could not send the code." }
@@ -120,24 +120,33 @@ export async function verifyRegisterOtp(
   const role = accountType === "developer" ? "developer" : "member"
   const ref = String(refRaw ?? "").trim()
 
-  const result = await consumeOtpChallenge(challenge, code)
-  if ("error" in result) return { error: result.error }
+  const check = await checkOtpChallenge(challenge, code)
+  if ("error" in check) return { error: check.error }
+
+  // Provision the profile with the service-role client (bypasses RLS and works
+  // whether or not a DB trigger pre-created the row). Referral attribution is
+  // best-effort — an invalid/unknown ref never blocks registration.
+  const admin = createAdminSupabase()
+
+  // Mint a FRESH single-use token now and consume it immediately — no rotation
+  // window between send and verify, so no stale-token "invalid" / JWT errors.
+  const { data: link, error: linkError } = await admin.auth.admin.generateLink({ type: "magiclink", email })
+  if (linkError || !link?.properties?.hashed_token) {
+    return { error: "Couldn't verify the code. Request a new one." }
+  }
 
   const supabase = await createClient()
-  const { data, error } = await supabase.auth.verifyOtp({ token_hash: result.tokenHash, type: "email" })
+  const { data, error } = await supabase.auth.verifyOtp({ token_hash: link.properties.hashed_token, type: "email" })
 
   if (error || !data.user) {
+    // Challenge NOT cleared — a transient failure lets the user resubmit.
     const m = (error?.message ?? "").toLowerCase()
     if (m.includes("expired")) return { error: "That code has expired. Request a new one." }
     return { error: error?.message ?? "Couldn't verify the code. Request a new one." }
   }
 
   const userId = data.user.id
-
-  // Provision the profile with the service-role client (bypasses RLS and works
-  // whether or not a DB trigger pre-created the row). Referral attribution is
-  // best-effort — an invalid/unknown ref never blocks registration.
-  const admin = createAdminSupabase()
+  await clearOtpChallenge(challenge)
 
   // Never downgrade an already-active account (defense in depth — the send step
   // blocks this too). Verified but active → just end the session and finish.

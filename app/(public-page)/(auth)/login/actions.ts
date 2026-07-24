@@ -7,7 +7,7 @@ import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromHeaders } from "@/lib/audit-log"
 import { sendOtpEmail } from "@/lib/mailer"
-import { generateOtpCode, storeOtpChallenge, consumeOtpChallenge } from "@/lib/auth-otp"
+import { generateOtpCode, storeOtpChallenge, checkOtpChallenge, clearOtpChallenge } from "@/lib/auth-otp"
 import { DEFAULT_ACCOUNT_PASSWORD } from "@/lib/account-password"
 import { provisionLrForOtpLogin } from "@/lib/lr/lr-provision"
 
@@ -52,7 +52,7 @@ export async function sendLoginOtp(emailRaw: string): Promise<OtpResult> {
 
   const code = generateOtpCode()
   try {
-    await storeOtpChallenge(data.user.id, code, data.properties.hashed_token)
+    await storeOtpChallenge(data.user.id, code)
     await sendOtpEmail(email, code, "login")
   } catch (e) {
     return { error: e instanceof Error ? `Could not send the code: ${e.message}` : "Could not send the code." }
@@ -99,7 +99,7 @@ export async function sendAuthOtp(emailRaw: string): Promise<OtpResult> {
 
   const code = generateOtpCode()
   try {
-    await storeOtpChallenge(data.user.id, code, data.properties.hashed_token)
+    await storeOtpChallenge(data.user.id, code)
     await sendOtpEmail(email, code, "login")
   } catch (e) {
     return { error: e instanceof Error ? `Could not send the code: ${e.message}` : "Could not send the code." }
@@ -129,8 +129,8 @@ export async function verifyLoginOtp(
   if (!email || !code) return { error: "Enter the code we emailed you." }
   if (!challenge) return { error: "This code is no longer valid. Request a new one." }
 
-  const result = await consumeOtpChallenge(challenge, code)
-  if ("error" in result) {
+  const check = await checkOtpChallenge(challenge, code)
+  if ("error" in check) {
     const ctx = await requestContextFromHeaders()
     await logAuditEvent({
       category: "auth",
@@ -139,17 +139,31 @@ export async function verifyLoginOtp(
       description: `Failed OTP sign-in for ${email}`,
       ...ctx,
     })
-    return { error: result.error }
+    return { error: check.error }
+  }
+
+  // Mint a FRESH single-use token now (not at send time) and consume it
+  // immediately — no rotation window between send and verify, so no stale-token
+  // "invalid" / JWT errors.
+  const admin = createAdminSupabase()
+  const { data: link, error: linkError } = await admin.auth.admin.generateLink({ type: "magiclink", email })
+  if (linkError || !link?.properties?.hashed_token) {
+    return { error: "Couldn't sign you in. Request a new code." }
   }
 
   const supabase = await createClient()
-  const { data, error } = await supabase.auth.verifyOtp({ token_hash: result.tokenHash, type: "email" })
+  const { data, error } = await supabase.auth.verifyOtp({ token_hash: link.properties.hashed_token, type: "email" })
 
   if (error || !data.user) {
+    // Challenge NOT cleared — a transient failure lets the user resubmit the
+    // same code instead of forcing a resend.
     const m = (error?.message ?? "").toLowerCase()
     if (m.includes("expired")) return { error: "That code has expired. Request a new one." }
     return { error: error?.message ?? "Couldn't sign you in. Request a new code." }
   }
+
+  // Session established — now the challenge can be retired.
+  await clearOtpChallenge(challenge)
 
   const { profile, error: profileError } = await ensureProfileForUser(supabase, {
     id: data.user.id,
@@ -169,7 +183,6 @@ export async function verifyLoginOtp(
   // check Leuterio Realty and upgrade to the agent role + active status. Guarded
   // and idempotent (see provisionLrForOtpLogin) so returning/curated accounts are
   // never re-mapped. Reflect any change in the profile used by the gates/redirect.
-  const admin = createAdminSupabase()
   const prov = await provisionLrForOtpLogin(admin, data.user.id, email)
   const effProfile = prov.changed ? { ...profile, role: prov.role, status: prov.status } : profile
 

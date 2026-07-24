@@ -6,14 +6,21 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
  *
  * Supabase's own email OTP length is a project-level dashboard setting (this
  * project generates 8 digits), so instead we mint our own 6-digit code and
- * only use Supabase for the session: `generateLink` gives us a single-use
- * `hashed_token`, which we hold back until the user proves they received the
- * 6-digit code. The challenge lives in the auth user's `app_metadata`
- * (server-only — users can't read or edit it), so no extra table is needed.
+ * only use Supabase for the session. The challenge (code hash + expiry +
+ * attempts) lives in the auth user's `app_metadata` — server-only, users can't
+ * read or edit it — so no extra table is needed.
  *
- * send step:   code + hashed_token stored via storeOtpChallenge(), code emailed.
- * verify step: consumeOtpChallenge() checks code hash, expiry, and attempt cap,
- *              then returns the hashed_token for verifyOtp({ token_hash }).
+ * IMPORTANT: we do NOT store Supabase's single-use magic-link token here.
+ * `generateLink` rotates that token on every send, so persisting it across the
+ * send→verify gap made a double/rapid send leave the stored token disagreeing
+ * with what Supabase holds → "invalid code" / JWT errors that cleared up on a
+ * retry. Instead the caller mints a FRESH token at verify time (once the 6-digit
+ * code checks out) and consumes it immediately — no rotation window.
+ *
+ * send step:   storeOtpChallenge() saves the code hash; the code is emailed.
+ * verify step: checkOtpChallenge() validates the code (expiry + attempt cap);
+ *              the caller then mints a fresh token, calls verifyOtp(), and on
+ *              success calls clearOtpChallenge().
  */
 
 const OTP_TTL_MS = 10 * 60 * 1000 // server-side validity; not surfaced in the email
@@ -21,7 +28,6 @@ const MAX_ATTEMPTS = 5
 
 type OtpChallenge = {
   ch: string // sha256 of the 6-digit code
-  th: string // Supabase hashed_token (single-use session ticket)
   exp: number // epoch ms
   at: number // failed attempts so far
 }
@@ -36,8 +42,8 @@ function hashCode(code: string): string {
 
 function readChallenge(meta: Record<string, unknown> | undefined): OtpChallenge | null {
   const raw = meta?.fhi_otp as Partial<OtpChallenge> | null | undefined
-  if (!raw || typeof raw.ch !== "string" || typeof raw.th !== "string") return null
-  return { ch: raw.ch, th: raw.th, exp: Number(raw.exp ?? 0), at: Number(raw.at ?? 0) }
+  if (!raw || typeof raw.ch !== "string") return null
+  return { ch: raw.ch, exp: Number(raw.exp ?? 0), at: Number(raw.at ?? 0) }
 }
 
 async function writeChallenge(userId: string, challenge: OtpChallenge | null): Promise<void> {
@@ -50,18 +56,25 @@ async function writeChallenge(userId: string, challenge: OtpChallenge | null): P
 }
 
 /** Persist a fresh challenge (overwrites any previous one for this user). */
-export async function storeOtpChallenge(userId: string, code: string, tokenHash: string): Promise<void> {
-  await writeChallenge(userId, { ch: hashCode(code), th: tokenHash, exp: Date.now() + OTP_TTL_MS, at: 0 })
+export async function storeOtpChallenge(userId: string, code: string): Promise<void> {
+  await writeChallenge(userId, { ch: hashCode(code), exp: Date.now() + OTP_TTL_MS, at: 0 })
+}
+
+/** Clear the challenge — call after the session is established (verify success). */
+export async function clearOtpChallenge(userId: string): Promise<void> {
+  await writeChallenge(userId, null)
 }
 
 /**
- * Check a submitted code against the stored challenge. On success the challenge
- * is cleared and the Supabase token hash is returned for session creation.
+ * Validate a submitted code against the stored challenge (expiry + attempt cap +
+ * hash). On success it does NOT clear the challenge — the caller clears it only
+ * after the Supabase session is actually created, so a transient session error
+ * never strands a correct code (the user can just resubmit).
  */
-export async function consumeOtpChallenge(
+export async function checkOtpChallenge(
   userId: string,
   code: string,
-): Promise<{ tokenHash: string } | { error: string }> {
+): Promise<{ ok: true } | { error: string }> {
   const admin = createAdminSupabase()
   const { data, error } = await admin.auth.admin.getUserById(userId)
   if (error || !data.user) return { error: "Couldn't verify the code. Request a new one." }
@@ -84,6 +97,5 @@ export async function consumeOtpChallenge(
     return { error: "Invalid code. Check the digits and try again." }
   }
 
-  await writeChallenge(userId, null)
-  return { tokenHash: challenge.th }
+  return { ok: true }
 }
