@@ -12,7 +12,7 @@ import { createClient as createSupabaseClient } from "@/lib/supabase/client"
 import { roleToLabel, getDashboardRouteByRole } from "@/lib/auth"
 import { useAuth } from "@/context/auth-context"
 import { getSidebarNavSections, getRoleColor, type NavItem, type NavSection } from "@/components/dashboard/sidebar-config"
-import { ROLE_SHELL_BADGE, normalizeAppRole } from "@/lib/app-roles"
+import { ROLE_SHELL_BADGE, normalizeAppRole, isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
 
 // ─── types ────────────────────────────────────────────────────────────────────
 export interface DashboardShellProps {
@@ -317,6 +317,17 @@ export function DashboardShell({
               </button>
             </div>
           </div>
+
+          {/* Encode Sale — the seller's most important action, always one tap away */}
+          {(isSalesPipelineRole(effectiveRole) || isAdminStaffRole(effectiveRole)) && (
+            <Link
+              href={`${dashboardBase}/sales/encode`}
+              onClick={() => setSidebarOpen(false)}
+              className="mt-3 w-full inline-flex items-center justify-center px-4 py-4 rounded-2xl bg-[#d6b357] text-[#001428] font-['Outfit'] font-bold text-lg hover:bg-[#c9a449] hover:-translate-y-0.5 transition-all duration-200 shadow-md"
+            >
+              Encode Sale
+            </Link>
+          )}
         </div>
 
         {/* Gradient divider */}

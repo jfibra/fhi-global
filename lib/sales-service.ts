@@ -11,6 +11,21 @@ import {
 export type CommissionStatus = "pending" | "processing" | "approved" | "released" | "rejected"
 export type ValidationStatus = "pending" | "under_review" | "validated" | "invalid_sale"
 
+/** What kind of deal this is. Brokerage/rental have no developer or project. */
+export type SaleType = "project" | "brokerage" | "rental"
+
+export const SALE_TYPE_LABELS: Record<SaleType, string> = {
+  project: "Project Sale",
+  brokerage: "Brokerage Sale",
+  rental: "Rental",
+}
+
+/** Property kinds for brokerage/rental deals (free-text friendly list). */
+export const SALE_PROPERTY_TYPES = [
+  "Apartment", "Villa", "Townhouse", "Penthouse", "Studio",
+  "Office", "Retail", "Warehouse", "Land", "Other",
+] as const
+
 export type DeveloperOption = {
   id: string
   name: string
@@ -51,12 +66,15 @@ export type SaleAttachment = {
 export type SaleRecord = {
   id: string
   agent_id: string
+  sale_type: SaleType
   developer_id: string
   project_id: number
   project_unit_id: number | null
   unit_number: string | null
   block_number: string | null
   lot_number: string | null
+  property_type: string | null
+  property_address: string | null
   client_id: string
   contract_price: number
   reservation_date: string | null
@@ -137,13 +155,18 @@ export type ClientFormData = {
 }
 
 export type SaleFormData = {
-  // property
+  // deal type
+  sale_type: SaleType
+  // property (project sales)
   developer_id: string
   project_id: string
   project_unit_id: string
   unit_number: string
   block_number: string
   lot_number: string
+  // property (brokerage / rental)
+  property_type: string
+  property_address: string
   // client
   client: ClientFormData
   // contract
@@ -165,12 +188,22 @@ type SortDir = "asc" | "desc"
 const EDITABLE_REVIEW_STATUSES: ValidationStatus[] = ["invalid_sale", "under_review"]
 
 const REQUIRED_FIELDS: Array<{ key: string; valid: (form: SaleFormData) => boolean; message: string }> = [
-  { key: "developer_id", valid: (form) => Boolean(form.developer_id), message: "Developer is required" },
-  { key: "project_id", valid: (form) => Boolean(form.project_id), message: "Project is required" },
+  // Project sales: developer + project mandatory. Brokerage/rental skip them.
+  { key: "developer_id", valid: (form) => form.sale_type !== "project" || Boolean(form.developer_id), message: "Developer is required" },
+  { key: "project_id", valid: (form) => form.sale_type !== "project" || Boolean(form.project_id), message: "Project is required" },
+  // Brokerage/rental: describe the property instead.
+  {
+    key: "property_type",
+    valid: (form) => form.sale_type === "project" || Boolean(form.property_type.trim()),
+    message: "Property type is required",
+  },
   {
     key: "unit_information",
-    valid: (form) => [form.project_unit_id, form.unit_number, form.block_number, form.lot_number].some((v) => Boolean(String(v ?? "").trim())),
-    message: "Unit information is required",
+    valid: (form) =>
+      form.sale_type === "project"
+        ? [form.project_unit_id, form.unit_number, form.block_number, form.lot_number].some((v) => Boolean(String(v ?? "").trim()))
+        : [form.property_address, form.unit_number, form.block_number, form.lot_number].some((v) => Boolean(String(v ?? "").trim())),
+    message: "Unit / property information is required",
   },
   { key: "client.first_name", valid: (form) => Boolean(form.client.first_name.trim()), message: "Client first name is required" },
   { key: "client.last_name", valid: (form) => Boolean(form.client.last_name.trim()), message: "Client last name is required" },
@@ -285,12 +318,15 @@ function normalizeSale(row: unknown): SaleRecord {
   return {
     id: String(raw.id ?? ""),
     agent_id: String(raw.agent_id ?? ""),
+    sale_type: (raw.sale_type === "brokerage" || raw.sale_type === "rental" ? raw.sale_type : "project") as SaleType,
     developer_id: String(raw.developer_id ?? ""),
     project_id: Number(raw.project_id ?? 0),
     project_unit_id: raw.project_unit_id != null ? Number(raw.project_unit_id) : null,
     unit_number: typeof raw.unit_number === "string" ? raw.unit_number : null,
     block_number: typeof raw.block_number === "string" ? raw.block_number : null,
     lot_number: typeof raw.lot_number === "string" ? raw.lot_number : null,
+    property_type: typeof raw.property_type === "string" ? raw.property_type : null,
+    property_address: typeof raw.property_address === "string" ? raw.property_address : null,
     client_id: String(raw.client_id ?? ""),
     contract_price: Number(raw.contract_price ?? 0),
     reservation_date: typeof raw.reservation_date === "string" ? raw.reservation_date : null,
@@ -624,15 +660,19 @@ export async function createSale(
 
   if (clientError) return { data: null, error: clientError.message }
 
-  // 2. Insert sale
+  // 2. Insert sale (brokerage/rental deals carry no developer or project)
+  const isProjectSale = form.sale_type === "project"
   const salePayload = {
     agent_id: currentUserId,
-    developer_id: form.developer_id,
-    project_id: Number(form.project_id),
-    project_unit_id: form.project_unit_id ? Number(form.project_unit_id) : null,
+    sale_type: form.sale_type,
+    developer_id: isProjectSale ? form.developer_id : null,
+    project_id: isProjectSale ? Number(form.project_id) : null,
+    project_unit_id: isProjectSale && form.project_unit_id ? Number(form.project_unit_id) : null,
     unit_number: form.unit_number.trim() || null,
     block_number: form.block_number.trim() || null,
     lot_number: form.lot_number.trim() || null,
+    property_type: !isProjectSale ? form.property_type.trim() || null : null,
+    property_address: !isProjectSale ? form.property_address.trim() || null : null,
     client_id: clientData.id,
     contract_price: Number(form.contract_price),
     reservation_date: form.reservation_date || null,
@@ -661,7 +701,12 @@ export async function createSale(
     `)
     .single()
 
-  if (error) return { data: null, error: error.message }
+  if (error) {
+    // The client row was inserted first — clean it up so a failed submit that
+    // gets retried doesn't leave orphaned duplicate clients behind.
+    await supabase.from("clients").delete().eq("id", clientData.id)
+    return { data: null, error: error.message }
+  }
 
   await logActivity({
     sales_report_id: String(data.id),
@@ -749,13 +794,17 @@ export async function updateSale(
     ? form.commission_status
     : existingSale.commission_status
 
+  const isProjectSaleUpdate = form.sale_type === "project"
   const saleUpdatePayload = {
-    developer_id: form.developer_id,
-    project_id: Number(form.project_id),
-    project_unit_id: form.project_unit_id ? Number(form.project_unit_id) : null,
+    sale_type: form.sale_type,
+    developer_id: isProjectSaleUpdate ? form.developer_id : null,
+    project_id: isProjectSaleUpdate ? Number(form.project_id) : null,
+    project_unit_id: isProjectSaleUpdate && form.project_unit_id ? Number(form.project_unit_id) : null,
     unit_number: form.unit_number.trim() || null,
     block_number: form.block_number.trim() || null,
     lot_number: form.lot_number.trim() || null,
+    property_type: !isProjectSaleUpdate ? form.property_type.trim() || null : null,
+    property_address: !isProjectSaleUpdate ? form.property_address.trim() || null : null,
     contract_price: Number(form.contract_price),
     reservation_date: form.reservation_date || null,
     payment_plan: form.payment_plan.trim() || null,

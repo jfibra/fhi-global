@@ -220,9 +220,19 @@ export default function SaleDetailPage() {
 
         {/* Property */}
         <SectionCard icon={Building2} title="Property Information">
-          <DetailRow label="Developer" value={sale.developers?.name} />
-          <DetailRow label="Project" value={sale.projects?.name} />
-          <DetailRow label="Unit Type" value={sale.project_units?.unit_type} />
+          <DetailRow label="Deal Type" value={sale.sale_type === "rental" ? "Rental" : sale.sale_type === "brokerage" ? "Brokerage" : "Project Sale"} />
+          {sale.sale_type === "project" ? (
+            <>
+              <DetailRow label="Developer" value={sale.developers?.name} />
+              <DetailRow label="Project" value={sale.projects?.name} />
+              <DetailRow label="Unit Type" value={sale.project_units?.unit_type} />
+            </>
+          ) : (
+            <>
+              <DetailRow label="Property Type" value={sale.property_type} />
+              <DetailRow label="Property Address" value={sale.property_address} />
+            </>
+          )}
           <DetailRow label="Unit Number" value={sale.unit_number} />
           <DetailRow label="Block" value={sale.block_number} />
           <DetailRow label="Lot" value={sale.lot_number} />

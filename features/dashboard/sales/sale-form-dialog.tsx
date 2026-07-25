@@ -28,6 +28,8 @@ import {
   fetchDevelopersForSale,
   fetchProjectsForDeveloper,
   fetchUnitsForProject,
+  SALE_PROPERTY_TYPES,
+  SALE_TYPE_LABELS,
   type SaleRecord,
   type SaleFormData,
   type DeveloperOption,
@@ -98,8 +100,10 @@ const EMPTY_CLIENT = {
 }
 
 const EMPTY_FORM: SaleFormData = {
+  sale_type: "project",
   developer_id: "", project_id: "", project_unit_id: "",
   unit_number: "", block_number: "", lot_number: "",
+  property_type: "", property_address: "",
   client: EMPTY_CLIENT,
   contract_price: "", reservation_date: "",
   payment_plan: "", payment_terms: "",
@@ -196,12 +200,15 @@ export function SaleFormDialog({
     if (editSale) {
       const client = editSale.clients
       const prefilledForm: SaleFormData = {
+        sale_type:         editSale.sale_type,
         developer_id:      editSale.developer_id,
-        project_id:        String(editSale.project_id),
+        project_id:        editSale.project_id ? String(editSale.project_id) : "",
         project_unit_id:   editSale.project_unit_id != null ? String(editSale.project_unit_id) : "",
         unit_number:       editSale.unit_number ?? "",
         block_number:      editSale.block_number ?? "",
         lot_number:        editSale.lot_number ?? "",
+        property_type:     editSale.property_type ?? "",
+        property_address:  editSale.property_address ?? "",
         client: {
           first_name:     client?.first_name ?? "",
           middle_name:    client?.middle_name ?? "",
@@ -485,7 +492,14 @@ export function SaleFormDialog({
             {(viewMode || activeTab === "property") && (
             <div>
               <SectionTitle icon={Building2} title="Property Information" />
+              {form.sale_type !== "project" && (
+                <p className="mb-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#d6b357]/15 border border-[#d6b357]/40 text-[#8a6d2a] text-xs font-bold">
+                  {SALE_TYPE_LABELS[form.sale_type]} — no developer or project on this deal
+                </p>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {form.sale_type === "project" ? (
+                <>
                 <div>
                   <FieldLabel text="Developer" required />
                   <select
@@ -542,6 +556,41 @@ export function SaleFormDialog({
                   </select>
                   {errors.unit_information && <p className="text-xs text-rose-500 mt-1 ml-1">{errors.unit_information}</p>}
                 </div>
+                </>
+                ) : (
+                <>
+                <div>
+                  <FieldLabel text="Property Type" required />
+                  <select
+                    value={form.property_type}
+                    onChange={(e) => set("property_type", e.target.value)}
+                    disabled={disabled}
+                    className={sel("property_type")}
+                    data-error-key="property_type"
+                  >
+                    <option value="">Select property type…</option>
+                    {SALE_PROPERTY_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  {errors.property_type && <p className="text-xs text-rose-500 mt-1 ml-1">{errors.property_type}</p>}
+                </div>
+
+                <div>
+                  <FieldLabel text="Property Address" />
+                  <input
+                    type="text"
+                    value={form.property_address}
+                    onChange={(e) => set("property_address", e.target.value)}
+                    disabled={disabled}
+                    placeholder="Building / community, street, city…"
+                    className={inp("property_address")}
+                    data-error-key="unit_information"
+                  />
+                  {errors.unit_information && <p className="text-xs text-rose-500 mt-1 ml-1">{errors.unit_information}</p>}
+                </div>
+                </>
+                )}
 
                 <div>
                   <FieldLabel text="Unit Number" />

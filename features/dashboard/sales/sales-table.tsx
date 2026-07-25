@@ -512,10 +512,18 @@ export function SalesTable({
                         {sale.profiles?.fullname ?? "—"}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">
-                        {sale.developers?.name ?? "—"}
+                        {sale.sale_type === "project" ? (
+                          sale.developers?.name ?? "—"
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#d6b357]/15 border border-[#d6b357]/40 text-[#8a6d2a] text-[11px] font-bold">
+                            {sale.sale_type === "rental" ? "Rental" : "Brokerage"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">
-                        {sale.projects?.name ?? "—"}
+                        {sale.sale_type === "project"
+                          ? (sale.projects?.name ?? "—")
+                          : (sale.property_type ?? "—")}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-xs text-[#6b7280]">
                         {sale.unit_number
