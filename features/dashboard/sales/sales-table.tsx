@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import {
+  ArrowLeft,
+  ArrowRight,
   ArrowUpDown,
   Building2,
   ChevronLeft,
@@ -248,10 +250,10 @@ export function SalesTable({
   const [sortDir, setSortDir] = useState<SortDir>("desc")
   const [loading, setLoading] = useState(false)
 
-  // Active sale-type tab + the per-type summary (deal count / value / pending) that
-  // powers the tab count badges and the summary tiles. All three types are loaded
-  // together so switching tabs is instant (no refetch).
-  const [activeTab, setActiveTab] = useState<SaleType>("project")
+  // Selected sale type. null = the chooser screen (three cards); a type = its report
+  // table. The per-type summary (deal count / value / pending) powers the card badges
+  // and the summary tiles; all three types load together so the cards preview counts.
+  const [activeTab, setActiveTab] = useState<SaleType | null>(null)
   const [summaries, setSummaries] = useState<Record<SaleType, SaleTypeSummary>>({
     project:   { dealCount: 0, totalValue: 0, pendingCount: 0 },
     brokerage: { dealCount: 0, totalValue: 0, pendingCount: 0 },
@@ -291,6 +293,7 @@ export function SalesTable({
   }, [])
 
   const loadSales = useCallback(async () => {
+    if (!activeTab) return // chooser screen — nothing to load yet
     setLoading(true)
     try {
       const { data, total: count, error } = await fetchSales({
@@ -351,6 +354,7 @@ export function SalesTable({
     setPage(1)
     if (t !== "project") setDeveloperFilter("all") // brokerage/rental have no developer
   }
+  const goBack = () => { setActiveTab(null); setPage(1) }
   const openEdit = (s: SaleRecord) => {
     if (!canEditSaleForRole(currentRole, s)) {
       addToast("error", "You can only edit sales that are Invalid Sale or Under Review")
@@ -496,79 +500,93 @@ export function SalesTable({
     ),
   })
 
-  const summary = summaries[activeTab]
   const colCount = columns.length
+  const activeMeta = activeTab ? SALE_TYPE_TABS.find((t) => t.type === activeTab) : undefined
+  const ActiveIcon = activeMeta?.icon ?? TrendingUp
 
   return (
     <>
       <div className="space-y-6">
 
-        {/* Page header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-lg">
-              <TrendingUp className="w-6 h-6 text-white" />
+        {activeTab === null ? (
+          /* ── Chooser: pick a sale type (mirrors the Encode-a-Sale page) ── */
+          <>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-lg">
+                <TrendingUp className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">
+                  Sales Reports
+                </h1>
+                <p className="text-sm text-[#6b7280]">
+                  {isSecretaryLikeRole(currentRole)
+                    ? "Choose a report to monitor deals, join validation discussion, and attach documents."
+                    : "Which report do you want to view? Choose one to start."}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">
-                Sales Reports
-              </h1>
-              <p className="text-sm text-[#6b7280]">
-                {isSecretaryLikeRole(currentRole)
-                  ? "Monitor deals org-wide, join validation discussion, and attach documents while a sale is under review or marked invalid."
-                  : "Record and manage property sales transactions"}
-              </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {SALE_TYPE_TABS.map((t) => {
+                const Icon = t.icon
+                return (
+                  <button
+                    key={t.type}
+                    type="button"
+                    onClick={() => onTabChange(t.type)}
+                    className="group text-left rounded-2xl border border-black/[0.08] bg-white p-6 transition-all hover:border-[#001f3f]/30 hover:shadow-md"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="w-14 h-14 rounded-full bg-[#f3f4f6] flex items-center justify-center transition-colors group-hover:bg-[#001f3f]/5">
+                        <Icon className="w-7 h-7 text-[#9ca3af] transition-colors group-hover:text-[#001f3f]" />
+                      </div>
+                      <span className="inline-flex items-baseline gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-[#f3f4f6] text-[#6b7280]">
+                        {summaries[t.type].dealCount}
+                        <span className="font-medium opacity-80">deals</span>
+                      </span>
+                    </div>
+                    <h3 className="mt-5 font-['Outfit'] text-xl font-bold text-[#0d1117]">{t.label}</h3>
+                    <p className="mt-1.5 text-sm text-[#6b7280]">{t.desc}</p>
+                    <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#d6b357] transition-all group-hover:gap-2.5">
+                      View report
+                      <ArrowRight className="w-4 h-4" />
+                    </span>
+                  </button>
+                )
+              })}
             </div>
-          </div>
-
-        </div>
-
-        {/* Sale-type selector — cards mirroring the "Encode a Sale" page */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {SALE_TYPE_TABS.map((t) => {
-            const active = activeTab === t.type
-            const Icon = t.icon
-            return (
+          </>
+        ) : (
+          /* ── Report: the table for the chosen sale type ── */
+          <>
+            <div className="space-y-4">
               <button
-                key={t.type}
                 type="button"
-                onClick={() => onTabChange(t.type)}
-                aria-pressed={active}
-                className={`group text-left rounded-2xl border bg-white p-5 transition-all ${
-                  active
-                    ? "border-[#001f3f] ring-2 ring-[#001f3f]/10 shadow-md"
-                    : "border-black/[0.08] hover:border-[#001f3f]/30 hover:shadow-sm"
-                }`}
+                onClick={goBack}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div
-                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
-                      active ? "bg-[#001f3f]" : "bg-[#f3f4f6] group-hover:bg-[#001f3f]/5"
-                    }`}
-                  >
-                    <Icon className={`w-6 h-6 ${active ? "text-[#d6b357]" : "text-[#9ca3af]"}`} />
-                  </div>
-                  <span
-                    className={`inline-flex items-baseline gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
-                      active ? "bg-[#001f3f] text-white" : "bg-[#f3f4f6] text-[#6b7280]"
-                    }`}
-                  >
-                    {summaries[t.type].dealCount}
-                    <span className="font-medium opacity-80">deals</span>
-                  </span>
-                </div>
-                <h3 className="mt-4 font-['Outfit'] text-lg font-bold text-[#0d1117]">{t.label}</h3>
-                <p className="mt-1 text-sm text-[#6b7280]">{t.desc}</p>
+                <ArrowLeft className="w-4 h-4" />
+                Back to reports
               </button>
-            )
-          })}
-        </div>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-lg">
+                  <ActiveIcon className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">
+                    {activeMeta?.label ?? "Sales"} Report
+                  </h1>
+                  <p className="text-sm text-[#6b7280]">{activeMeta?.desc}</p>
+                </div>
+              </div>
+            </div>
 
-        {/* Summary tiles for the active tab (deal count already shown on the cards) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <SummaryTile label="Total Contract Value" value={formatCurrency(summary.totalValue)} icon={Wallet} />
-          <SummaryTile label="Pending Validation" value={String(summary.pendingCount)} icon={Clock} />
-        </div>
+            {/* Summary tiles for the active tab (deal count already shown on the cards) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <SummaryTile label="Total Contract Value" value={formatCurrency(summaries[activeTab].totalValue)} icon={Wallet} />
+              <SummaryTile label="Pending Validation" value={String(summaries[activeTab].pendingCount)} icon={Clock} />
+            </div>
 
         {/* Filters bar */}
         <div className="bg-white/60 backdrop-blur-xl rounded-[24px] border border-white/60 shadow-sm shadow-black/5 p-4">
@@ -772,6 +790,8 @@ export function SalesTable({
             </div>
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* Dialogs */}
