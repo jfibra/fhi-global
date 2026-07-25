@@ -58,16 +58,19 @@ function toTitleCase(value: string): string {
 // A native <select> sizes to its widest option, so an invisible sizer (the
 // selected label) is stacked behind it to make each chip fit its own value.
 function ChipSelect({
-  value, options, onChange, colorClass, disabled,
+  value, options, onChange, colorClass, disabled, size = "md",
 }: {
   value: string
   options: Array<{ value: string; label: string }>
   onChange: (v: string) => void
   colorClass: string
   disabled?: boolean
+  size?: "md" | "sm"
 }) {
   const current = options.find((o) => o.value === value)
-  const chip = "rounded-full text-[11px] font-bold capitalize pl-2.5 pr-6 py-1 border whitespace-nowrap"
+  const chip = size === "sm"
+    ? "rounded-full text-[10px] font-bold capitalize pl-2 pr-5 py-0.5 border whitespace-nowrap"
+    : "rounded-full text-[11px] font-bold capitalize pl-2.5 pr-6 py-1 border whitespace-nowrap"
   return (
     <div className="relative inline-block">
       {/* In-flow sizer — its width (the selected label) sets the chip width. */}
@@ -83,7 +86,7 @@ function ChipSelect({
           <option key={o.value} value={o.value} className="bg-white text-[#111827]">{o.label}</option>
         ))}
       </select>
-      <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 opacity-70 pointer-events-none" />
+      <ChevronDown className={`w-3 h-3 absolute top-1/2 -translate-y-1/2 opacity-70 pointer-events-none ${size === "sm" ? "right-1" : "right-1.5"}`} />
     </div>
   )
 }
@@ -464,7 +467,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
             <input
               value={emailInput}
               onChange={(e) => setEmailInput(e.target.value)}
-              placeholder="EmaiL Address"
+              placeholder="Email Address"
               className="h-11 w-full pl-9 pr-3 rounded-xl border border-[#eceff3] bg-[#f8fafc] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:bg-white focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/6 transition-all"
             />
           </div>
@@ -600,13 +603,13 @@ function CardField({ label, icon, iconClass = "bg-blue-50 text-blue-600", childr
   className?: string
 }) {
   return (
-    <div className={`flex items-start gap-3 ${className}`}>
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 [&_svg]:w-[18px] [&_svg]:h-[18px] ${iconClass}`}>
+    <div className={`flex items-start gap-2.5 ${className}`}>
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 [&_svg]:w-4 [&_svg]:h-4 ${iconClass}`}>
         {icon}
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[10px] font-bold uppercase tracking-wider text-black/40 mb-0.5">{label}</p>
-        <div className="text-sm text-[#374151]">{children}</div>
+        <div className="text-[13px] text-[#374151]">{children}</div>
       </div>
     </div>
   )
@@ -641,53 +644,53 @@ function UserCard({
   const iconGreen = "bg-green-50 text-[#25d366]"
 
   return (
-    <div className="rounded-2xl border border-black/[0.08] bg-white shadow-sm hover:shadow-md transition-shadow p-6 sm:p-7">
+    <div className="rounded-2xl border border-black/[0.08] bg-white shadow-sm hover:shadow-md transition-shadow p-4 sm:p-5">
       {/* Header — avatar + name + role/status (+ actions) */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4 min-w-0">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="relative shrink-0">
-            <UserAvatar name={displayName} imageUrl={user.profile_url} size={72} />
-            <span className={`absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full ring-[3px] ring-white ${dotColor}`} title={isDeleted ? "Deleted" : status} />
+            <UserAvatar name={displayName} imageUrl={user.profile_url} size={52} />
+            <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full ring-2 ring-white ${dotColor}`} title={isDeleted ? "Deleted" : status} />
           </div>
-          <div className="min-w-0 pt-0.5">
+          <div className="min-w-0 flex flex-col justify-center">
             <button type="button" onClick={() => onOpen(user)} className="min-w-0 text-left group/name">
-              <h3 className="text-2xl font-bold text-[#0d1117] leading-tight truncate group-hover/name:text-[#001f3f] transition-colors">{displayName}</h3>
+              <h3 className="text-[15px] font-bold text-[#0d1117] leading-tight truncate group-hover/name:text-[#001f3f] transition-colors">{displayName}</h3>
             </button>
-            <div className="flex items-center flex-wrap gap-2 mt-2">
-              <ChipSelect value={(user.role ?? "member").toLowerCase()} onChange={(v) => onPatch(user.id, { role: v })} options={ROLE_OPTIONS} colorClass={roleChipCls(user.role)} />
-              <ChipSelect value={status} onChange={(v) => onPatch(user.id, { status: v })} options={STATUS_OPTIONS} colorClass={statusChipCls(user.status)} />
-              {isDeleted && <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 font-bold uppercase tracking-wide">Deleted</span>}
+            <div className="flex items-center flex-wrap gap-1.5 mt-1">
+              <ChipSelect size="sm" value={(user.role ?? "member").toLowerCase()} onChange={(v) => onPatch(user.id, { role: v })} options={ROLE_OPTIONS} colorClass={roleChipCls(user.role)} />
+              <ChipSelect size="sm" value={status} onChange={(v) => onPatch(user.id, { status: v })} options={STATUS_OPTIONS} colorClass={statusChipCls(user.status)} />
+              {isDeleted && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-600 font-bold uppercase tracking-wide">Deleted</span>}
             </div>
           </div>
         </div>
 
         {/* Actions — labeled buttons */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={() => onOpen(user)}
-            className="flex flex-col items-center gap-1 w-16 py-2.5 rounded-xl border border-[#e5e7eb] hover:bg-[#f9fafb] transition-colors"
+            className="flex flex-col items-center gap-0.5 w-14 py-2 rounded-lg border border-[#e5e7eb] hover:bg-[#f9fafb] transition-colors"
           >
-            <Eye className="w-5 h-5 text-blue-600" />
-            <span className="text-xs font-medium text-[#6b7280]">View</span>
+            <Eye className="w-4 h-4 text-blue-600" />
+            <span className="text-[11px] font-medium text-[#6b7280]">View</span>
           </button>
           {isDeleted && (
             <button
               type="button"
               onClick={() => onRestore(user.id)}
-              className="flex flex-col items-center gap-1 w-16 py-2.5 rounded-xl border border-[#e5e7eb] hover:bg-[#f9fafb] transition-colors"
+              className="flex flex-col items-center gap-0.5 w-14 py-2 rounded-lg border border-[#e5e7eb] hover:bg-[#f9fafb] transition-colors"
             >
-              <RotateCcw className="w-5 h-5 text-emerald-600" />
-              <span className="text-xs font-medium text-[#6b7280]">Restore</span>
+              <RotateCcw className="w-4 h-4 text-emerald-600" />
+              <span className="text-[11px] font-medium text-[#6b7280]">Restore</span>
             </button>
           )}
         </div>
       </div>
 
       {/* Details — three explicit columns */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-6 border-t border-[#f0f2f5] mt-6 pt-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 border-t border-[#f0f2f5] mt-4 pt-4">
         {/* Column 1 — contact */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           <CardField label="Email" icon={<Mail />} iconClass={iconBlue}>
             <span className="break-all">{user.email || cardDash}</span>
           </CardField>
@@ -706,7 +709,7 @@ function UserCard({
         </div>
 
         {/* Column 2 — personal */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           <CardField label="Gender" icon={<User />} iconClass={iconBlue}>
             <span className="capitalize">{user.gender || cardDash}</span>
           </CardField>
@@ -725,7 +728,7 @@ function UserCard({
         </div>
 
         {/* Column 3 — social + network */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           <CardField label="Facebook" icon={<Facebook />} iconClass={iconBlue}>
             {facebook ? (
               <a href={facebook} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{facebook}</a>
