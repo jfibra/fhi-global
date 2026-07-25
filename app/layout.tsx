@@ -73,7 +73,7 @@ export default function RootLayout({
       </head>
       <body className={`${_geist.variable} ${_geistMono.variable} ${_outfit.variable} ${_urbanist.variable} font-sans antialiased`}>
         <PageTransitionWrapper>{children}</PageTransitionWrapper>
-        <Toaster position="bottom-right" richColors />
+        <Toaster position="top-center" richColors />
         <Analytics />
       </body>
     </html>

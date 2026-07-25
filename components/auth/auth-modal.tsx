@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react"
 import { X, Mail, ArrowLeft, ArrowRight, Loader2 } from "lucide-react"
 import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
 import { OtpInput } from "@/components/auth/otp-input"
+import { toast } from "sonner"
 import { sendAuthOtp, verifyLoginOtp } from "@/app/(public-page)/(auth)/login/actions"
 
 const RESEND_COOLDOWN = 60
@@ -21,7 +22,6 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState("")
   const [code, setCode] = useState("")
   const [challenge, setChallenge] = useState("")
-  const [error, setError] = useState<string | null>(null)
   const [cooldown, setCooldown] = useState(0)
   const [pending, startTransition] = useTransition()
 
@@ -49,10 +49,9 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   const sendCode = () => {
     if (pending) return
     startTransition(async () => {
-      setError(null)
       const res = await sendAuthOtp(email)
       if (res?.error) {
-        setError(res.error)
+        toast.error(res.error)
       } else {
         setChallenge(res?.challenge ?? "")
         setStep("code")
@@ -65,10 +64,9 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   const verify = () => {
     if (pending) return
     startTransition(async () => {
-      setError(null)
       // Verify redirects on success (dashboard / complete-profile / account-inactive).
       const res = await verifyLoginOtp(email, code, challenge)
-      if (res?.error) setError(res.error)
+      if (res?.error) toast.error(res.error)
     })
   }
 
@@ -127,8 +125,6 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
                   />
                 </div>
 
-                {error && <ErrorBox message={error} />}
-
                 <SubmitButton pending={pending} label="Continue with Email" busy="Sending code…" />
               </form>
 
@@ -154,14 +150,12 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
 
               <OtpInput value={code} onChange={setCode} disabled={pending} autoFocus />
 
-              {error && <ErrorBox message={error} />}
-
               <SubmitButton pending={pending} label="Continue" busy="Verifying…" />
 
               <div className="flex items-center justify-between text-xs pt-0.5">
                 <button
                   type="button"
-                  onClick={() => { setStep("email"); setCode(""); setError(null) }}
+                  onClick={() => { setStep("email"); setCode("") }}
                   className="inline-flex items-center gap-1 text-[#6b7280] hover:text-[#001f3f] font-semibold transition-colors"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Change email
@@ -179,15 +173,6 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </div>
-    </div>
-  )
-}
-
-function ErrorBox({ message }: { message: string }) {
-  return (
-    <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
-      <span className="text-rose-400 mt-px text-sm leading-none">✕</span>
-      <p className="text-sm text-rose-700">{message}</p>
     </div>
   )
 }
