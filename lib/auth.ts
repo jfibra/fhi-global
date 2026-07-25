@@ -44,7 +44,7 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   users: ["super_admin", "admin"],
   teams: ["super_admin", "admin"],
   developers: ["super_admin", "admin", "editor"],
-  events: ["super_admin", "admin", "team_leader"], // keep in sync with ROLES_EVENT_MANAGERS in app-roles.ts
+  events: ["super_admin", "admin", "team_leader", "editor"], // keep in sync with ROLES_EVENT_MANAGERS in app-roles.ts
   "tax-entities": ["super_admin", "admin"],
   purchases: ["super_admin", "admin"],
   "purchase-categories": ["super_admin", "admin"],

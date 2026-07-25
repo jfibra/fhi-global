@@ -243,8 +243,8 @@ export const ROLES_SUPPORT_PORTAL: readonly AppRoleId[] = [...APP_ROLE_ORDER]
 /** Developer media/logo upload route (also allows content editors). */
 export const ROLES_ADMIN_OR_DEVELOPER: readonly AppRoleId[] = ["super_admin", "admin", "developer", "editor"]
 
-/** Who may manage events (create, edit, registrations, raffle): admin staff + team leaders. */
-export const ROLES_EVENT_MANAGERS: readonly AppRoleId[] = ["super_admin", "admin", "team_leader"]
+/** Who may manage events (create, edit, registrations, raffle): admin staff, team leaders, editors. */
+export const ROLES_EVENT_MANAGERS: readonly AppRoleId[] = ["super_admin", "admin", "team_leader", "editor"]
 
 export function isAdminStaffRole(role: string | null | undefined): boolean {
   return roleInList(role, ROLES_ADMIN_STAFF)

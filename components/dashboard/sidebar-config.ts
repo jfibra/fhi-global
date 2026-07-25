@@ -137,6 +137,7 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
           { icon: FolderOpen, label: "Projects",   href: `${basePath}/projects`   },
         ],
       },
+      { type: "item", item: { icon: CalendarDays, label: "Events", href: `${basePath}/events` } },
     ]
   }
 
