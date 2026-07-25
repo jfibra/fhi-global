@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowLeft,
   ArrowRight,
@@ -250,10 +251,23 @@ export function SalesTable({
   const [sortDir, setSortDir] = useState<SortDir>("desc")
   const [loading, setLoading] = useState(false)
 
-  // Selected sale type. null = the chooser screen (three cards); a type = its report
-  // table. The per-type summary (deal count / value / pending) powers the card badges
-  // and the summary tiles; all three types load together so the cards preview counts.
-  const [activeTab, setActiveTab] = useState<SaleType | null>(null)
+  // Selected sale type lives in the ?type= query param so it survives a refresh and
+  // is deep-linkable. null (missing/invalid param) = the chooser screen (three cards);
+  // a type = its report. The per-type summary (deal count / value / pending) powers the
+  // card badges and the tiles; all three load together so the cards preview counts.
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const typeParam = searchParams.get("type")
+  const activeTab: SaleType | null =
+    typeParam === "project" || typeParam === "brokerage" || typeParam === "rental" ? typeParam : null
+  const setActiveType = (t: SaleType | null) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (t) params.set("type", t)
+    else params.delete("type")
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }
   const [summaries, setSummaries] = useState<Record<SaleType, SaleTypeSummary>>({
     project:   { dealCount: 0, totalValue: 0, pendingCount: 0 },
     brokerage: { dealCount: 0, totalValue: 0, pendingCount: 0 },
@@ -350,11 +364,11 @@ export function SalesTable({
   }
 
   const onTabChange = (t: SaleType) => {
-    setActiveTab(t)
+    setActiveType(t)
     setPage(1)
     if (t !== "project") setDeveloperFilter("all") // brokerage/rental have no developer
   }
-  const goBack = () => { setActiveTab(null); setPage(1) }
+  const goBack = () => { setActiveType(null); setPage(1) }
   const openEdit = (s: SaleRecord) => {
     if (!canEditSaleForRole(currentRole, s)) {
       addToast("error", "You can only edit sales that are Invalid Sale or Under Review")
@@ -543,7 +557,7 @@ export function SalesTable({
                       </div>
                       <span className="inline-flex items-baseline gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-[#f3f4f6] text-[#6b7280]">
                         {summaries[t.type].dealCount}
-                        <span className="font-medium opacity-80">deals</span>
+                        <span className="font-medium opacity-80">records</span>
                       </span>
                     </div>
                     <h3 className="mt-5 font-['Outfit'] text-xl font-bold text-[#0d1117]">{t.label}</h3>

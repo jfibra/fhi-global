@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { useAuth } from "@/context/auth-context"
 import { canAccessSalesReportsArea } from "@/lib/app-roles"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
@@ -11,10 +12,14 @@ export default function SalesPage() {
   if (!allowed) return null
 
   return (
-    <SalesTable
-      currentUserId={user?.id ?? ""}
-      currentRole={(role ?? "").toLowerCase().trim()}
-      userName={profile?.fullname || user?.email || "User"}
-    />
+    // SalesTable reads the ?type= query param (useSearchParams) — Suspense is
+    // required so static rendering can bail out to the client cleanly.
+    <Suspense fallback={null}>
+      <SalesTable
+        currentUserId={user?.id ?? ""}
+        currentRole={(role ?? "").toLowerCase().trim()}
+        userName={profile?.fullname || user?.email || "User"}
+      />
+    </Suspense>
   )
 }
