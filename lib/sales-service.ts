@@ -30,6 +30,8 @@ export type DeveloperOption = {
   id: string
   name: string
   slug: string
+  logo_url: string | null
+  is_verified: boolean
 }
 
 export type ProjectOption = {
@@ -448,14 +450,20 @@ export async function fetchDevelopersForSale(): Promise<{ data: DeveloperOption[
   const supabase = createClient()
   const { data, error } = await supabase
     .from("developers")
-    .select("id, name, slug")
+    .select("id, name, slug, logo_url, is_verified")
     .eq("is_active", true)
     .is("deleted_at", null)
     .order("name", { ascending: true })
 
   if (error) return { data: null, error: error.message }
   return {
-    data: (data ?? []).map((r) => ({ id: String(r.id), name: String(r.name), slug: String(r.slug) })),
+    data: (data ?? []).map((r) => ({
+      id: String(r.id),
+      name: String(r.name),
+      slug: String(r.slug),
+      logo_url: typeof r.logo_url === "string" ? r.logo_url : null,
+      is_verified: Boolean(r.is_verified),
+    })),
     error: null,
   }
 }

@@ -32,6 +32,7 @@ import {
   type SaleFormData,
   type SaleType,
 } from "@/lib/sales-service"
+import { DeveloperCombobox } from "@/components/developers/developer-combobox"
 import { getDashboardRouteByRole } from "@/lib/auth"
 
 const EMPTY_CLIENT = {
@@ -416,18 +417,11 @@ export function EncodeSaleClient({
             {isProject ? (
               <>
                 <Field label="Developer" required error={errors.developer_id}>
-                  <SelectShell>
-                    <select
-                      className={`${inputCls} appearance-none cursor-pointer pr-10`}
-                      value={form.developer_id}
-                      onChange={(e) => void onDeveloperChange(e.target.value)}
-                    >
-                      <option value="">Select developer…</option>
-                      {developers.map((d) => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                    </select>
-                  </SelectShell>
+                  <DeveloperCombobox
+                    developers={developers}
+                    value={form.developer_id}
+                    onChange={(id) => void onDeveloperChange(id)}
+                  />
                 </Field>
                 <Field label="Project" required error={errors.project_id}>
                   <SelectShell>
