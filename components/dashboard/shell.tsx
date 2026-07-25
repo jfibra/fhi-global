@@ -384,21 +384,6 @@ export function DashboardShell({
                 </div>
               )}
             </div>
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarUrl}
-                alt={displayName}
-                className="w-8 h-8 rounded-xl object-cover shadow-md border border-[#e8eaed]"
-              />
-            ) : (
-              <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white shadow-md"
-                style={{ backgroundColor: "#001f3f" }}
-              >
-                {displayName.charAt(0).toUpperCase()}
-              </div>
-            )}
           </div>
         </header>
 
