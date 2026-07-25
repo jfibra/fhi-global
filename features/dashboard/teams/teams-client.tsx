@@ -9,7 +9,7 @@ import {
   Building2, Users, Settings, Upload, Pencil, Trash2, ToggleLeft,
   ToggleRight, MoreHorizontal, UserPlus, ArrowRight, UserMinus,
   RefreshCw, Image as ImageIcon, CheckCircle2, XCircle,
-  Loader2, AlertTriangle, EyeOff, Eye,
+  Loader2, AlertTriangle, EyeOff, Eye, X,
 } from "lucide-react"
 import {
   type Team,
@@ -26,6 +26,7 @@ import {
   deactivateMembership,
   removeMembership,
 } from "@/lib/team-service"
+import { TOOLBAR_GRADIENT } from "@/components/common/header-toolbar"
 import { TeamFormDialog } from "./team-form-dialog"
 import { TeamLogoUpload } from "./team-logo-upload"
 import { AddMemberDialog, TransferMemberDialog } from "./add-member-dialog"
@@ -60,6 +61,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
   const [toasts,          setToasts]           = useState<Toast[]>([])
   const [memberCounts,    setMemberCounts]      = useState<Record<string, number>>({})
   const [hideEmpty,       setHideEmpty]         = useState(true)
+  const [deptSearch,      setDeptSearch]        = useState("")
 
   // Member table state
   const [members,         setMembers]          = useState<TeamMemberProfile[]>([])
@@ -148,7 +150,6 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
   }
 
   const visibleRoots = hideEmpty ? roots.filter(teamHasMembers) : roots
-  const emptyCount = roots.length - roots.filter(teamHasMembers).length
 
   const toggleExpand = (id: string) =>
     setExpanded(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -224,84 +225,129 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
 
   // ─────────────────────────────────────────────────────────────────────────────
 
+  const deptQuery = deptSearch.trim().toLowerCase()
+  const searchedRoots = deptQuery
+    ? visibleRoots.filter(
+        t =>
+          t.name.toLowerCase().includes(deptQuery) ||
+          (byParent[t.id] ?? []).some(s => s.name.toLowerCase().includes(deptQuery)),
+      )
+    : visibleRoots
+
   return (
     <div className="flex flex-col gap-0">
-      {/* Page header */}
-      <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
-        <div>
-          <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117]">Teams & Departments</h2>
-          <p className="text-sm text-[#9ca3af] mt-0.5">Manage teams, subteams, and members</p>
-        </div>
-        <button
-          onClick={() => { setEditingTeam(null); setTeamFormOpen(true) }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#001f3f] text-white rounded-2xl text-sm font-semibold hover:bg-[#002a56] shadow-sm transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Create Team
-        </button>
-      </div>
-
       {/* Two-panel layout */}
-      <div className="flex gap-5 min-h-0" style={{ minHeight: "calc(100vh - 220px)" }}>
+      <div className="flex gap-5 min-h-0" style={{ minHeight: "calc(100vh - 140px)" }}>
 
-        {/* ── Sidebar tree ─────────────────────────────────────────────────── */}
-        <aside className="w-56 xl:w-64 shrink-0 flex flex-col rounded-2xl bg-white border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] overflow-hidden">
-          <div className="px-4 pt-4 pb-3 border-b border-[#f0f2f5] flex items-center justify-between gap-2">
-            <p className="text-xs font-bold text-[#374151] uppercase tracking-wider">Departments</p>
-            {teams.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setHideEmpty(p => !p)}
-                title={hideEmpty ? "Show all departments" : "Hide departments with no members"}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all ${
-                  hideEmpty
-                    ? "bg-[#001f3f]/8 text-[#001f3f]"
-                    : "text-[#9ca3af] hover:bg-[#f4f6f9] hover:text-[#374151]"
-                }`}
-              >
-                {hideEmpty ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                {hideEmpty ? "Show all" : `Hide empty${emptyCount > 0 ? ` (${emptyCount})` : ""}`}
-              </button>
-            )}
+        {/* ── Left: team management column ─────────────────────────────────── */}
+        <aside className="w-72 xl:w-80 shrink-0 flex flex-col gap-4 min-h-0">
+          {/* Header */}
+          <div className="flex items-center gap-3 rounded-2xl bg-white border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] p-4">
+            <div className={`w-[46px] h-[46px] rounded-[13px] flex items-center justify-center shrink-0 text-white ${TOOLBAR_GRADIENT}`}>
+              <Users className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-['Outfit'] text-base font-bold text-[#0d1117] leading-tight">Team Management</h2>
+              <p className="text-xs text-[#9ca3af] leading-tight mt-0.5">Manage teams, subteams, and members</p>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto py-2">
-            {teamsLoading ? (
-              <div className="space-y-2 px-3 py-2">
-                {[1,2,3].map(i => (
-                  <div key={i} className="h-8 rounded-xl bg-[#f4f6f9] animate-pulse" />
-                ))}
+          {/* Departments tree */}
+          <div className="flex-1 flex flex-col rounded-2xl bg-white border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] overflow-hidden min-h-0">
+            {/* Search + show/hide toggle */}
+            <div className="px-3 pt-3 pb-2.5 flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+                <input
+                  type="text"
+                  value={deptSearch}
+                  onChange={e => setDeptSearch(e.target.value)}
+                  placeholder="Search team, subteam…"
+                  className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#e8eaed] bg-white text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/6 transition-all"
+                />
+                {deptSearch && (
+                  <button
+                    type="button"
+                    aria-label="Clear search"
+                    onClick={() => setDeptSearch("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[#9ca3af] hover:text-[#374151] transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
-            ) : teams.length === 0 ? (
-              <div className="px-4 py-6 text-center">
-                <Building2 className="w-8 h-8 text-[#d1d5db] mx-auto mb-2" />
-                <p className="text-xs text-[#9ca3af]">No teams yet</p>
-              </div>
-            ) : visibleRoots.length === 0 ? (
-              <div className="px-4 py-6 text-center">
-                <Building2 className="w-8 h-8 text-[#d1d5db] mx-auto mb-2" />
-                <p className="text-xs text-[#9ca3af]">All departments are empty</p>
-              </div>
-            ) : (
-              <ul className="px-2">
-                {visibleRoots.map(team => {
-                  const subs = byParent[team.id] ?? []
-                  return (
-                    <TreeNode
-                      key={team.id}
-                      team={team}
-                      children={hideEmpty ? subs.filter(s => (memberCounts[s.id] ?? 0) > 0) : subs}
-                      memberCount={memberCounts[team.id] ?? 0}
-                      memberCounts={memberCounts}
-                      selectedId={selectedId}
-                      expanded={expanded}
-                      onSelect={selectTeam}
-                      onToggleExpand={toggleExpand}
-                    />
-                  )
-                })}
-              </ul>
-            )}
+              {teams.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setHideEmpty(p => !p)}
+                  title={hideEmpty ? "Show all departments" : "Hide departments with no members"}
+                  aria-label={hideEmpty ? "Show all departments" : "Hide empty departments"}
+                  className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-xl border transition-colors ${
+                    hideEmpty
+                      ? "border-[#001f3f]/20 bg-[#eef2ff] text-[#001f3f]"
+                      : "border-[#e8eaed] text-[#9ca3af] hover:text-[#374151] hover:border-[#d0d5dd]"
+                  }`}
+                >
+                  {hideEmpty ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              )}
+            </div>
+
+            {/* Create Team */}
+            <div className="px-3 pb-3 border-b border-[#f0f2f5]">
+              <button
+                onClick={() => { setEditingTeam(null); setTeamFormOpen(true) }}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-semibold shadow-sm transition-all hover:brightness-110 ${TOOLBAR_GRADIENT}`}
+              >
+                <Plus className="w-4 h-4" />
+                Create Team
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-2">
+              {teamsLoading ? (
+                <div className="space-y-2 px-3 py-2">
+                  {[1,2,3].map(i => (
+                    <div key={i} className="h-8 rounded-xl bg-[#f4f6f9] animate-pulse" />
+                  ))}
+                </div>
+              ) : teams.length === 0 ? (
+                <div className="px-4 py-6 text-center">
+                  <Building2 className="w-8 h-8 text-[#d1d5db] mx-auto mb-2" />
+                  <p className="text-xs text-[#9ca3af]">No teams yet</p>
+                </div>
+              ) : searchedRoots.length === 0 ? (
+                <div className="px-4 py-6 text-center">
+                  <Building2 className="w-8 h-8 text-[#d1d5db] mx-auto mb-2" />
+                  <p className="text-xs text-[#9ca3af]">
+                    {deptQuery ? "No departments match your search" : "All departments are empty"}
+                  </p>
+                </div>
+              ) : (
+                <ul className="px-2">
+                  {searchedRoots.map(team => {
+                    let subs = byParent[team.id] ?? []
+                    if (hideEmpty) subs = subs.filter(s => (memberCounts[s.id] ?? 0) > 0)
+                    if (deptQuery && !team.name.toLowerCase().includes(deptQuery)) {
+                      subs = subs.filter(s => s.name.toLowerCase().includes(deptQuery))
+                    }
+                    return (
+                      <TreeNode
+                        key={team.id}
+                        team={team}
+                        children={subs}
+                        memberCount={memberCounts[team.id] ?? 0}
+                        memberCounts={memberCounts}
+                        selectedId={selectedId}
+                        expanded={expanded}
+                        onSelect={selectTeam}
+                        onToggleExpand={toggleExpand}
+                      />
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
           </div>
         </aside>
 
@@ -662,8 +708,9 @@ function TreeNode({
 
   return (
     <li>
-      <div className={`flex items-center rounded-xl px-2 py-2 cursor-pointer transition-all text-sm group
-        ${isSelected ? "bg-[#001f3f]/8 text-[#001f3f]" : "text-[#374151] hover:bg-[#f4f6f9]"}`}>
+      <div className={`relative flex items-center rounded-xl px-2 py-2 cursor-pointer transition-all text-sm group
+        ${isSelected ? "bg-[#eef2ff] text-[#001f3f]" : "text-[#374151] hover:bg-[#f4f6f9]"}`}>
+        {isSelected && <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full bg-[#001f3f]" />}
         {/* expand toggle */}
         <button
           type="button"
@@ -693,9 +740,7 @@ function TreeNode({
           {!team.is_active && (
             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#f0f2f5] text-[#9ca3af] font-semibold shrink-0">off</span>
           )}
-          {memberCount > 0 && (
-            <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-[#001f3f]/8 text-[#001f3f] font-semibold shrink-0">{memberCount}</span>
-          )}
+          <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0 ${isSelected ? "bg-white text-[#001f3f]" : "bg-[#f0f2f5] text-[#6b7280]"}`}>{memberCount}</span>
         </button>
       </div>
 
