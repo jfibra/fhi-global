@@ -7,7 +7,7 @@ import {
 import { UserAvatar } from "@/components/user-avatar"
 import { HeaderToolbar, ToolbarIconButton, TOOLBAR_GRADIENT } from "@/components/common/header-toolbar"
 import { DataTable } from "@/components/common/data-table"
-import { Snackbar } from "@/components/common/snackbar"
+import { toast } from "sonner"
 import { UserProfileModal } from "./user-profile-modal"
 import type { UserRecord, UsersListResponse } from "@/lib/user-service"
 import { ROLE_OPTIONS, STATUS_OPTIONS, ROLE_COLORS, STATUS_COLORS, getUserDisplayName } from "@/lib/user-service"
@@ -128,7 +128,6 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const [sort,        setSort]        = useState<{ key: string; dir: "asc" | "desc" }>({ key: "joined_at", dir: "desc" })
   // The eye opens a read-only profile modal (complete-profile look) with an Edit toggle.
   const [viewUser,    setViewUser]    = useState<UserRecord | null>(null)
-  const [banner,      setBanner]      = useState<{ type: "success" | "error"; msg: string } | null>(null)
   const [referrers,   setReferrers]   = useState<ReferrerOption[]>([])
 
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -159,7 +158,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
       setUsers(data.users)
       setTotal(data.total)
     } catch {
-      setBanner({ type: "error", msg: "Failed to load users." })
+      toast.error("Failed to load users.")
     } finally {
       setLoading(false)
     }
@@ -203,7 +202,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
         throw new Error(d.error ?? "Update failed.")
       }
     } catch (e) {
-      setBanner({ type: "error", msg: e instanceof Error ? e.message : "Update failed." })
+      toast.error(e instanceof Error ? e.message : "Update failed.")
       await fetchUsers() // revert optimistic change to server truth
     }
   }, [fetchUsers])
@@ -235,10 +234,10 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const handleDelete = async (userId: string) => {
     setUsers((prev) => prev.filter((u) => u.id !== userId))
     setTotal((t) => Math.max(0, t - 1))
-    setBanner({ type: "success", msg: "User deleted." })
+    toast.success("User deleted.")
     const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" })
     if (!res.ok) {
-      setBanner({ type: "error", msg: "Failed to delete user." })
+      toast.error("Failed to delete user.")
       void fetchUsers()
     }
   }
@@ -252,11 +251,11 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
       return
     setUsers((prev) => prev.filter((u) => u.id !== userId))
     setTotal((t) => Math.max(0, t - 1))
-    setBanner({ type: "success", msg: "User permanently deleted." })
+    toast.success("User permanently deleted.")
     const res = await fetch(`/api/admin/users/${userId}?hard=1`, { method: "DELETE" })
     if (!res.ok) {
       const j = (await res.json().catch(() => ({}))) as { error?: string }
-      setBanner({ type: "error", msg: j.error ?? "Failed to permanently delete user." })
+      toast.error(j.error ?? "Failed to permanently delete user.")
       void fetchUsers()
     }
   }
@@ -266,7 +265,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const handleRestore = async (userId: string) => {
     setUsers((prev) => prev.filter((u) => u.id !== userId))
     setTotal((t) => Math.max(0, t - 1))
-    setBanner({ type: "success", msg: "User restored." })
+    toast.success("User restored.")
     const res = await fetch(`/api/admin/users/${userId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -274,7 +273,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     })
     if (!res.ok) {
       const j = (await res.json().catch(() => ({}))) as { error?: string }
-      setBanner({ type: "error", msg: j.error ?? "Failed to restore user." })
+      toast.error(j.error ?? "Failed to restore user.")
       void fetchUsers()
     }
   }
@@ -338,9 +337,6 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
         }
       />
 
-      {/* Toast (top-right) */}
-      <Snackbar state={banner} onClose={() => setBanner(null)} />
-
       {/* User table */}
       <DataTable
         columns={[
@@ -393,7 +389,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
           referrers={referrers}
           onClose={() => setViewUser(null)}
           onSaved={fetchUsers}
-          onBanner={(type: "success" | "error", msg: string) => setBanner({ type, msg })}
+          onBanner={(type: "success" | "error", msg: string) => (type === "success" ? toast.success(msg) : toast.error(msg))}
         />
       )}
     </>
@@ -435,7 +431,7 @@ function UserRow({
         >
           <UserAvatar name={displayName} imageUrl={user.profile_url} size={34} />
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-[#0d1117] leading-tight">{displayName}</p>
+            <p className="text-sm font-semibold text-[#0d1117] leading-tight capitalize">{displayName}</p>
             <p className="text-xs text-[#6b7280] leading-tight truncate">
               {user.email ?? <span className="text-[#d0d5dd]">—</span>}
             </p>
@@ -502,7 +498,7 @@ function UserRow({
           <select
             value={referrers.some((r) => r.id === invitedBy) ? invitedBy : ""}
             onChange={(e) => onPatch(user.id, { invited_by: e.target.value || null })}
-            className="appearance-none cursor-pointer w-[160px] truncate rounded-lg border border-[#e5e7eb] bg-white text-xs text-[#374151] pl-2.5 pr-7 py-1.5 focus:outline-none focus:border-[#001f3f] transition-colors disabled:opacity-50"
+            className="appearance-none cursor-pointer w-[160px] truncate rounded-lg border border-[#e5e7eb] bg-white text-xs text-[#374151] pl-2.5 pr-7 py-1.5 focus:outline-none focus:border-[#001f3f] transition-colors disabled:opacity-50 capitalize"
           >
             <option value="">
               {invitedBy && !referrers.some((r) => r.id === invitedBy)

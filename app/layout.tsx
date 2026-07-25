@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono, Outfit, Urbanist } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import { Toaster } from "sonner"
 import "./globals.css"
 import { DEFAULT_PREVIEW_IMAGE_URL } from "@/lib/seo"
 import { PageTransitionWrapper } from "@/components/ui/PageTransitionWrapper"
@@ -72,6 +73,7 @@ export default function RootLayout({
       </head>
       <body className={`${_geist.variable} ${_geistMono.variable} ${_outfit.variable} ${_urbanist.variable} font-sans antialiased`}>
         <PageTransitionWrapper>{children}</PageTransitionWrapper>
+        <Toaster position="bottom-right" richColors />
         <Analytics />
       </body>
     </html>
