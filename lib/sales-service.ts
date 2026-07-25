@@ -530,6 +530,7 @@ export async function fetchSales(opts: {
   page: number
   perPage: number
   search?: string
+  saleType?: SaleType
   agentId?: string
   developerId?: string
   projectId?: string
@@ -547,6 +548,7 @@ export async function fetchSales(opts: {
     page,
     perPage,
     search,
+    saleType,
     agentId,
     developerId,
     projectId,
@@ -584,6 +586,7 @@ export async function fetchSales(opts: {
     query = query.eq("agent_id", agentId)
   }
 
+  if (saleType) query = query.eq("sale_type", saleType)
   if (developerId) query = query.eq("developer_id", developerId)
   if (projectId) query = query.eq("project_id", Number(projectId))
   if (commissionStatus) query = query.eq("commission_status", commissionStatus)
@@ -591,12 +594,73 @@ export async function fetchSales(opts: {
   if (reservationDateFrom) query = query.gte("reservation_date", reservationDateFrom)
   if (reservationDateTo) query = query.lte("reservation_date", reservationDateTo)
 
+  // Free-text search. PostgREST .or() can't span embedded relations, so joined
+  // names (client/project/developer) are resolved to ids first, then folded into
+  // one .or() alongside the top-level property columns. Sanitize the term first —
+  // commas/parens/quotes are .or() grammar and would corrupt the filter. The whole
+  // .or() is ANDed with the agent force-scope above, so an agent's search still
+  // only ever matches their own sales.
+  if (search) {
+    const s = search.replace(/[,()"%*\\]/g, " ").replace(/\s+/g, " ").trim()
+    if (s) {
+      const [cRes, pRes, dRes] = await Promise.all([
+        supabase.from("clients").select("id").or(`first_name.ilike.%${s}%,middle_name.ilike.%${s}%,last_name.ilike.%${s}%`),
+        supabase.from("projects").select("id").ilike("name", `%${s}%`),
+        supabase.from("developers").select("id").ilike("name", `%${s}%`),
+      ])
+      const clauses = [
+        `unit_number.ilike.%${s}%`,
+        `property_type.ilike.%${s}%`,
+        `property_address.ilike.%${s}%`,
+        `block_number.ilike.%${s}%`,
+        `lot_number.ilike.%${s}%`,
+        `remarks.ilike.%${s}%`,
+      ]
+      const cIds = (cRes.data ?? []).map((r: { id: string }) => r.id)
+      if (cIds.length) clauses.push(`client_id.in.(${cIds.join(",")})`)
+      const pIds = (pRes.data ?? []).map((r: { id: number }) => r.id)
+      if (pIds.length) clauses.push(`project_id.in.(${pIds.join(",")})`)
+      const dIds = (dRes.data ?? []).map((r: { id: string }) => r.id)
+      if (dIds.length) clauses.push(`developer_id.in.(${dIds.join(",")})`)
+      query = query.or(clauses.join(","))
+    }
+  }
+
   const { data, count, error } = await query
   if (error) return { data: null, total: null, error: error.message }
 
   return {
     data: (data ?? []).map(normalizeSale),
     total: count ?? 0,
+    error: null,
+  }
+}
+
+export type SaleTypeSummary = { dealCount: number; totalValue: number; pendingCount: number }
+
+// Aggregate for the Sales Reports summary tiles / tab badges — deal count, total
+// contract value, and pending-validation count for a single sale type. Backed by
+// the sales_summary() RPC (server-side SUM; a client-side sum would hit
+// PostgREST's row cap and undercount). Role-scoped identically to fetchSales:
+// sales-pipeline roles are forced to their own agent_id, admins may narrow by agentId.
+export async function fetchSalesSummary(opts: {
+  saleType: SaleType
+  agentId?: string
+  currentRole?: string
+  currentUserId?: string
+}): Promise<{ data: SaleTypeSummary | null; error: string | null }> {
+  const supabase = createClient()
+  const { saleType, agentId, currentRole, currentUserId } = opts
+  const pAgent = isSalesPipelineRole(currentRole) && currentUserId ? currentUserId : (agentId || null)
+  const { data, error } = await supabase.rpc("sales_summary", { p_sale_type: saleType, p_agent_id: pAgent })
+  if (error) return { data: null, error: error.message }
+  const row = Array.isArray(data) ? data[0] : data
+  return {
+    data: {
+      dealCount: Number(row?.deal_count ?? 0),
+      totalValue: Number(row?.total_value ?? 0),
+      pendingCount: Number(row?.pending_count ?? 0),
+    },
     error: null,
   }
 }

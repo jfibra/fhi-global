@@ -1,35 +1,43 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import {
   ArrowUpDown,
+  Building2,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Filter,
+  Handshake,
   History,
+  KeyRound,
   MessageSquare,
   Paperclip,
-  Plus,
   RefreshCw,
   Search,
   TrendingUp,
+  Wallet,
   X,
+  type LucideIcon,
 } from "lucide-react"
 import {
   canEditSaleForRole,
   canManageSaleAttachmentsForRole,
   fetchSales,
+  fetchSalesSummary,
   fetchDevelopersForSale,
   fetchAgentsForSale,
   updateSaleValidationStatus,
   isAdminRole,
   type SaleRecord,
+  type SaleType,
+  type SaleTypeSummary,
   type CommissionStatus,
   type ValidationStatus,
   type DeveloperOption,
   type AgentOption,
 } from "@/lib/sales-service"
-import { isSalesPipelineRole, isSecretaryLikeRole } from "@/lib/app-roles"
+import { isSecretaryLikeRole } from "@/lib/app-roles"
 import { SaleActions } from "./sale-actions"
 import { SaleAttachmentsDialog } from "./sale-attachments-dialog"
 import { SaleFormDialog } from "./sale-form-dialog"
@@ -43,6 +51,24 @@ type SortField = "reservation_date" | "contract_price" | "created_at"
 type SortDir = "asc" | "desc"
 
 const PER_PAGE_OPTIONS = [10, 20, 50] as const
+
+// Sale-type tabs — mirror the "Encode a Sale" 3-card page (Building2/Handshake/KeyRound).
+const SALE_TYPE_TABS: Array<{ type: SaleType; label: string; icon: LucideIcon }> = [
+  { type: "project",   label: "Project Sales", icon: Building2 },
+  { type: "brokerage", label: "Brokerage",     icon: Handshake },
+  { type: "rental",    label: "Rental",        icon: KeyRound },
+]
+
+// One table column. `sortField` turns the header into a sort toggle; `cell` renders
+// the value for a row. Columns are built per active tab so brokerage/rental drop the
+// project-only Developer/Project/Unit columns and show Property Type/Address instead.
+type Col = {
+  key: string
+  header: string
+  sortField?: SortField
+  tdClassName?: string
+  cell: (s: SaleRecord) => ReactNode
+}
 
 const COMMISSION_STATUSES: CommissionStatus[] = ["pending", "processing", "approved", "released", "rejected"]
 const VALIDATION_STATUSES: ValidationStatus[] = ["pending", "under_review", "validated", "invalid_sale"]
@@ -132,12 +158,26 @@ function StatusBadge({ value, type }: { value: string; type: "commission" | "val
   )
 }
 
-function SkeletonRows() {
+function SummaryTile({ label, value, icon: Icon }: { label: string; value: string; icon: LucideIcon }) {
+  return (
+    <div className="bg-white/60 backdrop-blur-xl rounded-[20px] border border-white/60 shadow-sm shadow-black/5 p-4 flex items-center gap-3">
+      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shrink-0">
+        <Icon className="w-5 h-5 text-white" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">{label}</p>
+        <p className="text-lg font-bold text-[#0d1117] truncate">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+function SkeletonRows({ cols }: { cols: number }) {
   return (
     <>
       {Array.from({ length: 8 }).map((_, i) => (
         <tr key={i} className="border-b border-[#f3f4f6]">
-          {Array.from({ length: 11 }).map((__, j) => (
+          {Array.from({ length: cols }).map((__, j) => (
             <td key={j} className="px-4 py-4 first:pl-6 last:pr-6">
               <div className={`h-3 rounded-full bg-[#f0f2f5] animate-pulse ${j === 0 ? "w-32" : "w-20"}`} />
             </td>
@@ -207,6 +247,16 @@ export function SalesTable({
   const [sortDir, setSortDir] = useState<SortDir>("desc")
   const [loading, setLoading] = useState(false)
 
+  // Active sale-type tab + the per-type summary (deal count / value / pending) that
+  // powers the tab count badges and the summary tiles. All three types are loaded
+  // together so switching tabs is instant (no refetch).
+  const [activeTab, setActiveTab] = useState<SaleType>("project")
+  const [summaries, setSummaries] = useState<Record<SaleType, SaleTypeSummary>>({
+    project:   { dealCount: 0, totalValue: 0, pendingCount: 0 },
+    brokerage: { dealCount: 0, totalValue: 0, pendingCount: 0 },
+    rental:    { dealCount: 0, totalValue: 0, pendingCount: 0 },
+  })
+
   // dialog state
   const [showForm, setShowForm] = useState(false)
   const [viewMode, setViewMode] = useState(false)
@@ -221,7 +271,6 @@ export function SalesTable({
   const toastIdRef = useRef(0)
 
   const isAdminUser = isAdminRole(currentRole)
-  const canEncodeSale = isAdminUser || isSalesPipelineRole(currentRole)
 
   const addToast = (type: ToastType, text: string) => {
     const id = ++toastIdRef.current
@@ -247,6 +296,7 @@ export function SalesTable({
         page,
         perPage,
         search: search || undefined,
+        saleType: activeTab,
         agentId: agentFilter === "all" ? undefined : agentFilter,
         developerId: developerFilter === "all" ? undefined : developerFilter,
         commissionStatus: commissionFilter === "all" ? undefined : commissionFilter,
@@ -264,10 +314,25 @@ export function SalesTable({
     } finally {
       setLoading(false)
     }
-  }, [page, perPage, search, agentFilter, developerFilter, commissionFilter, validationFilter, dateFrom, dateTo, sortField, sortDir, currentRole, currentUserId])
+  }, [page, perPage, search, activeTab, agentFilter, developerFilter, commissionFilter, validationFilter, dateFrom, dateTo, sortField, sortDir, currentRole, currentUserId])
+
+  // Per-type summaries for the tab badges + tiles. Scoped like fetchSales (agents
+  // see only their own), and deliberately ignore the in-view filters so the numbers
+  // stay a stable overview — only re-fetched when the agent scope changes.
+  const loadSummaries = useCallback(async () => {
+    const scope = { agentId: agentFilter === "all" ? undefined : agentFilter, currentRole, currentUserId }
+    const [proj, brok, rent] = await Promise.all([
+      fetchSalesSummary({ saleType: "project", ...scope }),
+      fetchSalesSummary({ saleType: "brokerage", ...scope }),
+      fetchSalesSummary({ saleType: "rental", ...scope }),
+    ])
+    const zero: SaleTypeSummary = { dealCount: 0, totalValue: 0, pendingCount: 0 }
+    setSummaries({ project: proj.data ?? zero, brokerage: brok.data ?? zero, rental: rent.data ?? zero })
+  }, [agentFilter, currentRole, currentUserId])
 
   useEffect(() => { void loadReferenceData() }, [loadReferenceData])
   useEffect(() => { void loadSales() }, [loadSales])
+  useEffect(() => { void loadSummaries() }, [loadSummaries])
 
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput.trim()); setPage(1) }, 350)
@@ -280,7 +345,11 @@ export function SalesTable({
     setPage(1)
   }
 
-  const openCreate = () => { setSelectedSale(null); setViewMode(false); setShowForm(true) }
+  const onTabChange = (t: SaleType) => {
+    setActiveTab(t)
+    setPage(1)
+    if (t !== "project") setDeveloperFilter("all") // brokerage/rental have no developer
+  }
   const openEdit = (s: SaleRecord) => {
     if (!canEditSaleForRole(currentRole, s)) {
       addToast("error", "You can only edit sales that are Invalid Sale or Under Review")
@@ -307,12 +376,14 @@ export function SalesTable({
     if (error) { addToast("error", error); return }
     setSales((prev) => prev.map((item) => (item.id === sale.id ? data! : item)))
     addToast("success", `Validation set to ${STATUS_LABEL[nextStatus]}`)
+    void loadSummaries() // pending-validation count changed
   }
 
   const onSaved = (sale: SaleRecord, isEdit: boolean) => {
     setShowForm(false)
     addToast("success", isEdit ? "Sale updated" : "Sale recorded successfully")
     void loadSales()
+    void loadSummaries()
   }
 
   const handleCountChange = (id: string, count: number) => {
@@ -321,6 +392,111 @@ export function SalesTable({
       setAttachmentSale((prev) => prev ? { ...prev, attachments_count: count } : prev)
     }
   }
+
+  // Columns are tab-aware: Project keeps Developer/Project/Unit; Brokerage & Rental
+  // swap those for Property Type/Address. The Agent column shows only for admins
+  // (an agent's own rows would all read the same name). Built once per render.
+  const columns: Col[] = []
+  if (isAdminUser) {
+    columns.push({ key: "agent", header: "Agent", tdClassName: "font-semibold text-[#0d1117]", cell: (s) => s.profiles?.fullname ?? "—" })
+  }
+  if (activeTab === "project") {
+    columns.push({ key: "developer", header: "Developer", tdClassName: "text-[#374151]", cell: (s) => s.developers?.name ?? "—" })
+    columns.push({ key: "project", header: "Project", tdClassName: "text-[#374151]", cell: (s) => s.projects?.name ?? "—" })
+    columns.push({
+      key: "unit", header: "Unit", tdClassName: "text-xs text-[#6b7280]",
+      cell: (s) => s.unit_number
+        ? `${s.project_units?.unit_type ?? ""} · ${s.unit_number}`
+        : (s.project_units?.unit_type ?? "—"),
+    })
+  } else {
+    columns.push({ key: "ptype", header: "Property Type", tdClassName: "text-[#374151]", cell: (s) => s.property_type ?? "—" })
+    columns.push({ key: "paddr", header: "Property Address", tdClassName: "text-[#374151]", cell: (s) => s.property_address ?? "—" })
+  }
+  columns.push({ key: "client", header: "Client", tdClassName: "font-semibold text-[#0d1117]", cell: (s) => (s.clients ? `${s.clients.first_name} ${s.clients.last_name}` : "—") })
+  columns.push({ key: "price", header: "Contract Price", sortField: "contract_price", tdClassName: "text-right font-mono text-sm font-semibold text-[#0d1117]", cell: (s) => formatCurrency(s.contract_price) })
+  columns.push({ key: "resv", header: "Reservation Date", sortField: "reservation_date", tdClassName: "text-[#374151]", cell: (s) => formatDate(s.reservation_date) })
+  columns.push({ key: "comm", header: "Commission", cell: (s) => <StatusBadge value={s.commission_status} type="commission" /> })
+  columns.push({ key: "valid", header: "Validation", cell: (s) => <StatusBadge value={s.validation_status} type="validation" /> })
+  columns.push({ key: "created", header: "Created", sortField: "created_at", tdClassName: "text-[#6b7280]", cell: (s) => formatDate(s.created_at) })
+  columns.push({
+    key: "files", header: "Files",
+    cell: (s) => s.attachments_count > 0 ? (
+      <button
+        type="button"
+        onClick={() => openAttachments(s)}
+        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-600 border border-sky-200 hover:bg-sky-100 transition-colors"
+      >
+        <Paperclip className="w-3 h-3" />
+        {s.attachments_count}
+      </button>
+    ) : (
+      <span className="text-[#9ca3af] text-xs">—</span>
+    ),
+  })
+  columns.push({
+    key: "actions", header: "Actions",
+    cell: (s) => (
+      <div className="flex flex-wrap items-center gap-2">
+        {isAdminUser && (
+          <>
+            <button
+              type="button"
+              onClick={() => void handleValidationShortcut(s, "validated")}
+              disabled={s.validation_status === "validated"}
+              className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+            >
+              Validate Sale
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleValidationShortcut(s, "invalid_sale")}
+              disabled={s.validation_status === "invalid_sale"}
+              className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+            >
+              Invalid Sale
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleValidationShortcut(s, "under_review")}
+              disabled={s.validation_status === "under_review"}
+              className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 transition-colors"
+            >
+              Under Review
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          onClick={() => openDiscussion(s)}
+          title="Open validation discussion"
+          className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#6b7280] hover:border-[#001f3f]/80 hover:text-[#001f3f] transition-colors"
+        >
+          <MessageSquare className="w-4 h-4" />
+        </button>
+        {isAdminUser && (
+          <button
+            type="button"
+            onClick={() => openDiscussion(s, "activity")}
+            title="View activity history"
+            className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#6b7280] hover:border-[#001f3f]/80 hover:text-[#001f3f] transition-colors"
+          >
+            <History className="w-4 h-4" />
+          </button>
+        )}
+        <SaleActions
+          sale={s}
+          currentRole={currentRole}
+          onView={() => openView(s)}
+          onEdit={() => openEdit(s)}
+          onAttachments={() => openAttachments(s)}
+        />
+      </div>
+    ),
+  })
+
+  const summary = summaries[activeTab]
+  const colCount = columns.length
 
   return (
     <>
@@ -344,16 +520,43 @@ export function SalesTable({
             </div>
           </div>
 
-          {canEncodeSale && (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-4 py-2.5 rounded-full text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all duration-200"
-            >
-              <Plus className="w-4 h-4" />
-              Encode Sale
-            </button>
-          )}
+        </div>
+
+        {/* Sale-type tabs — mirror the "Encode a Sale" 3-card page */}
+        <div className="flex flex-wrap items-center gap-1 rounded-2xl bg-[#f3f4f6] p-1 w-fit">
+          {SALE_TYPE_TABS.map((t) => {
+            const active = activeTab === t.type
+            const Icon = t.icon
+            return (
+              <button
+                key={t.type}
+                type="button"
+                onClick={() => onTabChange(t.type)}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                  active
+                    ? "bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white shadow-sm"
+                    : "text-[#6b7280] hover:text-[#001f3f]"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {t.label}
+                <span
+                  className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[11px] font-bold ${
+                    active ? "bg-white/25 text-white" : "bg-white text-[#6b7280] border border-[#e5e5e5]"
+                  }`}
+                >
+                  {summaries[t.type].dealCount}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Summary tiles for the active tab */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <SummaryTile label="Deals" value={String(summary.dealCount)} icon={TrendingUp} />
+          <SummaryTile label="Total Contract Value" value={formatCurrency(summary.totalValue)} icon={Wallet} />
+          <SummaryTile label="Pending Validation" value={String(summary.pendingCount)} icon={Clock} />
         </div>
 
         {/* Filters bar */}
@@ -366,7 +569,7 @@ export function SalesTable({
                   type="text"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search client name, unit, project…"
+                  placeholder="Search client, unit, project, property…"
                   className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 placeholder:text-[#9ca3af]"
                 />
               </div>
@@ -387,16 +590,18 @@ export function SalesTable({
                   </select>
                 )}
 
-                <select
-                  value={developerFilter}
-                  onChange={(e) => { setDeveloperFilter(e.target.value); setPage(1) }}
-                  className="pl-3 pr-8 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
-                >
-                  <option value="all">All Developers</option>
-                  {developers.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
+                {activeTab === "project" && (
+                  <select
+                    value={developerFilter}
+                    onChange={(e) => { setDeveloperFilter(e.target.value); setPage(1) }}
+                    className="pl-3 pr-8 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
+                  >
+                    <option value="all">All Developers</option>
+                    {developers.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                )}
 
                 <select
                   value={commissionFilter}
@@ -466,161 +671,54 @@ export function SalesTable({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#f0f2f5] bg-white/40">
-                  <th className="text-left text-[11px] font-bold text-[#9ca3af] uppercase tracking-wider px-4 py-3.5 pl-6 whitespace-nowrap">Agent</th>
-                  <th className="text-left text-[11px] font-bold text-[#9ca3af] uppercase tracking-wider px-4 py-3.5 whitespace-nowrap">Developer</th>
-                  <th className="text-left text-[11px] font-bold text-[#9ca3af] uppercase tracking-wider px-4 py-3.5 whitespace-nowrap">Project</th>
-                  <th className="text-left text-[11px] font-bold text-[#9ca3af] uppercase tracking-wider px-4 py-3.5 whitespace-nowrap">Unit</th>
-                  <th className="text-left text-[11px] font-bold text-[#9ca3af] uppercase tracking-wider px-4 py-3.5 whitespace-nowrap">Client</th>
-                  <SortableHead label="Contract Price" field="contract_price" activeField={sortField} dir={sortDir} onToggle={toggleSort} />
-                  <SortableHead label="Reservation Date" field="reservation_date" activeField={sortField} dir={sortDir} onToggle={toggleSort} />
-                  <th className="text-left text-[11px] font-bold text-[#9ca3af] uppercase tracking-wider px-4 py-3.5 whitespace-nowrap">Commission</th>
-                  <th className="text-left text-[11px] font-bold text-[#9ca3af] uppercase tracking-wider px-4 py-3.5 whitespace-nowrap">Validation</th>
-                  <SortableHead label="Created" field="created_at" activeField={sortField} dir={sortDir} onToggle={toggleSort} />
-                  <th className="text-left text-[11px] font-bold text-[#9ca3af] uppercase tracking-wider px-4 py-3.5 whitespace-nowrap">Files</th>
-                  <th className="text-left text-[11px] font-bold text-[#9ca3af] uppercase tracking-wider px-4 py-3.5 whitespace-nowrap">Actions</th>
+                  {columns.map((col) =>
+                    col.sortField ? (
+                      <SortableHead
+                        key={col.key}
+                        label={col.header}
+                        field={col.sortField}
+                        activeField={sortField}
+                        dir={sortDir}
+                        onToggle={toggleSort}
+                      />
+                    ) : (
+                      <th
+                        key={col.key}
+                        className="text-left text-[11px] font-bold text-[#9ca3af] uppercase tracking-wider px-4 py-3.5 whitespace-nowrap first:pl-6 last:pr-6"
+                      >
+                        {col.header}
+                      </th>
+                    )
+                  )}
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-[#f8f9fa]">
                 {loading ? (
-                  <SkeletonRows />
+                  <SkeletonRows cols={colCount} />
                 ) : sales.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-6 py-14 text-center">
+                    <td colSpan={colCount} className="px-6 py-14 text-center">
                       <div className="flex flex-col items-center gap-2 text-[#9ca3af]">
                         <TrendingUp className="w-9 h-9 opacity-40" />
-                        <p className="text-sm font-medium text-[#6b7280]">No sales recorded yet.</p>
-                        <p className="text-xs">Start encoding your first property sale.</p>
-                        <button
-                          type="button"
-                          onClick={openCreate}
-                          className="mt-3 inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-4 py-2.5 rounded-full text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all duration-200"
-                        >
-                          <Plus className="w-4 h-4" />
-                          Encode Sale
-                        </button>
+                        <p className="text-sm font-medium text-[#6b7280]">No sales recorded for this type yet.</p>
+                        <p className="text-xs">
+                          Use the <span className="font-semibold text-[#001f3f]">Encode Sale</span> button in the sidebar to record one.
+                        </p>
                       </div>
                     </td>
                   </tr>
                 ) : (
                   sales.map((sale) => (
-                    <tr
-                      key={sale.id}
-                      className="hover:bg-[#fcfdff] transition-colors"
-                    >
-                      <td className="px-4 py-3.5 pl-6 whitespace-nowrap font-semibold text-[#0d1117]">
-                        {sale.profiles?.fullname ?? "—"}
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">
-                        {sale.sale_type === "project" ? (
-                          sale.developers?.name ?? "—"
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#d6b357]/15 border border-[#d6b357]/40 text-[#8a6d2a] text-[11px] font-bold">
-                            {sale.sale_type === "rental" ? "Rental" : "Brokerage"}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">
-                        {sale.sale_type === "project"
-                          ? (sale.projects?.name ?? "—")
-                          : (sale.property_type ?? "—")}
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-xs text-[#6b7280]">
-                        {sale.unit_number
-                          ? `${sale.project_units?.unit_type ?? ""} Â· ${sale.unit_number}`
-                          : (sale.project_units?.unit_type ?? "—")}
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap font-semibold text-[#0d1117]">
-                        {sale.clients
-                          ? `${sale.clients.first_name} ${sale.clients.last_name}`
-                          : "—"}
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-right font-mono text-sm font-semibold text-[#0d1117]">
-                        {formatCurrency(sale.contract_price)}
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-[#374151]">
-                        {formatDate(sale.reservation_date)}
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <StatusBadge value={sale.commission_status} type="commission" />
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <StatusBadge value={sale.validation_status} type="validation" />
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-[#6b7280]">
-                        {formatDate(sale.created_at)}
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        {sale.attachments_count > 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => openAttachments(sale)}
-                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-600 border border-sky-200 hover:bg-sky-100 transition-colors"
-                          >
-                            <Paperclip className="w-3 h-3" />
-                            {sale.attachments_count}
-                          </button>
-                        ) : (
-                          <span className="text-[#9ca3af] text-xs">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 pr-6 whitespace-nowrap">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {isAdminUser && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => void handleValidationShortcut(sale, "validated")}
-                                disabled={sale.validation_status === "validated"}
-                                className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-                              >
-                                Validate Sale
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void handleValidationShortcut(sale, "invalid_sale")}
-                                disabled={sale.validation_status === "invalid_sale"}
-                                className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
-                              >
-                                Invalid Sale
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void handleValidationShortcut(sale, "under_review")}
-                                disabled={sale.validation_status === "under_review"}
-                                className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 transition-colors"
-                              >
-                                Under Review
-                              </button>
-                            </>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => openDiscussion(sale)}
-                            title="Open validation discussion"
-                            className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#6b7280] hover:border-[#001f3f]/80 hover:text-[#001f3f] transition-colors"
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                          </button>
-                          {isAdminUser && (
-                            <button
-                              type="button"
-                              onClick={() => openDiscussion(sale, "activity")}
-                              title="View activity history"
-                              className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#6b7280] hover:border-[#001f3f]/80 hover:text-[#001f3f] transition-colors"
-                            >
-                              <History className="w-4 h-4" />
-                            </button>
-                          )}
-                          <SaleActions
-                            sale={sale}
-                            currentRole={currentRole}
-                            onView={() => openView(sale)}
-                            onEdit={() => openEdit(sale)}
-                            onAttachments={() => openAttachments(sale)}
-                          />
-                        </div>
-                      </td>
+                    <tr key={sale.id} className="hover:bg-[#fcfdff] transition-colors">
+                      {columns.map((col) => (
+                        <td
+                          key={col.key}
+                          className={`px-4 py-3.5 whitespace-nowrap first:pl-6 last:pr-6 ${col.tdClassName ?? "text-[#374151]"}`}
+                        >
+                          {col.cell(sale)}
+                        </td>
+                      ))}
                     </tr>
                   ))
                 )}
