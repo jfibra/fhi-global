@@ -35,6 +35,10 @@ export async function GET(req: NextRequest) {
   const roleFilter = sp.get("role")    ?? ""
   const statusFilter = sp.get("status") ?? ""
   const showDeleted  = sp.get("deleted") === "true"
+  // Structured search (search mode): first / last / email, AND-combined.
+  const fnameQ = (sp.get("fname") ?? "").trim()
+  const lnameQ = (sp.get("lname") ?? "").trim()
+  const emailQ = (sp.get("email") ?? "").trim()
 
   // Sort — whitelist to real profile columns; default newest-joined first.
   const SORT_COLUMNS: Record<string, string> = {
@@ -128,6 +132,22 @@ export async function GET(req: NextRequest) {
       clauses.push(`id.in.(${emailMatchIds.join(",")})`)
     }
     query = query.or(clauses.join(","))
+  }
+
+  // Structured search (first / last / email) — AND-combined (chained filters).
+  if (fnameQ) {
+    const safe = fnameQ.replace(/[,()"\\%_]/g, " ").trim()
+    if (safe) query = query.ilike("fname", `%${safe}%`)
+  }
+  if (lnameQ) {
+    const safe = lnameQ.replace(/[,()"\\%_]/g, " ").trim()
+    if (safe) query = query.ilike("lname", `%${safe}%`)
+  }
+  if (emailQ) {
+    const needle = emailQ.toLowerCase()
+    const ids = [...emailMap].filter(([, e]) => e.toLowerCase().includes(needle)).map(([id]) => id)
+    // No email match → force an empty result set.
+    query = query.in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"])
   }
 
   // Filters
