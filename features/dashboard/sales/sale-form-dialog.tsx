@@ -43,6 +43,7 @@ import {
   deleteSaleAttachment,
 } from "@/lib/sales-service"
 import { isAdminStaffRole } from "@/lib/app-roles"
+import { DeveloperCombobox } from "@/components/developers/developer-combobox"
 
 // ─── Portal ───────────────────────────────────────────────────────────────────
 
@@ -502,18 +503,14 @@ export function SaleFormDialog({
                 <>
                 <div>
                   <FieldLabel text="Developer" required />
-                  <select
-                    value={form.developer_id}
-                    onChange={(e) => void handleDeveloperChange(e.target.value)}
-                    disabled={disabled}
-                    className={sel("developer_id")}
-                    data-error-key="developer_id"
-                  >
-                    <option value="">Select developer…</option>
-                    {developers.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
+                  <div data-error-key="developer_id">
+                    <DeveloperCombobox
+                      developers={developers}
+                      value={form.developer_id}
+                      onChange={(id) => void handleDeveloperChange(id)}
+                      disabled={disabled}
+                    />
+                  </div>
                   {errors.developer_id && <p className="text-xs text-rose-500 mt-1 ml-1">{errors.developer_id}</p>}
                 </div>
 
