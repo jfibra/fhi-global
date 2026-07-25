@@ -33,6 +33,12 @@ function statusChipCls(status: string | null): string {
   return `${c.bg} ${c.text} ${c.border}`
 }
 
+// Title-case each word for display, normalizing ALL-CAPS DB values too
+// (e.g. "MARK LAWRINCE SARGADO" → "Mark Lawrince Sargado", "o'brien" → "O'Brien").
+function toTitleCase(value: string): string {
+  return value.toLowerCase().replace(/\b\p{L}/gu, (c) => c.toUpperCase())
+}
+
 // Inline chip-style dropdown for editing role/status directly in the table.
 // A native <select> sizes to its widest option, so an invisible sizer (the
 // selected label) is stacked behind it to make each chip fit its own value.
@@ -431,7 +437,7 @@ function UserRow({
         >
           <UserAvatar name={displayName} imageUrl={user.profile_url} size={34} />
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-[#0d1117] leading-tight capitalize">{displayName}</p>
+            <p className="text-sm font-semibold text-[#0d1117] leading-tight">{toTitleCase(displayName)}</p>
             <p className="text-xs text-[#6b7280] leading-tight truncate">
               {user.email ?? <span className="text-[#d0d5dd]">—</span>}
             </p>
@@ -498,15 +504,15 @@ function UserRow({
           <select
             value={referrers.some((r) => r.id === invitedBy) ? invitedBy : ""}
             onChange={(e) => onPatch(user.id, { invited_by: e.target.value || null })}
-            className="appearance-none cursor-pointer w-[160px] truncate rounded-lg border border-[#e5e7eb] bg-white text-xs text-[#374151] pl-2.5 pr-7 py-1.5 focus:outline-none focus:border-[#001f3f] transition-colors disabled:opacity-50 capitalize"
+            className="appearance-none cursor-pointer w-[160px] truncate rounded-lg border border-[#e5e7eb] bg-white text-xs text-[#374151] pl-2.5 pr-7 py-1.5 focus:outline-none focus:border-[#001f3f] transition-colors disabled:opacity-50"
           >
             <option value="">
               {invitedBy && !referrers.some((r) => r.id === invitedBy)
-                ? (user.referred_by_name ?? referrerName.get(invitedBy) ?? "Unknown")
+                ? toTitleCase(user.referred_by_name ?? referrerName.get(invitedBy) ?? "Unknown")
                 : "— None —"}
             </option>
             {referrers.map((r) => (
-              <option key={r.id} value={r.id}>{r.fullname}</option>
+              <option key={r.id} value={r.id}>{toTitleCase(r.fullname)}</option>
             ))}
           </select>
           <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-[#9ca3af] pointer-events-none" />
