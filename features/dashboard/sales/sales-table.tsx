@@ -52,11 +52,12 @@ type SortDir = "asc" | "desc"
 
 const PER_PAGE_OPTIONS = [10, 20, 50] as const
 
-// Sale-type tabs — mirror the "Encode a Sale" 3-card page (Building2/Handshake/KeyRound).
-const SALE_TYPE_TABS: Array<{ type: SaleType; label: string; icon: LucideIcon }> = [
-  { type: "project",   label: "Project Sales", icon: Building2 },
-  { type: "brokerage", label: "Brokerage",     icon: Handshake },
-  { type: "rental",    label: "Rental",        icon: KeyRound },
+// Sale-type selector cards — mirror the "Encode a Sale" 3-card page (icon + title
+// + description), reusing the same icons (Building2/Handshake/KeyRound).
+const SALE_TYPE_TABS: Array<{ type: SaleType; label: string; desc: string; icon: LucideIcon }> = [
+  { type: "project",   label: "Project Sale", desc: "Units sold within a developer's project.",      icon: Building2 },
+  { type: "brokerage", label: "Brokerage",    desc: "Resale / private-owner deals — no developer.",  icon: Handshake },
+  { type: "rental",    label: "Rental",       desc: "Rental transactions and lease contracts.",       icon: KeyRound },
 ]
 
 // One table column. `sortField` turns the header into a sort toggle; `cell` renders
@@ -522,8 +523,8 @@ export function SalesTable({
 
         </div>
 
-        {/* Sale-type tabs — mirror the "Encode a Sale" 3-card page */}
-        <div className="flex flex-wrap items-center gap-1 rounded-2xl bg-[#f3f4f6] p-1 w-fit">
+        {/* Sale-type selector — cards mirroring the "Encode a Sale" page */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {SALE_TYPE_TABS.map((t) => {
             const active = activeTab === t.type
             const Icon = t.icon
@@ -532,29 +533,39 @@ export function SalesTable({
                 key={t.type}
                 type="button"
                 onClick={() => onTabChange(t.type)}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                aria-pressed={active}
+                className={`group text-left rounded-2xl border bg-white p-5 transition-all ${
                   active
-                    ? "bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white shadow-sm"
-                    : "text-[#6b7280] hover:text-[#001f3f]"
+                    ? "border-[#001f3f] ring-2 ring-[#001f3f]/10 shadow-md"
+                    : "border-black/[0.08] hover:border-[#001f3f]/30 hover:shadow-sm"
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                {t.label}
-                <span
-                  className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[11px] font-bold ${
-                    active ? "bg-white/25 text-white" : "bg-white text-[#6b7280] border border-[#e5e5e5]"
-                  }`}
-                >
-                  {summaries[t.type].dealCount}
-                </span>
+                <div className="flex items-start justify-between gap-3">
+                  <div
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+                      active ? "bg-[#001f3f]" : "bg-[#f3f4f6] group-hover:bg-[#001f3f]/5"
+                    }`}
+                  >
+                    <Icon className={`w-6 h-6 ${active ? "text-[#d6b357]" : "text-[#9ca3af]"}`} />
+                  </div>
+                  <span
+                    className={`inline-flex items-baseline gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
+                      active ? "bg-[#001f3f] text-white" : "bg-[#f3f4f6] text-[#6b7280]"
+                    }`}
+                  >
+                    {summaries[t.type].dealCount}
+                    <span className="font-medium opacity-80">deals</span>
+                  </span>
+                </div>
+                <h3 className="mt-4 font-['Outfit'] text-lg font-bold text-[#0d1117]">{t.label}</h3>
+                <p className="mt-1 text-sm text-[#6b7280]">{t.desc}</p>
               </button>
             )
           })}
         </div>
 
-        {/* Summary tiles for the active tab */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <SummaryTile label="Deals" value={String(summary.dealCount)} icon={TrendingUp} />
+        {/* Summary tiles for the active tab (deal count already shown on the cards) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <SummaryTile label="Total Contract Value" value={formatCurrency(summary.totalValue)} icon={Wallet} />
           <SummaryTile label="Pending Validation" value={String(summary.pendingCount)} icon={Clock} />
         </div>
