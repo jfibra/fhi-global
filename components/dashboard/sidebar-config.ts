@@ -126,6 +126,20 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
     ]
   }
 
+  if (normalizedRole === "editor") {
+    return [
+      { type: "item", item: { icon: LayoutDashboard, label: "Overview", href: basePath } },
+      {
+        type: "group",
+        label: "Content Management",
+        items: [
+          { icon: Building2,  label: "Developers", href: `${basePath}/developers` },
+          { icon: FolderOpen, label: "Projects",   href: `${basePath}/projects`   },
+        ],
+      },
+    ]
+  }
+
   if (normalizedRole === "developer") {
     return [
       { type: "item", item: { icon: LayoutDashboard, label: "Overview",      href: basePath                } },

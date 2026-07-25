@@ -1,13 +1,13 @@
 "use client"
 
 import { useAuth } from "@/context/auth-context"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { canManageDeveloperContent } from "@/lib/app-roles"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { DevelopersDashboardShell } from "./developers-dashboard-shell"
 
 export default function DevelopersPage() {
   const { user, profile, role } = useAuth()
-  const allowed = useRequireAllowed(isAdminStaffRole(role))
+  const allowed = useRequireAllowed(canManageDeveloperContent(role))
   if (!allowed) return null
 
   return (

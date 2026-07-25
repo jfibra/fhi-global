@@ -1,15 +1,15 @@
 "use client"
 
 import { useAuth } from "@/context/auth-context"
-import { isAdminStaffRole, isDeveloperRole } from "@/lib/app-roles"
+import { canManageDeveloperContent, isDeveloperRole } from "@/lib/app-roles"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { ProjectsDashboardShell } from "./projects-dashboard-shell"
 import { DeveloperProjectsRoute } from "./developer-projects-route"
 
-/** All-projects management — admin / super_admin. */
+/** All-projects management — admin / super_admin / editor. */
 export function AdminProjects() {
   const { user, profile, role } = useAuth()
-  const allowed = useRequireAllowed(isAdminStaffRole(role))
+  const allowed = useRequireAllowed(canManageDeveloperContent(role))
   if (!allowed) return null
 
   return (

@@ -18,7 +18,7 @@ import {
   toggleDeveloperActive,
   toggleDeveloperVerified,
 } from "@/lib/developer-service"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { isAdminStaffRole, canManageDeveloperContent } from "@/lib/app-roles"
 import { formatDateTime, formatLongDateAtTime, relativeTime } from "@/lib/utils"
 import { DeveloperFormDialog } from "./developer-form-dialog"
 import { DeveloperLogoUpload } from "./developer-logo-upload"
@@ -79,9 +79,10 @@ interface RowActionsProps {
   onToggleActive: () => void
   onDelete: () => void
   onRestore: () => void
+  canInvite: boolean // developer invite-registration is admin-staff only
 }
 
-function RowActions({ dev, onEdit, onLogo, onInviteLink, onToggleVerified, onToggleActive, onDelete, onRestore }: RowActionsProps) {
+function RowActions({ dev, onEdit, onLogo, onInviteLink, onToggleVerified, onToggleActive, onDelete, onRestore, canInvite }: RowActionsProps) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -150,7 +151,7 @@ function RowActions({ dev, onEdit, onLogo, onInviteLink, onToggleVerified, onTog
                 }]),
                 { label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, action: onEdit },
                 { label: "Upload Logo", icon: <ImageIcon className="w-3.5 h-3.5" />, action: onLogo },
-                ...(dev.deleted_at ? [] : [{
+                ...(dev.deleted_at || !canInvite ? [] : [{
                   label: "Invite link",
                   icon: <QrCode className="w-3.5 h-3.5" />,
                   action: onInviteLink,
@@ -336,6 +337,9 @@ export function DevelopersClient({ currentRole }: Props) {
   }
 
   const isAdmin = isAdminStaffRole(currentRole)
+  // Editors can manage developer records (add/edit/delete/toggles); the
+  // invite-registration feature stays admin-staff only (its API is ADMIN_STAFF).
+  const canManage = canManageDeveloperContent(currentRole)
 
   return (
     <div className="space-y-6">
@@ -352,12 +356,14 @@ export function DevelopersClient({ currentRole }: Props) {
               <p className="text-sm text-[#6b7280]">Manage real estate developer profiles</p>
             </div>
           </div>
-          {isAdmin && (
+          {canManage && (
             <div className="flex items-center gap-3 self-start sm:self-auto">
-              <button type="button" onClick={() => { setInvitePreset(null); setShowInvite(true) }}
-                className="inline-flex items-center gap-2 border border-[#e5e5e5] text-[#374151] px-5 py-3 rounded-full font-semibold text-sm transition-all hover:border-[#001f3f] hover:text-[#001f3f]">
-                <QrCode className="w-4 h-4" /> Invite Registration
-              </button>
+              {isAdmin && (
+                <button type="button" onClick={() => { setInvitePreset(null); setShowInvite(true) }}
+                  className="inline-flex items-center gap-2 border border-[#e5e5e5] text-[#374151] px-5 py-3 rounded-full font-semibold text-sm transition-all hover:border-[#001f3f] hover:text-[#001f3f]">
+                  <QrCode className="w-4 h-4" /> Invite Registration
+                </button>
+              )}
               <button type="button" onClick={() => { setEditDev(null); setShowForm(true) }}
                 className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md flex items-center gap-2">
                 <Plus className="w-4 h-4" /> Add Developer
@@ -528,9 +534,10 @@ export function DevelopersClient({ currentRole }: Props) {
                   </div>
 
                   {/* Actions */}
-                  {isAdmin && (
+                  {canManage && (
                     <RowActions
                       dev={dev}
+                      canInvite={isAdmin}
                       onEdit={() => { setEditDev(dev); setShowForm(true) }}
                       onLogo={() => { setLogoTarget(dev); setShowLogo(true) }}
                       onInviteLink={() => { setInvitePreset(dev); setShowInvite(true) }}
@@ -566,9 +573,10 @@ export function DevelopersClient({ currentRole }: Props) {
                           )}
                           {dev.description && <p className="text-xs text-[#9ca3af] truncate">{dev.description}</p>}
                         </div>
-                        {isAdmin && (
+                        {canManage && (
                           <RowActions
                             dev={dev}
+                            canInvite={isAdmin}
                             onEdit={() => { setEditDev(dev); setShowForm(true) }}
                             onLogo={() => { setLogoTarget(dev); setShowLogo(true) }}
                             onInviteLink={() => { setInvitePreset(dev); setShowInvite(true) }}

@@ -68,6 +68,13 @@ export const APP_ROLES = {
     tableBadge: { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" },
     shellBadge: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
   },
+  editor: {
+    dashboardBasePath: "/editor",
+    adminLabel: "Editor",
+    sidebarHexColor: "#06b6d4",
+    tableBadge: { bg: "bg-cyan-50", text: "text-cyan-700", border: "border-cyan-200" },
+    shellBadge: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
+  },
 } as const
 
 export type AppRoleId = keyof typeof APP_ROLES
@@ -76,6 +83,7 @@ export type AppRoleId = keyof typeof APP_ROLES
 export const APP_ROLE_ORDER: AppRoleId[] = [
   "super_admin",
   "admin",
+  "editor",
   "team_leader",
   "unit_manager",
   "agent",
@@ -166,6 +174,18 @@ export function roleInList(role: string | null | undefined, allowed: readonly st
 export const ROLES_ADMIN_STAFF: readonly AppRoleId[] = ["super_admin", "admin"]
 
 /**
+ * Who may manage developer & project content — create/edit/delete developers and
+ * projects, plus the toggles on those pages (verify, activate, publish). Admin
+ * staff plus the content-only "editor" role. NOTE: this does NOT grant admin
+ * powers (users, invite links, logs) — those stay ROLES_ADMIN_STAFF.
+ */
+export const ROLES_DEVELOPER_CONTENT_MANAGERS: readonly AppRoleId[] = ["super_admin", "admin", "editor"]
+
+export function canManageDeveloperContent(role: string | null | undefined): boolean {
+  return roleInList(role, ROLES_DEVELOPER_CONTENT_MANAGERS)
+}
+
+/**
  * Sales hierarchy: agents, team leaders, and unit managers share the same pipeline tools
  * (e.g. `/{role}/listings`, `/{role}/sales`, public buy/rent browsing).
  */
@@ -220,8 +240,8 @@ export const ROLES_SUPPORT_INTERNAL_ASSIGNEES: readonly AppRoleId[] = ["admin", 
 /** Who may use the support UI / upload ticket files (all known roles). */
 export const ROLES_SUPPORT_PORTAL: readonly AppRoleId[] = [...APP_ROLE_ORDER]
 
-/** Developer media upload route. */
-export const ROLES_ADMIN_OR_DEVELOPER: readonly AppRoleId[] = ["super_admin", "admin", "developer"]
+/** Developer media/logo upload route (also allows content editors). */
+export const ROLES_ADMIN_OR_DEVELOPER: readonly AppRoleId[] = ["super_admin", "admin", "developer", "editor"]
 
 /** Who may manage events (create, edit, registrations, raffle): admin staff + team leaders. */
 export const ROLES_EVENT_MANAGERS: readonly AppRoleId[] = ["super_admin", "admin", "team_leader"]

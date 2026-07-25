@@ -150,6 +150,7 @@ export const config = {
     "/dashboard",
     "/superadmin/:path*",
     "/admin/:path*",
+    "/editor/:path*",
     "/teamleader/:path*",
     "/unitmanager/:path*",
     "/agent/:path*",

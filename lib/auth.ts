@@ -43,7 +43,7 @@ const ROLE_SLUG_SET = new Set(ROLE_SLUGS)
 const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   users: ["super_admin", "admin"],
   teams: ["super_admin", "admin"],
-  developers: ["super_admin", "admin"],
+  developers: ["super_admin", "admin", "editor"],
   events: ["super_admin", "admin", "team_leader"], // keep in sync with ROLES_EVENT_MANAGERS in app-roles.ts
   "tax-entities": ["super_admin", "admin"],
   purchases: ["super_admin", "admin"],
@@ -51,7 +51,7 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   "contact-inbox": ["super_admin", "admin"],
   "system-logs": ["super_admin", "admin"],
   listings: ["super_admin", "admin", "agent", "team_leader", "unit_manager"],
-  projects: ["super_admin", "admin", "developer"],
+  projects: ["super_admin", "admin", "developer", "editor"],
   company: ["developer"],
   media: ["developer"],
   sales: [...ROLES_SALES_REPORTS_ACCESS],
