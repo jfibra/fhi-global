@@ -8,6 +8,8 @@ import { sendOtpEmail } from "@/lib/mailer"
 import { generateOtpCode, storeOtpChallenge, checkOtpChallenge, clearOtpChallenge } from "@/lib/auth-otp"
 import { DEFAULT_ACCOUNT_PASSWORD } from "@/lib/account-password"
 import { resolveLrProvision } from "@/lib/lr/lr-provision"
+import { emailTypoMessage } from "@/lib/email-typo"
+import { checkEmailDeliverable } from "@/lib/email-validate"
 
 /**
  * Result of the two OTP steps (email → code). `challenge` is an opaque id the
@@ -42,6 +44,10 @@ export async function sendRegisterOtp(
   const email = String(emailRaw ?? "").trim().toLowerCase()
   if (!email) return { error: "Email is required." }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email address." }
+  const typo = emailTypoMessage(email)
+  if (typo) return { error: typo }
+  const undeliverable = await checkEmailDeliverable(email)
+  if (undeliverable) return { error: undeliverable }
 
   const accountType = normalizeAccountType(accountTypeRaw)
   const ref = String(refRaw ?? "").trim()

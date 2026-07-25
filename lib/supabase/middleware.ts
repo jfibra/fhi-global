@@ -39,9 +39,22 @@ export async function updateSession(request: NextRequest) {
     },
   })
 
+  const hasAuthCookie = request.cookies
+    .getAll()
+    .some((c) => c.name.startsWith("sb-") && c.name.includes("auth-token"))
+
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser()
+
+  // If a session cookie exists but the token can't be verified — e.g. a legacy
+  // HS256 token left over after the project moved to ES256 JWT signing keys
+  // ("unrecognized JWT kid <nil> for algorithm ES256") — clear it locally so the
+  // browser stops resending the bad token and the user gets a clean re-login.
+  if (error && !user && hasAuthCookie) {
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {})
+  }
 
   return {
     supabase,

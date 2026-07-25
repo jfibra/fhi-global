@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import type { CreateUserPayload, UsersListResponse, UserRecord } from "@/lib/user-service"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
+import { emailTypoMessage } from "@/lib/email-typo"
+import { checkEmailDeliverable } from "@/lib/email-validate"
 
 type AdminCaller = { id: string; name: string | null; role: string | null }
 
@@ -187,6 +189,15 @@ export async function POST(req: NextRequest) {
 
   if (!email || !password || !fname || !lname) {
     return NextResponse.json({ error: "Required fields missing." }, { status: 400 })
+  }
+
+  const typo = emailTypoMessage(email)
+  if (typo) {
+    return NextResponse.json({ error: typo }, { status: 400 })
+  }
+  const undeliverable = await checkEmailDeliverable(email)
+  if (undeliverable) {
+    return NextResponse.json({ error: undeliverable }, { status: 400 })
   }
 
   const normalizedRole = String(role ?? "member").toLowerCase().trim()

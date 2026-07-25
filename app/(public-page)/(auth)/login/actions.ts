@@ -10,6 +10,8 @@ import { sendOtpEmail } from "@/lib/mailer"
 import { generateOtpCode, storeOtpChallenge, checkOtpChallenge, clearOtpChallenge } from "@/lib/auth-otp"
 import { DEFAULT_ACCOUNT_PASSWORD } from "@/lib/account-password"
 import { provisionLrForOtpLogin } from "@/lib/lr/lr-provision"
+import { emailTypoMessage } from "@/lib/email-typo"
+import { checkEmailDeliverable } from "@/lib/email-validate"
 
 export type LoginState = {
   error?: string
@@ -75,6 +77,10 @@ export async function sendAuthOtp(emailRaw: string): Promise<OtpResult> {
   const email = String(emailRaw ?? "").trim().toLowerCase()
   if (!email) return { error: "Email is required." }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email address." }
+  const typo = emailTypoMessage(email)
+  if (typo) return { error: typo }
+  const undeliverable = await checkEmailDeliverable(email)
+  if (undeliverable) return { error: undeliverable }
 
   const admin = createAdminSupabase()
 
