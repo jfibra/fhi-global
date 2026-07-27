@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { Plus } from "lucide-react"
+import { ArrowLeft, Plus, Search, SlidersHorizontal } from "lucide-react"
 import {
   type Project,
   type Developer,
@@ -19,7 +19,6 @@ import {
   generateProjectSlug,
 } from "@/lib/project-service"
 
-import { ProjectsSidebar } from "./projects-sidebar"
 import { ProjectDataTab } from "./project-data-tab"
 import { ProjectHeader } from "./project-header"
 import { ProjectOverviewTab } from "./project-overview-tab"
@@ -336,148 +335,220 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
 
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE))
 
-  return (
-    <div className="flex h-full min-h-screen bg-[#f9fafb]">
-      {/* ── Sidebar ───────────────────────────────────────────────────────────── */}
-      <aside className="w-[340px] flex-shrink-0 flex flex-col bg-white border-r border-[#f0f0f0] h-screen sticky top-0 overflow-hidden">
-        {/* header */}
-        <div className="px-5 pt-6 pb-4 border-b border-[#f0f0f0]">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="font-['Outfit'] text-xl font-bold text-[#001f3f]">Projects</h1>
-            <button onClick={() => setShowNew(true)}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-[#001f3f] text-white hover:bg-[#001f3f]/80 transition-colors">
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
-          <ProjectsSidebar
-            search={search}
-            onSearch={(v: string) => { setSearch(v); setPage(1) }}
-            filterDev={filterDev}
-            onFilterDev={(v: string) => { setFilterDev(v); setPage(1) }}
-            filterStatus={filterStatus}
-            onFilterStatus={(v: string) => { setStatus(v); setPage(1) }}
-            developers={developers}
-          />
-        </div>
-        {/* list */}
-        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
-          {loading ? (
-            Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-16 rounded-2xl bg-[#f3f4f6] animate-pulse" />
-            ))
-          ) : projects.length === 0 ? (
-            <div className="text-center py-12 text-sm text-[#9ca3af]">No projects found</div>
-          ) : (
-            projects.map((p) => (
-              <button key={p.id} type="button"
-                onClick={() => void handleSelect(p.id)}
-                className={`w-full text-left px-4 py-3 rounded-2xl border transition-all ${
-                  selected?.id === p.id
-                    ? "bg-[#001f3f] text-white border-[#001f3f]"
-                    : "bg-white text-[#111827] border-[#f0f0f0] hover:border-[#001f3f]/30 hover:bg-[#f8fafc]"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-semibold truncate ${selected?.id === p.id ? "text-white" : "text-[#111827]"}`}>{p.name}</p>
-                    <p className={`text-xs mt-0.5 truncate ${selected?.id === p.id ? "text-white/60" : "text-[#6b7280]"}`}>
-                      {p.city ? `${p.city}, ` : ""}{p.country ?? ""}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                      p.is_published
-                        ? selected?.id === p.id ? "bg-white/20 text-white" : "bg-green-100 text-green-700"
-                        : selected?.id === p.id ? "bg-white/20 text-white/80" : "bg-gray-100 text-gray-500"
-                    }`}>{p.is_published ? "Live" : "Draft"}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                      selected?.id === p.id ? "bg-white/20 text-white/70" : "bg-[#f3f4f6] text-[#6b7280]"
-                    }`}>{p.status?.replace(/_/g, " ") ?? ""}</span>
-                  </div>
-                </div>
-              </button>
-            ))
-          )}
-        </div>
-        {/* pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-[#f0f0f0] text-xs text-[#6b7280]">
-            <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
-              className="px-3 py-1.5 rounded-xl border border-[#e5e5e5] disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
-              ← Prev
-            </button>
-            <span>{page} / {totalPages}</span>
-            <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1.5 rounded-xl border border-[#e5e5e5] disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
-              Next →
-            </button>
-          </div>
-        )}
-      </aside>
+  const statusLabel = (s: string | null) => (s ?? "").replace(/_/g, " ")
 
-      {/* ── Main panel ──────────────────────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {!selected ? (
-          <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
-            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#001f3f]/10 to-[#d6b357]/20 flex items-center justify-center mb-5">
-              <svg className="w-9 h-9 text-[#001f3f]/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 21V7l9-4 9 4v14M12 21V13m-4 8v-5m8 5v-5" />
-              </svg>
+  return (
+    <div className="min-h-screen bg-[#f9fafb]">
+      {!selected && !loadingProject ? (
+        /* ══ BROWSE — card grid with search & filters ═══════════════════════ */
+        <div className="max-w-[1400px] mx-auto px-6 py-8">
+          {/* heading row */}
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div>
+              <h1 className="font-['Outfit'] text-2xl font-bold text-[#001f3f]">Projects</h1>
+              <p className="text-sm text-[#9ca3af] mt-0.5">
+                {loading ? "Loading…" : `${total} project${total === 1 ? "" : "s"}`}
+              </p>
             </div>
-            <p className="text-[#374151] font-semibold text-lg font-['Outfit']">Select a project</p>
-            <p className="text-sm text-[#9ca3af] mt-1">Choose a project from the sidebar or create a new one</p>
             <button onClick={() => setShowNew(true)}
-              className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
               <Plus className="w-4 h-4" /> New Project
             </button>
           </div>
-        ) : loadingProject ? (
-          <div className="flex-1 overflow-y-auto p-8 space-y-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className={`h-14 rounded-2xl bg-[#f3f4f6] animate-pulse ${i === 0 ? "h-28" : ""}`} />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col flex-1 overflow-hidden">
-            {/* Project header */}
-            <ProjectHeader
-              project={selected}
-              onPublishToggle={() => void handlePublishToggle()}
-              onDuplicate={handleDuplicate}
-              onDelete={handleDelete}
-            />
 
-            {/* Tabs nav */}
-            <div className="flex gap-1 px-6 pt-4 pb-0 border-b border-[#f0f0f0] bg-white overflow-x-auto flex-shrink-0">
-              {TABS.map((t) => (
-                <button key={t.id} type="button" onClick={() => setActiveTab(t.id)}
-                  className={`flex-shrink-0 px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all whitespace-nowrap ${
-                    activeTab === t.id
-                      ? "bg-[#001f3f] text-white"
-                      : "text-[#6b7280] hover:text-[#111827] hover:bg-[#f3f4f6]"
-                  }`}>
-                  {t.label}
+          {/* toolbar */}
+          <div className="bg-white rounded-2xl border border-[#e5e5e5] p-3 mb-6 flex flex-col sm:flex-row gap-2.5">
+            <div className="flex items-center gap-2 bg-[#f3f4f6] rounded-xl px-3.5 py-2.5 border border-transparent focus-within:border-[#001f3f]/25 transition-all flex-1 min-w-0">
+              <Search className="w-4 h-4 text-[#9ca3af] flex-shrink-0" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+                placeholder="Search projects by name or city…"
+                className="flex-1 bg-transparent text-sm text-[#111827] placeholder-[#9ca3af] outline-none min-w-0"
+              />
+              {search && (
+                <button type="button" onClick={() => { setSearch(""); setPage(1) }} className="text-[#9ca3af] hover:text-[#374151] text-xs">✕</button>
+              )}
+            </div>
+            <div className="flex gap-2.5">
+              <div className="flex items-center gap-1.5 bg-[#f3f4f6] rounded-xl px-3 py-2.5">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-[#9ca3af] flex-shrink-0" />
+                <select
+                  value={filterDev}
+                  onChange={(e) => { setFilterDev(e.target.value); setPage(1) }}
+                  className="bg-transparent text-sm text-[#374151] outline-none cursor-pointer max-w-[180px]"
+                >
+                  <option value="">All Developers</option>
+                  {developers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center bg-[#f3f4f6] rounded-xl px-3 py-2.5">
+                <select
+                  value={filterStatus}
+                  onChange={(e) => { setStatus(e.target.value); setPage(1) }}
+                  className="bg-transparent text-sm text-[#374151] outline-none cursor-pointer"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="pre_launch">Pre-Launch</option>
+                  <option value="launch">Launch</option>
+                  <option value="under_construction">Under Construction</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* card grid */}
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="h-72 rounded-3xl bg-[#f3f4f6] animate-pulse" />
+              ))}
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#001f3f]/10 to-[#d6b357]/20 flex items-center justify-center mb-5">
+                <svg className="w-9 h-9 text-[#001f3f]/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 21V7l9-4 9 4v14M12 21V13m-4 8v-5m8 5v-5" />
+                </svg>
+              </div>
+              <p className="text-[#374151] font-semibold text-lg font-['Outfit']">No projects found</p>
+              <p className="text-sm text-[#9ca3af] mt-1">Try a different search, or create a new project</p>
+              <button onClick={() => setShowNew(true)}
+                className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
+                <Plus className="w-4 h-4" /> New Project
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {projects.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => void handleSelect(p.id)}
+                  className="group text-left bg-white rounded-3xl border border-[#eceef2] overflow-hidden shadow-[0_2px_12px_-6px_rgba(0,31,63,0.10)] hover:shadow-[0_16px_40px_-12px_rgba(0,31,63,0.28)] hover:-translate-y-1 hover:border-[#d6b357]/60 transition-all duration-200"
+                >
+                  {/* cover */}
+                  <div className="relative h-40 bg-gradient-to-br from-[#001f3f] to-[#0a3a66] overflow-hidden">
+                    {p.main_image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.main_image} alt={p.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <svg className="w-10 h-10 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 21V7l9-4 9 4v14M12 21V13m-4 8v-5m8 5v-5" />
+                        </svg>
+                      </div>
+                    )}
+                    <span className={`absolute top-3 left-3 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                      p.is_published ? "bg-emerald-500/95 text-white" : "bg-white/90 text-[#6b7280]"
+                    }`}>
+                      {p.is_published ? "Live" : "Draft"}
+                    </span>
+                    <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#001f3f]/85 text-[#d6b357] capitalize">
+                      {statusLabel(p.status)}
+                    </span>
+                  </div>
+                  {/* body */}
+                  <div className="p-4">
+                    <p className="text-[15px] font-bold text-[#111827] font-['Outfit'] truncate group-hover:text-[#001f3f]">{p.name}</p>
+                    <p className="text-xs text-[#6b7280] mt-0.5 truncate">
+                      {p.developers?.name ?? "—"}
+                      {p.city ? ` · ${p.city}` : ""}
+                    </p>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <span className="text-sm font-bold text-[#001f3f]">
+                        {p.launch_price_from
+                          ? `${p.currency?.trim() || "AED"} ${Number(p.launch_price_from).toLocaleString("en-US")}`
+                          : "Price on request"}
+                      </span>
+                      <span className="text-[11px] font-semibold text-[#8a6a10] bg-[#fdf6e3] border border-[#f0e8c8] rounded-full px-2.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        Open →
+                      </span>
+                    </div>
+                  </div>
                 </button>
               ))}
             </div>
+          )}
 
-            {/* Tab content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {activeTab === "data"           && <ProjectDataTab           project={selected} onJump={(tab) => setActiveTab(tab)} showToast={showToast} />}
-              {activeTab === "overview"       && <ProjectOverviewTab       project={selected} developers={developers} onSave={handleUpdateProject} showToast={showToast} />}
-              {activeTab === "units"          && <ProjectUnitsTab          projectId={selected.id} showToast={showToast} />}
-              {activeTab === "images"         && <ProjectImagesTab         project={selected} showToast={showToast} onMainImageChange={(url: string) => { setSelected({ ...selected, main_image: url }); setProjects((prev) => prev.map((p) => p.id === selected.id ? { ...p, main_image: url } : p)) }} />}
-              {activeTab === "amenities"      && <ProjectAmenitiesTab      projectId={selected.id} showToast={showToast} />}
-              {activeTab === "property_types" && <ProjectPropertyTypesTab  projectId={selected.id} showToast={showToast} />}
-              {activeTab === "media"          && <ProjectMediaTab          projectId={selected.id} showToast={showToast} />}
-              {activeTab === "features"       && <ProjectFeaturesTab       projectId={selected.id} showToast={showToast} />}
-              {activeTab === "nearby"         && <ProjectNearbyTab         projectId={selected.id} showToast={showToast} />}
-              {activeTab === "seo"            && <ProjectSeoTab            project={selected} onSave={handleUpdateProject} showToast={showToast} />}
-              {activeTab === "settings"       && <ProjectSettingsTab       project={selected} onSave={handleUpdateProject} onPublishToggle={() => void handlePublishToggle()} showToast={showToast} />}
+          {/* pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-4 mt-8 text-sm text-[#6b7280]">
+              <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
+                className="px-4 py-2 rounded-xl border border-[#e5e5e5] bg-white disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
+                ← Prev
+              </button>
+              <span className="font-semibold">{page} / {totalPages}</span>
+              <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}
+                className="px-4 py-2 rounded-xl border border-[#e5e5e5] bg-white disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
+                Next →
+              </button>
             </div>
+          )}
+        </div>
+      ) : loadingProject ? (
+        /* ══ DETAIL — loading ═══════════════════════════════════════════════ */
+        <div className="max-w-[1400px] mx-auto px-6 py-8 space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className={`h-14 rounded-2xl bg-[#f3f4f6] animate-pulse ${i === 0 ? "h-28" : ""}`} />
+          ))}
+        </div>
+      ) : selected ? (
+        /* ══ DETAIL — info + edit tabs ══════════════════════════════════════ */
+        <div className="flex flex-col h-screen overflow-hidden">
+          {/* back row */}
+          <div className="px-6 pt-4 bg-white flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" /> All projects
+            </button>
           </div>
-        )}
-      </main>
+
+          {/* Project header */}
+          <ProjectHeader
+            project={selected}
+            onPublishToggle={() => void handlePublishToggle()}
+            onDuplicate={handleDuplicate}
+            onDelete={handleDelete}
+            showToast={showToast}
+          />
+
+          {/* Tabs nav */}
+          <div className="flex gap-1 px-6 pt-4 pb-0 border-b border-[#f0f0f0] bg-white overflow-x-auto flex-shrink-0">
+            {TABS.map((t) => (
+              <button key={t.id} type="button" onClick={() => setActiveTab(t.id)}
+                className={`flex-shrink-0 px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all whitespace-nowrap ${
+                  activeTab === t.id
+                    ? "bg-[#001f3f] text-white"
+                    : "text-[#6b7280] hover:text-[#111827] hover:bg-[#f3f4f6]"
+                }`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {activeTab === "data"           && <ProjectDataTab           project={selected} onJump={(tab) => setActiveTab(tab)} showToast={showToast} />}
+            {activeTab === "overview"       && <ProjectOverviewTab       project={selected} developers={developers} onSave={handleUpdateProject} showToast={showToast} />}
+            {activeTab === "units"          && <ProjectUnitsTab          projectId={selected.id} showToast={showToast} />}
+            {activeTab === "images"         && <ProjectImagesTab         project={selected} showToast={showToast} onMainImageChange={(url: string) => { setSelected({ ...selected, main_image: url }); setProjects((prev) => prev.map((p) => p.id === selected.id ? { ...p, main_image: url } : p)) }} />}
+            {activeTab === "amenities"      && <ProjectAmenitiesTab      projectId={selected.id} showToast={showToast} />}
+            {activeTab === "property_types" && <ProjectPropertyTypesTab  projectId={selected.id} showToast={showToast} />}
+            {activeTab === "media"          && <ProjectMediaTab          projectId={selected.id} showToast={showToast} />}
+            {activeTab === "features"       && <ProjectFeaturesTab       projectId={selected.id} showToast={showToast} />}
+            {activeTab === "nearby"         && <ProjectNearbyTab         projectId={selected.id} showToast={showToast} />}
+            {activeTab === "seo"            && <ProjectSeoTab            project={selected} onSave={handleUpdateProject} showToast={showToast} />}
+            {activeTab === "settings"       && <ProjectSettingsTab       project={selected} onSave={handleUpdateProject} onPublishToggle={() => void handlePublishToggle()} showToast={showToast} />}
+          </div>
+        </div>
+      ) : null}
 
       {/* ── Overlays ─────────────────────────────────────────────────────────── */}
       {showNew && (

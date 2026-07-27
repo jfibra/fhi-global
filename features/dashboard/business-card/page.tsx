@@ -83,6 +83,22 @@ function loadImg(src: string): Promise<HTMLImageElement> {
 }
 
 // ── Canvas text/tracking helpers ─────────────────────────────────────────────
+// next/font registers Outfit under a hashed family name, so a literal 'Outfit'
+// in ctx.font silently falls back to Arial. Resolve the real family once.
+let resolvedDisplayFont: string | null = null
+function displayFont(): string {
+  if (resolvedDisplayFont) return resolvedDisplayFont
+  if (typeof document !== "undefined" && document.body) {
+    // next/font puts the CSS variable on <body>, not <html>.
+    const fam = getComputedStyle(document.body).getPropertyValue("--font-outfit").trim()
+    if (fam) {
+      resolvedDisplayFont = `${fam}, Arial, sans-serif`
+      return resolvedDisplayFont
+    }
+  }
+  return "Arial, sans-serif"
+}
+
 function setTracking(ctx: CanvasRenderingContext2D, px: number) {
   const c = ctx as CanvasRenderingContext2D & { letterSpacing?: string }
   try { c.letterSpacing = `${px}px` } catch { /* older browsers: no tracking */ }
@@ -95,7 +111,7 @@ function fitText(
   weight: number,
   basePx: number,
   maxW: number,
-  family = "'Outfit', Arial, sans-serif",
+  family = displayFont(),
 ): number {
   let size = basePx
   ctx.font = `${weight} ${size}px ${family}`
@@ -182,7 +198,7 @@ async function drawAvatar(
     ctx.fillStyle = g
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2)
     ctx.fillStyle = style.fallbackText ?? "#d6b357"
-    ctx.font = `700 ${r * 0.85}px 'Outfit', Arial, sans-serif`
+    ctx.font = `700 ${r * 0.85}px ${displayFont()}`
     ctx.textAlign = "center"
     ctx.textBaseline = "middle"
     ctx.fillText(initials || "?", cx, cy + r * 0.04)
@@ -374,11 +390,11 @@ async function renderPlatinumFront(ctx: CanvasRenderingContext2D, data: CardData
   ctx.textAlign = "left"
   ctx.textBaseline = "alphabetic"
   ctx.fillStyle = "#0d1b2e"
-  ctx.font = `700 ${shieldH * 0.38}px 'Outfit', Arial, sans-serif`
+  ctx.font = `700 ${shieldH * 0.38}px ${displayFont()}`
   ctx.fillText("Global Property", brandX, lockY + shieldH * 0.45)
   const dSize = shieldH * 0.24
   setTracking(ctx, dSize * 0.35)
-  ctx.font = `700 ${dSize}px 'Outfit', Arial, sans-serif`
+  ctx.font = `700 ${dSize}px ${displayFont()}`
   const dW = ctx.measureText("DUBAI").width
   const padX = dSize * 0.5, badgeY = lockY + shieldH * 0.60, badgeH = dSize * 1.5
   ctx.fillStyle = "#ca9104"
@@ -572,6 +588,11 @@ async function renderCard(
   width: number,
   height: number,
 ): Promise<string> {
+  try {
+    await document.fonts?.ready
+  } catch {
+    /* render with whatever fonts are available */
+  }
   const canvas = document.createElement("canvas")
   canvas.width  = width
   canvas.height = height

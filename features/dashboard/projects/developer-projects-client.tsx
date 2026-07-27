@@ -484,6 +484,7 @@ export function DeveloperProjectsClient({
                 project={selected}
                 onPublishToggle={() => void handlePublishToggle()}
                 onDelete={handleArchive}
+                showToast={showToast}
               />
 
               {/* Tabs nav */}

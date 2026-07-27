@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { MoreHorizontal, Globe, EyeOff, Copy, Trash2, Star, Gem } from "lucide-react"
+import { MoreHorizontal, Globe, EyeOff, Copy, Trash2, Star, Gem, LayoutTemplate, Clapperboard, X } from "lucide-react"
 import Image from "next/image"
 import type { Project } from "@/lib/project-service"
+import { ProjectPosterTab } from "./project-poster-tab"
+import { ProjectReelsTab } from "./project-reels-tab"
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -25,10 +27,54 @@ interface Props {
   onPublishToggle: () => void
   onDuplicate?: () => void
   onDelete: () => void
+  showToast?: (variant: "success" | "error", message: string) => void
 }
 
-export function ProjectHeader({ project, onPublishToggle, onDuplicate, onDelete }: Props) {
+/** Full-screen modal shell for the Poster / Reels studios. */
+function StudioModal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string
+  onClose: () => void
+  children: React.ReactNode
+}) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose()
+    }
+    document.addEventListener("keydown", handler)
+    return () => document.removeEventListener("keydown", handler)
+  }, [onClose])
+
+  return (
+    <Portal>
+      <div className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-6">
+        <div className="absolute inset-0 bg-[#001428]/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
+        <div className="relative bg-[#f9fafb] rounded-3xl shadow-2xl w-full max-w-6xl h-[92vh] flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-3.5 bg-white border-b border-[#f0f0f0] flex-shrink-0">
+            <p className="text-sm font-semibold text-[#6b7280] truncate">{title}</p>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#f3f4f6] text-[#6b7280] hover:text-[#001f3f] transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-6">{children}</div>
+        </div>
+      </div>
+    </Portal>
+  )
+}
+
+export function ProjectHeader({ project, onPublishToggle, onDuplicate, onDelete, showToast }: Props) {
   const [open, setOpen] = useState(false)
+  const [studio, setStudio] = useState<"poster" | "reels" | null>(null)
+  const toast = showToast ?? (() => {})
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef    = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ top: 0, left: 0 })
@@ -130,6 +176,21 @@ export function ProjectHeader({ project, onPublishToggle, onDuplicate, onDelete 
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
             type="button"
+            onClick={() => setStudio("poster")}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold bg-[#fdf6e3] text-[#8a6a10] border border-[#f0e8c8] hover:bg-[#faedc8] transition-all"
+          >
+            <LayoutTemplate className="w-3.5 h-3.5" /> Poster
+          </button>
+          <button
+            type="button"
+            onClick={() => setStudio("reels")}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold bg-[#fdf6e3] text-[#8a6a10] border border-[#f0e8c8] hover:bg-[#faedc8] transition-all"
+          >
+            <Clapperboard className="w-3.5 h-3.5" /> Reels
+          </button>
+
+          <button
+            type="button"
             onClick={onPublishToggle}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all ${
               project.is_published
@@ -168,6 +229,18 @@ export function ProjectHeader({ project, onPublishToggle, onDuplicate, onDelete 
           )}
         </div>
       </div>
+
+      {/* Studios open as full-screen modals */}
+      {studio === "poster" && (
+        <StudioModal title={project.name} onClose={() => setStudio(null)}>
+          <ProjectPosterTab project={project} showToast={toast} />
+        </StudioModal>
+      )}
+      {studio === "reels" && (
+        <StudioModal title={project.name} onClose={() => setStudio(null)}>
+          <ProjectReelsTab project={project} showToast={toast} />
+        </StudioModal>
+      )}
     </div>
   )
 }

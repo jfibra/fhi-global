@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireActiveSession } from "@/lib/auth-guard"
 
 type TargetField = "description" | "about_project"
 
@@ -14,6 +15,10 @@ type Payload = {
 }
 
 export async function POST(req: NextRequest) {
+  // Logged-in users only — this endpoint spends Gemini quota.
+  const guard = await requireActiveSession()
+  if (!guard.ok) return guard.response
+
   const apiKey = process.env.GEMINI_API_KEY?.trim()
   if (!apiKey) {
     return NextResponse.json({ error: "GEMINI_API_KEY is not configured" }, { status: 500 })

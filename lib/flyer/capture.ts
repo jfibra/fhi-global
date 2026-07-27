@@ -62,6 +62,9 @@ async function urlToDataUrl(url: string): Promise<string> {
   const cached = dataUrlCache.get(url)
   if (cached) return cached
   const res = await fetch(url, { cache: "force-cache" })
+  // Don't cache (or inline) error pages as "images" — a 502 here would
+  // otherwise poison the cache for every later export this session.
+  if (!res.ok) throw new Error(`Image fetch failed (${res.status}): ${url}`)
   const blob = await res.blob()
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const fr = new FileReader()
