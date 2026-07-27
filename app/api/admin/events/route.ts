@@ -3,6 +3,13 @@ import { requireActiveSession } from "@/lib/auth-guard"
 import { canManageEvents } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { sanitizeEventInput } from "@/lib/events/validate"
+import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
+
+// Event mutations run on the service-role client, so the audit_logs DB trigger
+// can't attribute an actor (auth.uid() is NULL) — routes log explicitly instead.
+function actorFrom(ctx: { userId: string; email: string | null; profile: { role: string | null; fullname: string | null } }) {
+  return { id: ctx.userId, name: ctx.profile.fullname ?? ctx.email ?? null, role: ctx.profile.role }
+}
 
 /** All events (any status) with registration counts — admin only. */
 export async function GET() {
@@ -96,6 +103,19 @@ export async function POST(req: NextRequest) {
   if (result.error || !result.data) {
     return NextResponse.json({ error: "Failed to create event" }, { status: 500 })
   }
+
+  await logAuditEvent({
+    category: "events",
+    event: "created",
+    source: "dashboard",
+    actor: actorFrom(session.context),
+    subjectType: "events",
+    subjectId: String(result.data.id),
+    subjectLabel: input.title,
+    description: `Created event "${input.title}"`,
+    newValues: { ...input, slug },
+    ...requestContextFromRequest(req),
+  })
 
   return NextResponse.json({ id: result.data.id })
 }

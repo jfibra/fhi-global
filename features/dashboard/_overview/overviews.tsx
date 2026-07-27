@@ -7,6 +7,7 @@ import { SalesPipelineOverview } from "@/components/dashboard/sales-pipeline-ove
 import { SecretaryLikeOverview } from "@/components/dashboard/secretary-like-overview"
 import { MemberOverview as MemberOverviewCard } from "@/components/dashboard/member-overview"
 import { AdminDashboardContent } from "./_dashboard"
+import { EditorDashboardContent } from "./editor-overview"
 
 export { DeveloperOverview } from "./developer-overview"
 
@@ -25,6 +26,17 @@ export function AdminOverview() {
       roleLabel={roleToLabel(r)}
       userName={profile?.fullname ?? user?.email ?? "Admin"}
       userId={user?.id ?? ""}
+    />
+  )
+}
+
+/** editor overview. */
+export function EditorOverview() {
+  const { user, profile } = useAuth()
+  return (
+    <EditorDashboardContent
+      userId={user?.id ?? ""}
+      userName={profile?.fullname ?? user?.email ?? "Editor"}
     />
   )
 }

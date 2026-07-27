@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation"
+import { EditorOverview } from "@/features/dashboard/_overview/overviews"
 
-// The editor role's job is developer & project content, so its landing goes
-// straight to Developers. proxy.ts sends logged-in editors to /editor.
+// Editor landing: content KPIs, quick actions, and the editor's own activity.
+// proxy.ts sends logged-in editors to /editor.
 export default function Page() {
-  redirect("/editor/developers")
+  return <EditorOverview />
 }
