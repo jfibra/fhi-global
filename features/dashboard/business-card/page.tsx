@@ -9,15 +9,34 @@ import { COUNTRY_CODES } from "@/lib/user-service"
 import { PhoneCountrySelect } from "@/components/phone-country-select"
 import {
   Phone, Mail, Save, Loader2, CheckCircle2, AlertCircle,
-  RefreshCcw, Info, CreditCard, Download,
+  RefreshCcw, Info, CreditCard, Download, Palette,
 } from "lucide-react"
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const FRONT_URL = "https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/fhi_global/business-card-front.png"
 const BACK_URL  = "https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/fhi_global/business-card-back.png"
+const BRAND_STACKED = "/FHI_Branding.png"        // gold shield + white wordmark (stacked)
+const BRAND_WHITE   = "/FHI_Branding_White.png"  // horizontal white lockup
+// Crop of the gold shield mark inside FHI_Branding.png (source pixels)
+const SHIELD_CROP = { sx: 910, sy: 0, sw: 725, sh: 885 }
 const EXPORT_W  = 2100
 const EXPORT_H  = 1200
 const API_BASE  = process.env.NEXT_PUBLIC_API_BASE_URL ?? ""
+
+const SUBTITLE = "INTERNATIONAL PROPERTY ENDORSER"
+
+// ── Designs ──────────────────────────────────────────────────────────────────
+export type DesignId = "classic" | "platinum" | "noir"
+
+const DESIGNS: { id: DesignId; name: string; tagline: string }[] = [
+  { id: "classic",  name: "Skyline Classic", tagline: "Navy skyline with gold accents" },
+  { id: "platinum", name: "Pearl Prestige",  tagline: "Ivory minimalist, framed in gold" },
+  { id: "noir",     name: "Executive Noir",  tagline: "Black-tie dark, centred layout" },
+]
+
+function isDesignId(v: unknown): v is DesignId {
+  return v === "classic" || v === "platinum" || v === "noir"
+}
 
 // ── Phone helpers ────────────────────────────────────────────────────────────
 /** Strip any leading 0 from the local number (digits only). */
@@ -43,22 +62,55 @@ function formatDisplay(dial: string, local: string): string {
 function isPhoneOk(local: string) { return local.length >= 4 }
 function toE164(dial: string, local: string) { return `${dial}${local}` }
 
-// ── Image loader ─────────────────────────────────────────────────────────────
+// ── Image loader (cached) ────────────────────────────────────────────────────
+const imgCache = new Map<string, Promise<HTMLImageElement>>()
+
 function loadImg(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
+  const cached = imgCache.get(src)
+  if (cached) return cached
+  const p = new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new window.Image()
     img.crossOrigin = "anonymous"
     img.onload  = () => resolve(img)
-    img.onerror = reject
-    img.src     = src
+    img.onerror = () => {
+      imgCache.delete(src) // allow retry on a later render
+      reject(new Error(`Image failed: ${src}`))
+    }
+    img.src = src
   })
+  imgCache.set(src, p)
+  return p
+}
+
+// ── Canvas text/tracking helpers ─────────────────────────────────────────────
+function setTracking(ctx: CanvasRenderingContext2D, px: number) {
+  const c = ctx as CanvasRenderingContext2D & { letterSpacing?: string }
+  try { c.letterSpacing = `${px}px` } catch { /* older browsers: no tracking */ }
+}
+
+/** Shrink font size until `text` fits within maxW. Sets ctx.font and returns the size. */
+function fitText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  weight: number,
+  basePx: number,
+  maxW: number,
+  family = "'Outfit', Arial, sans-serif",
+): number {
+  let size = basePx
+  ctx.font = `${weight} ${size}px ${family}`
+  while (ctx.measureText(text).width > maxW && size > 10) {
+    size -= 1
+    ctx.font = `${weight} ${size}px ${family}`
+  }
+  return size
 }
 
 // ── Canvas icon drawing ───────────────────────────────────────────────────────
-function drawPhoneIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number) {
+function drawPhoneIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color = "#ca9104") {
   const s = size
   ctx.save()
-  ctx.strokeStyle = "#ca9104"
+  ctx.strokeStyle = color
   ctx.lineWidth   = s * 0.12
   ctx.lineCap     = "round"
   ctx.lineJoin    = "round"
@@ -68,15 +120,15 @@ function drawPhoneIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, si
   ctx.stroke()
   ctx.beginPath()
   ctx.arc(cx, cy - s * 0.25, s * 0.1, 0, Math.PI * 2)
-  ctx.fillStyle = "#ca9104"
+  ctx.fillStyle = color
   ctx.fill()
   ctx.restore()
 }
 
-function drawMailIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number) {
+function drawMailIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color = "#ca9104") {
   const s = size
   ctx.save()
-  ctx.strokeStyle = "#ca9104"
+  ctx.strokeStyle = color
   ctx.lineWidth   = s * 0.1
   ctx.lineCap     = "round"
   ctx.lineJoin    = "round"
@@ -92,35 +144,145 @@ function drawMailIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, siz
   ctx.restore()
 }
 
-// ── Canvas renderer ───────────────────────────────────────────────────────────
-interface CardData { name: string; phoneDial: string; phoneLocal: string; email: string }
+// ── Avatar drawing ────────────────────────────────────────────────────────────
+interface AvatarStyle {
+  ring: string
+  ringWidth: number
+  outerRing?: string
+  fallbackBg?: [string, string]
+  fallbackText?: string
+}
 
-async function renderCard(
-  side: "front" | "back",
-  data: CardData,
-  width: number,
-  height: number,
-): Promise<string> {
-  const canvas = document.createElement("canvas")
-  canvas.width  = width
-  canvas.height = height
-  const ctx = canvas.getContext("2d")!
+async function drawAvatar(
+  ctx: CanvasRenderingContext2D,
+  url: string | null,
+  initials: string,
+  cx: number, cy: number, r: number,
+  style: AvatarStyle,
+) {
+  let img: HTMLImageElement | null = null
+  if (url) {
+    try { img = await loadImg(url) } catch { img = null }
+  }
 
-  // background image
-  const src = side === "front" ? FRONT_URL : BACK_URL
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
+  ctx.closePath()
+  ctx.clip()
+  if (img) {
+    // cover-fit crop
+    const scale = Math.max((r * 2) / img.width, (r * 2) / img.height)
+    const dw = img.width * scale, dh = img.height * scale
+    ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh)
+  } else {
+    const g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r)
+    g.addColorStop(0, style.fallbackBg?.[0] ?? "#001f3f")
+    g.addColorStop(1, style.fallbackBg?.[1] ?? "#0a3a66")
+    ctx.fillStyle = g
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2)
+    ctx.fillStyle = style.fallbackText ?? "#d6b357"
+    ctx.font = `700 ${r * 0.85}px 'Outfit', Arial, sans-serif`
+    ctx.textAlign = "center"
+    ctx.textBaseline = "middle"
+    ctx.fillText(initials || "?", cx, cy + r * 0.04)
+  }
+  ctx.restore()
+
+  // rings
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
+  ctx.strokeStyle = style.ring
+  ctx.lineWidth   = style.ringWidth
+  ctx.stroke()
+  if (style.outerRing) {
+    ctx.beginPath()
+    ctx.arc(cx, cy, r + style.ringWidth * 1.8, 0, Math.PI * 2)
+    ctx.strokeStyle = style.outerRing
+    ctx.lineWidth   = Math.max(1, style.ringWidth * 0.35)
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+// ── Shared row helpers ────────────────────────────────────────────────────────
+function contactRow(
+  ctx: CanvasRenderingContext2D,
+  kind: "phone" | "mail",
+  text: string,
+  x: number, y: number,
+  iconSize: number,
+  fontPx: number,
+  iconColor: string,
+  textColor: string,
+  maxW: number,
+) {
+  if (kind === "phone") drawPhoneIcon(ctx, x + iconSize * 0.5, y, iconSize, iconColor)
+  else drawMailIcon(ctx, x + iconSize * 0.5, y, iconSize, iconColor)
+  ctx.textAlign = "left"
+  ctx.textBaseline = "middle"
+  fitText(ctx, text, 400, fontPx, maxW, "Arial, sans-serif")
+  ctx.fillStyle = textColor
+  ctx.fillText(text, x + iconSize * 1.4, y)
+}
+
+function centeredContactRow(
+  ctx: CanvasRenderingContext2D,
+  kind: "phone" | "mail",
+  text: string,
+  cx: number, y: number,
+  iconSize: number,
+  fontPx: number,
+  iconColor: string,
+  textColor: string,
+  maxW: number,
+) {
+  fitText(ctx, text, 400, fontPx, maxW - iconSize * 1.5, "Arial, sans-serif")
+  const tw = ctx.measureText(text).width
+  const gap = iconSize * 0.5
+  const startX = cx - (iconSize + gap + tw) / 2
+  if (kind === "phone") drawPhoneIcon(ctx, startX + iconSize * 0.5, y, iconSize, iconColor)
+  else drawMailIcon(ctx, startX + iconSize * 0.5, y, iconSize, iconColor)
+  ctx.textAlign = "left"
+  ctx.textBaseline = "middle"
+  ctx.fillStyle = textColor
+  ctx.fillText(text, startX + iconSize + gap, y)
+}
+
+// ── Card data ─────────────────────────────────────────────────────────────────
+interface CardData {
+  name: string
+  phoneDial: string
+  phoneLocal: string
+  email: string
+  avatarUrl: string | null
+  initials: string
+}
+
+function phoneText(data: CardData) {
+  return data.phoneLocal ? formatDisplay(data.phoneDial, data.phoneLocal) : "+971 5x xxx xxxx"
+}
+
+// ── Design: Skyline Classic (image background) ───────────────────────────────
+async function renderClassicFront(ctx: CanvasRenderingContext2D, data: CardData, width: number, height: number) {
   try {
-    const img = await loadImg(src)
+    const img = await loadImg(FRONT_URL)
     ctx.drawImage(img, 0, 0, width, height)
   } catch {
-    // fallback: solid navy background if image fails
     ctx.fillStyle = "#001f3f"
     ctx.fillRect(0, 0, width, height)
   }
 
-  if (side === "back") return canvas.toDataURL("image/png")
+  // Avatar on the left, over the skyline
+  await drawAvatar(ctx, data.avatarUrl, data.initials, width * 0.19, height * 0.54, height * 0.185, {
+    ring: "#d6b357",
+    ringWidth: Math.max(2, height * 0.012),
+    outerRing: "rgba(255,255,255,0.35)",
+    fallbackBg: ["#0a3a66", "#001f3f"],
+  })
 
-  // ── Front overlay ────────────────────────────────────────────────────────
-  // Text region sits in the right ~55% of the card (typical business card layout)
+  // Text region sits in the right ~55% of the card
   const textX = width * 0.40
   const maxW  = width * 0.54
 
@@ -128,19 +290,13 @@ async function renderCard(
   ctx.fillStyle = "#ffffff"
   ctx.textAlign  = "left"
   ctx.textBaseline = "alphabetic"
-  let fontSize = Math.round(height * 0.10)
-  ctx.font = `700 ${fontSize}px 'Arial', sans-serif`
-  while (ctx.measureText(data.name || "Your Name").width > maxW && fontSize > 24) {
-    fontSize -= 2
-    ctx.font = `700 ${fontSize}px 'Arial', sans-serif`
-  }
+  const fontSize = fitText(ctx, data.name || "Your Name", 700, Math.round(height * 0.10), maxW)
   ctx.fillText(data.name || "Your Name", textX, height * 0.44)
 
   // Subtitle
-  const subSize = Math.round(height * 0.055)
-  ctx.font = `400 ${subSize}px 'Arial', sans-serif`
   ctx.fillStyle = "#ca9104"
-  ctx.fillText("Global Partner Dubai", textX, height * 0.44 + fontSize * 1.25)
+  const subSize = fitText(ctx, SUBTITLE, 600, Math.round(height * 0.05), maxW)
+  ctx.fillText(SUBTITLE, textX, height * 0.44 + fontSize * 1.25)
 
   // Divider
   const divY = height * 0.44 + fontSize * 1.25 + subSize * 0.9
@@ -156,22 +312,281 @@ async function renderCard(
   const iconSize  = rowSize * 1.1
   const row1Y     = divY + height * 0.12
   const row2Y     = row1Y + height * 0.09
-  const iconX     = textX
-  const txtStartX = textX + iconSize * 1.4
+  contactRow(ctx, "phone", phoneText(data), textX, row1Y, iconSize, rowSize, "#ca9104", "#ffffff", maxW - iconSize * 1.5)
+  contactRow(ctx, "mail", data.email || "your@email.com", textX, row2Y, iconSize, rowSize, "#ca9104", "#ffffff", maxW - iconSize * 1.5)
+}
 
-  ctx.font = `400 ${rowSize}px 'Arial', sans-serif`
-  ctx.fillStyle    = "#ffffff"
+async function renderClassicBack(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  try {
+    const img = await loadImg(BACK_URL)
+    ctx.drawImage(img, 0, 0, width, height)
+  } catch {
+    ctx.fillStyle = "#001f3f"
+    ctx.fillRect(0, 0, width, height)
+  }
+}
+
+// ── Design: Pearl Prestige (ivory + gold) ────────────────────────────────────
+function drawDoubleFrame(ctx: CanvasRenderingContext2D, width: number, height: number, outer: string, inner: string) {
+  const inset = height * 0.035
+  ctx.strokeStyle = outer
+  ctx.lineWidth = Math.max(1, height * 0.006)
+  ctx.strokeRect(inset, inset, width - inset * 2, height - inset * 2)
+  ctx.strokeStyle = inner
+  ctx.lineWidth = Math.max(1, height * 0.003)
+  ctx.strokeRect(inset * 1.55, inset * 1.55, width - inset * 3.1, height - inset * 3.1)
+}
+
+async function renderPlatinumFront(ctx: CanvasRenderingContext2D, data: CardData, width: number, height: number) {
+  // ivory base
+  ctx.fillStyle = "#f7f4ec"
+  ctx.fillRect(0, 0, width, height)
+
+  // decorative gold arcs, top-right
+  ctx.save()
+  ctx.strokeStyle = "rgba(202,145,4,0.13)"
+  ctx.lineWidth = Math.max(1, height * 0.005)
+  for (const f of [0.5, 0.68, 0.86]) {
+    ctx.beginPath()
+    ctx.arc(width * 0.93, height * 0.06, height * f, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+  // soft navy wash, bottom-left
+  const blot = ctx.createRadialGradient(width * 0.04, height * 1.02, 0, width * 0.04, height * 1.02, height * 0.55)
+  blot.addColorStop(0, "rgba(0,31,63,0.07)")
+  blot.addColorStop(1, "rgba(0,31,63,0)")
+  ctx.fillStyle = blot
+  ctx.fillRect(0, 0, width, height)
+  ctx.restore()
+
+  drawDoubleFrame(ctx, width, height, "rgba(202,145,4,0.55)", "rgba(0,31,63,0.10)")
+
+  // brand lockup top-left: gold shield + navy wordmark + DUBAI badge
+  const lockX = width * 0.075, lockY = height * 0.10, shieldH = height * 0.17
+  let shieldW = shieldH * (SHIELD_CROP.sw / SHIELD_CROP.sh)
+  try {
+    const logo = await loadImg(BRAND_STACKED)
+    ctx.drawImage(logo, SHIELD_CROP.sx, SHIELD_CROP.sy, SHIELD_CROP.sw, SHIELD_CROP.sh, lockX, lockY, shieldW, shieldH)
+  } catch {
+    shieldW = 0
+  }
+  const brandX = lockX + shieldW + shieldH * 0.22
+  ctx.textAlign = "left"
+  ctx.textBaseline = "alphabetic"
+  ctx.fillStyle = "#0d1b2e"
+  ctx.font = `700 ${shieldH * 0.38}px 'Outfit', Arial, sans-serif`
+  ctx.fillText("Global Property", brandX, lockY + shieldH * 0.45)
+  const dSize = shieldH * 0.24
+  setTracking(ctx, dSize * 0.35)
+  ctx.font = `700 ${dSize}px 'Outfit', Arial, sans-serif`
+  const dW = ctx.measureText("DUBAI").width
+  const padX = dSize * 0.5, badgeY = lockY + shieldH * 0.60, badgeH = dSize * 1.5
+  ctx.fillStyle = "#ca9104"
+  ctx.fillRect(brandX, badgeY, dW + padX * 2, badgeH)
+  ctx.fillStyle = "#ffffff"
   ctx.textBaseline = "middle"
+  ctx.fillText("DUBAI", brandX + padX, badgeY + badgeH / 2 + dSize * 0.06)
+  setTracking(ctx, 0)
 
-  // Phone row
-  drawPhoneIcon(ctx, iconX + iconSize * 0.5, row1Y, iconSize)
-  ctx.fillText(data.phoneLocal ? formatDisplay(data.phoneDial, data.phoneLocal) : "+971 5x xxx xxxx", txtStartX, row1Y)
+  // avatar on the right
+  const avR = height * 0.21
+  await drawAvatar(ctx, data.avatarUrl, data.initials, width * 0.815, height * 0.52, avR, {
+    ring: "#ca9104",
+    ringWidth: Math.max(2, height * 0.011),
+    outerRing: "rgba(0,31,63,0.22)",
+    fallbackBg: ["#001f3f", "#0a3a66"],
+  })
 
-  // Email row
-  drawMailIcon(ctx, iconX + iconSize * 0.5, row2Y, iconSize)
-  const emailTxt = data.email || "your@email.com"
-  ctx.font = `400 ${rowSize}px 'Arial', sans-serif`
-  ctx.fillText(emailTxt, txtStartX, row2Y)
+  const textX = width * 0.075
+  const maxW  = width * 0.56
+
+  // name
+  ctx.textAlign = "left"
+  ctx.textBaseline = "alphabetic"
+  ctx.fillStyle = "#0d1b2e"
+  fitText(ctx, data.name || "Your Name", 700, Math.round(height * 0.10), maxW)
+  ctx.fillText(data.name || "Your Name", textX, height * 0.52)
+
+  // subtitle
+  setTracking(ctx, height * 0.006)
+  ctx.fillStyle = "#ca9104"
+  fitText(ctx, SUBTITLE, 600, Math.round(height * 0.044), maxW)
+  ctx.fillText(SUBTITLE, textX, height * 0.615)
+  setTracking(ctx, 0)
+
+  // divider with diamond
+  const divY = height * 0.67
+  ctx.fillStyle = "#ca9104"
+  ctx.save()
+  ctx.translate(textX + height * 0.012, divY)
+  ctx.rotate(Math.PI / 4)
+  ctx.fillRect(-height * 0.011, -height * 0.011, height * 0.022, height * 0.022)
+  ctx.restore()
+  const grad = ctx.createLinearGradient(textX, 0, textX + maxW * 0.8, 0)
+  grad.addColorStop(0, "rgba(202,145,4,0.9)")
+  grad.addColorStop(1, "rgba(202,145,4,0)")
+  ctx.strokeStyle = grad
+  ctx.lineWidth = Math.max(1, height * 0.004)
+  ctx.beginPath()
+  ctx.moveTo(textX + height * 0.04, divY)
+  ctx.lineTo(textX + maxW * 0.8, divY)
+  ctx.stroke()
+
+  // contact rows
+  const rowSize  = Math.round(height * 0.046)
+  const iconSize = rowSize * 1.1
+  contactRow(ctx, "phone", phoneText(data), textX, height * 0.765, iconSize, rowSize, "#ca9104", "#16324f", maxW - iconSize * 1.5)
+  contactRow(ctx, "mail", data.email || "your@email.com", textX, height * 0.86, iconSize, rowSize, "#ca9104", "#16324f", maxW - iconSize * 1.5)
+}
+
+async function renderPlatinumBack(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  ctx.fillStyle = "#001f3f"
+  ctx.fillRect(0, 0, width, height)
+  const g = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, height * 0.75)
+  g.addColorStop(0, "rgba(214,179,87,0.10)")
+  g.addColorStop(1, "rgba(0,0,0,0)")
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, width, height)
+
+  drawDoubleFrame(ctx, width, height, "rgba(214,179,87,0.55)", "rgba(255,255,255,0.10)")
+
+  try {
+    const logo = await loadImg(BRAND_STACKED)
+    const lh = height * 0.56
+    const lw = lh * (logo.width / logo.height)
+    ctx.drawImage(logo, (width - lw) / 2, (height - lh) / 2, lw, lh)
+  } catch { /* plain navy back */ }
+}
+
+// ── Design: Executive Noir (dark + gold, centred) ────────────────────────────
+function noirBase(ctx: CanvasRenderingContext2D, width: number, height: number, glowY: number) {
+  const g = ctx.createLinearGradient(0, 0, width, height)
+  g.addColorStop(0, "#0a0a10")
+  g.addColorStop(0.55, "#12121a")
+  g.addColorStop(1, "#1b1b25")
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, width, height)
+
+  const glow = ctx.createRadialGradient(width * 0.5, glowY, 0, width * 0.5, glowY, height * 0.55)
+  glow.addColorStop(0, "rgba(214,179,87,0.15)")
+  glow.addColorStop(1, "rgba(214,179,87,0)")
+  ctx.fillStyle = glow
+  ctx.fillRect(0, 0, width, height)
+
+  // frame
+  const inset = height * 0.04
+  ctx.strokeStyle = "rgba(214,179,87,0.35)"
+  ctx.lineWidth = Math.max(1, height * 0.0035)
+  ctx.strokeRect(inset, inset, width - inset * 2, height - inset * 2)
+
+  // gold corner accents
+  const L = width * 0.05
+  ctx.strokeStyle = "#d6b357"
+  ctx.lineWidth = Math.max(1.5, height * 0.008)
+  ctx.lineCap = "square"
+  const corners: [number, number, number, number][] = [
+    [inset, inset, 1, 1], [width - inset, inset, -1, 1],
+    [inset, height - inset, 1, -1], [width - inset, height - inset, -1, -1],
+  ]
+  for (const [cx, cy, dx, dy] of corners) {
+    ctx.beginPath()
+    ctx.moveTo(cx + dx * L, cy)
+    ctx.lineTo(cx, cy)
+    ctx.lineTo(cx, cy + dy * L)
+    ctx.stroke()
+  }
+}
+
+async function renderNoirFront(ctx: CanvasRenderingContext2D, data: CardData, width: number, height: number) {
+  noirBase(ctx, width, height, height * 0.30)
+
+  // horizontal white logo, top-left
+  try {
+    const logo = await loadImg(BRAND_WHITE)
+    const lh = height * 0.095
+    const lw = lh * (logo.width / logo.height)
+    ctx.drawImage(logo, width * 0.065, height * 0.075, lw, lh)
+  } catch { /* skip logo */ }
+
+  // avatar centred
+  await drawAvatar(ctx, data.avatarUrl, data.initials, width * 0.5, height * 0.315, height * 0.16, {
+    ring: "#d6b357",
+    ringWidth: Math.max(2, height * 0.010),
+    outerRing: "rgba(255,255,255,0.18)",
+    fallbackBg: ["#26261f", "#101014"],
+  })
+
+  // name centred
+  ctx.textAlign = "center"
+  ctx.textBaseline = "alphabetic"
+  ctx.fillStyle = "#f5f2ea"
+  fitText(ctx, data.name || "Your Name", 700, Math.round(height * 0.085), width * 0.82)
+  ctx.fillText(data.name || "Your Name", width * 0.5, height * 0.585)
+
+  // subtitle centred
+  setTracking(ctx, height * 0.008)
+  ctx.fillStyle = "#d6b357"
+  fitText(ctx, SUBTITLE, 600, Math.round(height * 0.042), width * 0.82)
+  ctx.fillText(SUBTITLE, width * 0.5, height * 0.66)
+  setTracking(ctx, 0)
+
+  // divider: line ◆ line
+  const divY = height * 0.72
+  ctx.strokeStyle = "rgba(214,179,87,0.45)"
+  ctx.lineWidth = Math.max(1, height * 0.003)
+  ctx.beginPath()
+  ctx.moveTo(width * 0.32, divY)
+  ctx.lineTo(width * 0.46, divY)
+  ctx.moveTo(width * 0.54, divY)
+  ctx.lineTo(width * 0.68, divY)
+  ctx.stroke()
+  ctx.fillStyle = "#d6b357"
+  ctx.save()
+  ctx.translate(width * 0.5, divY)
+  ctx.rotate(Math.PI / 4)
+  ctx.fillRect(-height * 0.010, -height * 0.010, height * 0.020, height * 0.020)
+  ctx.restore()
+
+  // contact rows centred
+  const rowSize  = Math.round(height * 0.044)
+  const iconSize = rowSize * 1.1
+  centeredContactRow(ctx, "phone", phoneText(data), width * 0.5, height * 0.805, iconSize, rowSize, "#d6b357", "#e8e6df", width * 0.8)
+  centeredContactRow(ctx, "mail", data.email || "your@email.com", width * 0.5, height * 0.89, iconSize, rowSize, "#d6b357", "#e8e6df", width * 0.8)
+}
+
+async function renderNoirBack(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  noirBase(ctx, width, height, height * 0.5)
+  try {
+    const logo = await loadImg(BRAND_STACKED)
+    const lh = height * 0.52
+    const lw = lh * (logo.width / logo.height)
+    ctx.drawImage(logo, (width - lw) / 2, (height - lh) / 2, lw, lh)
+  } catch { /* plain dark back */ }
+}
+
+// ── Canvas renderer ───────────────────────────────────────────────────────────
+async function renderCard(
+  side: "front" | "back",
+  design: DesignId,
+  data: CardData,
+  width: number,
+  height: number,
+): Promise<string> {
+  const canvas = document.createElement("canvas")
+  canvas.width  = width
+  canvas.height = height
+  const ctx = canvas.getContext("2d")!
+
+  if (design === "platinum") {
+    if (side === "front") await renderPlatinumFront(ctx, data, width, height)
+    else await renderPlatinumBack(ctx, width, height)
+  } else if (design === "noir") {
+    if (side === "front") await renderNoirFront(ctx, data, width, height)
+    else await renderNoirBack(ctx, width, height)
+  } else {
+    if (side === "front") await renderClassicFront(ctx, data, width, height)
+    else await renderClassicBack(ctx, width, height)
+  }
 
   return canvas.toDataURL("image/png")
 }
@@ -180,6 +595,8 @@ async function renderCard(
 // Display canvas is 700×400 rendered at devicePixelRatio for crispness
 const DISP_W = 700
 const DISP_H = 400
+const THUMB_W = 350
+const THUMB_H = 200
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function BusinessCardPage() {
@@ -188,18 +605,29 @@ export default function BusinessCardPage() {
   const role = (profile?.role ?? "agent") as string
 
   const fullName = profile?.fullname ?? user?.email?.split("@")[0] ?? ""
+  // Cross-origin avatars (S3, Google) usually lack the CORS headers canvas
+  // export needs, so remote URLs go through our same-origin proxy instead.
+  const rawAvatar = profile?.profile_url?.trim() ?? ""
+  const avatarUrl = rawAvatar
+    ? (rawAvatar.startsWith("/") ? rawAvatar : `${API_BASE}/api/me/avatar`)
+    : null
+  const initials = [profile?.fname, profile?.lname]
+    .map((p) => (p ?? "").trim().charAt(0).toUpperCase())
+    .join("") || fullName.trim().charAt(0).toUpperCase()
 
   // phone/email state
   const [countryCode, setCountryCode] = useState("+971") // country-code value (e.g. "+63")
   const [localNumber, setLocalNumber] = useState("")     // local number digits
   const [email,       setEmail]       = useState("")
 
-  // card side
+  // design + card side
+  const [design,  setDesign]  = useState<DesignId>("classic")
   const [flipped, setFlipped] = useState(false)
 
   // canvas preview data URLs
   const [frontDataUrl, setFrontDataUrl] = useState("")
   const [backDataUrl,  setBackDataUrl]  = useState("")
+  const [thumbs, setThumbs] = useState<Record<DesignId, string>>({ classic: "", platinum: "", noir: "" })
   const [previewLoading, setPreviewLoading] = useState(false)
 
   // save state
@@ -219,6 +647,10 @@ export default function BusinessCardPage() {
       if (raw) {
         setLocalNumber(stripLocal(raw))
       }
+      // previously chosen card design
+      if (isDesignId(meta.business_card_design)) {
+        setDesign(meta.business_card_design)
+      }
     }
     if (user?.email) setEmail(user.email.toLowerCase())
   }, [profile, user])
@@ -234,15 +666,17 @@ export default function BusinessCardPage() {
   // ── regenerate canvas preview ────────────────────────────────────────────
   const regeneratePreview = useCallback(async () => {
     setPreviewLoading(true)
-    const data: CardData = { name: fullName, phoneDial, phoneLocal: localNumber, email }
-    const [f, b] = await Promise.all([
-      renderCard("front", data, DISP_W, DISP_H),
-      renderCard("back",  data, DISP_W, DISP_H),
+    const data: CardData = { name: fullName, phoneDial, phoneLocal: localNumber, email, avatarUrl, initials }
+    const [f, b, ...thumbUrls] = await Promise.all([
+      renderCard("front", design, data, DISP_W, DISP_H),
+      renderCard("back",  design, data, DISP_W, DISP_H),
+      ...DESIGNS.map((d) => renderCard("front", d.id, data, THUMB_W, THUMB_H)),
     ])
     setFrontDataUrl(f)
     setBackDataUrl(b)
+    setThumbs({ classic: thumbUrls[0], platinum: thumbUrls[1], noir: thumbUrls[2] })
     setPreviewLoading(false)
-  }, [fullName, phoneDial, localNumber, email])
+  }, [fullName, phoneDial, localNumber, email, avatarUrl, initials, design])
 
   // regenerate whenever inputs change (debounced 400ms)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -252,11 +686,24 @@ export default function BusinessCardPage() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [regeneratePreview])
 
+  // ── design selection (persisted best-effort) ─────────────────────────────
+  const selectDesign = (id: DesignId) => {
+    if (id === design) return
+    setDesign(id)
+    // fire-and-forget: remember the choice across devices
+    fetch(`${API_BASE}/api/me/contact`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ business_card_design: id }),
+    }).catch(() => { /* preview still works locally */ })
+  }
+
   // ── download ─────────────────────────────────────────────────────────────
   const download = async (side: "front" | "back") => {
     const safeName = fullName.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-]/g, "")
-    const filename  = `business-card-${side}-${safeName}-${EXPORT_W}x${EXPORT_H}.png`
-    const url = await renderCard(side, { name: fullName, phoneDial, phoneLocal: localNumber, email }, EXPORT_W, EXPORT_H)
+    const filename  = `business-card-${design}-${side}-${safeName}-${EXPORT_W}x${EXPORT_H}.png`
+    const data: CardData = { name: fullName, phoneDial, phoneLocal: localNumber, email, avatarUrl, initials }
+    const url = await renderCard(side, design, data, EXPORT_W, EXPORT_H)
     const a = document.createElement("a")
     a.href     = url
     a.download = filename
@@ -276,6 +723,7 @@ export default function BusinessCardPage() {
           phone: toE164(phoneDial, localNumber),
           phone_country_code: countryCode,
           phone_number: localNumber,
+          business_card_design: design,
         }),
       })
       if (!res.ok) {
@@ -317,7 +765,7 @@ export default function BusinessCardPage() {
           </div>
           <div>
             <h1 className="font-['Outfit'] text-xl font-bold text-[#0d1117]">My Business Card</h1>
-            <p className="text-sm text-[#9ca3af]">Edit your contact details and download your personalised card</p>
+            <p className="text-sm text-[#9ca3af]">Edit your contact details, pick a design, and download your personalised card</p>
           </div>
         </div>
       </div>
@@ -443,17 +891,65 @@ export default function BusinessCardPage() {
             <div className="space-y-1.5">
               <p className="text-sm font-semibold text-[#374151]">Tips</p>
               <ul className="text-xs text-[#6b7280] space-y-1 list-disc list-inside">
+                <li>Pick a card design — each thumbnail shows exactly how yours will look.</li>
+                <li>Your profile photo appears on the card; update it in Profile settings.</li>
                 <li>Click the card on the right to flip it and preview the back.</li>
                 <li>The preview updates live as you type — no need to save first.</li>
                 <li>Downloads are exported at 2100 × 1200 px (print quality).</li>
-                <li>Save your contact details so they're available across devices.</li>
               </ul>
             </div>
           </div>
         </div>
 
-        {/* ══ RIGHT – Card preview ═════════════════════════════════════════ */}
+        {/* ══ RIGHT – Design picker + card preview ═════════════════════════ */}
         <div className="space-y-5">
+
+          {/* Design picker */}
+          <div className="bg-white rounded-2xl border border-[#e4e7ec] shadow-[0_2px_16px_-4px_rgba(0,31,63,0.08)] overflow-hidden">
+            <div className="px-6 pt-5 pb-4 border-b border-[#f0f2f5] flex items-center gap-2.5">
+              <Palette className="w-4 h-4 text-[#d6b357]" />
+              <div>
+                <h2 className="font-['Outfit'] text-base font-bold text-[#0d1117]">Card Design</h2>
+                <p className="text-xs text-[#9ca3af] mt-0.5">Choose a style — the preview and downloads use it</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4">
+              {DESIGNS.map((d) => {
+                const selected = design === d.id
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => selectDesign(d.id)}
+                    aria-pressed={selected}
+                    className={`group relative text-left rounded-xl border-2 p-2 transition-all duration-200 ${
+                      selected
+                        ? "border-[#d6b357] bg-[#fffdf3] shadow-[0_4px_16px_-4px_rgba(214,179,87,0.45)]"
+                        : "border-[#e4e7ec] bg-white hover:border-[#c4c9d4] hover:shadow-[0_2px_12px_-4px_rgba(0,31,63,0.15)]"
+                    }`}
+                  >
+                    <div className="rounded-lg overflow-hidden border border-[#eef0f4]" style={{ aspectRatio: "1.75 / 1" }}>
+                      {thumbs[d.id] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={thumbs[d.id]} alt={`${d.name} design preview`} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-[#f4f6f9] flex items-center justify-center">
+                          <Loader2 className="w-4 h-4 text-[#c4c9d4] animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                    <p className={`mt-2 text-xs font-bold ${selected ? "text-[#8a6a10]" : "text-[#374151]"}`}>{d.name}</p>
+                    <p className="text-[10px] text-[#9ca3af] leading-snug">{d.tagline}</p>
+                    {selected && (
+                      <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#d6b357] flex items-center justify-center shadow">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
           {/* Flip container */}
           <div className="bg-white rounded-2xl border border-[#e4e7ec] shadow-[0_2px_16px_-4px_rgba(0,31,63,0.08)] overflow-hidden">

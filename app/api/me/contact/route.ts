@@ -10,18 +10,28 @@ export async function PATCH(req: Request) {
   const { userId, profile } = guard.context
 
   // ── Parse body ─────────────────────────────────────────────────────────────
-  let body: { phone?: string; phone_country_code?: string; phone_number?: string }
+  let body: {
+    phone?: string
+    phone_country_code?: string
+    phone_number?: string
+    business_card_design?: string
+  }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  const { phone, phone_country_code, phone_number } = body
+  const { phone, phone_country_code, phone_number, business_card_design } = body
 
   // ── Validate ───────────────────────────────────────────────────────────────
-  if (!phone && !phone_number) {
-    return NextResponse.json({ error: "Phone number is required" }, { status: 400 })
+  const BUSINESS_CARD_DESIGNS = ["classic", "platinum", "noir"]
+  if (business_card_design !== undefined && !BUSINESS_CARD_DESIGNS.includes(business_card_design)) {
+    return NextResponse.json({ error: "Unknown business card design" }, { status: 422 })
+  }
+
+  if (!phone && !phone_number && !business_card_design) {
+    return NextResponse.json({ error: "Nothing to update" }, { status: 400 })
   }
 
   // Basic E.164-ish validation: starts with + and at least 4 digits after
@@ -39,8 +49,9 @@ export async function PATCH(req: Request) {
   const existingMeta = (profile.metadata as Record<string, unknown>) ?? {}
   const newMeta = {
     ...existingMeta,
-    phone_number: phone_number ?? e164,
+    ...(phone_number || e164 ? { phone_number: phone_number ?? e164 } : {}),
     ...(phone_country_code ? { phone_country_code } : {}),
+    ...(business_card_design ? { business_card_design } : {}),
   }
 
   const { error: profileErr } = await adminClient
