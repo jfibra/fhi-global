@@ -274,8 +274,8 @@ async function renderClassicFront(ctx: CanvasRenderingContext2D, data: CardData,
     ctx.fillRect(0, 0, width, height)
   }
 
-  // Avatar on the left, over the skyline
-  await drawAvatar(ctx, data.avatarUrl, data.initials, width * 0.19, height * 0.54, height * 0.185, {
+  // Avatar on the left, over the skyline — kept below the top-left logo
+  await drawAvatar(ctx, data.avatarUrl, data.initials, width * 0.19, height * 0.63, height * 0.175, {
     ring: "#d6b357",
     ringWidth: Math.max(2, height * 0.012),
     outerRing: "rgba(255,255,255,0.35)",
