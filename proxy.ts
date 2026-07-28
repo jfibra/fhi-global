@@ -114,6 +114,14 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
+  // Active account on the held page (e.g. refreshed after an admin approved
+  // them) — release them to their dashboard.
+  if (pathname === "/account-inactive") {
+    const url = request.nextUrl.clone()
+    url.pathname = getDashboardRouteByRole(profile.role)
+    return NextResponse.redirect(url)
+  }
+
   const isPrivilegedRole = isAdminStaffRole(profile.role)
 
   if (
