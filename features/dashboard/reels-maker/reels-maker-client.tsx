@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Clapperboard, Download, ImagePlus, Loader2, Music, Pause, Play,
-  RotateCcw, Trash2, ArrowLeft, ArrowRight,
+  RotateCcw, Search, Trash2, ArrowLeft, ArrowRight,
 } from "lucide-react"
 import { fetchMyAgentListings, type AgentListing } from "@/lib/agent-listings-service"
 
@@ -2557,6 +2557,42 @@ function proxiedListingPhoto(url: string) {
   return `/api/map-marker-image?url=${encodeURIComponent(url)}`
 }
 
+// A picker entry: the agent's own listing, or (for members) another agent's
+// published listing served by /api/reels-maker/listings with the agent's name.
+type PickerListing = AgentListing & { pickerAgentName?: string | null }
+
+type PublishedListingDto = {
+  id: string
+  title: string
+  listingKind: "sale" | "rent"
+  price: number | null
+  currency: string
+  projectName: string | null
+  agentName: string | null
+  images: { id: string; url: string; sort_order: number }[]
+}
+
+function publishedDtoToListing(dto: PublishedListingDto): PickerListing {
+  return {
+    id: dto.id,
+    agent_id: "",
+    project_id: null,
+    title: dto.title,
+    description: null,
+    listing_kind: dto.listingKind,
+    price: dto.price,
+    currency: dto.currency,
+    status: "published",
+    unit_type: null,
+    created_at: "",
+    updated_at: "",
+    deleted_at: null,
+    projects: dto.projectName ? { id: 0, name: dto.projectName } : null,
+    agent_listing_images: dto.images,
+    pickerAgentName: dto.agentName,
+  }
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export function ReelsMakerClient({
@@ -2601,9 +2637,10 @@ export function ReelsMakerClient({
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
-  const [myListings, setMyListings] = useState<AgentListing[]>([])
+  const [myListings, setMyListings] = useState<PickerListing[]>([])
   const [listingsLoading, setListingsLoading] = useState(true)
   const [selectedListingId, setSelectedListingId] = useState<string>("")
+  const [listingSearch, setListingSearch] = useState("")
   const appliedInitialRef = useRef(false)
 
   const slides = useMemo(() => buildTimeline(photos.length), [photos.length])
@@ -2656,18 +2693,31 @@ export function ReelsMakerClient({
     }
   }, [])
 
-  // ── One-click reel from the agent's own listings. ──
+  // ── One-click reel: agents pick from their own listings; members (who can't
+  // create listings) browse every agent's published listings instead. ──
+  const isMemberPicker = currentRole.toLowerCase().trim() === "member"
   useEffect(() => {
     let alive = true
-    void fetchMyAgentListings(userId).then(({ data }) => {
-      if (!alive) return
-      setMyListings((data ?? []).filter((l) => l.status !== "archived"))
-      setListingsLoading(false)
-    })
+    if (isMemberPicker) {
+      void fetch("/api/reels-maker/listings", { cache: "no-store" })
+        .then(async (res) => (res.ok ? ((await res.json()) as { listings?: PublishedListingDto[] }) : { listings: [] }))
+        .catch(() => ({ listings: [] as PublishedListingDto[] }))
+        .then((json) => {
+          if (!alive) return
+          setMyListings((json.listings ?? []).map(publishedDtoToListing))
+          setListingsLoading(false)
+        })
+    } else {
+      void fetchMyAgentListings(userId).then(({ data }) => {
+        if (!alive) return
+        setMyListings((data ?? []).filter((l) => l.status !== "archived"))
+        setListingsLoading(false)
+      })
+    }
     return () => {
       alive = false
     }
-  }, [userId])
+  }, [userId, isMemberPicker])
 
   const applyListing = useCallback(
     (listing: AgentListing) => {
@@ -2894,7 +2944,12 @@ export function ReelsMakerClient({
     })
   }, [])
 
-  const roleValue = currentRole.toLowerCase().trim()
+  const listingQuery = listingSearch.trim().toLowerCase()
+  const visibleListings = !isMemberPicker || !listingQuery
+    ? myListings
+    : myListings.filter((l) =>
+        [l.title, l.pickerAgentName ?? "", l.projects?.name ?? ""].some((s) => s.toLowerCase().includes(listingQuery)),
+      )
   const inputCls =
     "w-full px-4 py-3 rounded-xl border border-[#e5e5e5] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] transition-colors"
   const labelCls = "block text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-1.5"
@@ -2918,20 +2973,46 @@ export function ReelsMakerClient({
           <div className="space-y-5">
             {/* One-click reel from a listing */}
             <div className="bg-white rounded-2xl border border-[#e8eaed] p-5">
-              <p className={labelCls}>One-click reel — pick one of my listings</p>
+              <p className={labelCls}>
+                {isMemberPicker ? "One-click reel — pick a listing" : "One-click reel — pick one of my listings"}
+              </p>
               {listingsLoading ? (
                 <p className="text-sm text-[#9ca3af] flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Loading your listings…
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading listings…
                 </p>
               ) : myListings.length === 0 ? (
                 <p className="text-sm text-[#9ca3af]">
-                  No listings yet — create one in <span className="font-semibold">My listings</span>, or build a
-                  reel manually below.
+                  {isMemberPicker ? (
+                    <>No published listings available yet — build a reel manually below.</>
+                  ) : (
+                    <>
+                      No listings yet — create one in <span className="font-semibold">My listings</span>, or build a
+                      reel manually below.
+                    </>
+                  )}
                 </p>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {myListings.map((l) => {
+                  {isMemberPicker && (
+                    <div className="mb-3 flex items-center gap-2 bg-[#f3f4f6] rounded-xl px-3.5 py-2.5 border border-transparent focus-within:border-[#001f3f]/25 transition-all">
+                      <Search className="w-4 h-4 text-[#9ca3af] flex-shrink-0" />
+                      <input
+                        type="text"
+                        value={listingSearch}
+                        onChange={(e) => setListingSearch(e.target.value)}
+                        placeholder="Search by property, agent, or project…"
+                        className="flex-1 bg-transparent text-sm text-[#111827] placeholder-[#9ca3af] outline-none min-w-0"
+                      />
+                      {listingSearch && (
+                        <button type="button" onClick={() => setListingSearch("")} className="text-[#9ca3af] hover:text-[#374151] text-xs">✕</button>
+                      )}
+                    </div>
+                  )}
+                  {visibleListings.length === 0 && (
+                    <p className="text-sm text-[#9ca3af]">No listings match your search.</p>
+                  )}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[420px] overflow-y-auto">
+                    {visibleListings.map((l) => {
                       const cover = l.agent_listing_images?.[0]?.url ?? null
                       const selected = l.id === selectedListingId
                       return (
@@ -2967,6 +3048,9 @@ export function ReelsMakerClient({
                           </div>
                           <div className="p-2">
                             <p className="text-xs font-bold text-[#111827] truncate">{l.title}</p>
+                            {isMemberPicker && l.pickerAgentName && (
+                              <p className="text-[10px] font-semibold text-[#001f3f] truncate">{l.pickerAgentName}</p>
+                            )}
                             <p className="text-[10px] text-[#6b7280] truncate">
                               {(l.agent_listing_images?.length ?? 0) > 0
                                 ? `${l.agent_listing_images?.length} photo${(l.agent_listing_images?.length ?? 0) > 1 ? "s" : ""}`
