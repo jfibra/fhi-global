@@ -201,22 +201,13 @@ function SidebarAccount({
         <ChevronDown className={`w-4 h-4 text-white/50 shrink-0 transition-transform duration-200 ${profileMenuOpen ? "rotate-180" : ""}`} />
       </button>
 
-      {/* Account dropdown — Home / Profile Settings / Sign Out */}
+      {/* Account dropdown — Profile Settings / Sign Out. Home lives in the top
+          bar, so it isn't repeated here. */}
       <div
         className="overflow-hidden transition-all duration-200 ease-in-out"
-        style={{ maxHeight: profileMenuOpen ? "220px" : "0px" }}
+        style={{ maxHeight: profileMenuOpen ? "160px" : "0px" }}
       >
         <div className="pt-2 space-y-0.5">
-          <Link
-            href="/"
-            onClick={closeAll}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-white/85 hover:text-white hover:bg-white/10 transition-all duration-200 group"
-          >
-            <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-[#d6b357]/20 flex items-center justify-center shrink-0 transition-all">
-              <Home className="w-[18px] h-[18px] text-white/80 group-hover:text-[#d6b357]" />
-            </span>
-            <span className="font-['Outfit'] font-semibold text-[15px]">Home</span>
-          </Link>
           <Link
             href={`${dashboardBase}/profile`}
             onClick={closeAll}
