@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { ArrowLeft, Plus, Search, SlidersHorizontal } from "lucide-react"
+import { ArrowLeft, Plus, Search, Sparkles } from "lucide-react"
+import { DeveloperCombobox } from "@/components/developers/developer-combobox"
 import {
   type Project,
   type Developer,
@@ -210,7 +211,18 @@ function NewProjectModal({
 }
 
 // ─── Main Component ─────────────────────────────────────────────────────────
-export function ProjectsClient({ currentRole, userId }: { currentRole: string; userId: string }) {
+export function ProjectsClient({
+  currentRole,
+  userId,
+  readOnly = false,
+}: {
+  currentRole: string
+  userId: string
+  // Read-only browse for agents/members: published projects only, no
+  // create/edit/publish/delete — the detail view exposes just the
+  // Poster & Reels studios from the header.
+  readOnly?: boolean
+}) {
   const [projects, setProjects]     = useState<Project[]>([])
   const [total, setTotal]           = useState(0)
   const [page, setPage]             = useState(1)
@@ -247,12 +259,13 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
       page, perPage: PER_PAGE, search,
       developerId: filterDev || undefined,
       status: filterStatus || undefined,
+      isPublished: readOnly ? true : undefined,
     })
     setLoading(false)
     if (error) { showToast("error", error); return }
     setProjects(data)
     setTotal(t)
-  }, [page, search, filterDev, filterStatus, showToast])
+  }, [page, search, filterDev, filterStatus, readOnly, showToast])
 
   useEffect(() => { void loadList() }, [loadList])
 
@@ -350,10 +363,12 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
                 {loading ? "Loading…" : `${total} project${total === 1 ? "" : "s"}`}
               </p>
             </div>
-            <button onClick={() => setShowNew(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
-              <Plus className="w-4 h-4" /> New Project
-            </button>
+            {!readOnly && (
+              <button onClick={() => setShowNew(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
+                <Plus className="w-4 h-4" /> New Project
+              </button>
+            )}
           </div>
 
           {/* toolbar */}
@@ -372,16 +387,13 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
               )}
             </div>
             <div className="flex gap-2.5">
-              <div className="flex items-center gap-1.5 bg-[#f3f4f6] rounded-xl px-3 py-2.5">
-                <SlidersHorizontal className="w-3.5 h-3.5 text-[#9ca3af] flex-shrink-0" />
-                <select
+              <div className="w-60">
+                <DeveloperCombobox
+                  developers={developers}
                   value={filterDev}
-                  onChange={(e) => { setFilterDev(e.target.value); setPage(1) }}
-                  className="bg-transparent text-sm text-[#374151] outline-none cursor-pointer max-w-[180px]"
-                >
-                  <option value="">All Developers</option>
-                  {developers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
+                  onChange={(id) => { setFilterDev(id); setPage(1) }}
+                  clearLabel="All Developers"
+                />
               </div>
               <div className="flex items-center bg-[#f3f4f6] rounded-xl px-3 py-2.5">
                 <select
@@ -414,11 +426,15 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
                 </svg>
               </div>
               <p className="text-[#374151] font-semibold text-lg font-['Outfit']">No projects found</p>
-              <p className="text-sm text-[#9ca3af] mt-1">Try a different search, or create a new project</p>
-              <button onClick={() => setShowNew(true)}
-                className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
-                <Plus className="w-4 h-4" /> New Project
-              </button>
+              <p className="text-sm text-[#9ca3af] mt-1">
+                {readOnly ? "Try a different search or filter" : "Try a different search, or create a new project"}
+              </p>
+              {!readOnly && (
+                <button onClick={() => setShowNew(true)}
+                  className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
+                  <Plus className="w-4 h-4" /> New Project
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -517,8 +533,30 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
             onDuplicate={handleDuplicate}
             onDelete={handleDelete}
             showToast={showToast}
+            readOnly={readOnly}
           />
 
+          {readOnly ? (
+            /* Read-only detail — the studios in the header are the whole point. */
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="max-w-xl mx-auto mt-10 rounded-3xl border border-[#e8eaed] bg-white p-8 text-center shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)]">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-[#fdf6e3] border border-[#f0e8c8] flex items-center justify-center mb-4">
+                  <Sparkles className="w-6 h-6 text-[#8a6a10]" />
+                </div>
+                <h3 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">Create marketing content</h3>
+                <p className="text-sm text-[#6b7280] mt-2 leading-relaxed">
+                  Use the <span className="font-semibold text-[#8a6a10]">Poster</span> and{" "}
+                  <span className="font-semibold text-[#8a6a10]">Reels</span> buttons above to generate a
+                  branded poster or a 9:16 video reel for {selected.name} — photos, pricing, and details
+                  are filled in automatically from the project.
+                </p>
+                {selected.about_project && (
+                  <p className="text-xs text-[#9ca3af] mt-4 leading-relaxed line-clamp-4">{selected.about_project}</p>
+                )}
+              </div>
+            </div>
+          ) : (
+          <>
           {/* Tabs nav */}
           <div className="flex gap-1 px-6 pt-4 pb-0 border-b border-[#f0f0f0] bg-white overflow-x-auto flex-shrink-0">
             {TABS.map((t) => (
@@ -547,6 +585,8 @@ export function ProjectsClient({ currentRole, userId }: { currentRole: string; u
             {activeTab === "seo"            && <ProjectSeoTab            project={selected} onSave={handleUpdateProject} showToast={showToast} />}
             {activeTab === "settings"       && <ProjectSettingsTab       project={selected} onSave={handleUpdateProject} onPublishToggle={() => void handlePublishToggle()} showToast={showToast} />}
           </div>
+          </>
+          )}
         </div>
       ) : null}
 

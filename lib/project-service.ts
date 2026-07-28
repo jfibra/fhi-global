@@ -145,6 +145,7 @@ export type Developer = {
   slug: string
   logo_url: string | null
   is_active: boolean
+  is_verified: boolean
 }
 
 export type Amenity = {
@@ -763,7 +764,7 @@ export async function fetchDevelopersForSelect(): Promise<{ data: Developer[]; e
   const supabase = createClient()
   const { data, error } = await supabase
     .from("developers")
-    .select("id, name, slug, logo_url, is_active")
+    .select("id, name, slug, logo_url, is_active, is_verified")
     .eq("is_active", true)
     .is("deleted_at", null)
     .order("name")

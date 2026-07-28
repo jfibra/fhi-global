@@ -10,6 +10,7 @@ import {
   isDeveloperRole,
   ROLES_SALES_REPORTS_ACCESS,
   ROLES_REELS_MAKER,
+  ROLES_PROJECT_STUDIO_VIEWERS,
 } from "@/lib/app-roles"
 
 export type AppUser = {
@@ -52,7 +53,8 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   "contact-inbox": ["super_admin", "admin"],
   "system-logs": ["super_admin", "admin"],
   listings: ["super_admin", "admin", "agent", "team_leader", "unit_manager"],
-  projects: ["super_admin", "admin", "developer", "editor"],
+  // Content managers + developers get the full editor; studio viewers get read-only.
+  projects: ["super_admin", "admin", "developer", "editor", ...ROLES_PROJECT_STUDIO_VIEWERS],
   company: ["developer"],
   media: ["developer"],
   sales: [...ROLES_SALES_REPORTS_ACCESS],

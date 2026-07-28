@@ -155,6 +155,11 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
     return [
       { type: "item", item: { icon: LayoutDashboard, label: "Overview", href: basePath } },
       { type: "item", item: { icon: ClipboardList, label: "My listings", href: `${basePath}/listings` } },
+      // Agents get the read-only projects browser for the Poster/Reels studios
+      // (see ROLES_PROJECT_STUDIO_VIEWERS); team leaders / unit managers do not.
+      ...(normalizedRole === "agent"
+        ? [{ type: "item" as const, item: { icon: FolderOpen, label: "Projects", href: `${basePath}/projects` } }]
+        : []),
       { type: "item", item: { icon: Clapperboard, label: "Reels Maker", href: `${basePath}/reels-maker` } },
       { type: "item", item: { icon: QrCode, label: "Invite", href: `${basePath}/invite` } },
       // Team leaders manage events too (see ROLES_EVENT_MANAGERS); agents and
@@ -218,6 +223,7 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
         items: [
           { icon: CreditCard, label: "Business Card", href: `${basePath}/business-card` },
           { icon: Clapperboard, label: "Reels Maker", href: `${basePath}/reels-maker` },
+          { icon: FolderOpen, label: "Projects", href: `${basePath}/projects` },
         ],
       },
       { type: "item", item: { icon: User, label: "Profile", href: `${basePath}/profile` } },

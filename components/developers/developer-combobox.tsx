@@ -19,6 +19,7 @@ export function DeveloperCombobox({
   onChange,
   disabled = false,
   placeholder = "Select developer…",
+  clearLabel,
   id,
 }: {
   developers: DeveloperOption[]
@@ -26,6 +27,8 @@ export function DeveloperCombobox({
   onChange: (developerId: string) => void
   disabled?: boolean
   placeholder?: string
+  /** Filter mode: label for a top row that clears the selection (onChange("")), e.g. "All Developers". Also shown in the trigger while nothing is selected. */
+  clearLabel?: string
   id?: string
 }) {
   const [open, setOpen] = useState(false)
@@ -78,6 +81,8 @@ export function DeveloperCombobox({
             <span className="flex-1 text-sm font-semibold text-[#111827] truncate">{selected.name}</span>
             {selected.is_verified && <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />}
           </>
+        ) : clearLabel ? (
+          <span className="flex-1 text-sm font-semibold text-[#374151] truncate">{clearLabel}</span>
         ) : (
           <span className="flex-1 text-sm text-[#9ca3af]">{placeholder}</span>
         )}
@@ -106,6 +111,16 @@ export function DeveloperCombobox({
                 </div>
               </div>
               <div className="max-h-60 overflow-y-auto py-1">
+                {clearLabel && !q && (
+                  <button
+                    type="button"
+                    onClick={() => { onChange(""); close() }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#f9fafb] text-left"
+                  >
+                    <span className="flex-1 text-sm font-medium text-[#374151]">{clearLabel}</span>
+                    {value === "" && <Check className="w-4 h-4 text-[#001f3f] shrink-0" />}
+                  </button>
+                )}
                 {filtered.length === 0 ? (
                   <p className="px-4 py-6 text-center text-xs text-[#9ca3af]">No developers match “{q}”.</p>
                 ) : (

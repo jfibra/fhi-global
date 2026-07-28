@@ -28,6 +28,8 @@ interface Props {
   onDuplicate?: () => void
   onDelete: () => void
   showToast?: (variant: "success" | "error", message: string) => void
+  /** Hide the mutating actions (publish / duplicate / delete); keep Poster & Reels. */
+  readOnly?: boolean
 }
 
 /** Full-screen modal shell for the Poster / Reels studios. */
@@ -71,7 +73,7 @@ function StudioModal({
   )
 }
 
-export function ProjectHeader({ project, onPublishToggle, onDuplicate, onDelete, showToast }: Props) {
+export function ProjectHeader({ project, onPublishToggle, onDuplicate, onDelete, showToast, readOnly = false }: Props) {
   const [open, setOpen] = useState(false)
   const [studio, setStudio] = useState<"poster" | "reels" | null>(null)
   const toast = showToast ?? (() => {})
@@ -189,6 +191,8 @@ export function ProjectHeader({ project, onPublishToggle, onDuplicate, onDelete,
             <Clapperboard className="w-3.5 h-3.5" /> Reels
           </button>
 
+          {!readOnly && (
+          <>
           <button
             type="button"
             onClick={onPublishToggle}
@@ -206,6 +210,8 @@ export function ProjectHeader({ project, onPublishToggle, onDuplicate, onDelete,
             className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[#f3f4f6] border border-[#e5e5e5] text-[#6b7280] transition-colors">
             <MoreHorizontal className="w-4 h-4" />
           </button>
+          </>
+          )}
 
           {open && (
             <Portal>
