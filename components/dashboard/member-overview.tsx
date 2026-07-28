@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Building2, KeyRound, LifeBuoy, User, ArrowRight, Sparkles } from "lucide-react"
+import { Building2, Clapperboard, CreditCard, KeyRound, LifeBuoy, User, ArrowRight, Sparkles } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { getDashboardRouteByRole } from "@/lib/auth"
 
@@ -27,6 +27,20 @@ export function MemberOverview({ displayName }: Props) {
       accent: "from-[#001f3f] to-[#003d7a]",
     },
     {
+      href: `${base}/business-card`,
+      title: "Business Card",
+      desc: "Design your personal FHI business card — pick a style, add your contact details, and download it print-ready.",
+      icon: CreditCard,
+      accent: "from-[#001f3f] to-[#003d7a]",
+    },
+    {
+      href: `${base}/reels-maker`,
+      title: "Reels Maker",
+      desc: "Turn property photos into a branded vertical video reel, ready to share on social media.",
+      icon: Clapperboard,
+      accent: "from-[#001f3f] to-[#003d7a]",
+    },
+    {
       href: `${base}/profile`,
       title: "Profile",
       desc: "Keep your name, timezone, and contact details up to date so we can reach you easily.",
@@ -48,8 +62,8 @@ export function MemberOverview({ displayName }: Props) {
         <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9ca3af] mb-1">Overview</p>
         <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117]">Welcome, {displayName}</h2>
         <p className="text-sm text-[#6b7280] mt-2 max-w-2xl leading-relaxed">
-          Your account is set up for browsing and support. Explore sale and rental listings anytime; use Support when you need
-          help from the team. Sales tools and business-card features are reserved for agent roles.
+          Explore sale and rental listings anytime, design your personal business card, and create shareable property
+          reels. Use Support whenever you need help from the team.
         </p>
       </div>
 

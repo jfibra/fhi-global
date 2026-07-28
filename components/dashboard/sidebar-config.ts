@@ -212,6 +212,14 @@ export function getSidebarNavSections(role: string | null | undefined): NavSecti
           { icon: KeyRound, label: "Rent", href: "/rent" },
         ],
       },
+      {
+        type: "group",
+        label: "Tools",
+        items: [
+          { icon: CreditCard, label: "Business Card", href: `${basePath}/business-card` },
+          { icon: Clapperboard, label: "Reels Maker", href: `${basePath}/reels-maker` },
+        ],
+      },
       { type: "item", item: { icon: User, label: "Profile", href: `${basePath}/profile` } },
       {
         type: "group",

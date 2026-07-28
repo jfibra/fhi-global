@@ -9,6 +9,7 @@ import {
   isSuperAdminRole,
   isDeveloperRole,
   ROLES_SALES_REPORTS_ACCESS,
+  ROLES_REELS_MAKER,
 } from "@/lib/app-roles"
 
 export type AppUser = {
@@ -55,7 +56,7 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   company: ["developer"],
   media: ["developer"],
   sales: [...ROLES_SALES_REPORTS_ACCESS],
-  "reels-maker": ["super_admin", "admin", "agent", "team_leader", "unit_manager"],
+  "reels-maker": [...ROLES_REELS_MAKER],
   invite: ["super_admin", "admin", "agent", "team_leader", "unit_manager"],
 }
 

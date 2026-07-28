@@ -3,14 +3,14 @@
 import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/context/auth-context"
-import { isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
+import { canUseReelsMaker } from "@/lib/app-roles"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { ReelsMakerClient } from "./reels-maker-client"
 
 function ReelsMakerPageInner() {
   const { user, profile, role } = useAuth()
   const searchParams = useSearchParams()
-  const allowed = useRequireAllowed(isSalesPipelineRole(role) || isAdminStaffRole(role))
+  const allowed = useRequireAllowed(canUseReelsMaker(role))
   if (!allowed) return null
 
   return (

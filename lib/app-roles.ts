@@ -246,6 +246,9 @@ export const ROLES_ADMIN_OR_DEVELOPER: readonly AppRoleId[] = ["super_admin", "a
 /** Who may manage events (create, edit, registrations, raffle): admin staff, team leaders, editors. */
 export const ROLES_EVENT_MANAGERS: readonly AppRoleId[] = ["super_admin", "admin", "team_leader", "editor"]
 
+/** Who may use the standalone Reels Maker: admin staff, the sales pipeline, and members. */
+export const ROLES_REELS_MAKER: readonly AppRoleId[] = ["super_admin", "admin", "agent", "team_leader", "unit_manager", "member"]
+
 export function isAdminStaffRole(role: string | null | undefined): boolean {
   return roleInList(role, ROLES_ADMIN_STAFF)
 }
@@ -284,4 +287,8 @@ export function isAdminOrDeveloperUploadRole(role: string | null | undefined): b
 
 export function canManageEvents(role: string | null | undefined): boolean {
   return roleInList(role, ROLES_EVENT_MANAGERS)
+}
+
+export function canUseReelsMaker(role: string | null | undefined): boolean {
+  return roleInList(role, ROLES_REELS_MAKER)
 }
