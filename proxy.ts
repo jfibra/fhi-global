@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth"
 import { isAdminStaffRole, isKnownRoleSlug } from "@/lib/app-roles"
 import { updateSession } from "@/lib/supabase/middleware"
+import { readCachedProfile, writeCachedProfile } from "@/lib/profile-cache"
 import { IDENTITY_HEADERS } from "@/lib/identity-headers"
 
 /**
@@ -80,11 +81,18 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
-  const { profile } = await ensureProfileForUser(supabase, {
-    id: user.id,
-    email: user.email,
-    user_metadata: user.user_metadata,
-  })
+  // Hot path: reuse the signed profile snapshot from a recent request rather than
+  // re-querying `profiles` on every RSC fetch and every <Link> prefetch.
+  const cachedProfile = await readCachedProfile(request, user.id)
+  const profile =
+    cachedProfile ??
+    (
+      await ensureProfileForUser(supabase, {
+        id: user.id,
+        email: user.email,
+        user_metadata: user.user_metadata,
+      })
+    ).profile
 
   if (!profile) {
     if (isDashboardRoute || isLoginRoute) {
@@ -148,7 +156,11 @@ export async function proxy(request: NextRequest) {
   }
 
   // Authenticated pass-through: hand the already-verified identity to the page.
-  return forwardIdentity(request, response, user, profile)
+  const forwarded = forwardIdentity(request, response, user, profile)
+  // Refresh only on a miss — re-signing every request would slide the expiry
+  // forever and let a stale role survive indefinitely.
+  if (!cachedProfile) await writeCachedProfile(forwarded, user.id, profile)
+  return forwarded
 }
 
 export const config = {
