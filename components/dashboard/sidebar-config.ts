@@ -4,6 +4,7 @@ import {
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, QrCode, ScrollText, Inbox, CalendarDays,
+  Wallet, MessagesSquare, FileText,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -14,10 +15,23 @@ import {
 
 // ─── How to maintain this file ────────────────────────────────────────────────
 //
-// Every role owns ONE flat list, all of them collected in ROLE_NAV at the
-// bottom. To change a role's sidebar, edit that role's list — nothing else.
-// Order in the list is order in the sidebar. There are no section headers: every
-// entry renders as a plain icon + label row.
+// Every role owns ONE list, all of them collected in ROLE_NAV at the bottom. To
+// change a role's sidebar, edit that role's list — nothing else. Order in the
+// list is order in the sidebar.
+//
+// A list holds entries, groups, or both:
+//
+//   • a bare NavEntry      → one plain row in the sidebar, links straight to the page
+//   • a NavGroupEntry      → ONE row in the sidebar (the group's own label + icon)
+//                            that opens a hub page of bento tiles, one per item
+//
+// So a group is never a header with children in the sidebar — it collapses to a
+// single clickable row, and its items only appear as tiles on the hub page. This
+// is the pattern filipinohomes-final uses for its admin dashboard.
+//
+// A group with exactly ONE item is pointless as a hub, so it degrades to a
+// direct link to that item — no group uses that today, but it means you can add
+// a group of one without it becoming a dead one-tile page.
 //
 // `to` is relative to the role's own dashboard base (`ROLE_DASHBOARD_MAP`), so
 // the lists never repeat `/admin` / `/agent` / … and a role's whole subtree can
@@ -26,6 +40,10 @@ import {
 //   to: ""            → the role's dashboard root      (/agent)
 //   to: "listings"    → a page under it                (/agent/listings)
 //   to: "/buy"        → left alone (leading slash = absolute, public pages)
+//
+// A group's own `to` is its hub route and needs a matching folder under
+// app/(users)/{role}/ for EVERY role that uses the list (admin + superadmin) —
+// a four-line wrapper rendering <HubPage hub="…" />.
 //
 // ROLE_NAV is a Record<AppRoleId, …>, so adding a role to APP_ROLES is a
 // compile error here until you give it a list — no role can silently fall
@@ -39,15 +57,41 @@ export interface NavEntry {
   label: string
   to: string
   badge?: number
+  /** One-liner under the label on the hub tile. Only used inside a group. */
+  description?: string
 }
 
-/** A resolved entry — what the shell renders. */
+/** A set of entries reachable through one sidebar row → a hub page of tiles. */
+export interface NavGroupEntry {
+  /** Sidebar row label, and the hub page's heading. */
+  group: string
+  /** The hub route, relative to the role's dashboard base. */
+  to: string
+  /** Sidebar row icon. */
+  icon: LucideIcon
+  items: NavEntry[]
+}
+
+/** One line in a role's list: a standalone entry or a group of them. */
+export type RoleNavEntry = NavEntry | NavGroupEntry
+
+/** A resolved sidebar row — what the shell renders. */
 export interface NavItem {
   icon: LucideIcon
   label: string
   href: string
   badge?: number
 }
+
+/** A resolved hub tile — what HubTileGrid renders. */
+export interface HubTile {
+  icon: LucideIcon
+  label: string
+  href: string
+  description: string
+}
+
+const isGroup = (entry: RoleNavEntry): entry is NavGroupEntry => "group" in entry
 
 // ─── Shared entries ───────────────────────────────────────────────────────────
 // Reused across several roles. Defined once so a label or icon change lands
@@ -64,37 +108,72 @@ const SUPPORT_TICKETS: NavEntry = { icon: LifeBuoy, label: "Support Tickets", to
 
 // ─── Per-role lists ───────────────────────────────────────────────────────────
 
-/** super_admin + admin — the full back office. */
-const ADMIN_NAV: NavEntry[] = [
+/** super_admin + admin — the full back office, behind five hub pages. */
+const ADMIN_NAV: RoleNavEntry[] = [
   OVERVIEW,
-  { icon: Users,         label: "Account Directory",   to: "users"               },
-  { icon: Network,       label: "Teams",               to: "teams"               },
-  { icon: Building2,     label: "Developers",          to: "developers"          },
-  PROJECTS,
-  { icon: ClipboardList, label: "All Listings",        to: "listings"            },
-  { icon: Landmark,      label: "Tax Entities",        to: "tax-entities"        },
-  { icon: ShoppingCart,  label: "Purchases",           to: "purchases"           },
-  { icon: Tag,           label: "Purchase Categories", to: "purchase-categories" },
-  SALES_REPORTS,
+  {
+    group: "Accounts & Invites",
+    to: "accounts",
+    icon: Users,
+    items: [
+      { icon: Users, label: "Account Directory", to: "users", description: "Every account, their role and status." },
+      { ...INVITE,                                            description: "Invite links for onboarding new accounts." },
+    ],
+  },
+  { icon: Network, label: "Teams", to: "teams" },
+  {
+    group: "Properties & Developers",
+    to: "properties",
+    icon: Building2,
+    items: [
+      { icon: Building2,     label: "Developers", to: "developers", description: "Developer companies and their profiles." },
+      { ...PROJECTS,                                                description: "Developments, units and their media." },
+      { icon: ClipboardList, label: "Listings",   to: "listings",   description: "Every listing across all agents." },
+    ],
+  },
+  {
+    group: "Finance",
+    to: "finance",
+    icon: Wallet,
+    items: [
+      { icon: ShoppingCart, label: "Purchases",           to: "purchases",           description: "Recorded company purchases." },
+      { icon: Tag,          label: "Purchase Categories", to: "purchase-categories", description: "Categories purchases are filed under." },
+      { icon: Landmark,     label: "Tax Entities",        to: "tax-entities",        description: "Entities purchases and sales are booked to." },
+      { ...SALES_REPORTS,                                                            description: "Encoded sales and commission reports." },
+    ],
+  },
   EVENTS,
-  SUPPORT_TICKETS,
-  { icon: Inbox,      label: "Contact Inbox", to: "contact-inbox" },
-  { icon: ScrollText, label: "System Logs",   to: "system-logs"   },
-  REELS_MAKER,
-  INVITE,
-  BUSINESS_CARD,
+  {
+    group: "Agent Resource",
+    to: "agent-resource",
+    icon: FileText,
+    items: [
+      { ...BUSINESS_CARD, description: "Your shareable digital business card." },
+      { ...REELS_MAKER,   description: "Turn a listing into a shareable reel." },
+    ],
+  },
+  {
+    group: "Communication",
+    to: "communication",
+    icon: MessagesSquare,
+    items: [
+      { icon: Inbox, label: "Contact Inbox", to: "contact-inbox", description: "Enquiries sent from the public site." },
+      { ...SUPPORT_TICKETS,                                        description: "Tickets raised by agents and clients." },
+    ],
+  },
+  { icon: ScrollText, label: "Activity Logs", to: "system-logs" },
 ]
 
 /** Content-only role: developers + projects, no admin powers. */
-const EDITOR_NAV: NavEntry[] = [
+const EDITOR_NAV: RoleNavEntry[] = [
   OVERVIEW,
-  { icon: Building2,  label: "Developers", to: "developers" },
+  { icon: Building2, label: "Developers", to: "developers" },
   PROJECTS,
   EVENTS,
 ]
 
 /** External developer partners — their own company and projects only. */
-const DEVELOPER_NAV: NavEntry[] = [
+const DEVELOPER_NAV: RoleNavEntry[] = [
   OVERVIEW,
   { icon: Briefcase, label: "Company Info",  to: "company"  },
   { icon: Layers,    label: "My Projects",   to: "projects" },
@@ -107,7 +186,7 @@ const DEVELOPER_NAV: NavEntry[] = [
  * particular rank gets (team leaders also manage events, per
  * ROLES_EVENT_MANAGERS in app-roles.ts).
  */
-const salesPipelineNav = ({ projects = false, events = false } = {}): NavEntry[] => [
+const salesPipelineNav = ({ projects = false, events = false } = {}): RoleNavEntry[] => [
   OVERVIEW,
   { icon: ClipboardList, label: "My listings", to: "listings" },
   // Agents get the read-only projects browser for the Poster/Reels studios
@@ -123,7 +202,7 @@ const salesPipelineNav = ({ projects = false, events = false } = {}): NavEntry[]
 ]
 
 /** secretary + team_secretary — paperwork support, no listings of their own. */
-const SECRETARY_NAV: NavEntry[] = [
+const SECRETARY_NAV: RoleNavEntry[] = [
   OVERVIEW,
   SALES_REPORTS,
   SUPPORT_TICKETS,
@@ -131,7 +210,7 @@ const SECRETARY_NAV: NavEntry[] = [
 ]
 
 /** Signed-up public users: browse, plus the self-serve tools. */
-const MEMBER_NAV: NavEntry[] = [
+const MEMBER_NAV: RoleNavEntry[] = [
   OVERVIEW,
   // Absolute — these are the public pages, not dashboard routes.
   { icon: Building2, label: "Buy",  to: "/buy"  },
@@ -146,7 +225,7 @@ const MEMBER_NAV: NavEntry[] = [
 ]
 
 /** One list per role. Exhaustive by construction — see the note at the top. */
-const ROLE_NAV: Record<AppRoleId, NavEntry[]> = {
+const ROLE_NAV: Record<AppRoleId, RoleNavEntry[]> = {
   super_admin:    ADMIN_NAV,
   admin:          ADMIN_NAV,
   editor:         EDITOR_NAV,
@@ -172,15 +251,51 @@ function hrefFor(base: string, to: string): string {
   return `${base}/${to}`
 }
 
-export function getSidebarNavItems(role: string | null | undefined): NavItem[] {
+function baseFor(role: string | null | undefined): string {
   // Unknown roles resolve to member, so ROLE_NAV always has a list.
   const roleId = resolveAppRoleOrMember(role)
-  const base = ROLE_DASHBOARD_MAP[roleId] ?? ROLE_DASHBOARD_MAP.member
+  return ROLE_DASHBOARD_MAP[roleId] ?? ROLE_DASHBOARD_MAP.member
+}
 
-  return ROLE_NAV[roleId].map((entry) => ({
-    icon: entry.icon,
-    label: entry.label,
-    href: hrefFor(base, entry.to),
-    badge: entry.badge,
-  }))
+function listFor(role: string | null | undefined): RoleNavEntry[] {
+  return ROLE_NAV[resolveAppRoleOrMember(role)]
+}
+
+/** The sidebar rows for a role. Groups collapse to one row each. */
+export function getSidebarNavItems(role: string | null | undefined): NavItem[] {
+  const base = baseFor(role)
+
+  return listFor(role).map((entry) => {
+    if (!isGroup(entry)) {
+      return { icon: entry.icon, label: entry.label, href: hrefFor(base, entry.to), badge: entry.badge }
+    }
+    // A single-item group isn't worth a hub — link straight to the item, but
+    // keep the group's label so the sidebar still reads as the group.
+    const only = entry.items.length === 1 ? entry.items[0] : null
+    return {
+      icon: entry.icon,
+      label: entry.group,
+      href: hrefFor(base, only ? only.to : entry.to),
+    }
+  })
+}
+
+/** The tiles for one hub page, or null if this role has no such hub. */
+export function getHubTiles(
+  role: string | null | undefined,
+  hub: string,
+): { title: string; tiles: HubTile[] } | null {
+  const base = baseFor(role)
+  const group = listFor(role).find((e): e is NavGroupEntry => isGroup(e) && e.to === hub)
+  if (!group) return null
+
+  return {
+    title: group.group,
+    tiles: group.items.map((item) => ({
+      icon: item.icon,
+      label: item.label,
+      href: hrefFor(base, item.to),
+      description: item.description ?? "",
+    })),
+  }
 }
