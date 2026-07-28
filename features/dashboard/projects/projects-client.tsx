@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useParams, usePathname, useRouter } from "next/navigation"
 import { createPortal } from "react-dom"
-import { ArrowLeft, Plus, Search, Sparkles } from "lucide-react"
+import { Plus, Search, Sparkles } from "lucide-react"
 import { DeveloperCombobox } from "@/components/developers/developer-combobox"
 import {
   type Project,
@@ -11,6 +12,7 @@ import {
   PROJECT_LISTING_TYPE_LABELS,
   fetchProjects,
   fetchProject,
+  fetchProjectBySlug,
   createProject,
   updateProject,
   softDeleteProject,
@@ -231,8 +233,17 @@ export function ProjectsClient({
   const [filterStatus, setStatus]   = useState("")
   const [loading, setLoading]       = useState(false)
 
+  const router = useRouter()
+  const pathname = usePathname()
+  // /{role}/projects        → the list
+  // /{role}/projects/{slug} → that project's page (a real route, not a param)
+  const routeParams = useParams<{ slug?: string | string[] }>()
+  const slug = typeof routeParams?.slug === "string" ? routeParams.slug : null
+  // The list route, derived by dropping the slug segment when we're on a detail.
+  const listPath = slug ? pathname.slice(0, -(slug.length + 1)) : pathname
+
   const [selected, setSelected]         = useState<Project | null>(null)
-  const [loadingProject, setLoadingProject] = useState(false)
+  const loadingProject = slug !== null && selected?.slug !== slug
   const [activeTab, setActiveTab]       = useState<TabId>("overview")
 
   const [developers, setDevelopers] = useState<Developer[]>([])
@@ -267,7 +278,8 @@ export function ProjectsClient({
     setTotal(t)
   }, [page, search, filterDev, filterStatus, readOnly, showToast])
 
-  useEffect(() => { void loadList() }, [loadList])
+  // Only the list route needs the list — a detail route would waste the query.
+  useEffect(() => { if (slug === null) void loadList() }, [loadList, slug])
 
   // ── Load developers for selects ────────────────────────────────────────────
   useEffect(() => {
@@ -275,14 +287,35 @@ export function ProjectsClient({
   }, [])
 
   // ── Select project ──────────────────────────────────────────────────────────
-  const handleSelect = async (id: number) => {
-    setLoadingProject(true)
+  const openProject = (project: Pick<Project, "slug">) => {
     setActiveTab("overview")
-    const { data, error } = await fetchProject(id)
-    setLoadingProject(false)
-    if (error) { showToast("error", error); return }
-    setSelected(data)
+    router.push(`${listPath}/${project.slug}`, { scroll: false })
   }
+  const closeProject = () => router.push(listPath, { scroll: false })
+
+  // ── `?project=<id>` IS the detail view ──────────────────────────────────────
+  // The URL is the single source of truth, not a mirror of local state. That
+  // matters because the breadcrumb's "Projects" crumb links to the bare path:
+  // it's the same route, so this component never remounts, and if `selected`
+  // were authoritative the detail would stay open (and an effect syncing state
+  // → URL would put the param straight back). Driving it the other way round —
+  // URL → state — means the crumb, a refresh, a shared link and browser-back
+  // all behave the same way, with no ping-pong between two effects.
+  useEffect(() => {
+    let alive = true
+    if (slug === null) {
+      // Back on the list route (breadcrumb crumb, browser back) — drop the detail.
+      Promise.resolve().then(() => { if (alive) setSelected(null) })
+      return () => { alive = false }
+    }
+    fetchProjectBySlug(slug).then(({ data, error }) => {
+      if (!alive) return
+      if (error) { showToast("error", error); return }
+      if (data) setSelected(data)
+    })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug])
 
   // ── Refresh selected ─────────────────────────────────────────────────────────
   const refreshSelected = async () => {
@@ -330,7 +363,7 @@ export function ProjectsClient({
         const { error } = await softDeleteProject(selected.id)
         if (error) { showToast("error", error); return }
         showToast("success", "Project deleted")
-        setSelected(null)
+        closeProject()
         await loadList()
       },
     })
@@ -442,7 +475,7 @@ export function ProjectsClient({
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => void handleSelect(p.id)}
+                  onClick={() => openProject(p)}
                   className="group text-left bg-white rounded-3xl border border-[#eceef2] overflow-hidden shadow-[0_2px_12px_-6px_rgba(0,31,63,0.10)] hover:shadow-[0_16px_40px_-12px_rgba(0,31,63,0.28)] hover:-translate-y-1 hover:border-[#d6b357]/60 transition-all duration-200"
                 >
                   {/* cover */}
@@ -516,16 +549,6 @@ export function ProjectsClient({
         /* ══ DETAIL — info + edit tabs ══════════════════════════════════════ */
         <div className="flex flex-col h-screen overflow-hidden">
           {/* back row */}
-          <div className="px-6 pt-4 bg-white flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => setSelected(null)}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" /> All projects
-            </button>
-          </div>
-
           {/* Project header */}
           <ProjectHeader
             project={selected}
@@ -599,7 +622,7 @@ export function ProjectsClient({
           onCreated={async (p) => {
             setShowNew(false)
             await loadList()
-            setSelected(p)
+            openProject(p)
           }}
         />
       )}

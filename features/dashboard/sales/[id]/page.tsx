@@ -190,13 +190,6 @@ export default function SaleDetailPage() {
         {/* Back + header */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Link
-              href={`${base}/sales`}
-              className="inline-flex items-center gap-1.5 text-xs text-[#6b7280] hover:text-[#001f3f] transition-colors mb-3"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Back to Sales Reports
-            </Link>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-lg">
                 <DollarSign className="w-6 h-6 text-white" />

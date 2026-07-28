@@ -306,6 +306,25 @@ export async function fetchProject(id: number): Promise<{ data: Project | null; 
   return { data: data as unknown as Project, error: null }
 }
 
+/**
+ * Same as fetchProject but keyed by slug — the dashboard detail route is
+ * /{role}/projects/{slug}. Slugs are allocated unique by
+ * allocateUniqueProjectSlug, so maybeSingle is safe here.
+ */
+export async function fetchProjectBySlug(slug: string): Promise<{ data: Project | null; error: string | null }> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*, developers(name, logo_url, slug)")
+    .eq("slug", slug)
+    .is("deleted_at", null)
+    .maybeSingle()
+
+  if (error) return { data: null, error: error.message }
+  if (!data) return { data: null, error: "Project not found" }
+  return { data: data as unknown as Project, error: null }
+}
+
 export async function createProject(form: ProjectFormData): Promise<{ data: Project | null; error: string | null }> {
   const supabase = createClient()
   const name = form.name?.trim() ?? ""

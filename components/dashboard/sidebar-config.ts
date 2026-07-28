@@ -328,6 +328,48 @@ export function getSearchTargets(role: string | null | undefined): NavSearchTarg
 }
 
 /** The tiles for one hub page, or null if this role has no such hub. */
+/**
+ * Where `pathname` sits in this role's nav: the hub that owns it (if any),
+ * then the page itself. Empty when the path isn't a nav destination.
+ *
+ * This is what lets the breadcrumb show "Accounts & Invites › Account
+ * Directory" for /admin/users — the hub is not in the URL, so a purely
+ * URL-derived trail could never find it.
+ */
+export function getNavTrail(
+  role: string | null | undefined,
+  pathname: string,
+): Array<{ label: string; href: string }> {
+  const base = baseFor(role)
+
+  for (const entry of listFor(role)) {
+    if (!isGroup(entry)) {
+      if (hrefFor(base, entry.to) === pathname) {
+        return [{ label: entry.label, href: pathname }]
+      }
+      continue
+    }
+
+    // Single-item groups collapse to their item — mirror getSidebarNavItems.
+    const only = entry.items.length === 1 ? entry.items[0] : null
+    const hubHref = hrefFor(base, only ? only.to : entry.to)
+    if (hubHref === pathname) return [{ label: entry.group, href: hubHref }]
+    if (only) continue
+
+    for (const item of entry.items) {
+      const itemHref = hrefFor(base, item.to)
+      if (itemHref === pathname) {
+        return [
+          { label: entry.group, href: hubHref },
+          { label: item.label, href: itemHref },
+        ]
+      }
+    }
+  }
+
+  return []
+}
+
 export function getHubTiles(
   role: string | null | undefined,
   hub: string,

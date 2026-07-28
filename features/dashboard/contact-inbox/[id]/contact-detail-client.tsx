@@ -105,10 +105,7 @@ export function ContactDetailClient({ id }: { id: string }) {
   return (
     <div className="max-w-3xl mx-auto space-y-5">
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Link href={`${base}/contact-inbox`} className="inline-flex items-center gap-2 text-sm font-semibold text-[#374151] hover:text-[#001f3f] transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Back to Contact Inbox
-        </Link>
+      <div className="flex items-center justify-end gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           {!isDeleted && (
             <>

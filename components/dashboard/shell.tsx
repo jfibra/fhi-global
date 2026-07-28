@@ -11,6 +11,7 @@ import { createClient as createSupabaseClient } from "@/lib/supabase/client"
 import { roleToLabel, getDashboardRouteByRole } from "@/lib/auth"
 import { useAuth } from "@/context/auth-context"
 import { getSidebarNavItems, getRoleColor, type NavItem } from "@/components/dashboard/sidebar-config"
+import { DashboardBreadcrumb } from "@/components/dashboard/dashboard-breadcrumb"
 import { DashboardSearch } from "@/components/dashboard/dashboard-search"
 import { ROLE_SHELL_BADGE, normalizeAppRole, isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
 
@@ -442,6 +443,10 @@ export function DashboardShell({
           roleLabel={effectiveRoleLabel}
           onOpenSidebar={() => setSidebarOpen(true)}
         />
+
+        {/* Route trail. Reads the pathname itself, so it re-renders on
+            navigation without dragging the rest of the shell with it. */}
+        <DashboardBreadcrumb />
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto scrollbar-none p-6">

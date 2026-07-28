@@ -1,9 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
-  ArrowLeft,
   ArrowRight,
   ArrowUpDown,
   Building2,
@@ -54,6 +53,16 @@ type SortField = "reservation_date" | "contract_price" | "created_at"
 type SortDir = "asc" | "desc"
 
 const PER_PAGE_OPTIONS = [10, 20, 50] as const
+
+// URL slug per sale type. Each has its own route (see app/(users)/{role}/sales/*),
+// so a report is a real page rather than a query param on the chooser.
+export const SALE_TYPE_SLUGS: Record<SaleType, string> = {
+  project:   "project-sale",
+  brokerage: "brokerage-sale",
+  rental:    "rental",
+}
+
+const TYPE_SLUG_RE = new RegExp(`/(${Object.values(SALE_TYPE_SLUGS).join("|")})$`)
 
 // Sale-type selector cards — mirror the "Encode a Sale" 3-card page (icon + title
 // + description), reusing the same icons (Building2/Handshake/KeyRound).
@@ -228,10 +237,13 @@ export function SalesTable({
   currentUserId,
   currentRole,
   userName,
+  saleType = null,
 }: {
   currentUserId: string
   currentRole: string
   userName: string
+  /** From the route. null = the chooser screen. */
+  saleType?: SaleType | null
 }) {
   const [sales, setSales] = useState<SaleRecord[]>([])
   const [developers, setDevelopers] = useState<DeveloperOption[]>([])
@@ -257,16 +269,14 @@ export function SalesTable({
   // card badges and the tiles; all three load together so the cards preview counts.
   const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const typeParam = searchParams.get("type")
-  const activeTab: SaleType | null =
-    typeParam === "project" || typeParam === "brokerage" || typeParam === "rental" ? typeParam : null
+  // The active type is the route, not a query param: /{role}/sales is the
+  // chooser and /{role}/sales/{slug} is that type's report. The base is derived
+  // by stripping a type slug off the current path, so this works for every role
+  // without knowing the role→path mapping.
+  const salesBase = pathname.replace(TYPE_SLUG_RE, "")
+  const activeTab: SaleType | null = saleType ?? null
   const setActiveType = (t: SaleType | null) => {
-    const params = new URLSearchParams(searchParams.toString())
-    if (t) params.set("type", t)
-    else params.delete("type")
-    const qs = params.toString()
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    router.push(t ? `${salesBase}/${SALE_TYPE_SLUGS[t]}` : salesBase, { scroll: false })
   }
   const [summaries, setSummaries] = useState<Record<SaleType, SaleTypeSummary>>({
     project:   { dealCount: 0, totalValue: 0, pendingCount: 0 },
@@ -368,7 +378,6 @@ export function SalesTable({
     setPage(1)
     if (t !== "project") setDeveloperFilter("all") // brokerage/rental have no developer
   }
-  const goBack = () => { setActiveType(null); setPage(1) }
   const openEdit = (s: SaleRecord) => {
     if (!canEditSaleForRole(currentRole, s)) {
       addToast("error", "You can only edit sales that are Invalid Sale or Under Review")
@@ -575,14 +584,6 @@ export function SalesTable({
           /* ── Report: the table for the chosen sale type ── */
           <>
             <div className="space-y-4">
-              <button
-                type="button"
-                onClick={goBack}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to reports
-              </button>
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-lg">
                   <ActiveIcon className="w-6 h-6 text-white" />

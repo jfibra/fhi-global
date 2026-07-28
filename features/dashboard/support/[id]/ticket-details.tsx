@@ -1,9 +1,7 @@
 "use client"
 
-import Link from "next/link"
-import { getDashboardRouteByRole } from "@/lib/auth"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ArrowLeft, Paperclip } from "lucide-react"
+import { Paperclip } from "lucide-react"
 import {
   fetchSupportAssignableUsers,
   fetchSupportTicketById,
@@ -90,7 +88,6 @@ export function TicketDetails({
   const toastIdRef = useRef(0)
 
   const isAdmin = isSupportAdmin(currentRole)
-  const base = getDashboardRouteByRole(currentRole)
 
   const addToast = (type: ToastType, text: string) => {
     const id = ++toastIdRef.current
@@ -243,9 +240,6 @@ export function TicketDetails({
     <div className="space-y-6 max-w-6xl">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <Link href={`${base}/support`} className="inline-flex items-center gap-1.5 text-xs text-[#6b7280] hover:text-[#001f3f] transition-colors mb-3">
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to Support Tickets
-          </Link>
           <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">{ticket?.title ?? "Support Ticket"}</h1>
           <p className="text-sm text-[#6b7280]">Ticket details, attachments, and discussion</p>
         </div>
