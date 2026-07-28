@@ -1,17 +1,16 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useRouter } from "next/navigation"
 import {
-  Menu, X, Bell, LogOut, Settings, ChevronRight, ChevronDown, Home,
+  Menu, X, Bell, LogOut, Settings, ChevronDown, Home, Plus,
 } from "lucide-react"
 import { createClient as createSupabaseClient } from "@/lib/supabase/client"
 import { roleToLabel, getDashboardRouteByRole } from "@/lib/auth"
 import { useAuth } from "@/context/auth-context"
-import { getSidebarNavSections, getRoleColor, type NavItem, type NavSection } from "@/components/dashboard/sidebar-config"
+import { getSidebarNavItems, getRoleColor, type NavItem } from "@/components/dashboard/sidebar-config"
 import { ROLE_SHELL_BADGE, normalizeAppRole, isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
 
 // ─── Render-once contract ────────────────────────────────────────────────────
@@ -45,23 +44,19 @@ export interface DashboardShellProps {
   roleColor?: string       // tailwind / hex for accent ring + active state
   userName?: string
   userAvatar?: string
-  /** Override flat nav items (legacy). Prefer navSections. */
+  /** Override the role's nav list (otherwise derived from the role). */
   navItems?: NavItem[]
-  /** Override grouped nav sections */
-  navSections?: NavSection[]
   children: React.ReactNode
 }
 
 // ─── Single nav link ─────────────────────────────────────────────────────────
 function NavLink({
   item,
-  indented,
   isActive,
   accentColor,
   onNavigate,
 }: {
   item: NavItem
-  indented: boolean
   isActive: boolean
   accentColor: string
   onNavigate: () => void
@@ -72,7 +67,6 @@ function NavLink({
       href={href}
       onClick={onNavigate}
       className={`group flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] transition-all duration-200 relative
-        ${indented ? "ml-2" : ""}
         ${isActive
           ? "bg-gradient-to-r from-white/20 to-white/5 text-white font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
           : "text-white/85 font-semibold hover:bg-white/10 hover:text-white"
@@ -104,95 +98,33 @@ function NavLink({
 }
 
 // ─── Nav ─────────────────────────────────────────────────────────────────────
-// The ONLY part of the shell that reads the pathname — see rule 1 above.
+// A flat list — no section headers, no collapse. The ONLY part of the shell
+// that reads the pathname (see rule 1 above), and it holds no state at all.
 function SidebarNav({
-  sections,
+  items,
   accentColor,
   onNavigate,
 }: {
-  sections: NavSection[]
+  items: NavItem[]
   accentColor: string
   onNavigate: () => void
 }) {
   const pathname = usePathname()
-  // Groups default to open; only labels the user has explicitly toggled land here.
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
 
-  const toggleGroup = (label: string) =>
-    setOpenGroups(prev => ({ ...prev, [label]: !(prev[label] ?? true) }))
-
+  // px-5 matches the account header above, so the active row's highlight lines
+  // up with the account card and the Encode Sale button instead of bleeding 8px
+  // wider on each side.
   return (
-    <nav className="flex-1 overflow-y-auto px-3 py-3 scrollbar-none space-y-0.5">
-      {sections.map((section, sIdx) => {
-        if (section.type === "item") {
-          return (
-            <NavLink
-              key={section.item.href}
-              item={section.item}
-              indented={false}
-              isActive={pathname === section.item.href}
-              accentColor={accentColor}
-              onNavigate={onNavigate}
-            />
-          )
-        }
-
-        // ── Collapsible group ──────────────────────────────────────────────
-        const { label, items } = section
-        const isOpen = openGroups[label] ?? true
-        const hasActiveChild = items.some(item => pathname === item.href)
-
-        return (
-          <div key={label} className="mt-1">
-            {/* Group header */}
-            <button
-              type="button"
-              onClick={() => toggleGroup(label)}
-              className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl group/hdr hover:bg-white/4 transition-colors duration-150"
-            >
-              <span
-                className={`text-[11px] font-bold uppercase tracking-[0.14em] transition-colors duration-150 ${
-                  hasActiveChild ? "text-[#d6b357]" : "text-white/60 group-hover/hdr:text-white/85"
-                }`}
-              >
-                {label}
-              </span>
-              <ChevronRight
-                className={`w-4 h-4 transition-all duration-200 ${
-                  hasActiveChild ? "text-[#d6b357]" : "text-white/50"
-                } ${isOpen ? "rotate-90" : "rotate-0"}`}
-              />
-            </button>
-
-            {/* Collapsible items — CSS max-height transition */}
-            <div
-              className="overflow-hidden transition-all duration-200 ease-in-out"
-              style={{ maxHeight: isOpen ? `${items.length * 60}px` : "0px" }}
-            >
-              <div className="space-y-0.5 pt-0.5 pb-1">
-                {items.map(item => (
-                  <NavLink
-                    key={item.href}
-                    item={item}
-                    indented
-                    isActive={pathname === item.href}
-                    accentColor={accentColor}
-                    onNavigate={onNavigate}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Subtle divider after each group (except last) */}
-            {sIdx < sections.length - 1 && (
-              <div
-                className="mx-1 mt-2 h-px"
-                style={{ background: "linear-gradient(to right, transparent, rgba(255,255,255,0.05), transparent)" }}
-              />
-            )}
-          </div>
-        )
-      })}
+    <nav className="flex-1 overflow-y-auto px-5 py-3 scrollbar-none space-y-0.5">
+      {items.map(item => (
+        <NavLink
+          key={item.href}
+          item={item}
+          isActive={pathname === item.href}
+          accentColor={accentColor}
+          onNavigate={onNavigate}
+        />
+      ))}
     </nav>
   )
 }
@@ -311,8 +243,9 @@ function SidebarAccount({
         <Link
           href={`${dashboardBase}/sales/encode`}
           onClick={onNavigate}
-          className="mt-3 w-full inline-flex items-center justify-center px-4 py-4 rounded-2xl bg-[#d6b357] text-[#001428] font-['Outfit'] font-bold text-lg hover:bg-[#c9a449] hover:-translate-y-0.5 transition-all duration-200 shadow-md"
+          className="mt-4 w-full inline-flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-xl bg-[#d6b357] text-[#001428] font-['Outfit'] font-bold text-[17px] hover:bg-[#c9a449] hover:-translate-y-0.5 transition-all duration-200 shadow-md"
         >
+          <Plus className="w-5 h-5" strokeWidth={2.5} />
           Encode Sale
         </Link>
       )}
@@ -414,7 +347,6 @@ export function DashboardShell({
   userName = "User",
   userAvatar,
   navItems,
-  navSections: navSectionsProp,
   children,
 }: DashboardShellProps) {
   // Shared state only — the mobile drawer, its backdrop and the burger button.
@@ -435,12 +367,8 @@ export function DashboardShell({
   const badgeCls =
     ROLE_SHELL_BADGE[normalizeAppRole(effectiveRole)] ?? "bg-white/10 text-white/60 border-white/20"
 
-  // Resolve sections: prop override → flat navItems override wrapped → auto from role
-  const resolvedSections: NavSection[] = navSectionsProp
-    ?? (navItems
-      ? navItems.map(item => ({ type: "item" as const, item }))
-      : getSidebarNavSections(effectiveRole)
-    )
+  // Prop override wins, else the role's own list from sidebar-config.
+  const resolvedItems: NavItem[] = navItems ?? getSidebarNavItems(effectiveRole)
 
   return (
     <div className="flex h-screen bg-[#f4f6f9] font-sans overflow-hidden">
@@ -458,22 +386,15 @@ export function DashboardShell({
         className={`fixed inset-y-0 left-0 z-40 w-72 flex flex-col bg-[#001228] shadow-2xl transition-transform duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:relative lg:translate-x-0`}
       >
-        {/* Top gradient accent bar */}
-        <div
-          className="absolute top-0 left-0 right-0 h-[2px] shrink-0"
-          style={{ background: `linear-gradient(to right, transparent, ${accentColor}, #d6b357, transparent)` }}
-        />
-
-        {/* ── FIXED: Logo + role header ── */}
+        {/* ── FIXED: account header ── */}
         <div className="shrink-0 px-5 pt-6 pb-4">
-          {/* Logo row */}
-          <div className="flex items-center justify-between mb-5">
-            <Link href="/" aria-label="FHI Global home" className="transition-opacity hover:opacity-80">
-              <Image src="/FHI_Branding_White.png" alt="FHI Global" width={110} height={32} className="object-contain h-auto" />
-            </Link>
+          {/* Close button — mobile only, so the drawer stays dismissable.
+              Hidden on lg so it costs no vertical space on desktop. */}
+          <div className="flex justify-end mb-3 lg:hidden">
             <button
               onClick={closeSidebar}
-              className="lg:hidden w-7 h-7 flex items-center justify-center rounded-xl bg-white/8 hover:bg-white/15 text-white/50 hover:text-white transition-all"
+              aria-label="Close menu"
+              className="w-7 h-7 flex items-center justify-center rounded-xl bg-white/8 hover:bg-white/15 text-white/50 hover:text-white transition-all"
             >
               <X className="w-4 h-4" />
             </button>
@@ -493,13 +414,13 @@ export function DashboardShell({
 
         {/* Gradient divider */}
         <div
-          className="mx-4 mb-1 h-px shrink-0"
+          className="mx-5 mb-1 h-px shrink-0"
           style={{ background: "linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)" }}
         />
 
         {/* ── SCROLLABLE: Nav ── */}
         <SidebarNav
-          sections={resolvedSections}
+          items={resolvedItems}
           accentColor={accentColor}
           onNavigate={closeSidebar}
         />
