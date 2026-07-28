@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef, useEffect } from "react"
+import { useState, useRef, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -13,6 +13,28 @@ import { roleToLabel, getDashboardRouteByRole } from "@/lib/auth"
 import { useAuth } from "@/context/auth-context"
 import { getSidebarNavSections, getRoleColor, type NavItem, type NavSection } from "@/components/dashboard/sidebar-config"
 import { ROLE_SHELL_BADGE, normalizeAppRole, isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
+
+// ─── Render-once contract ────────────────────────────────────────────────────
+//
+// This shell renders ONCE per session. Two rules keep it that way — break either
+// and the sidebar starts re-rendering on every click again:
+//
+//  1. NEVER call usePathname() (or any router hook) in DashboardShell. It lives
+//     in the (users) layout, and App Router layouts do not re-render on client
+//     navigation — the page swaps below them, inside Next's LayoutRouter. So the
+//     only thing that CAN re-render the shell is a hook subscription. usePathname
+//     re-runs every component that calls it on every route change; that single
+//     call at the top of this file was what made the whole sidebar re-render.
+//     <SidebarNav> is the one piece whose output depends on the URL (active
+//     highlighting), so the hook lives there and nowhere else.
+//
+//  2. Keep transient UI state in the piece that owns it. `notificationsOpen`
+//     belongs to the top bar, `profileMenuOpen` to the account card — hoisting
+//     them into DashboardShell would make opening a dropdown re-render the nav.
+//     Only `sidebarOpen` is shared (the mobile drawer + its overlay + the burger
+//     button), so that one stays here.
+//
+// No memo() anywhere: it would only paper over a violation of rule 1.
 
 // ─── types ────────────────────────────────────────────────────────────────────
 export interface DashboardShellProps {
@@ -30,133 +52,89 @@ export interface DashboardShellProps {
   children: React.ReactNode
 }
 
-export function DashboardShell({
-  role,
-  roleLabel,
-  roleColor,
-  userName = "User",
-  userAvatar,
-  navItems,
-  navSections: navSectionsProp,
-  children,
-}: DashboardShellProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
-  const notificationsRef = useRef<HTMLDivElement>(null)
-  const pathname = usePathname()
-  const router = useRouter()
-  const { user, profile } = useAuth()
-
-  const effectiveRole = profile?.role ?? role ?? "member"
-  const dashboardBase = getDashboardRouteByRole(effectiveRole)
-  const effectiveRoleLabel =
-    (profile?.role ? roleToLabel(profile.role) : roleLabel) ?? roleToLabel(effectiveRole)
-  const displayName = profile?.fullname || userName || user?.email || "User"
-  const avatarUrl = userAvatar || profile?.profile_url || null
-  // Accent color: explicit prop wins, else derive from the effective role.
-  const accentColor = roleColor ?? getRoleColor(effectiveRole)
-
-  // Resolve sections: prop override → flat navItems override wrapped → auto from role
-  const resolvedSections: NavSection[] = navSectionsProp
-    ?? (navItems
-      ? navItems.map(item => ({ type: "item" as const, item }))
-      : getSidebarNavSections(effectiveRole)
-    )
-
-  const badgeCls =
-    ROLE_SHELL_BADGE[normalizeAppRole(effectiveRole)] ?? "bg-white/10 text-white/60 border-white/20"
-
-  // ── Collapse state: keyed by group label, default open ────────────────────
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {}
-    resolvedSections.forEach(section => {
-      if (section.type === "group") {
-        // Auto-open group that contains the active route
-        const hasActive = section.items.some(
-          item => pathname === item.href || pathname.startsWith(item.href + "/")
-        )
-        initial[section.label] = true // default all open; active group stays open regardless
-        if (hasActive) initial[section.label] = true
-      }
-    })
-    return initial
-  })
-
-  const toggleGroup = useCallback((label: string) => {
-    setOpenGroups(prev => ({ ...prev, [label]: !prev[label] }))
-  }, [])
-
-  const handleSignOut = async () => {
-    const supabase = createSupabaseClient()
-    await supabase.auth.signOut()
-    router.push("/")
-    router.refresh()
-  }
-
-  useEffect(() => {
-    if (!notificationsOpen) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setNotificationsOpen(false)
-    }
-    const onPointer = (e: MouseEvent) => {
-      const el = notificationsRef.current
-      if (el && !el.contains(e.target as Node)) setNotificationsOpen(false)
-    }
-    document.addEventListener("keydown", onKey)
-    document.addEventListener("mousedown", onPointer)
-    return () => {
-      document.removeEventListener("keydown", onKey)
-      document.removeEventListener("mousedown", onPointer)
-    }
-  }, [notificationsOpen])
-
-  // ── Single nav item renderer ───────────────────────────────────────────────
-  const renderNavItem = (item: NavItem, indented = false) => {
-    const { icon: Icon, label, href, badge } = item
-    const isActive = pathname === href
-    return (
-      <Link
-        key={href}
-        href={href}
-        onClick={() => setSidebarOpen(false)}
-        className={`group flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] transition-all duration-200 relative
-          ${indented ? "ml-2" : ""}
-          ${isActive
-            ? "bg-gradient-to-r from-white/20 to-white/5 text-white font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
-            : "text-white/85 font-semibold hover:bg-white/10 hover:text-white"
-          }`}
-      >
-        {/* Active left accent */}
-        {isActive && (
-          <span
-            className="absolute left-0 top-2.5 bottom-2.5 w-[4px] rounded-full"
-            style={{ background: `linear-gradient(to bottom, ${accentColor}, #d6b357)` }}
-          />
-        )}
-        {/* Icon bubble */}
+// ─── Single nav link ─────────────────────────────────────────────────────────
+function NavLink({
+  item,
+  indented,
+  isActive,
+  accentColor,
+  onNavigate,
+}: {
+  item: NavItem
+  indented: boolean
+  isActive: boolean
+  accentColor: string
+  onNavigate: () => void
+}) {
+  const { icon: Icon, label, href, badge } = item
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className={`group flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] transition-all duration-200 relative
+        ${indented ? "ml-2" : ""}
+        ${isActive
+          ? "bg-gradient-to-r from-white/20 to-white/5 text-white font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+          : "text-white/85 font-semibold hover:bg-white/10 hover:text-white"
+        }`}
+    >
+      {/* Active left accent */}
+      {isActive && (
         <span
-          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${
-            isActive ? "bg-white/20 shadow-sm" : "bg-white/10 group-hover:bg-white/15"
-          }`}
-        >
-          <Icon className={`w-[18px] h-[18px] transition-colors ${isActive ? "text-[#d6b357]" : "text-white/80 group-hover:text-white"}`} />
+          className="absolute left-0 top-2.5 bottom-2.5 w-[4px] rounded-full"
+          style={{ background: `linear-gradient(to bottom, ${accentColor}, #d6b357)` }}
+        />
+      )}
+      {/* Icon bubble */}
+      <span
+        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${
+          isActive ? "bg-white/20 shadow-sm" : "bg-white/10 group-hover:bg-white/15"
+        }`}
+      >
+        <Icon className={`w-[18px] h-[18px] transition-colors ${isActive ? "text-[#d6b357]" : "text-white/80 group-hover:text-white"}`} />
+      </span>
+      <span className="flex-1 font-['Outfit']">{label}</span>
+      {badge != null && badge > 0 && (
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-[#d6b357]/20 to-[#d6b357]/10 text-[#d6b357] border border-[#d6b357]/20">
+          {badge}
         </span>
-        <span className="flex-1 font-['Outfit']">{label}</span>
-        {badge != null && badge > 0 && (
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-[#d6b357]/20 to-[#d6b357]/10 text-[#d6b357] border border-[#d6b357]/20">
-            {badge}
-          </span>
-        )}
-      </Link>
-    )
-  }
+      )}
+    </Link>
+  )
+}
 
-  const NavLinks = () => (
+// ─── Nav ─────────────────────────────────────────────────────────────────────
+// The ONLY part of the shell that reads the pathname — see rule 1 above.
+function SidebarNav({
+  sections,
+  accentColor,
+  onNavigate,
+}: {
+  sections: NavSection[]
+  accentColor: string
+  onNavigate: () => void
+}) {
+  const pathname = usePathname()
+  // Groups default to open; only labels the user has explicitly toggled land here.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
+
+  const toggleGroup = (label: string) =>
+    setOpenGroups(prev => ({ ...prev, [label]: !(prev[label] ?? true) }))
+
+  return (
     <nav className="flex-1 overflow-y-auto px-3 py-3 scrollbar-none space-y-0.5">
-      {resolvedSections.map((section, sIdx) => {
+      {sections.map((section, sIdx) => {
         if (section.type === "item") {
-          return renderNavItem(section.item)
+          return (
+            <NavLink
+              key={section.item.href}
+              item={section.item}
+              indented={false}
+              isActive={pathname === section.item.href}
+              accentColor={accentColor}
+              onNavigate={onNavigate}
+            />
+          )
         }
 
         // ── Collapsible group ──────────────────────────────────────────────
@@ -192,12 +170,21 @@ export function DashboardShell({
               style={{ maxHeight: isOpen ? `${items.length * 60}px` : "0px" }}
             >
               <div className="space-y-0.5 pt-0.5 pb-1">
-                {items.map(item => renderNavItem(item, true))}
+                {items.map(item => (
+                  <NavLink
+                    key={item.href}
+                    item={item}
+                    indented
+                    isActive={pathname === item.href}
+                    accentColor={accentColor}
+                    onNavigate={onNavigate}
+                  />
+                ))}
               </div>
             </div>
 
             {/* Subtle divider after each group (except last) */}
-            {sIdx < resolvedSections.length - 1 && (
+            {sIdx < sections.length - 1 && (
               <div
                 className="mx-1 mt-2 h-px"
                 style={{ background: "linear-gradient(to right, transparent, rgba(255,255,255,0.05), transparent)" }}
@@ -208,6 +195,252 @@ export function DashboardShell({
       })}
     </nav>
   )
+}
+
+// ─── User identity card + account dropdown + Encode Sale ─────────────────────
+// Owns `profileMenuOpen` so toggling the dropdown re-renders this card only.
+function SidebarAccount({
+  displayName,
+  avatarUrl,
+  roleLabel,
+  badgeCls,
+  accentColor,
+  dashboardBase,
+  showEncodeSale,
+  onNavigate,
+}: {
+  displayName: string
+  avatarUrl: string | null
+  roleLabel: string
+  badgeCls: string
+  accentColor: string
+  dashboardBase: string
+  showEncodeSale: boolean
+  onNavigate: () => void
+}) {
+  const router = useRouter()
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+
+  const closeAll = () => {
+    setProfileMenuOpen(false)
+    onNavigate()
+  }
+
+  const handleSignOut = async () => {
+    const supabase = createSupabaseClient()
+    await supabase.auth.signOut()
+    router.push("/")
+    router.refresh()
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setProfileMenuOpen((o) => !o)}
+        aria-expanded={profileMenuOpen}
+        aria-label="Account menu"
+        className="w-full text-left flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/8 hover:bg-white/8 transition-all"
+      >
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={avatarUrl}
+            alt={displayName}
+            className="w-14 h-14 rounded-full object-cover shrink-0 shadow-lg border-2 border-[#d6b357]/60"
+          />
+        ) : (
+          <div
+            className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold shrink-0 shadow-lg"
+            style={{ background: `linear-gradient(135deg, ${accentColor}, #d6b357)`, color: "#fff" }}
+          >
+            {displayName.charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="overflow-hidden flex-1">
+          <p className="text-sm font-bold text-white font-['Outfit'] truncate">{displayName}</p>
+          <div className={`mt-0.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${badgeCls}`}>
+            <span className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
+            {roleLabel}
+          </div>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-white/50 shrink-0 transition-transform duration-200 ${profileMenuOpen ? "rotate-180" : ""}`} />
+      </button>
+
+      {/* Account dropdown — Home / Profile Settings / Sign Out */}
+      <div
+        className="overflow-hidden transition-all duration-200 ease-in-out"
+        style={{ maxHeight: profileMenuOpen ? "220px" : "0px" }}
+      >
+        <div className="pt-2 space-y-0.5">
+          <Link
+            href="/"
+            onClick={closeAll}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-white/85 hover:text-white hover:bg-white/10 transition-all duration-200 group"
+          >
+            <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-[#d6b357]/20 flex items-center justify-center shrink-0 transition-all">
+              <Home className="w-[18px] h-[18px] text-white/80 group-hover:text-[#d6b357]" />
+            </span>
+            <span className="font-['Outfit'] font-semibold text-[15px]">Home</span>
+          </Link>
+          <Link
+            href={`${dashboardBase}/profile`}
+            onClick={closeAll}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-white/85 hover:text-white hover:bg-white/10 transition-all duration-200 group"
+          >
+            <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-white/15 flex items-center justify-center shrink-0 transition-all">
+              <Settings className="w-[18px] h-[18px] text-white/80 group-hover:text-white" />
+            </span>
+            <span className="font-['Outfit'] font-semibold text-[15px]">Profile Settings</span>
+          </Link>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-2xl text-white/85 hover:text-rose-300 hover:bg-rose-500/10 transition-all duration-200 group"
+          >
+            <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-rose-500/20 flex items-center justify-center shrink-0 transition-all">
+              <LogOut className="w-[18px] h-[18px] text-white/80 group-hover:text-rose-300" />
+            </span>
+            <span className="font-['Outfit'] font-semibold text-[15px]">Sign Out</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Encode Sale — the seller's most important action, always one tap away */}
+      {showEncodeSale && (
+        <Link
+          href={`${dashboardBase}/sales/encode`}
+          onClick={onNavigate}
+          className="mt-3 w-full inline-flex items-center justify-center px-4 py-4 rounded-2xl bg-[#d6b357] text-[#001428] font-['Outfit'] font-bold text-lg hover:bg-[#c9a449] hover:-translate-y-0.5 transition-all duration-200 shadow-md"
+        >
+          Encode Sale
+        </Link>
+      )}
+    </>
+  )
+}
+
+// ─── Top bar ─────────────────────────────────────────────────────────────────
+// Owns `notificationsOpen` so opening the bell re-renders the header only.
+function DashboardTopBar({
+  roleLabel,
+  onOpenSidebar,
+}: {
+  roleLabel: string
+  onOpenSidebar: () => void
+}) {
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const notificationsRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!notificationsOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNotificationsOpen(false)
+    }
+    const onPointer = (e: MouseEvent) => {
+      const el = notificationsRef.current
+      if (el && !el.contains(e.target as Node)) setNotificationsOpen(false)
+    }
+    document.addEventListener("keydown", onKey)
+    document.addEventListener("mousedown", onPointer)
+    return () => {
+      document.removeEventListener("keydown", onKey)
+      document.removeEventListener("mousedown", onPointer)
+    }
+  }, [notificationsOpen])
+
+  return (
+    <header className="shrink-0 flex items-center gap-4 px-6 py-4 bg-white border-b border-[#e8eaed] shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+      <button
+        onClick={onOpenSidebar}
+        className="lg:hidden text-[#6b7280] hover:text-[#0d1117] transition-colors"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      <div className="flex-1 min-w-0">
+        <h1 className="font-['Outfit'] text-lg font-bold text-[#0d1117] truncate">
+          {roleLabel} Dashboard
+        </h1>
+        <p className="text-xs text-[#6b7280]">
+          FHI Global &bull; Dubai Operations
+        </p>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="relative" ref={notificationsRef}>
+          <button
+            type="button"
+            aria-label="Notifications"
+            aria-expanded={notificationsOpen}
+            aria-haspopup="dialog"
+            onClick={() => setNotificationsOpen((o) => !o)}
+            className={`relative w-8 h-8 flex items-center justify-center rounded-xl text-[#6b7280] transition-all ${
+              notificationsOpen ? "bg-[#e8eaed] text-[#0d1117]" : "bg-[#f4f6f9] hover:bg-[#e8eaed]"
+            }`}
+          >
+            <Bell className="w-4 h-4" />
+          </button>
+          {notificationsOpen && (
+            <div
+              role="dialog"
+              aria-label="Notifications"
+              className="absolute right-0 top-full z-50 mt-2 w-[min(100vw-2rem,20rem)] rounded-2xl border border-[#e8eaed] bg-white py-2 shadow-[0_8px_30px_-4px_rgba(0,31,63,0.12)]"
+            >
+              <div className="border-b border-[#f0f2f5] px-4 py-2.5">
+                <p className="font-['Outfit'] text-sm font-bold text-[#0d1117]">Notifications</p>
+                <p className="text-[11px] text-[#9ca3af]">Alerts for your account and workspace</p>
+              </div>
+              <div className="px-4 py-10 text-center">
+                <Bell className="mx-auto mb-2 h-8 w-8 text-[#d1d5db]" aria-hidden />
+                <p className="text-sm font-medium text-[#6b7280]">No notifications yet</p>
+                <p className="mt-1 text-xs text-[#9ca3af] leading-relaxed">
+                  When there are updates, they will appear here.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  )
+}
+
+// ─── Shell ───────────────────────────────────────────────────────────────────
+export function DashboardShell({
+  role,
+  roleLabel,
+  roleColor,
+  userName = "User",
+  userAvatar,
+  navItems,
+  navSections: navSectionsProp,
+  children,
+}: DashboardShellProps) {
+  // Shared state only — the mobile drawer, its backdrop and the burger button.
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { user, profile } = useAuth()
+
+  const closeSidebar = () => setSidebarOpen(false)
+
+  const effectiveRole = profile?.role ?? role ?? "member"
+  const dashboardBase = getDashboardRouteByRole(effectiveRole)
+  const effectiveRoleLabel =
+    (profile?.role ? roleToLabel(profile.role) : roleLabel) ?? roleToLabel(effectiveRole)
+  const displayName = profile?.fullname || userName || user?.email || "User"
+  const avatarUrl = userAvatar || profile?.profile_url || null
+  // Accent color: explicit prop wins, else derive from the effective role.
+  const accentColor = roleColor ?? getRoleColor(effectiveRole)
+
+  const badgeCls =
+    ROLE_SHELL_BADGE[normalizeAppRole(effectiveRole)] ?? "bg-white/10 text-white/60 border-white/20"
+
+  // Resolve sections: prop override → flat navItems override wrapped → auto from role
+  const resolvedSections: NavSection[] = navSectionsProp
+    ?? (navItems
+      ? navItems.map(item => ({ type: "item" as const, item }))
+      : getSidebarNavSections(effectiveRole)
+    )
 
   return (
     <div className="flex h-screen bg-[#f4f6f9] font-sans overflow-hidden">
@@ -218,7 +451,7 @@ export function DashboardShell({
         className={`fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden transition-opacity duration-300 ${
           sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
-        onClick={() => setSidebarOpen(false)}
+        onClick={closeSidebar}
       />
 
       <aside
@@ -239,95 +472,23 @@ export function DashboardShell({
               <Image src="/FHI_Branding_White.png" alt="FHI Global" width={110} height={32} className="object-contain h-auto" />
             </Link>
             <button
-              onClick={() => setSidebarOpen(false)}
+              onClick={closeSidebar}
               className="lg:hidden w-7 h-7 flex items-center justify-center rounded-xl bg-white/8 hover:bg-white/15 text-white/50 hover:text-white transition-all"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* User identity card — click to reveal account actions */}
-          <button
-            type="button"
-            onClick={() => setProfileMenuOpen((o) => !o)}
-            aria-expanded={profileMenuOpen}
-            aria-label="Account menu"
-            className="w-full text-left flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/8 hover:bg-white/8 transition-all"
-          >
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarUrl}
-                alt={displayName}
-                className="w-14 h-14 rounded-full object-cover shrink-0 shadow-lg border-2 border-[#d6b357]/60"
-              />
-            ) : (
-              <div
-                className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold shrink-0 shadow-lg"
-                style={{ background: `linear-gradient(135deg, ${accentColor}, #d6b357)`, color: "#fff" }}
-              >
-                {displayName.charAt(0).toUpperCase()}
-              </div>
-            )}
-            <div className="overflow-hidden flex-1">
-              <p className="text-sm font-bold text-white font-['Outfit'] truncate">{displayName}</p>
-              <div className={`mt-0.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${badgeCls}`}>
-                <span className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
-                {effectiveRoleLabel}
-              </div>
-            </div>
-            <ChevronDown className={`w-4 h-4 text-white/50 shrink-0 transition-transform duration-200 ${profileMenuOpen ? "rotate-180" : ""}`} />
-          </button>
-
-          {/* Account dropdown — Home / Profile Settings / Sign Out */}
-          <div
-            className="overflow-hidden transition-all duration-200 ease-in-out"
-            style={{ maxHeight: profileMenuOpen ? "220px" : "0px" }}
-          >
-            <div className="pt-2 space-y-0.5">
-              <Link
-                href="/"
-                onClick={() => { setProfileMenuOpen(false); setSidebarOpen(false) }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-white/85 hover:text-white hover:bg-white/10 transition-all duration-200 group"
-              >
-                <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-[#d6b357]/20 flex items-center justify-center shrink-0 transition-all">
-                  <Home className="w-[18px] h-[18px] text-white/80 group-hover:text-[#d6b357]" />
-                </span>
-                <span className="font-['Outfit'] font-semibold text-[15px]">Home</span>
-              </Link>
-              <Link
-                href={`${dashboardBase}/profile`}
-                onClick={() => { setProfileMenuOpen(false); setSidebarOpen(false) }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-white/85 hover:text-white hover:bg-white/10 transition-all duration-200 group"
-              >
-                <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-white/15 flex items-center justify-center shrink-0 transition-all">
-                  <Settings className="w-[18px] h-[18px] text-white/80 group-hover:text-white" />
-                </span>
-                <span className="font-['Outfit'] font-semibold text-[15px]">Profile Settings</span>
-              </Link>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-2xl text-white/85 hover:text-rose-300 hover:bg-rose-500/10 transition-all duration-200 group"
-              >
-                <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-rose-500/20 flex items-center justify-center shrink-0 transition-all">
-                  <LogOut className="w-[18px] h-[18px] text-white/80 group-hover:text-rose-300" />
-                </span>
-                <span className="font-['Outfit'] font-semibold text-[15px]">Sign Out</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Encode Sale — the seller's most important action, always one tap away */}
-          {(isSalesPipelineRole(effectiveRole) || isAdminStaffRole(effectiveRole)) && (
-            <Link
-              href={`${dashboardBase}/sales/encode`}
-              onClick={() => setSidebarOpen(false)}
-              className="mt-3 w-full inline-flex items-center justify-center px-4 py-4 rounded-2xl bg-[#d6b357] text-[#001428] font-['Outfit'] font-bold text-lg hover:bg-[#c9a449] hover:-translate-y-0.5 transition-all duration-200 shadow-md"
-            >
-              Encode Sale
-            </Link>
-          )}
+          <SidebarAccount
+            displayName={displayName}
+            avatarUrl={avatarUrl}
+            roleLabel={effectiveRoleLabel}
+            badgeCls={badgeCls}
+            accentColor={accentColor}
+            dashboardBase={dashboardBase}
+            showEncodeSale={isSalesPipelineRole(effectiveRole) || isAdminStaffRole(effectiveRole)}
+            onNavigate={closeSidebar}
+          />
         </div>
 
         {/* Gradient divider */}
@@ -337,66 +498,20 @@ export function DashboardShell({
         />
 
         {/* ── SCROLLABLE: Nav ── */}
-        <NavLinks />
+        <SidebarNav
+          sections={resolvedSections}
+          accentColor={accentColor}
+          onNavigate={closeSidebar}
+        />
       </aside>
 
       {/* ── Main content ──────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-        {/* Top bar */}
-        <header className="shrink-0 flex items-center gap-4 px-6 py-4 bg-white border-b border-[#e8eaed] shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden text-[#6b7280] hover:text-[#0d1117] transition-colors"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-
-          <div className="flex-1 min-w-0">
-            <h1 className="font-['Outfit'] text-lg font-bold text-[#0d1117] truncate">
-              {effectiveRoleLabel} Dashboard
-            </h1>
-            <p className="text-xs text-[#6b7280]">
-              FHI Global &bull; Dubai Operations
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="relative" ref={notificationsRef}>
-              <button
-                type="button"
-                aria-label="Notifications"
-                aria-expanded={notificationsOpen}
-                aria-haspopup="dialog"
-                onClick={() => setNotificationsOpen((o) => !o)}
-                className={`relative w-8 h-8 flex items-center justify-center rounded-xl text-[#6b7280] transition-all ${
-                  notificationsOpen ? "bg-[#e8eaed] text-[#0d1117]" : "bg-[#f4f6f9] hover:bg-[#e8eaed]"
-                }`}
-              >
-                <Bell className="w-4 h-4" />
-              </button>
-              {notificationsOpen && (
-                <div
-                  role="dialog"
-                  aria-label="Notifications"
-                  className="absolute right-0 top-full z-50 mt-2 w-[min(100vw-2rem,20rem)] rounded-2xl border border-[#e8eaed] bg-white py-2 shadow-[0_8px_30px_-4px_rgba(0,31,63,0.12)]"
-                >
-                  <div className="border-b border-[#f0f2f5] px-4 py-2.5">
-                    <p className="font-['Outfit'] text-sm font-bold text-[#0d1117]">Notifications</p>
-                    <p className="text-[11px] text-[#9ca3af]">Alerts for your account and workspace</p>
-                  </div>
-                  <div className="px-4 py-10 text-center">
-                    <Bell className="mx-auto mb-2 h-8 w-8 text-[#d1d5db]" aria-hidden />
-                    <p className="text-sm font-medium text-[#6b7280]">No notifications yet</p>
-                    <p className="mt-1 text-xs text-[#9ca3af] leading-relaxed">
-                      When there are updates, they will appear here.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
+        <DashboardTopBar
+          roleLabel={effectiveRoleLabel}
+          onOpenSidebar={() => setSidebarOpen(true)}
+        />
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto scrollbar-none p-6">
