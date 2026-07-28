@@ -11,6 +11,7 @@ import { createClient as createSupabaseClient } from "@/lib/supabase/client"
 import { roleToLabel, getDashboardRouteByRole } from "@/lib/auth"
 import { useAuth } from "@/context/auth-context"
 import { getSidebarNavItems, getRoleColor, type NavItem } from "@/components/dashboard/sidebar-config"
+import { DashboardSearch } from "@/components/dashboard/dashboard-search"
 import { ROLE_SHELL_BADGE, normalizeAppRole, isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
 
 // ─── Render-once contract ────────────────────────────────────────────────────
@@ -291,13 +292,21 @@ function DashboardTopBar({
         <Menu className="w-5 h-5" />
       </button>
 
-      <div className="flex-1 min-w-0">
-        <h1 className="font-['Outfit'] text-lg font-bold text-[#0d1117] truncate">
+      {/* Back to the public site. */}
+      <Link
+        href="/"
+        className="flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-[15px] font-semibold text-[#374151] transition-colors hover:bg-[#f4f6f9] hover:text-[#001f3f]"
+      >
+        <Home className="h-[18px] w-[18px]" />
+        <span className="hidden md:inline">Home</span>
+      </Link>
+
+      <DashboardSearch />
+
+      <div className="min-w-0 flex-1">
+        <h1 className="hidden truncate text-right font-['Outfit'] text-sm font-bold text-[#0d1117] xl:block">
           {roleLabel} Dashboard
         </h1>
-        <p className="text-xs text-[#6b7280]">
-          FHI Global &bull; Dubai Operations
-        </p>
       </div>
 
       <div className="flex items-center gap-3">

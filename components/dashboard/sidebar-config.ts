@@ -91,6 +91,15 @@ export interface HubTile {
   description: string
 }
 
+/** A destination the topbar search can jump to. */
+export interface NavSearchTarget {
+  icon: LucideIcon
+  label: string
+  href: string
+  /** The hub this sits under, shown as a muted hint. Absent for top-level rows. */
+  group?: string
+}
+
 const isGroup = (entry: RoleNavEntry): entry is NavGroupEntry => "group" in entry
 
 // ─── Shared entries ───────────────────────────────────────────────────────────
@@ -278,6 +287,44 @@ export function getSidebarNavItems(role: string | null | undefined): NavItem[] {
       href: hrefFor(base, only ? only.to : entry.to),
     }
   })
+}
+
+/**
+ * Every destination this role can reach, flattened for the topbar search.
+ *
+ * This is why the search matters under the hub model: admin's sidebar shows
+ * nine rows, but the pages inside the hubs (Account Directory, Purchases,
+ * Contact Inbox …) are two clicks away and invisible until you open the hub.
+ * Search surfaces them directly, tagged with the hub they live under.
+ */
+export function getSearchTargets(role: string | null | undefined): NavSearchTarget[] {
+  const base = baseFor(role)
+  const out: NavSearchTarget[] = []
+
+  for (const entry of listFor(role)) {
+    if (!isGroup(entry)) {
+      out.push({ icon: entry.icon, label: entry.label, href: hrefFor(base, entry.to) })
+      continue
+    }
+    // The hub page itself, then each page inside it.
+    const only = entry.items.length === 1 ? entry.items[0] : null
+    out.push({
+      icon: entry.icon,
+      label: entry.group,
+      href: hrefFor(base, only ? only.to : entry.to),
+    })
+    if (only) continue
+    for (const item of entry.items) {
+      out.push({
+        icon: item.icon,
+        label: item.label,
+        href: hrefFor(base, item.to),
+        group: entry.group,
+      })
+    }
+  }
+
+  return out
 }
 
 /** The tiles for one hub page, or null if this role has no such hub. */
