@@ -4,7 +4,7 @@ import type React from "react"
 import { forwardRef, useMemo } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { Phone, Mail, Globe, Bed, Bath, Car, Maximize, LandPlot } from "lucide-react"
-import { type FlyerData, formatPrice } from "@/lib/flyer/theme"
+import { type FlyerData, formatPrice, getAgentInitials } from "@/lib/flyer/theme"
 import { LOGOS, type LogoOption, outlineFilter } from "@/lib/flyer/logos"
 
 export { LOGOS, type LogoOption }
@@ -156,6 +156,66 @@ const mix = (hex: string, pct: number) => {
 const darken = (hex: string, amt: number) => mix(hex, -amt)
 const lighten = (hex: string, amt: number) => mix(hex, amt)
 const titleCase = (s: string) => s.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+
+// The agent's photo in the "Listed by" footer.
+//
+// Deliberately an <img> and not a CSS background-image: lib/flyer/capture.ts
+// inlines every <img> as a data URL before html-to-image rasterizes the node,
+// so the photo is already resident when the clone is drawn. A background-image
+// would instead be fetched by html-to-image mid-rasterization — the race that
+// makes photos drop out of the export while the preview looks fine. Falls back
+// to the agent's initials so the circle is never an empty grey disc.
+function AgentAvatar({
+  url,
+  name,
+  size,
+  ring,
+  initialsColor,
+}: {
+  url: string
+  name: string
+  size: number
+  ring: string
+  initialsColor: string
+}) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        flexShrink: 0,
+        overflow: "hidden",
+        border: `3px solid ${ring}`,
+        backgroundColor: "#cbd5e1",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt={name}
+          crossOrigin="anonymous"
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      ) : (
+        <span
+          style={{
+            fontFamily: "var(--font-urbanist), sans-serif",
+            fontWeight: 800,
+            fontSize: Math.round(size * 0.38),
+            color: initialsColor,
+          }}
+        >
+          {getAgentInitials(name)}
+        </span>
+      )}
+    </div>
+  )
+}
 
 const LIGHT_PANEL_INK: Partial<Skin> = {
   logo: "black", line1: NAVY_INK, line2: BLUE_INK, tagline: "#334155", underline: BLUE_INK,
@@ -397,7 +457,7 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
           <div style={{ paddingTop: 18 }}>
             <div style={{ height: 1, backgroundColor: sk.footerDivider, marginBottom: 16 }} />
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 58, height: 58, borderRadius: "50%", flexShrink: 0, border: `3px solid ${sk.contactIcon}`, backgroundImage: agentAvatar ? `url("${agentAvatar}")` : undefined, backgroundColor: "#cbd5e1", backgroundSize: "cover", backgroundPosition: "center" }} />
+              <AgentAvatar url={agentAvatar} name={data.agent.name} size={58} ring={sk.contactIcon} initialsColor={sk.agentName} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontFamily: "var(--font-urbanist), sans-serif", fontWeight: 800, fontSize: 22, color: sk.agentName, lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{titleCase(data.agent.name)}</div>
                 <div style={{ fontSize: 15, color: sk.agentRole, marginTop: 2 }}>Real Estate Agent</div>
@@ -471,7 +531,7 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
               </div>
               <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 140, backgroundColor: sk.footerBg, borderTop: `1px solid ${sk.footerBorder}`, paddingLeft: 60, paddingRight: 60, display: "flex", alignItems: "center", gap: 32, pointerEvents: "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 18, flexShrink: 0 }}>
-                  <div style={{ width: 82, height: 82, borderRadius: "50%", flexShrink: 0, border: `3px solid ${sk.contactIcon}`, backgroundImage: agentAvatar ? `url("${agentAvatar}")` : undefined, backgroundColor: "#cbd5e1", backgroundSize: "cover", backgroundPosition: "center" }} />
+                  <AgentAvatar url={agentAvatar} name={data.agent.name} size={82} ring={sk.contactIcon} initialsColor={sk.agentName} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontFamily: "var(--font-urbanist), sans-serif", fontWeight: 800, fontSize: 26, color: sk.agentName, lineHeight: 1.15, whiteSpace: "nowrap" }}>{titleCase(data.agent.name)}</div>
                     <div style={{ fontSize: 18, color: sk.agentRole, marginTop: 2 }}>Real Estate Agent</div>
@@ -496,7 +556,7 @@ const AnnouncementPoster = forwardRef<HTMLDivElement, Props>(function Announceme
                 <div style={{ fontFamily: "var(--font-urbanist), sans-serif", fontWeight: 900, fontSize: sz(46, text.price), color: sk.priceValue, lineHeight: 1, marginTop: 4 }}>{priceStr}</div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0, paddingBottom: 6 }}>
-                <div style={{ width: 74, height: 74, borderRadius: "50%", flexShrink: 0, border: `3px solid ${sk.contactIcon}`, backgroundImage: agentAvatar ? `url("${agentAvatar}")` : undefined, backgroundColor: "#cbd5e1", backgroundSize: "cover", backgroundPosition: "center" }} />
+                <AgentAvatar url={agentAvatar} name={data.agent.name} size={74} ring={sk.contactIcon} initialsColor={sk.agentName} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontFamily: "var(--font-urbanist), sans-serif", fontWeight: 800, fontSize: 26, color: sk.agentName, lineHeight: 1.15, whiteSpace: "nowrap" }}>{titleCase(data.agent.name)}</div>
                   <div style={{ fontSize: 18, color: sk.agentRole, marginTop: 2 }}>Real Estate Agent</div>
