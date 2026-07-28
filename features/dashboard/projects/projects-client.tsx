@@ -463,7 +463,7 @@ export function ProjectsClient({
                     }`}>
                       {p.is_published ? "Live" : "Draft"}
                     </span>
-                    <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#001f3f]/85 text-[#d6b357] capitalize">
+                    <span className="absolute top-3 right-3 text-[10px] font-bold tracking-wider px-2.5 py-1 rounded-full bg-[#001f3f]/85 text-[#d6b357] capitalize">
                       {statusLabel(p.status)}
                     </span>
                   </div>
