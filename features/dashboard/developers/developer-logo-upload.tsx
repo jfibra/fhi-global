@@ -335,7 +335,7 @@ export function DeveloperLogoUpload({
 
                 <p className="text-[11px] text-[#9ca3af] font-mono px-1">
                   Path: FHI_GLOBAL / {developerSlug} / [timestamp]-logo.png
-                  {deferred && " · uploads when the developer is added"}
+                  {deferred && " · uploads when the developer is saved"}
                 </p>
               </>
             )}
