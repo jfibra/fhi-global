@@ -383,7 +383,7 @@ export function DeveloperInviteDialog({
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-[#f0f2f5]">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-2xl bg-[#001f3f] flex items-center justify-center">
                 <QrCode className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -445,7 +445,7 @@ export function DeveloperInviteDialog({
                     </div>
                   </div>
                   <button type="button" onClick={() => void create()} disabled={creating}
-                    className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white text-sm font-bold shadow-md hover:shadow-lg disabled:opacity-60 transition-all">
+                    className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-[#001f3f] hover:bg-[#002b57] text-white text-sm font-bold shadow-md hover:shadow-lg disabled:opacity-60 transition-all">
                     {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                     {creating ? "Generating…" : "Generate invite link"}
                   </button>

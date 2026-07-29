@@ -221,7 +221,7 @@ function DeveloperLogo({ url, name }: { url: string | null; name: string }) {
   }
   const initials = name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
   return (
-    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center flex-shrink-0">
+    <div className="w-9 h-9 rounded-xl bg-[#001f3f] flex items-center justify-center flex-shrink-0">
       <span className="text-white text-xs font-bold">{initials}</span>
     </div>
   )
@@ -536,7 +536,7 @@ export function DevelopersClient({ currentRole }: Props) {
         {/* Page header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 rounded-2xl bg-[#001f3f] flex items-center justify-center shadow-lg">
               <Building2 className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -553,7 +553,7 @@ export function DevelopersClient({ currentRole }: Props) {
                 </button>
               )}
               <button type="button" onClick={() => { setEditDev(null); setShowForm(true) }}
-                className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md flex items-center gap-2">
+                className="bg-[#001f3f] hover:bg-[#002b57] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md flex items-center gap-2">
                 <Plus className="w-4 h-4" /> Add Developer
               </button>
             </div>

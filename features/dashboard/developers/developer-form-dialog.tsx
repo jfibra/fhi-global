@@ -166,7 +166,7 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
           {/* Header */}
           <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#f0f0f0] flex-shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-2xl bg-[#001f3f] flex items-center justify-center">
                 {editDeveloper ? <Pencil className="w-5 h-5 text-white" /> : <Plus className="w-5 h-5 text-white" />}
               </div>
               <div>
@@ -327,7 +327,7 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
                     role="checkbox" aria-checked={form[key] as boolean}
                     onClick={() => set(key, !(form[key] as boolean))}
                     className={`relative w-11 h-6 rounded-full transition-all flex-shrink-0 cursor-pointer ${
-                      form[key] ? "bg-gradient-to-r from-[#001f3f] to-[#d6b357]" : "bg-[#e5e5e5]"
+                      form[key] ? "bg-[#001f3f]" : "bg-[#e5e5e5]"
                     }`}>
                     <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-200 ${
                       form[key] ? "translate-x-5" : "translate-x-0.5"
@@ -375,7 +375,7 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
               Cancel
             </button>
             <button type="button" onClick={() => void handleSubmit()} disabled={busy}
-              className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2">
+              className="bg-[#001f3f] hover:bg-[#002b57] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2">
               {busy
                 ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
                 : editDeveloper
