@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import {
   Users, ChevronDown, Eye, Phone, RotateCcw, Search, X,
   Calendar, Clock, User, Linkedin, Facebook, Mail,
@@ -11,6 +11,7 @@ import { TOOLBAR_GRADIENT } from "@/components/common/header-toolbar"
 import { TablePagination } from "@/components/common/data-table"
 import { toast } from "sonner"
 import { UserProfileModal } from "./user-profile-modal"
+import { UserDetailView } from "./user-detail-view"
 import type { UserRecord, UsersListResponse } from "@/lib/user-service"
 import { ROLE_OPTIONS, STATUS_OPTIONS, ROLE_COLORS, STATUS_COLORS, TIMEZONES, getUserDisplayName } from "@/lib/user-service"
 import { formatDateInZone, formatTimeInZone } from "@/lib/utils"
@@ -157,9 +158,14 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const [lnameInput,  setLnameInput]  = useState("")
   const [emailInput,  setEmailInput]  = useState("")
   const [query,       setQuery]       = useState<{ fname: string; lname: string; email: string } | null>(null)
-  // The eye opens a read-only profile modal (complete-profile look) with an Edit toggle.
+  // Clicking a card drills into the Account 360 view; "Edit profile" in there
+  // opens the existing profile modal on top.
+  const [detailUser,  setDetailUser]  = useState<UserRecord | null>(null)
   const [viewUser,    setViewUser]    = useState<UserRecord | null>(null)
   const [referrers,   setReferrers]   = useState<ReferrerOption[]>([])
+  // Bumped after a profile save so the 360 view refetches the same account.
+  const [detailRefresh, setDetailRefresh] = useState(0)
+  const drillReqRef = useRef(0)
 
   const totalPages = Math.ceil(total / perPage)
 
@@ -271,12 +277,58 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     }
   }
 
-  // Eye action: open the read-only profile modal, with an Edit toggle inside.
+  // Card click: open the Account 360 detail view.
   const openView = (user: UserRecord) => {
-    setViewUser(user)
+    setDetailUser(user)
   }
 
+  // Drill from a teammate/recruit row into that person's own 360 view — the
+  // row only carries an id, so pull the full record first. Sequence-guarded so
+  // rapid clicks can't land on an earlier account's response.
+  const openUserById = useCallback(async (id: string) => {
+    const reqId = ++drillReqRef.current
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, { cache: "no-store" })
+      if (!res.ok) throw new Error()
+      const record = (await res.json()) as UserRecord
+      if (reqId !== drillReqRef.current) return
+      setDetailUser(record)
+    } catch {
+      if (reqId === drillReqRef.current) toast.error("Couldn't open that account.")
+    }
+  }, [])
+
   // ── render ─────────────────────────────────────────────────────────────────
+  if (detailUser) {
+    return (
+      <>
+        <UserDetailView
+          // Remount per account (and per save) so no state survives a
+          // drill-through into another person's 360 view.
+          key={`${detailUser.id}:${detailRefresh}`}
+          user={detailUser}
+          onBack={() => setDetailUser(null)}
+          onEdit={() => setViewUser(detailUser)}
+          onOpenUser={(id) => void openUserById(id)}
+          refreshToken={detailRefresh}
+        />
+        {viewUser && (
+          <UserProfileModal
+            user={viewUser}
+            referrers={referrers}
+            onClose={() => setViewUser(null)}
+            onSaved={() => {
+              void fetchUsers()
+              void openUserById(detailUser.id)
+              setDetailRefresh((n) => n + 1)
+            }}
+            onBanner={(type: "success" | "error", msg: string) => (type === "success" ? toast.success(msg) : toast.error(msg))}
+          />
+        )}
+      </>
+    )
+  }
+
   return (
     <>
       {/* Structured search bar */}
@@ -452,8 +504,24 @@ function UserCard({
   const iconBlue  = "bg-blue-50 text-blue-600"
   const iconGreen = "bg-green-50 text-[#25d366]"
 
+  // The card itself opens the Account 360 view; the inline chips, links and
+  // Restore action stop propagation so they still work in place.
+  const stop = (e: React.MouseEvent) => e.stopPropagation()
+
   return (
-    <div className="rounded-2xl border border-black/[0.08] bg-white shadow-sm hover:shadow-md transition-shadow p-4 sm:p-5">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(user)}
+      // Only when the card itself has focus — otherwise this would swallow
+      // Enter/Space from the role/status selects and buttons inside it.
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(user) }
+      }}
+      aria-label={`Open ${displayName}'s account details`}
+      className="cursor-pointer rounded-2xl border border-black/[0.08] bg-white shadow-sm hover:shadow-md hover:border-[#001f3f]/25 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#001f3f]/15 transition-all p-4 sm:p-5"
+    >
       {/* Header — avatar + name + email + role (+ actions) */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -467,7 +535,7 @@ function UserCard({
               <button type="button" onClick={() => onOpen(user)} className="min-w-0 text-left group/name">
                 <h3 className="text-[15px] font-bold text-[#0d1117] leading-tight truncate group-hover/name:text-[#001f3f] transition-colors">{displayName}</h3>
               </button>
-              <span className="shrink-0">
+              <span className="shrink-0" onClick={stop}>
                 <ChipSelect size="sm" value={(user.role ?? "member").toLowerCase()} onChange={(v) => onPatch(user.id, { role: v })} options={ROLE_OPTIONS} colorClass={roleChipCls(user.role)} />
               </span>
               {isDeleted && <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-600 font-bold uppercase tracking-wide">Deleted</span>}
@@ -481,7 +549,7 @@ function UserCard({
           {isDeleted && (
             <button
               type="button"
-              onClick={() => onRestore(user.id)}
+              onClick={(e) => { stop(e); onRestore(user.id) }}
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 hover:underline"
             >
               <RotateCcw className="w-4 h-4" />
@@ -511,12 +579,12 @@ function UserCard({
           </CardField>
           <CardField label="Facebook" icon={<Facebook />} iconClass={iconBlue}>
             {facebook ? (
-              <a href={facebook} target="_blank" rel="noopener noreferrer" title={facebook} className="block truncate text-blue-600 hover:underline">{facebook}</a>
+              <a href={facebook} target="_blank" rel="noopener noreferrer" onClick={stop} title={facebook} className="block truncate text-blue-600 hover:underline">{facebook}</a>
             ) : cardDash}
           </CardField>
           <CardField label="LinkedIn" icon={<Linkedin />} iconClass={iconBlue}>
             {linkedin ? (
-              <a href={linkedin} target="_blank" rel="noopener noreferrer" title={linkedin} className="block truncate text-blue-600 hover:underline">{linkedin}</a>
+              <a href={linkedin} target="_blank" rel="noopener noreferrer" onClick={stop} title={linkedin} className="block truncate text-blue-600 hover:underline">{linkedin}</a>
             ) : cardDash}
           </CardField>
         </div>
@@ -547,7 +615,9 @@ function UserCard({
             <span className="tabular-nums">{user.joined_at ? `${formatDateInZone(user.joined_at, "Asia/Dubai")} · ${formatTimeInZone(user.joined_at, "Asia/Dubai")} GST` : cardDash}</span>
           </CardField>
           <CardField label="Status" icon={<BadgeCheck />} iconClass={iconBlue}>
-            <ChipSelect size="sm" value={status} onChange={(v) => onPatch(user.id, { status: v })} options={STATUS_OPTIONS} colorClass={statusChipCls(user.status)} />
+            <span className="inline-block" onClick={stop}>
+              <ChipSelect size="sm" value={status} onChange={(v) => onPatch(user.id, { status: v })} options={STATUS_OPTIONS} colorClass={statusChipCls(user.status)} />
+            </span>
           </CardField>
         </div>
       </div>
