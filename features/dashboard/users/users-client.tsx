@@ -15,7 +15,7 @@ import { UserProfileModal } from "./user-profile-modal"
 import { UserDetailView } from "./user-detail-view"
 import type { UserRecord, UsersListResponse } from "@/lib/user-service"
 import { ROLE_OPTIONS, STATUS_OPTIONS, ROLE_COLORS, STATUS_COLORS, TIMEZONES, getUserDisplayName } from "@/lib/user-service"
-import { formatDateInZone, formatTimeInZone } from "@/lib/utils"
+import { formatDateAtTimeInZone, formatDateInZone, formatTimeInZone } from "@/lib/utils"
 
 type ReferrerOption = { id: string; fullname: string; role: string }
 
@@ -138,18 +138,23 @@ function buildQuery(params: {
   return `/api/admin/users?${qs.toString()}`
 }
 
+/** Column sort for the directory (keys whitelisted by /api/admin/users). */
+type SortState = { key: string; dir: "asc" | "desc" }
+const DEFAULT_SORT: SortState = { key: "joined_at", dir: "desc" }
+
 /** One page of the directory. Returns null on a network/parse failure. */
 async function loadUsersPage(
   page: number,
   perPage: number,
   query: { fname: string; lname: string; email: string },
+  sort: SortState,
 ): Promise<UsersListResponse | null> {
   try {
     const res = await fetch(buildQuery({
       page, perPage,
       fname: query.fname, lname: query.lname, email: query.email,
       role: "", status: "", showDeleted: false,
-      sort: "joined_at", dir: "desc",
+      sort: sort.key, dir: sort.dir,
     }))
     return (await res.json()) as UsersListResponse
   } catch {
@@ -220,6 +225,8 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   // Starts as a blank query so the directory lists everyone on arrival, then
   // narrows as you type (debounced) — no need to press Search.
   const [query,       setQuery]       = useState<{ fname: string; lname: string; email: string }>({ fname: "", lname: "", email: "" })
+  // Column sort (table header clicks) — server-side, so it spans all pages.
+  const [sort,        setSort]        = useState<SortState>(DEFAULT_SORT)
   const view = useSyncExternalStore(subscribeView, getViewSnapshot, getViewServerSnapshot)
   // Clicking a card drills into the Account 360 view; "Edit profile" in there
   // opens the existing profile modal on top.
@@ -237,14 +244,14 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   // send no filters → all users. `loading` is derived from whether the results
   // in state match the current request, so the effect never sets state
   // synchronously (which would cascade renders).
-  const requestKey = `${page}|${perPage}|${query.fname}|${query.lname}|${query.email}`
+  const requestKey = `${page}|${perPage}|${query.fname}|${query.lname}|${query.email}|${sort.key}|${sort.dir}`
   const loading = loadedKey !== requestKey
 
   useEffect(() => {
     if (loadedKey === requestKey) return
     let alive = true
     void (async () => {
-      const data = await loadUsersPage(page, perPage, query)
+      const data = await loadUsersPage(page, perPage, query, sort)
       if (!alive) return
       if (data) {
         setUsers(data.users)
@@ -255,15 +262,24 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
       setLoadedKey(requestKey)
     })()
     return () => { alive = false }
-  }, [loadedKey, requestKey, page, perPage, query])
+  }, [loadedKey, requestKey, page, perPage, query, sort])
 
   /** Silent re-read of the current page (after an edit, save or failed patch). */
   const refresh = useCallback(async () => {
-    const data = await loadUsersPage(page, perPage, query)
+    const data = await loadUsersPage(page, perPage, query, sort)
     if (!data) return
     setUsers(data.users)
     setTotal(data.total)
-  }, [page, perPage, query])
+  }, [page, perPage, query, sort])
+
+  // Header click: toggle direction on the active column, otherwise sort the new
+  // column ascending. Server-side sort → back to page 1.
+  const handleSort = useCallback((key: string) => {
+    setSort((prev) => (prev.key === key
+      ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+      : { key, dir: "asc" }))
+    setPage(1)
+  }, [])
 
   // As-you-type search: commit the inputs after a short pause. setQuery only
   // fires from the timer, so this never cascades a synchronous render.
@@ -514,6 +530,8 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
           onPatch={applyPatch}
           onOpen={openView}
           onRestore={handleRestore}
+          sort={sort}
+          onSort={handleSort}
           page={page}
           perPage={perPage}
           total={total}
@@ -574,6 +592,8 @@ function UsersTable({
   onPatch,
   onOpen,
   onRestore,
+  sort,
+  onSort,
   page,
   perPage,
   total,
@@ -586,6 +606,8 @@ function UsersTable({
   onPatch: (id: string, patch: Record<string, unknown>) => void | Promise<void>
   onOpen: (u: UserRecord) => void
   onRestore: (id: string) => void
+  sort: SortState
+  onSort: (key: string) => void
   page: number
   perPage: number
   total: number
@@ -597,7 +619,18 @@ function UsersTable({
 
   return (
     <DataTable
-      columns={["Account", "Role", "Phone", "Referred by", "Joined", "Status", { label: "", className: "w-10" }]}
+      // sortKeys are whitelisted in /api/admin/users (SORT_COLUMNS)
+      columns={[
+        { label: "Account",     sortKey: "fullname" },
+        { label: "Role",        sortKey: "role" },
+        { label: "Phone",       sortKey: "contact" },
+        { label: "Referred by", sortKey: "referred_by" },
+        { label: "Joined",      sortKey: "joined_at" },
+        { label: "Status",      sortKey: "status" },
+        { label: "", className: "w-10" },
+      ]}
+      sort={sort}
+      onSort={onSort}
       page={page}
       perPage={perPage}
       total={total}
@@ -647,7 +680,7 @@ function UsersTable({
               {invitedBy ? toTitleCase(user.referred_by_name ?? referrerName.get(invitedBy) ?? "Unknown") : cardDash}
             </td>
             <td className="px-3 py-3 text-[12px] text-[#6b7280] whitespace-nowrap tabular-nums">
-              {user.joined_at ? formatDateInZone(user.joined_at, "Asia/Dubai") : cardDash}
+              {user.joined_at ? formatDateAtTimeInZone(user.joined_at, "Asia/Dubai") : cardDash}
             </td>
             <td className="px-3 py-3" onClick={stop}>
               <ChipSelect size="sm" value={status} onChange={(v) => onPatch(user.id, { status: v })} options={STATUS_OPTIONS} colorClass={statusChipCls(user.status)} />
