@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams, usePathname, useRouter } from "next/navigation"
 import { createPortal } from "react-dom"
-import { Plus, Search, Sparkles } from "lucide-react"
+import { Plus, Search, Sparkles, Upload, Image as ImageIcon } from "lucide-react"
 import { DeveloperCombobox } from "@/components/developers/developer-combobox"
 import {
   type Project,
@@ -20,6 +20,7 @@ import {
   publishProject,
   fetchDevelopersForSelect,
   generateProjectSlug,
+  addProjectImage,
 } from "@/lib/project-service"
 
 import { ProjectDataTab } from "./project-data-tab"
@@ -115,6 +116,24 @@ function NewProjectModal({
   const [status, setStatus]       = useState<string>("pre_launch")
   const [listingType, setListingType] = useState<ProjectListingType>("sale")
   const [saving, setSaving]       = useState(false)
+  // Cover photo is held here and uploaded straight after the insert — the S3
+  // key is built from the developer + project slugs, so the row must exist.
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [coverPreview, setCoverPreview] = useState<string | null>(null)
+  const coverInputRef = useRef<HTMLInputElement>(null)
+
+  const clearCover = () => {
+    setCoverPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return null })
+    setCoverFile(null)
+    if (coverInputRef.current) coverInputRef.current.value = ""
+  }
+
+  const pickCover = (f: File) => {
+    if (!f.type.startsWith("image/")) { showToast("error", "Only image files are allowed."); return }
+    if (f.size > 10 * 1024 * 1024) { showToast("error", "File exceeds the 10 MB limit."); return }
+    setCoverPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(f) })
+    setCoverFile(f)
+  }
 
   const handleNameChange = (v: string) => {
     setName(v)
@@ -139,10 +158,40 @@ function NewProjectModal({
       installment_available: false,
       freehold: false,
     })
+
+    if (error || !data) {
+      setSaving(false)
+      showToast("error", error ?? "Failed to create the project.")
+      return
+    }
+
+    // Upload the cover now that the project has an id and slug. A failure here
+    // never loses the project — it's reported and the photo can be added from
+    // the Images tab.
+    let created = data
+    if (coverFile) {
+      const devSlug = developers.find((d) => d.id === developerId)?.slug ?? "unknown"
+      const fd = new FormData()
+      fd.append("file", coverFile)
+      fd.append("developer_slug", devSlug)
+      fd.append("project_slug", created.slug)
+      try {
+        const res = await fetch("/api/upload/project", { method: "POST", body: fd })
+        const json = (await res.json()) as { url?: string }
+        if (!res.ok || !json.url) throw new Error()
+        // First image becomes the main image and syncs projects.main_image.
+        const { error: imgError } = await addProjectImage(created.id, json.url, null, 1)
+        if (imgError) showToast("error", `Project created, but the photo could not be saved: ${imgError}`)
+        else created = { ...created, main_image: json.url }
+      } catch {
+        showToast("error", "Project created, but the photo upload failed. Add it from the Images tab.")
+      }
+    }
+
     setSaving(false)
-    if (error) { showToast("error", error); return }
+    clearCover()
     showToast("success", "Project created")
-    if (data) onCreated(data)
+    onCreated(created)
   }
 
   return (
@@ -195,6 +244,40 @@ function NewProjectModal({
                 ))}
               </select>
             </div>
+            {/* Cover photo */}
+            <div>
+              <label className="block text-xs font-semibold text-[#6b7280] mb-1.5">Cover photo</label>
+              <div className="flex items-center gap-3 rounded-xl border border-[#e5e5e5] bg-white px-3 py-2.5">
+                <div className="w-16 h-12 rounded-lg border border-[#eef0f2] bg-[#f9fafb] flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {coverPreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={coverPreview} alt="Selected cover" className="w-full h-full object-cover" />
+                  ) : (
+                    <ImageIcon className="w-4 h-4 text-[#c0c6cf]" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => coverInputRef.current?.click()} disabled={saving}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] transition-all disabled:opacity-50">
+                      <Upload className="w-3.5 h-3.5" /> {coverFile ? "Change" : "Choose image"}
+                    </button>
+                    {coverFile && (
+                      <button type="button" onClick={clearCover} disabled={saving}
+                        className="text-xs font-semibold text-rose-500 hover:underline disabled:opacity-50">
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[#9ca3af] mt-1 truncate">
+                    {coverFile ? `${coverFile.name} — set as the main image.` : "Optional · more photos in the Images tab."}
+                  </p>
+                </div>
+                <input ref={coverInputRef} type="file" accept="image/*" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) pickCover(f) }} />
+              </div>
+            </div>
+
             <div className="flex gap-3 pt-2">
               <button type="button" onClick={onClose}
                 className="flex-1 px-5 py-2.5 rounded-full border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-all">
