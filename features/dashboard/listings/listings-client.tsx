@@ -10,6 +10,7 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { createPortal } from "react-dom"
 import {
@@ -194,22 +195,22 @@ function ToolbarSelect({
   options: { value: string; label: string }[]
 }) {
   return (
-    <div className={`${SHELL} relative h-[52px]`}>
+    <div className={`${SHELL} relative h-[44px]`}>
       <Icon
-        className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] pointer-events-none"
+        className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
         style={{ color: ACCENT }}
       />
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={label}
-        className="appearance-none w-full h-full bg-transparent rounded-2xl pl-12 pr-10 text-[15px] font-semibold text-[#344054] focus:outline-none focus:ring-4 focus:ring-[#001f3f]/10 cursor-pointer"
+        className="appearance-none w-full h-full bg-transparent rounded-2xl pl-10 pr-8 text-[14px] font-semibold text-[#344054] focus:outline-none focus:ring-4 focus:ring-[#001f3f]/10 cursor-pointer"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
-      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-[#98a2b3] pointer-events-none" />
+      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#98a2b3] pointer-events-none" />
     </div>
   )
 }
@@ -235,7 +236,7 @@ function Chip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`h-9 px-4 rounded-full text-[13px] font-bold transition-all inline-flex items-center gap-2 whitespace-nowrap ${
+      className={`h-8 px-3 rounded-full text-[12px] font-bold transition-all inline-flex items-center gap-1.5 whitespace-nowrap ${
         active
           ? `${BRAND_GRADIENT} shadow-sm`
           : "bg-[#f1f3f6] text-[#6b7280] hover:bg-[#e8ebef] hover:text-[#374151]"
@@ -252,7 +253,7 @@ function Chip({
 }
 
 function ChipDivider() {
-  return <span className="w-px h-6 bg-[#e3e7ed] mx-1 shrink-0" aria-hidden />
+  return <span className="w-px h-5 bg-[#e3e7ed] mx-0.5 shrink-0" aria-hidden />
 }
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
@@ -260,7 +261,7 @@ function ChipDivider() {
 function KindBadge({ kind }: { kind: "sale" | "rent" }) {
   return (
     <span
-      className="px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide text-white shadow-sm"
+      className="px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wide text-white shadow-sm"
       style={{ backgroundColor: kind === "sale" ? GOLD : "#2563eb" }}
     >
       {kind === "sale" ? "FOR SALE" : "FOR RENT"}
@@ -272,7 +273,7 @@ function StatusBadge({ status }: { status: AgentListingStatus }) {
   const meta = STATUS_META[status]
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur text-[11px] font-bold shadow-sm ${meta.text}`}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/95 backdrop-blur text-[10px] font-bold shadow-sm ${meta.text}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} aria-hidden />
       {meta.label}
@@ -335,7 +336,7 @@ function RowMenu({ items, label }: { items: MenuItem[]; label: string }) {
         onClick={() => setOpen((v) => !v)}
         aria-label={label}
         aria-expanded={open}
-        className="w-8 h-8 flex items-center justify-center rounded-lg text-[#9ca3af] hover:bg-[#f4f6f9] hover:text-[#001f3f] transition-colors flex-shrink-0"
+        className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9ca3af] hover:bg-[#f4f6f9] hover:text-[#001f3f] transition-colors flex-shrink-0"
       >
         <MoreHorizontal className="w-4 h-4" />
       </button>
@@ -391,7 +392,7 @@ function Fact({
 }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-[#6b7280]">
-      <Icon className="w-3.5 h-3.5 text-[#b6bcc6]" />
+      <Icon className="w-3 h-3 text-[#b6bcc6]" />
       {value == null ? (
         <span className="text-[#c4c9d0]">—</span>
       ) : (
@@ -417,86 +418,94 @@ function ListingCard({ row, actions }: { row: AgentListing; actions: CardActions
   return (
     <article className="flex flex-col rounded-2xl bg-white border border-[#e6eaf1] shadow-sm hover:shadow-lg transition-shadow duration-300">
       {/* Cover */}
-      <div className="relative h-44 rounded-t-2xl overflow-hidden bg-[#eef1f5]">
+      <div className="relative h-32 rounded-t-2xl overflow-hidden bg-[#eef1f5]">
         {cover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={cover} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+          // next/image resizes on the fly — the S3 originals are 300–470KB each
+          // and this box is ~250x128, so serving them raw was the page's biggest
+          // cost by far. `sizes` must track the grid below or Next over-fetches.
+          <Image
+            src={cover}
+            alt=""
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, (max-width: 1536px) 25vw, 20vw"
+            className="object-cover"
+          />
         ) : (
           <div className="h-full w-full flex flex-col items-center justify-center gap-1.5 text-[#b8bfc9]">
-            <ImagePlus className="w-7 h-7" />
+            <ImagePlus className="w-6 h-6" />
             <span className="text-[11px] font-semibold">No photo yet</span>
           </div>
         )}
-        <span className="absolute top-3 left-3">
+        <span className="absolute top-2.5 left-2.5">
           <KindBadge kind={row.listing_kind} />
         </span>
-        <span className="absolute top-3 right-3">
+        <span className="absolute top-2.5 right-2.5">
           <StatusBadge status={row.status} />
         </span>
         {photos > 1 && (
-          <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/55 text-white text-[11px] font-bold tabular-nums">
+          <span className="absolute bottom-2.5 right-2.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/55 text-white text-[10px] font-bold tabular-nums">
             <Images className="w-3 h-3" /> {photos}
           </span>
         )}
       </div>
 
       {/* Body */}
-      <div className="p-4 flex-1 flex flex-col gap-2">
-        <h3 className={`${DISPLAY} text-[15px] font-bold text-[#0d1117] leading-snug line-clamp-1`}>
+      <div className="p-3 flex-1 flex flex-col gap-1.5">
+        <h3 className={`${DISPLAY} text-[14px] font-bold text-[#0d1117] leading-snug line-clamp-1`}>
           {row.title}
         </h3>
 
-        <p className="flex items-center gap-1.5 text-xs text-[#6b7280] min-w-0">
-          <MapPin className="w-3.5 h-3.5 text-[#b6bcc6] flex-shrink-0" />
+        <p className="flex items-center gap-1.5 text-[11px] text-[#6b7280] min-w-0">
+          <MapPin className="w-3 h-3 text-[#b6bcc6] flex-shrink-0" />
           <span className="truncate">
             {loc ?? (dev || proj ? [dev, proj].filter(Boolean).join(" · ") : "No location on file")}
           </span>
         </p>
 
         <p
-          className={`${DISPLAY} text-[17px] font-bold leading-tight ${
+          className={`${DISPLAY} text-[15px] font-bold leading-tight ${
             price.known ? "text-[#0d1117]" : "text-[#9ca3af]"
           }`}
         >
           {price.text}
           {price.fromProject && (
-            <span className="ml-1.5 text-[10px] font-semibold text-[#9ca3af] align-middle">from project</span>
+            <span className="ml-1 text-[9px] font-semibold text-[#9ca3af] align-middle">from project</span>
           )}
         </p>
 
-        <div className="flex items-center gap-3 flex-wrap text-xs pt-0.5">
+        <div className="flex items-center gap-2.5 flex-wrap text-[11px] pt-0.5">
           <Fact icon={BedDouble} value={facts.beds} suffix={facts.beds === 1 ? "bed" : "beds"} />
           <Fact icon={Bath} value={facts.baths} suffix={facts.baths === 1 ? "bath" : "baths"} />
           <Fact icon={Maximize2} value={facts.size?.value ?? null} suffix={facts.size?.unit ?? "sqm"} />
         </div>
 
-        <p className="text-[11px] text-[#b0b7c1] mt-auto pt-1 truncate">
+        <p className="text-[10px] text-[#b0b7c1] mt-auto pt-0.5 truncate">
           {unitLabel ? `${unitLabel} · ` : ""}
           Edited {relativeTime(row.updated_at)}
         </p>
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-1 px-2.5 py-2 border-t border-[#f1f3f6]">
+      <div className="flex items-center gap-0.5 px-2 py-1.5 border-t border-[#f1f3f6]">
         <Link
           href={actions.reelHref}
-          className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-bold text-[#7c3aed] hover:bg-[#7c3aed]/10 transition-colors"
+          className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-[#7c3aed] hover:bg-[#7c3aed]/10 transition-colors whitespace-nowrap"
         >
-          <Clapperboard className="w-3.5 h-3.5" /> Reel
+          <Clapperboard className="w-3 h-3" /> Reel
         </Link>
         <button
           type="button"
           onClick={actions.onFlyer}
-          className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-bold text-[#001f3f] hover:bg-[#001f3f]/[0.07] transition-colors"
+          className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-[#001f3f] hover:bg-[#001f3f]/[0.07] transition-colors whitespace-nowrap"
         >
-          <FileImage className="w-3.5 h-3.5" /> Flyer
+          <FileImage className="w-3 h-3" /> Flyer
         </button>
         <button
           type="button"
           onClick={actions.onPoster}
-          className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-bold text-[#0e7490] hover:bg-[#0891b2]/10 transition-colors"
+          className="flex-[2] inline-flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-[#0e7490] hover:bg-[#0891b2]/10 transition-colors whitespace-nowrap"
         >
-          <Megaphone className="w-3.5 h-3.5" /> Poster
+          <Megaphone className="w-3 h-3" /> Just Listed/Sold
         </button>
         <RowMenu items={actions.menu} label={`More actions for ${row.title}`} />
       </div>
@@ -513,11 +522,10 @@ function ListingRow({ row, actions }: { row: AgentListing; actions: CardActions 
   const facts = unitFacts(row)
 
   return (
-    <div className="flex items-center gap-4 px-4 py-3 hover:bg-[#f8fafc] transition-colors">
-      <div className="relative w-20 h-16 rounded-xl overflow-hidden bg-[#eef1f5] flex-shrink-0">
+    <div className="flex items-center gap-3 px-3 py-2.5 hover:bg-[#f8fafc] transition-colors">
+      <div className="relative w-16 h-12 rounded-lg overflow-hidden bg-[#eef1f5] flex-shrink-0">
         {cover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={cover} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+          <Image src={cover} alt="" fill sizes="64px" className="object-cover" />
         ) : (
           <div className="h-full w-full flex items-center justify-center text-[#c4c9d0]">
             <ImagePlus className="w-4 h-4" />
@@ -527,23 +535,23 @@ function ListingRow({ row, actions }: { row: AgentListing; actions: CardActions 
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="text-sm font-bold text-[#0d1117] truncate">{row.title}</h3>
+          <h3 className="text-[13px] font-bold text-[#0d1117] truncate">{row.title}</h3>
           <KindBadge kind={row.listing_kind} />
         </div>
-        <p className="flex items-center gap-1.5 text-xs text-[#6b7280] mt-0.5 min-w-0">
+        <p className="flex items-center gap-1.5 text-[11px] text-[#6b7280] mt-0.5 min-w-0">
           <MapPin className="w-3 h-3 text-[#b6bcc6] flex-shrink-0" />
           <span className="truncate">{loc ?? "No location on file"}</span>
         </p>
       </div>
 
-      <div className="hidden md:flex items-center gap-3 text-xs flex-shrink-0">
+      <div className="hidden md:flex items-center gap-2.5 text-[11px] flex-shrink-0">
         <Fact icon={BedDouble} value={facts.beds} suffix="" />
         <Fact icon={Bath} value={facts.baths} suffix="" />
         <Fact icon={Maximize2} value={facts.size?.value ?? null} suffix={facts.size?.unit ?? "sqm"} />
       </div>
 
       <p
-        className={`hidden sm:block text-sm font-bold tabular-nums w-40 text-right flex-shrink-0 ${
+        className={`hidden sm:block text-[13px] font-bold tabular-nums w-36 text-right flex-shrink-0 ${
           price.known ? "text-[#0d1117]" : "text-[#9ca3af]"
         }`}
       >
@@ -558,25 +566,25 @@ function ListingRow({ row, actions }: { row: AgentListing; actions: CardActions 
         <Link
           href={actions.reelHref}
           title="Create a reel"
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-[#7c3aed] hover:bg-[#7c3aed]/10"
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-[#7c3aed] hover:bg-[#7c3aed]/10"
         >
-          <Clapperboard className="w-4 h-4" />
+          <Clapperboard className="w-3.5 h-3.5" />
         </Link>
         <button
           type="button"
           onClick={actions.onFlyer}
           title="Create a flyer"
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-[#001f3f] hover:bg-[#001f3f]/[0.07]"
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-[#001f3f] hover:bg-[#001f3f]/[0.07]"
         >
-          <FileImage className="w-4 h-4" />
+          <FileImage className="w-3.5 h-3.5" />
         </button>
         <button
           type="button"
           onClick={actions.onPoster}
-          title="Just listed / sold poster"
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-[#0e7490] hover:bg-[#0891b2]/10"
+          title="Just Listed/Sold"
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-[#0e7490] hover:bg-[#0891b2]/10"
         >
-          <Megaphone className="w-4 h-4" />
+          <Megaphone className="w-3.5 h-3.5" />
         </button>
         <RowMenu items={actions.menu} label={`More actions for ${row.title}`} />
       </div>
@@ -599,6 +607,8 @@ export function AgentListingsClient({
 
   const [rows, setRows] = useState<AgentListing[]>([])
   const [projects, setProjects] = useState<ProjectPickerOption[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
+  const [projectsFetched, setProjectsFetched] = useState(false)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -642,16 +652,10 @@ export function AgentListingsClient({
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000)
   }, [])
 
-  const fetchAll = useCallback(
-    () => Promise.all([fetchMyAgentListings(userId), fetchPublishedProjectsForListingForm()]),
-    [userId],
-  )
-
-  const applyResults = useCallback(
-    ([listRes, projRes]: Awaited<ReturnType<typeof fetchAll>>) => {
-      if (listRes.error) showToast("error", listRes.error)
-      else setRows(listRes.data ?? [])
-      if (!projRes.error && projRes.data) setProjects(projRes.data)
+  const applyListings = useCallback(
+    (res: Awaited<ReturnType<typeof fetchMyAgentListings>>) => {
+      if (res.error) showToast("error", res.error)
+      else setRows(res.data ?? [])
     },
     [showToast],
   )
@@ -659,21 +663,35 @@ export function AgentListingsClient({
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const results = await fetchAll()
+      const res = await fetchMyAgentListings(userId)
       if (cancelled) return
-      applyResults(results)
+      applyListings(res)
       setLoading(false)
     })()
     return () => {
       cancelled = true
     }
-  }, [fetchAll, applyResults])
+  }, [userId, applyListings])
 
   const refresh = useCallback(async () => {
     setRefreshing(true)
-    applyResults(await fetchAll())
+    applyListings(await fetchMyAgentListings(userId))
     setRefreshing(false)
-  }, [fetchAll, applyResults])
+  }, [userId, applyListings])
+
+  /**
+   * The project picker pulls EVERY published project (~240 rows with developer
+   * names) and is only ever read inside the create/edit dialog, so it loads the
+   * first time that dialog opens rather than on every visit to the page.
+   */
+  const ensureProjects = useCallback(async () => {
+    if (projectsFetched || projectsLoading) return
+    setProjectsLoading(true)
+    const res = await fetchPublishedProjectsForListingForm()
+    if (!res.error && res.data) setProjects(res.data)
+    setProjectsFetched(true)
+    setProjectsLoading(false)
+  }, [projectsFetched, projectsLoading])
 
   /** Counts behind the filter chips. Only buckets the schema actually supports. */
   const stats = useMemo(() => {
@@ -820,6 +838,7 @@ export function AgentListingsClient({
   }, [modalOpen, formProjectId])
 
   const openCreate = () => {
+    void ensureProjects()
     setEditing(null)
     setForm(emptyForm)
     setSelectedDeveloperId("")
@@ -830,6 +849,7 @@ export function AgentListingsClient({
   }
 
   const openEdit = (row: AgentListing) => {
+    void ensureProjects()
     setEditing(row)
     setAiHint("")
     setAiDescError(null)
@@ -1069,12 +1089,12 @@ export function AgentListingsClient({
              which is content + 48px = main's full width.
            • min-height must be 100% + 3rem for the same reason vertically, so a
              short list still paints white all the way down. */}
-      <div className="space-y-4 -m-6 p-6 bg-white min-h-[calc(100%+3rem)]">
+      <div className="space-y-3 -m-6 p-6 bg-white min-h-[calc(100%+3rem)]">
         {/* Toolbar — search · sort · developer · clear/refresh · New Listing, one line */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
-          <div className={`${SHELL} relative flex-1 min-w-[220px] h-[52px]`}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className={`${SHELL} relative flex-1 min-w-[220px] h-[44px]`}>
             <Search
-              className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] pointer-events-none"
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
               style={{ color: ACCENT }}
             />
             <input
@@ -1082,7 +1102,7 @@ export function AgentListingsClient({
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search title, location or project…"
               aria-label="Search listings"
-              className="w-full h-full bg-transparent rounded-2xl pl-12 pr-10 text-[15px] text-[#344054] placeholder:text-[#98a2b3] focus:outline-none focus:ring-4 focus:ring-[#001f3f]/10"
+              className="w-full h-full bg-transparent rounded-2xl pl-10 pr-9 text-[14px] text-[#344054] placeholder:text-[#98a2b3] focus:outline-none focus:ring-4 focus:ring-[#001f3f]/10"
             />
             {search && (
               <button
@@ -1096,7 +1116,7 @@ export function AgentListingsClient({
             )}
           </div>
 
-          <div className="flex gap-2.5 flex-wrap sm:flex-nowrap">
+          <div className="flex gap-2 flex-wrap sm:flex-nowrap">
             <ToolbarSelect
               icon={ArrowDownWideNarrow}
               label="Sort by"
@@ -1120,16 +1140,16 @@ export function AgentListingsClient({
             />
 
             {/* Clear filters · refresh */}
-            <div className={`${SHELL} h-[52px] flex items-center px-1 gap-0.5`}>
+            <div className={`${SHELL} h-[44px] flex items-center px-1 gap-0.5`}>
               <button
                 type="button"
                 onClick={clearFilters}
                 disabled={!filtersActive}
                 aria-label="Clear all filters"
                 title={filtersActive ? "Clear all filters" : "No filters applied"}
-                className="w-11 h-11 rounded-xl flex items-center justify-center transition-colors enabled:hover:bg-[#f2f5fa] disabled:opacity-35 disabled:cursor-not-allowed"
+                className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors enabled:hover:bg-[#f2f5fa] disabled:opacity-35 disabled:cursor-not-allowed"
               >
-                <FilterX className="w-[18px] h-[18px]" style={{ color: ACCENT }} />
+                <FilterX className="w-4 h-4" style={{ color: ACCENT }} />
               </button>
               <span className="w-px h-6 bg-[#e2e8f0]" aria-hidden />
               <button
@@ -1137,10 +1157,10 @@ export function AgentListingsClient({
                 onClick={() => void refresh()}
                 aria-label="Refresh listings"
                 title="Refresh"
-                className="w-11 h-11 rounded-xl flex items-center justify-center transition-colors hover:bg-[#f2f5fa]"
+                className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors hover:bg-[#f2f5fa]"
               >
                 <RefreshCw
-                  className={`w-[18px] h-[18px] ${refreshing ? "animate-spin" : ""}`}
+                  className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
                   style={{ color: ACCENT }}
                 />
               </button>
@@ -1149,9 +1169,9 @@ export function AgentListingsClient({
             <button
               type="button"
               onClick={openCreate}
-              className={`${BRAND_GRADIENT} h-[52px] px-5 rounded-2xl inline-flex items-center justify-center gap-2 text-[15px] font-bold shadow-md hover:shadow-lg transition-all whitespace-nowrap grow sm:grow-0`}
+              className={`${BRAND_GRADIENT} h-[44px] px-4 rounded-2xl inline-flex items-center justify-center gap-1.5 text-[14px] font-bold shadow-md hover:shadow-lg transition-all whitespace-nowrap grow sm:grow-0`}
             >
-              <Plus className="w-[18px] h-[18px]" />
+              <Plus className="w-4 h-4" />
               New Listing
             </button>
           </div>
@@ -1160,7 +1180,7 @@ export function AgentListingsClient({
         {/* Filter chips — status | category | property type. Each group is
             single-select; clicking an active chip clears that group. */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {statusPills.map((p) => (
               <Chip
                 key={p.value}
@@ -1208,35 +1228,35 @@ export function AgentListingsClient({
               onClick={() => setView("grid")}
               aria-pressed={view === "grid"}
               aria-label="Card view"
-              className={`w-9 h-8 rounded-lg flex items-center justify-center transition-all ${
+              className={`w-8 h-7 rounded-lg flex items-center justify-center transition-all ${
                 view === "grid" ? "bg-white text-[#001f3f] shadow-sm" : "text-[#9ca3af] hover:text-[#374151]"
               }`}
             >
-              <LayoutGrid className="w-4 h-4" />
+              <LayoutGrid className="w-3.5 h-3.5" />
             </button>
             <button
               type="button"
               onClick={() => setView("list")}
               aria-pressed={view === "list"}
               aria-label="List view"
-              className={`w-9 h-8 rounded-lg flex items-center justify-center transition-all ${
+              className={`w-8 h-7 rounded-lg flex items-center justify-center transition-all ${
                 view === "list" ? "bg-white text-[#001f3f] shadow-sm" : "text-[#9ca3af] hover:text-[#374151]"
               }`}
             >
-              <List className="w-4 h-4" />
+              <List className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
         {/* Results */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-[330px] rounded-2xl bg-white border border-[#e6eaf1] animate-pulse" />
+              <div key={i} className="h-[268px] rounded-2xl bg-white border border-[#e6eaf1] animate-pulse" />
             ))}
           </div>
         ) : rows.length === 0 ? (
-          <div className="rounded-[22px] border border-[#e6eaf1] bg-white shadow-sm p-14 text-center">
+          <div className="rounded-[22px] border border-[#e6eaf1] bg-white shadow-sm p-10 text-center">
             <span className="w-14 h-14 rounded-2xl bg-[#001f3f]/5 text-[#001f3f] flex items-center justify-center mx-auto mb-4">
               <Images className="w-6 h-6" />
             </span>
@@ -1254,7 +1274,7 @@ export function AgentListingsClient({
             </button>
           </div>
         ) : visible.length === 0 ? (
-          <div className="rounded-[22px] border border-[#e6eaf1] bg-white shadow-sm p-14 text-center">
+          <div className="rounded-[22px] border border-[#e6eaf1] bg-white shadow-sm p-10 text-center">
             <span className="w-14 h-14 rounded-2xl bg-[#f4f6f9] text-[#9ca3af] flex items-center justify-center mx-auto mb-4">
               <Search className="w-6 h-6" />
             </span>
@@ -1275,7 +1295,7 @@ export function AgentListingsClient({
             </button>
           </div>
         ) : view === "grid" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
             {visible.map((row) => (
               <ListingCard key={row.id} row={row} actions={actionsFor(row)} />
             ))}
@@ -1289,7 +1309,7 @@ export function AgentListingsClient({
         )}
 
         {visible.length > 0 && (
-          <p className="text-xs text-[#9ca3af] text-center tabular-nums">
+          <p className="text-[11px] text-[#9ca3af] text-center tabular-nums">
             Showing {visible.length} of {rows.length} listing{rows.length === 1 ? "" : "s"}
           </p>
         )}
@@ -1359,7 +1379,9 @@ export function AgentListingsClient({
                   }}
                   className="w-full border border-[#e5e5e5] rounded-xl px-3 py-2 text-sm bg-white"
                 >
-                  <option value="">— No developer project —</option>
+                  <option value="">
+                    {projectsLoading ? "Loading developers…" : "— No developer project —"}
+                  </option>
                   {developerOptions.map((d) => (
                     <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
