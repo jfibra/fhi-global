@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { createPortal } from "react-dom"
 import Image from "next/image"
 import {
@@ -8,6 +8,7 @@ import {
   CheckCircle2, XCircle, Archive, ArchiveRestore, Eye, ExternalLink,
   Building2, ChevronLeft, ChevronRight, Star, Globe,
   Phone, Mail, Filter, SortAsc, Trash2, QrCode,
+  LayoutGrid, Table as TableIcon,
 } from "lucide-react"
 import {
   type Developer,
@@ -226,6 +227,191 @@ function DeveloperLogo({ url, name }: { url: string | null; name: string }) {
   )
 }
 
+// ─── View mode (cards ⇄ table), remembered per browser ────────────────────────
+// Read through useSyncExternalStore: touching localStorage during render would
+// make the server and client disagree and break hydration.
+type ViewMode = "cards" | "table"
+const VIEW_KEY = "fhi.developers.view"
+
+const viewListeners = new Set<() => void>()
+let viewCache: ViewMode | null = null
+
+function subscribeView(onChange: () => void) {
+  viewListeners.add(onChange)
+  return () => { viewListeners.delete(onChange) }
+}
+
+function getViewSnapshot(): ViewMode {
+  if (viewCache === null) {
+    try {
+      viewCache = window.localStorage.getItem(VIEW_KEY) === "table" ? "table" : "cards"
+    } catch {
+      viewCache = "cards"
+    }
+  }
+  return viewCache
+}
+
+/** Cards is the default so this page matches the Projects grid. */
+function getViewServerSnapshot(): ViewMode {
+  return "cards"
+}
+
+function storeView(next: ViewMode) {
+  viewCache = next
+  try { window.localStorage.setItem(VIEW_KEY, next) } catch { /* private mode */ }
+  for (const cb of viewListeners) cb()
+}
+
+// ─── Developer card (grid view) ──────────────────────────────────────────────
+function DeveloperCard({
+  dev, canManage, isAdmin, onEdit, onLogo, onInviteLink, onToggleVerified, onToggleActive, onDelete, onRestore,
+}: {
+  dev: Developer
+  canManage: boolean
+  isAdmin: boolean
+  onEdit: () => void
+  onLogo: () => void
+  onInviteLink: () => void
+  onToggleVerified: () => void
+  onToggleActive: () => void
+  onDelete: () => void
+  onRestore: () => void
+}) {
+  const initials = dev.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
+
+  return (
+    // A plain container, not role="button": putting a widget role here would
+    // make its children presentational and hide the badges, contact details and
+    // rating from screen readers. The click target is the overlay button below,
+    // which real controls (links, kebab) sit above in z-order.
+    <div
+      className={`group relative h-full flex flex-col bg-white rounded-3xl border border-[#eceef2] overflow-hidden shadow-[0_2px_12px_-6px_rgba(0,31,63,0.10)] transition-all duration-200 ${
+        canManage ? "hover:shadow-[0_16px_40px_-12px_rgba(0,31,63,0.28)] hover:-translate-y-1 hover:border-[#d6b357]/60 focus-within:ring-4 focus-within:ring-[#001f3f]/15" : ""
+      } ${dev.deleted_at ? "opacity-60" : ""}`}
+    >
+      {canManage && (
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label={`Edit ${dev.name}`}
+          className="absolute inset-0 z-[1] cursor-pointer rounded-3xl focus:outline-none"
+        />
+      )}
+
+      {/* Logo plate — light so dark brand marks stay visible */}
+      <div className="relative h-32 bg-[#f6f8fb] border-b border-[#f0f2f5] flex items-center justify-center overflow-hidden">
+        {dev.logo_url ? (
+          <Image
+            src={dev.logo_url}
+            alt={dev.name}
+            fill
+            // Without this the browser fetches a full-viewport-width variant
+            // for a ~250px plate.
+            sizes="(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            className="object-contain p-6"
+          />
+        ) : (
+          <div className="w-16 h-16 rounded-2xl bg-[#001f3f] flex items-center justify-center">
+            <span className="text-white text-lg font-bold">{initials}</span>
+          </div>
+        )}
+
+        <span className={`absolute top-3 left-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
+          dev.is_verified ? "bg-emerald-500/95 text-white" : "bg-white/90 text-[#6b7280]"
+        }`}>
+          {dev.is_verified ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+          {dev.is_verified ? "Verified" : "Unverified"}
+        </span>
+
+        {dev.deleted_at ? (
+          <span className="absolute top-3 right-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-rose-500/95 text-white">
+            <Archive className="w-3 h-3" /> Deleted
+          </span>
+        ) : (
+          <span className={`absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
+            dev.is_active ? "bg-[#001f3f]/85 text-[#d6b357]" : "bg-amber-100 text-amber-700"
+          }`}>
+            {dev.is_active ? "Active" : "Inactive"}
+          </span>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="p-4 flex flex-col flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            {dev.deleted_at ? (
+              <p className="text-[15px] font-bold text-[#0d1117] font-['Outfit'] truncate">{dev.name}</p>
+            ) : (
+              <a
+                href={`/developers/${dev.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`View ${dev.name} public page`}
+                className="group/name relative z-[2] inline-flex items-center gap-1 max-w-full text-[15px] font-bold text-[#0d1117] font-['Outfit'] hover:text-[#001f3f] transition-colors"
+              >
+                <span className="truncate group-hover/name:underline">{dev.name}</span>
+                <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-0 group-hover/name:opacity-60 transition-opacity" />
+              </a>
+            )}
+            <p className="text-xs text-[#9ca3af] mt-0.5 line-clamp-2 min-h-[2rem]">
+              {dev.description || "No description yet."}
+            </p>
+          </div>
+          {canManage && (
+            <span className="relative z-[2] flex-shrink-0">
+              <RowActions
+                dev={dev}
+                canInvite={isAdmin}
+                onEdit={onEdit}
+                onLogo={onLogo}
+                onInviteLink={onInviteLink}
+                onToggleVerified={onToggleVerified}
+                onToggleActive={onToggleActive}
+                onDelete={onDelete}
+                onRestore={onRestore}
+              />
+            </span>
+          )}
+        </div>
+
+        {/* Contact — real links, above the overlay, so they stay clickable and
+            copyable and show the full value on hover when clipped. */}
+        <div className="mt-3 space-y-1 relative z-[2] w-fit max-w-full">
+          {dev.email && (
+            <a href={`mailto:${dev.email}`} title={dev.email}
+              className="text-[11px] text-[#6b7280] hover:text-[#001f3f] flex items-center gap-1.5 max-w-full">
+              <Mail className="w-3 h-3 flex-shrink-0" /><span className="truncate">{dev.email}</span>
+            </a>
+          )}
+          {dev.website_url && (
+            <a href={dev.website_url} target="_blank" rel="noopener noreferrer" title={dev.website_url}
+              className="text-[11px] text-[#6b7280] hover:text-[#001f3f] flex items-center gap-1.5 max-w-full">
+              <Globe className="w-3 h-3 flex-shrink-0" /><span className="truncate">{dev.website_url.replace(/^https?:\/\//, "")}</span>
+            </a>
+          )}
+          {dev.phone && (
+            <a href={`tel:${dev.phone.replace(/\s+/g, "")}`} title={dev.phone}
+              className="text-[11px] text-[#6b7280] hover:text-[#001f3f] flex items-center gap-1.5 max-w-full">
+              <Phone className="w-3 h-3 flex-shrink-0" /><span className="truncate">{dev.phone}</span>
+            </a>
+          )}
+          {!dev.email && !dev.website_url && !dev.phone && <p className="text-[11px] text-[#c0c6cf]">No contact details</p>}
+        </div>
+
+        {/* Footer: rating + added — pinned to the bottom so cards in a row line up */}
+        <div className="mt-auto pt-3 border-t border-[#f4f6f9] flex items-center justify-between gap-2">
+          <StarRating value={dev.rating} />
+          <span className="text-[10px] text-[#9ca3af] truncate" title={formatDateTime(dev.created_at)}>
+            {relativeTime(dev.created_at)}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main component ──────────────────────────────────────────────────────────
 interface Props {
   currentRole: string
@@ -259,6 +445,8 @@ export function DevelopersClient({ currentRole }: Props) {
   const [invitePreset, setInvitePreset] = useState<Developer | null>(null)
   const [confirm, setConfirm]           = useState<{ message: string; action: () => void } | null>(null)
   const [toasts, setToasts]             = useState<ToastMsg[]>([])
+
+  const view = useSyncExternalStore(subscribeView, getViewSnapshot, getViewServerSnapshot)
 
   const toastIdRef = useRef(0)
   const addToast = (type: ToastType, text: string) => {
@@ -423,24 +611,83 @@ export function DevelopersClient({ currentRole }: Props) {
             </button>
           </div>
 
-          {/* Sort pills */}
-          <div className="flex items-center gap-2 mt-3 flex-wrap">
-            <span className="text-xs text-[#9ca3af] font-semibold uppercase tracking-wider">Sort:</span>
-            {(["name", "created_at", "rating"] as SortField[]).map((f) => (
-              <button key={f} type="button" onClick={() => sortToggle(f)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
-                  sortField === f
-                    ? "bg-[#001f3f] text-white border-[#001f3f]"
-                    : "border-[#e5e5e5] text-[#6b7280] hover:border-[#001f3f] hover:text-[#001f3f]"
-                }`}>
-                {f === "created_at" ? "Date added" : f.charAt(0).toUpperCase() + f.slice(1)}
-                {sortField === f && <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>}
-              </button>
-            ))}
+          {/* Sort pills + view switch */}
+          <div className="flex items-center justify-between gap-3 mt-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-[#9ca3af] font-semibold uppercase tracking-wider">Sort:</span>
+              {(["name", "created_at", "rating"] as SortField[]).map((f) => (
+                <button key={f} type="button" onClick={() => sortToggle(f)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+                    sortField === f
+                      ? "bg-[#001f3f] text-white border-[#001f3f]"
+                      : "border-[#e5e5e5] text-[#6b7280] hover:border-[#001f3f] hover:text-[#001f3f]"
+                  }`}>
+                  {f === "created_at" ? "Date added" : f.charAt(0).toUpperCase() + f.slice(1)}
+                  {sortField === f && <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>}
+                </button>
+              ))}
+            </div>
+
+            <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[#f3f4f6]" role="group" aria-label="View mode">
+              {([
+                { id: "cards" as const, label: "Cards", icon: <LayoutGrid className="w-3.5 h-3.5" /> },
+                { id: "table" as const, label: "Table", icon: <TableIcon className="w-3.5 h-3.5" /> },
+              ]).map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => storeView(v.id)}
+                  aria-pressed={view === v.id}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    view === v.id ? "bg-white text-[#001f3f] shadow-sm" : "text-[#6b7280] hover:text-[#111827]"
+                  }`}
+                >
+                  {v.icon}{v.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Table */}
+        {/* ── Card grid (default — matches the Projects page) ─────────────── */}
+        {view === "cards" ? (
+          loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="h-72 rounded-3xl bg-white/70 border border-[#eceef2] animate-pulse" />
+              ))}
+            </div>
+          ) : devs.length === 0 ? (
+            <div className="bg-white rounded-3xl border border-[#eceef2] flex flex-col items-center justify-center py-20 text-center px-4">
+              <div className="w-16 h-16 rounded-2xl bg-[#f3f4f6] flex items-center justify-center mb-4">
+                <Building2 className="w-8 h-8 text-[#d1d5db]" />
+              </div>
+              <p className="text-base font-semibold text-[#374151]">No developers found</p>
+              <p className="text-sm text-[#9ca3af] mt-1">
+                {search ? "Try adjusting your search or filters." : "Add your first developer to get started."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {devs.map((dev) => (
+                <DeveloperCard
+                  key={dev.id}
+                  dev={dev}
+                  canManage={canManage}
+                  isAdmin={isAdmin}
+                  onEdit={() => { setEditDev(dev); setShowForm(true) }}
+                  onLogo={() => { setLogoTarget(dev); setShowLogo(true) }}
+                  onInviteLink={() => { setInvitePreset(dev); setShowInvite(true) }}
+                  onToggleVerified={() => void handleToggleVerified(dev)}
+                  onToggleActive={() => void handleToggleActive(dev)}
+                  onDelete={() => handleDelete(dev)}
+                  onRestore={() => void handleRestore(dev)}
+                />
+              ))}
+            </div>
+          )
+        ) : (
+        /* ── Table ─────────────────────────────────────────────────────────── */
         <div className="bg-white/60 backdrop-blur-2xl rounded-[24px] border border-white/60 shadow-xl shadow-black/5 overflow-hidden">
           <div className="overflow-x-auto">
           {/* Table header */}
@@ -608,6 +855,7 @@ export function DevelopersClient({ currentRole }: Props) {
           )}
           </div>
         </div>
+        )}
 
         {/* Pagination */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
