@@ -6,7 +6,7 @@ import Image from "next/image"
 import {
   Search, Plus, RefreshCw, MoreHorizontal, Pencil, ImageIcon,
   CheckCircle2, XCircle, Archive, ArchiveRestore, Eye, ExternalLink,
-  Building2, ChevronLeft, ChevronRight, Star, Globe,
+  Building2, ChevronLeft, ChevronRight, ChevronDown, Star, Globe,
   Phone, Mail, Filter, SortAsc, Trash2, QrCode,
   LayoutGrid, Table as TableIcon,
 } from "lucide-react"
@@ -263,6 +263,113 @@ function storeView(next: ViewMode) {
   for (const cb of viewListeners) cb()
 }
 
+// ─── Filter dropdown ─────────────────────────────────────────────────────────
+// A native <select>'s popup is drawn by the OS and can't be styled, so it broke
+// the rounded look of the filter bar. This is the same control with our own menu.
+function FilterSelect<T extends string>({
+  value, options, onChange, ariaLabel,
+}: {
+  value: T
+  options: { value: T; label: string }[]
+  onChange: (v: T) => void
+  ariaLabel: string
+}) {
+  const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 })
+  const current = options.find((o) => o.value === value)
+
+  // The filter bar uses backdrop-blur, which creates a stacking context an
+  // absolutely-positioned menu can't escape — the cards below would paint over
+  // it. So the menu is portalled to <body> and positioned off the trigger rect.
+  useEffect(() => {
+    if (!open) return
+
+    const place = () => {
+      const r = triggerRef.current?.getBoundingClientRect()
+      if (!r) return
+      const menuWidth = Math.max(r.width, 176)
+      const estimatedHeight = options.length * 36 + 12
+      const pad = 8
+      const below = r.bottom + 6 + estimatedHeight <= window.innerHeight - pad
+      setPos({
+        top: below ? r.bottom + 6 : Math.max(pad, r.top - estimatedHeight - 6),
+        left: Math.min(Math.max(pad, r.left), window.innerWidth - menuWidth - pad),
+        width: menuWidth,
+      })
+    }
+
+    place()
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (!triggerRef.current?.contains(t) && !menuRef.current?.contains(t)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false) }
+    window.addEventListener("resize", place)
+    window.addEventListener("scroll", place, true)
+    document.addEventListener("mousedown", onDown)
+    document.addEventListener("keydown", onKey)
+    return () => {
+      window.removeEventListener("resize", place)
+      window.removeEventListener("scroll", place, true)
+      document.removeEventListener("mousedown", onDown)
+      document.removeEventListener("keydown", onKey)
+    }
+  }, [open, options.length])
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        className={`w-full sm:w-auto flex items-center justify-between gap-2 px-4 py-3 rounded-2xl border bg-white text-sm text-[#374151] transition-all ${
+          open ? "border-[#001f3f] ring-4 ring-[#001f3f]/5" : "border-[#e5e5e5] hover:border-[#001f3f]/40"
+        }`}
+      >
+        <span className="whitespace-nowrap">{current?.label ?? ""}</span>
+        <ChevronDown className={`w-4 h-4 text-[#9ca3af] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <Portal>
+          <div className="fixed inset-0 z-[130]" onClick={() => setOpen(false)} />
+          <div
+            ref={menuRef}
+            role="listbox"
+            aria-label={ariaLabel}
+            style={{ top: pos.top, left: pos.left, minWidth: pos.width }}
+            className="fixed z-[140] bg-white rounded-2xl border border-[#f0f0f0] shadow-2xl py-1.5 overflow-hidden"
+          >
+            {options.map((o) => {
+              const selected = o.value === value
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  onClick={() => { onChange(o.value); setOpen(false) }}
+                  className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left transition-colors whitespace-nowrap ${
+                    selected ? "bg-[#001f3f]/6 text-[#001f3f] font-semibold" : "text-[#374151] hover:bg-[#f8fafc]"
+                  }`}
+                >
+                  <CheckCircle2 className={`w-3.5 h-3.5 flex-shrink-0 ${selected ? "opacity-100" : "opacity-0"}`} />
+                  {o.label}
+                </button>
+              )
+            })}
+          </div>
+        </Portal>
+      )}
+    </>
+  )
+}
+
 // ─── Developer card (grid view) ──────────────────────────────────────────────
 function DeveloperCard({
   dev, canManage, isAdmin, onEdit, onLogo, onInviteLink, onToggleVerified, onToggleActive, onDelete, onRestore,
@@ -418,7 +525,9 @@ interface Props {
   userId: string
 }
 
-const PER_PAGE_OPTIONS = [10, 20, 50] as const
+// Multiples of 12 so the card grid fills evenly at every breakpoint (4, 3 or 2
+// columns all divide into 12).
+const PER_PAGE_OPTIONS = [12, 24, 48] as const
 
 type SortField = "name" | "created_at" | "rating"
 type SortDir   = "asc" | "desc"
@@ -427,7 +536,7 @@ export function DevelopersClient({ currentRole }: Props) {
   const [devs, setDevs]         = useState<Developer[]>([])
   const [total, setTotal]       = useState(0)
   const [page, setPage]         = useState(1)
-  const [perPage, setPerPage]   = useState<10 | 20 | 50>(10)
+  const [perPage, setPerPage]   = useState<12 | 24 | 48>(12)
   const [search, setSearch]     = useState("")
   const [searchInput, setSearchInput] = useState("")
   const [filterVerified, setFilterVerified] = useState<boolean | null>(null)
@@ -575,27 +684,31 @@ export function DevelopersClient({ currentRole }: Props) {
             </div>
 
             {/* Verified filter */}
-            <select
+            <FilterSelect
+              ariaLabel="Filter by verification"
               value={filterVerified === null ? "all" : filterVerified ? "verified" : "unverified"}
-              onChange={(e) => {
-                setFilterVerified(e.target.value === "all" ? null : e.target.value === "verified")
+              options={[
+                { value: "all", label: "All Verified" },
+                { value: "verified", label: "Verified" },
+                { value: "unverified", label: "Unverified" },
+              ]}
+              onChange={(v) => {
+                setFilterVerified(v === "all" ? null : v === "verified")
                 setPage(1)
               }}
-              className="px-4 py-3 rounded-2xl border border-[#e5e5e5] bg-white text-sm text-[#374151] focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 transition-all">
-              <option value="all">All Verified</option>
-              <option value="verified">Verified</option>
-              <option value="unverified">Unverified</option>
-            </select>
+            />
 
             {/* Status filter */}
-            <select
+            <FilterSelect
+              ariaLabel="Filter by status"
               value={filterStatus}
-              onChange={(e) => { setFilterStatus(e.target.value as "all" | "active" | "inactive"); setPage(1) }}
-              className="px-4 py-3 rounded-2xl border border-[#e5e5e5] bg-white text-sm text-[#374151] focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 transition-all">
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+              options={[
+                { value: "all", label: "All Status" },
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" },
+              ]}
+              onChange={(v) => { setFilterStatus(v); setPage(1) }}
+            />
 
             {/* Show deleted */}
             <label className="flex items-center gap-2 px-4 py-3 rounded-2xl border border-[#e5e5e5] bg-white text-sm text-[#374151] cursor-pointer select-none">
@@ -865,7 +978,7 @@ export function DevelopersClient({ currentRole }: Props) {
             </p>
             <select
               value={perPage}
-              onChange={(e) => { setPerPage(Number(e.target.value) as 10 | 20 | 50); setPage(1) }}
+              onChange={(e) => { setPerPage(Number(e.target.value) as 12 | 24 | 48); setPage(1) }}
               className="px-3 py-1.5 rounded-xl border border-[#e5e5e5] bg-white text-xs text-[#374151] focus:outline-none focus:border-[#001f3f] transition-all">
               {PER_PAGE_OPTIONS.map((n) => <option key={n} value={n}>{n} / page</option>)}
             </select>
