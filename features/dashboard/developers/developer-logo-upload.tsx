@@ -18,14 +18,20 @@ function Portal({ children }: { children: React.ReactNode }) {
 
 interface Props {
   open: boolean
-  developerId: string
+  /** Omit in deferred mode (Add Developer) — the row doesn't exist yet. */
+  developerId?: string
   developerSlug: string
   developerName: string
   currentLogoUrl: string | null
   onClose: () => void
-  onUploaded: (url: string) => void
+  onUploaded?: (url: string) => void
   onRemoved: () => void
   onError: (msg: string) => void
+  /**
+   * Deferred mode: hand back the cropped blob instead of uploading.
+   * The caller uploads to S3 later (when the developer is created).
+   */
+  onCropped?: (blob: Blob, previewUrl: string) => void
 }
 
 // Aspect presets. "original" tracks the image's own ratio so the default crop
@@ -48,7 +54,9 @@ export function DeveloperLogoUpload({
   onUploaded,
   onRemoved,
   onError,
+  onCropped,
 }: Props) {
+  const deferred = !!onCropped
   const [imageSrc, setImageSrc]   = useState<string | null>(null)
   const [crop, setCrop]           = useState<Point>({ x: 0, y: 0 })
   const [zoom, setZoom]           = useState(1)
@@ -107,7 +115,9 @@ export function DeveloperLogoUpload({
   // it — a tainted canvas makes the cropped-blob export throw a SecurityError.
   const loadCurrentForCrop = useCallback(() => {
     if (!currentLogoUrl) return
-    setImageSrc(`/api/image-proxy?url=${encodeURIComponent(currentLogoUrl)}`)
+    // blob:/data: URLs (deferred mode's local preview) are same-origin already.
+    const isLocal = currentLogoUrl.startsWith("blob:") || currentLogoUrl.startsWith("data:")
+    setImageSrc(isLocal ? currentLogoUrl : `/api/image-proxy?url=${encodeURIComponent(currentLogoUrl)}`)
     setCrop({ x: 0, y: 0 })
     setZoom(1)
     setAspectKey("original")
@@ -119,6 +129,17 @@ export function DeveloperLogoUpload({
     setBusy(true)
     try {
       const blob = await getCroppedBlob(imageSrc, croppedAreaPixels, "image/png")
+
+      if (onCropped) {
+        // Deferred mode: no S3/DB call — the caller uploads when the developer is created.
+        onCropped(blob, URL.createObjectURL(blob))
+        return
+      }
+      if (!developerId) {
+        onError("Missing developer id.")
+        return
+      }
+
       const fd = new FormData()
       fd.append("file", blob, "logo.png")
       fd.append("developerSlug", developerSlug)
@@ -134,7 +155,7 @@ export function DeveloperLogoUpload({
       const { error } = await updateDeveloperLogoUrl(developerId, json.url)
       if (error) { onError(error); return }
 
-      onUploaded(json.url)
+      onUploaded?.(json.url)
     } catch (err) {
       onError(err instanceof Error ? err.message : "Upload failed.")
     } finally {
@@ -143,6 +164,11 @@ export function DeveloperLogoUpload({
   }
 
   const handleRemove = async () => {
+    if (deferred || !developerId) {
+      // Deferred mode: nothing persisted yet — just discard the pending logo.
+      onRemoved()
+      return
+    }
     setBusy(true)
     const { error } = await updateDeveloperLogoUrl(developerId, null)
     if (error) { onError(error); setBusy(false); return }
@@ -258,7 +284,13 @@ export function DeveloperLogoUpload({
                     }`}
                   >
                     <div className="relative w-32 h-32 rounded-2xl overflow-hidden border border-[#e5e5e5] bg-white">
-                      <Image src={currentLogoUrl} alt="Current logo" fill className="object-contain p-2" />
+                      {currentLogoUrl.startsWith("blob:") || currentLogoUrl.startsWith("data:") ? (
+                        // next/image can't optimize blob:/data: URLs (deferred mode's local preview)
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={currentLogoUrl} alt="Current logo" className="absolute inset-0 w-full h-full object-contain p-2" />
+                      ) : (
+                        <Image src={currentLogoUrl} alt="Current logo" fill className="object-contain p-2" />
+                      )}
                     </div>
                     <div className="flex items-center gap-2.5">
                       <button type="button" onClick={() => inputRef.current?.click()} disabled={busy}
@@ -303,6 +335,7 @@ export function DeveloperLogoUpload({
 
                 <p className="text-[11px] text-[#9ca3af] font-mono px-1">
                   Path: FHI_GLOBAL / {developerSlug} / [timestamp]-logo.png
+                  {deferred && " · uploads when the developer is added"}
                 </p>
               </>
             )}
@@ -332,8 +365,8 @@ export function DeveloperLogoUpload({
                 <button type="button" onClick={() => void handleUpload()} disabled={busy || !croppedAreaPixels}
                   className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-6 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-50 disabled:translate-y-0 flex items-center gap-2">
                   {busy
-                    ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploading…</>
-                    : <><Check className="w-4 h-4" /> Crop &amp; Upload</>
+                    ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {deferred ? "Cropping…" : "Uploading…"}</>
+                    : <><Check className="w-4 h-4" /> {deferred ? "Crop & Attach" : "Crop & Upload"}</>
                   }
                 </button>
               )}
