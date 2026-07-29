@@ -10,6 +10,18 @@ export type AgentListingImage = {
   sort_order: number
 }
 
+/** One unit line configured by the developer on a project. `agent_listings.unit_type`
+ *  is matched against `unit_type` to resolve the beds/baths/size a listing shows. */
+export type ProjectUnitFacts = {
+  unit_type: string | null
+  bedrooms: number | null
+  bathrooms: number | null
+  size_sqft: number | string | null
+  size_sqm: number | string | null
+  price_from: number | string | null
+  price_to: number | string | null
+}
+
 export type AgentListing = {
   id: string
   /** URL slug generated from the title by the DB (migration 013); public link is /listings/<slug>. */
@@ -32,7 +44,21 @@ export type AgentListing = {
     id: number
     name: string
     developer_id?: string | null
+    /** Location, pricing and unit facts all live on the project — a standalone
+     *  listing has none of them. Mirrors the embed the public listing page uses
+     *  (lib/buy/agent-listings-public.ts) so dashboard and public agree. */
+    city?: string | null
+    location?: string | null
+    community?: string | null
+    main_image?: string | null
+    launch_price_from?: number | string | null
+    launch_price_to?: number | string | null
+    currency?: string | null
     developers?: { name?: string | null } | null
+    project_units?: ProjectUnitFacts[] | null
+    /** Apartment / Penthouse / Townhouse / Villa — the `property_types` catalogue,
+     *  assigned to the project by the developer. */
+    project_property_types?: { property_types?: { name?: string | null } | null }[] | null
   } | null
   agent_listing_images?: AgentListingImage[] | null
 }
@@ -55,6 +81,20 @@ export type ProjectPickerOption = {
 
 const UNASSIGNED_DEVELOPER_KEY = "__unassigned__"
 export { UNASSIGNED_DEVELOPER_KEY }
+
+/** Single source of truth for the row shape every agent-listing read returns, so
+ *  the create/update responses carry the same project facts as the list query. */
+const LISTING_SELECT = `
+  *,
+  projects (
+    id, name, developer_id, city, location, community, main_image,
+    launch_price_from, launch_price_to, currency,
+    developers ( name ),
+    project_units ( unit_type, bedrooms, bathrooms, size_sqft, size_sqm, price_from, price_to ),
+    project_property_types ( property_types ( name ) )
+  ),
+  agent_listing_images ( id, url, sort_order )
+`
 
 async function resolveListingMoneyFields(
   supabase: ReturnType<typeof createClient>,
@@ -82,9 +122,7 @@ export async function fetchMyAgentListings(agentId: string): Promise<{
   const supabase = createClient()
   const { data, error } = await supabase
     .from("agent_listings")
-    .select(
-      "*, projects ( id, name, developer_id, developers ( name ) ), agent_listing_images ( id, url, sort_order )",
-    )
+    .select(LISTING_SELECT)
     .eq("agent_id", agentId)
     .is("deleted_at", null)
     .order("updated_at", { ascending: false })
@@ -151,9 +189,7 @@ export async function createAgentListing(
       unit_type: input.unit_type?.trim() || null,
       updated_at: now,
     })
-    .select(
-      "*, projects ( id, name, developer_id, developers ( name ) ), agent_listing_images ( id, url, sort_order )",
-    )
+    .select(LISTING_SELECT)
     .single()
 
   if (error) return { data: null, error: error.message }
@@ -187,9 +223,7 @@ export async function updateAgentListing(
     })
     .eq("id", listingId)
     .eq("agent_id", agentId)
-    .select(
-      "*, projects ( id, name, developer_id, developers ( name ) ), agent_listing_images ( id, url, sort_order )",
-    )
+    .select(LISTING_SELECT)
     .single()
 
   if (error) return { data: null, error: error.message }
@@ -243,6 +277,25 @@ export async function saveAgentListingOgCard(
     .update({ og_card_options: options, updated_at: new Date().toISOString() })
     .eq("id", listingId)
     .eq("agent_id", agentId)
+
+  return { error: error?.message ?? null }
+}
+
+/** Status-only write, for the Publish / Move to draft / Archive row actions.
+ *  Separate from updateAgentListing so a status flip never round-trips the whole
+ *  form (and can never touch price or photos). */
+export async function setAgentListingStatus(
+  listingId: string,
+  agentId: string,
+  status: AgentListingStatus,
+): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from("agent_listings")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", listingId)
+    .eq("agent_id", agentId)
+    .is("deleted_at", null)
 
   return { error: error?.message ?? null }
 }

@@ -148,9 +148,12 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { icon: ShoppingCart, label: "Purchases",           to: "purchases",           description: "Recorded company purchases." },
       { icon: Tag,          label: "Purchase Categories", to: "purchase-categories", description: "Categories purchases are filed under." },
       { icon: Landmark,     label: "Tax Entities",        to: "tax-entities",        description: "Entities purchases and sales are booked to." },
-      { ...SALES_REPORTS,                                                            description: "Encoded sales and commission reports." },
     ],
   },
+  // Sales Reports sits at the top level rather than inside the Finance hub: it is
+  // the most-visited page in that group, and every other role that can see it
+  // (sales pipeline, secretaries) already reaches it in one click.
+  SALES_REPORTS,
   EVENTS,
   {
     group: "Agent Resource",
