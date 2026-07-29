@@ -468,9 +468,9 @@ function ListingCard({ row, actions }: { row: AgentListing; actions: CardActions
           }`}
         >
           {price.text}
-          {price.fromProject && (
+          {/* {price.fromProject && (
             <span className="ml-1 text-[9px] font-semibold text-[#9ca3af] align-middle">from project</span>
-          )}
+          )} */}
         </p>
 
         <div className="flex items-center gap-2.5 flex-wrap text-[11px] pt-0.5">
