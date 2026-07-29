@@ -1,14 +1,15 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import {
   Users, ChevronDown, Eye, Phone, RotateCcw, Search, X,
   Calendar, Clock, User, Linkedin, Facebook, Mail,
   Building2, Briefcase, Loader2, BadgeCheck,
+  LayoutGrid, Table as TableIcon,
 } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
 import { TOOLBAR_GRADIENT } from "@/components/common/header-toolbar"
-import { TablePagination } from "@/components/common/data-table"
+import { DataTable, TablePagination } from "@/components/common/data-table"
 import { toast } from "sonner"
 import { UserProfileModal } from "./user-profile-modal"
 import { UserDetailView } from "./user-detail-view"
@@ -137,11 +138,70 @@ function buildQuery(params: {
   return `/api/admin/users?${qs.toString()}`
 }
 
+/** One page of the directory. Returns null on a network/parse failure. */
+async function loadUsersPage(
+  page: number,
+  perPage: number,
+  query: { fname: string; lname: string; email: string },
+): Promise<UsersListResponse | null> {
+  try {
+    const res = await fetch(buildQuery({
+      page, perPage,
+      fname: query.fname, lname: query.lname, email: query.email,
+      role: "", status: "", showDeleted: false,
+      sort: "joined_at", dir: "desc",
+    }))
+    return (await res.json()) as UsersListResponse
+  } catch {
+    return null
+  }
+}
+
 type AdminUsersClientProps = {
   currentRole: string
   roleLabel?: string
   roleColor?: string
 }
+
+// ─── View mode (cards ⇄ table), remembered per browser ────────────────────────
+// Backed by localStorage through useSyncExternalStore: reading storage during
+// render would make the server ("cards") and client disagree and break
+// hydration, so the server snapshot is always "cards" and React swaps in the
+// stored preference once mounted.
+type ViewMode = "cards" | "table"
+const VIEW_KEY = "fhi.accountDirectory.view"
+
+const viewListeners = new Set<() => void>()
+let viewCache: ViewMode | null = null
+
+function subscribeView(onChange: () => void) {
+  viewListeners.add(onChange)
+  return () => { viewListeners.delete(onChange) }
+}
+
+function getViewSnapshot(): ViewMode {
+  if (viewCache === null) {
+    try {
+      viewCache = window.localStorage.getItem(VIEW_KEY) === "table" ? "table" : "cards"
+    } catch {
+      viewCache = "cards"
+    }
+  }
+  return viewCache
+}
+
+function getViewServerSnapshot(): ViewMode {
+  return "cards"
+}
+
+function storeView(next: ViewMode) {
+  viewCache = next
+  try { window.localStorage.setItem(VIEW_KEY, next) } catch { /* private mode */ }
+  for (const cb of viewListeners) cb()
+}
+
+/** Debounce for the as-you-type search (ms). */
+const SEARCH_DEBOUNCE = 350
 
 
 export function AdminUsersClient(props: AdminUsersClientProps) {
@@ -150,14 +210,17 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const [total,       setTotal]       = useState(0)
   const [page,        setPage]        = useState(1)
   const [perPage,     setPerPage]     = useState(DEFAULT_PER_PAGE)
-  const [loading,     setLoading]     = useState(false)
+  /** Request signature whose results are currently in `users`. */
+  const [loadedKey,   setLoadedKey]   = useState("")
   // Structured search inputs (first / last / email) + the committed query that
-  // drives a fetch (null = nothing searched yet). A blank search is allowed —
-  // it fetches ALL users (paginated).
+  // drives a fetch. A blank query is allowed — it fetches ALL users (paginated).
   const [fnameInput,  setFnameInput]  = useState("")
   const [lnameInput,  setLnameInput]  = useState("")
   const [emailInput,  setEmailInput]  = useState("")
-  const [query,       setQuery]       = useState<{ fname: string; lname: string; email: string } | null>(null)
+  // Starts as a blank query so the directory lists everyone on arrival, then
+  // narrows as you type (debounced) — no need to press Search.
+  const [query,       setQuery]       = useState<{ fname: string; lname: string; email: string }>({ fname: "", lname: "", email: "" })
+  const view = useSyncExternalStore(subscribeView, getViewSnapshot, getViewServerSnapshot)
   // Clicking a card drills into the Account 360 view; "Edit profile" in there
   // opens the existing profile modal on top.
   const [detailUser,  setDetailUser]  = useState<UserRecord | null>(null)
@@ -171,37 +234,54 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
 
   // ── fetch ──────────────────────────────────────────────────────────────────
   // Fetches the committed first/last/email query, paginated. Empty query fields
-  // send no filters → all users.
-  const fetchUsers = useCallback(async () => {
-    setLoading(true)
-    const url = buildQuery({
-      page, perPage,
-      fname: query?.fname ?? "", lname: query?.lname ?? "", email: query?.email ?? "",
-      role: "", status: "", showDeleted: false,
-      sort: "joined_at", dir: "desc",
-    })
-    try {
-      const res = await fetch(url)
-      const data: UsersListResponse = await res.json()
-      setUsers(data.users)
-      setTotal(data.total)
-    } catch {
-      toast.error("Failed to load users.")
-    } finally {
-      setLoading(false)
-    }
-  }, [page, perPage, query])
+  // send no filters → all users. `loading` is derived from whether the results
+  // in state match the current request, so the effect never sets state
+  // synchronously (which would cascade renders).
+  const requestKey = `${page}|${perPage}|${query.fname}|${query.lname}|${query.email}`
+  const loading = loadedKey !== requestKey
 
   useEffect(() => {
-    // Don't fetch until a search has been run (blank or not).
-    if (!query) {
-      setUsers([])
-      setTotal(0)
-      setLoading(false)
-      return
-    }
-    void fetchUsers()
-  }, [fetchUsers, query])
+    if (loadedKey === requestKey) return
+    let alive = true
+    void (async () => {
+      const data = await loadUsersPage(page, perPage, query)
+      if (!alive) return
+      if (data) {
+        setUsers(data.users)
+        setTotal(data.total)
+      } else {
+        toast.error("Failed to load users.")
+      }
+      setLoadedKey(requestKey)
+    })()
+    return () => { alive = false }
+  }, [loadedKey, requestKey, page, perPage, query])
+
+  /** Silent re-read of the current page (after an edit, save or failed patch). */
+  const refresh = useCallback(async () => {
+    const data = await loadUsersPage(page, perPage, query)
+    if (!data) return
+    setUsers(data.users)
+    setTotal(data.total)
+  }, [page, perPage, query])
+
+  // As-you-type search: commit the inputs after a short pause. setQuery only
+  // fires from the timer, so this never cascades a synchronous render.
+  useEffect(() => {
+    const fname = fnameInput.trim()
+    const lname = lnameInput.trim()
+    const email = emailInput.trim()
+    const t = setTimeout(() => {
+      setQuery((prev) => {
+        if (prev && prev.fname === fname && prev.lname === lname && prev.email === email) return prev
+        setPage(1)
+        return { fname, lname, email }
+      })
+    }, SEARCH_DEBOUNCE)
+    return () => clearTimeout(t)
+  }, [fnameInput, lnameInput, emailInput])
+
+  const changeView = (next: ViewMode) => storeView(next)
 
   // Eligible "Referred by" options (sales pipeline + admin staff) for the
   // inline picker + resolving each user's referrer name.
@@ -240,9 +320,9 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Update failed.")
-      await fetchUsers() // revert optimistic change to server truth
+      await refresh() // revert optimistic change to server truth
     }
-  }, [fetchUsers])
+  }, [refresh])
 
   const goPage = (p: number) => setPage(p)
 
@@ -255,7 +335,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
 
   const clearSearch = () => {
     setFnameInput(""); setLnameInput(""); setEmailInput("")
-    setQuery(null); setUsers([]); setTotal(0); setPage(1)
+    setQuery({ fname: "", lname: "", email: "" }); setPage(1)
   }
 
   // ── actions ────────────────────────────────────────────────────────────────
@@ -273,7 +353,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     if (!res.ok) {
       const j = (await res.json().catch(() => ({}))) as { error?: string }
       toast.error(j.error ?? "Failed to restore user.")
-      void fetchUsers()
+      void refresh()
     }
   }
 
@@ -318,7 +398,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
             referrers={referrers}
             onClose={() => setViewUser(null)}
             onSaved={() => {
-              void fetchUsers()
+              void refresh()
               void openUserById(detailUser.id)
               setDetailRefresh((n) => n + 1)
             }}
@@ -387,30 +467,60 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
           </button>
         </form>
 
-      {/* Results as cards */}
+      {/* Result count + view switch */}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-xs text-[#6b7280]">
+          {loading ? "Searching…" : `${total} account${total === 1 ? "" : "s"}`}
+        </p>
+        <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[#f3f4f6]" role="group" aria-label="View mode">
+          {([
+            { id: "cards" as const, label: "Cards", icon: <LayoutGrid className="w-3.5 h-3.5" /> },
+            { id: "table" as const, label: "Table", icon: <TableIcon className="w-3.5 h-3.5" /> },
+          ]).map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => changeView(v.id)}
+              aria-pressed={view === v.id}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                view === v.id ? "bg-white text-[#001f3f] shadow-sm" : "text-[#6b7280] hover:text-[#111827]"
+              }`}
+            >
+              {v.icon}{v.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Results */}
       {loading ? (
         <div className="grid grid-cols-1 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-52 rounded-2xl border border-black/[0.08] bg-white animate-pulse" />
+            <div key={i} className={`rounded-2xl border border-black/[0.08] bg-white animate-pulse ${view === "table" ? "h-14" : "h-52"}`} />
           ))}
         </div>
       ) : users.length === 0 ? (
         <div className="rounded-2xl border border-black/[0.08] bg-white px-6 py-16 text-center">
           <div className="flex flex-col items-center gap-2 text-[#9ca3af]">
             <Search className="w-8 h-8 opacity-40" />
-            {query ? (
-              <>
-                <p className="text-sm font-medium">No users found</p>
-                <p className="text-xs">No one matches that first name, last name, or email.</p>
-              </>
-            ) : (
-              <>
-                <p className="text-sm font-medium">Search for users</p>
-                <p className="text-xs">Enter a name or email (or leave blank for all) and press Search.</p>
-              </>
-            )}
+            <p className="text-sm font-medium">No users found</p>
+            <p className="text-xs">No one matches that first name, last name, or email.</p>
           </div>
         </div>
+      ) : view === "table" ? (
+        <UsersTable
+          users={users}
+          referrerName={referrerName}
+          onPatch={applyPatch}
+          onOpen={openView}
+          onRestore={handleRestore}
+          page={page}
+          perPage={perPage}
+          total={total}
+          totalPages={totalPages}
+          onPageChange={goPage}
+          onPerPageChange={(n) => { setPerPage(n); setPage(1) }}
+        />
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4">
@@ -447,11 +557,118 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
           user={viewUser}
           referrers={referrers}
           onClose={() => setViewUser(null)}
-          onSaved={fetchUsers}
+          onSaved={() => void refresh()}
           onBanner={(type: "success" | "error", msg: string) => (type === "success" ? toast.success(msg) : toast.error(msg))}
         />
       )}
     </>
+  )
+}
+
+// ─── Table view ───────────────────────────────────────────────────────────────
+// Same data as the cards, one row per account. Clicking a row opens the same
+// Account 360 view; the inline role/status chips keep working in place.
+function UsersTable({
+  users,
+  referrerName,
+  onPatch,
+  onOpen,
+  onRestore,
+  page,
+  perPage,
+  total,
+  totalPages,
+  onPageChange,
+  onPerPageChange,
+}: {
+  users: UserRecord[]
+  referrerName: Map<string, string>
+  onPatch: (id: string, patch: Record<string, unknown>) => void | Promise<void>
+  onOpen: (u: UserRecord) => void
+  onRestore: (id: string) => void
+  page: number
+  perPage: number
+  total: number
+  totalPages: number
+  onPageChange: (p: number) => void
+  onPerPageChange: (n: number) => void
+}) {
+  const stop = (e: React.MouseEvent) => e.stopPropagation()
+
+  return (
+    <DataTable
+      columns={["Account", "Role", "Phone", "Referred by", "Joined", "Status", { label: "", className: "w-10" }]}
+      page={page}
+      perPage={perPage}
+      total={total}
+      totalPages={totalPages}
+      onPageChange={onPageChange}
+      onPerPageChange={onPerPageChange}
+      perPageOptions={PER_PAGE_OPTIONS}
+    >
+      {users.map((user) => {
+        const displayName = toTitleCase(getUserDisplayName(user))
+        const isDeleted = user.is_deleted === true
+        const invitedBy = typeof user.metadata?.invited_by === "string" ? user.metadata.invited_by : ""
+        const phone = contactFrom(user.metadata, "phone")
+        const status = (user.status ?? "pending").toLowerCase()
+
+        return (
+          <tr
+            key={user.id}
+            onClick={() => onOpen(user)}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget) return
+              if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(user) }
+            }}
+            tabIndex={0}
+            aria-label={`Open ${displayName}'s account details`}
+            className="border-b border-black/[0.05] last:border-0 hover:bg-[#f9fafb] focus:outline-none focus-visible:bg-[#f3f4f6] cursor-pointer transition-colors"
+          >
+            <td className="px-3 py-3 first:pl-6">
+              <div className="flex items-center gap-3 min-w-0">
+                <UserAvatar name={displayName} imageUrl={user.profile_url} size={34} />
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-[#0d1117] truncate flex items-center gap-1.5">
+                    {displayName}
+                    {isDeleted && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-600 font-bold uppercase tracking-wide">Deleted</span>
+                    )}
+                  </p>
+                  <p className="text-[11px] text-[#9ca3af] truncate">{user.email || "—"}</p>
+                </div>
+              </div>
+            </td>
+            <td className="px-3 py-3" onClick={stop}>
+              <ChipSelect size="sm" value={(user.role ?? "member").toLowerCase()} onChange={(v) => onPatch(user.id, { role: v })} options={ROLE_OPTIONS} colorClass={roleChipCls(user.role)} />
+            </td>
+            <td className="px-3 py-3 text-[13px] text-[#374151] whitespace-nowrap">{phone || cardDash}</td>
+            <td className="px-3 py-3 text-[13px] text-[#374151] capitalize truncate max-w-[160px]">
+              {invitedBy ? toTitleCase(user.referred_by_name ?? referrerName.get(invitedBy) ?? "Unknown") : cardDash}
+            </td>
+            <td className="px-3 py-3 text-[12px] text-[#6b7280] whitespace-nowrap tabular-nums">
+              {user.joined_at ? formatDateInZone(user.joined_at, "Asia/Dubai") : cardDash}
+            </td>
+            <td className="px-3 py-3" onClick={stop}>
+              <ChipSelect size="sm" value={status} onChange={(v) => onPatch(user.id, { status: v })} options={STATUS_OPTIONS} colorClass={statusChipCls(user.status)} />
+            </td>
+            <td className="px-3 py-3 last:pr-6 text-right whitespace-nowrap">
+              {isDeleted ? (
+                <button
+                  type="button"
+                  onClick={(e) => { stop(e); onRestore(user.id) }}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:underline"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Restore
+                </button>
+              ) : (
+                <Eye className="w-4 h-4 text-[#c0c6cf] inline" aria-hidden />
+              )}
+            </td>
+          </tr>
+        )
+      })}
+    </DataTable>
   )
 }
 
