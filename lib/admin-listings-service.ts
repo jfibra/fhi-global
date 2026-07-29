@@ -9,15 +9,38 @@ export type AdminListingStatus = "draft" | "published" | "archived"
 
 export type AdminListingAgent = { id: string; fullname: string | null; role: string | null }
 export type AdminListingImage = { id: string; url: string; sort_order: number }
+export type AdminListingUnit = {
+  unit_type: string | null
+  bedrooms: number | null
+  bathrooms: number | null
+  size_sqft: number | string | null
+  size_sqm: number | string | null
+  price_from: number | string | null
+  price_to: number | string | null
+}
+
 export type AdminListingProject = {
   id: number
   name: string
   developer_id: string | null
+  /** Location, pricing and unit facts the cards render. Mirrors the agent-side
+   *  embed so both listing pages show identical numbers. */
+  city?: string | null
+  location?: string | null
+  community?: string | null
+  main_image?: string | null
+  launch_price_from?: number | string | null
+  launch_price_to?: number | string | null
+  currency?: string | null
   developers: { id: string; name: string | null } | null
+  project_units?: AdminListingUnit[] | null
+  project_property_types?: { property_types?: { name?: string | null } | null }[] | null
 }
 
 export type AdminListingRow = {
   id: string
+  /** From migration 013; the public route also resolves the bare id. */
+  slug?: string | null
   agent_id: string
   project_id: number | null
   title: string
@@ -39,6 +62,10 @@ export type AdminListingsSummary = {
   published: number
   draft: number
   archived: number
+  /** Org-wide kind split + soft-deleted count, for the filter chips. */
+  sale: number
+  rent: number
+  deleted: number
   total: number
 }
 

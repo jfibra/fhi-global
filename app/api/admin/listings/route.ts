@@ -15,9 +15,19 @@ const STATUSES = new Set(["draft", "published", "archived"])
 const KINDS = new Set(["sale", "rent"])
 
 const BASE_COLUMNS =
-  "id, agent_id, project_id, title, description, listing_kind, price, currency, status, unit_type, created_at, updated_at, deleted_at, " +
+  "id, slug, agent_id, project_id, title, description, listing_kind, price, currency, status, unit_type, created_at, updated_at, deleted_at, " +
   "agent:profiles!agent_id ( id, fullname, role ), " +
   "agent_listing_images ( id, url, sort_order )"
+
+/** The project facts the cards render — location, pricing and the unit line that
+ *  supplies beds/baths/size. Mirrors the agent-side embed in
+ *  lib/agent-listings-service.ts so both listing pages show the same numbers. */
+const PROJECT_FIELDS =
+  "id, name, developer_id, city, location, community, main_image, " +
+  "launch_price_from, launch_price_to, currency, " +
+  "developers ( id, name ), " +
+  "project_units ( unit_type, bedrooms, bathrooms, size_sqft, size_sqm, price_from, price_to ), " +
+  "project_property_types ( property_types ( name ) )"
 
 export async function GET(req: NextRequest) {
   const guard = await requireRole([...ROLES_ADMIN_STAFF])
@@ -42,8 +52,8 @@ export async function GET(req: NextRequest) {
   // Inner-join projects only when filtering by developer, so listings without a
   // project (project_id NULL) are still returned in the default view.
   const projectEmbed = developerId
-    ? "projects!inner ( id, name, developer_id, developers ( id, name ) )"
-    : "projects ( id, name, developer_id, developers ( id, name ) )"
+    ? `projects!inner ( ${PROJECT_FIELDS} )`
+    : `projects ( ${PROJECT_FIELDS} )`
 
   let query = admin
     .from("agent_listings")
@@ -76,19 +86,37 @@ export async function GET(req: NextRequest) {
   })
 }
 
+/** Org-wide, unfiltered counts. The page is server-paginated, so the filter chips
+ *  can't count from the current page — these are what they display. */
 async function buildSummary(admin: ReturnType<typeof createAdminSupabase>) {
-  const countFor = async (status: string) => {
-    const { count } = await admin
-      .from("agent_listings")
-      .select("id", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .eq("status", status)
+  const live = () =>
+    admin.from("agent_listings").select("id", { count: "exact", head: true }).is("deleted_at", null)
+
+  const countBy = async (column: "status" | "listing_kind", value: string) => {
+    const { count } = await live().eq(column, value)
     return count ?? 0
   }
-  const [published, draft, archived] = await Promise.all([
-    countFor("published"),
-    countFor("draft"),
-    countFor("archived"),
+
+  const [published, draft, archived, sale, rent, deleted] = await Promise.all([
+    countBy("status", "published"),
+    countBy("status", "draft"),
+    countBy("status", "archived"),
+    countBy("listing_kind", "sale"),
+    countBy("listing_kind", "rent"),
+    admin
+      .from("agent_listings")
+      .select("id", { count: "exact", head: true })
+      .not("deleted_at", "is", null)
+      .then((r) => r.count ?? 0),
   ])
-  return { published, draft, archived, total: published + draft + archived }
+
+  return {
+    published,
+    draft,
+    archived,
+    sale,
+    rent,
+    deleted,
+    total: published + draft + archived,
+  }
 }

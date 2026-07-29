@@ -13,7 +13,41 @@
 //   • agent_listings has no expiry, sold or pending state — the status CHECK
 //     allows only draft | published | archived.
 
-import type { AgentListing, ProjectUnitFacts } from "@/lib/agent-listings-service"
+import type { ProjectUnitFacts } from "@/lib/agent-listings-service"
+
+/**
+ * The minimum shape these helpers need. Both `AgentListing` (agent page, browser
+ * client + RLS) and `AdminListingRow` (admin page, service-role API) satisfy it
+ * structurally, so the two listing pages derive location, pricing and unit facts
+ * from exactly the same code and can never disagree.
+ */
+export type ListingFacts = {
+  id: string
+  slug?: string | null
+  title: string
+  status: "draft" | "published" | "archived"
+  updated_at: string
+  description: string | null
+  listing_kind: "sale" | "rent"
+  price: number | null
+  currency: string
+  unit_type: string | null
+  project_id: number | null
+  projects?: {
+    name: string
+    city?: string | null
+    location?: string | null
+    community?: string | null
+    main_image?: string | null
+    launch_price_from?: number | string | null
+    launch_price_to?: number | string | null
+    currency?: string | null
+    developers?: { name?: string | null } | null
+    project_units?: ProjectUnitFacts[] | null
+    project_property_types?: { property_types?: { name?: string | null } | null }[] | null
+  } | null
+  agent_listing_images?: { url: string; sort_order: number }[] | null
+}
 
 function num(v: number | string | null | undefined): number | null {
   if (v == null) return null
@@ -31,7 +65,7 @@ function text(v: string | null | undefined): string | null {
 /** "Downtown Dubai, Dubai" from the linked project. Real data often repeats the
  *  same name across city/location/community (e.g. both "Dubai Marina"), so parts
  *  are de-duplicated case-insensitively before joining. */
-export function locationLabel(row: AgentListing): string | null {
+export function locationLabel(row: ListingFacts): string | null {
   const p = row.projects
   if (!p) return null
   const parts = [text(p.community), text(p.location), text(p.city)].filter(
@@ -51,7 +85,7 @@ export function locationLabel(row: AgentListing): string | null {
 
 /** Prefer the developer unit line the agent actually picked; otherwise fall back
  *  the same way the public page does (first unit that has a bedroom count). */
-export function resolveUnit(row: AgentListing): ProjectUnitFacts | null {
+export function resolveUnit(row: ListingFacts): ProjectUnitFacts | null {
   const units = row.projects?.project_units
   if (!units?.length) return null
   const wanted = text(row.unit_type)?.toLowerCase()
@@ -70,7 +104,7 @@ export type UnitFacts = {
   size: { value: number; unit: "sqft" | "sqm" } | null
 }
 
-export function unitFacts(row: AgentListing): UnitFacts {
+export function unitFacts(row: ListingFacts): UnitFacts {
   const u = resolveUnit(row)
   if (!u) return { beds: null, baths: null, size: null }
   const sqft = num(u.size_sqft)
@@ -110,7 +144,7 @@ export type PriceLine = {
 /** The listing's own price wins; otherwise the picked unit's range, then the
  *  project's launch range — the same precedence the public page uses. No rent
  *  period is appended: agent_listings stores no period. */
-export function priceLine(row: AgentListing): PriceLine {
+export function priceLine(row: ListingFacts): PriceLine {
   const own = num(row.price)
   if (own != null) {
     return { text: formatMoney(own, null, row.currency), fromProject: false, known: true }
@@ -143,39 +177,39 @@ export function priceLine(row: AgentListing): PriceLine {
 // ─── Cover image ──────────────────────────────────────────────────────────────
 
 /** The agent's own first photo, else the developer project's main image. */
-export function coverImage(row: AgentListing): string | null {
+export function coverImage(row: ListingFacts): string | null {
   const own = row.agent_listing_images?.[0]?.url
   if (text(own)) return own as string
   return text(row.projects?.main_image)
 }
 
-export function photoCount(row: AgentListing): number {
+export function photoCount(row: ListingFacts): number {
   return row.agent_listing_images?.length ?? 0
 }
 
 // ─── Labels ───────────────────────────────────────────────────────────────────
 
-export function developerName(row: AgentListing): string | null {
+export function developerName(row: ListingFacts): string | null {
   return text(row.projects?.developers?.name)
 }
 
-export function projectName(row: AgentListing): string | null {
+export function projectName(row: ListingFacts): string | null {
   return text(row.projects?.name)
 }
 
 /** Public URL for a listing (slug from migration 013; the id still resolves). */
-export function publicPath(row: AgentListing): string {
+export function publicPath(row: ListingFacts): string {
   return `/listings/${text(row.slug) ?? row.id}`
 }
 
-export function unitTypeLabel(row: AgentListing): string | null {
+export function unitTypeLabel(row: ListingFacts): string | null {
   return text(row.unit_type) ?? text(resolveUnit(row)?.unit_type ?? null)
 }
 
 /** Property types the linked project is tagged with (Apartment / Penthouse /
  *  Townhouse / Villa). Empty for standalone listings — agent_listings itself has
  *  no property-type column. */
-export function propertyTypes(row: AgentListing): string[] {
+export function propertyTypes(row: ListingFacts): string[] {
   const links = row.projects?.project_property_types
   if (!links?.length) return []
   const names = links
@@ -186,7 +220,7 @@ export function propertyTypes(row: AgentListing): string[] {
 
 /** Everything the search box matches. `slug` is included so pasting the tail of a
  *  public link finds the listing — agent_listings has no reference/code column. */
-export function searchHaystack(row: AgentListing): string {
+export function searchHaystack(row: ListingFacts): string {
   return [
     row.title,
     row.slug,
