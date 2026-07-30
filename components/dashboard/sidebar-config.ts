@@ -4,7 +4,7 @@ import {
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, QrCode, ScrollText, Inbox, CalendarDays,
-  Wallet, MessagesSquare, FileText, UploadCloud,
+  Wallet, MessagesSquare, FileText, UploadCloud, Globe,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -117,6 +117,7 @@ const PROJECTS: NavEntry = { icon: FolderOpen, label: "Projects", to: "projects"
 const INVITE: NavEntry = { icon: QrCode, label: "Invite", to: "invite" }
 const REELS_MAKER: NavEntry = { icon: Clapperboard, label: "Reels Maker", to: "reels-maker" }
 const BUSINESS_CARD: NavEntry = { icon: CreditCard, label: "Business Card", to: "business-card" }
+const PUBLIC_PROFILE: NavEntry = { icon: Globe, label: "Public Profile Maker", to: "public-profile-maker" }
 const SALES_REPORTS: NavEntry = { icon: TrendingUp, label: "Sales Reports", to: "sales" }
 const SUPPORT_TICKETS: NavEntry = { icon: LifeBuoy, label: "Support Tickets", to: "support" }
 
@@ -165,7 +166,8 @@ const ADMIN_NAV: RoleNavEntry[] = [
     to: "agent-resource",
     icon: FileText,
     items: [
-      { ...BUSINESS_CARD, description: "Your shareable digital business card." },
+      { ...BUSINESS_CARD,  description: "Your shareable digital business card." },
+      { ...PUBLIC_PROFILE, description: "The one link you share — contacts, socials and QR." },
       { ...REELS_MAKER,   description: "Turn a listing into a shareable reel." },
     ],
   },
@@ -225,6 +227,7 @@ const salesPipelineNav = ({ projects = false, events = false, teamSales = false 
   ...(teamSales ? [{ icon: Users, label: "Team Sales", to: "team-sales" } satisfies NavEntry] : []),
   SUPPORT_TICKETS,
   BUSINESS_CARD,
+  PUBLIC_PROFILE,
 ]
 
 /** secretary + team_secretary — paperwork support, no listings of their own. */
@@ -233,6 +236,7 @@ const SECRETARY_NAV: RoleNavEntry[] = [
   SALES_REPORTS,
   SUPPORT_TICKETS,
   BUSINESS_CARD,
+  PUBLIC_PROFILE,
 ]
 
 /** Signed-up public users: browse, plus the self-serve tools. */
@@ -242,6 +246,7 @@ const MEMBER_NAV: RoleNavEntry[] = [
   { icon: Building2, label: "Buy",  to: "/buy"  },
   { icon: KeyRound,  label: "Rent", to: "/rent" },
   BUSINESS_CARD,
+  PUBLIC_PROFILE,
   REELS_MAKER,
   // Read-only projects browser, same as agents (ROLES_PROJECT_STUDIO_VIEWERS).
   PROJECTS,
