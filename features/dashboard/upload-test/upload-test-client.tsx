@@ -104,13 +104,6 @@ export function UploadTestClient() {
     <div className="space-y-5">
       <div>
         <h1 className={`${DISPLAY} text-2xl font-bold text-[#0d1117]`}>Upload compression test</h1>
-        <p className="text-sm text-[#6b7280] mt-1 max-w-2xl">
-          Pick any photo to run it through the same server-side compression every upload route uses
-          (resize to 1200px, re-encode as WebP, binary-search quality to a 100 KB target — see{" "}
-          <code className="text-[#374151]">lib/upload/compress-image.ts</code>). Both the original and the
-          result get uploaded to S3 under <code className="text-[#374151]">_dev-upload-test/</code> so you
-          can inspect either at full resolution. Admin-only; nothing here is attached to a real listing.
-        </p>
       </div>
 
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onPick} />
