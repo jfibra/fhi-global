@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowRight,
   ArrowUpDown,
@@ -24,6 +24,8 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react"
+import { formatCurrency, formatDate, StatusBadge } from "./sale-ui"
+import { AgentSalesPanel } from "./agent-sales-panel"
 import {
   canEditSaleForRole,
   canManageSaleAttachmentsForRole,
@@ -65,6 +67,7 @@ export const SALE_TYPE_SLUGS: Record<SaleType, string> = {
 }
 
 const TYPE_SLUG_RE = new RegExp(`/(${Object.values(SALE_TYPE_SLUGS).join("|")})$`)
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Sale-type selector cards — mirror the "Encode a Sale" 3-card page (icon + title
 // + description), reusing the same icons (Building2/Handshake/KeyRound).
@@ -128,55 +131,13 @@ function ToastStack({
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatDate(value: string | null) {
-  if (!value) return "—"
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? "—"
-    : date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value) + " AED"
-}
-
-function StatusBadge({ value, type }: { value: string; type: "commission" | "validation" }) {
-  const colors: Record<string, string> = {
-    // commission statuses
-    pending:      "bg-amber-50 text-amber-700 border-amber-200",
-    processing:   "bg-blue-50 text-blue-700 border-blue-200",
-    approved:     "bg-emerald-50 text-emerald-700 border-emerald-200",
-    released:     "bg-violet-50 text-violet-700 border-violet-200",
-    rejected:     "bg-rose-50 text-rose-700 border-rose-200",
-    // validation statuses
-    under_review: "bg-sky-50 text-sky-700 border-sky-200",
-    validated:    "bg-emerald-50 text-emerald-700 border-emerald-200",
-    invalid_sale: "bg-rose-50 text-rose-700 border-rose-200",
-  }
-  const labels: Record<string, string> = {
-    pending:      "Pending",
-    processing:   "Processing",
-    approved:     "Approved",
-    released:     "Released",
-    rejected:     "Rejected",
-    under_review: "Under Review",
-    validated:    "Validated",
-    invalid_sale: "Invalid Sale",
-  }
-  const cls   = colors[value] ?? "bg-slate-100 text-slate-600 border-slate-200"
-  const label = labels[value] ?? value.replace(/_/g, " ")
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border capitalize ${cls}`}>
-      {label}
-    </span>
-  )
-}
+// formatDate / formatCurrency / StatusBadge live in ./sale-ui so the per-agent
+// drill-in renders them identically.
 
 function SummaryTile({ label, value, icon: Icon }: { label: string; value: string; icon: LucideIcon }) {
   return (
     <div className="bg-white/60 backdrop-blur-xl rounded-[20px] border border-white/60 shadow-sm shadow-black/5 p-4 flex items-center gap-3">
-      <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shrink-0">
+      <div className="w-10 h-10 rounded-xl bg-[#001f3f] flex items-center justify-center shrink-0">
         <Icon className="w-5 h-5 text-white" />
       </div>
       <div className="min-w-0">
@@ -280,6 +241,9 @@ export function SalesTable({
   const setActiveType = (t: SaleType | null) => {
     router.push(t ? `${salesBase}/${SALE_TYPE_SLUGS[t]}` : salesBase, { scroll: false })
   }
+  const searchParams = useSearchParams()
+  const drillParam = searchParams.get("agent")
+  const drillId = drillParam && UUID_RE.test(drillParam) ? drillParam : null
   const [summaries, setSummaries] = useState<Record<SaleType, SaleTypeSummary>>({
     project:   { dealCount: 0, totalValue: 0, pendingCount: 0 },
     brokerage: { dealCount: 0, totalValue: 0, pendingCount: 0 },
@@ -295,6 +259,12 @@ export function SalesTable({
   const [showAttachments, setShowAttachments] = useState(false)
   const [attachmentSale, setAttachmentSale] = useState<SaleRecord | null>(null)
   const [discussionTarget, setDiscussionTarget] = useState<{ sale: SaleRecord; tab: DiscussionTab } | null>(null)
+  // Row click drills into that agent's full sales history (admins only — for
+  // an agent every row is their own, so there'd be nothing to drill into).
+  // The open drill lives in ?agent= so browser Back returns to the report and
+  // the view survives refresh / can be linked; state only caches the clicked
+  // row's name so the header isn't blank while the panel fetches the profile.
+  const [agentDrill, setAgentDrill] = useState<{ id: string; name: string | null } | null>(null)
 
   const [toasts, setToasts] = useState<Array<{ id: number; type: ToastType; text: string }>>([])
   const toastIdRef = useRef(0)
@@ -579,12 +549,26 @@ export function SalesTable({
               })}
             </div>
           </>
+        ) : isAdminUser && drillId ? (
+          /* ── Drill-in: one agent's full sales history ── */
+          <AgentSalesPanel
+            // Remount per agent so no filter or row state leaks between them.
+            key={drillId}
+            agentId={drillId}
+            agentName={agentDrill?.id === drillId ? agentDrill.name : null}
+            currentRole={currentRole}
+            currentUserId={currentUserId}
+            developers={developers}
+            backLabel={`Back to ${activeMeta?.label ?? "Sales"} Report`}
+            onBack={() => router.push(pathname, { scroll: false })}
+            onViewSale={(s) => openView(s)}
+          />
         ) : (
           /* ── Report: the table for the chosen sale type ── */
           <>
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shadow-lg">
+                <div className="w-12 h-12 rounded-2xl bg-[#001f3f] flex items-center justify-center shadow-lg">
                   <ActiveIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>
@@ -752,18 +736,38 @@ export function SalesTable({
                     </td>
                   </tr>
                 ) : (
-                  sales.map((sale) => (
-                    <tr key={sale.id} className="hover:bg-[#fcfdff] transition-colors">
-                      {columns.map((col) => (
-                        <td
-                          key={col.key}
-                          className={`px-4 py-2.5 whitespace-nowrap align-middle first:pl-6 last:pr-6 ${col.tdClassName ?? "text-[#374151]"}`}
-                        >
-                          {col.cell(sale)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
+                  sales.map((sale) => {
+                    const drillable = isAdminUser && Boolean(sale.agent_id)
+                    const openDrill = () => {
+                      setAgentDrill({ id: sale.agent_id, name: sale.profiles?.fullname ?? null })
+                      router.push(`${pathname}?agent=${sale.agent_id}`, { scroll: false })
+                    }
+                    return (
+                      <tr
+                        key={sale.id}
+                        onClick={drillable ? openDrill : undefined}
+                        onKeyDown={drillable ? (e) => {
+                          if (e.target !== e.currentTarget) return
+                          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDrill() }
+                        } : undefined}
+                        tabIndex={drillable ? 0 : undefined}
+                        title={drillable ? `View all sales by ${sale.profiles?.fullname ?? "this agent"}` : undefined}
+                        className={`hover:bg-[#fcfdff] focus:outline-none focus-visible:bg-[#f3f4f6] transition-colors ${drillable ? "cursor-pointer" : ""}`}
+                      >
+                        {columns.map((col) => (
+                          <td
+                            key={col.key}
+                            // The Actions cell holds its own buttons — a click
+                            // there must not also drill into the agent.
+                            onClick={col.key === "actions" || col.key === "files" ? (e) => e.stopPropagation() : undefined}
+                            className={`px-4 py-2.5 whitespace-nowrap align-middle first:pl-6 last:pr-6 ${col.tdClassName ?? "text-[#374151]"}`}
+                          >
+                            {col.cell(sale)}
+                          </td>
+                        ))}
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>
