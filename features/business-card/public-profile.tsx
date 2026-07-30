@@ -1,18 +1,14 @@
 "use client"
 
 import Image from "next/image"
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { QRCodeCanvas } from "qrcode.react"
 import {
-  ChevronDown, CreditCard, Download, Link2, Mail, Phone, RefreshCcw, UserPlus, X,
+  Building2, Download, Globe, KeyRound, Link2, Mail, Phone, X,
 } from "lucide-react"
 import { SOCIAL_PLATFORMS, type CustomLink, type SocialLinks } from "@/lib/public-profile"
 import { SOCIAL_ICONS } from "./social-icons"
-import {
-  DISP_H, DISP_W, EXPORT_H, EXPORT_W,
-  dialFromValue, isDesignId, renderCard, stripLocal,
-  type CardData, type DesignId,
-} from "./card-render"
+import { dialFromValue, stripLocal } from "./card-render"
 
 /**
  * Public, unauthenticated profile page for one person — the destination of the
@@ -31,6 +27,24 @@ const BACKDROP =
 
 const BRAND_WHITE = "/FHI_Branding_White.png"
 
+/**
+ * The buttons every profile ends with, after whatever the agent added.
+ *
+ * Same-origin paths rather than absolute URLs: the profile is served from the
+ * site itself, so these resolve to fhiglobal.ae in production and to localhost
+ * in development, with no env var and no hardcoded host.
+ */
+const DEFAULT_LINKS: Array<{
+  key: string
+  href: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+}> = [
+  { key: "site", href: "/",     label: "Visit our website", icon: Globe },
+  { key: "buy",  href: "/buy",  label: "Browse properties", icon: Building2 },
+  { key: "rent", href: "/rent", label: "Rent a property",   icon: KeyRound },
+]
+
 /** QR is drawn at this size and scaled down by CSS — sharp on any screen. */
 const QR_EXPORT_PX = 560
 /** The enlarged canvas in the modal, which is also what "Download" saves. */
@@ -44,7 +58,6 @@ export type PublicProfileData = {
   email: string
   countryCode: string
   phoneNumber: string
-  design: string
   avatarUrl: string | null
   tagline: string
   links: CustomLink[]
@@ -75,36 +88,15 @@ function hostOf(url: string): string {
   }
 }
 
-/** RFC 6350 vCard. Escaping matters: an unescaped comma silently splits a field. */
-function buildVCard(data: PublicProfileData, phoneE164: string): string {
-  const esc = (v: string) => v.replace(/([\\,;])/g, "\\$1").replace(/\n/g, "\\n")
-  const lines = [
-    "BEGIN:VCARD",
-    "VERSION:3.0",
-    `FN:${esc(data.fullname)}`,
-    `N:${esc(data.fullname)};;;;`,
-    "ORG:FHI Global",
-    `TITLE:${esc(data.roleLabel)}`,
-    ...(phoneE164 ? [`TEL;TYPE=CELL:${phoneE164}`] : []),
-    ...(data.email ? [`EMAIL;TYPE=WORK:${data.email}`] : []),
-    ...(data.tagline ? [`NOTE:${esc(data.tagline)}`] : []),
-    "URL:https://fhiglobal.ae",
-    "END:VCARD",
-  ]
-  return lines.join("\r\n")
-}
-
 function ActionPill({
   href,
-  onClick,
   icon: Icon,
   label,
   hint,
   delay,
   external = false,
 }: {
-  href?: string
-  onClick?: () => void
+  href: string
   icon: React.ComponentType<{ className?: string }>
   label: string
   hint?: string
@@ -113,8 +105,13 @@ function ActionPill({
    *  ranking signal, since we don't vouch for where it goes. */
   external?: boolean
 }) {
-  const inner = (
-    <>
+  return (
+    <a
+      href={href}
+      className="animate-hero-item w-full flex items-center gap-3 px-3 py-3 rounded-full bg-white shadow-[0_6px_20px_-8px_rgba(0,0,0,0.45)] hover:-translate-y-0.5 hover:shadow-[0_10px_26px_-8px_rgba(0,0,0,0.5)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#d6b357]/60 transition-all duration-200"
+      style={{ animationDelay: `${delay}ms` }}
+      {...(external ? { target: "_blank", rel: "noopener noreferrer nofollow ugc" } : {})}
+    >
       <span className="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center">
         <Icon className="w-4 h-4 text-white" />
       </span>
@@ -124,28 +121,7 @@ function ActionPill({
       </span>
       {/* Balances the icon tile so the label stays optically centred. */}
       <span className="w-9 shrink-0" aria-hidden />
-    </>
-  )
-
-  const cls =
-    "animate-hero-item w-full flex items-center gap-3 px-3 py-3 rounded-full bg-white shadow-[0_6px_20px_-8px_rgba(0,0,0,0.45)] hover:-translate-y-0.5 hover:shadow-[0_10px_26px_-8px_rgba(0,0,0,0.5)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#d6b357]/60 transition-all duration-200"
-
-  if (href) {
-    return (
-      <a
-        href={href}
-        className={cls}
-        style={{ animationDelay: `${delay}ms` }}
-        {...(external ? { target: "_blank", rel: "noopener noreferrer nofollow ugc" } : {})}
-      >
-        {inner}
-      </a>
-    )
-  }
-  return (
-    <button type="button" onClick={onClick} className={cls} style={{ animationDelay: `${delay}ms` }}>
-      {inner}
-    </button>
+    </a>
   )
 }
 
@@ -162,65 +138,13 @@ export function PublicProfile({
   data: PublicProfileData
   embedded?: boolean
 }) {
-  const design: DesignId = isDesignId(data.design) ? data.design : "classic"
   const local = stripLocal(data.phoneNumber)
   const dial = dialFromValue(data.countryCode)
   const phoneE164 = local ? `${dial}${local}` : ""
   const phoneDisplay = local ? `${dial} ${local}` : ""
   const waNumber = phoneE164.replace(/\D/g, "")
 
-  const [cardOpen, setCardOpen] = useState(false)
   const [qrOpen, setQrOpen] = useState(false)
-  const [flipped, setFlipped] = useState(false)
-  const [front, setFront] = useState("")
-  const [back, setBack] = useState("")
-
-  const cardData: CardData = useMemo(
-    () => ({
-      name: data.fullname,
-      phoneDial: dial,
-      phoneLocal: local,
-      email: data.email,
-      avatarUrl: data.avatarUrl,
-      initials: data.initials,
-    }),
-    [data.fullname, dial, local, data.email, data.avatarUrl, data.initials],
-  )
-
-  // Render the card only once it is actually asked for — a visitor who just taps
-  // "Call" should never pay for two canvas renders.
-  useEffect(() => {
-    if (!cardOpen || front) return
-    let alive = true
-    void (async () => {
-      const [f, b] = await Promise.all([
-        renderCard("front", design, cardData, DISP_W, DISP_H),
-        renderCard("back", design, cardData, DISP_W, DISP_H),
-      ])
-      if (!alive) return
-      setFront(f)
-      setBack(b)
-    })()
-    return () => { alive = false }
-  }, [cardOpen, front, design, cardData])
-
-  const saveContact = useCallback(() => {
-    const blob = new Blob([buildVCard(data, phoneE164)], { type: "text/vcard;charset=utf-8" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${data.fullname.replace(/\s+/g, "-") || "contact"}.vcf`
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [data, phoneE164])
-
-  const downloadCard = useCallback(async () => {
-    const url = await renderCard("front", design, cardData, EXPORT_W, EXPORT_H)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${data.fullname.replace(/\s+/g, "-") || "business"}-card.png`
-    a.click()
-  }, [design, data.fullname, cardData])
 
   const selfUrl = useSelfUrl(data.id)
 
@@ -272,13 +196,12 @@ export function PublicProfile({
   const step = (slot: number) => slot * 70
   const HEADER_SLOTS = 5
 
-  // The agent's own buttons lead — they are the point of a link page. Dialling
-  // and composing are left to the phone/email in the contact block and the
-  // WhatsApp icon, so the two built-ins below are all that follow.
+  // The agent's own buttons lead, then the three FHI defaults. Dialling and
+  // composing are left to the phone/email in the contact block and the WhatsApp
+  // icon, so no action row duplicates them.
   const actions: Array<{
     key: string
-    href?: string
-    onClick?: () => void
+    href: string
     icon: React.ComponentType<{ className?: string }>
     label: string
     hint?: string
@@ -294,13 +217,7 @@ export function PublicProfile({
       hint: hostOf(link.url),
       external: true,
     })),
-    { key: "vcf", onClick: saveContact, icon: UserPlus, label: "Save to my contacts", hint: "Downloads a .vcf contact file" },
-    {
-      key: "card",
-      onClick: () => setCardOpen((v) => !v),
-      icon: cardOpen ? ChevronDown : CreditCard,
-      label: cardOpen ? "Hide business card" : "View my business card",
-    },
+    ...DEFAULT_LINKS,
   ]
 
   return (
@@ -369,7 +286,6 @@ export function PublicProfile({
             <ActionPill
               key={a.key}
               href={a.href}
-              onClick={a.onClick}
               icon={a.icon}
               label={a.label}
               hint={a.hint}
@@ -378,62 +294,6 @@ export function PublicProfile({
             />
           ))}
         </div>
-
-        {/* Card reveal — the printed card itself, tap to flip. */}
-        {cardOpen && (
-          <div className="w-full mt-4 animate-hero-item" style={{ animationDelay: "0ms" }}>
-            <div
-              className="bc-scene w-full cursor-pointer select-none"
-              style={{ aspectRatio: "1.75 / 1" }}
-              onClick={() => setFlipped((f) => !f)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault()
-                  setFlipped((f) => !f)
-                }
-              }}
-              aria-label={`Business card, showing the ${flipped ? "back" : "front"}. Activate to flip.`}
-            >
-              <div className={`bc-card w-full h-full ${flipped ? "bc-card--flipped" : ""}`}>
-                <div className="bc-face bc-face--front w-full h-full rounded-2xl overflow-hidden shadow-[0_14px_40px_-10px_rgba(0,0,0,0.7)]">
-                  {front ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={front} alt={`${data.fullname} business card, front`} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-[#001f3f] rounded-2xl animate-pulse" />
-                  )}
-                </div>
-                <div className="bc-face bc-face--back w-full h-full rounded-2xl overflow-hidden shadow-[0_14px_40px_-10px_rgba(0,0,0,0.7)]">
-                  {back ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={back} alt={`${data.fullname} business card, back`} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-[#001428] rounded-2xl animate-pulse" />
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 flex items-center justify-center gap-5">
-              <button
-                type="button"
-                onClick={() => setFlipped((f) => !f)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/80 hover:text-white transition-colors"
-              >
-                <RefreshCcw className="w-3.5 h-3.5" /> Flip
-              </button>
-              <button
-                type="button"
-                onClick={() => void downloadCard()}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#d6b357] hover:text-[#e6cd8c] transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" /> Download card
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Contact card — QR, the details in the clear, and the brand mark, in one
             block at the foot of the page. The QR sits on its own white tile

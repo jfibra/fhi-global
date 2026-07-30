@@ -122,7 +122,6 @@ export default function PublicProfileMakerPage() {
   const meta = (profile?.metadata as Record<string, unknown> | null) ?? {}
   const countryCode = typeof meta.phone_country_code === "string" ? meta.phone_country_code : "+971"
   const phoneNumber = typeof meta.phone_number === "string" ? meta.phone_number : ""
-  const cardDesign = typeof meta.business_card_design === "string" ? meta.business_card_design : "classic"
 
   const previewData: PublicProfileData = useMemo(() => {
     // Preview only the links that would actually survive a save, so what is on
@@ -143,7 +142,6 @@ export default function PublicProfileMakerPage() {
       email: user?.email?.toLowerCase() ?? "",
       countryCode,
       phoneNumber,
-      design: cardDesign,
       // Session-scoped same-origin proxy — the card canvas can't read S3/Google
       // avatars cross-origin.
       avatarUrl: rawAvatar ? (rawAvatar.startsWith("/") ? rawAvatar : `${API_BASE}/api/me/avatar`) : null,
@@ -157,7 +155,7 @@ export default function PublicProfileMakerPage() {
       socials: normalised,
     }
   }, [
-    socials, tagline, buttons, fullName, rawAvatar, countryCode, phoneNumber, cardDesign,
+    socials, tagline, buttons, fullName, rawAvatar, countryCode, phoneNumber,
     profile?.fname, profile?.lname, profile?.role, user?.id, user?.email,
   ])
 

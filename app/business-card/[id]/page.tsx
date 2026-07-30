@@ -48,7 +48,6 @@ async function loadProfile(id: string): Promise<PublicProfileData | null> {
   const meta = (profile.metadata as Record<string, unknown> | null) ?? {}
   const countryCode = typeof meta.phone_country_code === "string" ? meta.phone_country_code : "+971"
   const phoneNumber = typeof meta.phone_number === "string" ? meta.phone_number : ""
-  const design = typeof meta.business_card_design === "string" ? meta.business_card_design : "classic"
 
   const fullname =
     (profile.fullname ?? "").trim() ||
@@ -77,7 +76,6 @@ async function loadProfile(id: string): Promise<PublicProfileData | null> {
     email,
     countryCode,
     phoneNumber,
-    design,
     avatarUrl,
     tagline: readTagline(profile.metadata),
     links: readCustomLinks(profile.metadata),
