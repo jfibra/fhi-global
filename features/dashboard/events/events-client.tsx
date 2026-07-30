@@ -14,6 +14,7 @@ import {
 import { EventFlyerModal } from "./event-flyer-modal"
 import { EventRaffle } from "./event-raffle"
 import { EVENT_BRANDS, eventBrand } from "@/lib/events/brands"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 type AdminEvent = {
   id: string
@@ -199,8 +200,10 @@ export function EventsClient() {
     setUploading(true)
     setFormError(null)
     try {
+      // Shrink in the browser before it goes over the wire (fails open).
+      const { file: toUpload } = await compressImageForUpload(file)
       const fd = new FormData()
-      fd.append("file", file)
+      fd.append("file", toUpload, toUpload.name)
       const res = await fetch("/api/upload/event", { method: "POST", body: fd })
       const data = (await res.json()) as { url?: string; error?: string }
       if (!res.ok || !data.url) throw new Error(data.error ?? "Upload failed")

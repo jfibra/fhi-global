@@ -9,6 +9,7 @@ import {
   isSupportAdmin,
   type SupportTicketAttachment,
 } from "@/lib/support-service"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 function formatDate(value: string) {
   const date = new Date(value)
@@ -61,7 +62,8 @@ export function TicketAttachments({
     setUploading(true)
     try {
       const formData = new FormData()
-      formData.append("file", file)
+      const { file: toUpload } = await compressImageForUpload(file)
+      formData.append("file", toUpload, toUpload.name)
       formData.append("ticketId", ticketId)
 
       const response = await fetch("/api/upload/support-ticket-file", { method: "POST", body: formData })

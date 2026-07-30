@@ -5,6 +5,7 @@ import { createPortal } from "react-dom"
 import { X, Upload, Image as ImageIcon, Loader2 } from "lucide-react"
 import type { Team } from "@/lib/team-service"
 import { updateTeamLogoUrl } from "@/lib/team-service"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 interface Props {
   open: boolean
@@ -63,8 +64,10 @@ export function TeamLogoUpload({ open, onClose, onUploaded, team }: Props) {
     setUploading(true)
     setError(null)
     try {
+      // Shrink in the browser before it goes over the wire (fails open).
+      const { file: toUpload } = await compressImageForUpload(file)
       const fd = new FormData()
-      fd.append("file", file)
+      fd.append("file", toUpload, toUpload.name)
       fd.append("teamSlug", team.slug)
 
       const res = await fetch("/api/upload/team", { method: "POST", body: fd })

@@ -24,6 +24,7 @@ import {
 import { addProjectImage } from "@/lib/project-service"
 import { createClient } from "@/lib/supabase/client"
 import { DeveloperPortalPageHeader } from "@/components/developer/developer-portal-page-header"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 // ─── Toast ─────────────────────────────────────────────────────────────────────
 type ToastVariant = "success" | "error"
@@ -133,8 +134,11 @@ function UploadModal({
       } else {
         if (!file) { onError("Please select a file."); setUploading(false); return }
 
+        // Shrink in the browser before it goes over the wire (fails open).
+        // Non-images (e.g. brochures) pass through untouched.
+        const { file: toUpload } = await compressImageForUpload(file)
         const fd = new FormData()
-        fd.append("file", file)
+        fd.append("file", toUpload, toUpload.name)
         fd.append("developer_slug", developerSlug)
         fd.append("project_slug", projectSlug)
 

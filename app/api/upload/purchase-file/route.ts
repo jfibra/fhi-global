@@ -2,13 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { isAdminStaffRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
-import { compressImageForUpload } from "@/lib/upload/compress-image"
 
-// sharp is a native module — it cannot run on the Edge runtime, so pin Node
-// explicitly rather than relying on the default. Image compression is also
-// CPU-bound, so allow more than the default execution window.
-export const runtime = "nodejs"
-export const maxDuration = 60
+// Images arrive already resized + WebP-encoded by the browser
+// (lib/upload/compress-image.ts), so this route just stores what it is given.
 
 const s3 = new S3Client({
   region: process.env.S3_REGION!,
@@ -69,25 +65,13 @@ export async function POST(request: NextRequest) {
     const originalName = (file as File).name ?? "upload"
     const ext          = originalName.split(".").pop()?.toLowerCase() ?? "bin"
 
-    const rawBuffer = Buffer.from(await file.arrayBuffer())
-    // Only receipt/attachment photos (jpeg/png/webp) get compressed; every
-    // other attachment type (pdf, doc, xlsx, csv, …) passes through unchanged.
-    const { buffer, contentType, compressed } = await compressImageForUpload(
-      rawBuffer,
-      CONTENT_TYPE_MAP[ext] ?? "application/octet-stream",
-    )
-    // Compression changes the actual bytes to webp, so the stored filename and
-    // the file_name/file_type the UI displays must follow — otherwise a "Receipt.jpg"
-    // label would point at webp-encoded bytes.
-    const finalExt  = compressed ? "webp" : ext
-    const finalName = compressed
-      ? originalName.replace(/\.[^./]+$/, "") + ".webp"
-      : originalName
+    const buffer      = Buffer.from(await file.arrayBuffer())
+    const contentType = CONTENT_TYPE_MAP[ext] ?? "application/octet-stream"
 
     // S3 path: FHI_GLOBAL/purchases/{year}/{purchaseId}/{timestamp}-{filename}
     const year      = new Date().getFullYear()
     const timestamp = Date.now()
-    const safeName  = finalName.replace(/[^a-zA-Z0-9._-]/g, "_")
+    const safeName  = originalName.replace(/[^a-zA-Z0-9._-]/g, "_")
     const key       = `FHI_GLOBAL/purchases/${year}/${purchaseId}/${timestamp}-${safeName}`
 
     await s3.send(
@@ -104,8 +88,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       url:       publicUrl,
-      file_name: finalName,
-      file_type: finalExt.toUpperCase(),
+      file_name: originalName,
+      file_type: ext.toUpperCase(),
     })
   } catch (err) {
     console.error("[purchase-file-upload]", err)

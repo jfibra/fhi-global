@@ -17,6 +17,7 @@ import {
   type SupportTicketRecord,
 } from "@/lib/support-service"
 import { isAdminStaffRole } from "@/lib/app-roles"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -105,7 +106,8 @@ export function SupportFormDialog({
 
   const uploadAttachmentFile = async (ticketId: string, file: File) => {
     const formData = new FormData()
-    formData.append("file", file)
+    const { file: toUpload } = await compressImageForUpload(file)
+    formData.append("file", toUpload, toUpload.name)
     formData.append("ticketId", ticketId)
 
     const response = await fetch("/api/upload/support-ticket-file", {

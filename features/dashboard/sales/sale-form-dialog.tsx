@@ -45,6 +45,7 @@ import {
 } from "@/lib/sales-service"
 import { isAdminStaffRole } from "@/lib/app-roles"
 import { DeveloperCombobox } from "@/components/developers/developer-combobox"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 // ─── Portal ───────────────────────────────────────────────────────────────────
 
@@ -311,7 +312,8 @@ export function SaleFormDialog({
     setAttUploading(true)
     try {
       const formData = new FormData()
-      formData.append("file", file)
+      const { file: toUpload } = await compressImageForUpload(file)
+      formData.append("file", toUpload, toUpload.name)
       formData.append("saleId", saleId)
       const res = await fetch("/api/upload/sale-file", { method: "POST", body: formData })
       const json = await res.json() as { url?: string; file_name?: string; file_type?: string; error?: string }

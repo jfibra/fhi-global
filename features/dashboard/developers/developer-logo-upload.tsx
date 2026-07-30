@@ -8,6 +8,7 @@ import { Upload, X, Check, ImageIcon, Trash2, ZoomIn, ZoomOut, ArrowLeft, Crop }
 import Image from "next/image"
 import { updateDeveloperLogoUrl } from "@/lib/developer-service"
 import { getCroppedBlob } from "@/lib/crop-image"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -140,8 +141,15 @@ export function DeveloperLogoUpload({
         return
       }
 
+      // Shrink in the browser before it goes over the wire — see
+      // lib/upload/compress-image.ts. Fails open, so a logo still uploads
+      // (just uncompressed) if the browser can't do it.
+      const { file: toUpload } = await compressImageForUpload(
+        new File([blob], "logo.png", { type: blob.type || "image/png" }),
+      )
+
       const fd = new FormData()
-      fd.append("file", blob, "logo.png")
+      fd.append("file", toUpload, toUpload.name)
       fd.append("developerSlug", developerSlug)
 
       const res = await fetch("/api/upload/developer", { method: "POST", body: fd })

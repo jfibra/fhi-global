@@ -19,6 +19,7 @@ import {
   type SaleAttachment,
 } from "@/lib/sales-service"
 import { isAdminStaffRole } from "@/lib/app-roles"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -94,7 +95,8 @@ export function SaleAttachmentsDialog({
     setUploading(true)
     try {
       const formData = new FormData()
-      formData.append("file", file)
+      const { file: toUpload } = await compressImageForUpload(file)
+      formData.append("file", toUpload, toUpload.name)
       formData.append("saleId", sale.id)
 
       const res = await fetch("/api/upload/sale-file", {

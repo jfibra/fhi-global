@@ -35,6 +35,7 @@ import { ProjectFeaturesTab } from "./project-features-tab"
 import { ProjectNearbyTab } from "./project-nearby-tab"
 import { ProjectSeoTab } from "./project-seo-tab"
 import { ProjectSettingsTab } from "./project-settings-tab"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 // ─── Portal ────────────────────────────────────────────────────────────────────
 function Portal({ children }: { children: React.ReactNode }) {
@@ -171,8 +172,10 @@ function NewProjectModal({
     let created = data
     if (coverFile) {
       const devSlug = developers.find((d) => d.id === developerId)?.slug ?? "unknown"
+      // Shrink in the browser before it goes over the wire (fails open).
+      const { file: toUpload } = await compressImageForUpload(coverFile)
       const fd = new FormData()
-      fd.append("file", coverFile)
+      fd.append("file", toUpload, toUpload.name)
       fd.append("developer_slug", devSlug)
       fd.append("project_slug", created.slug)
       try {

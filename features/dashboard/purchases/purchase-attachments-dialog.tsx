@@ -16,6 +16,7 @@ import {
   type Purchase,
   type PurchaseAttachment,
 } from "@/lib/purchase-service"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 // ─── Portal ───────────────────────────────────────────────────────────────────
 
@@ -89,7 +90,8 @@ export function PurchaseAttachmentsDialog({
     setUploading(true)
     try {
       const formData = new FormData()
-      formData.append("file", file)
+      const { file: toUpload } = await compressImageForUpload(file)
+      formData.append("file", toUpload, toUpload.name)
       formData.append("purchaseId", purchase.id)
 
       const res = await fetch("/api/upload/purchase-file", {

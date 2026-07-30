@@ -18,6 +18,7 @@ import {
 } from "@/lib/developer-service"
 import { formatDateTime, relativeTime } from "@/lib/utils"
 import { DeveloperLogoUpload } from "./developer-logo-upload"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 // ─── Portal ────────────────────────────────────────────────────────────────────
 function Portal({ children }: { children: React.ReactNode }) {
@@ -119,8 +120,12 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
   const uploadPendingLogo = async (developerId: string): Promise<string | null> => {
     if (!pendingLogo) return null
     try {
+      // Shrink in the browser before it goes over the wire (fails open).
+      const { file: toUpload } = await compressImageForUpload(
+        new File([pendingLogo.blob], "logo.png", { type: pendingLogo.blob.type || "image/png" }),
+      )
       const fd = new FormData()
-      fd.append("file", pendingLogo.blob, "logo.png")
+      fd.append("file", toUpload, toUpload.name)
       fd.append("developerSlug", form.slug.trim())
       const res = await fetch("/api/upload/developer", { method: "POST", body: fd })
       const json = (await res.json()) as { url?: string; error?: string }

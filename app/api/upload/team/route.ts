@@ -2,13 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { isAdminStaffRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
-import { compressImageForUpload } from "@/lib/upload/compress-image"
 
-// sharp is a native module — it cannot run on the Edge runtime, so pin Node
-// explicitly rather than relying on the default. Image compression is also
-// CPU-bound, so allow more than the default execution window.
-export const runtime = "nodejs"
-export const maxDuration = 60
+// Images arrive already resized + WebP-encoded by the browser
+// (lib/upload/compress-image.ts), so this route just stores what it is given.
 
 const s3 = new S3Client({
   region: process.env.S3_REGION!,
@@ -62,22 +58,15 @@ export async function POST(request: NextRequest) {
     const ext          = originalName.split(".").pop()?.toLowerCase() ?? "png"
     const timestamp    = Date.now()
 
-    const rawBuffer = Buffer.from(await file.arrayBuffer())
-    // gif/svg/pdf pass through unchanged — compressImageForUpload only acts on
-    // jpeg/png/webp.
-    const { buffer, contentType, compressed } = await compressImageForUpload(
-      rawBuffer,
-      CONTENT_TYPES[ext] ?? "application/octet-stream",
-    )
-    const finalExt = compressed ? "webp" : ext
-    const key      = `FHI_GLOBAL/${teamSlug}/${timestamp}-logo.${finalExt}`
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const key    = `FHI_GLOBAL/${teamSlug}/${timestamp}-logo.${ext}`
 
     await s3.send(
       new PutObjectCommand({
         Bucket:       process.env.S3_BUCKET_NAME!,
         Key:          key,
         Body:         buffer,
-        ContentType:  contentType,
+        ContentType:  CONTENT_TYPES[ext] ?? "application/octet-stream",
         CacheControl: "public, max-age=31536000",
       }),
     )

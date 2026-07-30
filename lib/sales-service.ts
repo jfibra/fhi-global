@@ -5,6 +5,7 @@ import {
   isSecretaryLikeRole,
   ROLES_SALE_AGENT_PROFILES,
 } from "@/lib/app-roles"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1043,7 +1044,8 @@ export async function uploadSaleProofFile(
 ): Promise<{ data: SaleAttachment | null; error: string | null }> {
   try {
     const uploadForm = new FormData()
-    uploadForm.append("file", file)
+    const { file: toUpload } = await compressImageForUpload(file)
+    uploadForm.append("file", toUpload, toUpload.name)
     uploadForm.append("saleId", saleId)
 
     const uploadRes = await fetch("/api/upload/sale-file", { method: "POST", body: uploadForm })

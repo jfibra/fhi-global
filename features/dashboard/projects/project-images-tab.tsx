@@ -10,6 +10,7 @@ import {
   setMainImage,
   deleteProjectImage,
 } from "@/lib/project-service"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 interface Props {
   project: { id: number; slug: string; developer_id: string | null; developers?: { slug?: string | null } | null }
@@ -42,8 +43,10 @@ export function ProjectImagesTab({ project, showToast, onMainImageChange }: Prop
     const projectSlug = project.slug
 
     for (const file of Array.from(files)) {
+      // Shrink in the browser before it goes over the wire (fails open).
+      const { file: toUpload } = await compressImageForUpload(file)
       const fd = new FormData()
-      fd.append("file", file)
+      fd.append("file", toUpload, toUpload.name)
       fd.append("developer_slug", devSlug)
       fd.append("project_slug", projectSlug)
 

@@ -6,6 +6,7 @@ import Cropper from "react-easy-crop"
 import type { Area, Point } from "react-easy-crop"
 import { Trash2, ZoomIn, ZoomOut, X, Check, Upload } from "lucide-react"
 import { getCroppedBlob } from "@/lib/crop-image"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 // ─── component ────────────────────────────────────────────────────────────────
 export function ProfileAvatarUpload({
@@ -89,8 +90,12 @@ export function ProfileAvatarUpload({
 
     try {
       const blob = await getCroppedBlob(srcToUpload, croppedAreaPixels, "image/jpeg", 0.92)
+      // Shrink in the browser before it goes over the wire (fails open).
+      const { file: toUpload } = await compressImageForUpload(
+        new File([blob], "avatar.jpg", { type: blob.type || "image/jpeg" }),
+      )
       const formData = new FormData()
-      formData.append("file", blob, "avatar.jpg")
+      formData.append("file", toUpload, toUpload.name)
       formData.append("userId", userId)
 
       const res = await fetch("/api/upload/avatar", { method: "POST", body: formData })

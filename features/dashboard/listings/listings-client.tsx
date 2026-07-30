@@ -64,6 +64,7 @@ import {
   ViewToggle,
   WHITE_PAGE,
 } from "./listing-ui"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 // app/layout.tsx exposes Outfit as a CSS variable; the repo's usual
 // `font-['Outfit']` names a family that was never registered, so it silently
@@ -420,9 +421,12 @@ export function AgentListingsClient({
         showToast("error", `${file.name} is not an image`)
         continue
       }
-      const fd = new FormData()
-      fd.append("file", file)
       try {
+        // Shrink in the browser first: listing photos come straight off a phone
+        // camera, so this is what keeps the upload from taking tens of seconds.
+        const { file: toUpload } = await compressImageForUpload(file)
+        const fd = new FormData()
+        fd.append("file", toUpload, toUpload.name)
         const res = await fetch("/api/upload/agent-listing", { method: "POST", body: fd })
         const data = (await res.json()) as { url?: string; error?: string }
         if (!res.ok) {
