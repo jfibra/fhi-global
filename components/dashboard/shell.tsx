@@ -13,6 +13,7 @@ import { useAuth } from "@/context/auth-context"
 import { getSidebarNavItems, getRoleColor, type NavItem } from "@/components/dashboard/sidebar-config"
 import { DashboardBreadcrumb } from "@/components/dashboard/dashboard-breadcrumb"
 import { DashboardSearch } from "@/components/dashboard/dashboard-search"
+import { RequiredSaleProofGate } from "@/components/dashboard/required-sale-proof-gate"
 import { ROLE_SHELL_BADGE, normalizeAppRole, isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
 
 // ─── Render-once contract ────────────────────────────────────────────────────
@@ -444,6 +445,10 @@ export function DashboardShell({
           {children}
         </main>
       </div>
+
+      {/* Login-time enforcement: any of the user's own sales still missing a
+          proof of transaction must be resolved before using the dashboard. */}
+      <RequiredSaleProofGate />
     </div>
   )
 }

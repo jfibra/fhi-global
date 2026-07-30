@@ -22,7 +22,7 @@ import {
   fetchDevelopersForSale,
   fetchProjectsForDeveloper,
   fetchUnitsForProject,
-  insertSaleAttachment,
+  uploadSaleProofFile,
   validateSaleFormData,
   SALE_PROPERTY_TYPES,
   SALE_TYPE_LABELS,
@@ -227,6 +227,11 @@ export function EncodeSaleClient({
   }
 
   const submit = async () => {
+    // Proof of transaction is mandatory — never record a sale without it.
+    if (files.length === 0) {
+      setSubmitError("Attach at least one proof of transaction before submitting.")
+      return
+    }
     setSubmitting(true)
     setSubmitError(null)
     try {
@@ -236,35 +241,19 @@ export function EncodeSaleClient({
         return
       }
       // Upload staged proof files — the sale is already saved, so failures
-      // here never lose the sale; they just get reported for a manual retry.
+      // here never lose the sale; they just get reported for a manual retry
+      // (and the login prompt will nudge again until proof is attached).
       let failed = 0
       for (const file of files) {
-        try {
-          const fd = new FormData()
-          fd.append("file", file)
-          fd.append("saleId", data.id)
-          const res = await fetch("/api/upload/sale-file", { method: "POST", body: fd })
-          const json = (await res.json()) as { url?: string; file_name?: string; file_type?: string; error?: string }
-          if (!res.ok || !json.url) throw new Error(json.error ?? "upload failed")
-          const { error: attError } = await insertSaleAttachment({
-            sales_report_id: data.id,
-            file_name: json.file_name ?? file.name,
-            file_url: json.url,
-            file_type: json.file_type ?? null,
-            uploaded_by: currentUserId,
-            uploaded_role: currentRole,
-          })
-          if (attError) throw new Error(attError)
-        } catch {
-          failed++
-        }
+        const { error: uploadError } = await uploadSaleProofFile(file, data.id)
+        if (uploadError) failed++
       }
       setUploadNote(
-        files.length === 0
-          ? null
-          : failed === 0
-            ? `${files.length} file${files.length > 1 ? "s" : ""} attached.`
-            : `${files.length - failed} of ${files.length} files attached — upload the rest from the sales list.`,
+        failed === 0
+          ? `${files.length} file${files.length > 1 ? "s" : ""} attached.`
+          : failed === files.length
+            ? "Sale saved, but the proof upload failed — please add it from your sales list."
+            : `${files.length - failed} of ${files.length} files attached — add the rest from the sales list.`,
       )
       setDone(true)
     } finally {
@@ -625,9 +614,11 @@ export function EncodeSaleClient({
                 </div>
               ))}
             </dl>
-            {/* Proof of transaction attachments */}
-            <div className="rounded-2xl border border-dashed border-[#d1d5db] p-4">
-              <p className={labelCls}>Proof of transaction (optional)</p>
+            {/* Proof of transaction attachments — required */}
+            <div className={`rounded-2xl border border-dashed p-4 ${files.length === 0 ? "border-rose-300 bg-rose-50/40" : "border-[#d1d5db]"}`}>
+              <p className={labelCls}>
+                Proof of transaction <span className="text-rose-500">*</span>
+              </p>
               <div className="flex flex-wrap items-center gap-2">
                 <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-colors cursor-pointer">
                   <Paperclip className="w-4 h-4" />
@@ -658,8 +649,10 @@ export function EncodeSaleClient({
                   </span>
                 ))}
               </div>
-              <p className="mt-2 text-[11px] text-[#9ca3af]">
-                Receipts, contracts, cheques — images or PDF. You can also add files later from the sales list.
+              <p className={`mt-2 text-[11px] ${files.length === 0 ? "text-rose-600 font-semibold" : "text-[#9ca3af]"}`}>
+                {files.length === 0
+                  ? "At least one proof file is required to submit — receipts, contracts, cheques (images or PDF)."
+                  : "Receipts, contracts, cheques — images or PDF. Add as many as you need."}
               </p>
             </div>
 
@@ -696,8 +689,9 @@ export function EncodeSaleClient({
             <button
               type="button"
               onClick={() => void submit()}
-              disabled={submitting}
-              className="inline-flex items-center gap-2 px-7 py-2.5 rounded-xl bg-gradient-to-r from-[#d6b357] to-[#b8913f] text-[#001428] text-sm font-bold shadow-md hover:shadow-lg transition-shadow disabled:opacity-60"
+              disabled={submitting || files.length === 0}
+              title={files.length === 0 ? "Attach a proof of transaction first" : undefined}
+              className="inline-flex items-center gap-2 px-7 py-2.5 rounded-xl bg-gradient-to-r from-[#d6b357] to-[#b8913f] text-[#001428] text-sm font-bold shadow-md hover:shadow-lg transition-shadow disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               {submitting ? "Submitting…" : "Submit sale"}

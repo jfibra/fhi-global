@@ -40,6 +40,7 @@ import {
   type SaleAttachment,
   fetchSaleAttachments,
   insertSaleAttachment,
+  uploadSaleProofFile,
   deleteSaleAttachment,
 } from "@/lib/sales-service"
 import { isAdminStaffRole } from "@/lib/app-roles"
@@ -175,7 +176,7 @@ export function SaleFormDialog({
     { id: "client",      label: "Client" },
     { id: "contract",    label: "Contract" },
     ...(isAdmin ? [{ id: "workflow" as TabId, label: "Workflow" }] : []),
-    ...(!viewMode ? [{ id: "attachments" as TabId, label: pendingFiles.length > 0 ? `Attachments (${pendingFiles.length})` : "Attachments" }] : []),
+    ...(!viewMode ? [{ id: "attachments" as TabId, label: pendingFiles.length > 0 ? `Attachments (${pendingFiles.length})` : (isEdit ? "Attachments" : "Attachments *") }] : []),
   ]
 
   // Load developers on mount
@@ -385,6 +386,13 @@ export function SaleFormDialog({
       return
     }
 
+    // Proof of transaction is mandatory when encoding a new sale.
+    if (!isEdit && pendingFiles.length === 0) {
+      setActiveTab("attachments")
+      onError("Attach at least one proof of transaction before encoding the sale.")
+      return
+    }
+
     setSaving(true)
     try {
       if (isEdit && editSale) {
@@ -394,11 +402,10 @@ export function SaleFormDialog({
       } else {
         const { data, error } = await createSale(form, currentUserId, currentRole)
         if (error) { onError(error); return }
-        // Upload any staged files after sale is created
-        if (pendingFiles.length > 0) {
-          for (const file of pendingFiles) {
-            await uploadAttachmentFile(file, data!.id)
-          }
+        // Upload staged proof after the sale exists. Routed through the
+        // service-role helper so it works while the sale is still pending.
+        for (const file of pendingFiles) {
+          await uploadSaleProofFile(file, data!.id)
         }
         onSaved(data!, false)
       }
@@ -1054,7 +1061,7 @@ export function SaleFormDialog({
                   <>
                     <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-100 rounded-2xl text-sm text-amber-800">
                       <span>ðŸ“Ž</span>
-                      <p>Files added here will be uploaded automatically after the sale is saved.</p>
+                      <p><strong>Proof of transaction is required.</strong> Files added here upload automatically after the sale is saved.</p>
                     </div>
                     <div
                       onDragOver={(e) => { e.preventDefault(); setAttDragOver(true) }}

@@ -65,6 +65,17 @@ export type SaleAttachment = {
   profiles: { fullname: string | null } | null
 }
 
+/** A sale owned by the current user that has no proof-of-transaction file yet. */
+export type SaleMissingProof = {
+  id: string
+  sale_type: SaleType
+  client_name: string
+  location: string
+  contract_price: number
+  reservation_date: string | null
+  validation_status: ValidationStatus
+}
+
 export type SaleRecord = {
   id: string
   agent_id: string
@@ -1016,6 +1027,123 @@ export async function fetchSaleAttachments(saleId: string): Promise<{
 
   if (error) return { data: null, error: error.message }
   return { data: (data ?? []).map(normalizeAttachment), error: null }
+}
+
+/**
+ * Upload a proof-of-transaction file for a sale: push the bytes to S3, then
+ * record the attachment through the service-role route (server-authoritative
+ * authorization). Use this for the mandatory-proof flows — encoding a new sale
+ * and the login backfill prompt — because the owner must be able to attach
+ * proof even while the sale is still `pending`, which the RLS-backed
+ * insertSaleAttachment() intentionally forbids.
+ */
+export async function uploadSaleProofFile(
+  file: File,
+  saleId: string,
+): Promise<{ data: SaleAttachment | null; error: string | null }> {
+  try {
+    const uploadForm = new FormData()
+    uploadForm.append("file", file)
+    uploadForm.append("saleId", saleId)
+
+    const uploadRes = await fetch("/api/upload/sale-file", { method: "POST", body: uploadForm })
+    const uploadJson = (await uploadRes.json()) as {
+      url?: string
+      file_name?: string
+      file_type?: string
+      error?: string
+    }
+    if (!uploadRes.ok || !uploadJson.url) {
+      return { data: null, error: uploadJson.error ?? "File upload failed" }
+    }
+
+    const recordRes = await fetch("/api/sales/attachments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        saleId,
+        file_name: uploadJson.file_name ?? file.name,
+        file_url: uploadJson.url,
+        file_type: uploadJson.file_type ?? null,
+      }),
+    })
+    const recordJson = (await recordRes.json()) as { attachment?: unknown; error?: string }
+    if (!recordRes.ok || !recordJson.attachment) {
+      return { data: null, error: recordJson.error ?? "Failed to save the attachment" }
+    }
+
+    return { data: normalizeAttachment(recordJson.attachment), error: null }
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : "File upload failed" }
+  }
+}
+
+/**
+ * Sales owned by `userId` that have no attachment yet — powers the login prompt
+ * that forces agents to backfill a missing proof of transaction. RLS already
+ * scopes an agent to their own sales; the zero-attachment filter runs in JS
+ * because PostgREST can't express "having count(attachments) = 0" inline.
+ */
+export async function fetchMySalesMissingProof(
+  userId: string,
+): Promise<{ data: SaleMissingProof[] | null; error: string | null }> {
+  if (!userId) return { data: [], error: null }
+
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("sales_reports")
+    .select(`
+      id, sale_type, contract_price, reservation_date, validation_status,
+      property_type, property_address,
+      projects(name),
+      clients(first_name,last_name),
+      sales_attachments(id)
+    `)
+    .eq("agent_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(200)
+
+  if (error) return { data: null, error: error.message }
+
+  const relObj = (rel: unknown): Record<string, unknown> | null => {
+    if (!rel) return null
+    const item = Array.isArray(rel) ? (rel[0] ?? null) : rel
+    return item ? (item as Record<string, unknown>) : null
+  }
+
+  const mapped = (data ?? [])
+    .filter((row: unknown) => {
+      const att = (row as Record<string, unknown>).sales_attachments
+      return !Array.isArray(att) || att.length === 0
+    })
+    .map((row: unknown) => {
+      const raw = row as Record<string, unknown>
+      const client = relObj(raw.clients)
+      const project = relObj(raw.projects)
+      const saleType = (raw.sale_type === "brokerage" || raw.sale_type === "rental"
+        ? raw.sale_type
+        : "project") as SaleType
+      const clientName = client
+        ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim()
+        : ""
+      const location =
+        saleType === "project"
+          ? (typeof project?.name === "string" ? project.name : SALE_TYPE_LABELS.project)
+          : [raw.property_type, raw.property_address]
+              .filter((v) => typeof v === "string" && v.trim())
+              .join(" · ") || SALE_TYPE_LABELS[saleType]
+      return {
+        id: String(raw.id ?? ""),
+        sale_type: saleType,
+        client_name: clientName || "—",
+        location: location || "—",
+        contract_price: Number(raw.contract_price ?? 0),
+        reservation_date: typeof raw.reservation_date === "string" ? raw.reservation_date : null,
+        validation_status: (raw.validation_status as ValidationStatus) ?? "pending",
+      }
+    })
+
+  return { data: mapped, error: null }
 }
 
 export async function insertSaleAttachment(payload: {
