@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { createClient } from "@/lib/supabase/server"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 const s3 = new S3Client({
   region: process.env.S3_REGION!,
@@ -40,16 +41,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File exceeds 5 MB limit" }, { status: 413 })
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer())
+    const rawBuffer = Buffer.from(await file.arrayBuffer())
+    // The cropper always exports image/jpeg (see profile-avatar-upload.tsx),
+    // so that's the type fed into compression regardless of the Blob's own type.
+    const { buffer, contentType, compressed } = await compressImageForUpload(rawBuffer, "image/jpeg")
     const timestamp = Date.now()
-    const key = `avatars/${userId}/${timestamp}.jpg`
+    const key = `avatars/${userId}/${timestamp}.${compressed ? "webp" : "jpg"}`
 
     await s3.send(
       new PutObjectCommand({
         Bucket: process.env.S3_BUCKET_NAME!,
         Key: key,
         Body: buffer,
-        ContentType: "image/jpeg",
+        ContentType: contentType,
         CacheControl: "public, max-age=31536000",
       }),
     )

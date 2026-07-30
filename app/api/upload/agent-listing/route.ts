@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { isSalesPipelineRole } from "@/lib/app-roles"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 const s3 = new S3Client({
   region: process.env.S3_REGION!,
@@ -33,18 +34,21 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = session.context.userId
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg"
+  const rawBuffer = Buffer.from(await file.arrayBuffer())
+  const { buffer, contentType, compressed } = await compressImageForUpload(
+    rawBuffer,
+    file.type || "image/jpeg",
+  )
+  const ext = compressed ? "webp" : (file.name.split(".").pop()?.toLowerCase() ?? "jpg")
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
   const key = `FHI_GLOBAL/agent-listings/${userId}/${filename}`
-
-  const buffer = Buffer.from(await file.arrayBuffer())
 
   await s3.send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
       Body: buffer,
-      ContentType: file.type || "image/jpeg",
+      ContentType: contentType,
     }),
   )
 

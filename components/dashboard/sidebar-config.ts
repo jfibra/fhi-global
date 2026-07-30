@@ -4,7 +4,7 @@ import {
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, QrCode, ScrollText, Inbox, CalendarDays,
-  Wallet, MessagesSquare, FileText,
+  Wallet, MessagesSquare, FileText, UploadCloud,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -174,6 +174,12 @@ const ADMIN_NAV: RoleNavEntry[] = [
     ],
   },
   { icon: ScrollText, label: "Activity Logs", to: "system-logs" },
+  // Dev-only test bench for the upload-compression pipeline
+  // (lib/upload/compress-image.ts) — not a real business feature, just a way
+  // to throw arbitrary images at the exact same server-side compression every
+  // upload route runs. Admin staff only; safe to remove once that pipeline's
+  // behavior is no longer in question.
+  { icon: UploadCloud, label: "Upload Test", to: "upload-test" },
 ]
 
 /** Content-only role: developers + projects, no admin powers. */

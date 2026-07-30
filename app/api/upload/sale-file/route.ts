@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { canAccessSalesReportsArea } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 const s3 = new S3Client({
   region: process.env.S3_REGION!,
@@ -63,7 +64,20 @@ export async function POST(request: NextRequest) {
 
     const originalName = (file as File).name ?? "upload"
     const ext          = originalName.split(".").pop()?.toLowerCase() ?? "bin"
-    const contentType  = CONTENT_TYPE_MAP[ext] ?? "application/octet-stream"
+
+    const rawBuffer = Buffer.from(await file.arrayBuffer())
+    // Only receipt/attachment photos (jpeg/png/webp) get compressed; every
+    // other attachment type (pdf, doc, xlsx, csv, …) passes through unchanged.
+    const { buffer, contentType, compressed } = await compressImageForUpload(
+      rawBuffer,
+      CONTENT_TYPE_MAP[ext] ?? "application/octet-stream",
+    )
+    // Compression changes the actual bytes to webp, so the stored filename and
+    // the file_name/file_type the UI displays must follow.
+    const finalExt  = compressed ? "webp" : ext
+    const finalName = compressed
+      ? originalName.replace(/\.[^./]+$/, "") + ".webp"
+      : originalName
 
     // S3 path: fhi_global/sales_report/{year}/{month}/{date}/{saleId}/{timestamp}-{filename}
     const now       = new Date()
@@ -71,10 +85,8 @@ export async function POST(request: NextRequest) {
     const month     = String(now.getMonth() + 1).padStart(2, "0")
     const day       = String(now.getDate()).padStart(2, "0")
     const timestamp = Date.now()
-    const safeName  = originalName.replace(/[^a-zA-Z0-9._-]/g, "_")
+    const safeName  = finalName.replace(/[^a-zA-Z0-9._-]/g, "_")
     const key       = `fhi_global/sales_report/${year}/${month}/${day}/${saleId}/${timestamp}-${safeName}`
-
-    const buffer = Buffer.from(await file.arrayBuffer())
 
     await s3.send(
       new PutObjectCommand({
@@ -90,8 +102,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       url:       publicUrl,
-      file_name: originalName,
-      file_type: ext.toUpperCase(),
+      file_name: finalName,
+      file_type: finalExt.toUpperCase(),
     })
   } catch (err) {
     console.error("[sale-file-upload]", err)
