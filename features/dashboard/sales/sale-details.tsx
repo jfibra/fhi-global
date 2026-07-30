@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom"
 import { useEffect, useState } from "react"
 import {
+  Briefcase,
   Building2,
   Calendar,
   DollarSign,
@@ -141,8 +142,20 @@ export function SaleDetails({
             </div>
           </div>
 
-          {/* Body */}
+          {/* Body — section order is deliberate: Agent, Client, Property, Contract. */}
           <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+
+            {/* Agent */}
+            <SectionCard icon={Briefcase} title="Agent Information">
+              <DetailRow label="Agent" value={sale.profiles?.fullname} />
+            </SectionCard>
+
+            {/* Client */}
+            <SectionCard icon={User} title="Client Information">
+              <DetailRow label="Name" value={clientName} />
+              <DetailRow label="Email" value={sale.clients?.email} />
+              <DetailRow label="Phone" value={sale.clients?.phone} />
+            </SectionCard>
 
             {/* Property */}
             <SectionCard icon={Building2} title="Property Information">
@@ -162,13 +175,6 @@ export function SaleDetails({
               <DetailRow label="Unit Number" value={sale.unit_number} />
               <DetailRow label="Block" value={sale.block_number} />
               <DetailRow label="Lot" value={sale.lot_number} />
-            </SectionCard>
-
-            {/* Client */}
-            <SectionCard icon={User} title="Client Information">
-              <DetailRow label="Name" value={clientName} />
-              <DetailRow label="Email" value={sale.clients?.email} />
-              <DetailRow label="Phone" value={sale.clients?.phone} />
             </SectionCard>
 
             {/* Contract */}
@@ -202,8 +208,8 @@ export function SaleDetails({
 
             {/* Meta */}
             <div className="bg-white/60 backdrop-blur-xl rounded-[20px] border border-white/60 shadow-sm shadow-black/5 p-5">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <DetailRow label="Agent" value={sale.profiles?.fullname} />
+              {/* Agent moved to its own section at the top, so it isn't repeated here. */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <DetailRow label="Attachments" value={
                   <span className="inline-flex items-center gap-1.5">
                     <Paperclip className="w-3 h-3" />
