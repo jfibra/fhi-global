@@ -5,9 +5,10 @@ import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
-  Menu, X, Phone, Mail, Facebook, Instagram, Linkedin, Twitter,
+  Menu, X, Phone, Mail, Facebook, Instagram,
   ChevronDown, LayoutDashboard, LogOut,
 } from "lucide-react"
+import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
 import { getDashboardRouteByRole } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/client"
 import { AuthModal } from "@/components/auth/auth-modal"
@@ -23,10 +24,8 @@ const NAV_LINKS = [
 ]
 
 const SOCIAL_LINKS = [
-  { label: "Facebook",  href: "#", Icon: Facebook },
-  { label: "Instagram", href: "#", Icon: Instagram },
-  { label: "LinkedIn",  href: "#", Icon: Linkedin },
-  { label: "Twitter",   href: "#", Icon: Twitter },
+  { label: "Facebook",  href: SOCIAL_URLS.facebook,  Icon: Facebook },
+  { label: "Instagram", href: SOCIAL_URLS.instagram, Icon: Instagram },
 ]
 
 type HeaderSession = {
@@ -484,6 +483,8 @@ export function Header() {
                   key={label}
                   href={href}
                   aria-label={label}
+                  target={isExternalSocial(href) ? "_blank" : undefined}
+                  rel={isExternalSocial(href) ? "noopener noreferrer" : undefined}
                   className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/8 hover:bg-[#d6b357]/20 hover:text-[#d6b357] text-white/50 transition-all duration-200"
                 >
                   <Icon className="w-4 h-4" />

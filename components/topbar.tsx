@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Phone, Mail } from "lucide-react"
+import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
 
 function FacebookIcon() {
   return (
@@ -14,22 +15,6 @@ function InstagramIcon() {
       <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
       <circle cx="12" cy="12" r="4" />
       <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor" strokeWidth={0} />
-    </svg>
-  )
-}
-function LinkedInIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current" aria-hidden="true">
-      <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
-      <rect x="2" y="9" width="4" height="12" />
-      <circle cx="4" cy="4" r="2" />
-    </svg>
-  )
-}
-function TwitterXIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current" aria-hidden="true">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
     </svg>
   )
 }
@@ -60,15 +45,15 @@ export function TopBar() {
         {/* Right — social icons */}
         <div className="flex items-center gap-0.5">
           {[
-            { href: "#", label: "Facebook",  Icon: FacebookIcon },
-            { href: "#", label: "Instagram", Icon: InstagramIcon },
-            { href: "#", label: "LinkedIn",  Icon: LinkedInIcon },
-            { href: "#", label: "Twitter/X", Icon: TwitterXIcon },
+            { href: SOCIAL_URLS.facebook,  label: "Facebook",  Icon: FacebookIcon },
+            { href: SOCIAL_URLS.instagram, label: "Instagram", Icon: InstagramIcon },
           ].map(({ href, label, Icon }) => (
             <Link
               key={label}
               href={href}
               aria-label={label}
+              target={isExternalSocial(href) ? "_blank" : undefined}
+              rel={isExternalSocial(href) ? "noopener noreferrer" : undefined}
               className="w-7 h-7 flex items-center justify-center rounded-full hover:text-[#d6b357] hover:bg-white/8 transition-all duration-200"
             >
               <Icon />
