@@ -3,6 +3,12 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { createClient } from "@/lib/supabase/server"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 
+// sharp is a native module — it cannot run on the Edge runtime, so pin Node
+// explicitly rather than relying on the default. Image compression is also
+// CPU-bound, so allow more than the default execution window.
+export const runtime = "nodejs"
+export const maxDuration = 60
+
 const s3 = new S3Client({
   region: process.env.S3_REGION!,
   credentials: {

@@ -4,6 +4,12 @@ import { isAdminOrDeveloperUploadRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 
+// sharp is a native module — it cannot run on the Edge runtime, so pin Node
+// explicitly rather than relying on the default. Image compression is also
+// CPU-bound, so allow more than the default execution window.
+export const runtime = "nodejs"
+export const maxDuration = 60
+
 const s3 = new S3Client({
   region: process.env.S3_REGION!,
   credentials: {
@@ -80,6 +86,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url: publicUrl })
   } catch (err) {
     console.error("[developer-upload]", err)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    // Surface the real reason. This route is admin/super-admin only (checked
+    // above), so there is no untrusted audience to leak internals to — and a
+    // generic "Internal server error" made a production-only failure
+    // undiagnosable without dashboard log access.
+    return NextResponse.json(
+      { error: err instanceof Error ? `Upload failed: ${err.message}` : "Upload failed" },
+      { status: 500 },
+    )
   }
 }
