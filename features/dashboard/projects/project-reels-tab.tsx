@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { QRCodeCanvas } from "qrcode.react"
 import {
-  Clapperboard, Download, Loader2, Pause, Play, RotateCcw, Film,
+  Clapperboard, Download, Loader2, Pause, Play, RotateCcw, Film, Music,
 } from "lucide-react"
 import type { Project } from "@/lib/project-service"
 import { proxied, formatPrice } from "@/lib/flyer/theme"
@@ -36,6 +36,18 @@ interface Props {
 const LOGO_WHITE = "/FHI_Branding_White.png"
 const MAX_PHOTOS = 8
 
+// Selectable soundtracks (files live in public/reelssounds). There is no
+// dedicated FHI jingle yet, so "FHI Global Property" reuses the FH Global
+// Partners track — swap its src here when an FHI jingle lands.
+type Soundtrack = { key: string; label: string; src: string }
+const SOUNDTRACKS: Soundtrack[] = [
+  { key: "fhi-global", label: "FHI Global Property", src: "/reelssounds/fh-global-partners-jingle.mp3" },
+  { key: "fh-partners", label: "FH Global Partners", src: "/reelssounds/fh-global-partners-jingle.mp3" },
+  { key: "homes-ph", label: "Homes PH", src: "/reelssounds/homes-ph-jingle.mp3" },
+  { key: "rent-ph", label: "Rent PH", src: "/reelssounds/rent-ph-jingle.mp3" },
+  { key: "filipino-homes", label: "Filipino Homes", src: "/reelssounds/filipinohomes-jingle.mp3" },
+]
+
 export function ProjectReelsTab({ project, showToast }: Props) {
   const [data, setData] = useState<ProjectMarketingData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -50,6 +62,13 @@ export function ProjectReelsTab({ project, showToast }: Props) {
   const [recording, setRecording] = useState(false)
   const [progress, setProgress] = useState(0)
 
+  const [musicOn, setMusicOn] = useState(true)
+  const [soundtrackKey, setSoundtrackKey] = useState(SOUNDTRACKS[0].key)
+  const soundtrack = useMemo(
+    () => SOUNDTRACKS.find((s) => s.key === soundtrackKey) ?? SOUNDTRACKS[0],
+    [soundtrackKey],
+  )
+
   const [logoImg, setLogoImg] = useState<HTMLImageElement | null>(null)
   const [photoImgs, setPhotoImgs] = useState<HTMLImageElement[]>([])
   const [fontFamily, setFontFamily] = useState("Arial, sans-serif")
@@ -60,6 +79,8 @@ export function ProjectReelsTab({ project, showToast }: Props) {
   const playStartRef = useRef(0)
   const pausedAtRef = useRef(0)
   const recorderRef = useRef<MediaRecorder | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioCtxRef = useRef<AudioContext | null>(null)
 
   // ── Data assembly ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -149,6 +170,7 @@ export function ProjectReelsTab({ project, showToast }: Props) {
   const stopPlayback = useCallback(() => {
     cancelAnimationFrame(rafRef.current)
     setPlaying(false)
+    audioRef.current?.pause()
   }, [])
 
   // Draw a static frame whenever anything changes while idle. At t=0 the
@@ -192,11 +214,19 @@ export function ProjectReelsTab({ project, showToast }: Props) {
     const resumeFrom = pausedAtRef.current >= totalS ? 0 : pausedAtRef.current
     playStartRef.current = performance.now() - resumeFrom * 1000
     setPlaying(true)
+    if (musicOn) {
+      if (!audioRef.current) audioRef.current = new Audio()
+      const a = audioRef.current
+      if (!a.src.endsWith(soundtrack.src)) a.src = soundtrack.src
+      a.loop = true
+      a.currentTime = resumeFrom % 60
+      void a.play().catch(() => {})
+    }
     runLoop(() => {
       pausedAtRef.current = 0
       stopPlayback()
     })
-  }, [playing, recording, totalS, runLoop, stopPlayback])
+  }, [playing, recording, totalS, musicOn, soundtrack.src, runLoop, stopPlayback])
 
   const handleRestart = useCallback(() => {
     if (recording) return
@@ -210,14 +240,21 @@ export function ProjectReelsTab({ project, showToast }: Props) {
   useEffect(
     () => () => {
       cancelAnimationFrame(rafRef.current)
+      audioRef.current?.pause()
       try {
         if (recorderRef.current?.state === "recording") recorderRef.current.stop()
       } catch {
         // already stopped
       }
+      void audioCtxRef.current?.close().catch(() => {})
     },
     [],
   )
+
+  // Stop the preview jingle immediately if music is switched off mid-playback.
+  useEffect(() => {
+    if (!musicOn) audioRef.current?.pause()
+  }, [musicOn])
 
   // ── Export ───────────────────────────────────────────────────────────────
   const handleRecord = useCallback(async () => {
@@ -230,10 +267,30 @@ export function ProjectReelsTab({ project, showToast }: Props) {
     try {
       await document.fonts?.ready
       const stream = canvas.captureStream(30)
+
+      // Mix the selected jingle in via WebAudio (export stays silent on speakers).
+      if (musicOn) {
+        try {
+          const actx = new AudioContext()
+          audioCtxRef.current = actx
+          const res = await fetch(soundtrack.src)
+          const buf = await actx.decodeAudioData(await res.arrayBuffer())
+          const src = actx.createBufferSource()
+          src.buffer = buf
+          src.loop = true
+          const dest = actx.createMediaStreamDestination()
+          src.connect(dest)
+          src.start()
+          for (const track of dest.stream.getAudioTracks()) stream.addTrack(track)
+        } catch {
+          // No audio if the jingle fails to decode — video still exports.
+        }
+      }
+
       const candidates = [
         "video/mp4;codecs=avc1",
         "video/mp4",
-        "video/webm;codecs=vp9",
+        "video/webm;codecs=vp9,opus",
         "video/webm",
       ]
       const mime = candidates.find((m) => MediaRecorder.isTypeSupported(m)) ?? ""
@@ -256,6 +313,8 @@ export function ProjectReelsTab({ project, showToast }: Props) {
       recorder.stop()
       await done
       for (const track of stream.getTracks()) track.stop()
+      void audioCtxRef.current?.close().catch(() => {})
+      audioCtxRef.current = null
 
       const ext = mime.startsWith("video/mp4") ? "mp4" : "webm"
       const blob = new Blob(chunks, { type: mime || "video/webm" })
@@ -273,7 +332,7 @@ export function ProjectReelsTab({ project, showToast }: Props) {
       setProgress(0)
       pausedAtRef.current = 0
     }
-  }, [recording, stopPlayback, runLoop, project.slug, showToast])
+  }, [recording, stopPlayback, runLoop, musicOn, soundtrack.src, project.slug, showToast])
 
   // ── Photo selection ──────────────────────────────────────────────────────
   const togglePhoto = (url: string) => {
@@ -390,6 +449,43 @@ export function ProjectReelsTab({ project, showToast }: Props) {
             <p className="sm:col-span-2 text-[11px] text-[#9ca3af]">
               Slide captions rotate automatically through price, handover, features and amenities pulled from the project.
               The outro carries a QR code to the public project page{data.contactPhone || data.contactEmail ? " plus the sales contact" : ""}.
+            </p>
+          </div>
+
+          {/* Soundtrack */}
+          <div className="bg-white rounded-2xl border border-[#e5e5e5] p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <span className={labelCls}>Music</span>
+              <button
+                type="button"
+                onClick={() => setMusicOn((v) => !v)}
+                disabled={recording}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors disabled:opacity-50 ${
+                  musicOn
+                    ? "border-[#001f3f] bg-[#001f3f]/5 text-[#001f3f]"
+                    : "border-[#e5e5e5] text-[#6b7280]"
+                }`}
+              >
+                <Music className="w-4 h-4" />
+                Brand jingle: {musicOn ? "On" : "Off"}
+              </button>
+            </div>
+            <div>
+              <label htmlFor="reel-soundtrack" className={labelCls}>Soundtrack</label>
+              <select
+                id="reel-soundtrack"
+                value={soundtrackKey}
+                onChange={(e) => setSoundtrackKey(e.target.value)}
+                disabled={!musicOn || recording}
+                className={`${inputCls} disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {SOUNDTRACKS.map((s) => (
+                  <option key={s.key} value={s.key}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+            <p className="sm:col-span-2 text-[11px] text-[#9ca3af]">
+              The chosen jingle plays under the live preview and is mixed into the exported video.
             </p>
           </div>
         </div>
