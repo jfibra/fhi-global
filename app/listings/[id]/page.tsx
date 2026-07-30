@@ -16,9 +16,9 @@ export const revalidate = 120
 
 type Props = { params: Promise<{ id: string }> }
 
-const TEL = "+971567428288"
+const TEL = "+639778150888"
 const EMAIL = "info@fhiglobal.ae"
-const WA = "971567428288"
+const WA = "639778150888"
 
 function WhatsAppGlyph({ className }: { className?: string }) {
   return (

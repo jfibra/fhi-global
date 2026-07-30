@@ -41,11 +41,11 @@ export function TopBar() {
         {/* Left — contact info */}
         <div className="flex items-center gap-5">
           <a
-            href="tel:+971567428288"
+            href="tel:+639778150888"
             className="flex items-center gap-1.5 hover:text-[#d6b357] transition-colors duration-200"
           >
             <Phone className="w-3 h-3" />
-            <span>+971 56 742 8288</span>
+            <span>+63 977 815 0888</span>
           </a>
           <span className="hidden sm:block w-px h-3 bg-white/15" />
           <a
