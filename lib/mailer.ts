@@ -391,6 +391,10 @@ function saleEmailBody(input: {
   detailsHtml: string
   note: string | null
   dashboardUrl: string
+  /** Optional quoted block (e.g. a discussion comment) shown above the details. */
+  quoteHtml?: string
+  /** CTA button label; defaults to "View my sales". */
+  ctaLabel?: string
 }): string {
   return `
         <tr>
@@ -400,6 +404,14 @@ function saleEmailBody(input: {
             <p style="margin:0;font-size:15px;line-height:1.65;color:#4b5563;">${input.intro}</p>
           </td>
         </tr>
+        ${input.quoteHtml ? `
+        <tr>
+          <td style="padding:18px 40px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafd;border-left:3px solid ${GOLD};border-radius:0 10px 10px 0;">
+              <tr><td style="padding:14px 18px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#374151;font-style:italic;">${input.quoteHtml}</td></tr>
+            </table>
+          </td>
+        </tr>` : ""}
         <tr>
           <td style="padding:20px 40px 6px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafd;border:1px solid #e2e8f2;border-radius:14px;">
@@ -419,7 +431,7 @@ function saleEmailBody(input: {
           <td align="center" style="padding:22px 40px 34px;">
             <a href="${esc(input.dashboardUrl)}"
                style="display:inline-block;background:${NAVY};color:#ffffff;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;text-decoration:none;padding:13px 34px;border-radius:12px;border-bottom:3px solid ${GOLD};">
-              View my sales
+              ${esc(input.ctaLabel ?? "View my sales")}
             </a>
           </td>
         </tr>`
@@ -617,6 +629,51 @@ export async function sendSaleStatusEmail(input: {
     html: eventEmailShell({
       subject,
       preheader: `${copy.eyebrow} for your ${d.saleTypeLabel.toLowerCase()}.`,
+      bodyHtml,
+    }),
+  })
+}
+
+/** Sent to the other party when a validation-discussion comment is posted. */
+export async function sendSaleCommentEmail(input: {
+  to: string
+  recipientName: string | null
+  commenterName: string | null
+  commenterRoleLabel: string | null
+  commentExcerpt: string
+  /** The sale's current validation status, human label — shown in the details. */
+  statusLabel: string
+  details: SaleEmailDetails
+}): Promise<void> {
+  const d = input.details
+  const name = greetingName(input.recipientName)
+  const who = input.commenterName?.trim() || "A team member"
+  const roleSuffix = input.commenterRoleLabel ? ` (${esc(input.commenterRoleLabel)})` : ""
+  const subject = `New message — ${d.clientName ?? d.saleTypeLabel} · ${moneyLabel(d.contractPrice)}`
+  const intro = `<strong>${esc(who)}</strong>${roleSuffix} posted a new message on the validation discussion for this sale.`
+
+  // Escape first so a comment can never inject markup, then keep the author's line breaks.
+  const quoteHtml = esc(input.commentExcerpt).replace(/\r?\n/g, "<br>")
+
+  const bodyHtml = saleEmailBody({
+    eyebrow: "New message",
+    heading: `You have a new message, ${esc(name)} 💬`,
+    intro,
+    quoteHtml,
+    detailsHtml: saleDetailRows(d, input.statusLabel),
+    note: null,
+    dashboardUrl: d.dashboardUrl,
+    ctaLabel: "Open the discussion",
+  })
+
+  await transport().sendMail({
+    from: fromAddress(),
+    to: input.to,
+    subject,
+    text: `${who}${input.commenterRoleLabel ? ` (${input.commenterRoleLabel})` : ""} posted a new message on the validation discussion for this sale:\n\n"${input.commentExcerpt}"\n\n${saleDetailText(d, input.statusLabel)}\n\n${d.dashboardUrl}`,
+    html: eventEmailShell({
+      subject,
+      preheader: `New message from ${who} on ${d.clientName ?? d.saleTypeLabel}.`,
       bodyHtml,
     }),
   })

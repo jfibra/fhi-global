@@ -1295,6 +1295,20 @@ export function notifySaleEvent(saleId: string, event: "encoded" | "validation" 
   }).catch(() => {})
 }
 
+/**
+ * Fire-and-forget email to the other party about a new validation-discussion
+ * comment. The server route re-reads the comment + sale and picks recipients,
+ * so this only names the comment; failures are swallowed so a missed email
+ * never breaks posting the comment.
+ */
+export function notifySaleComment(saleId: string, commentId: string): void {
+  void fetch(`/api/sales/${saleId}/notify-comment`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ commentId }),
+  }).catch(() => {})
+}
+
 export async function updateSaleValidationStatus(
   saleId: string,
   nextStatus: ValidationStatus,

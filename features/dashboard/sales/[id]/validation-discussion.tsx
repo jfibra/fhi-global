@@ -5,6 +5,7 @@ import {
   fetchSaleActivityLogs,
   fetchValidationComments,
   insertValidationComment,
+  notifySaleComment,
   type SaleActivityLog,
   type SaleValidationComment,
   type ValidationStatus,
@@ -111,6 +112,8 @@ export function ValidationDiscussion({
     if (data) {
       setComments((prev) => [...prev, data])
       setCommentText("")
+      // Email the other party (admin ↔ agent). Fire-and-forget — never blocks the post.
+      notifySaleComment(saleId, data.id)
     }
     setSending(false)
   }
