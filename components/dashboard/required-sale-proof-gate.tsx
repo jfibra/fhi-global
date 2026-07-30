@@ -97,20 +97,16 @@ export function RequiredSaleProofGate() {
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-2xl bg-white rounded-[28px] shadow-2xl flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="w-full max-w-lg bg-white rounded-xl shadow-xl flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="relative shrink-0 px-7 pt-7 pb-5">
-          <div
-            className="absolute top-0 left-0 right-0 h-[3px] rounded-t-[28px]"
-            style={{ background: "linear-gradient(to right, #001f3f, #d6b357)" }}
-          />
+        <div className="shrink-0 px-6 pt-6 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-md shrink-0">
-              <ShieldAlert className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 rounded-lg bg-[#f4f6f9] flex items-center justify-center shrink-0">
+              <ShieldAlert className="w-[18px] h-[18px] text-[#001f3f]" />
             </div>
             <div>
-              <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">
+              <h2 className="font-['Outfit'] text-base font-bold text-[#0d1117]">
                 Proof of transaction required
               </h2>
               <p className="text-xs text-[#6b7280] mt-0.5">
@@ -122,23 +118,21 @@ export function RequiredSaleProofGate() {
           </div>
         </div>
 
-        <div className="mx-7 h-px bg-[#f0f2f5]" />
-
         {/* Sales list */}
-        <div className="flex-1 overflow-y-auto px-7 py-6 space-y-3">
+        <div className="flex-1 overflow-y-auto px-6 pb-2 space-y-2.5">
           {sales.map((sale) => {
             const state = rowState[sale.id]
             const done = Boolean(state?.done)
             return (
               <div
                 key={sale.id}
-                className={`rounded-2xl border p-4 transition-colors ${
-                  done ? "border-emerald-200 bg-emerald-50/50" : "border-[#e5e5e5] bg-white"
+                className={`rounded-lg border p-3.5 transition-colors ${
+                  done ? "border-emerald-200 bg-emerald-50/50" : "border-[#eceef1] bg-white"
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-[#0d1117] truncate">{sale.client_name}</p>
+                    <p className="text-sm font-semibold text-[#0d1117] truncate">{sale.client_name}</p>
                     <p className="text-xs text-[#6b7280] truncate">{sale.location}</p>
                     <p className="text-xs text-[#9ca3af] mt-1">
                       {formatCurrency(sale.contract_price)} · {formatDate(sale.reservation_date)}
@@ -146,7 +140,7 @@ export function RequiredSaleProofGate() {
                   </div>
 
                   {done ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-100 text-emerald-700 text-xs font-bold shrink-0">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-100 text-emerald-700 text-xs font-semibold shrink-0">
                       <CheckCircle2 className="w-4 h-4" />
                       Proof attached
                     </span>
@@ -156,7 +150,7 @@ export function RequiredSaleProofGate() {
                         type="button"
                         onClick={() => inputsRef.current[sale.id]?.click()}
                         disabled={state?.uploading}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors disabled:opacity-60 disabled:cursor-not-allowed shrink-0"
+                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#00356b] transition-colors disabled:opacity-60 disabled:cursor-not-allowed shrink-0"
                       >
                         {state?.uploading ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -182,21 +176,19 @@ export function RequiredSaleProofGate() {
                   )}
                 </div>
                 {state?.error && (
-                  <p className="mt-2 text-xs text-rose-600 font-semibold">{state.error}</p>
+                  <p className="mt-2 text-xs text-rose-600 font-medium">{state.error}</p>
                 )}
               </div>
             )
           })}
         </div>
 
-        <div className="mx-7 h-px bg-[#f0f2f5]" />
-
         {/* Footer */}
-        <div className="shrink-0 px-7 py-4 flex items-center justify-between gap-3">
+        <div className="shrink-0 px-6 pt-3 pb-5 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={() => void handleSignOut()}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#e5e5e5] text-sm font-semibold text-[#6b7280] hover:text-rose-600 hover:border-rose-200 transition-colors"
+            className="inline-flex items-center gap-2 px-2 py-2 text-sm font-medium text-[#6b7280] hover:text-rose-600 transition-colors"
           >
             <LogOut className="w-4 h-4" />
             Sign out
@@ -205,9 +197,8 @@ export function RequiredSaleProofGate() {
             type="button"
             onClick={() => setDismissed(true)}
             disabled={!allDone}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#d6b357] to-[#b8913f] text-[#001428] text-sm font-bold shadow-md hover:shadow-lg transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#00356b] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <CheckCircle2 className="w-4 h-4" />
             Continue to dashboard
           </button>
         </div>
