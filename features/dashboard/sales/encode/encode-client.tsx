@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import {
   createSale,
+  notifySaleEvent,
   fetchDevelopersForSale,
   fetchProjectsForDeveloper,
   fetchUnitsForProject,
@@ -240,6 +241,7 @@ export function EncodeSaleClient({
         setSubmitError(error ?? "Failed to record the sale")
         return
       }
+      notifySaleEvent(data.id, "encoded")
       // Upload staged proof files — the sale is already saved, so failures
       // here never lose the sale; they just get reported for a manual retry
       // (and the login prompt will nudge again until proof is attached).

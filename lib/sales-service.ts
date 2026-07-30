@@ -1282,12 +1282,25 @@ export async function deleteSaleAttachment(
   return { error: null }
 }
 
+/**
+ * Fire-and-forget email to the sale's agent about a pipeline event. The server
+ * route re-reads everything from the database, so this only names the event;
+ * failures are swallowed — a missed email must never break the mutation UX.
+ */
+export function notifySaleEvent(saleId: string, event: "encoded" | "validation" | "commission"): void {
+  void fetch(`/api/sales/${saleId}/notify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event }),
+  }).catch(() => {})
+}
+
 export async function updateSaleValidationStatus(
   saleId: string,
   nextStatus: ValidationStatus,
   currentUserId: string,
   currentRole: string,
-): Promise<{ data: SaleRecord | null; error: string | null }> {
+): Promise<{ data: SaleRecord | null; error: string | null; previousStatus?: string | null }> {
   const supabase = createClient()
 
   if (!isAdminRole(currentRole)) {
@@ -1333,7 +1346,9 @@ export async function updateSaleValidationStatus(
     })
   }
 
-  return { data: normalizeSale(data), error: null }
+  // previousStatus is the authoritative pre-update value — callers use it to
+  // decide whether the change deserves a notification (same gate as the log).
+  return { data: normalizeSale(data), error: null, previousStatus: String(existingRaw.validation_status) }
 }
 
 export async function fetchSaleActivityLogs(saleId: string): Promise<{ data: SaleActivityLog[] | null; error: string | null }> {

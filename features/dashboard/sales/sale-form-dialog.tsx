@@ -23,6 +23,7 @@ import {
   canEditSaleForRole,
   canManageSaleAttachmentsForRole,
   createSale,
+  notifySaleEvent,
   updateSale,
   validateSaleFormData,
   fetchDevelopersForSale,
@@ -400,10 +401,14 @@ export function SaleFormDialog({
       if (isEdit && editSale) {
         const { data, error } = await updateSale(editSale.id, form, currentUserId, currentRole)
         if (error) { onError(error); return }
+        // Email the agent about any status an admin changed through the form.
+        if (data!.validation_status !== editSale.validation_status) notifySaleEvent(editSale.id, "validation")
+        if (data!.commission_status !== editSale.commission_status) notifySaleEvent(editSale.id, "commission")
         onSaved(data!, true)
       } else {
         const { data, error } = await createSale(form, currentUserId, currentRole)
         if (error) { onError(error); return }
+        notifySaleEvent(data!.id, "encoded")
         // Upload staged proof after the sale exists. Routed through the
         // service-role helper so it works while the sale is still pending.
         for (const file of pendingFiles) {

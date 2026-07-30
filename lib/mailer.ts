@@ -344,3 +344,280 @@ export async function sendRaffleWinnerEmail(input: {
     }),
   })
 }
+
+// ─── Sales pipeline emails (encode confirmation + status updates) ──────────────
+
+function moneyLabel(value: number): string {
+  const n = Number(value || 0)
+  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + " AED"
+}
+
+/** reservation_date is a plain date — no time component to show. */
+function saleDateLabel(iso: string | null): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleDateString("en-AE", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Dubai" })
+}
+
+export type SaleEmailDetails = {
+  saleTypeLabel: string
+  clientName: string | null
+  propertyLabel: string | null
+  developerName: string | null
+  contractPrice: number
+  reservationDate: string | null
+  /** Absolute link to the agent's sales area. */
+  dashboardUrl: string
+}
+
+function saleDetailRows(d: SaleEmailDetails, statusLabel: string): string {
+  const dateLabel = saleDateLabel(d.reservationDate)
+  return [
+    detailRow("Sale type", d.saleTypeLabel),
+    d.clientName ? detailRow("Client", d.clientName) : "",
+    d.propertyLabel ? detailRow("Property", d.propertyLabel) : "",
+    d.developerName ? detailRow("Developer", d.developerName) : "",
+    detailRow("Contract price", moneyLabel(d.contractPrice)),
+    dateLabel ? detailRow("Reservation", dateLabel) : "",
+    detailRow("Status", statusLabel),
+  ].join("")
+}
+
+function saleEmailBody(input: {
+  eyebrow: string
+  heading: string
+  intro: string
+  detailsHtml: string
+  note: string | null
+  dashboardUrl: string
+}): string {
+  return `
+        <tr>
+          <td style="padding:36px 40px 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">${esc(input.eyebrow)}</p>
+            <h1 style="margin:0 0 12px;font-size:23px;line-height:1.3;font-weight:700;color:#0d1117;">${input.heading}</h1>
+            <p style="margin:0;font-size:15px;line-height:1.65;color:#4b5563;">${input.intro}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px 6px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafd;border:1px solid #e2e8f2;border-radius:14px;">
+              <tr><td style="padding:16px 20px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${input.detailsHtml}</table>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+        ${input.note ? `
+        <tr>
+          <td style="padding:14px 40px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <p style="margin:0;font-size:13px;line-height:1.65;color:#6b7280;">${input.note}</p>
+          </td>
+        </tr>` : ""}
+        <tr>
+          <td align="center" style="padding:22px 40px 34px;">
+            <a href="${esc(input.dashboardUrl)}"
+               style="display:inline-block;background:${NAVY};color:#ffffff;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;text-decoration:none;padding:13px 34px;border-radius:12px;border-bottom:3px solid ${GOLD};">
+              View my sales
+            </a>
+          </td>
+        </tr>`
+}
+
+/** First name only for greetings — "MARIA DELA CRUZ" reads better as "Maria". */
+function greetingName(fullName: string | null): string {
+  const first = (fullName ?? "").trim().split(/\s+/)[0] ?? ""
+  if (!first) return "there"
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase()
+}
+
+/** Plain-text variant of an intro/note that carries inline HTML like <strong>. */
+function stripTags(html: string): string {
+  return html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()
+}
+
+/** Shared detail lines for the plain-text alternatives — mirrors saleDetailRows. */
+function saleDetailText(d: SaleEmailDetails, statusLabel: string): string {
+  const dateLabel = saleDateLabel(d.reservationDate)
+  return [
+    `Sale type: ${d.saleTypeLabel}`,
+    d.clientName ? `Client: ${d.clientName}` : "",
+    d.propertyLabel ? `Property: ${d.propertyLabel}` : "",
+    d.developerName ? `Developer: ${d.developerName}` : "",
+    `Contract price: ${moneyLabel(d.contractPrice)}`,
+    dateLabel ? `Reservation: ${dateLabel}` : "",
+    `Status: ${statusLabel}`,
+  ].filter(Boolean).join("\n")
+}
+
+const ENCODED_STATUS_LABELS: Record<string, string> = {
+  pending: "Pending validation",
+  under_review: "Under Review",
+  validated: "Validated",
+  invalid_sale: "Invalid Sale",
+}
+
+/** Confirmation sent to the agent right after their sale is encoded. */
+export async function sendSaleEncodedEmail(input: {
+  to: string
+  agentName: string | null
+  /** The sale's actual validation status — admins can encode pre-validated sales. */
+  validationStatus: string
+  details: SaleEmailDetails
+}): Promise<void> {
+  const d = input.details
+  const subject = `Sale recorded — ${d.clientName ?? d.saleTypeLabel} · ${moneyLabel(d.contractPrice)}`
+  const name = greetingName(input.agentName)
+  const isPending = input.validationStatus === "pending"
+  const statusLabel =
+    ENCODED_STATUS_LABELS[input.validationStatus] ?? input.validationStatus.replace(/_/g, " ")
+  const intro = isPending
+    ? `Your <strong>${esc(d.saleTypeLabel)}</strong> has been submitted successfully and is now
+            <strong>pending validation</strong> by the admin team. Keep this email for your records —
+            you'll get another one as soon as its status changes.`
+    : `Your <strong>${esc(d.saleTypeLabel)}</strong> has been recorded. Its current validation status
+            is <strong>${esc(statusLabel)}</strong>.`
+  const note = isPending
+    ? "Make sure your proof of transaction is attached — the admin team needs it to validate the sale."
+    : null
+
+  const bodyHtml = saleEmailBody({
+    eyebrow: "Sale recorded",
+    heading: `Your sale has been recorded, ${esc(name)}! 🏆`,
+    intro,
+    detailsHtml: saleDetailRows(d, statusLabel),
+    note,
+    dashboardUrl: d.dashboardUrl,
+  })
+
+  await transport().sendMail({
+    from: fromAddress(),
+    to: input.to,
+    subject,
+    text: `Your sale has been recorded.\n\n${stripTags(intro)}\n\n${saleDetailText(d, statusLabel)}\n${note ? `\n${note}\n` : ""}\n${d.dashboardUrl}`,
+    html: eventEmailShell({
+      subject,
+      preheader: isPending
+        ? `Your ${d.saleTypeLabel.toLowerCase()} was recorded and is pending validation.`
+        : `Your ${d.saleTypeLabel.toLowerCase()} was recorded — status: ${statusLabel}.`,
+      bodyHtml,
+    }),
+  })
+}
+
+type SaleStatusCopy = { eyebrow: string; heading: string; intro: string; statusLabel: string; note: string | null }
+
+const VALIDATION_COPY: Record<string, SaleStatusCopy> = {
+  validated: {
+    eyebrow: "Sale validated",
+    heading: "Great news, {name} — your sale is validated! ✅",
+    intro: "The admin team has reviewed and <strong>validated</strong> your sale. It now counts toward your production.",
+    statusLabel: "Validated",
+    note: null,
+  },
+  under_review: {
+    eyebrow: "Sale under review",
+    heading: "Your sale is under review, {name}",
+    intro: "The admin team is currently <strong>reviewing</strong> this sale. No action is needed from you right now — you'll be emailed once the review is done.",
+    statusLabel: "Under Review",
+    note: null,
+  },
+  invalid_sale: {
+    eyebrow: "Sale marked invalid",
+    heading: "Your sale was marked invalid, {name}",
+    intro: "The admin team marked this sale as an <strong>invalid sale</strong>. Please review the details below.",
+    statusLabel: "Invalid Sale",
+    note: "If you believe this is a mistake, open the sale in your dashboard and use its discussion thread to reach the admin team.",
+  },
+  pending: {
+    eyebrow: "Validation update",
+    heading: "Your sale is back to pending, {name}",
+    intro: "This sale's validation was reset to <strong>pending</strong> and will be looked at again by the admin team.",
+    statusLabel: "Pending",
+    note: null,
+  },
+}
+
+const COMMISSION_COPY: Record<string, SaleStatusCopy> = {
+  processing: {
+    eyebrow: "Commission update",
+    heading: "Your commission is being processed, {name}",
+    intro: "The commission for this sale is now <strong>processing</strong>. You'll be emailed at each step until it's released.",
+    statusLabel: "Processing",
+    note: null,
+  },
+  approved: {
+    eyebrow: "Commission approved",
+    heading: "Your commission has been approved, {name} 🙌",
+    intro: "The commission for this sale has been <strong>approved</strong> and is queued for release.",
+    statusLabel: "Approved",
+    note: null,
+  },
+  released: {
+    eyebrow: "Commission released",
+    heading: "Congratulations, {name} — your commission is released! 🎉",
+    intro: "The commission for this sale has been <strong>released</strong>.",
+    statusLabel: "Released",
+    note: null,
+  },
+  rejected: {
+    eyebrow: "Commission update",
+    heading: "Your commission was rejected, {name}",
+    intro: "The commission for this sale was <strong>rejected</strong>. Please review the details below.",
+    statusLabel: "Rejected",
+    note: "If you believe this is a mistake, open the sale in your dashboard and use its discussion thread to reach the admin team.",
+  },
+  pending: {
+    eyebrow: "Commission update",
+    heading: "Your commission is back to pending, {name}",
+    intro: "The commission status for this sale was reset to <strong>pending</strong>.",
+    statusLabel: "Pending",
+    note: null,
+  },
+}
+
+/** Sent to the agent when an admin changes a sale's validation or commission status. */
+export async function sendSaleStatusEmail(input: {
+  to: string
+  agentName: string | null
+  kind: "validation" | "commission"
+  status: string
+  details: SaleEmailDetails
+}): Promise<void> {
+  const d = input.details
+  const copyMap = input.kind === "validation" ? VALIDATION_COPY : COMMISSION_COPY
+  const fallbackLabel = input.status.replace(/_/g, " ")
+  const copy: SaleStatusCopy = copyMap[input.status] ?? {
+    eyebrow: input.kind === "validation" ? "Validation update" : "Commission update",
+    heading: "Your sale's status changed, {name}",
+    intro: `This sale's ${input.kind} status is now <strong>${esc(fallbackLabel)}</strong>.`,
+    statusLabel: fallbackLabel,
+    note: null,
+  }
+  const name = greetingName(input.agentName)
+  const subject = `${copy.eyebrow} — ${d.clientName ?? d.saleTypeLabel} · ${moneyLabel(d.contractPrice)}`
+
+  const bodyHtml = saleEmailBody({
+    eyebrow: copy.eyebrow,
+    // Function replacement: a literal name containing "$&" or "$`" must not
+    // trigger String.replace's $-substitutions.
+    heading: copy.heading.replace("{name}", () => esc(name)),
+    intro: copy.intro,
+    detailsHtml: saleDetailRows(d, copy.statusLabel),
+    note: copy.note,
+    dashboardUrl: d.dashboardUrl,
+  })
+
+  await transport().sendMail({
+    from: fromAddress(),
+    to: input.to,
+    subject,
+    text: `${copy.eyebrow}\n\n${stripTags(copy.intro)}\n\n${saleDetailText(d, copy.statusLabel)}\n${copy.note ? `\n${copy.note}\n` : ""}\n${d.dashboardUrl}`,
+    html: eventEmailShell({
+      subject,
+      preheader: `${copy.eyebrow} for your ${d.saleTypeLabel.toLowerCase()}.`,
+      bodyHtml,
+    }),
+  })
+}

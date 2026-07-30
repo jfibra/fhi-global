@@ -33,6 +33,7 @@ import {
   fetchSalesSummary,
   fetchDevelopersForSale,
   fetchAgentsForSale,
+  notifySaleEvent,
   updateSaleValidationStatus,
   deleteSale,
   isAdminRole,
@@ -381,13 +382,23 @@ export function SalesTable({
   }
   const closeDiscussion = () => setDiscussionTarget(null)
 
+  // In-flight guard: rows keep their stale status until setSales lands, so a
+  // rapid double-click would otherwise fire the update (and its email) twice.
+  const validationBusyRef = useRef<Set<string>>(new Set())
   const handleValidationShortcut = async (sale: SaleRecord, nextStatus: ValidationStatus) => {
-    if (!isAdminUser) return
-    const { data, error } = await updateSaleValidationStatus(sale.id, nextStatus, currentUserId, currentRole)
-    if (error) { addToast("error", error); return }
-    setSales((prev) => prev.map((item) => (item.id === sale.id ? data! : item)))
-    addToast("success", `Validation set to ${STATUS_LABEL[nextStatus]}`)
-    void loadSummaries() // pending-validation count changed
+    if (!isAdminUser || validationBusyRef.current.has(sale.id)) return
+    validationBusyRef.current.add(sale.id)
+    try {
+      const { data, error, previousStatus } = await updateSaleValidationStatus(sale.id, nextStatus, currentUserId, currentRole)
+      if (error) { addToast("error", error); return }
+      // Gate on the authoritative pre-update status, not the possibly-stale row.
+      if (previousStatus !== nextStatus) notifySaleEvent(sale.id, "validation")
+      setSales((prev) => prev.map((item) => (item.id === sale.id ? data! : item)))
+      addToast("success", `Validation set to ${STATUS_LABEL[nextStatus]}`)
+      void loadSummaries() // pending-validation count changed
+    } finally {
+      validationBusyRef.current.delete(sale.id)
+    }
   }
 
   // Runs the pending confirmation (Invalid Sale / Under Review, or Delete).
