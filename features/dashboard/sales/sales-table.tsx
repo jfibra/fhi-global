@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Crown,
   Filter,
   Handshake,
   History,
@@ -26,6 +27,7 @@ import {
 } from "lucide-react"
 import { formatCurrency, formatDate, StatusBadge } from "./sale-ui"
 import { AgentSalesPanel } from "./agent-sales-panel"
+import { TopSellerStudio } from "./marketing/top-seller-studio"
 import {
   canEditSaleForRole,
   canManageSaleAttachmentsForRole,
@@ -268,6 +270,7 @@ export function SalesTable({
   // the view survives refresh / can be linked; state only caches the clicked
   // row's name so the header isn't blank while the panel fetches the profile.
   const [agentDrill, setAgentDrill] = useState<{ id: string; name: string | null } | null>(null)
+  const [showTopSeller, setShowTopSeller] = useState(false)
 
   // Confirmation flow. Validate is a direct click; Invalid Sale / Under Review
   // ask for a click-confirm; Delete asks for a press-and-hold confirm.
@@ -623,12 +626,22 @@ export function SalesTable({
                 <div className="w-12 h-12 rounded-2xl bg-[#001f3f] flex items-center justify-center shadow-lg">
                   <ActiveIcon className="w-6 h-6 text-white" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">
                     {activeMeta?.label ?? "Sales"} Report
                   </h1>
                   <p className="text-sm text-[#6b7280]">{activeMeta?.desc}</p>
                 </div>
+                {isAdminUser && (
+                  <button
+                    type="button"
+                    onClick={() => setShowTopSeller(true)}
+                    className="ml-auto shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
+                  >
+                    <Crown className="w-4 h-4" />
+                    Top Seller Poster
+                  </button>
+                )}
               </div>
             </div>
 
@@ -975,6 +988,8 @@ export function SalesTable({
           </div>
         </div>
       )}
+
+      {showTopSeller && <TopSellerStudio onClose={() => setShowTopSeller(false)} />}
 
       <ToastStack
         toasts={toasts}

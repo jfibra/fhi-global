@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono, Outfit, Urbanist } from "next/font/google"
+import { Geist, Geist_Mono, Outfit, Urbanist, Great_Vibes } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { AppToaster } from "@/components/app-toaster"
 import "./globals.css"
@@ -13,6 +13,8 @@ const _geistMono = Geist_Mono({ subsets: ["latin"], display: "swap", variable: "
 const _outfit = Outfit({ subsets: ["latin"], display: "swap", variable: "--font-outfit" })
 // Urbanist — used by the marketing flyer / announcement templates.
 const _urbanist = Urbanist({ subsets: ["latin"], weight: ["800", "900"], display: "swap", variable: "--font-urbanist" })
+// Great Vibes — script accents on the award posters (Top Seller studio).
+const _greatVibes = Great_Vibes({ subsets: ["latin"], weight: ["400"], display: "swap", variable: "--font-script" })
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
@@ -71,7 +73,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://hefwmaoborpfuyhbguzv.supabase.co" crossOrigin="anonymous" />
         <link rel="preload" as="image" href="/FHI_Branding_White.png" />
       </head>
-      <body className={`${_geist.variable} ${_geistMono.variable} ${_outfit.variable} ${_urbanist.variable} font-sans antialiased`}>
+      <body className={`${_geist.variable} ${_geistMono.variable} ${_outfit.variable} ${_urbanist.variable} ${_greatVibes.variable} font-sans antialiased`}>
         <PageTransitionWrapper>{children}</PageTransitionWrapper>
         <AppToaster />
         <Analytics />
