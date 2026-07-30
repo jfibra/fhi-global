@@ -1003,14 +1003,20 @@ export async function updateSale(
   return { data: normalizeSale(data), error: null }
 }
 
+/**
+ * Delete a sale (admin only). Routed through the service-role endpoint so it can
+ * clean up the sale plus its cascading children regardless of RLS; the server
+ * re-checks the caller is admin staff.
+ */
 export async function deleteSale(id: string): Promise<{ error: string | null }> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from("sales_reports")
-    .delete()
-    .eq("id", id)
-
-  return { error: error?.message ?? null }
+  try {
+    const res = await fetch(`/api/sales/${id}`, { method: "DELETE" })
+    const json = (await res.json().catch(() => ({}))) as { error?: string }
+    if (!res.ok) return { error: json.error ?? "Failed to delete the sale" }
+    return { error: null }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Failed to delete the sale" }
+  }
 }
 
 // ─── Attachments ──────────────────────────────────────────────────────────────

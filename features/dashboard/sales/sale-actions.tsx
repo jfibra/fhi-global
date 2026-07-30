@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { Eye, MoreHorizontal, Paperclip, Pencil } from "lucide-react"
+import { Eye, MoreHorizontal, Paperclip, Pencil, Trash2 } from "lucide-react"
 import { canManageSaleAttachmentsForRole, type SaleRecord } from "@/lib/sales-service"
 import { isAdminStaffRole } from "@/lib/app-roles"
 
@@ -19,15 +19,18 @@ export function SaleActions({
   onView,
   onEdit,
   onAttachments,
+  onDelete,
 }: {
   sale: SaleRecord
   currentRole: string
   onView: () => void
   onEdit: () => void
   onAttachments: () => void
+  onDelete?: () => void
 }) {
   const isAdmin = isAdminStaffRole(currentRole)
   const canEdit = isAdmin
+  const canDelete = isAdmin && Boolean(onDelete)
   const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, sale)
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLDivElement>(null)
@@ -40,7 +43,8 @@ export function SaleActions({
       if (!triggerRef.current) return
       const rect = triggerRef.current.getBoundingClientRect()
       const menuWidth = 210
-      const estimatedMenuHeight = (canEdit || canManageAttachments) ? 160 : 60
+      const itemCount = 1 + (canEdit ? 1 : 0) + (canManageAttachments ? 1 : 0) + (canDelete ? 1 : 0)
+      const estimatedMenuHeight = itemCount * 40 + 24
       const viewportPadding = 8
       const placeBelow = rect.bottom + 8 + estimatedMenuHeight <= window.innerHeight - viewportPadding
       const top = placeBelow
@@ -59,7 +63,7 @@ export function SaleActions({
       window.removeEventListener("resize", computePosition)
       window.removeEventListener("scroll", computePosition, true)
     }
-  }, [open, canEdit, canManageAttachments])
+  }, [open, canEdit, canManageAttachments, canDelete])
 
   useEffect(() => {
     if (!open) return
@@ -122,6 +126,20 @@ export function SaleActions({
                 >
                   <Paperclip className="w-4 h-4 text-[#9ca3af]" /> Manage Attachments
                 </button>
+              )}
+
+              {/* Delete Sale — admin only, destructive */}
+              {canDelete && (
+                <>
+                  <div className="my-1 h-px bg-[#f0f0f0]" />
+                  <button
+                    type="button"
+                    onClick={() => act(onDelete!)}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" /> Delete Sale
+                  </button>
+                </>
               )}
             </div>
           </div>

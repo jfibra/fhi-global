@@ -34,6 +34,7 @@ import {
   fetchDevelopersForSale,
   fetchAgentsForSale,
   updateSaleValidationStatus,
+  deleteSale,
   isAdminRole,
   type SaleRecord,
   type SaleType,
@@ -46,6 +47,7 @@ import {
 import { isSecretaryLikeRole } from "@/lib/app-roles"
 import { SaleActions } from "./sale-actions"
 import { SaleAttachmentsDialog } from "./sale-attachments-dialog"
+import { SaleConfirmDialog } from "./sale-confirm-dialog"
 import { SaleFormDialog } from "./sale-form-dialog"
 import { SaleDetails } from "./sale-details"
 import { ValidationDiscussion, type DiscussionTab } from "./[id]/validation-discussion"
@@ -266,6 +268,15 @@ export function SalesTable({
   // row's name so the header isn't blank while the panel fetches the profile.
   const [agentDrill, setAgentDrill] = useState<{ id: string; name: string | null } | null>(null)
 
+  // Confirmation flow. Validate is a direct click; Invalid Sale / Under Review
+  // ask for a click-confirm; Delete asks for a press-and-hold confirm.
+  const [confirm, setConfirm] = useState<
+    | { kind: "validation"; sale: SaleRecord; nextStatus: ValidationStatus }
+    | { kind: "delete"; sale: SaleRecord }
+    | null
+  >(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
+
   const [toasts, setToasts] = useState<Array<{ id: number; type: ToastType; text: string }>>([])
   const toastIdRef = useRef(0)
 
@@ -379,6 +390,31 @@ export function SalesTable({
     void loadSummaries() // pending-validation count changed
   }
 
+  // Runs the pending confirmation (Invalid Sale / Under Review, or Delete).
+  // Always closes the dialog afterwards — success or failure is surfaced via a
+  // toast, and reopening gives a fresh (re-armed) hold-to-confirm button.
+  const runConfirm = async () => {
+    if (!confirm || confirmBusy) return
+    setConfirmBusy(true)
+    try {
+      if (confirm.kind === "delete") {
+        const { error } = await deleteSale(confirm.sale.id)
+        if (error) {
+          addToast("error", error)
+        } else {
+          addToast("success", "Sale deleted")
+          void loadSales()
+          void loadSummaries()
+        }
+      } else {
+        await handleValidationShortcut(confirm.sale, confirm.nextStatus)
+      }
+    } finally {
+      setConfirm(null)
+      setConfirmBusy(false)
+    }
+  }
+
   const onSaved = (sale: SaleRecord, isEdit: boolean) => {
     setShowForm(false)
     addToast("success", isEdit ? "Sale updated" : "Sale recorded successfully")
@@ -445,14 +481,18 @@ export function SalesTable({
         {isAdminUser && (
           <>
             {([
-              { status: "validated" as const, label: "Validate sale", Icon: CheckCircle2, cls: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" },
-              { status: "invalid_sale" as const, label: "Mark invalid sale", Icon: XCircle, cls: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100" },
-              { status: "under_review" as const, label: "Mark under review", Icon: Clock, cls: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100" },
-            ]).map(({ status, label, Icon, cls }) => (
+              { status: "validated" as const, label: "Validate sale", Icon: CheckCircle2, needsConfirm: false, cls: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" },
+              { status: "invalid_sale" as const, label: "Mark invalid sale", Icon: XCircle, needsConfirm: true, cls: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100" },
+              { status: "under_review" as const, label: "Mark under review", Icon: Clock, needsConfirm: true, cls: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100" },
+            ]).map(({ status, label, Icon, needsConfirm, cls }) => (
               <button
                 key={status}
                 type="button"
-                onClick={() => void handleValidationShortcut(s, status)}
+                onClick={() =>
+                  needsConfirm
+                    ? setConfirm({ kind: "validation", sale: s, nextStatus: status })
+                    : void handleValidationShortcut(s, status)
+                }
                 disabled={s.validation_status === status}
                 title={label}
                 aria-label={label}
@@ -487,6 +527,7 @@ export function SalesTable({
           onView={() => openView(s)}
           onEdit={() => openEdit(s)}
           onAttachments={() => openAttachments(s)}
+          onDelete={() => setConfirm({ kind: "delete", sale: s })}
         />
       </div>
     ),
@@ -692,6 +733,22 @@ export function SalesTable({
           </div>
         </div>
 
+        {/* Action legend — explains the validation shortcut icons (admins only) */}
+        {isAdminUser && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-xs text-[#6b7280]">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">Action icons</span>
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Validate sale
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <XCircle className="w-4 h-4 text-rose-600" /> Invalid sale
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-sky-600" /> Under review
+            </span>
+          </div>
+        )}
+
         {/* Table */}
         <div className="bg-white/60 backdrop-blur-xl rounded-[24px] border border-white/60 shadow-sm shadow-black/5 overflow-hidden">
           <div className="overflow-x-auto">
@@ -839,6 +896,37 @@ export function SalesTable({
         onClose={() => { setShowAttachments(false); setAttachmentSale(null) }}
         onCountChange={handleCountChange}
       />
+
+      {/* Delete — press-and-hold to confirm (irreversible) */}
+      {confirm?.kind === "delete" && (
+        <SaleConfirmDialog
+          title="Delete this sale?"
+          message={`This permanently deletes ${
+            (confirm.sale.clients
+              ? `${confirm.sale.clients.first_name} ${confirm.sale.clients.last_name}`.trim()
+              : "") || "this sale"
+          }'s record — including its attachments, activity log and discussion. This can't be undone.`}
+          confirmLabel="Hold to delete"
+          tone="danger"
+          hold
+          busy={confirmBusy}
+          onConfirm={() => void runConfirm()}
+          onCancel={() => { if (!confirmBusy) setConfirm(null) }}
+        />
+      )}
+
+      {/* Invalid Sale / Under Review — click to confirm (Validate stays direct) */}
+      {confirm?.kind === "validation" && (
+        <SaleConfirmDialog
+          title={confirm.nextStatus === "invalid_sale" ? "Mark as Invalid Sale?" : "Move to Under Review?"}
+          message={`This sets the validation status to ${STATUS_LABEL[confirm.nextStatus]}. You can change it again later.`}
+          confirmLabel={confirm.nextStatus === "invalid_sale" ? "Mark Invalid Sale" : "Move to Under Review"}
+          tone="primary"
+          busy={confirmBusy}
+          onConfirm={() => void runConfirm()}
+          onCancel={() => { if (!confirmBusy) setConfirm(null) }}
+        />
+      )}
 
       {discussionTarget && (
         <div className="fixed inset-0 z-[120] flex items-start justify-center px-4 py-6">
