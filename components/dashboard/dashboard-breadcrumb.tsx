@@ -10,11 +10,13 @@ import { ROLE_DASHBOARD_MAP, resolveAppRoleOrMember } from "@/lib/app-roles"
 /**
  * Route-driven breadcrumb, rendered once in the shell above the page.
  *
- * Labels come from sidebar-config rather than the URL, so a page shows the hub
- * that owns it — /admin/users reads "Dashboard › Accounts & Invites › Account
- * Directory" even though the hub isn't in the path. Anything below a nav
- * destination (detail routes like /admin/sales/<uuid>) is appended, with id
- * segments shown as "Details".
+ * Labels come from sidebar-config rather than the URL: a hub item's page lives
+ * nested under its hub's own route folder (/admin/communication/support), so
+ * the hub segment IS in the path — getNavTrail just turns "communication" +
+ * "support" into their sidebar labels ("Communication" › "Support Tickets")
+ * instead of raw slugs. Anything below a nav destination (detail routes like
+ * /admin/communication/support/<uuid>, or /admin/sales/<uuid> for a plain
+ * non-hub page) is appended, with id segments shown as "Details".
  */
 
 /**

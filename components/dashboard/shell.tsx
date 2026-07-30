@@ -106,10 +106,13 @@ function NavLink({
 function SidebarNav({
   items,
   accentColor,
+  dashboardBase,
   onNavigate,
 }: {
   items: NavItem[]
   accentColor: string
+  /** The role's bare dashboard root (e.g. /admin) — see isActive below. */
+  dashboardBase: string
   onNavigate: () => void
 }) {
   const pathname = usePathname()
@@ -119,15 +122,30 @@ function SidebarNav({
   // wider on each side.
   return (
     <nav className="flex-1 overflow-y-auto px-5 py-3 scrollbar-none space-y-0.5">
-      {items.map(item => (
-        <NavLink
-          key={item.href}
-          item={item}
-          isActive={pathname === item.href}
-          accentColor={accentColor}
-          onNavigate={onNavigate}
-        />
-      ))}
+      {items.map(item => {
+        // A hub row's href is an ancestor of every page inside it
+        // (/admin/communication is a prefix of /admin/communication/support),
+        // so a plain equality check would only ever light up the hub's own
+        // tile-grid page, never while actually browsing inside it. Every other
+        // row gets the same prefix check for the same reason (e.g. a Sales
+        // Reports detail page keeps that row lit). The one row this must NOT
+        // apply to is the bare dashboard root (Overview) — its href equals
+        // dashboardBase, which is a prefix of literally every other route, so
+        // prefix-matching it would keep Overview lit everywhere.
+        const isActive =
+          item.href === dashboardBase
+            ? pathname === item.href
+            : pathname === item.href || pathname.startsWith(`${item.href}/`)
+        return (
+          <NavLink
+            key={item.href}
+            item={item}
+            isActive={isActive}
+            accentColor={accentColor}
+            onNavigate={onNavigate}
+          />
+        )
+      })}
     </nav>
   )
 }
@@ -424,6 +442,7 @@ export function DashboardShell({
         <SidebarNav
           items={resolvedItems}
           accentColor={accentColor}
+          dashboardBase={dashboardBase}
           onNavigate={closeSidebar}
         />
       </aside>

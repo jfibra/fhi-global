@@ -43,7 +43,12 @@ import {
 //
 // A group's own `to` is its hub route and needs a matching folder under
 // app/(users)/{role}/ for EVERY role that uses the list (admin + superadmin) —
-// a four-line wrapper rendering <HubPage hub="…" />.
+// a four-line wrapper rendering <HubPage hub="…" />. Each ITEM inside the group
+// then needs its own page nested one level further in, under that same hub
+// folder (app/(users)/{role}/{hub}/{item}/…) — hubItemHref() is what builds
+// that nested href, so a hub tile, a search result, and a browser URL bar all
+// agree on where an item actually lives, and the sidebar's hub row stays
+// highlighted (via prefix match in shell.tsx) while you're anywhere under it.
 //
 // ROLE_NAV is a Record<AppRoleId, …>, so adding a role to APP_ROLES is a
 // compile error here until you give it a list — no role can silently fall
@@ -269,6 +274,21 @@ function hrefFor(base: string, to: string): string {
   return `${base}/${to}`
 }
 
+/**
+ * A hub sub-item's href, nested under its own hub's path — /admin/communication/support,
+ * not /admin/support. Every page inside a hub folder actually lives on disk
+ * under that hub's route folder (app/(users)/{role}/{hub}/{item}/…), so this is
+ * what keeps the sidebar's hub row highlighted while browsing inside it: the
+ * hub genuinely is an ancestor of the URL, not just a conceptual grouping.
+ *
+ * Not used for the single-item collapse case (see the `only` branches above) —
+ * a one-item group bypasses its hub folder entirely and links straight to the
+ * item, so that item's own `to` is used unprefixed there.
+ */
+function hubItemHref(base: string, group: NavGroupEntry, item: NavEntry): string {
+  return hrefFor(base, `${group.to}/${item.to}`)
+}
+
 function baseFor(role: string | null | undefined): string {
   // Unknown roles resolve to member, so ROLE_NAV always has a list.
   const roleId = resolveAppRoleOrMember(role)
@@ -327,7 +347,7 @@ export function getSearchTargets(role: string | null | undefined): NavSearchTarg
       out.push({
         icon: item.icon,
         label: item.label,
-        href: hrefFor(base, item.to),
+        href: hubItemHref(base, entry, item),
         group: entry.group,
       })
     }
@@ -341,9 +361,13 @@ export function getSearchTargets(role: string | null | undefined): NavSearchTarg
  * Where `pathname` sits in this role's nav: the hub that owns it (if any),
  * then the page itself. Empty when the path isn't a nav destination.
  *
- * This is what lets the breadcrumb show "Accounts & Invites › Account
- * Directory" for /admin/users — the hub is not in the URL, so a purely
- * URL-derived trail could never find it.
+ * Hub sub-item routes are nested under their hub (/admin/communication/support),
+ * so most of this now falls out of a plain href match. This still earns its
+ * keep for the STANDALONE case in dashboard-breadcrumb.tsx (a page that shares
+ * a URL prefix with a nav destination but isn't a sub-view of it) and for
+ * detail routes below a nav destination (e.g. /admin/communication/support/<uuid>),
+ * which the breadcrumb resolves by walking up the path until a prefix here
+ * matches, then appending whatever it trimmed off as the tail.
  */
 export function getNavTrail(
   role: string | null | undefined,
@@ -366,7 +390,7 @@ export function getNavTrail(
     if (only) continue
 
     for (const item of entry.items) {
-      const itemHref = hrefFor(base, item.to)
+      const itemHref = hubItemHref(base, entry, item)
       if (itemHref === pathname) {
         return [
           { label: entry.group, href: hubHref },
@@ -392,7 +416,7 @@ export function getHubTiles(
     tiles: group.items.map((item) => ({
       icon: item.icon,
       label: item.label,
-      href: hrefFor(base, item.to),
+      href: hubItemHref(base, group, item),
       description: item.description ?? "",
     })),
   }
