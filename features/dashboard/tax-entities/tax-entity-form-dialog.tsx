@@ -113,7 +113,7 @@ function DeveloperSelector({
                   className="w-6 h-6 rounded-md object-contain border border-[#e5e5e5] bg-white"
                 />
               ) : (
-                <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[#001f3f] to-[#d6b357] text-white text-[10px] font-bold flex items-center justify-center">
+                <div className="w-6 h-6 rounded-md bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white text-[10px] font-bold flex items-center justify-center">
                   {selected.name.slice(0, 1).toUpperCase()}
                 </div>
               )}
@@ -156,7 +156,7 @@ function DeveloperSelector({
                     className="w-6 h-6 rounded-md object-contain border border-[#e5e5e5] bg-white"
                   />
                 ) : (
-                  <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[#001f3f] to-[#d6b357] text-white text-[10px] font-bold flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-md bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white text-[10px] font-bold flex items-center justify-center">
                     {dev.name.slice(0, 1).toUpperCase()}
                   </div>
                 )}
@@ -313,7 +313,7 @@ export function TaxEntityFormDialog({
         <div className="relative w-full sm:max-w-[min(1100px,calc(100%-3rem))] max-h-[95dvh] flex flex-col bg-white/95 backdrop-blur-2xl rounded-t-[32px] sm:rounded-[32px] border border-white/60 shadow-2xl overflow-hidden">
           <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#f0f0f0] flex-shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center">
                 {viewMode ? <Landmark className="w-5 h-5 text-white" /> : editEntity ? <Pencil className="w-5 h-5 text-white" /> : <Plus className="w-5 h-5 text-white" />}
               </div>
               <div>
@@ -578,7 +578,7 @@ export function TaxEntityFormDialog({
                   >
                     <div
                       className={`relative w-11 h-6 rounded-full transition-all flex-shrink-0 ${
-                        form[key] ? "bg-gradient-to-r from-[#001f3f] to-[#d6b357]" : "bg-[#d1d5db]"
+                        form[key] ? "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f]" : "bg-[#d1d5db]"
                       }`}
                     >
                       <span
@@ -612,7 +612,7 @@ export function TaxEntityFormDialog({
                 type="button"
                 onClick={() => void handleSubmit()}
                 disabled={busy}
-                className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
+                className="bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
               >
                 {busy ? (
                   <>

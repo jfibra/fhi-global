@@ -427,7 +427,7 @@ function ActionCard({ action }: { action: QuickAction }) {
       href={action.href}
       className="group flex flex-col gap-3 rounded-2xl border border-[#e8eaed] bg-white p-5 shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] hover:shadow-[0_4px_20px_-2px_rgba(0,31,63,0.10)] hover:-translate-y-0.5 transition-all duration-300"
     >
-      <span className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-[#001f3f] to-[#d6b357] shadow-md">
+      <span className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] shadow-md">
         <Icon className="w-5 h-5 text-white" />
       </span>
       <div>

@@ -123,7 +123,7 @@ export function ValidationDiscussion({
           onClick={() => setActiveTab("discussion")}
           className={`px-4 py-2 rounded-2xl text-xs font-semibold transition-all ${
             activeTab === "discussion"
-              ? "bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white"
+              ? "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white"
               : "bg-[#f3f4f6] text-[#6b7280] hover:text-[#374151]"
           }`}
         >
@@ -135,7 +135,7 @@ export function ValidationDiscussion({
             onClick={() => setActiveTab("activity")}
             className={`px-4 py-2 rounded-2xl text-xs font-semibold transition-all ${
               activeTab === "activity"
-                ? "bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white"
+                ? "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white"
                 : "bg-[#f3f4f6] text-[#6b7280] hover:text-[#374151]"
             }`}
           >
@@ -205,7 +205,7 @@ export function ValidationDiscussion({
                 type="button"
                 onClick={() => void submitComment()}
                 disabled={sending || !commentText.trim()}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-2.5 rounded-2xl text-xs font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-5 py-2.5 rounded-2xl text-xs font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {sending ? "Posting..." : "Post Comment"}
               </button>

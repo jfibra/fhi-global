@@ -495,7 +495,7 @@ export default function ShareCardModal({
                   type="button"
                   onClick={() => void handleSave()}
                   disabled={saving}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white text-sm font-semibold shadow-md hover:shadow-lg disabled:opacity-50 transition-all"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white text-sm font-semibold shadow-md hover:shadow-lg disabled:opacity-50 transition-all"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : savedFlash ? <Check className="w-4 h-4" /> : null}
                   {saving ? "Saving…" : savedFlash ? "Saved" : "Save card"}

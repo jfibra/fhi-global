@@ -174,7 +174,7 @@ function StatusBadge({ value, type }: { value: string; type: "commission" | "val
 function SummaryTile({ label, value, icon: Icon }: { label: string; value: string; icon: LucideIcon }) {
   return (
     <div className="bg-white/60 backdrop-blur-xl rounded-[20px] border border-white/60 shadow-sm shadow-black/5 p-4 flex items-center gap-3">
-      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shrink-0">
+      <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shrink-0">
         <Icon className="w-5 h-5 text-white" />
       </div>
       <div className="min-w-0">
@@ -535,7 +535,7 @@ export function SalesTable({
           /* ── Chooser: pick a sale type (mirrors the Encode-a-Sale page) ── */
           <>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shadow-lg">
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -585,7 +585,7 @@ export function SalesTable({
           <>
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-lg">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shadow-lg">
                   <ActiveIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>

@@ -78,7 +78,7 @@ function SectionCard({
   return (
     <div className="bg-white/60 backdrop-blur-xl rounded-[20px] border border-white/60 shadow-sm shadow-black/5 p-5">
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center">
+        <div className="w-7 h-7 rounded-xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center">
           <Icon className="w-3.5 h-3.5 text-white" />
         </div>
         <h3 className="font-['Outfit'] text-sm font-bold text-[#0d1117] uppercase tracking-wider">{title}</h3>
@@ -113,11 +113,11 @@ export function SaleDetails({
           <div className="relative shrink-0 px-7 pt-7 pb-5 bg-white rounded-t-[28px]">
             <div
               className="absolute top-0 left-0 right-0 h-[3px] rounded-t-[28px]"
-              style={{ background: "linear-gradient(to right, #001f3f, #d6b357)" }}
+              style={{ background: "linear-gradient(to bottom, #0a3d6b, #001f3f)" }}
             />
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-md">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shadow-md">
                   <DollarSign className="w-5 h-5 text-white" />
                 </div>
                 <div>

@@ -447,7 +447,7 @@ export function UserForm({
             <button
               type="button"
               onClick={() => setReadOnly(false)}
-              className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md"
+              className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md"
             >
               <Edit3 className="w-4 h-4" />
               Edit
@@ -457,7 +457,7 @@ export function UserForm({
               type="button"
               onClick={isEdit ? handleEdit : handleCreate}
               disabled={busy}
-              className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-70 disabled:translate-y-0"
+              className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-70 disabled:translate-y-0"
             >
               {busy ? (
                 <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />

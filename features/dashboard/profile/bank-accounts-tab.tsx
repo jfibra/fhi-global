@@ -291,7 +291,7 @@ function BankAccountModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#f0f0f0] flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center">
               <Landmark className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -417,7 +417,7 @@ function BankAccountModal({
               role="checkbox"
               aria-checked={form.is_primary}
               onClick={() => set("is_primary", !form.is_primary)}
-              className={`relative w-11 h-6 rounded-full transition-all flex-shrink-0 cursor-pointer ${form.is_primary ? "bg-gradient-to-r from-[#001f3f] to-[#d6b357]" : "bg-[#e5e5e5]"}`}
+              className={`relative w-11 h-6 rounded-full transition-all flex-shrink-0 cursor-pointer ${form.is_primary ? "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f]" : "bg-[#e5e5e5]"}`}
             >
               <span
                 className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-200 ${form.is_primary ? "translate-x-5" : "translate-x-0.5"}`}
@@ -443,7 +443,7 @@ function BankAccountModal({
             type="button"
             onClick={() => void handleSubmit()}
             disabled={busy}
-            className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
+            className="bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
           >
             {busy ? (
               <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
@@ -542,14 +542,14 @@ function AccountRow({
     <div
       className={`rounded-2xl border p-4 transition-all ${
         account.is_primary
-          ? "border-[#d6b357]/40 bg-gradient-to-r from-[#001f3f]/[0.03] to-[#d6b357]/[0.04]"
+          ? "border-[#d6b357]/40 bg-gradient-to-r from-[#0a3d6b]/[0.03] to-[#001f3f]/[0.04]"
           : "border-[#f0f0f0] bg-white/70"
       } ${!isActive ? "opacity-60" : ""}`}
     >
       {/* Top row: bank name + badges */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
-          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${account.is_primary ? "bg-gradient-to-br from-[#001f3f] to-[#d6b357]" : "bg-[#f3f4f6]"}`}>
+          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${account.is_primary ? "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f]" : "bg-[#f3f4f6]"}`}>
             <Landmark className={`w-5 h-5 ${account.is_primary ? "text-white" : "text-[#6b7280]"}`} />
           </div>
           <div className="min-w-0">
@@ -561,7 +561,7 @@ function AccountRow({
         {/* Badges */}
         <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
           {account.is_primary && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white">
               <Star className="w-3 h-3" />
               Primary
             </span>
@@ -659,7 +659,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       <button
         type="button"
         onClick={onAdd}
-        className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md flex items-center gap-2"
+        className="bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md flex items-center gap-2"
       >
         <Plus className="w-4 h-4" /> Add Bank Account
       </button>
@@ -789,7 +789,7 @@ export function BankAccountsTab({ userId }: { userId: string }) {
           <button
             type="button"
             onClick={openAdd}
-            className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md flex items-center gap-2 flex-shrink-0"
+            className="bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-5 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md flex items-center gap-2 flex-shrink-0"
           >
             <Plus className="w-4 h-4" /> Add Bank Account
           </button>

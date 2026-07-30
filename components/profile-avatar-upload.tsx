@@ -149,7 +149,7 @@ export function ProfileAvatarUpload({
                 {currentUrl ? (
                   <Image src={currentUrl} alt={displayName} fill className="object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-3xl font-bold bg-gradient-to-br from-[#001f3f] to-[#d6b357] text-white">
+                  <div className="w-full h-full flex items-center justify-center text-3xl font-bold bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white">
                     {displayName.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -158,7 +158,7 @@ export function ProfileAvatarUpload({
             </div>
 
             <div className="flex flex-col gap-3 px-6 pb-6">
-              <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 disabled:cursor-not-allowed">
+              <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} className="w-full flex items-center justify-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 disabled:cursor-not-allowed">
                 <Upload className="w-4 h-4" />
                 {busy ? "Uploading…" : "Choose Photo"}
               </button>
@@ -256,7 +256,7 @@ export function ProfileAvatarUpload({
                 type="button"
                 onClick={() => void handleConfirmCrop()}
                 disabled={uploading}
-                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-70 disabled:translate-y-0"
+                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-70 disabled:translate-y-0"
               >
                 {uploading ? (
                   <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />

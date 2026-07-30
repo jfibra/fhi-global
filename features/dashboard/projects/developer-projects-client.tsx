@@ -187,7 +187,7 @@ function NewProjectModal({
                 Cancel
               </button>
               <button type="submit" disabled={saving || !name.trim()}
-                className="flex-1 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white text-sm font-semibold transition-all disabled:opacity-50">
+                className="flex-1 px-5 py-2.5 rounded-full bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white text-sm font-semibold transition-all disabled:opacity-50">
                 {saving ? "Creating…" : "Create Project"}
               </button>
             </div>
@@ -466,7 +466,7 @@ export function DeveloperProjectsClient({
               <p className="text-sm text-[#9ca3af] mt-1 mb-6">Choose from the sidebar or create a new one.</p>
               <button
                 onClick={() => setShowNew(true)}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white text-sm font-semibold hover:shadow-lg transition-all"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white text-sm font-semibold hover:shadow-lg transition-all"
               >
                 <Plus className="w-4 h-4" /> Create My First Project
               </button>

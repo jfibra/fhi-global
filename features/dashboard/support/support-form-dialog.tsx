@@ -171,10 +171,10 @@ export function SupportFormDialog({
       <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 pointer-events-none">
         <div className="pointer-events-auto w-full max-w-4xl bg-white rounded-[28px] shadow-2xl flex flex-col max-h-[95vh]" onClick={(e) => e.stopPropagation()}>
           <div className="relative shrink-0 px-7 pt-7 pb-5">
-            <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-[28px]" style={{ background: "linear-gradient(to right, #001f3f, #d6b357)" }} />
+            <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-[28px]" style={{ background: "linear-gradient(to bottom, #0a3d6b, #001f3f)" }} />
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-md">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shadow-md">
                   <AlertCircle className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -308,7 +308,7 @@ export function SupportFormDialog({
               type="button"
               onClick={() => void handleSubmit()}
               disabled={saving}
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-7 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {saving ? "Creating..." : "Create Ticket"}
             </button>

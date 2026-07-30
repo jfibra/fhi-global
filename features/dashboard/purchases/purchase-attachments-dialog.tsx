@@ -157,11 +157,11 @@ export function PurchaseAttachmentsDialog({
           <div className="relative shrink-0 px-7 pt-7 pb-5">
             <div
               className="absolute top-0 left-0 right-0 h-[3px] rounded-t-[28px]"
-              style={{ background: "linear-gradient(to right, #001f3f, #d6b357)" }}
+              style={{ background: "linear-gradient(to bottom, #0a3d6b, #001f3f)" }}
             />
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-md">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shadow-md">
                   <Paperclip className="w-5 h-5 text-white" />
                 </div>
                 <div>

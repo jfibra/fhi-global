@@ -104,7 +104,7 @@ export function ProfileForm({
           </div>
           <div className="mt-3 h-1.5 rounded-full bg-white/70 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-[#001f3f] to-[#d6b357] transition-all"
+              className="h-full rounded-full bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] transition-all"
               style={{ width: `${completion}%` }}
             />
           </div>

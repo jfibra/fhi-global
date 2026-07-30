@@ -67,7 +67,7 @@ function FieldLabel({ text, required }: { text: string; required?: boolean }) {
 function SectionTitle({ icon: Icon, title }: { icon: React.ComponentType<{ className?: string }>; title: string }) {
   return (
     <div className="flex items-center gap-2 mb-4">
-      <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center">
+      <div className="w-7 h-7 rounded-xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center">
         <Icon className="w-3.5 h-3.5 text-white" />
       </div>
       <h3 className="font-['Outfit'] text-sm font-bold text-[#0d1117] uppercase tracking-wider">{title}</h3>
@@ -438,11 +438,11 @@ export function SaleFormDialog({
           <div className="relative shrink-0 px-7 pt-7 pb-5">
             <div
               className="absolute top-0 left-0 right-0 h-[3px] rounded-t-[28px]"
-              style={{ background: "linear-gradient(to right, #001f3f, #d6b357)" }}
+              style={{ background: "linear-gradient(to bottom, #0a3d6b, #001f3f)" }}
             />
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-md">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shadow-md">
                   {viewMode ? <Eye className="w-5 h-5 text-white" /> : isEdit ? <Pencil className="w-5 h-5 text-white" /> : <DollarSign className="w-5 h-5 text-white" />}
                 </div>
                 <div>
@@ -1143,7 +1143,7 @@ export function SaleFormDialog({
                   type="button"
                   onClick={() => void handleSubmit()}
                   disabled={saving}
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-7 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {saving
                     ? (pendingFiles.length > 0 && !isEdit ? "Saving & uploading…" : "Saving…")

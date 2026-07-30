@@ -34,7 +34,7 @@ export function UserAvatar({
 
   return (
     <div
-      className={`rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold select-none bg-gradient-to-br from-[#001f3f] to-[#d6b357] ${className}`}
+      className={`rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold select-none bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] ${className}`}
       style={{ width: size, height: size, fontSize: Math.max(10, size * 0.38) }}
       aria-label={name}
     >

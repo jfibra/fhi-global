@@ -77,7 +77,7 @@ function SectionCard({
   return (
     <div className="bg-white/60 backdrop-blur-xl rounded-[20px] border border-white/60 shadow-sm shadow-black/5 p-6">
       <div className="flex items-center gap-2 mb-5">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center">
           <Icon className="w-4 h-4 text-white" />
         </div>
         <h3 className="font-['Outfit'] text-sm font-bold text-[#0d1117] uppercase tracking-wider">{title}</h3>
@@ -191,7 +191,7 @@ export default function SaleDetailPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shadow-lg">
                 <DollarSign className="w-6 h-6 text-white" />
               </div>
               <div>

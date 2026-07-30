@@ -53,7 +53,7 @@ export function ProfileSidebar({
             {profile.profile_url ? (
               <Image src={profile.profile_url} alt={displayName} fill className="object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-3xl font-bold bg-gradient-to-br from-[#001f3f] to-[#d6b357] text-white">
+              <div className="w-full h-full flex items-center justify-center text-3xl font-bold bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white">
                 {displayName.charAt(0).toUpperCase()}
               </div>
             )}
@@ -62,7 +62,7 @@ export function ProfileSidebar({
             type="button"
             onClick={() => setUploaderOpen(true)}
             disabled={avatarBusy}
-            className="absolute bottom-0 right-0 w-9 h-9 flex items-center justify-center rounded-full bg-gradient-to-br from-[#001f3f] to-[#d6b357] text-white shadow-lg border-2 border-white transition-all hover:scale-110 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="absolute bottom-0 right-0 w-9 h-9 flex items-center justify-center rounded-full bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white shadow-lg border-2 border-white transition-all hover:scale-110 disabled:opacity-60 disabled:cursor-not-allowed"
             title="Change profile photo"
           >
             <Camera className="w-4 h-4" />
@@ -71,7 +71,7 @@ export function ProfileSidebar({
 
         <h3 className="mt-4 font-['Outfit'] text-xl font-bold text-[#0d1117]">{displayName}</h3>
 
-        <div className="mt-2 inline-flex items-center px-3 py-1 bg-gradient-to-r from-[#001f3f] to-[#d6b357] rounded-full">
+        <div className="mt-2 inline-flex items-center px-3 py-1 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] rounded-full">
           <span className="text-xs font-semibold text-white tracking-wide">{roleLabel(profile.role)}</span>
         </div>
       </div>
@@ -84,7 +84,7 @@ export function ProfileSidebar({
         </div>
         <div className="h-2.5 rounded-full bg-[#eef2f7] overflow-hidden">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-[#001f3f] to-[#d6b357] transition-all duration-500"
+            className="h-full rounded-full bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] transition-all duration-500"
             style={{ width: `${completion}%` }}
           />
         </div>

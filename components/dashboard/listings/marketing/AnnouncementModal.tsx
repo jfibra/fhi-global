@@ -420,7 +420,7 @@ export default function AnnouncementModal({
             <button type="button" onClick={() => void handlePrint()} disabled={loading || printing || !data} title="Print" className="p-2 rounded-lg border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f] disabled:opacity-50">
               {printing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
             </button>
-            <button type="button" onClick={() => void handleDownload()} disabled={loading || downloading || !data} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white text-sm font-semibold shadow-md hover:shadow-lg disabled:opacity-50 transition-all">
+            <button type="button" onClick={() => void handleDownload()} disabled={loading || downloading || !data} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white text-sm font-semibold shadow-md hover:shadow-lg disabled:opacity-50 transition-all">
               {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
               {downloading ? "Exporting…" : "Download"}
             </button>

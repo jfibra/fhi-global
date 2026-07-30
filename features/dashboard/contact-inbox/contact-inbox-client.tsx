@@ -88,7 +88,7 @@ export function ContactInboxClient() {
       <div className="max-w-12xl space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-lg">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shadow-lg">
             <Inbox className="w-6 h-6 text-white" />
           </div>
           <div>

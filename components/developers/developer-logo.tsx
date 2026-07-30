@@ -31,7 +31,7 @@ export function DeveloperLogo({
       .toUpperCase() || "?"
   return (
     <div
-      className="rounded-xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center flex-shrink-0"
+      className="rounded-xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center flex-shrink-0"
       style={dim}
     >
       <span className="text-white font-bold" style={{ fontSize: Math.max(11, Math.round(size * 0.36)) }}>{initials}</span>

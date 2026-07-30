@@ -136,7 +136,7 @@ function QuickViewDialog({
             <div className="flex justify-end">
               <Link
                 href={`${base}/support/${ticket.id}`}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-2.5 rounded-2xl text-xs font-semibold"
+                className="inline-flex items-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-5 py-2.5 rounded-2xl text-xs font-semibold"
               >
                 <ExternalLink className="w-3 h-3" /> Open Details
               </Link>
@@ -299,7 +299,7 @@ export function SupportTable({
     <button
       type="button"
       onClick={() => setShowCreate(true)}
-      className="inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-4 py-2.5 rounded-full text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all"
+      className="inline-flex items-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-4 py-2.5 rounded-full text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all"
     >
       <Plus className="w-4 h-4" /> Create ticket
     </button>
@@ -318,7 +318,7 @@ export function SupportTable({
         ) : (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shadow-lg">
                 <AlertCircle className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -434,7 +434,7 @@ export function SupportTable({
                         <button
                           type="button"
                           onClick={() => setShowCreate(true)}
-                          className="mt-3 inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-4 py-2.5 rounded-full text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all"
+                          className="mt-3 inline-flex items-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-4 py-2.5 rounded-full text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all"
                         >
                           <Plus className="w-4 h-4" />
                           Create Ticket
@@ -575,7 +575,7 @@ export function SupportTable({
                 type="button"
                 disabled={statusDraft === statusTicket.status}
                 onClick={() => void handleStatusUpdate()}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-5 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Save Status
               </button>

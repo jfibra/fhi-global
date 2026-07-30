@@ -402,7 +402,7 @@ export function UserProfileModal({
             disabled={busy}
             className={`flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 disabled:opacity-70 ${
               readOnly
-                ? "bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white shadow-md hover:translate-y-[-1px] hover:shadow-lg"
+                ? "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white shadow-md hover:translate-y-[-1px] hover:shadow-lg"
                 : "bg-white text-[#4b5563] border border-[#e5e5e5] hover:border-[#001f3f]"
             }`}
           >
@@ -417,7 +417,7 @@ export function UserProfileModal({
             className={`flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-full font-semibold text-sm transition-all duration-300 ${
               readOnly
                 ? "bg-white text-[#9ca3af] border border-[#e5e5e5] cursor-not-allowed"
-                : "bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white shadow-md hover:translate-y-[-1px] hover:shadow-lg disabled:opacity-70"
+                : "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white shadow-md hover:translate-y-[-1px] hover:shadow-lg disabled:opacity-70"
             }`}
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}

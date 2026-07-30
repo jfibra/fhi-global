@@ -265,7 +265,7 @@ export function ProfileTabs({
               type="button"
               className={`px-5 py-2 text-sm font-semibold rounded-full transition-all duration-200 ${
                 activeTab === tab.key
-                  ? "bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white shadow-md"
+                  ? "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white shadow-md"
                   : "text-[#6b7280] hover:text-[#001f3f] hover:bg-[#f8fafc]"
               }`}
               onClick={() => setActiveTab(tab.key)}
@@ -447,7 +447,7 @@ export function ProfileTabs({
                 type="button"
                 onClick={() => void handleSaveProfileInfo()}
                 disabled={busySection === "profile"}
-                className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
+                className="bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
               >
                 {busySection === "profile" ? (
                   <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>

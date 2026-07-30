@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { X, Check, Pencil, Tag, Building2, Info } from "lucide-react"
+import { TOOLBAR_GRADIENT } from "@/components/common/header-toolbar"
 import {
   type AdminListingRow,
   type AdminListingUpdateInput,
@@ -106,7 +107,7 @@ export function ListingEditDialog({ listing, onClose, onSaved, onError }: Props)
           {/* Header */}
           <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#f0f0f0] flex-shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center">
+              <div className={`w-10 h-10 rounded-2xl ${TOOLBAR_GRADIENT} flex items-center justify-center`}>
                 <Pencil className="w-5 h-5 text-white" />
               </div>
               <div className="min-w-0">
@@ -222,7 +223,7 @@ export function ListingEditDialog({ listing, onClose, onSaved, onError }: Props)
               type="button"
               onClick={() => void handleSubmit()}
               disabled={busy}
-              className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
+              className={`${TOOLBAR_GRADIENT} text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2`}
             >
               {busy ? (
                 <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>

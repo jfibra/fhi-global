@@ -224,7 +224,7 @@ export function TicketDetails({
                     setTicket(data)
                     addToast("success", "Ticket status updated")
                   }}
-                  className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-5 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all"
+                  className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-5 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all"
                 >
                   Mark Ticket Resolved
                 </button>

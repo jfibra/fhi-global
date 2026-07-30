@@ -337,7 +337,7 @@ export function CompanyClient({
             <button
               type="submit"
               disabled={saving}
-              className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white px-8 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-50 disabled:translate-y-0 flex items-center gap-2"
+              className="bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-8 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-50 disabled:translate-y-0 flex items-center gap-2"
             >
               {saving ? (
                 <>

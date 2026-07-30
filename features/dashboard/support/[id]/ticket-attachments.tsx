@@ -144,7 +144,7 @@ export function TicketAttachments({
               </button>
               <button
                 type="button"
-                className="px-5 py-2 text-sm font-semibold text-white bg-gradient-to-r from-[#001f3f] to-[#d6b357] rounded-xl transition-all shadow-sm flex items-center gap-2"
+                className="px-5 py-2 text-sm font-semibold text-white bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] rounded-xl transition-all shadow-sm flex items-center gap-2"
                 onClick={(e) => {
                   e.stopPropagation()
                   void uploadFile(stagedFile)

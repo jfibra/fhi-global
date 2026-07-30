@@ -200,11 +200,11 @@ export function PurchaseFormDialog({
           <div className="relative shrink-0 px-7 pt-7 pb-5">
             <div
               className="absolute top-0 left-0 right-0 h-[3px] rounded-t-[28px]"
-              style={{ background: "linear-gradient(to right, #001f3f, #d6b357)" }}
+              style={{ background: "linear-gradient(to bottom, #0a3d6b, #001f3f)" }}
             />
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#d6b357] flex items-center justify-center shadow-md">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shadow-md">
                   {viewMode ? <Eye className="w-4.5 h-4.5 text-white" />
                     : isEdit ? <Pencil className="w-4.5 h-4.5 text-white" />
                     : <Plus className="w-4.5 h-4.5 text-white" />}
@@ -471,7 +471,7 @@ export function PurchaseFormDialog({
                     onClick={handleSubmit}
                     disabled={saving}
                     className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold text-white shadow-md transition-all hover:translate-y-[-1px] hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0"
-                    style={{ background: "linear-gradient(to right, #001f3f, #d6b357)" }}
+                    style={{ background: "linear-gradient(to bottom, #0a3d6b, #001f3f)" }}
                   >
                     {saving ? (
                       <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />

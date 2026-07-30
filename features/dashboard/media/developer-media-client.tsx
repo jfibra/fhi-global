@@ -250,7 +250,7 @@ function UploadModal({
               Cancel
             </button>
             <button type="submit" disabled={uploading}
-              className="flex-1 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#001f3f] to-[#d6b357] text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+              className="flex-1 px-5 py-2.5 rounded-full bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
               {uploading ? (
                 <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploading…</>
               ) : (
