@@ -6,6 +6,7 @@ import {
   ArrowRight,
   ArrowUpDown,
   Building2,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -20,6 +21,7 @@ import {
   TrendingUp,
   Wallet,
   X,
+  XCircle,
   type LucideIcon,
 } from "lucide-react"
 import {
@@ -191,7 +193,7 @@ function SkeletonRows({ cols }: { cols: number }) {
       {Array.from({ length: 8 }).map((_, i) => (
         <tr key={i} className="border-b border-[#f3f4f6]">
           {Array.from({ length: cols }).map((__, j) => (
-            <td key={j} className="px-4 py-4 first:pl-6 last:pr-6">
+            <td key={j} className="px-4 py-2.5 first:pl-6 last:pr-6">
               <div className={`h-3 rounded-full bg-[#f0f2f5] animate-pulse ${j === 0 ? "w-32" : "w-20"}`} />
             </td>
           ))}
@@ -464,34 +466,31 @@ export function SalesTable({
   })
   columns.push({
     key: "actions", header: "Actions",
+    // One line, never wrapping: with flex-wrap these six controls stacked into
+    // five rows once the column narrowed, stretching every row to ~200px tall.
+    // The three validation shortcuts are icon buttons (labelled via title +
+    // aria-label) so the column stays narrow too.
     cell: (s) => (
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-1.5 flex-nowrap">
         {isAdminUser && (
           <>
-            <button
-              type="button"
-              onClick={() => void handleValidationShortcut(s, "validated")}
-              disabled={s.validation_status === "validated"}
-              className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-            >
-              Validate Sale
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleValidationShortcut(s, "invalid_sale")}
-              disabled={s.validation_status === "invalid_sale"}
-              className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
-            >
-              Invalid Sale
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleValidationShortcut(s, "under_review")}
-              disabled={s.validation_status === "under_review"}
-              className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 transition-colors"
-            >
-              Under Review
-            </button>
+            {([
+              { status: "validated" as const, label: "Validate sale", Icon: CheckCircle2, cls: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" },
+              { status: "invalid_sale" as const, label: "Mark invalid sale", Icon: XCircle, cls: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100" },
+              { status: "under_review" as const, label: "Mark under review", Icon: Clock, cls: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100" },
+            ]).map(({ status, label, Icon, cls }) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => void handleValidationShortcut(s, status)}
+                disabled={s.validation_status === status}
+                title={label}
+                aria-label={label}
+                className={`w-8 h-8 inline-flex items-center justify-center rounded-full border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${cls}`}
+              >
+                <Icon className="w-4 h-4" />
+              </button>
+            ))}
           </>
         )}
         <button
@@ -758,7 +757,7 @@ export function SalesTable({
                       {columns.map((col) => (
                         <td
                           key={col.key}
-                          className={`px-4 py-3.5 whitespace-nowrap first:pl-6 last:pr-6 ${col.tdClassName ?? "text-[#374151]"}`}
+                          className={`px-4 py-2.5 whitespace-nowrap align-middle first:pl-6 last:pr-6 ${col.tdClassName ?? "text-[#374151]"}`}
                         >
                           {col.cell(sale)}
                         </td>
