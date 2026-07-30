@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { createPageMetadata } from "@/lib/seo"
 import { roleToLabel } from "@/lib/app-roles"
-import { readSocialLinks, readTagline } from "@/lib/public-profile"
+import { readCustomLinks, readSocialLinks, readTagline } from "@/lib/public-profile"
 import { PublicProfile, type PublicProfileData } from "@/features/business-card/public-profile"
 
 /**
@@ -80,6 +80,7 @@ async function loadProfile(id: string): Promise<PublicProfileData | null> {
     design,
     avatarUrl,
     tagline: readTagline(profile.metadata),
+    links: readCustomLinks(profile.metadata),
     socials: readSocialLinks(profile.metadata),
   }
 }

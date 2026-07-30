@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { normalizeTagline, parseSocialLinks, type SocialLinks } from "@/lib/public-profile"
+import {
+  normalizeTagline, parseCustomLinks, parseSocialLinks,
+  type CustomLink, type SocialLinks,
+} from "@/lib/public-profile"
 
 export async function PATCH(req: Request) {
   // ── Auth guard ─────────────────────────────────────────────────────────────
@@ -18,6 +21,7 @@ export async function PATCH(req: Request) {
     business_card_design?: string
     socials?: unknown
     tagline?: unknown
+    links?: unknown
   }
   try {
     body = await req.json()
@@ -25,7 +29,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  const { phone, phone_country_code, phone_number, business_card_design, socials, tagline } = body
+  const { phone, phone_country_code, phone_number, business_card_design, socials, tagline, links } = body
 
   // ── Validate ───────────────────────────────────────────────────────────────
   const BUSINESS_CARD_DESIGNS = ["classic", "platinum", "noir"]
@@ -54,9 +58,15 @@ export async function PATCH(req: Request) {
   // clears it.
   const normalizedTagline = tagline === undefined ? undefined : normalizeTagline(tagline)
 
+  // Same leniency as the tagline: bad rows are dropped, not rejected, so one
+  // typo can't cost the agent the rest of their page.
+  const parsedLinks: CustomLink[] | undefined =
+    links === undefined ? undefined : parseCustomLinks(links)
+
   if (
     !phone && !phone_number && !business_card_design &&
-    parsedSocials === undefined && normalizedTagline === undefined
+    parsedSocials === undefined && normalizedTagline === undefined &&
+    parsedLinks === undefined
   ) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 })
   }
@@ -81,6 +91,7 @@ export async function PATCH(req: Request) {
     ...(business_card_design ? { business_card_design } : {}),
     ...(parsedSocials !== undefined ? { socials: parsedSocials } : {}),
     ...(normalizedTagline !== undefined ? { tagline: normalizedTagline } : {}),
+    ...(parsedLinks !== undefined ? { links: parsedLinks } : {}),
   }
 
   const { error: profileErr } = await adminClient

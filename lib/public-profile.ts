@@ -10,24 +10,30 @@
  * value can only ever be normalised and validated one way.
  */
 
-// ─── Tagline ──────────────────────────────────────────────────────────────────
-
-/** Two comfortable lines on a phone. Longer and it crowds out the buttons. */
-export const TAGLINE_MAX = 160
+// ─── Free text ────────────────────────────────────────────────────────────────
 
 /**
- * Squeeze a typed tagline into one clean line. Newlines and runs of whitespace
- * collapse to single spaces (the page centres it and wraps on its own) and
+ * Squeeze typed text into one clean line. Newlines and runs of whitespace
+ * collapse to single spaces (the page centres text and wraps it itself) and
  * control characters are dropped. React escapes the result on render, so there
- * is nothing further to sanitise.
+ * is nothing further to sanitise here.
  */
-export function normalizeTagline(raw: unknown): string {
+function oneLine(raw: unknown, max: number): string {
   if (typeof raw !== "string") return ""
   return raw
     .replace(/[\u0000-\u001f\u007f]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, TAGLINE_MAX)
+    .slice(0, max)
+}
+
+// ─── Tagline ──────────────────────────────────────────────────────────────────
+
+/** Two comfortable lines on a phone. Longer and it crowds out the buttons. */
+export const TAGLINE_MAX = 160
+
+export function normalizeTagline(raw: unknown): string {
+  return oneLine(raw, TAGLINE_MAX)
 }
 
 /** Read a stored tagline back out of `profiles.metadata`. */
@@ -169,4 +175,73 @@ export function readSocialLinks(metadata: unknown): SocialLinks {
     if (url) out[key] = url
   }
   return out
+}
+
+// ─── Custom buttons ───────────────────────────────────────────────────────────
+
+/** Enough for a link page without turning it into a menu. */
+export const CUSTOM_LINKS_MAX = 8
+/** Fits one line on a pill at the page's type size. */
+export const LINK_LABEL_MAX = 40
+
+export type CustomLink = { label: string; url: string }
+
+/**
+ * Normalise a button's destination, or null if it can't be trusted.
+ *
+ * Unlike the social fields, the host is the agent's own choice — these point at
+ * their listings, brochures and booking forms. What is NOT their choice is the
+ * scheme: anything but http/https is refused rather than coerced, so
+ * `javascript:` and `data:` can never reach an href. A bare domain gets https.
+ */
+export function normalizeLinkUrl(raw: unknown): string | null {
+  if (typeof raw !== "string") return null
+  const value = raw.trim()
+  if (!value) return null
+
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(value)
+  if (scheme && !/^https?$/i.test(scheme[1])) return null
+
+  let url: URL
+  try {
+    url = new URL(scheme ? value : `https://${value}`)
+  } catch {
+    return null
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null
+  // A hostname with no dot is a typo rather than a site — "localhost" included,
+  // since this renders on a public page.
+  if (!url.hostname.includes(".")) return null
+  return url.toString()
+}
+
+export function normalizeLinkLabel(raw: unknown): string {
+  return oneLine(raw, LINK_LABEL_MAX)
+}
+
+/**
+ * Validate a whole `links` payload. Rows that fail are DROPPED rather than
+ * failing the request: the maker flags them inline before sending, and one bad
+ * row must never cost the agent the rest of their page.
+ */
+export function parseCustomLinks(input: unknown): CustomLink[] {
+  if (!Array.isArray(input)) return []
+  const out: CustomLink[] = []
+  for (const row of input) {
+    if (!row || typeof row !== "object") continue
+    const { label, url } = row as Record<string, unknown>
+    const cleanLabel = normalizeLinkLabel(label)
+    const cleanUrl = normalizeLinkUrl(url)
+    if (!cleanLabel || !cleanUrl) continue
+    out.push({ label: cleanLabel, url: cleanUrl })
+    if (out.length === CUSTOM_LINKS_MAX) break
+  }
+  return out
+}
+
+/** Read stored buttons back out of `profiles.metadata`. */
+export function readCustomLinks(metadata: unknown): CustomLink[] {
+  const meta = (metadata as Record<string, unknown> | null) ?? {}
+  // Re-validated on read: stored rows can predate a tightened rule.
+  return parseCustomLinks(meta.links)
 }

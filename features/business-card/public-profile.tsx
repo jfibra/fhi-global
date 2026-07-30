@@ -4,9 +4,9 @@ import Image from "next/image"
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import { QRCodeCanvas } from "qrcode.react"
 import {
-  ChevronDown, CreditCard, Download, Mail, Phone, RefreshCcw, UserPlus, X,
+  ChevronDown, CreditCard, Download, Link2, Mail, Phone, RefreshCcw, UserPlus, X,
 } from "lucide-react"
-import { SOCIAL_PLATFORMS, type SocialLinks } from "@/lib/public-profile"
+import { SOCIAL_PLATFORMS, type CustomLink, type SocialLinks } from "@/lib/public-profile"
 import { SOCIAL_ICONS } from "./social-icons"
 import {
   DISP_H, DISP_W, EXPORT_H, EXPORT_W,
@@ -47,6 +47,7 @@ export type PublicProfileData = {
   design: string
   avatarUrl: string | null
   tagline: string
+  links: CustomLink[]
   socials: SocialLinks
 }
 
@@ -63,6 +64,15 @@ function useSelfUrl(id: string): string {
     () => "",
   )
   return origin ? `${origin}/business-card/${id}` : ""
+}
+
+/** "www.example.com/x" → "example.com", for the subtext under a custom button. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host.replace(/^www\./, "")
+  } catch {
+    return ""
+  }
 }
 
 /** RFC 6350 vCard. Escaping matters: an unescaped comma silently splits a field. */
@@ -91,6 +101,7 @@ function ActionPill({
   label,
   hint,
   delay,
+  external = false,
 }: {
   href?: string
   onClick?: () => void
@@ -98,6 +109,9 @@ function ActionPill({
   label: string
   hint?: string
   delay: number
+  /** Agent-supplied destination: opens in a new tab and passes no referrer or
+   *  ranking signal, since we don't vouch for where it goes. */
+  external?: boolean
 }) {
   const inner = (
     <>
@@ -118,7 +132,12 @@ function ActionPill({
 
   if (href) {
     return (
-      <a href={href} className={cls} style={{ animationDelay: `${delay}ms` }}>
+      <a
+        href={href}
+        className={cls}
+        style={{ animationDelay: `${delay}ms` }}
+        {...(external ? { target: "_blank", rel: "noopener noreferrer nofollow ugc" } : {})}
+      >
         {inner}
       </a>
     )
@@ -253,8 +272,9 @@ export function PublicProfile({
   const step = (slot: number) => slot * 70
   const HEADER_SLOTS = 5
 
-  // Dialling and composing are left to the raw phone/email above and the
-  // WhatsApp button below, so these two are the only action rows.
+  // The agent's own buttons lead — they are the point of a link page. Dialling
+  // and composing are left to the phone/email in the contact block and the
+  // WhatsApp icon, so the two built-ins below are all that follow.
   const actions: Array<{
     key: string
     href?: string
@@ -262,7 +282,18 @@ export function PublicProfile({
     icon: React.ComponentType<{ className?: string }>
     label: string
     hint?: string
+    external?: boolean
   }> = [
+    ...data.links.map((link, i) => ({
+      key: `link-${i}`,
+      href: link.url,
+      icon: Link2,
+      label: link.label,
+      // Naming the destination is the honest thing to do on a page of
+      // agent-supplied outbound links.
+      hint: hostOf(link.url),
+      external: true,
+    })),
     { key: "vcf", onClick: saveContact, icon: UserPlus, label: "Save to my contacts", hint: "Downloads a .vcf contact file" },
     {
       key: "card",
@@ -342,6 +373,7 @@ export function PublicProfile({
               icon={a.icon}
               label={a.label}
               hint={a.hint}
+              external={a.external}
               delay={step(HEADER_SLOTS + i)}
             />
           ))}
