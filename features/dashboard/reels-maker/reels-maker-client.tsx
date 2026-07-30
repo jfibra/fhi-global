@@ -3123,15 +3123,15 @@ export function ReelsMakerClient({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Property title</label>
-                  <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Modern 3BR Family Home" maxLength={60} />
+                  <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Modern 3BR Apartment" maxLength={60} />
                 </div>
                 <div>
                   <label className={labelCls}>Location</label>
-                  <input className={inputCls} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Cebu City, Philippines" maxLength={60} />
+                  <input className={inputCls} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Downtown Dubai, UAE" maxLength={60} />
                 </div>
                 <div>
                   <label className={labelCls}>Price text</label>
-                  <input className={inputCls} value={price} onChange={(e) => setPrice(e.target.value)} placeholder={market === "rent" ? "₱25,000 / month" : "₱4,500,000"} maxLength={30} />
+                  <input className={inputCls} value={price} onChange={(e) => setPrice(e.target.value)} placeholder={market === "rent" ? "AED 120,000 / year" : "AED 2,500,000"} maxLength={30} />
                 </div>
                 <div>
                   <label className={labelCls}>Agent name</label>
@@ -3139,7 +3139,7 @@ export function ReelsMakerClient({
                 </div>
                 <div>
                   <label className={labelCls}>Contact number</label>
-                  <input className={inputCls} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0917 123 4567" maxLength={30} />
+                  <input className={inputCls} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+971 50 123 4567" maxLength={30} />
                 </div>
                 <div className="flex items-end">
                   <button
