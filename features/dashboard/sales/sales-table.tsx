@@ -481,7 +481,7 @@ export function SalesTable({
         {isAdminUser && (
           <>
             {([
-              { status: "validated" as const, label: "Validate sale", Icon: CheckCircle2, needsConfirm: false, cls: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" },
+              { status: "validated" as const, label: "Validate sale", Icon: CheckCircle2, needsConfirm: true, cls: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" },
               { status: "invalid_sale" as const, label: "Mark invalid sale", Icon: XCircle, needsConfirm: true, cls: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100" },
               { status: "under_review" as const, label: "Mark under review", Icon: Clock, needsConfirm: true, cls: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100" },
             ]).map(({ status, label, Icon, needsConfirm, cls }) => (
@@ -918,9 +918,21 @@ export function SalesTable({
       {/* Invalid Sale / Under Review — click to confirm (Validate stays direct) */}
       {confirm?.kind === "validation" && (
         <SaleConfirmDialog
-          title={confirm.nextStatus === "invalid_sale" ? "Mark as Invalid Sale?" : "Move to Under Review?"}
+          title={
+            confirm.nextStatus === "validated"
+              ? "Validate this sale?"
+              : confirm.nextStatus === "invalid_sale"
+                ? "Mark as Invalid Sale?"
+                : "Move to Under Review?"
+          }
           message={`This sets the validation status to ${STATUS_LABEL[confirm.nextStatus]}. You can change it again later.`}
-          confirmLabel={confirm.nextStatus === "invalid_sale" ? "Mark Invalid Sale" : "Move to Under Review"}
+          confirmLabel={
+            confirm.nextStatus === "validated"
+              ? "Validate Sale"
+              : confirm.nextStatus === "invalid_sale"
+                ? "Mark Invalid Sale"
+                : "Move to Under Review"
+          }
           tone="primary"
           busy={confirmBusy}
           onConfirm={() => void runConfirm()}
