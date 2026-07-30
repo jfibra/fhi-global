@@ -209,7 +209,7 @@ const DEVELOPER_NAV: RoleNavEntry[] = [
  * particular rank gets (team leaders also manage events, per
  * ROLES_EVENT_MANAGERS in app-roles.ts).
  */
-const salesPipelineNav = ({ projects = false, events = false } = {}): RoleNavEntry[] => [
+const salesPipelineNav = ({ projects = false, events = false, teamSales = false } = {}): RoleNavEntry[] => [
   OVERVIEW,
   { icon: ClipboardList, label: "My listings", to: "listings" },
   // Agents get the read-only projects browser for the Poster/Reels studios
@@ -220,6 +220,9 @@ const salesPipelineNav = ({ projects = false, events = false } = {}): RoleNavEnt
   // Team leaders manage events too (see ROLES_EVENT_MANAGERS).
   ...(events ? [EVENTS] : []),
   SALES_REPORTS,
+  // Team leaders / unit managers see their whole team's production
+  // (keep in sync with "team-sales" in SUB_PATH_ROLES, lib/auth.ts).
+  ...(teamSales ? [{ icon: Users, label: "Team Sales", to: "team-sales" } satisfies NavEntry] : []),
   SUPPORT_TICKETS,
   BUSINESS_CARD,
 ]
@@ -253,8 +256,8 @@ const ROLE_NAV: Record<AppRoleId, RoleNavEntry[]> = {
   admin:          ADMIN_NAV,
   editor:         EDITOR_NAV,
   developer:      DEVELOPER_NAV,
-  team_leader:    salesPipelineNav({ events: true }),
-  unit_manager:   salesPipelineNav(),
+  team_leader:    salesPipelineNav({ events: true, teamSales: true }),
+  unit_manager:   salesPipelineNav({ teamSales: true }),
   agent:          salesPipelineNav({ projects: true }),
   secretary:      SECRETARY_NAV,
   team_secretary: SECRETARY_NAV,

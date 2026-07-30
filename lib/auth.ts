@@ -59,6 +59,7 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   media: ["developer"],
   sales: [...ROLES_SALES_REPORTS_ACCESS],
   "reels-maker": [...ROLES_REELS_MAKER],
+  "team-sales": ["team_leader", "unit_manager"],
   invite: ["super_admin", "admin", "agent", "team_leader", "unit_manager"],
 }
 
