@@ -66,13 +66,13 @@ const TYPE_CARDS: Array<{
   {
     type: "project",
     icon: Building2,
-    title: "Project Sale",
+    title: "Project Sale / Off-Plan",
     desc: "A unit in a developer's project — pick the developer, project and unit.",
   },
   {
     type: "brokerage",
     icon: Handshake,
-    title: "Brokerage",
+    title: "Brokerage / Ready Unit",
     desc: "A resale / private-owner deal — no developer, just the property details.",
   },
   {
