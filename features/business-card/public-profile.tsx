@@ -4,9 +4,10 @@ import Image from "next/image"
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { QRCodeCanvas } from "qrcode.react"
 import {
-  ArrowLeft, Building2, ClipboardList, Download, Globe, Link2, Mail, Phone, Star, X,
+  ArrowLeft, Building2, ClipboardList, Download, Globe, Link2, Star, X,
 } from "lucide-react"
 import { type ProfileTheme } from "@/lib/profile-themes"
+import { ContactCard } from "./contact-card"
 import {
   DEFAULT_BUTTON_URL, SOCIAL_PLATFORMS,
   type CustomLink, type FeaturedItem, type FixedButtonKey, type SocialLinks,
@@ -24,8 +25,6 @@ import { dialFromValue, stripLocal } from "./card-render"
  */
 
 const DISPLAY = "font-[family-name:var(--font-outfit)]"
-
-const BRAND_WHITE = "/FHI_Branding_White.png"
 
 /** QR is drawn at this size and scaled down by CSS — sharp on any screen. */
 const QR_EXPORT_PX = 560
@@ -487,83 +486,18 @@ export function PublicProfile({
             ))}
           </div>
 
-          {/* Contact card — QR, the details in the clear, and the brand mark, in one
-              block at the foot of the page. The QR sits on its own white tile
-              because a scanner needs the quiet zone and the full contrast; the
-              values are select-all rather than links so they can be copied by hand. */}
-          <div
-            className="animate-hero-item mt-9 w-full rounded-2xl border backdrop-blur-sm p-4"
-            style={{
-              animationDelay: `${step(HEADER_SLOTS + actions.length)}ms`,
-              background: t.panel,
-              borderColor: t.panelBorder,
-            }}
-          >
-            <div className="flex items-center gap-4">
-              {/* QR — tap to enlarge, for scanning across a table. */}
-              <button
-                type="button"
-                onClick={() => setQrOpen(true)}
-                disabled={!selfUrl}
-                aria-label="Enlarge the QR code"
-                className="shrink-0 p-2 rounded-xl bg-white shadow-[0_6px_18px_-8px_rgba(0,0,0,0.6)] hover:scale-[1.04] active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#d6b357]/70 disabled:cursor-default disabled:hover:scale-100 transition-transform duration-200"
-              >
-                {selfUrl ? (
-                  <QRCodeCanvas
-                    value={selfUrl}
-                    // Drawn at export size and scaled down by CSS so it stays sharp
-                    // on high-density screens and survives a screenshot.
-                    size={QR_EXPORT_PX}
-                    level="M"
-                    marginSize={2}
-                    fgColor="#001f3f"
-                    bgColor="#ffffff"
-                    style={{ width: 96, height: 96 }}
-                  />
-                ) : (
-                  <div className="w-24 h-24 rounded-lg bg-[#eef1f5] animate-pulse" />
-                )}
-              </button>
+          {/* Contact card — one of six designs, rendered by contact-card.tsx. */}
+          <ContactCard
+            design={t.contactLayout}
+            t={t}
+            phoneDisplay={phoneDisplay}
+            email={data.email}
+            selfUrl={selfUrl}
+            onQrOpen={() => setQrOpen(true)}
+            delay={step(HEADER_SLOTS + actions.length)}
+          />
 
-              {/* Details + brand */}
-              <div className="min-w-0 flex-1 flex flex-col gap-2">
-                {phoneDisplay && (
-                  <p className="flex items-center gap-2 text-[15px] font-semibold tabular-nums" style={{ color: t.ink }}>
-                    <Phone className="w-3.5 h-3.5 shrink-0" style={{ color: t.accent }} aria-hidden />
-                    <span className="select-all">{phoneDisplay}</span>
-                  </p>
-                )}
-                {data.email && (
-                  <p className="flex items-start gap-2 text-[13px] leading-snug" style={{ color: t.inkMuted }}>
-                    <Mail className="w-3.5 h-3.5 mt-[3px] shrink-0" style={{ color: t.accent }} aria-hidden />
-                    <span className="select-all break-all">{data.email}</span>
-                  </p>
-                )}
-
-                {/* Only a separator when there is something above it to separate. */}
-                {(phoneDisplay || data.email) && <div className="h-px" style={{ background: t.panelBorder }} />}
-
-                <a
-                  href="https://fhiglobal.ae"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group inline-flex items-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#d6b357]/60 rounded"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={BRAND_WHITE}
-                    alt="FHI Global"
-                    className="h-5 w-auto opacity-90 group-hover:opacity-100 transition-opacity"
-                  />
-                  <span className="text-[11px] tracking-wider transition-colors" style={{ color: t.inkMuted }}>
-                    www.fhiglobal.ae
-                  </span>
-                </a>
-              </div>
-            </div>
-          </div>
-
-          {/* Socials — only the ones this person actually filled in. */}
+        {/* Socials — only the ones this person actually filled in. */}
           {socialEntries.length > 0 && (
             <div
               className="animate-hero-item mt-9 w-full flex flex-wrap items-center justify-center gap-3 sm:gap-4"
