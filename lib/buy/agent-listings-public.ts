@@ -40,16 +40,20 @@ export type PublicAgentListingRow = {
   updated_at: string
   projects: BuyRawProject | null
   agent_listing_images?: { url: string; sort_order: number }[] | null
-  /** Owning agent, for the enquiry card. Embedded only on the detail fetch. */
-  profiles?: PublicListingAgent | PublicListingAgent[] | null
+  /** Owning agent's id. The profile itself is fetched server-side — see below. */
+  agent_id?: string | null
 }
 
 /**
- * The listing owner's public-facing details.
+ * The listing owner's public-facing details, for the enquiry card.
  *
- * Only what an enquiry needs: who they are, their photo and their phone. The
- * phone lives in `profiles.metadata` (there is no column for it), same as the
- * business card and public profile read it.
+ * Deliberately NOT embedded in the public query any more: `profiles` is behind
+ * RLS (migration 020) and unreadable by the anon key, so the embed would come
+ * back null. app/listings/[id]/page.tsx loads it with the service-role client
+ * instead, which also lets it pick up the agent's email from auth.users.
+ *
+ * The phone lives in `profiles.metadata` — there is no column for it — same as
+ * the business card and public profile read it.
  */
 export type PublicListingAgent = {
   id: string
@@ -63,13 +67,10 @@ export type PublicListingAgent = {
   metadata: Record<string, unknown> | null
 }
 
-/** Flatten the embed (PostgREST may hand back an array) and drop unusable rows. */
-export function listingAgentOf(row: PublicAgentListingRow): PublicListingAgent | null {
-  const raw = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
-  if (!raw) return null
-  // A deactivated or deleted agent falls back to the house contact card.
-  if (raw.is_deleted === true || (raw.status ?? "active") !== "active") return null
-  return raw
+/** A deactivated or deleted agent falls back to the house contact card. */
+export function isUsableListingAgent(agent: PublicListingAgent | null): boolean {
+  if (!agent) return false
+  return agent.is_deleted !== true && (agent.status ?? "active") === "active"
 }
 
 /**
@@ -172,12 +173,11 @@ export async function fetchPublicAgentListingById(idOrSlug: string): Promise<{
   const query = supabase
     .from("agent_listings")
     .select(
-      // The owning agent is embedded here but NOT on the list query above —
-      // the enquiry card only exists on the detail page, and the browse grids
-      // would be paying for a join they never read.
-      `id, slug, title, description, listing_kind, price, currency, unit_type, created_at, updated_at,
-       projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order ),
-       profiles:agent_id ( id, fullname, fname, lname, profile_url, role, status, is_deleted, metadata )`,
+      // agent_id only — the profile behind it is behind RLS and is loaded by
+      // the page on the service-role client. The list query above doesn't even
+      // need the id: the enquiry card exists only on the detail page.
+      `id, slug, title, description, listing_kind, price, currency, unit_type, created_at, updated_at, agent_id,
+       projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
     )
     .eq("status", "published")
     .is("deleted_at", null)

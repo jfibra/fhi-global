@@ -6,9 +6,10 @@ import { MapPin, Building2, ArrowLeft, Mail, Phone, ChevronRight } from "lucide-
 import { createPageMetadata, SITE_URL } from "@/lib/seo"
 import {
   fetchPublicAgentListingById,
+  isUsableListingAgent,
   listingAgentName,
-  listingAgentOf,
   listingAgentPhone,
+  type PublicListingAgent,
 } from "@/lib/buy/agent-listings-public"
 import { roleToLabel } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
@@ -28,22 +29,35 @@ const EMAIL = "info@fhiglobal.ae"
 const WA = "971567428288"
 
 /**
- * The agent's email, for the enquiry button.
+ * The listing agent's details for the enquiry card.
  *
- * Addresses live in auth.users, which the public anon client can't read, so
- * this is a single service-role lookup — the same one the public business-card
- * page makes. It runs server-side during ISR, so the key never reaches the
- * browser and the page stays cacheable. Failure just falls back to the shared
- * inbox rather than breaking the page.
+ * Service-role, because neither half is reachable publicly: `profiles` is
+ * behind RLS (migration 020) and email lives in auth.users. Same approach as
+ * the public business-card page. It runs server-side during ISR, so the key
+ * never reaches the browser and the page stays cacheable; any failure falls
+ * back to the house contact card rather than breaking the page.
  */
-async function fetchAgentEmail(agentId: string | undefined): Promise<string> {
-  if (!agentId) return ""
+async function fetchListingAgent(
+  agentId: string | null | undefined,
+): Promise<{ agent: PublicListingAgent | null; email: string }> {
+  if (!agentId) return { agent: null, email: "" }
   try {
     const admin = createAdminSupabase()
-    const { data } = await admin.auth.admin.getUserById(agentId)
-    return data?.user?.email?.trim() ?? ""
+    const [profileRes, authRes] = await Promise.all([
+      admin
+        .from("profiles")
+        .select("id, fullname, fname, lname, profile_url, role, status, is_deleted, metadata")
+        .eq("id", agentId)
+        .maybeSingle(),
+      admin.auth.admin.getUserById(agentId).catch(() => null),
+    ])
+    const agent = (profileRes.data as PublicListingAgent | null) ?? null
+    return {
+      agent: isUsableListingAgent(agent) ? agent : null,
+      email: authRes?.data?.user?.email?.trim() ?? "",
+    }
   } catch {
-    return ""
+    return { agent: null, email: "" }
   }
 }
 
@@ -138,13 +152,13 @@ export default async function PublicAgentListingPage({ params }: Props) {
   // Enquiries go to the agent who owns the listing. Their phone falls back to
   // the house line, so Call and WhatsApp always reach someone even when the
   // agent has no number saved.
-  const agent = listingAgentOf(row)
+  const { agent, email: agentEmail } = await fetchListingAgent(row.agent_id)
   const agentName = listingAgentName(agent)
   const agentTitle = agent?.role ? roleToLabel(agent.role) : "Listing Agent"
   const agentPhone = listingAgentPhone(agent)
   const contactTel = agentPhone || TEL
   const contactWa = (agentPhone || WA).replace(/^\+/, "")
-  const contactEmail = (await fetchAgentEmail(agent?.id)) || EMAIL
+  const contactEmail = agentEmail || EMAIL
 
   return (
     <div className="min-h-screen bg-[#faf8f4] font-sans">
