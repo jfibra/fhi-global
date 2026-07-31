@@ -9,7 +9,7 @@ import {
 import { type ProfileTheme } from "@/lib/profile-themes"
 import { ContactCard } from "./contact-card"
 import {
-  DEFAULT_BUTTON_URL, SOCIAL_PLATFORMS,
+  DEFAULT_BUTTON_URL, SOCIAL_PLATFORMS, titleCaseName,
   type CustomLink, type FeaturedItem, type FixedButtonKey, type SocialLinks,
 } from "@/lib/public-profile"
 import { SOCIAL_ICONS } from "./social-icons"
@@ -266,7 +266,7 @@ function CollectionView({
 
 /**
  * `embedded` renders the same page inside a fixed-height container (the phone
- * frame on the Business Profile Maker) instead of owning the viewport. The CSP
+ * frame on the Digital Business Card) instead of owning the viewport. The CSP
  * sets `frame-src 'none'`, so an iframe preview isn't an option — and mounting
  * the real component is better anyway: it reflects unsaved edits instantly.
  */
@@ -288,6 +288,8 @@ export function PublicProfile({
   const [view, setView] = useState<"profile" | "listings" | "projects">("profile")
 
   const t = data.theme
+  // Display only — the stored name is left as typed.
+  const displayName = titleCaseName(data.fullname)
 
   const selfUrl = useSelfUrl(data.id)
 
@@ -441,7 +443,7 @@ export function PublicProfile({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={data.avatarUrl}
-                    alt={data.fullname}
+                    alt={displayName}
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -456,7 +458,7 @@ export function PublicProfile({
             className={`${DISPLAY} animate-hero-item mt-5 text-center text-[26px] leading-tight font-bold`}
             style={{ animationDelay: `${step(1)}ms`, color: t.ink }}
           >
-            {data.fullname}
+            {displayName}
           </h1>
 
           {/* Tagline — the person's own words, in their own line. */}
@@ -543,7 +545,7 @@ export function PublicProfile({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 id="qr-dialog-title" className={`${DISPLAY} text-base font-bold text-[#0d1117] truncate`}>
-                  {data.fullname || "My profile"}
+                  {displayName || "My profile"}
                 </h2>
                 <p className="text-xs text-[#6b7280] mt-0.5">Point a camera at the code</p>
               </div>

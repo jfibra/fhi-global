@@ -44,6 +44,8 @@ export type ProfileTheme = {
   contactBg: string | null
   /** Set when the agent chose an ink, so the contact card can follow it too. */
   textColor: string | null
+  /** Buttons and the contact card wear a vertical gradient. */
+  gradient: boolean
   /** Glass panels — the contact card, social buttons. */
   panel: string
   panelBorder: string
@@ -84,7 +86,7 @@ type ThemeBase = Omit<
   ProfileTheme,
   | "pillRadius" | "pillBorder" | "pillPadY" | "pillFont"
   | "tileSize" | "tileRadius" | "tileBorder" | "showIcon" | "contactLayout"
-  | "contactBg" | "textColor"
+  | "contactBg" | "textColor" | "gradient"
 >
 
 export const PROFILE_THEMES: ThemeBase[] = [
@@ -269,7 +271,8 @@ function iconTokens(
       return { tile: "transparent", tileInk: accent, tileBorder: "none", showIcon: true }
     default:
       return {
-        tile: `linear-gradient(180deg, ${accent} 0%, ${shade(accent, 0.25)} 100%)`,
+        // Same interpolation as the toolbar tile this mirrors.
+        tile: `linear-gradient(180deg in oklab, ${accent} 0%, ${shade(accent, 0.25)} 100%)`,
         tileInk: luminance(accent) > 0.55 ? "#16202e" : "#ffffff",
         tileBorder: "none",
         showIcon: true,
@@ -298,9 +301,12 @@ function withControls(base: ThemeBase, choice: ThemeChoice): ProfileTheme {
   const contactLayout = choice.contact ?? DEFAULT_CONTACT_DESIGN
   const contactBg = choice.contactBg ?? null
   const textColor = choice.textColor ?? null
+  const gradient = choice.gradient === true
 
   if (style === "outline" || style === "glass") {
     const pill = {
+      // Outline has no fill and Glass is already a translucent wash, so neither
+      // has a hex to interpolate — the gradient only applies to solid fills.
       pillBg: style === "outline" ? "transparent" : base.panel,
       pillInk: base.ink,
       pillSubInk: base.inkMuted,
@@ -312,6 +318,7 @@ function withControls(base: ThemeBase, choice: ThemeChoice): ProfileTheme {
       contactLayout,
       contactBg,
       textColor,
+      gradient,
       pillRadius: radius,
       pillBorder:
         style === "outline" ? `1.5px solid ${base.panelBorder}` : `1px solid ${base.panelBorder}`,
@@ -322,9 +329,11 @@ function withControls(base: ThemeBase, choice: ThemeChoice): ProfileTheme {
   return {
     ...base,
     ...sizing,
+    pillBg: gradient ? verticalGradient(base.pillBg) : base.pillBg,
     contactLayout,
     contactBg,
     textColor,
+    gradient,
     pillRadius: radius,
     pillBorder: "none",
     ...iconTokens(base, iconStyle),
@@ -366,6 +375,8 @@ export type ThemeChoice = {
   contact?: ContactDesignId
   /** Overrides the contact card's own surface, whatever design is picked. */
   contactBg?: string
+  /** Vertical gradient on the buttons and the contact card. */
+  gradient?: boolean
   /** Percentage of the default button height/type size. */
   buttonSize?: number
   /** Corner radius in px; the max reads as fully round. */
@@ -406,6 +417,31 @@ function luminance(hex: string): number {
     return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
   })
   return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]
+}
+
+/**
+ * A vertical two-stop gradient: the fill at the top, a slightly darker step at the
+ * foot. Same shape as the gradient the listings buttons wear (`bg-gradient-to-b`,
+ * via TOOLBAR_GRADIENT), and interpolated `in oklab` because that is what
+ * Tailwind v4 compiles that utility to — plain `180deg` blends in sRGB and takes
+ * a different path between the same two stops.
+ *
+ * One rule for every fill. An earlier version brightened dark fills upward so the
+ * chosen colour landed at the FOOT; that inverted the direction the rest of the
+ * dashboard reads as, where the colour you picked is the top of the ramp.
+ *
+ * 0.28 was chosen by rendering 0.16 / 0.28 / 0.40 beside the listings button: 0.16
+ * is invisible on a near-black fill, 0.40 turns a white pill grey. Expressed as a
+ * shade of its own top colour, that button's own foot is about 0.45 — but it spans
+ * two hand-picked navies, which a single derived step cannot match without
+ * muddying the light fills.
+ *
+ * Returns the input untouched if it is not a hex: an rgba panel or `transparent`
+ * has nothing to interpolate.
+ */
+export function verticalGradient(fill: string): string {
+  if (!HEX.test(fill)) return fill
+  return `linear-gradient(180deg in oklab, ${fill} 0%, ${shade(fill, 0.28)} 100%)`
 }
 
 /** Darken a hex by a fraction, for the two-stop background gradient. */
@@ -518,6 +554,7 @@ export function parseThemeChoice(input: unknown): ThemeChoice {
   if (ICON_STYLES.some((s2) => s2.id === raw.icons)) out.icons = raw.icons as IconStyleId
   if (CONTACT_DESIGNS.some((s2) => s2.id === raw.contact)) out.contact = raw.contact as ContactDesignId
   if (typeof raw.contactBg === "string" && HEX.test(raw.contactBg)) out.contactBg = raw.contactBg
+  if (raw.gradient === true) out.gradient = true
 
   for (const key of Object.keys(SIZE_LIMITS) as SizeKey[]) {
     if (raw[key] === undefined) continue
@@ -554,7 +591,7 @@ export function resolveTheme(choice: ThemeChoice): ProfileTheme {
   if (choice.id !== "custom" && choice.background) {
     base = paintBackground(choice.background, accent, choice.overlay)
   }
-  if (choice.accent) base = { ...base, accent, tile: `linear-gradient(180deg, ${accent} 0%, ${shade(accent, 0.25)} 100%)`, tileInk: luminance(accent) > 0.55 ? "#16202e" : "#ffffff" }
+  if (choice.accent) base = { ...base, accent, tile: `linear-gradient(180deg in oklab, ${accent} 0%, ${shade(accent, 0.25)} 100%)`, tileInk: luminance(accent) > 0.55 ? "#16202e" : "#ffffff" }
 
   // Text over the background only. The buttons keep their own ink, because that
   // is chosen against the PILL — tinting it here would put the page's colour on

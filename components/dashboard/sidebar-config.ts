@@ -117,7 +117,7 @@ const PROJECTS: NavEntry = { icon: FolderOpen, label: "Projects", to: "projects"
 const INVITE: NavEntry = { icon: QrCode, label: "Invite", to: "invite" }
 const REELS_MAKER: NavEntry = { icon: Clapperboard, label: "Reels Maker", to: "reels-maker" }
 const BUSINESS_CARD: NavEntry = { icon: CreditCard, label: "Business Card", to: "business-card" }
-const PUBLIC_PROFILE: NavEntry = { icon: Globe, label: "Business Profile Maker", to: "business-profile-maker" }
+const DIGITAL_CARD: NavEntry = { icon: Globe, label: "Digital Business Card", to: "digital-business-card" }
 const SALES_REPORTS: NavEntry = { icon: TrendingUp, label: "Sales Reports", to: "sales" }
 const SUPPORT_TICKETS: NavEntry = { icon: LifeBuoy, label: "Support Tickets", to: "support" }
 // Shared marketing artwork. Open to every role, so it appears in all lists and
@@ -172,7 +172,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
     icon: FileText,
     items: [
       { ...BUSINESS_CARD,  description: "Your shareable digital business card." },
-      { ...PUBLIC_PROFILE, description: "The one link you share — contacts, socials and QR." },
+      { ...DIGITAL_CARD, description: "The one link you share — contacts, socials and QR." },
       { ...REELS_MAKER,   description: "Turn a listing into a shareable reel." },
     ],
   },
@@ -239,7 +239,7 @@ const salesPipelineNav = ({ projects = false, events = false, teamSales = false 
   ...(teamSales ? [{ icon: Users, label: "Team Sales", to: "team-sales" } satisfies NavEntry] : []),
   SUPPORT_TICKETS,
   BUSINESS_CARD,
-  PUBLIC_PROFILE,
+  DIGITAL_CARD,
   MATERIALS,
   EBOOKS,
 ]
@@ -250,7 +250,7 @@ const SECRETARY_NAV: RoleNavEntry[] = [
   SALES_REPORTS,
   SUPPORT_TICKETS,
   BUSINESS_CARD,
-  PUBLIC_PROFILE,
+  DIGITAL_CARD,
   MATERIALS,
   EBOOKS,
 ]
@@ -262,7 +262,7 @@ const MEMBER_NAV: RoleNavEntry[] = [
   { icon: Building2, label: "Buy",  to: "/buy"  },
   { icon: KeyRound,  label: "Rent", to: "/rent" },
   BUSINESS_CARD,
-  PUBLIC_PROFILE,
+  DIGITAL_CARD,
   REELS_MAKER,
   // Read-only projects browser, same as agents (ROLES_PROJECT_STUDIO_VIEWERS).
   PROJECTS,

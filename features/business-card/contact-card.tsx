@@ -2,7 +2,7 @@
 
 import { Globe, Mail, Phone } from "lucide-react"
 import { QRCodeCanvas } from "qrcode.react"
-import { inkFor, type ContactDesignId, type ProfileTheme } from "@/lib/profile-themes"
+import { inkFor, verticalGradient, type ContactDesignId, type ProfileTheme } from "@/lib/profile-themes"
 
 /**
  * The contact card at the foot of the public profile.
@@ -195,7 +195,9 @@ const qr = (size: number, round = false) => (
 const shell = "animate-hero-item relative mt-9 w-full overflow-hidden rounded-2xl"
 const shellStyle: React.CSSProperties = {
   animationDelay: `${delay}ms`,
-  background: s.bg,
+  // The same vertical treatment the buttons get. Panel's rgba surface has no
+  // hex to interpolate, so it passes through unchanged.
+  background: t.gradient ? verticalGradient(s.bg) : s.bg,
   boxShadow: "0 12px 34px -14px rgba(0,0,0,0.55)",
 }
 

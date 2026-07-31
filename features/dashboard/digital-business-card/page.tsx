@@ -24,7 +24,7 @@ import {
 } from "@/lib/profile-themes"
 
 /**
- * Business Profile Maker — edits the one page an agent actually shares
+ * Digital Business Card — edits the one page an agent actually shares
  * (app/business-card/[id]) and previews it live.
  *
  * Only the social links are editable here. Name and photo come from Profile

@@ -6,7 +6,7 @@
  * phone number and card design, so this needs no schema change.
  *
  * Everything here is shared by the API route that writes the values and the two
- * places that read them (the Business Profile Maker and the page itself), so a
+ * places that read them (the Digital Business Card and the page itself), so a
  * value can only ever be normalised and validated one way.
  */
 
@@ -25,6 +25,25 @@ function oneLine(raw: unknown, max: number): string {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, max)
+}
+
+// ─── Display name ─────────────────────────────────────────────────────────────
+
+/**
+ * Title-case a name for display: first letter of each word up, the rest down.
+ *
+ * Profiles are entered by hand and plenty arrive shouting — "LEONEL AIRWIND
+ * BUSANO SABUGAA" — which looks wrong at 26px on a public page. This is a
+ * DISPLAY transform only; the stored value is left exactly as typed, so nothing
+ * is lost and an admin still sees what was entered.
+ *
+ * Word boundaries include hyphens and apostrophes, so "MARY-JANE" and "O'BRIEN"
+ * come out as "Mary-Jane" and "O'Brien" rather than "Mary-jane" and "O'brien".
+ */
+export function titleCaseName(raw: string): string {
+  return raw
+    .toLocaleLowerCase()
+    .replace(/(^|[\s\-'\u2019])(\p{L})/gu, (_, sep: string, ch: string) => sep + ch.toLocaleUpperCase())
 }
 
 // ─── Tagline ──────────────────────────────────────────────────────────────────

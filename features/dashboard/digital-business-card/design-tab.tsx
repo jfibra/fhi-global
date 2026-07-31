@@ -7,7 +7,7 @@ import { compressImageForUpload } from "@/lib/upload/compress-image"
 import {
   BACKDROP_LIBRARY_MAX, BUTTON_STYLES, CONTACT_DESIGNS, DEFAULT_BUTTON_STYLE,
   DEFAULT_CONTACT_DESIGN, DEFAULT_ICON_STYLE, ICON_STYLES, PROFILE_THEMES,
-  SIZE_LIMITS, STOCK_BACKDROPS, readBackdropLibrary, resolveTheme,
+  SIZE_LIMITS, STOCK_BACKDROPS, readBackdropLibrary, resolveTheme, verticalGradient,
   type ButtonStyleId, type ContactDesignId, type CustomBackground,
   type IconStyleId, type SizeKey, type ThemeChoice,
 } from "@/lib/profile-themes"
@@ -521,6 +521,39 @@ export function DesignTab({
                 )
               })}
             </div>
+
+            {/* Gradient. Applies to the buttons and to the contact card together,
+                because they are the two solid surfaces on the page. */}
+            <button
+              type="button"
+              onClick={() => setCustom({ gradient: value.gradient ? undefined : true })}
+              aria-pressed={Boolean(value.gradient)}
+              className={`mt-3 w-full flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
+                value.gradient ? "border-[#d6b357] bg-[#fffdf3]" : "border-[#e5e7eb] bg-[#f9fafb] hover:border-[#c4c9d4]"
+              }`}
+            >
+              <span
+                className="h-8 w-12 shrink-0 rounded-lg"
+                style={{ background: verticalGradient(resolved.pillBg), border: resolved.pillBorder }}
+              />
+              <span className="flex-1 min-w-0">
+                <span className="block text-xs font-bold text-[#0d1117]">Gradient</span>
+                <span className="block text-[11px] text-[#6b7280]">
+                  Lighter at the top, deeper at the foot — on the buttons and the contact card
+                </span>
+              </span>
+              <span
+                className={`w-10 h-5.5 shrink-0 rounded-full p-0.5 transition-colors ${
+                  value.gradient ? "bg-[#d6b357]" : "bg-[#d1d5db]"
+                }`}
+              >
+                <span
+                  className={`block w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                    value.gradient ? "translate-x-[18px]" : ""
+                  }`}
+                />
+              </span>
+            </button>
 
             {/* The sliders live with the chips they refine, rather than in a
                 separate block where it was not obvious what they applied to. */}

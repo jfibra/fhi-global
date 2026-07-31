@@ -6,7 +6,7 @@ import { readThemeChoice, resolveTheme } from "@/lib/profile-themes"
 import { roleToLabel } from "@/lib/app-roles"
 import {
   readCustomLinks, readFeaturedProjects, readFixedButtonLabels, readSocialLinks,
-  readTagline, type FeaturedItem,
+  readTagline, titleCaseName, type FeaturedItem,
 } from "@/lib/public-profile"
 import { PublicProfile, type PublicProfileData } from "@/features/business-card/public-profile"
 
@@ -180,10 +180,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
   return {
     ...createPageMetadata({
-      title: `${data.fullname} | FHI Global`,
+      // No " | FHI Global" suffix here — createPageMetadata's template
+      // appends one, and spelling it out again doubled it in the tab.
+      title: titleCaseName(data.fullname),
       description:
         data.tagline ||
-        `${data.fullname} — ${data.roleLabel} at FHI Global. Call, message or save the contact details.`,
+        `${titleCaseName(data.fullname)} — ${data.roleLabel} at FHI Global. Call, message or save the contact details.`,
       pathname: `/business-card/${data.id}`,
     }),
     // A personal contact page has no business in search results.
