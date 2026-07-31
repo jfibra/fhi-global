@@ -49,7 +49,10 @@ export default function BusinessCardPage() {
   // canvas preview data URLs
   const [frontDataUrl, setFrontDataUrl] = useState("")
   const [backDataUrl,  setBackDataUrl]  = useState("")
-  const [thumbs, setThumbs] = useState<Record<DesignId, string>>({ classic: "", platinum: "", noir: "" })
+  // Keyed off DESIGNS rather than a literal, so adding a design needs no edit here.
+  const [thumbs, setThumbs] = useState<Record<DesignId, string>>(
+    () => Object.fromEntries(DESIGNS.map((d) => [d.id, ""])) as Record<DesignId, string>,
+  )
   const [previewLoading, setPreviewLoading] = useState(false)
 
   // save state
@@ -96,7 +99,7 @@ export default function BusinessCardPage() {
     ])
     setFrontDataUrl(f)
     setBackDataUrl(b)
-    setThumbs({ classic: thumbUrls[0], platinum: thumbUrls[1], noir: thumbUrls[2] })
+    setThumbs(Object.fromEntries(DESIGNS.map((d, i) => [d.id, thumbUrls[i]])) as Record<DesignId, string>)
     setPreviewLoading(false)
   }, [fullName, phoneDial, localNumber, email, avatarUrl, initials, design])
 

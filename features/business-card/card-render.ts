@@ -28,16 +28,21 @@ export const THUMB_H = 200
 export const SUBTITLE = "INTERNATIONAL PROPERTY ENDORSER"
 
 // ── Designs ──────────────────────────────────────────────────────────────────
-export type DesignId = "classic" | "platinum" | "noir"
+export type DesignId = "classic" | "platinum" | "noir" | "arc" | "split" | "gold"
 
 export const DESIGNS: { id: DesignId; name: string; tagline: string }[] = [
   { id: "classic",  name: "Skyline Classic", tagline: "Navy skyline with gold accents" },
   { id: "platinum", name: "Pearl Prestige",  tagline: "Ivory minimalist, framed in gold" },
   { id: "noir",     name: "Executive Noir",  tagline: "Black-tie dark, centred layout" },
+  { id: "arc",      name: "Gilded Arc",      tagline: "Navy with a sweeping gold arc" },
+  { id: "split",    name: "Marina Split",    tagline: "Champagne panel, navy sidebar" },
+  { id: "gold",     name: "Gold Leaf",       tagline: "Brushed gold, navy type" },
 ]
 
+const DESIGN_IDS = new Set<string>(DESIGNS.map((d) => d.id))
+
 export function isDesignId(v: unknown): v is DesignId {
-  return v === "classic" || v === "platinum" || v === "noir"
+  return typeof v === "string" && DESIGN_IDS.has(v)
 }
 
 // ── Phone helpers ────────────────────────────────────────────────────────────
@@ -582,6 +587,324 @@ async function renderNoirBack(ctx: CanvasRenderingContext2D, width: number, heig
   } catch { /* plain dark back */ }
 }
 
+// ── Design: Gilded Arc (navy + sweeping gold arc) ────────────────────────────
+/** Navy field with concentric gold arcs swung from off-canvas, bottom-left. */
+function arcBase(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  const g = ctx.createLinearGradient(0, 0, width, height)
+  g.addColorStop(0, "#012c58")
+  g.addColorStop(0.55, "#001f3f")
+  g.addColorStop(1, "#00142b")
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, width, height)
+
+  // Warm lift behind the portrait so the avatar doesn't sit on flat navy.
+  const glow = ctx.createRadialGradient(width * 0.22, height * 0.5, 0, width * 0.22, height * 0.5, height * 0.8)
+  glow.addColorStop(0, "rgba(214,179,87,0.16)")
+  glow.addColorStop(1, "rgba(214,179,87,0)")
+  ctx.fillStyle = glow
+  ctx.fillRect(0, 0, width, height)
+
+  // Quarter arcs swung from the bottom-left corner. The widest is kept under
+  // 0.44w so the sweep frames the portrait and never crosses the type block —
+  // gold rules over a gold subtitle would be unreadable.
+  ctx.save()
+  ctx.lineCap = "butt"
+  const bands: [number, number, string][] = [
+    [height * 0.28, height * 0.006, "rgba(214,179,87,0.45)"],
+    [height * 0.60, height * 0.030, "#d6b357"],
+    [height * 0.70, height * 0.007, "rgba(247,227,161,0.70)"],
+    [height * 0.76, height * 0.004, "rgba(214,179,87,0.35)"],
+  ]
+  for (const [r, w, color] of bands) {
+    ctx.beginPath()
+    ctx.arc(0, height, r, -Math.PI / 2, 0)
+    ctx.strokeStyle = color
+    ctx.lineWidth = w
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+async function renderArcFront(ctx: CanvasRenderingContext2D, data: CardData, width: number, height: number) {
+  arcBase(ctx, width, height)
+
+  // horizontal white lockup, top-right
+  try {
+    const logo = await loadImg(BRAND_WHITE)
+    const lh = height * 0.10
+    const lw = lh * (logo.width / logo.height)
+    ctx.drawImage(logo, width - lw - width * 0.06, height * 0.085, lw, lh)
+  } catch { /* skip logo */ }
+
+  await drawAvatar(ctx, data.avatarUrl, data.initials, width * 0.215, height * 0.52, height * 0.215, {
+    ring: "#d6b357",
+    ringWidth: Math.max(2, height * 0.014),
+    outerRing: "rgba(247,227,161,0.45)",
+    fallbackBg: ["#0a3a66", "#001f3f"],
+  })
+
+  const textX = width * 0.44
+  const maxW = width * 0.50
+
+  ctx.textAlign = "left"
+  ctx.textBaseline = "alphabetic"
+  ctx.fillStyle = "#ffffff"
+  fitText(ctx, data.name || "Your Name", 700, Math.round(height * 0.105), maxW)
+  ctx.fillText(data.name || "Your Name", textX, height * 0.46)
+
+  setTracking(ctx, height * 0.007)
+  ctx.fillStyle = "#e7c86a"
+  fitText(ctx, SUBTITLE, 600, Math.round(height * 0.043), maxW)
+  ctx.fillText(SUBTITLE, textX, height * 0.555)
+  setTracking(ctx, 0)
+
+  // gold rule that fades out to the right
+  const divY = height * 0.615
+  const grad = ctx.createLinearGradient(textX, 0, textX + maxW, 0)
+  grad.addColorStop(0, "rgba(214,179,87,0.95)")
+  grad.addColorStop(1, "rgba(214,179,87,0)")
+  ctx.strokeStyle = grad
+  ctx.lineWidth = Math.max(1, height * 0.004)
+  ctx.beginPath()
+  ctx.moveTo(textX, divY)
+  ctx.lineTo(textX + maxW, divY)
+  ctx.stroke()
+
+  const rowSize = Math.round(height * 0.046)
+  const iconSize = rowSize * 1.1
+  contactRow(ctx, "phone", phoneText(data), textX, height * 0.735, iconSize, rowSize, "#e7c86a", "#ffffff", maxW - iconSize * 1.5)
+  contactRow(ctx, "mail", data.email || "your@email.com", textX, height * 0.845, iconSize, rowSize, "#e7c86a", "#ffffff", maxW - iconSize * 1.5)
+}
+
+async function renderArcBack(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  arcBase(ctx, width, height)
+  try {
+    const logo = await loadImg(BRAND_STACKED)
+    const lh = height * 0.50
+    const lw = lh * (logo.width / logo.height)
+    ctx.drawImage(logo, (width - lw) / 2, (height - lh) / 2, lw, lh)
+  } catch { /* plain navy back */ }
+}
+
+// ── Design: Marina Split (navy sidebar + champagne panel) ────────────────────
+const SPLIT_AT = 0.36
+
+function splitBase(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  // champagne panel
+  const panel = ctx.createLinearGradient(0, 0, width, height)
+  panel.addColorStop(0, "#faf3e6")
+  panel.addColorStop(1, "#efe3cb")
+  ctx.fillStyle = panel
+  ctx.fillRect(0, 0, width, height)
+
+  // navy sidebar
+  const bandW = width * SPLIT_AT
+  const band = ctx.createLinearGradient(0, 0, bandW, height)
+  band.addColorStop(0, "#00284f")
+  band.addColorStop(1, "#001428")
+  ctx.fillStyle = band
+  ctx.fillRect(0, 0, bandW, height)
+
+  // gold seam between the two halves
+  ctx.fillStyle = "#d6b357"
+  ctx.fillRect(bandW, 0, Math.max(2, width * 0.005), height)
+
+  // hairline keyline inside the champagne side
+  const inset = height * 0.055
+  ctx.strokeStyle = "rgba(202,145,4,0.35)"
+  ctx.lineWidth = Math.max(1, height * 0.003)
+  ctx.strokeRect(bandW + inset, inset, width - bandW - inset * 2, height - inset * 2)
+}
+
+async function renderSplitFront(ctx: CanvasRenderingContext2D, data: CardData, width: number, height: number) {
+  splitBase(ctx, width, height)
+
+  const bandCx = width * SPLIT_AT * 0.5
+
+  // stacked lockup in the sidebar, above the portrait
+  try {
+    const logo = await loadImg(BRAND_STACKED)
+    const lh = height * 0.26
+    const lw = lh * (logo.width / logo.height)
+    ctx.drawImage(logo, bandCx - lw / 2, height * 0.10, lw, lh)
+  } catch { /* skip logo */ }
+
+  await drawAvatar(ctx, data.avatarUrl, data.initials, bandCx, height * 0.66, height * 0.185, {
+    ring: "#d6b357",
+    ringWidth: Math.max(2, height * 0.013),
+    outerRing: "rgba(255,255,255,0.22)",
+    fallbackBg: ["#0a3a66", "#001f3f"],
+  })
+
+  const textX = width * (SPLIT_AT + 0.075)
+  const maxW = width * (1 - SPLIT_AT) * 0.82
+
+  ctx.textAlign = "left"
+  ctx.textBaseline = "alphabetic"
+  ctx.fillStyle = "#0d1b2e"
+  fitText(ctx, data.name || "Your Name", 700, Math.round(height * 0.105), maxW)
+  ctx.fillText(data.name || "Your Name", textX, height * 0.40)
+
+  setTracking(ctx, height * 0.006)
+  ctx.fillStyle = "#a8790a"
+  fitText(ctx, SUBTITLE, 600, Math.round(height * 0.040), maxW)
+  ctx.fillText(SUBTITLE, textX, height * 0.49)
+  setTracking(ctx, 0)
+
+  // divider with a diamond, matching Pearl's detailing
+  const divY = height * 0.565
+  ctx.fillStyle = "#ca9104"
+  ctx.save()
+  ctx.translate(textX + height * 0.012, divY)
+  ctx.rotate(Math.PI / 4)
+  ctx.fillRect(-height * 0.010, -height * 0.010, height * 0.020, height * 0.020)
+  ctx.restore()
+  const grad = ctx.createLinearGradient(textX, 0, textX + maxW, 0)
+  grad.addColorStop(0, "rgba(202,145,4,0.85)")
+  grad.addColorStop(1, "rgba(202,145,4,0)")
+  ctx.strokeStyle = grad
+  ctx.lineWidth = Math.max(1, height * 0.004)
+  ctx.beginPath()
+  ctx.moveTo(textX + height * 0.042, divY)
+  ctx.lineTo(textX + maxW, divY)
+  ctx.stroke()
+
+  const rowSize = Math.round(height * 0.044)
+  const iconSize = rowSize * 1.1
+  contactRow(ctx, "phone", phoneText(data), textX, height * 0.705, iconSize, rowSize, "#ca9104", "#16324f", maxW - iconSize * 1.5)
+  contactRow(ctx, "mail", data.email || "your@email.com", textX, height * 0.825, iconSize, rowSize, "#ca9104", "#16324f", maxW - iconSize * 1.5)
+}
+
+async function renderSplitBack(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  const g = ctx.createLinearGradient(0, 0, width, height)
+  g.addColorStop(0, "#00284f")
+  g.addColorStop(1, "#001428")
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, width, height)
+
+  drawDoubleFrame(ctx, width, height, "rgba(214,179,87,0.55)", "rgba(255,255,255,0.10)")
+
+  try {
+    const logo = await loadImg(BRAND_STACKED)
+    const lh = height * 0.52
+    const lw = lh * (logo.width / logo.height)
+    ctx.drawImage(logo, (width - lw) / 2, (height - lh) / 2, lw, lh)
+  } catch { /* plain navy back */ }
+}
+
+// ── Design: Gold Leaf (brushed gold + navy type) ─────────────────────────────
+const NAVY_INK = "#001f3f"
+
+/** Brushed gold field with a soft diagonal sheen. */
+function goldBase(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  const g = ctx.createLinearGradient(0, 0, width, height)
+  g.addColorStop(0, "#f0d894")
+  g.addColorStop(0.28, "#dcb75c")
+  g.addColorStop(0.52, "#c9a244")
+  g.addColorStop(0.74, "#e2c477")
+  g.addColorStop(1, "#bf942f")
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, width, height)
+
+  // brushed streaks, angled with the sheen
+  ctx.save()
+  ctx.globalAlpha = 0.10
+  ctx.strokeStyle = "#fff6d8"
+  ctx.lineWidth = Math.max(1, height * 0.004)
+  for (let i = -6; i < 22; i++) {
+    const x = (i / 16) * width
+    ctx.beginPath()
+    ctx.moveTo(x, 0)
+    ctx.lineTo(x + width * 0.16, height)
+    ctx.stroke()
+  }
+  ctx.restore()
+
+  // inner keyline
+  const inset = height * 0.045
+  ctx.strokeStyle = "rgba(0,31,63,0.28)"
+  ctx.lineWidth = Math.max(1, height * 0.003)
+  ctx.strokeRect(inset, inset, width - inset * 2, height - inset * 2)
+}
+
+/** Navy plate behind the white lockup — the logo can't read on gold alone. */
+function navyPlate(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  ctx.save()
+  ctx.fillStyle = NAVY_INK
+  ctx.beginPath()
+  ctx.roundRect(x, y, w, h, h * 0.22)
+  ctx.fill()
+  ctx.strokeStyle = "rgba(255,255,255,0.22)"
+  ctx.lineWidth = Math.max(1, h * 0.035)
+  ctx.stroke()
+  ctx.restore()
+}
+
+async function renderGoldFront(ctx: CanvasRenderingContext2D, data: CardData, width: number, height: number) {
+  goldBase(ctx, width, height)
+
+  // navy contact band across the bottom
+  const bandY = height * 0.70
+  ctx.fillStyle = NAVY_INK
+  ctx.fillRect(0, bandY, width, height - bandY)
+  ctx.fillStyle = "rgba(247,227,161,0.85)"
+  ctx.fillRect(0, bandY, width, Math.max(2, height * 0.006))
+
+  // logo plate, top-right
+  try {
+    const logo = await loadImg(BRAND_WHITE)
+    const lh = height * 0.085
+    const lw = lh * (logo.width / logo.height)
+    const padX = lh * 0.55, padY = lh * 0.42
+    const plateW = lw + padX * 2, plateH = lh + padY * 2
+    const plateX = width - plateW - width * 0.055, plateY = height * 0.075
+    navyPlate(ctx, plateX, plateY, plateW, plateH)
+    ctx.drawImage(logo, plateX + padX, plateY + padY, lw, lh)
+  } catch { /* skip logo */ }
+
+  await drawAvatar(ctx, data.avatarUrl, data.initials, width * 0.185, height * 0.40, height * 0.175, {
+    ring: NAVY_INK,
+    ringWidth: Math.max(2, height * 0.013),
+    outerRing: "rgba(255,255,255,0.45)",
+    fallbackBg: ["#0a3a66", "#001f3f"],
+  })
+
+  const textX = width * 0.335
+  const maxW = width * 0.44
+
+  ctx.textAlign = "left"
+  ctx.textBaseline = "alphabetic"
+  ctx.fillStyle = NAVY_INK
+  fitText(ctx, data.name || "Your Name", 700, Math.round(height * 0.098), maxW)
+  ctx.fillText(data.name || "Your Name", textX, height * 0.42)
+
+  setTracking(ctx, height * 0.006)
+  ctx.fillStyle = "#5c4407"
+  fitText(ctx, SUBTITLE, 600, Math.round(height * 0.040), maxW)
+  ctx.fillText(SUBTITLE, textX, height * 0.515)
+  setTracking(ctx, 0)
+
+  // contact rows sit inside the navy band
+  const rowSize = Math.round(height * 0.044)
+  const iconSize = rowSize * 1.1
+  const rowsMaxW = width * 0.42
+  contactRow(ctx, "phone", phoneText(data), width * 0.075, height * 0.80, iconSize, rowSize, "#e7c86a", "#ffffff", rowsMaxW)
+  contactRow(ctx, "mail", data.email || "your@email.com", width * 0.52, height * 0.80, iconSize, rowSize, "#e7c86a", "#ffffff", rowsMaxW)
+}
+
+async function renderGoldBack(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  goldBase(ctx, width, height)
+  try {
+    const logo = await loadImg(BRAND_STACKED)
+    const lh = height * 0.34
+    const lw = lh * (logo.width / logo.height)
+    const padX = lh * 0.30, padY = lh * 0.26
+    const plateW = lw + padX * 2, plateH = lh + padY * 2
+    navyPlate(ctx, (width - plateW) / 2, (height - plateH) / 2, plateW, plateH)
+    ctx.drawImage(logo, (width - lw) / 2, (height - lh) / 2, lw, lh)
+  } catch { /* plain gold back */ }
+}
+
 // ── Canvas renderer ───────────────────────────────────────────────────────────
 export async function renderCard(
   side: "front" | "back",
@@ -603,6 +926,15 @@ export async function renderCard(
   if (design === "platinum") {
     if (side === "front") await renderPlatinumFront(ctx, data, width, height)
     else await renderPlatinumBack(ctx, width, height)
+  } else if (design === "arc") {
+    if (side === "front") await renderArcFront(ctx, data, width, height)
+    else await renderArcBack(ctx, width, height)
+  } else if (design === "split") {
+    if (side === "front") await renderSplitFront(ctx, data, width, height)
+    else await renderSplitBack(ctx, width, height)
+  } else if (design === "gold") {
+    if (side === "front") await renderGoldFront(ctx, data, width, height)
+    else await renderGoldBack(ctx, width, height)
   } else if (design === "noir") {
     if (side === "front") await renderNoirFront(ctx, data, width, height)
     else await renderNoirBack(ctx, width, height)
