@@ -14,7 +14,7 @@ import {
   FileText, Loader2, MessageCircle, Phone, QrCode, RefreshCw, Search, Users,
 } from "lucide-react"
 import { roleToLabel } from "@/lib/auth"
-import { ROLE_COLORS } from "@/lib/app-roles"
+import { ROLE_COLORS, invitableRolesFor, roleInList } from "@/lib/app-roles"
 
 type Recruit = {
   id: string
@@ -81,7 +81,7 @@ export function InviteClient({
   const [approveError, setApproveError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   // Role chosen for each pending recruit at approval time (member | agent).
-  const [roleChoice, setRoleChoice] = useState<Record<string, "member" | "agent">>({})
+  const [roleChoice, setRoleChoice] = useState<Record<string, string>>({})
 
   // Search + pagination over the recruits list.
   const PAGE_SIZE = 10
@@ -157,22 +157,41 @@ export function InviteClient({
     `Join me on FHI Global — Dubai's premier real estate portal. Create your account here: ${inviteUrl}`,
   )
 
-  const roleValue = currentRole.toLowerCase().trim()
+  // What this user's rank may set on a recruit, mirroring the ladder the two API
+  // routes enforce (INVITE_GRANTABLE_ROLES in app-roles.ts): team leaders reach
+  // unit manager, unit managers reach agent, agents and members reach member.
+  // An empty set means a read-only list.
+  const grantable = invitableRolesFor(currentRole)
+  const canGrant = (role: string) => roleInList(role, grantable)
 
-  // Team leaders and unit managers (and admin staff) can manage their own
-  // recruits — but only members and agents. Anyone else sees a read-only list.
-  const canApprove = ["team_leader", "unit_manager", "admin", "super_admin"].includes(roleValue)
-  // Role can be set/changed for any member/agent recruit — pending OR active.
-  const canEditRole = (r: Recruit) =>
-    canApprove && ["member", "agent"].includes(r.role.toLowerCase().trim())
+  // Approving is allowed whenever the recruit's rank is one this user could have
+  // granted — so a member can still confirm their own member referral even
+  // though there is nothing else for them to pick.
+  const canApprove = (r: Recruit) => canGrant(r.role)
+  // The dropdown only appears when there is an actual choice to make.
+  const canEditRole = (r: Recruit) => grantable.length > 1 && canGrant(r.role)
 
   // Effective role picked for a recruit — the explicit choice, else its current
-  // role, else member.
-  const roleFor = (r: Recruit): "member" | "agent" => {
+  // role, else the lowest rank this user can grant.
+  const roleFor = (r: Recruit): string => {
     const chosen = roleChoice[r.id]
     if (chosen) return chosen
-    return r.role.toLowerCase().trim() === "agent" ? "agent" : "member"
+    const current = r.role.toLowerCase().trim()
+    return canGrant(current) ? current : (grantable[grantable.length - 1] ?? "member")
   }
+
+  // "Team Secretary" is twice the width of "Member", so the column is sized to
+  // the longest label this caller can actually put in it rather than to a fixed
+  // guess — an agent's column stays narrow, an admin's gets the room it needs.
+  // Both what this caller can pick AND what the recruits already are — a recruit
+  // can carry a rank the viewer can't grant (an admin set it), and that one
+  // renders as a plain chip with no truncation.
+  const longestRoleLabel = Math.max(
+    6,
+    ...grantable.map((r) => roleToLabel(r).length),
+    ...recruits.map((r) => roleToLabel(r.role).length),
+  )
+  const roleColWidth = longestRoleLabel > 12 ? "w-32" : longestRoleLabel > 6 ? "w-28" : "w-20"
 
   // Distinct chip colors per role so members vs agents are easy to scan.
   const roleChipCls = (role: string) => {
@@ -296,7 +315,7 @@ export function InviteClient({
 
   // Change role from the dropdown — persists immediately for any recruit
   // (pending or active) without approving them. Approval stays a separate action.
-  const handleRoleSelect = async (r: Recruit, role: "member" | "agent") => {
+  const handleRoleSelect = async (r: Recruit, role: string) => {
     setRoleChoice((prev) => ({ ...prev, [r.id]: role }))
     if (role === r.role.toLowerCase().trim()) return
 
@@ -473,7 +492,7 @@ export function InviteClient({
                 <ul className="divide-y divide-[#f0f2f5]">
                   {pageItems.map((r) => {
                     const editRole = canEditRole(r)
-                    const showApprove = editRole && r.status !== "active"
+                    const showApprove = canApprove(r) && r.status !== "active"
                     const busy = approvingId === r.id
                     return (
                     <li key={r.id} className="flex items-center gap-3 py-3">
@@ -519,17 +538,20 @@ export function InviteClient({
                       )}
 
                       {/* Role column — colored chip-style dropdown when editable, static chip otherwise */}
-                      <div className="shrink-0 w-20 flex justify-center">
+                      <div className={`shrink-0 flex justify-center ${roleColWidth}`}>
                         {editRole ? (
                           <div className="relative inline-flex w-full">
                             <select
                               value={roleFor(r)}
                               disabled={busy}
-                              onChange={(e) => void handleRoleSelect(r, e.target.value as "member" | "agent")}
+                              onChange={(e) => void handleRoleSelect(r, e.target.value)}
                               className={`w-full appearance-none cursor-pointer rounded-full text-center text-[11px] font-bold capitalize pl-2.5 pr-6 py-1 border focus:outline-none transition-colors disabled:opacity-60 ${roleChipCls(roleFor(r))}`}
                             >
-                              <option value="member">Member</option>
-                              <option value="agent">Agent</option>
+                              {grantable.map((role) => (
+                                <option key={role} value={role}>
+                                  {roleToLabel(role)}
+                                </option>
+                              ))}
                             </select>
                             {busy ? (
                               <Loader2 className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 animate-spin opacity-70 pointer-events-none" />

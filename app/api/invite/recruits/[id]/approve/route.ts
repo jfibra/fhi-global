@@ -1,27 +1,29 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
-import { isAdminStaffRole, normalizeAppRole } from "@/lib/app-roles"
+import { canGrantInviteRole, invitableRolesFor, isAdminStaffRole, normalizeAppRole, roleToLabel } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
 /**
- * Approve (activate) a recruit — a team-leader / unit-manager-facing version of
- * the admin activation. Deliberately narrow:
+ * Approve (activate) a recruit — a recruiter-facing version of the admin
+ * activation. Deliberately narrow:
  *
- *   • the caller must be a team_leader or unit_manager (admin staff may also use
- *     it, though they have the full admin route too);
+ *   • the caller's rank must be able to grant something at all
+ *     (INVITE_GRANTABLE_ROLES in app-roles.ts). Admin staff may also use it,
+ *     though they have the full admin route too;
  *   • the target must have registered through the caller's invite link
  *     (profiles.metadata->>invited_by === caller id) — admin staff bypass this;
- *   • the target's role must be `member` or `agent`, and the caller may set
- *     which of the two the approved account becomes (body `{ role }`).
+ *   • the target's current role must sit inside the caller's grantable set, and
+ *     the caller may set which rank the approved account becomes (body
+ *     `{ role }`) from that same set. Registration defaults everyone to `member`
+ *     (app/api/register/route.ts), so a member's referral is already a member and
+ *     approving it without a `role` simply keeps it there.
  *
  * Activation writes the same fields the admin route does
  * (app/api/admin/users/[id]/route.ts): status='active' + clear the soft-delete
  * flags. `isInactiveProfile` (status !== 'active' || is_deleted) is the login
  * gate, so this is exactly what makes the account usable.
  */
-
-const APPROVABLE_TARGET_ROLES = new Set(["member", "agent"])
 
 export async function POST(
   req: NextRequest,
@@ -31,21 +33,21 @@ export async function POST(
   if (!session.ok) return session.response
 
   const { userId, email, profile } = session.context
-  const callerRole = normalizeAppRole(profile.role)
   const isAdmin = isAdminStaffRole(profile.role)
-  const isLeader = callerRole === "team_leader" || callerRole === "unit_manager"
-
-  if (!isAdmin && !isLeader) {
+  const grantable = invitableRolesFor(profile.role)
+  if (grantable.length === 0) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
+  const allowedLabel = grantable.map(roleToLabel).join(", ")
+
   const { id } = await params
 
-  // Optional role to set on approval — restricted to member/agent.
+  // Optional role to set on approval — restricted to the caller's own ladder.
   const body = (await req.json().catch(() => ({}))) as { role?: unknown }
   const requestedRole = typeof body.role === "string" ? normalizeAppRole(body.role) : null
-  if (requestedRole && !APPROVABLE_TARGET_ROLES.has(requestedRole)) {
-    return NextResponse.json({ error: "Role must be member or agent." }, { status: 400 })
+  if (requestedRole && !canGrantInviteRole(profile.role, requestedRole)) {
+    return NextResponse.json({ error: `You can only approve as: ${allowedLabel}.` }, { status: 400 })
   }
 
   const admin = createAdminSupabase()
@@ -67,10 +69,10 @@ export async function POST(
     return NextResponse.json({ error: "Recruit not found." }, { status: 404 })
   }
 
-  // Only members and agents can be approved through this route.
-  if (!APPROVABLE_TARGET_ROLES.has(normalizeAppRole(target.role))) {
+  // Only ranks below the caller's own can be approved through this route.
+  if (!canGrantInviteRole(profile.role, target.role)) {
     return NextResponse.json(
-      { error: "You can only approve members and agents here." },
+      { error: `You can only approve: ${allowedLabel}.` },
       { status: 403 },
     )
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
-import { isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
+import { invitableRolesFor } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { isProfileMissingMinimumFields, type AppProfile } from "@/lib/auth"
 
@@ -15,8 +15,12 @@ export async function GET() {
   const session = await requireActiveSession()
   if (!session.ok) return session.response
 
+  // Anyone who recruits may read their own downline — the same ladder the
+  // approve/role routes enforce (INVITE_GRANTABLE_ROLES), which is what gives
+  // members access to their own referrals. Non-recruiting ranks (secretary,
+  // editor, developer) get nothing.
   const { userId, profile } = session.context
-  if (!isSalesPipelineRole(profile.role) && !isAdminStaffRole(profile.role)) {
+  if (invitableRolesFor(profile.role).length === 0) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 

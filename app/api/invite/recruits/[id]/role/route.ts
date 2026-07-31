@@ -1,24 +1,26 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
-import { isAdminStaffRole, normalizeAppRole } from "@/lib/app-roles"
+import { canGrantInviteRole, invitableRolesFor, isAdminStaffRole, normalizeAppRole, roleToLabel } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
 /**
- * Change a recruit's role WITHOUT approving/activating them — the team-leader /
- * unit-manager counterpart to the admin role edit, scoped to their own
- * recruits. Same guards as the approve route:
+ * Change a recruit's role WITHOUT approving/activating them — the recruiter-facing
+ * counterpart to the admin role edit, scoped to their own recruits. Same guards
+ * as the approve route:
  *
- *   • caller must be team_leader / unit_manager (admin staff may also use it);
+ *   • the caller's rank must be able to grant something at all
+ *     (INVITE_GRANTABLE_ROLES — team_leader → unit_manager/agent/member,
+ *     unit_manager → agent/member, agent and member → member);
  *   • the recruit must have registered through the caller's invite
  *     (metadata.invited_by === caller id) — admin staff bypass this;
- *   • both the current and the new role must be `member` or `agent`.
+ *   • BOTH the recruit's current role and the requested one must sit inside the
+ *     caller's grantable set, so a leader can never touch a peer or a senior and
+ *     can never grant a rank at or above their own.
  *
  * Only `role` is written; `status`/`is_deleted` are left untouched, so a pending
  * recruit stays pending. Activation is a separate action (the approve route).
  */
-
-const EDITABLE_ROLES = new Set(["member", "agent"])
 
 export async function PATCH(
   req: NextRequest,
@@ -28,18 +30,20 @@ export async function PATCH(
   if (!session.ok) return session.response
 
   const { userId, email, profile } = session.context
-  const callerRole = normalizeAppRole(profile.role)
   const isAdmin = isAdminStaffRole(profile.role)
-  const isLeader = callerRole === "team_leader" || callerRole === "unit_manager"
-  if (!isAdmin && !isLeader) {
+  const grantable = invitableRolesFor(profile.role)
+  if (grantable.length === 0) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
+
+  // Named in the message so the UI can show exactly what this caller may set.
+  const allowedLabel = grantable.map(roleToLabel).join(", ")
 
   const { id } = await params
   const body = (await req.json().catch(() => ({}))) as { role?: unknown }
   const nextRole = typeof body.role === "string" ? normalizeAppRole(body.role) : ""
-  if (!EDITABLE_ROLES.has(nextRole)) {
-    return NextResponse.json({ error: "Role must be member or agent." }, { status: 400 })
+  if (!canGrantInviteRole(profile.role, nextRole)) {
+    return NextResponse.json({ error: `You can only set: ${allowedLabel}.` }, { status: 400 })
   }
 
   const admin = createAdminSupabase()
@@ -53,9 +57,12 @@ export async function PATCH(
     return NextResponse.json({ error: "Recruit not found." }, { status: 404 })
   }
 
+  // The recruit's CURRENT rank must also be one the caller could have granted —
+  // otherwise a unit manager could demote a team leader who happened to be in
+  // their downline.
   const previousRole = normalizeAppRole(target.role)
-  if (!EDITABLE_ROLES.has(previousRole)) {
-    return NextResponse.json({ error: "You can only change the role of members and agents." }, { status: 403 })
+  if (!canGrantInviteRole(profile.role, previousRole)) {
+    return NextResponse.json({ error: `You can only change the role of: ${allowedLabel}.` }, { status: 403 })
   }
 
   // Ownership: leaders may only manage their own recruits. Admin staff bypass.

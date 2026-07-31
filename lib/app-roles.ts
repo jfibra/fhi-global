@@ -311,3 +311,47 @@ export function canUseReelsMaker(role: string | null | undefined): boolean {
 export function canBrowseProjectStudios(role: string | null | undefined): boolean {
   return roleInList(role, ROLES_PROJECT_STUDIO_VIEWERS)
 }
+
+/**
+ * Which roles a user may hand to a recruit who signed up through their invite
+ * link — the single source of truth for the Invite page and both
+ * `/api/invite/recruits/[id]/{approve,role}` routes.
+ *
+ * A rank may only grant ranks below its own, so nobody can clone or promote past
+ * themselves.
+ *
+ * Admin staff are the one exception: they get a team leader's reach PLUS
+ * team_leader itself, which is the only rank on this ladder nobody else can hand
+ * out. Everything past that — admin, super_admin, editor, developer, secretary —
+ * is deliberately off the ladder and stays admin-user-editor only.
+ *
+ * Roles absent from this map (member, secretary, editor, developer, …) don't
+ * recruit, and an empty set is what locks them out of the whole feature: the
+ * recruits list, the approve route and the role route all refuse a caller who can
+ * grant nothing. Keep the keys in sync with SUB_PATH_ROLES.invite in auth.ts,
+ * which decides who can open the page at all.
+ *
+ * Every row is ordered by APP_ROLE_ORDER (senior → junior), which the dropdown
+ * renders in and whose last entry is the default a recruit falls back to.
+ */
+const TEAM_LEADER_GRANTS: readonly AppRoleId[] = ["unit_manager", "agent", "team_secretary", "member"]
+
+export const INVITE_GRANTABLE_ROLES: Record<string, readonly AppRoleId[]> = {
+  // Derived from the team leader's row so the two can't drift apart.
+  super_admin: ["team_leader", ...TEAM_LEADER_GRANTS],
+  admin: ["team_leader", ...TEAM_LEADER_GRANTS],
+  team_leader: TEAM_LEADER_GRANTS,
+  unit_manager: ["agent", "member"],
+  agent: ["member"],
+}
+
+export function invitableRolesFor(role: string | null | undefined): readonly AppRoleId[] {
+  return INVITE_GRANTABLE_ROLES[normalizeAppRole(role)] ?? []
+}
+
+export function canGrantInviteRole(
+  callerRole: string | null | undefined,
+  targetRole: string | null | undefined,
+): boolean {
+  return roleInList(targetRole, invitableRolesFor(callerRole))
+}
