@@ -40,6 +40,71 @@ export type PublicAgentListingRow = {
   updated_at: string
   projects: BuyRawProject | null
   agent_listing_images?: { url: string; sort_order: number }[] | null
+  /** Owning agent's id. The profile itself is fetched server-side — see below. */
+  agent_id?: string | null
+}
+
+/**
+ * The listing owner's public-facing details, for the enquiry card.
+ *
+ * Deliberately NOT embedded in the public query any more: `profiles` is behind
+ * RLS (migration 020) and unreadable by the anon key, so the embed would come
+ * back null. app/listings/[id]/page.tsx loads it with the service-role client
+ * instead, which also lets it pick up the agent's email from auth.users.
+ *
+ * The phone lives in `profiles.metadata` — there is no column for it — same as
+ * the business card and public profile read it.
+ */
+export type PublicListingAgent = {
+  id: string
+  fullname: string | null
+  fname: string | null
+  lname: string | null
+  profile_url: string | null
+  role: string | null
+  status: string | null
+  is_deleted: boolean | null
+  metadata: Record<string, unknown> | null
+}
+
+/** A deactivated or deleted agent falls back to the house contact card. */
+export function isUsableListingAgent(agent: PublicListingAgent | null): boolean {
+  if (!agent) return false
+  return agent.is_deleted !== true && (agent.status ?? "active") === "active"
+}
+
+/**
+ * E.164 phone for the agent, or "" when they have none saved.
+ *
+ * "+971" + "501234567" → "+971501234567". Not every profile is that tidy:
+ * some store the number with the country code already in it, and naively
+ * concatenating gives "+971+971501234567" — a link that dials nothing. So the
+ * dial code is only prepended when it isn't already there, and a leading zero
+ * on the local part is dropped.
+ */
+export function listingAgentPhone(agent: PublicListingAgent | null): string {
+  const meta = agent?.metadata ?? {}
+  const dialRaw = typeof meta.phone_country_code === "string" ? meta.phone_country_code.trim() : ""
+  const localRaw = typeof meta.phone_number === "string" ? meta.phone_number.trim() : ""
+  if (!localRaw) return ""
+
+  const digits = (s: string) => s.replace(/\D/g, "")
+  const dial = digits(dialRaw)
+  const local = digits(localRaw)
+  if (!local) return ""
+
+  // Already international (typed with a +, or repeats the dial code).
+  if (localRaw.startsWith("+") || (dial && local.startsWith(dial))) return `+${local}`
+  return `+${dial}${local.replace(/^0+/, "")}`
+}
+
+/** Display name, falling back through the same chain as the business card. */
+export function listingAgentName(agent: PublicListingAgent | null): string {
+  if (!agent) return ""
+  return (
+    (agent.fullname ?? "").trim() ||
+    [agent.fname, agent.lname].filter(Boolean).join(" ").trim()
+  )
 }
 
 const PROJECT_EMBED = `
@@ -108,7 +173,11 @@ export async function fetchPublicAgentListingById(idOrSlug: string): Promise<{
   const query = supabase
     .from("agent_listings")
     .select(
-      `id, slug, title, description, listing_kind, price, currency, unit_type, created_at, updated_at, projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
+      // agent_id only — the profile behind it is behind RLS and is loaded by
+      // the page on the service-role client. The list query above doesn't even
+      // need the id: the enquiry card exists only on the detail page.
+      `id, slug, title, description, listing_kind, price, currency, unit_type, created_at, updated_at, agent_id,
+       projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
     )
     .eq("status", "published")
     .is("deleted_at", null)

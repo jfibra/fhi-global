@@ -5,11 +5,11 @@ import { Check, ImagePlus, Link2, Loader2, Palette, X } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 import {
-  BACKDROP_LIBRARY_MAX, BUTTON_STYLES, DEFAULT_BUTTON_STYLE, DEFAULT_ICON_STYLE,
-  ICON_STYLES, PROFILE_THEMES, SIZE_LIMITS, STOCK_BACKDROPS,
-  readBackdropLibrary, resolveTheme,
-  type ButtonStyleId, type CustomBackground, type IconStyleId, type SizeKey,
-  type ThemeChoice,
+  BACKDROP_LIBRARY_MAX, BUTTON_STYLES, CONTACT_DESIGNS, DEFAULT_BUTTON_STYLE,
+  DEFAULT_CONTACT_DESIGN, DEFAULT_ICON_STYLE, ICON_STYLES, PROFILE_THEMES,
+  SIZE_LIMITS, STOCK_BACKDROPS, readBackdropLibrary, resolveTheme,
+  type ButtonStyleId, type ContactDesignId, type CustomBackground,
+  type IconStyleId, type SizeKey, type ThemeChoice,
 } from "@/lib/profile-themes"
 
 /**
@@ -27,6 +27,15 @@ const ACCENT_PRESETS = ["#d6b357", "#e8a33d", "#3f8cd6", "#38a169", "#c0466f", "
 
 /** Backgrounds that read well behind white pills, plus two light options. */
 const BG_PRESETS = ["#0b1220", "#001f3f", "#14141c", "#123b2e", "#3b1d2e", "#f4f1ea"]
+
+/** Surfaces that hold a white QR bed and read well with either ink. */
+const CARD_BG_PRESETS = ["#0d2340", "#0b0b10", "#123b2e", "#3b1d2e", "#faf7f1", "#ffffff"]
+
+/** Rough luminance check, only for choosing the swatch's preview ink. */
+function isDarkHex(hex: string): boolean {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) || 0)
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 <= 0.45
+}
 
 function Swatch({ choice }: { choice: ThemeChoice }) {
   const t = resolveTheme(choice)
@@ -127,6 +136,7 @@ export function DesignTab({
   const accent: string = value.accent ?? resolved.accent
   const buttons: ButtonStyleId = value.buttons ?? DEFAULT_BUTTON_STYLE
   const icons: IconStyleId = value.icons ?? DEFAULT_ICON_STYLE
+  const contact: ContactDesignId = value.contact ?? DEFAULT_CONTACT_DESIGN
   const bgMode: "default" | "color" | "image" = value.background?.type ?? "default"
   const sizeOf = (k: SizeKey) => value[k] ?? SIZE_LIMITS[k].def
   const bgColor = background.type === "color" ? background.color : "#0b1220"
@@ -203,7 +213,7 @@ export function DesignTab({
         </div>
       </div>
 
-      <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-3 items-stretch">
         {PROFILE_THEMES.map((t) => {
           const selected = value.id === t.id
           return (
@@ -212,7 +222,7 @@ export function DesignTab({
               type="button"
               onClick={() => onChange({ id: t.id })}
               aria-pressed={selected}
-              className={`relative text-left rounded-2xl border-2 p-2 transition-all duration-200 ${
+              className={`relative flex h-full flex-col text-left rounded-2xl border-2 p-2 transition-all duration-200 ${
                 selected
                   ? "border-[#d6b357] bg-[#fffdf3] shadow-[0_4px_16px_-4px_rgba(214,179,87,0.45)]"
                   : "border-[#e4e7ec] bg-white hover:border-[#c4c9d4] hover:shadow-[0_2px_12px_-4px_rgba(0,31,63,0.15)]"
@@ -221,10 +231,12 @@ export function DesignTab({
               {/* Previewed with the agent's overrides, so the grid shows what each
                   template would actually look like for them. */}
               <Swatch choice={{ ...value, id: t.id }} />
-              <p className={`mt-2 text-xs font-bold ${selected ? "text-[#8a6a10]" : "text-[#374151]"}`}>
+              {/* Fixed rows for the label and the blurb, so a one-line blurb and a
+                  two-line one still leave the cells the same height. */}
+              <p className={`mt-2 text-xs font-bold leading-4 ${selected ? "text-[#8a6a10]" : "text-[#374151]"}`}>
                 {t.name}
               </p>
-              <p className="text-[10px] text-[#9ca3af] leading-snug line-clamp-2">{t.blurb}</p>
+              <p className="text-[10px] text-[#9ca3af] leading-[1.2] line-clamp-2 min-h-[2.4em]">{t.blurb}</p>
               {selected && (
                 <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#d6b357] flex items-center justify-center shadow">
                   <Check className="w-3.5 h-3.5 text-white" />
@@ -239,15 +251,19 @@ export function DesignTab({
           type="button"
           onClick={() => onChange({ ...value, id: "custom" })}
           aria-pressed={value.id === "custom"}
-          className={`relative text-left rounded-2xl border-2 p-2 transition-all duration-200 ${
+          className={`relative flex h-full flex-col text-left rounded-2xl border-2 p-2 transition-all duration-200 ${
             value.id === "custom"
               ? "border-[#d6b357] bg-[#fffdf3] shadow-[0_4px_16px_-4px_rgba(214,179,87,0.45)]"
               : "border-dashed border-[#c4c9d4] bg-white hover:border-[#001f3f]"
           }`}
         >
           <Swatch choice={{ ...value, id: "custom" }} />
-          <p className={`mt-2 text-xs font-bold ${value.id === "custom" ? "text-[#8a6a10]" : "text-[#374151]"}`}>Custom</p>
-          <p className="text-[10px] text-[#9ca3af] leading-snug">Your own accent and background</p>
+          <p className={`mt-2 text-xs font-bold leading-4 ${value.id === "custom" ? "text-[#8a6a10]" : "text-[#374151]"}`}>
+            Custom
+          </p>
+          <p className="text-[10px] text-[#9ca3af] leading-[1.2] line-clamp-2 min-h-[2.4em]">
+            Your own accent and background
+          </p>
           {value.id === "custom" && (
             <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#d6b357] flex items-center justify-center shadow">
               <Check className="w-3.5 h-3.5 text-white" />
@@ -460,7 +476,7 @@ export function DesignTab({
           {/* Buttons */}
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-[#374151] mb-2">Button design</p>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-stretch">
               {BUTTON_STYLES.map((b) => {
                 // Each chip previews the shape against the CURRENT look.
                 const preview = resolveTheme({ ...value, buttons: b.id })
@@ -471,7 +487,7 @@ export function DesignTab({
                     type="button"
                     onClick={() => setCustom({ buttons: b.id })}
                     aria-pressed={on}
-                    className={`rounded-xl border-2 p-2 transition-all ${
+                    className={`flex h-full flex-col rounded-xl border-2 p-2 transition-all ${
                       on ? "border-[#d6b357] bg-[#fffdf3]" : "border-[#e4e7ec] bg-white hover:border-[#c4c9d4]"
                     }`}
                   >
@@ -494,7 +510,7 @@ export function DesignTab({
                       </span>
                     </span>
                     <span
-                      className={`mt-1.5 block text-[10px] font-bold ${on ? "text-[#8a6a10]" : "text-[#6b7280]"}`}
+                      className={`mt-1.5 block text-[10px] font-bold leading-4 ${on ? "text-[#8a6a10]" : "text-[#6b7280]"}`}
                     >
                       {b.name}
                     </span>
@@ -502,12 +518,33 @@ export function DesignTab({
                 )
               })}
             </div>
+
+            {/* The sliders live with the chips they refine, rather than in a
+                separate block where it was not obvious what they applied to. */}
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
+              <Slider
+                label="Button size"
+                sizeKey="buttonSize"
+                suffix="%"
+                value={sizeOf("buttonSize")}
+                onChange={(n) => setCustom({ buttonSize: n })}
+                onReset={() => setCustom({ buttonSize: undefined })}
+              />
+              <Slider
+                label="Button radius"
+                sizeKey="buttonRadius"
+                suffix={sizeOf("buttonRadius") >= SIZE_LIMITS.buttonRadius.max ? "px · round" : "px"}
+                value={sizeOf("buttonRadius")}
+                onChange={(n) => setCustom({ buttonRadius: n })}
+                onReset={() => setCustom({ buttonRadius: undefined })}
+              />
+            </div>
           </div>
 
           {/* Icon design */}
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-[#374151] mb-2">Icon design</p>
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 items-stretch">
               {ICON_STYLES.map((st) => {
                 // Previewed against the CURRENT look, tile shape included.
                 const pv = resolveTheme({ ...value, icons: st.id })
@@ -518,7 +555,7 @@ export function DesignTab({
                     type="button"
                     onClick={() => setCustom({ icons: st.id })}
                     aria-pressed={on}
-                    className={`rounded-xl border-2 p-2 transition-all ${
+                    className={`flex h-full flex-col rounded-xl border-2 p-2 transition-all ${
                       on ? "border-[#d6b357] bg-[#fffdf3]" : "border-[#e4e7ec] bg-white hover:border-[#c4c9d4]"
                     }`}
                   >
@@ -549,7 +586,7 @@ export function DesignTab({
                       )}
                     </span>
                     <span
-                      className={`mt-1.5 block text-[10px] font-bold ${on ? "text-[#8a6a10]" : "text-[#6b7280]"}`}
+                      className={`mt-1.5 block text-[10px] font-bold leading-4 ${on ? "text-[#8a6a10]" : "text-[#6b7280]"}`}
                     >
                       {st.name}
                     </span>
@@ -557,42 +594,161 @@ export function DesignTab({
                 )
               })}
             </div>
+
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
+              <Slider
+                label="Icon size"
+                sizeKey="iconSize"
+                suffix={sizeOf("iconSize") === 0 ? "px · no tile" : "px"}
+                value={sizeOf("iconSize")}
+                onChange={(n) => setCustom({ iconSize: n })}
+                onReset={() => setCustom({ iconSize: undefined })}
+              />
+              <Slider
+                label="Icon radius"
+                sizeKey="iconRadius"
+                suffix="px"
+                value={sizeOf("iconRadius")}
+                onChange={(n) => setCustom({ iconRadius: n })}
+                onReset={() => setCustom({ iconRadius: undefined })}
+              />
+            </div>
           </div>
 
-          {/* Size & shape */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
-            <Slider
-              label="Button size"
-              sizeKey="buttonSize"
-              suffix="%"
-              value={sizeOf("buttonSize")}
-              onChange={(n) => setCustom({ buttonSize: n })}
-              onReset={() => setCustom({ buttonSize: undefined })}
-            />
-            <Slider
-              label="Button radius"
-              sizeKey="buttonRadius"
-              suffix={sizeOf("buttonRadius") >= SIZE_LIMITS.buttonRadius.max ? "px · round" : "px"}
-              value={sizeOf("buttonRadius")}
-              onChange={(n) => setCustom({ buttonRadius: n })}
-              onReset={() => setCustom({ buttonRadius: undefined })}
-            />
-            <Slider
-              label="Icon size"
-              sizeKey="iconSize"
-              suffix={sizeOf("iconSize") === 0 ? "px · no tile" : "px"}
-              value={sizeOf("iconSize")}
-              onChange={(n) => setCustom({ iconSize: n })}
-              onReset={() => setCustom({ iconSize: undefined })}
-            />
-            <Slider
-              label="Icon radius"
-              sizeKey="iconRadius"
-              suffix="px"
-              value={sizeOf("iconRadius")}
-              onChange={(n) => setCustom({ iconRadius: n })}
-              onReset={() => setCustom({ iconRadius: undefined })}
-            />
+          {/* Contact card */}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-[#374151] mb-2">Contact card</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 items-stretch">
+              {CONTACT_DESIGNS.map((c) => {
+                const on = contact === c.id
+                // The last three have no card surface — the rows are the page's
+                // own buttons — so their swatches sit on the page background.
+                const glass = c.id === "panel"
+                // A chosen background applies to whichever design is picked, so
+                // the swatch previews it rather than the design's own surface.
+                const chosen = value.contactBg
+                const dark = chosen ? isDarkHex(chosen) : c.id === "navy"
+                const surface = chosen ?? (c.id === "navy" ? "#0d2340" : "#faf7f1")
+                const gold = resolved.accent
+                const ink = dark ? "#ffffff" : "#12233c"
+
+                const pip = (
+                  <span
+                    className="h-1.5 w-1.5 shrink-0"
+                    style={{ background: resolved.tile, borderRadius: Math.min(resolved.tileRadius, 3) }}
+                  />
+                )
+                const line = (op: number, tone = ink) => (
+                  <span className="flex items-center gap-1">
+                    {resolved.showIcon && pip}
+                    <span className="h-[3px] flex-1 rounded-full" style={{ background: tone, opacity: op }} />
+                  </span>
+                )
+                const qrBed = (size: number, border = gold) => (
+                  <span
+                    className="shrink-0 rounded bg-white"
+                    style={{ width: size, height: size, border: `1.5px solid ${border}` }}
+                  />
+                )
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCustom({ contact: c.id })}
+                    aria-pressed={on}
+                    title={c.hint}
+                    className={`flex h-full flex-col rounded-xl border-2 p-2 text-left transition-all ${
+                      on ? "border-[#d6b357] bg-[#fffdf3]" : "border-[#e4e7ec] bg-white hover:border-[#c4c9d4]"
+                    }`}
+                  >
+                    <span
+                      className="relative flex h-16 flex-col justify-center overflow-hidden rounded-lg p-1.5"
+                      style={
+                        glass && !chosen
+                          ? { backgroundImage: resolved.scrim, backgroundSize: "cover" }
+                          : { background: surface }
+                      }
+                    >
+                      {c.id === "ivory" && (
+                        <>
+                          <span className="absolute -top-2 -right-2 h-6 w-9 rotate-[20deg]" style={{ background: `linear-gradient(115deg, ${gold}, transparent 70%)`, borderBottomLeftRadius: "100%" }} />
+                          <span className="absolute -bottom-2 -left-2 h-6 w-9 rotate-[20deg]" style={{ background: `linear-gradient(295deg, ${gold}, transparent 70%)`, borderTopRightRadius: "100%" }} />
+                        </>
+                      )}
+
+                      {/* QR, a gold rule, then the lines. Panel draws its own
+                          translucent tile over the backdrop; a chosen colour
+                          makes it a solid card like the others. */}
+                      <span
+                        className={`relative flex items-center gap-1.5 ${glass && !chosen ? "rounded-md p-1" : ""}`}
+                        style={
+                          glass && !chosen
+                            ? { background: resolved.panel, border: `1px solid ${resolved.panelBorder}` }
+                            : undefined
+                        }
+                      >
+                        {qrBed(glass ? 24 : 28)}
+                        <span className="h-7 w-px shrink-0" style={{ background: `${gold}66` }} />
+                        <span className="flex-1 min-w-0 space-y-1">
+                          {line(0.85, glass && !chosen ? resolved.ink : ink)}
+                          {line(0.5, glass && !chosen ? resolved.ink : ink)}
+                          {line(0.5, glass && !chosen ? resolved.ink : ink)}
+                        </span>
+                      </span>
+                    </span>
+                    <span className={`mt-1.5 block text-[10px] font-bold leading-4 ${on ? "text-[#8a6a10]" : "text-[#374151]"}`}>
+                      {c.name}
+                    </span>
+                    <span className="block text-[10px] leading-[1.2] text-[#9ca3af] line-clamp-2 min-h-[2.4em]">
+                      {c.hint}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Card background. Overrides whichever design is selected; the card's
+                text flips between dark and light to stay readable on it. */}
+            <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-[#374151]">
+              Card background
+            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCustom({ contactBg: undefined })}
+                aria-pressed={!value.contactBg}
+                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all ${
+                  !value.contactBg
+                    ? "border-[#001f3f] bg-[#001f3f] text-white"
+                    : "border-[#e5e7eb] bg-[#f9fafb] text-[#374151] hover:border-[#c4c9d4]"
+                }`}
+              >
+                Design default
+              </button>
+              {CARD_BG_PRESETS.map((hex) => (
+                <button
+                  key={hex}
+                  type="button"
+                  onClick={() => setCustom({ contactBg: hex })}
+                  aria-label={`Card background ${hex}`}
+                  aria-pressed={value.contactBg?.toLowerCase() === hex}
+                  className={`w-8 h-8 rounded-lg border-2 transition-transform hover:scale-110 ${
+                    value.contactBg?.toLowerCase() === hex ? "border-[#0d1117]" : "border-white shadow"
+                  }`}
+                  style={{ background: hex }}
+                />
+              ))}
+              <label className="inline-flex items-center gap-2 ml-1 text-[11px] text-[#6b7280]">
+                <input
+                  type="color"
+                  value={value.contactBg ?? "#0d2340"}
+                  onChange={(e) => setCustom({ contactBg: e.target.value })}
+                  aria-label="Pick any card background"
+                  className="w-8 h-8 rounded-lg border border-[#e5e7eb] bg-white p-0.5 cursor-pointer"
+                />
+                any colour
+              </label>
+            </div>
           </div>
 
           {/* Accent */}

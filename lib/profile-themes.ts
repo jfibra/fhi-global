@@ -38,6 +38,10 @@ export type ProfileTheme = {
   tileBorder: string
   /** False hides the icon entirely, leaving a label-only button. */
   showIcon: boolean
+  /** Which contact-card design closes the page. */
+  contactLayout: ContactDesignId
+  /** A chosen surface for that card, or null to use the design's own. */
+  contactBg: string | null
   /** Glass panels — the contact card, social buttons. */
   panel: string
   panelBorder: string
@@ -77,7 +81,8 @@ function clampSize(key: SizeKey, raw: unknown): number | undefined {
 type ThemeBase = Omit<
   ProfileTheme,
   | "pillRadius" | "pillBorder" | "pillPadY" | "pillFont"
-  | "tileSize" | "tileRadius" | "tileBorder" | "showIcon"
+  | "tileSize" | "tileRadius" | "tileBorder" | "showIcon" | "contactLayout"
+  | "contactBg"
 >
 
 export const PROFILE_THEMES: ThemeBase[] = [
@@ -200,7 +205,36 @@ export const ICON_STYLES = [
 
 export type IconStyleId = (typeof ICON_STYLES)[number]["id"]
 
+/**
+ * Contact-card designs for the foot of the page, adapted from the printed set.
+ * Each is a full look — surface, QR framing, icon shape and one flourish — not
+ * just an arrangement. Rendered by features/business-card/contact-card.tsx.
+ */
+export const CONTACT_DESIGNS = [
+  // The original look, kept as an option: a translucent panel that takes its
+  // colours from the page rather than bringing its own surface.
+  { id: "panel", name: "Panel", hint: "Translucent, follows the page" },
+  { id: "navy", name: "Navy", hint: "Dark card, gold-framed QR" },
+  { id: "ivory", name: "Ivory", hint: "Light card, gold corner ribbons" },
+] as const
+
+export type ContactDesignId = (typeof CONTACT_DESIGNS)[number]["id"]
+
+export const DEFAULT_CONTACT_DESIGN: ContactDesignId = "panel"
+
 export const DEFAULT_ICON_STYLE: IconStyleId = "solid"
+
+/**
+ * Ink that stays legible on `bgHex`. Exported because the contact card needs it
+ * for a surface the agent chose, and duplicating the luminance maths there would
+ * let the two drift apart.
+ */
+export function inkFor(bgHex: string): { ink: string; inkMuted: string } {
+  const light = HEX.test(bgHex) && luminance(bgHex) > 0.45
+  return light
+    ? { ink: "#12233c", inkMuted: "rgba(18,35,60,0.62)" }
+    : { ink: "#ffffff", inkMuted: "rgba(255,255,255,0.74)" }
+}
 
 /** hex → rgba, for the washes the Soft treatment needs. */
 function alpha(hex: string, a: number): string {
@@ -259,6 +293,8 @@ function withControls(base: ThemeBase, choice: ThemeChoice): ProfileTheme {
     tileRadius: choice.iconRadius ?? SIZE_LIMITS.iconRadius.def,
   }
   const iconStyle = choice.icons ?? DEFAULT_ICON_STYLE
+  const contactLayout = choice.contact ?? DEFAULT_CONTACT_DESIGN
+  const contactBg = choice.contactBg ?? null
 
   if (style === "outline" || style === "glass") {
     const pill = {
@@ -270,6 +306,8 @@ function withControls(base: ThemeBase, choice: ThemeChoice): ProfileTheme {
       ...base,
       ...sizing,
       ...pill,
+      contactLayout,
+      contactBg,
       pillRadius: radius,
       pillBorder:
         style === "outline" ? `1.5px solid ${base.panelBorder}` : `1px solid ${base.panelBorder}`,
@@ -280,6 +318,8 @@ function withControls(base: ThemeBase, choice: ThemeChoice): ProfileTheme {
   return {
     ...base,
     ...sizing,
+    contactLayout,
+    contactBg,
     pillRadius: radius,
     pillBorder: "none",
     ...iconTokens(base, iconStyle),
@@ -316,6 +356,9 @@ export type ThemeChoice = {
   accent?: string
   buttons?: ButtonStyleId
   icons?: IconStyleId
+  contact?: ContactDesignId
+  /** Overrides the contact card's own surface, whatever design is picked. */
+  contactBg?: string
   /** Percentage of the default button height/type size. */
   buttonSize?: number
   /** Corner radius in px; the max reads as fully round. */
@@ -465,6 +508,8 @@ export function parseThemeChoice(input: unknown): ThemeChoice {
   if (typeof raw.accent === "string" && HEX.test(raw.accent)) out.accent = raw.accent
   if (BUTTON_STYLES.some((s2) => s2.id === raw.buttons)) out.buttons = raw.buttons as ButtonStyleId
   if (ICON_STYLES.some((s2) => s2.id === raw.icons)) out.icons = raw.icons as IconStyleId
+  if (CONTACT_DESIGNS.some((s2) => s2.id === raw.contact)) out.contact = raw.contact as ContactDesignId
+  if (typeof raw.contactBg === "string" && HEX.test(raw.contactBg)) out.contactBg = raw.contactBg
 
   for (const key of Object.keys(SIZE_LIMITS) as SizeKey[]) {
     if (raw[key] === undefined) continue

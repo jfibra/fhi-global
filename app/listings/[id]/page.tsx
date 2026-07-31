@@ -4,7 +4,15 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { MapPin, Building2, ArrowLeft, Mail, Phone, ChevronRight } from "lucide-react"
 import { createPageMetadata, SITE_URL } from "@/lib/seo"
-import { fetchPublicAgentListingById } from "@/lib/buy/agent-listings-public"
+import {
+  fetchPublicAgentListingById,
+  isUsableListingAgent,
+  listingAgentName,
+  listingAgentPhone,
+  type PublicListingAgent,
+} from "@/lib/buy/agent-listings-public"
+import { roleToLabel } from "@/lib/app-roles"
+import { createAdminSupabase } from "@/lib/admin-supabase"
 import { pickUnit } from "@/lib/buy/listings-page-logic"
 import { mergedListingGalleryUrls } from "@/lib/listing-gallery-urls"
 import { ListingPhotoMosaic } from "@/components/public/listing-photo-mosaic"
@@ -19,6 +27,39 @@ type Props = { params: Promise<{ id: string }> }
 const TEL = "+971567428288"
 const EMAIL = "info@fhiglobal.ae"
 const WA = "971567428288"
+
+/**
+ * The listing agent's details for the enquiry card.
+ *
+ * Service-role, because neither half is reachable publicly: `profiles` is
+ * behind RLS (migration 020) and email lives in auth.users. Same approach as
+ * the public business-card page. It runs server-side during ISR, so the key
+ * never reaches the browser and the page stays cacheable; any failure falls
+ * back to the house contact card rather than breaking the page.
+ */
+async function fetchListingAgent(
+  agentId: string | null | undefined,
+): Promise<{ agent: PublicListingAgent | null; email: string }> {
+  if (!agentId) return { agent: null, email: "" }
+  try {
+    const admin = createAdminSupabase()
+    const [profileRes, authRes] = await Promise.all([
+      admin
+        .from("profiles")
+        .select("id, fullname, fname, lname, profile_url, role, status, is_deleted, metadata")
+        .eq("id", agentId)
+        .maybeSingle(),
+      admin.auth.admin.getUserById(agentId).catch(() => null),
+    ])
+    const agent = (profileRes.data as PublicListingAgent | null) ?? null
+    return {
+      agent: isUsableListingAgent(agent) ? agent : null,
+      email: authRes?.data?.user?.email?.trim() ?? "",
+    }
+  } catch {
+    return { agent: null, email: "" }
+  }
+}
 
 function WhatsAppGlyph({ className }: { className?: string }) {
   return (
@@ -107,6 +148,17 @@ export default async function PublicAgentListingPage({ params }: Props) {
   const loc = [proj?.city, proj?.location].filter(Boolean).join(", ") || "United Arab Emirates"
   const typeLabel = (row.unit_type?.trim() || u?.unit_type || "Property").replace(/\b\w/g, (c) => c.toUpperCase())
   const backHref = row.listing_kind === "rent" ? "/rent" : "/buy"
+
+  // Enquiries go to the agent who owns the listing. Their phone falls back to
+  // the house line, so Call and WhatsApp always reach someone even when the
+  // agent has no number saved.
+  const { agent, email: agentEmail } = await fetchListingAgent(row.agent_id)
+  const agentName = listingAgentName(agent)
+  const agentTitle = agent?.role ? roleToLabel(agent.role) : "Listing Agent"
+  const agentPhone = listingAgentPhone(agent)
+  const contactTel = agentPhone || TEL
+  const contactWa = (agentPhone || WA).replace(/^\+/, "")
+  const contactEmail = agentEmail || EMAIL
 
   return (
     <div className="min-h-screen bg-[#faf8f4] font-sans">
@@ -256,20 +308,48 @@ export default async function PublicAgentListingPage({ params }: Props) {
 
           {/* ── Contact card (sticky, like the reference's agent panel) ── */}
           <aside className="lg:sticky lg:top-24 bg-white rounded-2xl border border-[#e8eaed] shadow-[0_16px_44px_-16px_rgba(0,20,40,0.18)] overflow-hidden">
+            {/* Header: the listing's own agent when we have one, otherwise the
+                house team — a deactivated agent or one with no phone on file
+                must not leave the enquiry pointing nowhere. */}
             <div className="bg-gradient-to-r from-[#001f3f] to-[#002a52] px-5 py-4 flex items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/FHI_Branding_White.png" alt="FHI Global" className="h-8 w-auto object-contain" />
-              <div>
-                <p className="text-white text-sm font-bold leading-tight">FHI Global</p>
-                <p className="text-[#d6b357] text-[11px] font-bold uppercase tracking-wider">Listing Team</p>
-              </div>
+              {agentName ? (
+                <>
+                  {agent?.profile_url ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={agent.profile_url}
+                      alt={agentName}
+                      className="h-11 w-11 rounded-full object-cover border-2 border-[#d6b357] shrink-0"
+                    />
+                  ) : (
+                    <span className="h-11 w-11 rounded-full border-2 border-[#d6b357] bg-white/10 flex items-center justify-center text-[#d6b357] text-sm font-bold shrink-0">
+                      {agentName.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-white text-sm font-bold leading-tight truncate">{agentName}</p>
+                    <p className="text-[#d6b357] text-[11px] font-bold uppercase tracking-wider">
+                      {agentTitle}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/FHI_Branding_White.png" alt="FHI Global" className="h-8 w-auto object-contain" />
+                  <div>
+                    <p className="text-white text-sm font-bold leading-tight">FHI Global</p>
+                    <p className="text-[#d6b357] text-[11px] font-bold uppercase tracking-wider">Listing Team</p>
+                  </div>
+                </>
+              )}
             </div>
             <div className="p-5 space-y-2.5">
               <p className="rounded-xl bg-[#f8faff] border border-[#e0e7ff] px-4 py-3 text-sm text-[#4b5563] leading-relaxed">
                 Hi, I&apos;m interested in <span className="font-semibold text-[#0f2940]">{row.title}</span>.
               </p>
               <a
-                href={`https://wa.me/${WA}?text=${encodeURIComponent(`Hi, I'm interested in ${row.title}`)}`}
+                href={`https://wa.me/${contactWa}?text=${encodeURIComponent(`Hi, I'm interested in ${row.title}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl bg-[#25d366] text-white text-sm font-bold hover:bg-[#1fb457] transition-colors"
@@ -278,14 +358,14 @@ export default async function PublicAgentListingPage({ params }: Props) {
                 WhatsApp
               </a>
               <a
-                href={`tel:${TEL}`}
+                href={`tel:${contactTel}`}
                 className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl bg-gradient-to-r from-[#d6b357] to-[#c9a449] text-[#001f3f] text-sm font-bold hover:from-[#c9a449] hover:to-[#b8913f] transition-colors"
               >
                 <Phone className="w-4 h-4" />
                 Call
               </a>
               <a
-                href={`mailto:${EMAIL}?subject=Inquiry:%20${encodeURIComponent(row.title)}`}
+                href={`mailto:${contactEmail}?subject=Inquiry:%20${encodeURIComponent(row.title)}`}
                 className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl border border-[#d1d5db] text-[#0f2940] text-sm font-bold hover:border-[#001f3f] transition-colors"
               >
                 <Mail className="w-4 h-4" />

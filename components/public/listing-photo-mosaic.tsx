@@ -9,7 +9,7 @@ type MosaicImage = {
 }
 
 /**
- * homes.com-style adaptive photo mosaic: one large hero tile plus up to four
+ * homes.com-style adaptive photo mosaic: one large hero tile plus up to six
  * side tiles that auto-arrange to the photo count, with a "+N" overlay and an
  * "All photos" chip. Every tile opens the fullscreen lightbox at that photo.
  */
@@ -31,8 +31,16 @@ export function ListingPhotoMosaic({
     : "h-[300px] sm:h-[420px] lg:h-[480px]"
 
   const count = images.length
-  const side = images.slice(1, 5)
-  const hiddenCount = Math.max(0, count - 5)
+  /**
+   * Up to six thumbnails beside the hero. The hero always spans 2 columns of a
+   * 2-row grid, so the column count sets how many fit: 5 columns leaves 3×2.
+   * It's chosen from how many photos there actually are — a fixed 5 would
+   * leave a listing with four photos showing empty cells.
+   */
+  const side = images.slice(1, 7)
+  const lgCols =
+    side.length >= 5 ? "lg:grid-cols-5" : side.length >= 3 ? "lg:grid-cols-4" : "lg:grid-cols-3"
+  const hiddenCount = Math.max(0, count - (1 + side.length))
 
   const prev = () => setLightboxIndex((i) => (i !== null ? Math.max(0, i - 1) : null))
   const next = () => setLightboxIndex((i) => (i !== null ? Math.min(count - 1, i + 1) : null))
@@ -68,15 +76,15 @@ export function ListingPhotoMosaic({
           {tile(images[0], 0, `block w-full aspect-[16/9] ${fullBleed ? "max-h-[560px]" : "max-h-[480px]"}`)}
         </div>
       ) : count === 2 ? (
-        <div className={`grid grid-cols-2 gap-2 ${frame} ${fullBleed ? "h-[320px] sm:h-[460px]" : "h-[280px] sm:h-[400px]"}`}>
+        <div className={`grid grid-cols-2 gap-1 ${frame} ${fullBleed ? "h-[320px] sm:h-[460px]" : "h-[280px] sm:h-[400px]"}`}>
           {tile(images[0], 0, "h-full w-full")}
           {tile(images[1], 1, "h-full w-full")}
         </div>
       ) : (
-        <div className={`relative grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 grid-rows-2 gap-2 ${frame} ${mosaicHeights}`}>
+        <div className={`relative grid grid-cols-2 sm:grid-cols-3 ${lgCols} grid-rows-2 gap-1 ${frame} ${mosaicHeights}`}>
           {/* Hero */}
           {tile(images[0], 0, "col-span-2 row-span-2 h-full w-full")}
-          {/* Side tiles: 2 from sm, 4 from lg */}
+          {/* Side tiles: 2 from sm (3 columns), the rest from lg */}
           {side.map((img, i) => {
             const isLastVisible = i === side.length - 1
             const overlay = isLastVisible && hiddenCount > 0 ? `+${hiddenCount} photos` : undefined
