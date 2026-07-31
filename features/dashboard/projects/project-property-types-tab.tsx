@@ -7,9 +7,10 @@ import { fetchPropertyTypes, fetchProjectPropertyTypes, syncProjectPropertyTypes
 interface Props {
   projectId: number
   showToast: (variant: "success" | "error", message: string) => void
+  readOnly?: boolean
 }
 
-export function ProjectPropertyTypesTab({ projectId, showToast }: Props) {
+export function ProjectPropertyTypesTab({ projectId, showToast, readOnly = false }: Props) {
   const [types, setTypes]       = useState<PropertyType[]>([])
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [loading, setLoading]   = useState(false)
@@ -44,6 +45,8 @@ export function ProjectPropertyTypesTab({ projectId, showToast }: Props) {
     showToast("success", "Property types saved")
   }
 
+  const selectedTypes = types.filter((t) => selected.has(t.id))
+
   if (loading) {
     return (
       <div className="grid grid-cols-3 gap-3">
@@ -63,6 +66,19 @@ export function ProjectPropertyTypesTab({ projectId, showToast }: Props) {
 
       {types.length === 0 ? (
         <div className="py-12 text-center text-sm text-[#9ca3af]">No property types configured in the database yet.</div>
+      ) : readOnly ? (
+        selectedTypes.length === 0 ? (
+          <div className="py-12 text-center text-sm text-[#9ca3af]">No property types selected.</div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-[#f0f0f0] p-5 flex flex-wrap gap-3">
+            {selectedTypes.map((t) => (
+              <span key={t.id}
+                className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-[#001f3f] bg-[#001f3f]/5 text-[#001f3f] text-sm font-medium">
+                {t.name}
+              </span>
+            ))}
+          </div>
+        )
       ) : (
         <div className="bg-white rounded-2xl border border-[#f0f0f0] p-5 grid grid-cols-3 gap-3">
           {types.map((t) => (
@@ -80,12 +96,14 @@ export function ProjectPropertyTypesTab({ projectId, showToast }: Props) {
         </div>
       )}
 
-      <div className="flex justify-end">
-        <button type="button" onClick={() => void handleSave()} disabled={saving}
-          className="flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50">
-          <Save className="w-4 h-4" />{saving ? "Saving…" : "Save Property Types"}
-        </button>
-      </div>
+      {!readOnly && (
+        <div className="flex justify-end">
+          <button type="button" onClick={() => void handleSave()} disabled={saving}
+            className="flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50">
+            <Save className="w-4 h-4" />{saving ? "Saving…" : "Save Property Types"}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

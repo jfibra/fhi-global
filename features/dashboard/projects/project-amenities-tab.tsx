@@ -7,9 +7,10 @@ import { fetchAmenities, fetchProjectAmenities, syncProjectAmenities, type Ameni
 interface Props {
   projectId: number
   showToast: (variant: "success" | "error", message: string) => void
+  readOnly?: boolean
 }
 
-export function ProjectAmenitiesTab({ projectId, showToast }: Props) {
+export function ProjectAmenitiesTab({ projectId, showToast, readOnly = false }: Props) {
   const [amenities, setAmenities]   = useState<Amenity[]>([])
   const [selected, setSelected]     = useState<Set<number>>(new Set())
   const [loading, setLoading]       = useState(false)
@@ -54,6 +55,8 @@ export function ProjectAmenitiesTab({ projectId, showToast }: Props) {
     )
   }
 
+  const selectedAmenities = amenities.filter((a) => selected.has(a.id))
+
   return (
     <div className="max-w-3xl space-y-5">
       <div className="flex items-center justify-between">
@@ -61,7 +64,20 @@ export function ProjectAmenitiesTab({ projectId, showToast }: Props) {
         <span className="text-xs text-[#6b7280]">{selected.size} selected</span>
       </div>
 
-      {amenities.length === 0 ? (
+      {readOnly ? (
+        selectedAmenities.length === 0 ? (
+          <div className="py-12 text-center text-sm text-[#9ca3af]">No amenities yet.</div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-[#f0f0f0] p-5 flex flex-wrap gap-2.5">
+            {selectedAmenities.map((a) => (
+              <span key={a.id}
+                className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-[#001f3f] bg-[#001f3f]/5 text-[#001f3f] text-sm font-medium">
+                {a.name}
+              </span>
+            ))}
+          </div>
+        )
+      ) : amenities.length === 0 ? (
         <div className="py-12 text-center text-sm text-[#9ca3af]">No amenities configured in the database yet.</div>
       ) : (
         <div className="bg-white rounded-2xl border border-[#f0f0f0] p-5 grid grid-cols-3 gap-3">
@@ -80,12 +96,14 @@ export function ProjectAmenitiesTab({ projectId, showToast }: Props) {
         </div>
       )}
 
-      <div className="flex justify-end">
-        <button type="button" onClick={() => void handleSave()} disabled={saving}
-          className="flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50">
-          <Save className="w-4 h-4" />{saving ? "Saving…" : "Save Amenities"}
-        </button>
-      </div>
+      {!readOnly && (
+        <div className="flex justify-end">
+          <button type="button" onClick={() => void handleSave()} disabled={saving}
+            className="flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50">
+            <Save className="w-4 h-4" />{saving ? "Saving…" : "Save Amenities"}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

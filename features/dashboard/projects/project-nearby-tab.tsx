@@ -7,6 +7,7 @@ import { type ProjectNeighbor, fetchProjectNeighbors, upsertProjectNeighbor, del
 interface Props {
   projectId: number
   showToast: (variant: "success" | "error", message: string) => void
+  readOnly?: boolean
 }
 
 type Category = ProjectNeighbor["category"]
@@ -14,7 +15,7 @@ const CATEGORIES: Category[] = ["school", "hospital", "shopping", null]
 
 const EMPTY: Partial<ProjectNeighbor> = { category: null, description: "" }
 
-export function ProjectNearbyTab({ projectId, showToast }: Props) {
+export function ProjectNearbyTab({ projectId, showToast, readOnly = false }: Props) {
   const [items, setItems]   = useState<ProjectNeighbor[]>([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<Partial<ProjectNeighbor> | null>(null)
@@ -65,13 +66,15 @@ export function ProjectNearbyTab({ projectId, showToast }: Props) {
     <div className="max-w-3xl space-y-5">
       <div className="flex items-center justify-between">
         <h3 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">Nearby Places</h3>
-        <button type="button" onClick={() => setEditing({ ...EMPTY })}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
-          <Plus className="w-3.5 h-3.5" /> Add Place
-        </button>
+        {!readOnly && (
+          <button type="button" onClick={() => setEditing({ ...EMPTY })}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
+            <Plus className="w-3.5 h-3.5" /> Add Place
+          </button>
+        )}
       </div>
 
-      {editing && (
+      {!readOnly && editing && (
         <div className="bg-white rounded-2xl border border-[#e5e5e5] p-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -114,16 +117,18 @@ export function ProjectNearbyTab({ projectId, showToast }: Props) {
             <div key={item.id} className="flex items-center gap-4 bg-white rounded-2xl border border-[#f0f0f0] px-4 py-3">
               {categoryBadge(item.category)}
               <span className="flex-1 text-sm text-[#374151]">{item.description}</span>
-              <div className="flex gap-1">
-                <button type="button" onClick={() => setEditing(item)}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#f3f4f6] text-[#6b7280] transition-colors">
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button type="button" onClick={() => void handleDelete(item.id)}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-rose-50 text-rose-400 transition-colors">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              {!readOnly && (
+                <div className="flex gap-1">
+                  <button type="button" onClick={() => setEditing(item)}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#f3f4f6] text-[#6b7280] transition-colors">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button type="button" onClick={() => void handleDelete(item.id)}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-rose-50 text-rose-400 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           ))
         )}

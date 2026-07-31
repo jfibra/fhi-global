@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams, usePathname, useRouter } from "next/navigation"
 import { createPortal } from "react-dom"
-import { Plus, Search, Sparkles, Upload, Image as ImageIcon } from "lucide-react"
+import { Plus, Search, Upload, Image as ImageIcon } from "lucide-react"
 import { DeveloperCombobox } from "@/components/developers/developer-combobox"
 import {
   type Project,
@@ -98,6 +98,11 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "seo",             label: "SEO" },
   { id: "settings",        label: "Settings" },
 ]
+
+// Tabs agents/members may browse read-only — content only, no Data Health / SEO / Settings.
+const READONLY_TAB_IDS = new Set<TabId>([
+  "overview", "units", "images", "amenities", "property_types", "media", "features", "nearby",
+])
 
 // ─── New Project Modal ─────────────────────────────────────────────────────────
 function NewProjectModal({
@@ -645,30 +650,9 @@ export function ProjectsClient({
             readOnly={readOnly}
           />
 
-          {readOnly ? (
-            /* Read-only detail — the studios in the header are the whole point. */
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="max-w-xl mx-auto mt-10 rounded-3xl border border-[#e8eaed] bg-white p-8 text-center shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)]">
-                <div className="w-14 h-14 mx-auto rounded-2xl bg-[#fdf6e3] border border-[#f0e8c8] flex items-center justify-center mb-4">
-                  <Sparkles className="w-6 h-6 text-[#8a6a10]" />
-                </div>
-                <h3 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">Create marketing content</h3>
-                <p className="text-sm text-[#6b7280] mt-2 leading-relaxed">
-                  Use the <span className="font-semibold text-[#8a6a10]">Poster</span> and{" "}
-                  <span className="font-semibold text-[#8a6a10]">Reels</span> buttons above to generate a
-                  branded poster or a 9:16 video reel for {selected.name} — photos, pricing, and details
-                  are filled in automatically from the project.
-                </p>
-                {selected.about_project && (
-                  <p className="text-xs text-[#9ca3af] mt-4 leading-relaxed line-clamp-4">{selected.about_project}</p>
-                )}
-              </div>
-            </div>
-          ) : (
-          <>
-          {/* Tabs nav */}
+          {/* Tabs nav — agents/members (readOnly) get the content tabs only. */}
           <div className="flex gap-1 px-6 pt-4 pb-0 border-b border-[#f0f0f0] bg-white overflow-x-auto flex-shrink-0">
-            {TABS.map((t) => (
+            {(readOnly ? TABS.filter((t) => READONLY_TAB_IDS.has(t.id)) : TABS).map((t) => (
               <button key={t.id} type="button" onClick={() => setActiveTab(t.id)}
                 className={`flex-shrink-0 px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all whitespace-nowrap ${
                   activeTab === t.id
@@ -680,22 +664,21 @@ export function ProjectsClient({
             ))}
           </div>
 
-          {/* Tab content */}
+          {/* Tab content — panels render read-only when `readOnly`; Data Health /
+              SEO / Settings stay admin-only. */}
           <div className="flex-1 overflow-y-auto p-6">
-            {activeTab === "data"           && <ProjectDataTab           project={selected} onJump={(tab) => setActiveTab(tab)} showToast={showToast} />}
-            {activeTab === "overview"       && <ProjectOverviewTab       project={selected} developers={developers} onSave={handleUpdateProject} showToast={showToast} />}
-            {activeTab === "units"          && <ProjectUnitsTab          projectId={selected.id} showToast={showToast} />}
-            {activeTab === "images"         && <ProjectImagesTab         project={selected} showToast={showToast} onMainImageChange={(url: string) => { setSelected({ ...selected, main_image: url }); setProjects((prev) => prev.map((p) => p.id === selected.id ? { ...p, main_image: url } : p)) }} />}
-            {activeTab === "amenities"      && <ProjectAmenitiesTab      projectId={selected.id} showToast={showToast} />}
-            {activeTab === "property_types" && <ProjectPropertyTypesTab  projectId={selected.id} showToast={showToast} />}
-            {activeTab === "media"          && <ProjectMediaTab          projectId={selected.id} showToast={showToast} />}
-            {activeTab === "features"       && <ProjectFeaturesTab       projectId={selected.id} showToast={showToast} />}
-            {activeTab === "nearby"         && <ProjectNearbyTab         projectId={selected.id} showToast={showToast} />}
-            {activeTab === "seo"            && <ProjectSeoTab            project={selected} onSave={handleUpdateProject} showToast={showToast} />}
-            {activeTab === "settings"       && <ProjectSettingsTab       project={selected} onSave={handleUpdateProject} onPublishToggle={() => void handlePublishToggle()} showToast={showToast} />}
+            {activeTab === "data"           && !readOnly && <ProjectDataTab           project={selected} onJump={(tab) => setActiveTab(tab)} showToast={showToast} />}
+            {activeTab === "overview"       && <ProjectOverviewTab       project={selected} developers={developers} onSave={handleUpdateProject} showToast={showToast} readOnly={readOnly} />}
+            {activeTab === "units"          && <ProjectUnitsTab          projectId={selected.id} showToast={showToast} readOnly={readOnly} />}
+            {activeTab === "images"         && <ProjectImagesTab         project={selected} showToast={showToast} readOnly={readOnly} onMainImageChange={(url: string) => { setSelected({ ...selected, main_image: url }); setProjects((prev) => prev.map((p) => p.id === selected.id ? { ...p, main_image: url } : p)) }} />}
+            {activeTab === "amenities"      && <ProjectAmenitiesTab      projectId={selected.id} showToast={showToast} readOnly={readOnly} />}
+            {activeTab === "property_types" && <ProjectPropertyTypesTab  projectId={selected.id} showToast={showToast} readOnly={readOnly} />}
+            {activeTab === "media"          && <ProjectMediaTab          projectId={selected.id} showToast={showToast} readOnly={readOnly} />}
+            {activeTab === "features"       && <ProjectFeaturesTab       projectId={selected.id} showToast={showToast} readOnly={readOnly} />}
+            {activeTab === "nearby"         && <ProjectNearbyTab         projectId={selected.id} showToast={showToast} readOnly={readOnly} />}
+            {activeTab === "seo"            && !readOnly && <ProjectSeoTab            project={selected} onSave={handleUpdateProject} showToast={showToast} />}
+            {activeTab === "settings"       && !readOnly && <ProjectSettingsTab       project={selected} onSave={handleUpdateProject} onPublishToggle={() => void handlePublishToggle()} showToast={showToast} />}
           </div>
-          </>
-          )}
         </div>
       ) : null}
 

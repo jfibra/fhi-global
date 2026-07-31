@@ -39,9 +39,10 @@ interface Props {
   developers: Developer[]
   onSave: (fields: Partial<ProjectFormData>) => Promise<void>
   showToast: (variant: "success" | "error", message: string) => void
+  readOnly?: boolean
 }
 
-export function ProjectOverviewTab({ project, developers, onSave, showToast }: Props) {
+export function ProjectOverviewTab({ project, developers, onSave, showToast, readOnly = false }: Props) {
   const [form, setForm]         = useState<Partial<ProjectFormData>>({})
   const [saving, setSaving]     = useState(false)
   const [active, setActive]     = useState<InnerTab>("basic")
@@ -265,30 +266,34 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
           {field(
             "Short Description",
             area("description", "Short description visible in listings…", 2),
-            <button
-              type="button"
-              onClick={() => openAiModal("description")}
-              disabled={Boolean(aiLoading)}
-              className="inline-flex items-center gap-1 rounded-full border border-[#d6b357]/40 bg-[#fff8e1] px-2.5 py-1 text-[11px] font-semibold text-[#0f2940] hover:bg-[#fff3cc] disabled:opacity-50"
-            >
-              <Sparkles className="h-3 w-3 text-[#d6b357]" />
-              {aiLoading === "description" ? "Generating…" : "AI Generate"}
-            </button>,
+            !readOnly && (
+              <button
+                type="button"
+                onClick={() => openAiModal("description")}
+                disabled={Boolean(aiLoading)}
+                className="inline-flex items-center gap-1 rounded-full border border-[#d6b357]/40 bg-[#fff8e1] px-2.5 py-1 text-[11px] font-semibold text-[#0f2940] hover:bg-[#fff3cc] disabled:opacity-50"
+              >
+                <Sparkles className="h-3 w-3 text-[#d6b357]" />
+                {aiLoading === "description" ? "Generating…" : "AI Generate"}
+              </button>
+            ),
           )}
         </div>
         <div className="col-span-2">
           {field(
             "About Project",
             area("about_project", "Detailed about section shown on the project page…", 5),
-            <button
-              type="button"
-              onClick={() => openAiModal("about_project")}
-              disabled={Boolean(aiLoading)}
-              className="inline-flex items-center gap-1 rounded-full border border-[#d6b357]/40 bg-[#fff8e1] px-2.5 py-1 text-[11px] font-semibold text-[#0f2940] hover:bg-[#fff3cc] disabled:opacity-50"
-            >
-              <Sparkles className="h-3 w-3 text-[#d6b357]" />
-              {aiLoading === "about_project" ? "Generating…" : "AI Generate"}
-            </button>,
+            !readOnly && (
+              <button
+                type="button"
+                onClick={() => openAiModal("about_project")}
+                disabled={Boolean(aiLoading)}
+                className="inline-flex items-center gap-1 rounded-full border border-[#d6b357]/40 bg-[#fff8e1] px-2.5 py-1 text-[11px] font-semibold text-[#0f2940] hover:bg-[#fff3cc] disabled:opacity-50"
+              >
+                <Sparkles className="h-3 w-3 text-[#d6b357]" />
+                {aiLoading === "about_project" ? "Generating…" : "AI Generate"}
+              </button>
+            ),
           )}
         </div>
       </div>
@@ -382,7 +387,9 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
 
       {/* Panel */}
       <div className="bg-white rounded-2xl border border-[#f0f0f0] p-6">
-        {panels[active]}
+        <fieldset disabled={readOnly} className="min-w-0 border-0 p-0 m-0">
+          {panels[active]}
+        </fieldset>
       </div>
 
       {aiModalOpen && (
@@ -427,16 +434,18 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast }: P
       )}
 
       {/* Save */}
-      <div className="flex justify-end pt-4">
-        <button
-          type="submit"
-          disabled={saving}
-          className="flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50"
-        >
-          <Save className="w-4 h-4" />
-          {saving ? "Saving…" : "Save Changes"}
-        </button>
-      </div>
+      {!readOnly && (
+        <div className="flex justify-end pt-4">
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50"
+          >
+            <Save className="w-4 h-4" />
+            {saving ? "Saving…" : "Save Changes"}
+          </button>
+        </div>
+      )}
     </form>
   )
 }

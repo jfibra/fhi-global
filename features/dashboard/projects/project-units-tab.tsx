@@ -12,6 +12,7 @@ import {
 interface Props {
   projectId: number
   showToast: (variant: "success" | "error", message: string) => void
+  readOnly?: boolean
 }
 
 const EMPTY: Partial<ProjectUnit> = {
@@ -27,7 +28,7 @@ const EMPTY: Partial<ProjectUnit> = {
   is_available: true,
 }
 
-export function ProjectUnitsTab({ projectId, showToast }: Props) {
+export function ProjectUnitsTab({ projectId, showToast, readOnly = false }: Props) {
   const [units, setUnits]   = useState<ProjectUnit[]>([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<Partial<ProjectUnit> | null>(null)
@@ -77,14 +78,16 @@ export function ProjectUnitsTab({ projectId, showToast }: Props) {
     <div className="max-w-4xl space-y-5">
       <div className="flex items-center justify-between">
         <h3 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">Unit Types</h3>
-        <button type="button" onClick={() => setEditing({ ...EMPTY })}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
-          <Plus className="w-3.5 h-3.5" /> Add Unit
-        </button>
+        {!readOnly && (
+          <button type="button" onClick={() => setEditing({ ...EMPTY })}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
+            <Plus className="w-3.5 h-3.5" /> Add Unit
+          </button>
+        )}
       </div>
 
       {/* Form */}
-      {editing && (
+      {!readOnly && editing && (
         <div className="bg-white rounded-2xl border border-[#e5e5e5] p-5 space-y-4">
           <h4 className="text-sm font-bold text-[#374151]">{editing.id ? "Edit Unit" : "New Unit"}</h4>
           <div className="grid grid-cols-4 gap-3">
@@ -148,7 +151,7 @@ export function ProjectUnitsTab({ projectId, showToast }: Props) {
             {[1,2,3].map((i) => <div key={i} className="h-10 rounded-xl bg-[#f3f4f6] animate-pulse" />)}
           </div>
         ) : units.length === 0 ? (
-          <div className="py-12 text-center text-sm text-[#9ca3af]">No units yet. Add your first unit type.</div>
+          <div className="py-12 text-center text-sm text-[#9ca3af]">{readOnly ? "No units yet." : "No units yet. Add your first unit type."}</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -172,16 +175,18 @@ export function ProjectUnitsTab({ projectId, showToast }: Props) {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <button type="button" onClick={() => setEditing(u)}
-                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#f3f4f6] text-[#6b7280] transition-colors">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button type="button" onClick={() => void handleDelete(u.id)} disabled={delId === u.id}
-                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-rose-50 text-rose-400 transition-colors disabled:opacity-50">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    {!readOnly && (
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => setEditing(u)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#f3f4f6] text-[#6b7280] transition-colors">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button type="button" onClick={() => void handleDelete(u.id)} disabled={delId === u.id}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-rose-50 text-rose-400 transition-colors disabled:opacity-50">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
