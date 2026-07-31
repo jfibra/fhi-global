@@ -158,17 +158,21 @@ export default function BookView({ src, title }: Props) {
 
   // Measure the shell. Quantised to 20px so ordinary layout jitter doesn't
   // churn the size (which the library only reads when it is constructed).
+  //
+  // Depends on `doc`: until the document loads this component renders the
+  // "Opening…" state, wrapRef is null, and an attach-once effect would bail
+  // out and never run again — leaving the book stuck on its fallback size.
   useEffect(() => {
+    if (!doc) return
     const el = wrapRef.current
     if (!el) return
-    const ro = new ResizeObserver(([entry]) => {
-      const r = entry.contentRect
-      const q = (n: number) => Math.max(0, Math.floor(n / 20) * 20)
-      setBox({ w: q(r.width), h: q(r.height) })
-    })
+    const q = (n: number) => Math.max(0, Math.floor(n / 20) * 20)
+    const measure = () => setBox({ w: q(el.clientWidth), h: q(el.clientHeight) })
+    measure() // before the first observer tick, so the book starts right
+    const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [doc])
 
   if (error) {
     return (
@@ -196,40 +200,52 @@ export default function BookView({ src, title }: Props) {
   const spread = (box?.w ?? 0) >= SPREAD_MIN_WIDTH
 
   /**
-   * Widest a page may be. Stretch mode fits to the parent's WIDTH, so on a wide
-   * screen it happily makes pages taller than the shell and crops them top and
-   * bottom. Deriving the cap from the available HEIGHT is what keeps the whole
-   * page on screen; the width cap then stops a short, wide window from
-   * overflowing sideways. Falls back to a sane value before the first measure
-   * so the book is never blank.
+   * The largest page that fits the measured shell, in both directions.
+   *
+   * Start from the width each page may occupy (half of it in a spread) and
+   * derive the height from the page ratio; if that overflows, size from the
+   * height instead. These go straight to the library in "fixed" mode — its
+   * "stretch" mode computes its own size from the parent and honours neither
+   * the max bounds nor the parent's height, which came out cropped on a short
+   * window and tiny on a tall one.
    */
-  const maxPageWidth =
-    box && box.h > 0
-      ? Math.max(240, Math.min(Math.floor(box.h / ratio), Math.floor(spread ? box.w / 2 : box.w)))
-      : 640
+  const pagesAcross = spread ? 2 : 1
+  const availW = box?.w ?? 900
+  const availH = box?.h ?? 600
+  let pageW = availW / pagesAcross
+  let pageH = pageW * ratio
+  if (pageH > availH) {
+    pageH = availH
+    pageW = pageH / ratio
+  }
+  pageW = Math.max(160, Math.floor(pageW))
+  pageH = Math.max(200, Math.floor(pageH))
 
   return (
     <div className="flex h-full flex-col items-center gap-2 p-2">
-      {/* w-full matters: the library's "stretch" mode fills its parent, and in
-          a centred flex column the parent would otherwise shrink to nothing and
-          collapse the book to its minimum size. */}
-      <div ref={wrapRef} className="flex min-h-0 w-full flex-1 items-center justify-center">
+      {/* w-full so this measures the full shell width rather than shrinking to
+          its content, and overflow-hidden so a mis-sized book can never push
+          the pager out of view — the reader always keeps its controls. */}
+      <div ref={wrapRef} className="flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden">
         <HTMLFlipBook
           // The library reads its bounds at construction, so a genuine size
           // change has to remount it. Quantised measurements keep that rare.
-          key={`${spread ? "spread" : "single"}-${maxPageWidth}`}
+          key={`${spread ? "spread" : "single"}-${pageW}x${pageH}`}
           ref={flipRef}
           className="ebook-flip"
           style={{}}
-          // In stretch mode these set the page's aspect ratio and its bounds,
-          // not a literal size.
-          width={550}
-          height={Math.round(550 * ratio)}
-          size="stretch"
-          minWidth={240}
-          maxWidth={maxPageWidth}
-          minHeight={320}
-          maxHeight={Math.max(360, box?.h ?? 900)}
+          // "fixed" with an explicit page size, rather than "stretch": stretch
+          // derives its own size from the parent and ignored the bounds given
+          // to it, coming out either cropped or tiny depending on the window.
+          // These numbers are computed from the measured shell above, so the
+          // book is exactly as large as will fit.
+          width={pageW}
+          height={pageH}
+          size="fixed"
+          minWidth={100}
+          maxWidth={3000}
+          minHeight={100}
+          maxHeight={3000}
           maxShadowOpacity={0.4}
           showCover
           mobileScrollSupport
