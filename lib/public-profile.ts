@@ -6,7 +6,7 @@
  * phone number and card design, so this needs no schema change.
  *
  * Everything here is shared by the API route that writes the values and the two
- * places that read them (the Public Profile Maker and the page itself), so a
+ * places that read them (the Business Profile Maker and the page itself), so a
  * value can only ever be normalised and validated one way.
  */
 
@@ -239,9 +239,123 @@ export function parseCustomLinks(input: unknown): CustomLink[] {
   return out
 }
 
+/**
+ * The buttons whose destination the profile owns rather than the agent: the two
+ * featured collections, and the company site at the foot of the stack.
+ *
+ * Only the LABEL of each is stored, and only the label can be edited. Keeping
+ * the destinations out of `links` is what makes that guarantee structural —
+ * there is no field to change them with.
+ */
+export const DEFAULT_BUTTON_URL = "https://fhiglobal.ae"
+
+export const FIXED_BUTTONS = [
+  {
+    key: "featuredListings",
+    metaKey: "featured_listings_label",
+    fallback: "Check out my listings",
+    /** Shown in the editor in place of a url. */
+    destination: "Opens your featured listings",
+    /** Why it might not appear yet. */
+    requires: "Appears once you feature a listing below",
+  },
+  {
+    key: "featuredProjects",
+    metaKey: "featured_projects_label",
+    fallback: "Featured projects",
+    destination: "Opens your featured projects",
+    requires: "Appears once you feature a project below",
+  },
+  {
+    key: "default",
+    metaKey: "default_button_label",
+    fallback: "Visit our website",
+    destination: DEFAULT_BUTTON_URL,
+  },
+] as const
+
+export type FixedButtonKey = (typeof FIXED_BUTTONS)[number]["key"]
+
+/** Every fixed button's current wording, falling back to the stock one. */
+export function readFixedButtonLabels(metadata: unknown): Record<FixedButtonKey, string> {
+  const meta = (metadata as Record<string, unknown> | null) ?? {}
+  const out = {} as Record<FixedButtonKey, string>
+  for (const b of FIXED_BUTTONS) {
+    out[b.key] = normalizeLinkLabel(meta[b.metaKey]) || b.fallback
+  }
+  return out
+}
+
+/** Validate a submitted set. Unknown keys are dropped; a blank clears to stock. */
+export function parseFixedButtonLabels(input: unknown): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (!input || typeof input !== "object") return out
+  const src = input as Record<string, unknown>
+  for (const b of FIXED_BUTTONS) {
+    if (!(b.key in src)) continue
+    out[b.metaKey] = normalizeLinkLabel(src[b.key])
+  }
+  return out
+}
+
+export const DEFAULT_BUTTON_LABEL = FIXED_BUTTONS[2].fallback
+
 /** Read stored buttons back out of `profiles.metadata`. */
 export function readCustomLinks(metadata: unknown): CustomLink[] {
   const meta = (metadata as Record<string, unknown> | null) ?? {}
   // Re-validated on read: stored rows can predate a tightened rule.
   return parseCustomLinks(meta.links)
+}
+
+// ─── Featured projects ────────────────────────────────────────────────────────
+
+/**
+ * Projects an agent has pinned to their own profile.
+ *
+ * Kept in `profiles.metadata.featured_projects` as an ordered list of project
+ * ids, NOT in `projects.is_featured`: that column is a single site-wide flag an
+ * admin sets, so writing to it from a profile would change what every visitor
+ * sees. This is one person's selection, so it belongs to that person's row.
+ *
+ * Featured LISTINGS need no equivalent — a listing has exactly one owner, so
+ * `agent_listings.is_featured` is already per-profile.
+ */
+export const FEATURED_PROJECTS_MAX = 6
+
+/** Ordered, de-duplicated, capped. Anything that isn't a positive integer id goes. */
+export function parseFeaturedProjects(input: unknown): number[] {
+  if (!Array.isArray(input)) return []
+  const out: number[] = []
+  for (const raw of input) {
+    const n = typeof raw === "number" ? raw : Number(raw)
+    if (!Number.isInteger(n) || n <= 0) continue
+    if (out.includes(n)) continue
+    out.push(n)
+    if (out.length === FEATURED_PROJECTS_MAX) break
+  }
+  return out
+}
+
+/** Read the stored picks back out of `profiles.metadata`. */
+export function readFeaturedProjects(metadata: unknown): number[] {
+  const meta = (metadata as Record<string, unknown> | null) ?? {}
+  return parseFeaturedProjects(meta.featured_projects)
+}
+
+// ─── Featured items, as the public profile shows them ─────────────────────────
+
+/**
+ * One pinned listing or project, flattened to just what a card needs. Both kinds
+ * share a shape so the profile can render one grid instead of two.
+ */
+export type FeaturedItem = {
+  kind: "listing" | "project"
+  /** Public path — /listings/<slug> or /projects/<slug>. */
+  href: string
+  title: string
+  /** Location for a project, unit/kind for a listing. Blank hides the line. */
+  subtitle: string
+  /** Already-formatted, because the currency differs per row. */
+  price: string
+  image: string | null
 }

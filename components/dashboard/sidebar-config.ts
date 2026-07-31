@@ -117,7 +117,7 @@ const PROJECTS: NavEntry = { icon: FolderOpen, label: "Projects", to: "projects"
 const INVITE: NavEntry = { icon: QrCode, label: "Invite", to: "invite" }
 const REELS_MAKER: NavEntry = { icon: Clapperboard, label: "Reels Maker", to: "reels-maker" }
 const BUSINESS_CARD: NavEntry = { icon: CreditCard, label: "Business Card", to: "business-card" }
-const PUBLIC_PROFILE: NavEntry = { icon: Globe, label: "Public Profile Maker", to: "public-profile-maker" }
+const PUBLIC_PROFILE: NavEntry = { icon: Globe, label: "Business Profile Maker", to: "business-profile-maker" }
 const SALES_REPORTS: NavEntry = { icon: TrendingUp, label: "Sales Reports", to: "sales" }
 const SUPPORT_TICKETS: NavEntry = { icon: LifeBuoy, label: "Support Tickets", to: "support" }
 // Shared marketing artwork. Open to every role, so it appears in all lists and

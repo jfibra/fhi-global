@@ -2577,6 +2577,9 @@ function publishedDtoToListing(dto: PublishedListingDto): PickerListing {
     id: dto.id,
     agent_id: "",
     project_id: null,
+    // The public picker DTO carries no featured flag, and the picker doesn't
+    // surface one — false rather than a guess.
+    is_featured: false,
     title: dto.title,
     description: null,
     listing_kind: dto.listingKind,

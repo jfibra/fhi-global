@@ -94,7 +94,7 @@ export function ShareProfileLink({ profileId }: { profileId: string | null }) {
 
 
   return (
-    <div className="mt-6 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] p-6 sm:p-7 shadow-[0_8px_28px_-8px_rgba(0,31,63,0.45)]">
+    <div className="rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] p-6 sm:p-7 shadow-[0_8px_28px_-8px_rgba(0,31,63,0.45)]">
       <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
 
         {/* Link column */}

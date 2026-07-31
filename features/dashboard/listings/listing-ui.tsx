@@ -26,6 +26,7 @@ import {
   MoreHorizontal,
   RefreshCw,
   Search,
+  Star,
   X,
 } from "lucide-react"
 import { TOOLBAR_GRADIENT } from "@/components/common/header-toolbar"
@@ -335,6 +336,18 @@ export type MenuItem = {
 }
 
 /** Portal-positioned row menu — flips above the trigger near the viewport edge. */
+/**
+ * Shown on the cover whenever a listing is featured — the at-a-glance answer to
+ * "is this one featured?", without opening anything.
+ */
+export function FeaturedBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#d6b357] text-[#3b2c05] text-[10px] font-bold shadow-sm">
+      <Star className="w-3 h-3 fill-current" /> Featured
+    </span>
+  )
+}
+
 export function RowMenu({ items, label }: { items: MenuItem[]; label: string }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -481,8 +494,9 @@ export function ListingCard({ row, deleted, meta, footer }: ListingViewProps) {
             <span className="text-[11px] font-semibold">No photo yet</span>
           </div>
         )}
-        <span className="absolute top-2.5 left-2.5">
+        <span className="absolute top-2.5 left-2.5 flex flex-col items-start gap-1.5">
           <KindBadge kind={row.listing_kind} />
+          {row.is_featured && <FeaturedBadge />}
         </span>
         <span className="absolute top-2.5 right-2.5">
           <StatusBadge status={row.status} deleted={deleted} />
@@ -564,6 +578,7 @@ export function ListingRow({ row, deleted, meta, footer }: ListingViewProps) {
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="text-[13px] font-bold text-[#0d1117] truncate">{row.title}</h3>
           <KindBadge kind={row.listing_kind} />
+          {row.is_featured && <FeaturedBadge />}
         </div>
         <p className="flex items-center gap-1.5 text-[11px] text-[#6b7280] mt-0.5 min-w-0">
           <MapPin className="w-3 h-3 text-[#b6bcc6] flex-shrink-0" />

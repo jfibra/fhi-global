@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { parseBackdropLibrary, parseThemeChoice } from "@/lib/profile-themes"
 import {
-  normalizeTagline, parseCustomLinks, parseSocialLinks,
+  normalizeTagline, parseCustomLinks, parseFeaturedProjects,
+  parseFixedButtonLabels, parseSocialLinks,
   type CustomLink, type SocialLinks,
 } from "@/lib/public-profile"
 
@@ -22,6 +24,10 @@ export async function PATCH(req: Request) {
     socials?: unknown
     tagline?: unknown
     links?: unknown
+    featured_projects?: unknown
+    fixed_button_labels?: unknown
+    theme?: unknown
+    backdrops?: unknown
   }
   try {
     body = await req.json()
@@ -29,7 +35,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  const { phone, phone_country_code, phone_number, business_card_design, socials, tagline, links } = body
+  const { phone, phone_country_code, phone_number, business_card_design, socials, tagline, links, featured_projects, fixed_button_labels, theme, backdrops } = body
 
   // ── Validate ───────────────────────────────────────────────────────────────
   const BUSINESS_CARD_DESIGNS = ["classic", "platinum", "noir"]
@@ -63,10 +69,25 @@ export async function PATCH(req: Request) {
   const parsedLinks: CustomLink[] | undefined =
     links === undefined ? undefined : parseCustomLinks(links)
 
+  const parsedFeatured: number[] | undefined =
+    featured_projects === undefined ? undefined : parseFeaturedProjects(featured_projects)
+
+  // Labels only — every fixed button's destination is a constant, so there is
+  // no field here that could change one.
+  const fixedLabels: Record<string, string> | undefined =
+    fixed_button_labels === undefined ? undefined : parseFixedButtonLabels(fixed_button_labels)
+
+  // Validated to a known template id, or to custom with a checked base + hex,
+  // so a stored theme can never carry arbitrary css onto the public page.
+  const parsedTheme = theme === undefined ? undefined : parseThemeChoice(theme)
+  const parsedBackdrops =
+    backdrops === undefined ? undefined : parseBackdropLibrary(backdrops)
+
   if (
     !phone && !phone_number && !business_card_design &&
     parsedSocials === undefined && normalizedTagline === undefined &&
-    parsedLinks === undefined
+    parsedLinks === undefined && parsedFeatured === undefined && fixedLabels === undefined &&
+    parsedTheme === undefined && parsedBackdrops === undefined
   ) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 })
   }
@@ -92,6 +113,10 @@ export async function PATCH(req: Request) {
     ...(parsedSocials !== undefined ? { socials: parsedSocials } : {}),
     ...(normalizedTagline !== undefined ? { tagline: normalizedTagline } : {}),
     ...(parsedLinks !== undefined ? { links: parsedLinks } : {}),
+    ...(parsedFeatured !== undefined ? { featured_projects: parsedFeatured } : {}),
+    ...(fixedLabels ?? {}),
+    ...(parsedTheme !== undefined ? { theme: parsedTheme } : {}),
+    ...(parsedBackdrops !== undefined ? { backdrops: parsedBackdrops } : {}),
   }
 
   const { error: profileErr } = await adminClient

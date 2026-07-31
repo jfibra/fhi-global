@@ -34,6 +34,8 @@ export type AgentListing = {
   price: number | null
   currency: string
   status: AgentListingStatus
+  /** Migration 019. Agent-chosen highlight — the Featured page reads this. */
+  is_featured: boolean
   unit_type: string | null
   created_at: string
   updated_at: string
@@ -293,6 +295,27 @@ export async function setAgentListingStatus(
   const { error } = await supabase
     .from("agent_listings")
     .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", listingId)
+    .eq("agent_id", agentId)
+    .is("deleted_at", null)
+
+  return { error: error?.message ?? null }
+}
+
+/**
+ * Flip a listing's featured flag. Scoped by agent_id as well as id so this can
+ * only ever touch the caller's own row, matching `agent_listings_update_own`
+ * rather than relying on the policy alone.
+ */
+export async function setAgentListingFeatured(
+  listingId: string,
+  agentId: string,
+  isFeatured: boolean,
+): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from("agent_listings")
+    .update({ is_featured: isFeatured, updated_at: new Date().toISOString() })
     .eq("id", listingId)
     .eq("agent_id", agentId)
     .is("deleted_at", null)

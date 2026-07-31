@@ -26,6 +26,8 @@ export type ListingFacts = {
   slug?: string | null
   title: string
   status: "draft" | "published" | "archived"
+  /** Migration 019. Optional so the admin row type, which doesn't select it, still fits. */
+  is_featured?: boolean | null
   updated_at: string
   description: string | null
   listing_kind: "sale" | "rent"

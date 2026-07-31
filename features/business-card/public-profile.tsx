@@ -4,9 +4,13 @@ import Image from "next/image"
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { QRCodeCanvas } from "qrcode.react"
 import {
-  Building2, Download, Globe, KeyRound, Link2, Mail, Phone, X,
+  ArrowLeft, Building2, ClipboardList, Download, Globe, Link2, Mail, Phone, Star, X,
 } from "lucide-react"
-import { SOCIAL_PLATFORMS, type CustomLink, type SocialLinks } from "@/lib/public-profile"
+import { type ProfileTheme } from "@/lib/profile-themes"
+import {
+  DEFAULT_BUTTON_URL, SOCIAL_PLATFORMS,
+  type CustomLink, type FeaturedItem, type FixedButtonKey, type SocialLinks,
+} from "@/lib/public-profile"
 import { SOCIAL_ICONS } from "./social-icons"
 import { dialFromValue, stripLocal } from "./card-render"
 
@@ -21,29 +25,7 @@ import { dialFromValue, stripLocal } from "./card-render"
 
 const DISPLAY = "font-[family-name:var(--font-outfit)]"
 
-/** Dubai skyline already served for the public site's hero/about pages. */
-const BACKDROP =
-  "https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/2.png"
-
 const BRAND_WHITE = "/FHI_Branding_White.png"
-
-/**
- * The buttons every profile ends with, after whatever the agent added.
- *
- * Same-origin paths rather than absolute URLs: the profile is served from the
- * site itself, so these resolve to fhiglobal.ae in production and to localhost
- * in development, with no env var and no hardcoded host.
- */
-const DEFAULT_LINKS: Array<{
-  key: string
-  href: string
-  label: string
-  icon: React.ComponentType<{ className?: string }>
-}> = [
-  { key: "site", href: "/",     label: "Visit our website", icon: Globe },
-  { key: "buy",  href: "/buy",  label: "Browse properties", icon: Building2 },
-  { key: "rent", href: "/rent", label: "Rent a property",   icon: KeyRound },
-]
 
 /** QR is drawn at this size and scaled down by CSS — sharp on any screen. */
 const QR_EXPORT_PX = 560
@@ -60,7 +42,14 @@ export type PublicProfileData = {
   phoneNumber: string
   avatarUrl: string | null
   tagline: string
+  /** Pinned items, in the order the agent chose. Each gets its own full view. */
+  listings: FeaturedItem[]
+  projects: FeaturedItem[]
   links: CustomLink[]
+  /** Wording for the buttons whose destination the profile owns. */
+  buttonLabels: Record<FixedButtonKey, string>
+  /** Resolved look — see lib/profile-themes.ts. */
+  theme: ProfileTheme
   socials: SocialLinks
 }
 
@@ -90,44 +79,190 @@ function hostOf(url: string): string {
 
 function ActionPill({
   href,
+  onClick,
   icon: Icon,
   label,
   hint,
   delay,
+  t,
   external = false,
 }: {
-  href: string
+  /** A destination, or an onClick for the in-page reveals. Exactly one. */
+  href?: string
+  onClick?: () => void
   icon: React.ComponentType<{ className?: string }>
   label: string
   hint?: string
   delay: number
+  t: ProfileTheme
   /** Agent-supplied destination: opens in a new tab and passes no referrer or
    *  ranking signal, since we don't vouch for where it goes. */
   external?: boolean
 }) {
-  return (
-    <a
-      href={href}
-      className="animate-hero-item w-full flex items-center gap-3 px-3 py-3 rounded-full bg-white shadow-[0_6px_20px_-8px_rgba(0,0,0,0.45)] hover:-translate-y-0.5 hover:shadow-[0_10px_26px_-8px_rgba(0,0,0,0.5)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#d6b357]/60 transition-all duration-200"
-      style={{ animationDelay: `${delay}ms` }}
-      {...(external ? { target: "_blank", rel: "noopener noreferrer nofollow ugc" } : {})}
-    >
-      <span className="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center">
-        <Icon className="w-4 h-4 text-white" />
+  // Lucide sizes off the svg box, so the glyph scales with its tile.
+  const iconGlyph = Math.max(12, Math.round((t.tileSize || 20) * 0.45))
+
+  const cls =
+    "animate-hero-item w-full flex items-center gap-3 px-3 shadow-[0_6px_20px_-8px_rgba(0,0,0,0.45)] hover:-translate-y-0.5 hover:shadow-[0_10px_26px_-8px_rgba(0,0,0,0.5)] focus-visible:outline-none focus-visible:ring-4 transition-all duration-200"
+  const style = {
+    animationDelay: `${delay}ms`,
+    background: t.pillBg,
+    borderRadius: t.pillRadius,
+    border: t.pillBorder,
+    paddingTop: t.pillPadY,
+    paddingBottom: t.pillPadY,
+    // Tailwind can't express a runtime ring colour; the CSS variable it reads can.
+    ["--tw-ring-color" as string]: `${t.accent}99`,
+  } as React.CSSProperties
+
+  const inner = (
+    <>
+      {/* A tile of 0 is a deliberate choice, not an empty box — the glyph then
+          sits bare against the pill. */}
+      <span
+        className="shrink-0 flex items-center justify-center"
+        style={{
+          width: t.tileSize || 20,
+          height: t.tileSize || 20,
+          background: t.tileSize ? t.tile : "transparent",
+          border: t.tileSize ? t.tileBorder : "none",
+          borderRadius: t.tileRadius,
+          color: t.tileSize ? t.tileInk : t.pillInk,
+        }}
+      >
+        <span className="block" style={{ width: iconGlyph, height: iconGlyph }}>
+          <Icon className="w-full h-full" />
+        </span>
       </span>
       <span className="flex-1 text-center">
-        <span className={`${DISPLAY} block text-[15px] font-bold text-[#0d1117]`}>{label}</span>
-        {hint && <span className="block text-[11px] text-[#6b7280] mt-0.5 truncate">{hint}</span>}
+        <span
+          className={`${DISPLAY} block font-bold`}
+          style={{ color: t.pillInk, fontSize: t.pillFont }}
+        >
+          {label}
+        </span>
+        {hint && (
+          <span className="block text-[11px] mt-0.5 truncate" style={{ color: t.pillSubInk }}>
+            {hint}
+          </span>
+        )}
       </span>
       {/* Balances the icon tile so the label stays optically centred. */}
-      <span className="w-9 shrink-0" aria-hidden />
-    </a>
+      <span className="shrink-0" style={{ width: t.tileSize || 20 }} aria-hidden />
+    </>
+  )
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        className={cls}
+        style={style}
+        {...(external ? { target: "_blank", rel: "noopener noreferrer nofollow ugc" } : {})}
+      >
+        {inner}
+      </a>
+    )
+  }
+  return (
+    <button type="button" onClick={onClick} className={cls} style={style}>
+      {inner}
+    </button>
+  )
+}
+
+/**
+ * A pinned collection, filling the column in place of the profile.
+ *
+ * Deliberately a view swap rather than an expander: a handful of properties with
+ * covers, prices and their own back affordance is a page, and stacking it under
+ * the buttons buried the last one three screens down.
+ */
+function CollectionView({
+  title,
+  items,
+  onBack,
+  t,
+}: {
+  title: string
+  items: FeaturedItem[]
+  onBack: () => void
+  t: ProfileTheme
+}) {
+  return (
+    <div className="w-full">
+      <button
+        type="button"
+        onClick={onBack}
+        className="animate-hero-item inline-flex items-center gap-1.5 text-sm font-semibold hover:opacity-100 focus-visible:outline-none rounded-lg px-1 transition-opacity opacity-80"
+        style={{ animationDelay: "0ms", color: t.ink }}
+      >
+        <ArrowLeft className="w-4 h-4" /> Back to profile
+      </button>
+
+      <h2
+        className={`${DISPLAY} animate-hero-item mt-4 text-[22px] font-bold`}
+        style={{ animationDelay: "70ms", color: t.ink }}
+      >
+        {title}
+      </h2>
+      <p
+        className="animate-hero-item text-xs mt-0.5"
+        style={{ animationDelay: "70ms", color: t.inkMuted }}
+      >
+        {items.length} handpicked
+      </p>
+
+      <div className="mt-5 space-y-4">
+        {items.map((item, i) => (
+          <a
+            key={`${item.kind}-${i}`}
+            href={item.href}
+            className="animate-hero-item block overflow-hidden shadow-[0_8px_24px_-10px_rgba(0,0,0,0.55)] hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-10px_rgba(0,0,0,0.6)] focus-visible:outline-none transition-all duration-200"
+            style={{
+              animationDelay: `${140 + i * 70}ms`,
+              background: t.pillBg,
+              // Cards echo the button shape, but never fully round — a pill-shaped
+              // photo card reads as a mistake.
+              borderRadius: t.pillRadius === "9999px" ? "18px" : t.pillRadius,
+              border: t.pillBorder,
+            }}
+          >
+            <span className="relative block w-full bg-[#eef1f5]" style={{ aspectRatio: "16 / 10" }}>
+              {item.image ? (
+                // Agent and developer media live on several hosts; a plain <img>
+                // keeps this page off next/image's allowlist entirely.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={item.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              ) : (
+                <span className="absolute inset-0 flex items-center justify-center text-[#b8bfc9]">
+                  <Building2 className="w-7 h-7" />
+                </span>
+              )}
+            </span>
+            <span className="block p-3.5">
+              <span className={`${DISPLAY} block text-[15px] font-bold leading-snug`} style={{ color: t.pillInk }}>
+                {item.title}
+              </span>
+              {item.subtitle && (
+                <span className="block text-[12px] capitalize mt-0.5" style={{ color: t.pillSubInk }}>
+                  {item.subtitle}
+                </span>
+              )}
+              <span className="block text-[14px] font-bold tabular-nums mt-1.5" style={{ color: t.pillInk }}>
+                {item.price}
+              </span>
+            </span>
+          </a>
+        ))}
+      </div>
+    </div>
   )
 }
 
 /**
  * `embedded` renders the same page inside a fixed-height container (the phone
- * frame on the Public Profile Maker) instead of owning the viewport. The CSP
+ * frame on the Business Profile Maker) instead of owning the viewport. The CSP
  * sets `frame-src 'none'`, so an iframe preview isn't an option — and mounting
  * the real component is better anyway: it reflects unsaved edits instantly.
  */
@@ -145,8 +280,20 @@ export function PublicProfile({
   const waNumber = phoneE164.replace(/\D/g, "")
 
   const [qrOpen, setQrOpen] = useState(false)
+  /** Which collection has taken over the column, if any. */
+  const [view, setView] = useState<"profile" | "listings" | "projects">("profile")
+
+  const t = data.theme
 
   const selfUrl = useSelfUrl(data.id)
+
+  // Escape backs out of a collection view, matching the QR dialog.
+  useEffect(() => {
+    if (view === "profile") return
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setView("profile") }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [view])
 
   // Escape closes the enlarged QR. Bound only while it is open so the page has
   // no stray listener the rest of the time.
@@ -196,17 +343,36 @@ export function PublicProfile({
   const step = (slot: number) => slot * 70
   const HEADER_SLOTS = 5
 
-  // The agent's own buttons lead, then the three FHI defaults. Dialling and
-  // composing are left to the phone/email in the contact block and the WhatsApp
-  // icon, so no action row duplicates them.
+  // Featured collections first, then the agent's own buttons — every row here is
+  // theirs to set. Dialling and composing are left to the phone/email in the
+  // contact block and the WhatsApp icon, so no action row duplicates them.
   const actions: Array<{
     key: string
-    href: string
+    href?: string
+    onClick?: () => void
     icon: React.ComponentType<{ className?: string }>
     label: string
     hint?: string
     external?: boolean
   }> = [
+    ...(data.listings.length > 0
+      ? [{
+          key: "featured-listings",
+          onClick: () => setView("listings"),
+          icon: ClipboardList,
+          label: data.buttonLabels.featuredListings,
+          hint: `${data.listings.length} propert${data.listings.length === 1 ? "y" : "ies"}`,
+        }]
+      : []),
+    ...(data.projects.length > 0
+      ? [{
+          key: "featured-projects",
+          onClick: () => setView("projects"),
+          icon: Star,
+          label: data.buttonLabels.featuredProjects,
+          hint: `${data.projects.length} project${data.projects.length === 1 ? "" : "s"}`,
+        }]
+      : []),
     ...data.links.map((link, i) => ({
       key: `link-${i}`,
       href: link.url,
@@ -217,22 +383,29 @@ export function PublicProfile({
       hint: hostOf(link.url),
       external: true,
     })),
-    ...DEFAULT_LINKS,
+    {
+      key: "default",
+      href: DEFAULT_BUTTON_URL,
+      icon: Globe,
+      label: data.buttonLabels.default,
+    },
   ]
 
   return (
     <main className={`relative overflow-hidden ${embedded ? "min-h-full" : "min-h-screen"}`}>
-      {/* Backdrop */}
-      <Image
-        src={BACKDROP}
-        alt=""
-        fill
-        priority
-        // The embedded preview is a ~366px phone frame, not the viewport.
-        sizes={embedded ? "400px" : "100vw"}
-        className="object-cover object-center"
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#001f3f]/85 via-[#001f3f]/72 to-[#00152b]/97" />
+      {/* Backdrop — photo only when the theme has one; the scrim always paints. */}
+      {t.image && (
+        <Image
+          src={t.image}
+          alt=""
+          fill
+          priority
+          // The embedded preview is a ~366px phone frame, not the viewport.
+          sizes={embedded ? "400px" : "100vw"}
+          className="object-cover object-center"
+        />
+      )}
+      <div className="absolute inset-0" style={{ background: t.scrim }} />
 
       {/* Content column — sized for a phone, centred on anything wider. */}
       <div
@@ -241,152 +414,173 @@ export function PublicProfile({
         }`}
       >
 
-        {/* Avatar — same gold ring the printed card uses, so the page and the
-            card read as one identity. */}
-        <div className="animate-hero-item" style={{ animationDelay: `${step(0)}ms` }}>
-          <div className="relative w-[112px] h-[112px] rounded-full p-[3px] bg-[#d6b357] shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)]">
-            <div className="w-full h-full rounded-full overflow-hidden ring-2 ring-white/25 bg-[#0a3a66] flex items-center justify-center">
-              {data.avatarUrl ? (
-                // Proxied through our own origin; a plain <img> keeps this page
-                // independent of next/image's remote-pattern allowlist.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={data.avatarUrl}
-                  alt={data.fullname}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className={`${DISPLAY} text-3xl font-bold text-[#d6b357]`}>{data.initials}</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Name */}
-        <h1
-          className={`${DISPLAY} animate-hero-item mt-5 text-center text-[26px] leading-tight font-bold text-white`}
-          style={{ animationDelay: `${step(1)}ms` }}
-        >
-          {data.fullname}
-        </h1>
-
-        {/* Tagline — the person's own words, in their own line. */}
-        {data.tagline && (
-          <p
-            className="animate-hero-item mt-2.5 max-w-[21rem] text-center text-[15px] leading-snug text-white/80 text-balance"
-            style={{ animationDelay: `${step(2)}ms` }}
-          >
-            {data.tagline}
-          </p>
-        )}
-
-        {/* Actions */}
-        <div className="w-full mt-8 space-y-3">
-          {actions.map((a, i) => (
-            <ActionPill
-              key={a.key}
-              href={a.href}
-              icon={a.icon}
-              label={a.label}
-              hint={a.hint}
-              external={a.external}
-              delay={step(HEADER_SLOTS + i)}
-            />
-          ))}
-        </div>
-
-        {/* Contact card — QR, the details in the clear, and the brand mark, in one
-            block at the foot of the page. The QR sits on its own white tile
-            because a scanner needs the quiet zone and the full contrast; the
-            values are select-all rather than links so they can be copied by hand. */}
-        <div
-          className="animate-hero-item mt-9 w-full rounded-2xl bg-white/10 border border-white/20 backdrop-blur-sm p-4"
-          style={{ animationDelay: `${step(HEADER_SLOTS + actions.length)}ms` }}
-        >
-          <div className="flex items-center gap-4">
-            {/* QR — tap to enlarge, for scanning across a table. */}
-            <button
-              type="button"
-              onClick={() => setQrOpen(true)}
-              disabled={!selfUrl}
-              aria-label="Enlarge the QR code"
-              className="shrink-0 p-2 rounded-xl bg-white shadow-[0_6px_18px_-8px_rgba(0,0,0,0.6)] hover:scale-[1.04] active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#d6b357]/70 disabled:cursor-default disabled:hover:scale-100 transition-transform duration-200"
+        {view !== "profile" ? (
+          <CollectionView
+            title={view === "listings" ? data.buttonLabels.featuredListings : data.buttonLabels.featuredProjects}
+            items={view === "listings" ? data.listings : data.projects}
+            onBack={() => setView("profile")}
+            t={t}
+          />
+        ) : (
+          <>
+          {/* Avatar — same gold ring the printed card uses, so the page and the
+              card read as one identity. */}
+          <div className="animate-hero-item" style={{ animationDelay: `${step(0)}ms` }}>
+            <div
+              className="relative w-[112px] h-[112px] rounded-full p-[3px] shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)]"
+              style={{ background: t.accent }}
             >
-              {selfUrl ? (
-                <QRCodeCanvas
-                  value={selfUrl}
-                  // Drawn at export size and scaled down by CSS so it stays sharp
-                  // on high-density screens and survives a screenshot.
-                  size={QR_EXPORT_PX}
-                  level="M"
-                  marginSize={2}
-                  fgColor="#001f3f"
-                  bgColor="#ffffff"
-                  style={{ width: 96, height: 96 }}
-                />
-              ) : (
-                <div className="w-24 h-24 rounded-lg bg-[#eef1f5] animate-pulse" />
-              )}
-            </button>
-
-            {/* Details + brand */}
-            <div className="min-w-0 flex-1 flex flex-col gap-2">
-              {phoneDisplay && (
-                <p className="flex items-center gap-2 text-[15px] font-semibold text-white tabular-nums">
-                  <Phone className="w-3.5 h-3.5 text-[#d6b357] shrink-0" aria-hidden />
-                  <span className="select-all">{phoneDisplay}</span>
-                </p>
-              )}
-              {data.email && (
-                <p className="flex items-start gap-2 text-[13px] leading-snug text-white/75">
-                  <Mail className="w-3.5 h-3.5 mt-[3px] text-[#d6b357] shrink-0" aria-hidden />
-                  <span className="select-all break-all">{data.email}</span>
-                </p>
-              )}
-
-              {/* Only a separator when there is something above it to separate. */}
-              {(phoneDisplay || data.email) && <div className="h-px bg-white/15" />}
-
-              <a
-                href="https://fhiglobal.ae"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group inline-flex items-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#d6b357]/60 rounded"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={BRAND_WHITE}
-                  alt="FHI Global"
-                  className="h-5 w-auto opacity-90 group-hover:opacity-100 transition-opacity"
-                />
-                <span className="text-[11px] tracking-wider text-white/50 group-hover:text-white/80 transition-colors">
-                  www.fhiglobal.ae
-                </span>
-              </a>
+              <div className="w-full h-full rounded-full overflow-hidden ring-2 ring-white/25 bg-[#0a3a66] flex items-center justify-center">
+                {data.avatarUrl ? (
+                  // Proxied through our own origin; a plain <img> keeps this page
+                  // independent of next/image's remote-pattern allowlist.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={data.avatarUrl}
+                    alt={data.fullname}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className={`${DISPLAY} text-3xl font-bold`} style={{ color: t.accent }}>{data.initials}</span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Socials — only the ones this person actually filled in. */}
-        {socialEntries.length > 0 && (
-          <div
-            className="animate-hero-item mt-9 w-full flex flex-wrap items-center justify-center gap-3 sm:gap-4"
-            style={{ animationDelay: `${step(HEADER_SLOTS + actions.length + 1)}ms` }}
+          {/* Name */}
+          <h1
+            className={`${DISPLAY} animate-hero-item mt-5 text-center text-[26px] leading-tight font-bold`}
+            style={{ animationDelay: `${step(1)}ms`, color: t.ink }}
           >
-            {socialEntries.map(({ id, label, href, Icon }) => (
-              <a
-                key={id}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer me"
-                title={label}
-                aria-label={label}
-                className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-white/12 border border-white/20 text-white hover:bg-white hover:text-[#001f3f] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#d6b357]/60 transition-all duration-200"
-              >
-                <Icon className="w-[18px] h-[18px]" />
-              </a>
+            {data.fullname}
+          </h1>
+
+          {/* Tagline — the person's own words, in their own line. */}
+          {data.tagline && (
+            <p
+              className="animate-hero-item mt-2.5 max-w-[21rem] text-center text-[15px] leading-snug text-balance"
+              style={{ animationDelay: `${step(2)}ms`, color: t.ink, opacity: 0.85 }}
+            >
+              {data.tagline}
+            </p>
+          )}
+
+          {/* Actions */}
+          <div className="w-full mt-8 space-y-3">
+            {actions.map((a, i) => (
+              <ActionPill
+                key={a.key}
+                href={a.href}
+                onClick={a.onClick}
+                icon={a.icon}
+                label={a.label}
+                hint={a.hint}
+                external={a.external}
+                t={t}
+                delay={step(HEADER_SLOTS + i)}
+              />
             ))}
           </div>
+
+          {/* Contact card — QR, the details in the clear, and the brand mark, in one
+              block at the foot of the page. The QR sits on its own white tile
+              because a scanner needs the quiet zone and the full contrast; the
+              values are select-all rather than links so they can be copied by hand. */}
+          <div
+            className="animate-hero-item mt-9 w-full rounded-2xl border backdrop-blur-sm p-4"
+            style={{
+              animationDelay: `${step(HEADER_SLOTS + actions.length)}ms`,
+              background: t.panel,
+              borderColor: t.panelBorder,
+            }}
+          >
+            <div className="flex items-center gap-4">
+              {/* QR — tap to enlarge, for scanning across a table. */}
+              <button
+                type="button"
+                onClick={() => setQrOpen(true)}
+                disabled={!selfUrl}
+                aria-label="Enlarge the QR code"
+                className="shrink-0 p-2 rounded-xl bg-white shadow-[0_6px_18px_-8px_rgba(0,0,0,0.6)] hover:scale-[1.04] active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#d6b357]/70 disabled:cursor-default disabled:hover:scale-100 transition-transform duration-200"
+              >
+                {selfUrl ? (
+                  <QRCodeCanvas
+                    value={selfUrl}
+                    // Drawn at export size and scaled down by CSS so it stays sharp
+                    // on high-density screens and survives a screenshot.
+                    size={QR_EXPORT_PX}
+                    level="M"
+                    marginSize={2}
+                    fgColor="#001f3f"
+                    bgColor="#ffffff"
+                    style={{ width: 96, height: 96 }}
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-lg bg-[#eef1f5] animate-pulse" />
+                )}
+              </button>
+
+              {/* Details + brand */}
+              <div className="min-w-0 flex-1 flex flex-col gap-2">
+                {phoneDisplay && (
+                  <p className="flex items-center gap-2 text-[15px] font-semibold tabular-nums" style={{ color: t.ink }}>
+                    <Phone className="w-3.5 h-3.5 shrink-0" style={{ color: t.accent }} aria-hidden />
+                    <span className="select-all">{phoneDisplay}</span>
+                  </p>
+                )}
+                {data.email && (
+                  <p className="flex items-start gap-2 text-[13px] leading-snug" style={{ color: t.inkMuted }}>
+                    <Mail className="w-3.5 h-3.5 mt-[3px] shrink-0" style={{ color: t.accent }} aria-hidden />
+                    <span className="select-all break-all">{data.email}</span>
+                  </p>
+                )}
+
+                {/* Only a separator when there is something above it to separate. */}
+                {(phoneDisplay || data.email) && <div className="h-px" style={{ background: t.panelBorder }} />}
+
+                <a
+                  href="https://fhiglobal.ae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group inline-flex items-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#d6b357]/60 rounded"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={BRAND_WHITE}
+                    alt="FHI Global"
+                    className="h-5 w-auto opacity-90 group-hover:opacity-100 transition-opacity"
+                  />
+                  <span className="text-[11px] tracking-wider transition-colors" style={{ color: t.inkMuted }}>
+                    www.fhiglobal.ae
+                  </span>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Socials — only the ones this person actually filled in. */}
+          {socialEntries.length > 0 && (
+            <div
+              className="animate-hero-item mt-9 w-full flex flex-wrap items-center justify-center gap-3 sm:gap-4"
+              style={{ animationDelay: `${step(HEADER_SLOTS + actions.length + 1)}ms` }}
+            >
+              {socialEntries.map(({ id, label, href, Icon }) => (
+                <a
+                  key={id}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer me"
+                  title={label}
+                  aria-label={label}
+                  className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full border hover:-translate-y-0.5 focus-visible:outline-none transition-all duration-200"
+                  style={{ background: t.panel, borderColor: t.panelBorder, color: t.ink }}
+                >
+                  <Icon className="w-[18px] h-[18px]" />
+                </a>
+              ))}
+            </div>
+          )}
+          </>
         )}
 
       </div>

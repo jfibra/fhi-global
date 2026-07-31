@@ -265,6 +265,8 @@ export async function fetchProjects(params: {
   status?: string
   isActive?: boolean | null
   isPublished?: boolean | null
+  /** Featured-only, for the Featured page. */
+  isFeatured?: boolean
 }): Promise<{ data: Project[]; total: number; error: string | null }> {
   const supabase = createClient()
   const page = params.page ?? 1
@@ -287,6 +289,7 @@ export async function fetchProjects(params: {
   if (params.status) q = q.eq("status", params.status)
   if (params.isActive !== undefined && params.isActive !== null) q = q.eq("is_active", params.isActive)
   if (params.isPublished !== undefined && params.isPublished !== null) q = q.eq("is_published", params.isPublished)
+  if (params.isFeatured) q = q.eq("is_featured", true)
 
   const { data, count, error } = await q
   if (error) return { data: [], total: 0, error: error.message }

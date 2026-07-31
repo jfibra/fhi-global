@@ -2,8 +2,12 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { createPageMetadata } from "@/lib/seo"
+import { readThemeChoice, resolveTheme } from "@/lib/profile-themes"
 import { roleToLabel } from "@/lib/app-roles"
-import { readCustomLinks, readSocialLinks, readTagline } from "@/lib/public-profile"
+import {
+  readCustomLinks, readFeaturedProjects, readFixedButtonLabels, readSocialLinks,
+  readTagline, type FeaturedItem,
+} from "@/lib/public-profile"
 import { PublicProfile, type PublicProfileData } from "@/features/business-card/public-profile"
 
 /**
@@ -25,6 +29,85 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /** Developers are internal partner accounts — they have no public card to share. */
 const NO_PUBLIC_CARD = new Set(["developer"])
+
+function money(amount: number | string | null | undefined, currency: string | null): string {
+  const n = typeof amount === "string" ? Number(amount) : amount
+  if (n == null || !Number.isFinite(n)) return "Price on request"
+  return `${(currency || "AED").toUpperCase()} ${new Intl.NumberFormat("en-US").format(n)}`
+}
+
+/**
+ * The pinned listings and projects, resolved to public cards.
+ *
+ * Both reads are filtered to what a stranger may actually open — a listing must
+ * be published, a project published and not deleted — so unpinning is not the
+ * only thing that can take an item off the page. A stale id in the stored pick
+ * list simply resolves to nothing rather than a dead card.
+ */
+async function loadFeatured(
+  admin: ReturnType<typeof createAdminSupabase>,
+  agentId: string,
+  projectIds: number[],
+): Promise<{ listings: FeaturedItem[]; projects: FeaturedItem[] }> {
+  const [listingsRes, projectsRes] = await Promise.all([
+    admin
+      .from("agent_listings")
+      .select("id, slug, title, listing_kind, unit_type, price, currency, projects ( name, city, launch_price_from, currency, main_image ), agent_listing_images ( url, sort_order )")
+      .eq("agent_id", agentId)
+      .eq("is_featured", true)
+      .eq("status", "published")
+      .is("deleted_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(6),
+    projectIds.length
+      ? admin
+          .from("projects")
+          .select("id, name, slug, city, main_image, launch_price_from, currency")
+          .in("id", projectIds)
+          .eq("is_published", true)
+          .is("deleted_at", null)
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+  ])
+
+  const listings: FeaturedItem[] = ((listingsRes.data ?? []) as Record<string, unknown>[]).map((r) => {
+    const proj = r.projects as Record<string, unknown> | null
+    const images = (r.agent_listing_images ?? []) as { url: string; sort_order: number }[]
+    const cover =
+      [...images].sort((a, b) => a.sort_order - b.sort_order)[0]?.url ??
+      (typeof proj?.main_image === "string" ? proj.main_image : null)
+    return {
+      kind: "listing",
+      href: `/listings/${(r.slug as string) || (r.id as string)}`,
+      title: String(r.title ?? "Listing"),
+      subtitle: [r.unit_type, `For ${r.listing_kind}`].filter(Boolean).join(" · "),
+      // A project-linked listing inherits the developer's price.
+      price: money(
+        (r.price as number | null) ?? (proj?.launch_price_from as number | null) ?? null,
+        (r.currency as string | null) ?? (proj?.currency as string | null),
+      ),
+      image: cover,
+    }
+  })
+
+  // Kept in the agent's chosen order, which the stored list preserves.
+  const byId = new Map(
+    ((projectsRes.data ?? []) as Record<string, unknown>[]).map((p) => [Number(p.id), p]),
+  )
+  const projects: FeaturedItem[] = projectIds.flatMap((pid) => {
+    const p = byId.get(pid)
+    if (!p) return []
+    return [{
+      kind: "project" as const,
+      href: `/projects/${p.slug as string}`,
+      title: String(p.name ?? "Project"),
+      subtitle: typeof p.city === "string" ? p.city : "",
+      price: money(p.launch_price_from as number | null, p.currency as string | null),
+      image: typeof p.main_image === "string" ? p.main_image : null,
+    }]
+  })
+
+  return { listings, projects }
+}
 
 async function loadProfile(id: string): Promise<PublicProfileData | null> {
   if (!UUID_RE.test(id)) return null
@@ -79,7 +162,10 @@ async function loadProfile(id: string): Promise<PublicProfileData | null> {
     avatarUrl,
     tagline: readTagline(profile.metadata),
     links: readCustomLinks(profile.metadata),
+    buttonLabels: readFixedButtonLabels(profile.metadata),
+    theme: resolveTheme(readThemeChoice(profile.metadata)),
     socials: readSocialLinks(profile.metadata),
+    ...(await loadFeatured(admin, profile.id, readFeaturedProjects(profile.metadata))),
   }
 }
 

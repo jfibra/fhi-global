@@ -54,7 +54,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   const admin = createAdminSupabase()
   const { data: existing, error: fetchErr } = await admin
     .from("agent_listings")
-    .select("id, agent_id, project_id, title, description, listing_kind, status, unit_type, price, currency, deleted_at")
+    .select("id, agent_id, project_id, title, description, listing_kind, status, unit_type, price, currency, is_featured, deleted_at")
     .eq("id", id)
     .maybeSingle<ExistingListing>()
 

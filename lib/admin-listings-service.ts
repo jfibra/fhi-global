@@ -49,6 +49,8 @@ export type AdminListingRow = {
   price: number | null
   currency: string
   status: AdminListingStatus
+  /** Migration 019. */
+  is_featured: boolean
   unit_type: string | null
   created_at: string
   updated_at: string
