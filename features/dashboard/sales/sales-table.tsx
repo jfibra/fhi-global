@@ -77,8 +77,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // Sale-type selector cards — mirror the "Encode a Sale" 3-card page (icon + title
 // + description), reusing the same icons (Building2/Handshake/KeyRound).
 const SALE_TYPE_TABS: Array<{ type: SaleType; label: string; desc: string; icon: LucideIcon }> = [
-  { type: "project",   label: "Project Sale", desc: "Units sold within a developer's project.",      icon: Building2 },
-  { type: "brokerage", label: "Brokerage",    desc: "Resale / private-owner deals — no developer.",  icon: Handshake },
+  { type: "project",   label: "Project Sale / Off-Plan", desc: "Units sold within a developer's project.",      icon: Building2 },
+  { type: "brokerage", label: "Brokerage / Ready Unit",    desc: "Resale / private-owner deals — no developer.",  icon: Handshake },
   { type: "rental",    label: "Rental",       desc: "Rental transactions and lease contracts.",       icon: KeyRound },
 ]
 
