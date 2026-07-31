@@ -369,6 +369,10 @@ type ReelInputs = {
   headline: string
   /** The word the intro shouts in the accent colour, e.g. "HOMES?". */
   highlight: string
+  /** Closing line on the outro, e.g. "FIND YOUR NEXT". */
+  outroLine: string
+  /** Closing word in the accent colour, e.g. "HOME TODAY!". */
+  outroHighlight: string
   /** One caption per photo slide; a blank entry draws no caption. */
   slideTexts: string[]
 }
@@ -384,6 +388,20 @@ type ReelAssets = {
 /** Default opening line when the field is left blank. */
 const DEFAULT_HEADLINE = "LOOKING FOR"
 const defaultHighlight = (market: Market) => (market === "rent" ? "RENT?" : "HOMES?")
+
+/** Defaults for the closing call to action. */
+const DEFAULT_OUTRO_LINE = "FIND YOUR NEXT"
+const defaultOutroHighlight = (market: Market) => (market === "rent" ? "RENTAL TODAY!" : "HOME TODAY!")
+
+/** The outro's closing line. */
+function outroLineText(inputs: ReelInputs): string {
+  return (inputs.outroLine.trim() || DEFAULT_OUTRO_LINE).toUpperCase()
+}
+
+/** The outro's closing word, in the brand's accent colour. */
+function outroHighlightText(inputs: ReelInputs): string {
+  return (inputs.outroHighlight.trim() || defaultOutroHighlight(inputs.market)).toUpperCase()
+}
 
 /** The intro's opening line, upper-cased the way every design draws it. */
 function headlineText(inputs: ReelInputs): string {
@@ -677,8 +695,8 @@ function drawIntroFilipinoHomes(
     ctx.textAlign = "left"
     ctx.font = `800 31px ${F}`
     ctx.fillStyle = "#ffffff"
-    ctx.fillText("FIND YOUR NEXT", 156, fy + 64)
-    ctx.fillText(isRent ? "RENTAL TODAY!" : "HOME TODAY!", 156, fy + 102)
+    ctx.fillText(outroLineText(inputs), 156, fy + 64)
+    ctx.fillText(outroHighlightText(inputs), 156, fy + 102)
     // Website on the right.
     ctx.beginPath()
     ctx.arc(608, fy + 74, 34, 0, Math.PI * 2)
@@ -922,11 +940,14 @@ function drawOutro(
     ctx.save()
     ctx.globalAlpha = Math.min(1, ce * 1.4)
     ctx.textAlign = "center"
-    ctx.font = `900 96px ${F}`
+    const l1 = outroLineText(inputs)
+    const l2 = outroHighlightText(inputs)
+    ctx.font = `900 ${fitFont(ctx, l1, 900, 96, F, W - 140)}px ${F}`
     ctx.fillStyle = "#ffffff"
-    ctx.fillText("FIND YOUR NEXT", W / 2, 850 + (1 - ce) * 50)
+    ctx.fillText(l1, W / 2, 850 + (1 - ce) * 50)
+    ctx.font = `900 ${fitFont(ctx, l2, 900, 96, F, W - 140)}px ${F}`
     ctx.fillStyle = brand.accent
-    ctx.fillText(isRent ? "RENTAL TODAY!" : "HOME TODAY!", W / 2, 970 + (1 - ce) * 50)
+    ctx.fillText(l2, W / 2, 970 + (1 - ce) * 50)
     ctx.restore()
   }
 
@@ -1275,8 +1296,8 @@ function drawIntroFhPartners(
     ctx.fillStyle = brand.accent
     ctx.fillRect(0, fy, W, 6)
     // Two-tone CTA rendered as one centered line.
-    const part1 = "FIND YOUR NEXT "
-    const part2 = isRent ? "RENTAL TODAY!" : "HOME TODAY!"
+    const part1 = `${outroLineText(inputs)} `
+    const part2 = outroHighlightText(inputs)
     const ctaSize = fitFont(ctx, part1 + part2, 900, 54, F, 960)
     ctx.font = `900 ${ctaSize}px ${F}`
     ctx.textAlign = "left"
@@ -1632,9 +1653,9 @@ function drawIntroFhiGlobal(
     ctx.textBaseline = "alphabetic"
     ctx.font = `800 31px ${F}`
     ctx.fillStyle = "#ffffff"
-    ctx.fillText("FIND YOUR NEXT", 168, fy + 82)
+    ctx.fillText(outroLineText(inputs), 168, fy + 82)
     ctx.fillStyle = brand.accent
-    ctx.fillText(isRent ? "RENTAL TODAY!" : "HOME TODAY!", 168, fy + 122)
+    ctx.fillText(outroHighlightText(inputs), 168, fy + 122)
     // Site, right: globe + VISIT US NOW + big gold site.
     ctx.fillStyle = "rgba(214,179,87,0.14)"
     ctx.beginPath()
@@ -1942,8 +1963,8 @@ function drawIntroRentsouq(
     miniIcon(ctx, "search", 108, fy + 84, 16, brand.accent)
     ctx.textAlign = "left"
     ctx.textBaseline = "alphabetic"
-    const l1 = "FIND YOUR NEXT"
-    const l2 = isRent ? "RENTAL TODAY!" : "HOME TODAY!"
+    const l1 = outroLineText(inputs)
+    const l2 = outroHighlightText(inputs)
     const pSize = Math.min(
       fitFont(ctx, l1, 800, 30, F, 372),
       fitFont(ctx, l2, 800, 30, F, 372),
@@ -2130,6 +2151,8 @@ export function ReelsMakerClient({
   const [phone, setPhone] = useState("")
   const [headline, setHeadline] = useState("")
   const [highlight, setHighlight] = useState("")
+  const [outroLine, setOutroLine] = useState("")
+  const [outroHighlight, setOutroHighlight] = useState("")
   /**
    * Slide captions keyed by photo id, not by position — reordering or deleting
    * a photo would otherwise leave every later caption on the wrong slide.
@@ -2170,9 +2193,14 @@ export function ReelsMakerClient({
       phone,
       headline,
       highlight,
+      outroLine,
+      outroHighlight,
       slideTexts: photos.map((p) => captions[p.id] ?? ""),
     }),
-    [market, title, location, price, agentName, phone, headline, highlight, photos, captions],
+    [
+      market, title, location, price, agentName, phone,
+      headline, highlight, outroLine, outroHighlight, photos, captions,
+    ],
   )
   const assets: ReelAssets = useMemo(
     // Gate on avatarUrl rather than clearing the state in an effect, so an
@@ -2650,41 +2678,76 @@ export function ReelsMakerClient({
               </div>
             </div>
 
-            {/* Opening headline */}
-            <div className="bg-white rounded-2xl border border-[#e8eaed] p-5 space-y-4">
+            {/* Headlines — first slide and last slide */}
+            <div className="bg-white rounded-2xl border border-[#e8eaed] p-5 space-y-5">
               <div>
-                <p className={`${labelCls} mb-0`}>Opening headline</p>
+                <p className={`${labelCls} mb-0`}>Headlines</p>
                 <p className="text-xs text-[#9ca3af] mt-1">
-                  The first slide. Leave blank to use the default for the selected market.
+                  Leave any field blank to use the default for the selected market.
                 </p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>Headline</label>
-                  <input
-                    className={inputCls}
-                    value={headline}
-                    onChange={(e) => setHeadline(e.target.value)}
-                    placeholder={DEFAULT_HEADLINE}
-                    maxLength={28}
-                  />
+
+              <div className="space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#9ca3af]">Opening slide</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>Headline</label>
+                    <input
+                      className={inputCls}
+                      value={headline}
+                      onChange={(e) => setHeadline(e.target.value)}
+                      placeholder={DEFAULT_HEADLINE}
+                      maxLength={28}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Highlighted word</label>
+                    <input
+                      className={inputCls}
+                      value={highlight}
+                      onChange={(e) => setHighlight(e.target.value)}
+                      placeholder={defaultHighlight(market)}
+                      maxLength={18}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className={labelCls}>Highlighted word</label>
-                  <input
-                    className={inputCls}
-                    value={highlight}
-                    onChange={(e) => setHighlight(e.target.value)}
-                    placeholder={defaultHighlight(market)}
-                    maxLength={18}
-                  />
-                </div>
+                <p className="text-xs text-[#6b7280]">
+                  Preview:{" "}
+                  <span className="font-bold text-[#111827]">{headlineText(inputs)}</span>{" "}
+                  <span className="font-bold" style={{ color: brand.accent }}>{highlightText(inputs)}</span>
+                </p>
               </div>
-              <p className="text-xs text-[#6b7280]">
-                Preview:{" "}
-                <span className="font-bold text-[#111827]">{headlineText(inputs)}</span>{" "}
-                <span className="font-bold" style={{ color: brand.accent }}>{highlightText(inputs)}</span>
-              </p>
+
+              <div className="space-y-3 border-t border-[#f0f2f5] pt-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#9ca3af]">Closing slide</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>Closing line</label>
+                    <input
+                      className={inputCls}
+                      value={outroLine}
+                      onChange={(e) => setOutroLine(e.target.value)}
+                      placeholder={DEFAULT_OUTRO_LINE}
+                      maxLength={28}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Highlighted word</label>
+                    <input
+                      className={inputCls}
+                      value={outroHighlight}
+                      onChange={(e) => setOutroHighlight(e.target.value)}
+                      placeholder={defaultOutroHighlight(market)}
+                      maxLength={22}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-[#6b7280]">
+                  Preview:{" "}
+                  <span className="font-bold text-[#111827]">{outroLineText(inputs)}</span>{" "}
+                  <span className="font-bold" style={{ color: brand.accent }}>{outroHighlightText(inputs)}</span>
+                </p>
+              </div>
             </div>
 
             {/* Listing details */}
