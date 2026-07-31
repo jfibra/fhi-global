@@ -328,11 +328,10 @@ export function InviteClient({
         <div>
           <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] flex items-center gap-2">
             <QrCode className="w-6 h-6 text-[#001f3f]" />
-            Invite
+            Invite 
           </h1>
           <p className="text-sm text-[#6b7280] mt-1">
-            Your personal QR code. Anyone who scans it lands on the registration page, and their
-            account is credited to you.
+            This QR code is for sharing. Let others scan to connect with you and explore opportunities to join your growing real estate team
           </p>
         </div>
 
