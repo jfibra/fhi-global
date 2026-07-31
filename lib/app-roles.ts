@@ -240,6 +240,14 @@ export const ROLES_SUPPORT_INTERNAL_ASSIGNEES: readonly AppRoleId[] = ["admin", 
 /** Who may use the support UI / upload ticket files (all known roles). */
 export const ROLES_SUPPORT_PORTAL: readonly AppRoleId[] = [...APP_ROLE_ORDER]
 
+/**
+ * Internal shared resources — Materials and Ebooks. Everyone except
+ * `developer`: those are external partner accounts, and this is our own
+ * marketing artwork and training library. Derived rather than listed so a
+ * future role is included by default and only developers stay out.
+ */
+export const ROLES_INTERNAL_RESOURCES: readonly AppRoleId[] = APP_ROLE_ORDER.filter((r) => r !== "developer")
+
 /** Developer media/logo upload route (also allows content editors). */
 export const ROLES_ADMIN_OR_DEVELOPER: readonly AppRoleId[] = ["super_admin", "admin", "developer", "editor"]
 

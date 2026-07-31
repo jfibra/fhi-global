@@ -212,8 +212,9 @@ const DEVELOPER_NAV: RoleNavEntry[] = [
   { icon: Briefcase, label: "Company Info",  to: "company"  },
   { icon: Layers,    label: "My Projects",   to: "projects" },
   { icon: Images,    label: "Media / Files", to: "media"    },
-  MATERIALS,
-  EBOOKS,
+  // No MATERIALS / EBOOKS here: those are internal-only (see
+  // ROLES_INTERNAL_RESOURCES in app-roles.ts), and developers are external
+  // partner accounts.
   SUPPORT_TICKETS,
 ]
 
