@@ -75,7 +75,7 @@ export function MaterialsGallery({ materials }: { materials: Material[] }) {
         {materials.map((m, i) => (
           <figure
             key={m.file}
-            className="group overflow-hidden rounded-2xl border border-black/[0.08] bg-white transition-shadow hover:shadow-[0_10px_32px_-14px_rgba(0,31,63,0.4)]"
+            className="group overflow-hidden rounded-lg border border-black/[0.08] bg-white transition-shadow hover:shadow-[0_10px_32px_-14px_rgba(0,31,63,0.4)]"
           >
             {/* Fixed square box: the tile reserves its space before the image
                 arrives, so loading never shifts the grid. `contain` rather than
@@ -85,7 +85,7 @@ export function MaterialsGallery({ materials }: { materials: Material[] }) {
               type="button"
               onClick={() => setOpenIndex(i)}
               aria-label={`View ${m.title}`}
-              className="relative block aspect-square w-full overflow-hidden bg-[#eef1f5] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#001f3f]/20"
+              className="relative block aspect-square w-full overflow-hidden rounded-t-lg bg-[#eef1f5] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#001f3f]/20"
             >
               <Image
                 src={m.src}
@@ -101,21 +101,14 @@ export function MaterialsGallery({ materials }: { materials: Material[] }) {
               </span>
             </button>
 
-            <figcaption className="flex items-center gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-[#0d1117]" title={m.title}>
-                  {m.title}
-                </p>
-                <p className="text-[11px] text-[#9ca3af]">
-                  {m.width && m.height ? `${m.width} × ${m.height} · ` : ""}
-                  {formatBytes(m.bytes)}
-                </p>
-              </div>
+            {/* No caption — the artwork speaks for itself, and dropping the
+                title keeps every card exactly the same height. */}
+            <figcaption className="px-3 py-3">
               <a
                 href={m.src}
                 download={m.file}
                 aria-label={`Download ${m.title}`}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#001f3f] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#002b57]"
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#001f3f] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#002b57]"
               >
                 <Download className="h-3.5 w-3.5" />
                 Download
