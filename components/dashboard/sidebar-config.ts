@@ -4,7 +4,7 @@ import {
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, QrCode, ScrollText, Inbox, CalendarDays,
-  Wallet, MessagesSquare, FileText, UploadCloud, Globe,
+  Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -120,6 +120,9 @@ const BUSINESS_CARD: NavEntry = { icon: CreditCard, label: "Business Card", to: 
 const PUBLIC_PROFILE: NavEntry = { icon: Globe, label: "Public Profile Maker", to: "public-profile-maker" }
 const SALES_REPORTS: NavEntry = { icon: TrendingUp, label: "Sales Reports", to: "sales" }
 const SUPPORT_TICKETS: NavEntry = { icon: LifeBuoy, label: "Support Tickets", to: "support" }
+// Shared marketing artwork. Open to every role, so it appears in all lists and
+// is deliberately absent from SUB_PATH_ROLES in lib/auth.ts (unlisted = shared).
+const MATERIALS: NavEntry = { icon: FolderDown, label: "Materials", to: "materials" }
 
 // ─── Per-role lists ───────────────────────────────────────────────────────────
 
@@ -180,6 +183,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { ...SUPPORT_TICKETS,                                        description: "Tickets raised by agents and clients." },
     ],
   },
+  MATERIALS,
   { icon: ScrollText, label: "Activity Logs", to: "system-logs" },
   // Dev-only test bench for the upload-compression pipeline
   // (lib/upload/compress-image.ts) — not a real business feature, just a way
@@ -195,6 +199,7 @@ const EDITOR_NAV: RoleNavEntry[] = [
   { icon: Building2, label: "Developers", to: "developers" },
   PROJECTS,
   EVENTS,
+  MATERIALS,
 ]
 
 /** External developer partners — their own company and projects only. */
@@ -203,6 +208,7 @@ const DEVELOPER_NAV: RoleNavEntry[] = [
   { icon: Briefcase, label: "Company Info",  to: "company"  },
   { icon: Layers,    label: "My Projects",   to: "projects" },
   { icon: Images,    label: "Media / Files", to: "media"    },
+  MATERIALS,
   SUPPORT_TICKETS,
 ]
 
@@ -228,6 +234,7 @@ const salesPipelineNav = ({ projects = false, events = false, teamSales = false 
   SUPPORT_TICKETS,
   BUSINESS_CARD,
   PUBLIC_PROFILE,
+  MATERIALS,
 ]
 
 /** secretary + team_secretary — paperwork support, no listings of their own. */
@@ -237,6 +244,7 @@ const SECRETARY_NAV: RoleNavEntry[] = [
   SUPPORT_TICKETS,
   BUSINESS_CARD,
   PUBLIC_PROFILE,
+  MATERIALS,
 ]
 
 /** Signed-up public users: browse, plus the self-serve tools. */
@@ -250,6 +258,7 @@ const MEMBER_NAV: RoleNavEntry[] = [
   REELS_MAKER,
   // Read-only projects browser, same as agents (ROLES_PROJECT_STUDIO_VIEWERS).
   PROJECTS,
+  MATERIALS,
   // No "Profile" entry — the account card's dropdown already links to
   // {base}/profile as "Profile Settings" (see SidebarAccount in shell.tsx).
   SUPPORT_TICKETS,
