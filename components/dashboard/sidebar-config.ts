@@ -4,7 +4,7 @@ import {
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, QrCode, ScrollText, Inbox, CalendarDays,
-  Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown,
+  Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -123,6 +123,8 @@ const SUPPORT_TICKETS: NavEntry = { icon: LifeBuoy, label: "Support Tickets", to
 // Shared marketing artwork. Open to every role, so it appears in all lists and
 // is deliberately absent from SUB_PATH_ROLES in lib/auth.ts (unlisted = shared).
 const MATERIALS: NavEntry = { icon: FolderDown, label: "Materials", to: "materials" }
+// Training PDFs, also open to every role — likewise absent from SUB_PATH_ROLES.
+const EBOOKS: NavEntry = { icon: Library, label: "Ebooks", to: "ebooks" }
 
 // ─── Per-role lists ───────────────────────────────────────────────────────────
 
@@ -184,6 +186,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
     ],
   },
   MATERIALS,
+  EBOOKS,
   { icon: ScrollText, label: "Activity Logs", to: "system-logs" },
   // Dev-only test bench for the upload-compression pipeline
   // (lib/upload/compress-image.ts) — not a real business feature, just a way
@@ -200,6 +203,7 @@ const EDITOR_NAV: RoleNavEntry[] = [
   PROJECTS,
   EVENTS,
   MATERIALS,
+  EBOOKS,
 ]
 
 /** External developer partners — their own company and projects only. */
@@ -209,6 +213,7 @@ const DEVELOPER_NAV: RoleNavEntry[] = [
   { icon: Layers,    label: "My Projects",   to: "projects" },
   { icon: Images,    label: "Media / Files", to: "media"    },
   MATERIALS,
+  EBOOKS,
   SUPPORT_TICKETS,
 ]
 
@@ -235,6 +240,7 @@ const salesPipelineNav = ({ projects = false, events = false, teamSales = false 
   BUSINESS_CARD,
   PUBLIC_PROFILE,
   MATERIALS,
+  EBOOKS,
 ]
 
 /** secretary + team_secretary — paperwork support, no listings of their own. */
@@ -245,6 +251,7 @@ const SECRETARY_NAV: RoleNavEntry[] = [
   BUSINESS_CARD,
   PUBLIC_PROFILE,
   MATERIALS,
+  EBOOKS,
 ]
 
 /** Signed-up public users: browse, plus the self-serve tools. */
@@ -259,6 +266,7 @@ const MEMBER_NAV: RoleNavEntry[] = [
   // Read-only projects browser, same as agents (ROLES_PROJECT_STUDIO_VIEWERS).
   PROJECTS,
   MATERIALS,
+  EBOOKS,
   // No "Profile" entry — the account card's dropdown already links to
   // {base}/profile as "Profile Settings" (see SidebarAccount in shell.tsx).
   SUPPORT_TICKETS,

@@ -24,6 +24,8 @@ const FLAGCDN        = "flagcdn.com"
 // Google Maps JavaScript API (buy page map)
 const MAPS_API       = "maps.googleapis.com"
 const MAPS_GSTATIC   = "maps.gstatic.com"
+// Ebook PDFs, framed by the dashboard reader (keep in sync with EBOOK_FRAME_HOSTS in lib/ebooks.ts)
+const EBOOK_PDF_HOST = "https://leuteriorealty.com"
 
 // ── Content-Security-Policy ──────────────────────────────────────────────────
 // next/font/google self-hosts fonts at build-time → no fonts.googleapis.com needed.
@@ -57,8 +59,10 @@ const CSP = [
   // No plugins / Flash / PDFs embedded via <object>/<embed>
   `object-src 'none'`,
 
-  // No third-party iframes (Google sign-in uses a full-page redirect, not a frame)
-  `frame-src 'none'`,
+  // Only the ebook host may be framed — the dashboard reader embeds those PDFs
+  // in the browser's native viewer (see lib/ebooks.ts). Google sign-in uses a
+  // full-page redirect, not a frame, so nothing else needs framing.
+  `frame-src ${EBOOK_PDF_HOST}`,
   // Prevent this app from being embedded in iframes elsewhere
   `frame-ancestors 'none'`,
 
@@ -171,6 +175,13 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: FLAGCDN,
+      },
+      // Ebook cover art, stored beside each PDF (see lib/ebooks.ts). Served
+      // through our own optimizer, so those 1 MB PNGs reach the shelf as
+      // thumbnail-sized AVIF/WebP.
+      {
+        protocol: "https",
+        hostname: "leuteriorealty.com",
       },
       // Google account avatars (Google Sign-In users' profile photos)
       {
