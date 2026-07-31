@@ -11,6 +11,7 @@ import {
   listingAgentPhone,
 } from "@/lib/buy/agent-listings-public"
 import { roleToLabel } from "@/lib/app-roles"
+import { createAdminSupabase } from "@/lib/admin-supabase"
 import { pickUnit } from "@/lib/buy/listings-page-logic"
 import { mergedListingGalleryUrls } from "@/lib/listing-gallery-urls"
 import { ListingPhotoMosaic } from "@/components/public/listing-photo-mosaic"
@@ -25,6 +26,26 @@ type Props = { params: Promise<{ id: string }> }
 const TEL = "+971567428288"
 const EMAIL = "info@fhiglobal.ae"
 const WA = "971567428288"
+
+/**
+ * The agent's email, for the enquiry button.
+ *
+ * Addresses live in auth.users, which the public anon client can't read, so
+ * this is a single service-role lookup — the same one the public business-card
+ * page makes. It runs server-side during ISR, so the key never reaches the
+ * browser and the page stays cacheable. Failure just falls back to the shared
+ * inbox rather than breaking the page.
+ */
+async function fetchAgentEmail(agentId: string | undefined): Promise<string> {
+  if (!agentId) return ""
+  try {
+    const admin = createAdminSupabase()
+    const { data } = await admin.auth.admin.getUserById(agentId)
+    return data?.user?.email?.trim() ?? ""
+  } catch {
+    return ""
+  }
+}
 
 function WhatsAppGlyph({ className }: { className?: string }) {
   return (
@@ -123,6 +144,7 @@ export default async function PublicAgentListingPage({ params }: Props) {
   const agentPhone = listingAgentPhone(agent)
   const contactTel = agentPhone || TEL
   const contactWa = (agentPhone || WA).replace(/^\+/, "")
+  const contactEmail = (await fetchAgentEmail(agent?.id)) || EMAIL
 
   return (
     <div className="min-h-screen bg-[#faf8f4] font-sans">
@@ -329,7 +351,7 @@ export default async function PublicAgentListingPage({ params }: Props) {
                 Call
               </a>
               <a
-                href={`mailto:${EMAIL}?subject=Inquiry:%20${encodeURIComponent(row.title)}`}
+                href={`mailto:${contactEmail}?subject=Inquiry:%20${encodeURIComponent(row.title)}`}
                 className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl border border-[#d1d5db] text-[#0f2940] text-sm font-bold hover:border-[#001f3f] transition-colors"
               >
                 <Mail className="w-4 h-4" />
