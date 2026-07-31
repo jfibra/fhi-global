@@ -22,9 +22,22 @@ import { fetchMyAgentListings, type AgentListing } from "@/lib/agent-listings-se
 
 const W = 1080
 const H = 1920
-const INTRO_S = 5.5
+// The intro and outro carry the headline and the contact details, so they hold
+// longer than a photo — long enough to actually read them.
+const INTRO_S = 7.5
 const PHOTO_S = 3.5
-const OUTRO_S = 5
+const OUTRO_S = 7
+
+/**
+ * How long the reveals on those two slides take to play out.
+ *
+ * Every draw function animates against t01, its progress through the slide, so
+ * simply lengthening a slide would stretch the motion and make it sluggish.
+ * Progress is capped against these instead: the animation runs at its original
+ * pace, then the finished frame holds for the remainder.
+ */
+const INTRO_ANIM_S = 5.5
+const OUTRO_ANIM_S = 5
 
 // ─── Brands ────────────────────────────────────────────────────────────────────
 
@@ -64,34 +77,6 @@ const BRANDS: Brand[] = [
     paper: "#f7f6f2",
     tagline: "YOUR TRUSTED PARTNER IN REAL ESTATE",
     defaultMarket: "sale",
-  },
-  {
-    key: "homesph",
-    name: "Homes PH",
-    logoSrc: "/logos/homesph-logo.png",
-    logoIsWhite: false,
-    jingleSrc: "/reelssounds/homes-ph-jingle.mp3",
-    site: "www.homes.ph",
-    primary: "#2b35aa",
-    accent: "#f5a623",
-    third: "#2b35aa",
-    paper: "#f6f7fb",
-    tagline: "REAL HOMES. REAL POSSIBILITIES.",
-    defaultMarket: "sale",
-  },
-  {
-    key: "rentph",
-    name: "Rent PH",
-    logoSrc: "/logos/RentPh new colored logo.png",
-    logoIsWhite: false,
-    jingleSrc: "/reelssounds/rent-ph-jingle.mp3",
-    site: "www.rent.ph",
-    primary: "#2f6fe4",
-    accent: "#f7941d",
-    third: "#12203c",
-    paper: "#f4f7fd",
-    tagline: "RENT SMART. LIVE BETTER.",
-    defaultMarket: "rent",
   },
   {
     key: "fhipartners",
@@ -175,6 +160,43 @@ function fitFont(
   const w = ctx.measureText(text).width
   if (w > maxWidth) size = Math.max(18, baseSize * (maxWidth / w))
   return size
+}
+
+/**
+ * Break free text into at most `maxLines` lines that fit `maxWidth`, so a
+ * typed caption wraps instead of shrinking to nothing. The last line is
+ * ellipsised if the text runs past the limit.
+ */
+function wrapLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  weight: number,
+  size: number,
+  family: string,
+  maxWidth: number,
+  maxLines: number,
+): string[] {
+  ctx.font = `${weight} ${size}px ${family}`
+  const words = text.split(/\s+/).filter(Boolean)
+  const lines: string[] = []
+  let line = ""
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word
+    if (ctx.measureText(next).width <= maxWidth || !line) {
+      line = next
+      continue
+    }
+    lines.push(line)
+    line = word
+    if (lines.length === maxLines) break
+  }
+  if (lines.length < maxLines && line) lines.push(line)
+  if (lines.length === maxLines && words.length) {
+    // Anything that didn't fit gets an ellipsis on the final line.
+    const used = lines.join(" ").split(/\s+/).length
+    if (used < words.length) lines[maxLines - 1] = `${lines[maxLines - 1]}…`
+  }
+  return lines
 }
 
 /** Draw an image so it covers the rect (like CSS object-fit: cover). */
@@ -343,12 +365,45 @@ type ReelInputs = {
   price: string
   agentName: string
   phone: string
+  /** Opening line, e.g. "LOOKING FOR". Blank falls back to the default. */
+  headline: string
+  /** The word the intro shouts in the accent colour, e.g. "HOMES?". */
+  highlight: string
+  /** One caption per photo slide; a blank entry draws no caption. */
+  slideTexts: string[]
 }
 
 type ReelAssets = {
   logo: HTMLImageElement | null
   photos: HTMLImageElement[]
   font: string
+  /** Agent's profile photo, shown on the outro. Null if they have none. */
+  avatar: HTMLImageElement | null
+}
+
+/** Default opening line when the field is left blank. */
+const DEFAULT_HEADLINE = "LOOKING FOR"
+const defaultHighlight = (market: Market) => (market === "rent" ? "RENT?" : "HOMES?")
+
+/** The intro's opening line, upper-cased the way every design draws it. */
+function headlineText(inputs: ReelInputs): string {
+  return (inputs.headline.trim() || DEFAULT_HEADLINE).toUpperCase()
+}
+
+/** The shouted word, in the brand's accent colour. */
+function highlightText(inputs: ReelInputs): string {
+  return (inputs.highlight.trim() || defaultHighlight(inputs.market)).toUpperCase()
+}
+
+/**
+ * Split the opening line for the designs that stack it on two rows: everything
+ * up to the last word, then the last word ("LOOKING" / "FOR"). A single-word
+ * headline puts everything on the first row and leaves the second blank.
+ */
+function headlineRows(inputs: ReelInputs): [string, string] {
+  const words = headlineText(inputs).split(/\s+/).filter(Boolean)
+  if (words.length <= 1) return [words[0] ?? "", ""]
+  return [words.slice(0, -1).join(" "), words[words.length - 1]]
 }
 
 const FEATURES_SALE = [
@@ -446,29 +501,35 @@ function drawIntroFilipinoHomes(
   drawLogo(ctx, assets.logo, brand, 66, 70, 400, 130, true)
   ctx.restore()
 
-  // ── Headline: LOOKING / FOR / HOMES? (or RENT?). ──
+  // ── Headline: two stacked rows, then the highlight word. ──
+  const [row1, row2] = headlineRows(inputs)
   const words: Array<{ text: string; color: string; y: number; size: number; delay: number }> = [
-    { text: "LOOKING", color: brand.primary, y: 470, size: 128, delay: 0.14 },
-    { text: "FOR", color: brand.primary, y: 610, size: 128, delay: 0.22 },
+    { text: row1, color: brand.primary, y: 470, size: 128, delay: 0.14 },
+    { text: row2, color: brand.primary, y: 610, size: 128, delay: 0.22 },
     {
-      text: isRent ? "RENT?" : "HOMES?",
+      text: highlightText(inputs),
       color: brand.accent,
       y: 775,
       size: 150,
       delay: 0.3,
     },
-  ]
+  ].filter((w) => w.text)
   for (const wd of words) {
     const we = easeOutCubic((t01 - wd.delay) / 0.24)
     if (we <= 0) continue
+    const size = fitFont(ctx, wd.text, 900, wd.size, F, 470)
     ctx.save()
-    ctx.globalAlpha = Math.min(1, we * 1.4)
+    // Each word wipes up into its own band instead of only fading — the line
+    // lands like a title card rather than appearing all at once.
+    ctx.beginPath()
+    ctx.rect(0, wd.y - size - 10, W, size + 28)
+    ctx.clip()
+    ctx.globalAlpha = Math.min(1, we * 1.6)
     ctx.textAlign = "left"
     ctx.textBaseline = "alphabetic"
-    const size = fitFont(ctx, wd.text, 900, wd.size, F, 470)
     ctx.font = `900 ${size}px ${F}`
     ctx.fillStyle = wd.color
-    ctx.fillText(wd.text, 66 - (1 - we) * 60, wd.y)
+    ctx.fillText(wd.text, 66 - (1 - we) * 44, wd.y + (1 - we) * size * 0.8)
     ctx.restore()
   }
   // Small two-tone divider under the headline.
@@ -703,6 +764,57 @@ function drawPhoto(
   }
   ctx.restore()
 
+  // Per-slide caption. Big display type that reveals line by line from behind
+  // a mask, under a growing accent rule — the plain fade this replaced read as
+  // a flat label rather than part of the edit. Empty caption = clean photo.
+  const caption = (inputs.slideTexts[photoIdx] ?? "").trim()
+  if (caption) {
+    const CAP_SIZE = 104
+    const lines = wrapLines(ctx, caption, 900, CAP_SIZE, F, W - 180, 3)
+    const lineH = CAP_SIZE * 1.14
+    const blockBottom = H - 640
+    const firstY = blockBottom - (lines.length - 1) * lineH
+
+    // Accent rule that draws itself in above the text.
+    const re = easeOutCubic((t01 - 0.08) / 0.3)
+    if (re > 0) {
+      ctx.save()
+      ctx.globalAlpha = Math.min(1, re)
+      ctx.fillStyle = brand.accent
+      const rw = 128 * re
+      rr(ctx, W / 2 - rw / 2, firstY - CAP_SIZE - 64, rw, 12, 6)
+      ctx.fill()
+      ctx.restore()
+    }
+
+    lines.forEach((line, i) => {
+      const delay = 0.14 + i * 0.09
+      const e = easeOutCubic((t01 - delay) / 0.36)
+      if (e <= 0) return
+      const size = fitFont(ctx, line, 900, CAP_SIZE, F, W - 180)
+      const y = firstY + i * lineH
+
+      ctx.save()
+      // Clip to the line's own band so the text rises into view rather than
+      // just fading — the reveal reads as motion, not opacity.
+      ctx.beginPath()
+      ctx.rect(0, y - size - 14, W, size + 34)
+      ctx.clip()
+      ctx.globalAlpha = Math.min(1, e * 1.5)
+      ctx.textAlign = "center"
+      ctx.textBaseline = "alphabetic"
+      ctx.font = `900 ${size}px ${F}`
+      // Shadow instead of a pill: keeps it legible on any photo without
+      // boxing the type in.
+      ctx.shadowColor = "rgba(4,8,16,0.75)"
+      ctx.shadowBlur = 28
+      ctx.shadowOffsetY = 8
+      ctx.fillStyle = "#ffffff"
+      ctx.fillText(line, W / 2, y + (1 - e) * (size * 0.95))
+      ctx.restore()
+    })
+  }
+
   // Listing text block.
   const te = easeOutCubic((t01 - 0.14) / 0.26)
   if (te > 0) {
@@ -831,18 +943,44 @@ function drawOutro(
     ctx.lineWidth = 2
     rr(ctx, 90, cy0, W - 180, 330, 36)
     ctx.stroke()
+
+    // Agent's photo, straddling the top edge of the card in a brand ring.
+    // Sits in the gap below the CTA; the card's text shifts down to clear it.
+    const shift = assets.avatar ? 30 : 0
+    if (assets.avatar) {
+      const r = 80
+      const acx = W / 2
+      const acy = cy0 - 40
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(acx, acy, r, 0, Math.PI * 2)
+      ctx.closePath()
+      ctx.clip()
+      const img = assets.avatar
+      const scale = Math.max((r * 2) / img.width, (r * 2) / img.height)
+      const dw = img.width * scale
+      const dh = img.height * scale
+      ctx.drawImage(img, acx - dw / 2, acy - dh / 2, dw, dh)
+      ctx.restore()
+      ctx.beginPath()
+      ctx.arc(acx, acy, r, 0, Math.PI * 2)
+      ctx.strokeStyle = brand.accent
+      ctx.lineWidth = 8
+      ctx.stroke()
+    }
+
     ctx.textAlign = "center"
     if (inputs.agentName.trim()) {
       const nSize = fitFont(ctx, inputs.agentName.trim(), 800, 58, F, W - 300)
       ctx.font = `800 ${nSize}px ${F}`
       ctx.fillStyle = "#ffffff"
-      ctx.fillText(inputs.agentName.trim(), W / 2, cy0 + 108)
+      ctx.fillText(inputs.agentName.trim(), W / 2, cy0 + 108 + shift)
       ctx.font = `600 30px ${F}`
       ctx.fillStyle = "rgba(255,255,255,0.65)"
-      ctx.fillText(isRent ? "YOUR RENTAL SPECIALIST" : "YOUR REAL ESTATE PARTNER", W / 2, cy0 + 160)
+      ctx.fillText(isRent ? "YOUR RENTAL SPECIALIST" : "YOUR REAL ESTATE PARTNER", W / 2, cy0 + 160 + shift)
     }
     if (inputs.phone.trim()) {
-      const py = cy0 + 250
+      const py = cy0 + 250 + shift
       const pSize = fitFont(ctx, inputs.phone.trim(), 900, 66, F, W - 420)
       ctx.font = `900 ${pSize}px ${F}`
       const pw = ctx.measureText(inputs.phone.trim()).width
@@ -881,652 +1019,6 @@ function drawOutro(
   }
 }
 
-/** Intro — Homes PH poster: angular hero on blue corner wedges, amber dots, blue "REAL HOMES." panel. */
-function drawIntroHomesPh(
-  ctx: CanvasRenderingContext2D,
-  t01: number,
-  brand: Brand,
-  inputs: ReelInputs,
-  assets: ReelAssets,
-) {
-  const F = assets.font
-  const isRent = inputs.market === "rent"
-
-  // Paper background with a soft top-to-bottom tint.
-  const g = ctx.createLinearGradient(0, 0, 0, H)
-  g.addColorStop(0, "#ffffff")
-  g.addColorStop(1, brand.paper)
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, W, H)
-
-  // ── Hero shape geometry (rounded pentagon on the right, poster-style). ──
-  const hx0 = 585 // left edge — everything left of this (minus rim) is text-safe
-  const hx1 = 1036
-  const hyTL = 545 // left-top corner y
-  const hyTR = 285 // right-top corner y (diagonal top edge)
-  const hyB = 1120 // where the sides start curving to the bottom apex
-  const hay = 1330 // bottom apex y
-  const hax = (hx0 + hx1) / 2
-  const heroPath = () => {
-    ctx.beginPath()
-    ctx.moveTo(hx0, hyTL + 46)
-    ctx.quadraticCurveTo(hx0, hyTL, hx0 + 52, hyTL - 30) // rounded left-top corner
-    ctx.lineTo(hx1 - 56, hyTR + 33) // diagonal top edge
-    ctx.quadraticCurveTo(hx1, hyTR, hx1, hyTR + 52) // rounded top-right corner
-    ctx.lineTo(hx1, hyB)
-    ctx.quadraticCurveTo(hx1, hay, hax, hay) // rounded bottom apex
-    ctx.quadraticCurveTo(hx0, hay, hx0, hyB)
-    ctx.closePath()
-  }
-  const dotGrid = (x0: number, y0: number, cols: number, rows: number) => {
-    ctx.fillStyle = brand.accent
-    for (let r = 0; r < rows; r++)
-      for (let c = 0; c < cols; c++) {
-        ctx.beginPath()
-        ctx.arc(x0 + c * 26, y0 + r * 26, 5, 0, Math.PI * 2)
-        ctx.fill()
-      }
-  }
-
-  // ── Blue corner wedges + amber dot grids (poster backdrop). ──
-  const we0 = easeOutCubic(t01 / 0.18)
-  if (we0 > 0) {
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, we0 * 1.2)
-    ctx.fillStyle = brand.primary
-    ctx.beginPath() // top-right wedge
-    ctx.moveTo(598, 0)
-    ctx.lineTo(W, 0)
-    ctx.lineTo(W, 642)
-    ctx.closePath()
-    ctx.fill()
-    ctx.beginPath() // bottom-right wedge (sits behind panel-side photo cards)
-    ctx.moveTo(W, 1012)
-    ctx.lineTo(W, 1706)
-    ctx.lineTo(510, 1706)
-    ctx.closePath()
-    ctx.fill()
-    dotGrid(886, 84, 4, 4) // amber dots on the top-right wedge
-    dotGrid(52, 1702, 5, 3) // amber dots near the bottom-left
-    ctx.restore()
-  }
-
-  // ── Hero photo in the angular shape, sliding in from the right. ──
-  const he = easeOutCubic((t01 - 0.04) / 0.26)
-  if (he > 0) {
-    ctx.save()
-    ctx.translate((1 - he) * 260, 0)
-    ctx.globalAlpha = Math.min(1, he * 1.2)
-    ctx.shadowColor = "rgba(15,23,42,0.3)"
-    ctx.shadowBlur = 30
-    ctx.fillStyle = "#ffffff"
-    heroPath()
-    ctx.fill()
-    ctx.shadowBlur = 0
-    heroPath()
-    ctx.save()
-    ctx.clip()
-    const hero = assets.photos[0]
-    if (hero) {
-      coverImg(ctx, hero, hx0 - 4, 272, hx1 - hx0 + 8, hay - 268, 1 + 0.05 * t01)
-    } else {
-      const pg = ctx.createLinearGradient(hx0, 272, hx1, hay)
-      pg.addColorStop(0, brand.primary)
-      pg.addColorStop(1, brand.accent)
-      ctx.fillStyle = pg
-      ctx.fillRect(hx0 - 4, 268, hx1 - hx0 + 8, hay - 264)
-    }
-    ctx.restore()
-    ctx.strokeStyle = "#ffffff"
-    ctx.lineWidth = 14
-    heroPath()
-    ctx.stroke()
-    ctx.restore()
-  }
-
-  // ── Logo, top-left, drawn large on the light page. ──
-  ctx.save()
-  ctx.globalAlpha = Math.min(1, t01 / 0.16)
-  drawLogo(ctx, assets.logo, brand, 66, 74, 430, 150, true)
-  ctx.restore()
-
-  // ── Headline: LOOKING / FOR in blue, HOMES?/RENT? in amber. ──
-  const lookSize = fitFont(ctx, "LOOKING", 900, 118, F, 495)
-  const bigWord = isRent ? "RENT?" : "HOMES?"
-  const bigSize = fitFont(ctx, bigWord, 900, 142, F, 495)
-  const words: Array<{ text: string; color: string; y: number; size: number; delay: number }> = [
-    { text: "LOOKING", color: brand.primary, y: 430, size: lookSize, delay: 0.14 },
-    { text: "FOR", color: brand.primary, y: 560, size: lookSize, delay: 0.21 },
-    { text: bigWord, color: brand.accent, y: 724, size: bigSize, delay: 0.28 },
-  ]
-  for (const wd of words) {
-    const we = easeOutCubic((t01 - wd.delay) / 0.22)
-    if (we <= 0) continue
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, we * 1.4)
-    ctx.textAlign = "left"
-    ctx.textBaseline = "alphabetic"
-    ctx.font = `900 ${wd.size}px ${F}`
-    ctx.fillStyle = wd.color
-    ctx.fillText(wd.text, 66 - (1 - we) * 60, wd.y)
-    ctx.restore()
-  }
-  // Two-tone divider under the headline.
-  const de = easeOutCubic((t01 - 0.36) / 0.18)
-  if (de > 0) {
-    ctx.fillStyle = brand.primary
-    ctx.fillRect(70, 758, 64 * de, 10)
-    ctx.fillStyle = brand.accent
-    ctx.fillRect(70 + 64 * de, 758, 64 * de, 10)
-  }
-
-  // ── Subtitle (two big lines, poster copy). ──
-  const se = easeOutCubic((t01 - 0.4) / 0.2)
-  if (se > 0) {
-    const sub1 = isRent ? "Find your next home." : "Find the right place."
-    const sub2 = "Live the life you deserve."
-    const sSize = Math.min(
-      fitFont(ctx, sub1, 600, 42, F, 495),
-      fitFont(ctx, sub2, 600, 42, F, 495),
-    )
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, se * 1.4)
-    ctx.textAlign = "left"
-    ctx.textBaseline = "alphabetic"
-    ctx.font = `600 ${sSize}px ${F}`
-    ctx.fillStyle = brand.primary
-    const sy = (1 - se) * 24
-    ctx.fillText(sub1, 66, 832 + sy)
-    ctx.fillText(sub2, 66, 888 + sy)
-    ctx.restore()
-  }
-
-  // ── Feature rows with alternating blue/amber icon circles. ──
-  const splitBody = (body: string): [string, string] => {
-    const parts = body.split(" ")
-    const mid = Math.ceil(parts.length / 2)
-    return [parts.slice(0, mid).join(" "), parts.slice(mid).join(" ")]
-  }
-  const feats = isRent ? FEATURES_RENT : FEATURES_SALE
-  const featColors = [brand.primary, brand.accent, brand.primary]
-  feats.forEach((f, i) => {
-    const fe = easeOutCubic((t01 - 0.48 - i * 0.06) / 0.2)
-    if (fe <= 0) return
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, fe * 1.4)
-    const fy = 985 + i * 150 + (1 - fe) * 30
-    ctx.fillStyle = featColors[i % featColors.length]
-    ctx.beginPath()
-    ctx.arc(118, fy, 48, 0, Math.PI * 2)
-    ctx.fill()
-    miniIcon(ctx, f.icon, 118, fy, 22, "#ffffff")
-    ctx.textAlign = "left"
-    ctx.textBaseline = "alphabetic"
-    const tSize = fitFont(ctx, f.title, 800, 40, F, 352) // 352 keeps text clear of the hero edge
-    ctx.font = `800 ${tSize}px ${F}`
-    ctx.fillStyle = brand.primary
-    ctx.fillText(f.title, 208, fy - 12)
-    const [b1, b2] = splitBody(f.body)
-    const bSize = Math.min(
-      fitFont(ctx, b1, 500, 29, F, 352),
-      fitFont(ctx, b2, 500, 29, F, 352),
-    )
-    ctx.font = `500 ${bSize}px ${F}`
-    ctx.fillStyle = "#4b5563"
-    ctx.fillText(b1, 208, fy + 28)
-    ctx.fillText(b2, 208, fy + 62)
-    if (i < feats.length - 1) {
-      ctx.strokeStyle = "rgba(100,110,125,0.25)"
-      ctx.lineWidth = 2
-      ctx.beginPath()
-      ctx.moveTo(208, fy + 92)
-      ctx.lineTo(560, fy + 92)
-      ctx.stroke()
-    }
-    ctx.restore()
-  })
-
-  // ── Signature blue panel: REAL HOMES. REAL POSSIBILITIES. + categories. ──
-  const pe = easeOutCubic((t01 - 0.58) / 0.22)
-  if (pe > 0) {
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, pe * 1.3)
-    const py = 1395 + (1 - pe) * 40
-    ctx.shadowColor = "rgba(15,23,42,0.22)"
-    ctx.shadowBlur = 24
-    ctx.fillStyle = brand.primary
-    rr(ctx, 44, py, 670, 295, 34)
-    ctx.fill()
-    ctx.shadowBlur = 0
-    ctx.textAlign = "left"
-    ctx.textBaseline = "alphabetic"
-    ctx.font = `900 46px ${F}`
-    ctx.fillStyle = "#ffffff"
-    ctx.fillText("REAL HOMES.", 84, py + 70)
-    const pSize = fitFont(ctx, "REAL POSSIBILITIES.", 900, 46, F, 586)
-    ctx.font = `900 ${pSize}px ${F}`
-    const prefix = "REAL "
-    ctx.fillText(prefix, 84, py + 128)
-    ctx.fillStyle = brand.accent
-    ctx.fillText("POSSIBILITIES.", 84 + ctx.measureText(prefix).width, py + 128)
-    ctx.fillRect(84, py + 146, 150, 7) // small amber underline
-    // 4 white icon+label categories in a 2×2 grid (labels stay >= 26px).
-    const catLabels = ["APARTMENTS", "HOUSES", "CONDOS", "LOTS & SPACES"]
-    ctx.textBaseline = "middle"
-    CATEGORIES.forEach((c, i) => {
-      const col = i % 2
-      const row = Math.floor(i / 2)
-      const bx = 84 + col * 290
-      const bcy = py + 200 + row * 58
-      ctx.fillStyle = "rgba(255,255,255,0.18)"
-      ctx.beginPath()
-      ctx.arc(bx + 24, bcy, 24, 0, Math.PI * 2)
-      ctx.fill()
-      miniIcon(ctx, c.icon, bx + 24, bcy, 13, "#ffffff")
-      const lSize = fitFont(ctx, catLabels[i], 800, 27, F, col === 0 ? 200 : 246)
-      ctx.font = `800 ${lSize}px ${F}`
-      ctx.fillStyle = "#ffffff"
-      ctx.fillText(catLabels[i], bx + 62, bcy)
-    })
-    ctx.textBaseline = "alphabetic"
-    ctx.restore()
-  }
-
-  // ── Up to 2 white-rimmed photo cards to the panel's right. ──
-  const extras = [assets.photos[1], assets.photos[2]].filter(
-    (p): p is HTMLImageElement => Boolean(p),
-  )
-  const cardH = extras.length === 1 ? 293 : 139
-  extras.forEach((photo, idx) => {
-    const ce = easeOutCubic((t01 - 0.61 - idx * 0.05) / 0.18)
-    if (ce <= 0) return
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, ce * 1.4)
-    const cx = 736 + (1 - ce) * 70
-    const cy0 = 1395 + idx * (cardH + 15)
-    ctx.shadowColor = "rgba(15,23,42,0.3)"
-    ctx.shadowBlur = 18
-    ctx.fillStyle = "#ffffff"
-    rr(ctx, cx, cy0, 300, cardH, 24)
-    ctx.fill()
-    ctx.shadowBlur = 0
-    ctx.save()
-    rr(ctx, cx + 9, cy0 + 9, 282, cardH - 18, 16)
-    ctx.clip()
-    coverImg(ctx, photo, cx + 9, cy0 + 9, 282, cardH - 18, 1.02 + 0.04 * t01)
-    ctx.restore()
-    ctx.restore()
-  })
-
-  // ── Footer: amber CTA pill + website on the light page. ──
-  const fe2 = easeOutCubic((t01 - 0.66) / 0.19)
-  if (fe2 > 0) {
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, fe2 * 1.3)
-    const fy = 1770 + (1 - fe2) * 46
-    ctx.shadowColor = "rgba(15,23,42,0.18)"
-    ctx.shadowBlur = 16
-    ctx.fillStyle = brand.accent
-    rr(ctx, 44, fy, 560, 100, 50)
-    ctx.fill()
-    ctx.shadowBlur = 0
-    ctx.fillStyle = "#ffffff"
-    ctx.beginPath()
-    ctx.arc(108, fy + 50, 36, 0, Math.PI * 2)
-    ctx.fill()
-    miniIcon(ctx, "search", 108, fy + 50, 17, brand.accent)
-    ctx.textAlign = "left"
-    ctx.textBaseline = "alphabetic"
-    ctx.font = `800 31px ${F}`
-    ctx.fillStyle = "#ffffff"
-    ctx.fillText("FIND YOUR NEXT", 160, fy + 42)
-    ctx.fillText(isRent ? "RENTAL TODAY!" : "HOME TODAY!", 160, fy + 82)
-    // Website, right side, big blue on the light page.
-    ctx.fillStyle = brand.primary
-    ctx.beginPath()
-    ctx.arc(672, fy + 50, 34, 0, Math.PI * 2)
-    ctx.fill()
-    miniIcon(ctx, "globe", 672, fy + 50, 16, "#ffffff")
-    ctx.font = `700 26px ${F}`
-    ctx.fillStyle = "#5b6472"
-    ctx.fillText("VISIT US NOW", 724, fy + 34)
-    const siteSize = fitFont(ctx, brand.site, 900, 46, F, W - 724 - 36)
-    ctx.font = `900 ${siteSize}px ${F}`
-    ctx.fillStyle = brand.primary
-    ctx.fillText(brand.site, 724, fy + 88)
-    ctx.restore()
-  }
-}
-
-/** Intro (Rent PH) — animated recreation of the rent.ph poster: centered logo,
- *  tall organic photo blob upper-right with blue quarter-round + orange swoosh,
- *  "LOOKING FOR RENT?" left column, squircle feature rows, tilted polaroids over
- *  a blue bottom-right wave, orange CTA and site row bottom-left. */
-function drawIntroRentPh(
-  ctx: CanvasRenderingContext2D,
-  t01: number,
-  brand: Brand,
-  inputs: ReelInputs,
-  assets: ReelAssets,
-) {
-  const F = assets.font
-  const isRent = inputs.market === "rent"
-  const ink = brand.third // #12203c
-  const hero = assets.photos[0]
-
-  // ── Paper background (white → paper tint, like the poster's airy page). ──
-  const g = ctx.createLinearGradient(0, 0, 0, H)
-  g.addColorStop(0, "#ffffff")
-  g.addColorStop(1, brand.paper)
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, W, H)
-
-  // ── Blue wave panel filling the bottom-right corner (behind polaroids). ──
-  const pe = easeOutCubic((t01 - 0.04) / 0.22)
-  if (pe > 0) {
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, pe * 1.3)
-    ctx.translate(0, (1 - pe) * 160)
-    ctx.fillStyle = brand.primary
-    ctx.beginPath()
-    ctx.moveTo(0, H)
-    ctx.lineTo(0, H - 44)
-    ctx.quadraticCurveTo(300, H - 60, 520, H - 110)
-    ctx.quadraticCurveTo(690, H - 150, 720, 1380)
-    ctx.quadraticCurveTo(750, 1080, W, 930)
-    ctx.lineTo(W, H)
-    ctx.closePath()
-    ctx.fill()
-    ctx.restore()
-  }
-
-  // ── Hero photo in a tall organic blob, upper right (asymmetric radii). ──
-  const he = easeOutCubic((t01 - 0.08) / 0.26)
-  if (he > 0) {
-    const bx = 560
-    const by = 310
-    const bw = 470
-    const bh = 880
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, he * 1.25)
-    ctx.translate((1 - he) * 260, 0)
-    // Blue diagonal band tucked behind the blob's top-right corner.
-    ctx.save()
-    ctx.translate(1035, 345)
-    ctx.rotate(-0.6)
-    ctx.fillStyle = brand.primary
-    rr(ctx, -46, -150, 92, 300, 46)
-    ctx.fill()
-    ctx.restore()
-    // Big blue quarter-round behind the blob's rounded bottom-left.
-    ctx.fillStyle = brand.primary
-    ctx.beginPath()
-    ctx.arc(760, 1210, 170, 0, Math.PI * 2)
-    ctx.fill()
-    // Orange swoosh arc sweeping under the photo.
-    ctx.strokeStyle = brand.accent
-    ctx.lineWidth = 48
-    ctx.lineCap = "round"
-    ctx.beginPath()
-    ctx.arc(900, 1150, 310, Math.PI * 0.55, Math.PI)
-    ctx.stroke()
-    // Blob path: rounded rect with very large asymmetric corner radii.
-    const blobPath = () => {
-      ctx.beginPath()
-      ctx.moveTo(bx + 210, by)
-      ctx.arcTo(bx + bw, by, bx + bw, by + bh, 64)
-      ctx.arcTo(bx + bw, by + bh, bx, by + bh, 130)
-      ctx.arcTo(bx, by + bh, bx, by, 230)
-      ctx.arcTo(bx, by, bx + bw, by, 210)
-      ctx.closePath()
-    }
-    blobPath()
-    ctx.save()
-    ctx.clip()
-    if (hero) {
-      coverImg(ctx, hero, bx, by, bw, bh, 1 + 0.05 * t01)
-    } else {
-      const pg = ctx.createLinearGradient(bx, by, bx + bw, by + bh)
-      pg.addColorStop(0, brand.primary)
-      pg.addColorStop(1, brand.accent)
-      ctx.fillStyle = pg
-      ctx.fillRect(bx, by, bw, bh)
-    }
-    ctx.restore()
-    blobPath()
-    ctx.strokeStyle = "#ffffff"
-    ctx.lineWidth = 14
-    ctx.stroke()
-    ctx.restore()
-  }
-
-  // ── Centered logo up top + orange slogan line (Rent.ph signature). ──
-  const le = Math.min(1, t01 / 0.16)
-  if (le > 0) {
-    ctx.save()
-    ctx.globalAlpha = le
-    let lx = (W - 460) / 2
-    if (assets.logo) {
-      const ratio = assets.logo.width / Math.max(1, assets.logo.height)
-      let lw = 460
-      let lh = lw / ratio
-      if (lh > 130) {
-        lh = 130
-        lw = lh * ratio
-      }
-      lx = (W - lw) / 2
-    }
-    drawLogo(ctx, assets.logo, brand, lx, 64, 460, 130, true)
-    ctx.textAlign = "center"
-    ctx.textBaseline = "alphabetic"
-    const slogan = "PHILIPPINES  #1  PROPERTY  RENTAL  WEBSITE"
-    const ss = fitFont(ctx, slogan, 800, 28, F, 920)
-    ctx.font = `800 ${ss}px ${F}`
-    ctx.fillStyle = brand.accent
-    ctx.fillText(slogan, W / 2, 258)
-    ctx.restore()
-  }
-
-  // ── Headline: LOOKING / FOR in ink, RENT? (or HOMES?) in orange. ──
-  const words: Array<{ text: string; color: string; y: number; size: number; delay: number }> = [
-    { text: "LOOKING", color: ink, y: 440, size: 130, delay: 0.16 },
-    { text: "FOR", color: ink, y: 570, size: 130, delay: 0.24 },
-    { text: isRent ? "RENT?" : "HOMES?", color: brand.accent, y: 730, size: 160, delay: 0.32 },
-  ]
-  for (const wd of words) {
-    const we = easeOutCubic((t01 - wd.delay) / 0.24)
-    if (we <= 0) continue
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, we * 1.4)
-    ctx.textAlign = "left"
-    ctx.textBaseline = "alphabetic"
-    const size = fitFont(ctx, wd.text, 900, wd.size, F, 470)
-    ctx.font = `900 ${size}px ${F}`
-    ctx.fillStyle = wd.color
-    ctx.fillText(wd.text, 66 - (1 - we) * 60, wd.y)
-    ctx.restore()
-  }
-  // Short blue divider bar under the headline.
-  const de = easeOutCubic((t01 - 0.4) / 0.18)
-  if (de > 0) {
-    ctx.fillStyle = brand.primary
-    ctx.fillRect(70, 772, 120 * de, 10)
-  }
-
-  // ── Subtitle. ──
-  const se = easeOutCubic((t01 - 0.44) / 0.2)
-  if (se > 0) {
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, se * 1.4)
-    ctx.textAlign = "left"
-    ctx.textBaseline = "alphabetic"
-    const sub1 = isRent ? "Find your next home" : "Discover places you'll"
-    const sub2 = isRent ? "easily and securely." : "love to live in."
-    const sSize = Math.min(
-      fitFont(ctx, sub1, 600, 43, F, 460),
-      fitFont(ctx, sub2, 600, 43, F, 460),
-    )
-    ctx.font = `600 ${sSize}px ${F}`
-    ctx.fillStyle = ink
-    ctx.fillText(sub1, 70, 850)
-    ctx.fillText(sub2, 70, 906)
-    ctx.restore()
-  }
-
-  // ── Feature rows with blue/orange icon squircles (rounded squares). ──
-  const feats = isRent ? FEATURES_RENT : FEATURES_SALE
-  const rowColors = [brand.primary, brand.accent, brand.primary]
-  feats.forEach((f, i) => {
-    const fe = easeOutCubic((t01 - 0.46 - i * 0.06) / 0.2)
-    if (fe <= 0) return
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, fe * 1.4)
-    const fy = 1080 + i * 152 + (1 - fe) * 30
-    const col = rowColors[i % rowColors.length]
-    ctx.fillStyle = col
-    rr(ctx, 66, fy - 46, 92, 92, 26)
-    ctx.fill()
-    miniIcon(ctx, f.icon, 112, fy, 26, "#ffffff")
-    ctx.textAlign = "left"
-    ctx.textBaseline = "alphabetic"
-    const tSize = fitFont(ctx, f.title, 800, 40, F, 350)
-    ctx.font = `800 ${tSize}px ${F}`
-    ctx.fillStyle = col
-    ctx.fillText(f.title, 186, fy - 16)
-    // Body: keep >=29px by wrapping to two lines instead of shrinking.
-    ctx.font = `500 29px ${F}`
-    let line1 = f.body
-    let line2 = ""
-    if (ctx.measureText(f.body).width > 350) {
-      const cutAt = f.body.indexOf(" ", Math.floor(f.body.length / 2))
-      const cut = cutAt === -1 ? f.body.lastIndexOf(" ") : cutAt
-      if (cut > 0) {
-        line1 = f.body.slice(0, cut)
-        line2 = f.body.slice(cut + 1)
-      }
-    }
-    ctx.fillStyle = "#4b5563"
-    if (line2) {
-      ctx.fillText(line1, 186, fy + 20)
-      ctx.fillText(line2, 186, fy + 54)
-    } else {
-      ctx.fillText(line1, 186, fy + 30)
-    }
-    ctx.restore()
-  })
-
-  // ── Tilted polaroid cards stacked over the blue wave (poster signature). ──
-  const cards: Array<{ img: HTMLImageElement | null; cx: number; cy: number; rot: number }> = [
-    { img: assets.photos[1] ?? hero ?? null, cx: 742, cy: 1318, rot: -0.105 },
-    { img: assets.photos[2] ?? hero ?? null, cx: 886, cy: 1468, rot: 0.1 },
-    { img: hero ?? null, cx: 798, cy: 1628, rot: -0.07 },
-  ]
-  cards.forEach((card, i) => {
-    const ce = easeOutCubic((t01 - 0.52 - i * 0.06) / 0.2)
-    if (ce <= 0) return
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, ce * 1.4)
-    ctx.translate(card.cx, card.cy + (1 - ce) * 70)
-    ctx.rotate(card.rot)
-    ctx.shadowColor = "rgba(15,23,42,0.3)"
-    ctx.shadowBlur = 22
-    ctx.fillStyle = "#ffffff"
-    rr(ctx, -160, -125, 320, 250, 14)
-    ctx.fill()
-    ctx.shadowBlur = 0
-    rr(ctx, -144, -109, 288, 172, 8)
-    ctx.save()
-    ctx.clip()
-    if (card.img) {
-      coverImg(ctx, card.img, -144, -109, 288, 172)
-    } else {
-      const cg = ctx.createLinearGradient(-144, -109, 144, 63)
-      cg.addColorStop(0, brand.primary)
-      cg.addColorStop(1, brand.accent)
-      ctx.fillStyle = cg
-      ctx.fillRect(-144, -109, 288, 172)
-    }
-    ctx.restore()
-    ctx.restore()
-  })
-
-  // ── Solid orange CTA button, bottom-left. ──
-  const ce2 = easeOutCubic((t01 - 0.62) / 0.18)
-  if (ce2 > 0) {
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, ce2 * 1.4)
-    const cy0 = 1470 + (1 - ce2) * 40
-    ctx.shadowColor = "rgba(18,32,60,0.3)"
-    ctx.shadowBlur = 20
-    ctx.fillStyle = brand.accent
-    rr(ctx, 66, cy0, 470, 150, 34)
-    ctx.fill()
-    ctx.shadowBlur = 0
-    ctx.textAlign = "center"
-    ctx.textBaseline = "middle"
-    const l1 = "FIND YOUR NEXT"
-    const l2 = isRent ? "RENTAL TODAY!" : "HOME TODAY!"
-    const bSize = Math.min(
-      fitFont(ctx, l1, 800, 38, F, 400),
-      fitFont(ctx, l2, 800, 38, F, 400),
-    )
-    ctx.font = `800 ${bSize}px ${F}`
-    ctx.fillStyle = "#ffffff"
-    ctx.fillText(l1, 66 + 235, cy0 + 53)
-    ctx.fillText(l2, 66 + 235, cy0 + 99)
-    ctx.textBaseline = "alphabetic"
-    ctx.restore()
-  }
-
-  // ── Globe + VISIT US NOW + big site, below the CTA. ──
-  const ve = easeOutCubic((t01 - 0.68) / 0.16)
-  if (ve > 0) {
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, ve * 1.4)
-    ctx.fillStyle = brand.primary
-    ctx.beginPath()
-    ctx.arc(112, 1756, 40, 0, Math.PI * 2)
-    ctx.fill()
-    miniIcon(ctx, "globe", 112, 1756, 19, "#ffffff")
-    ctx.textAlign = "left"
-    ctx.textBaseline = "alphabetic"
-    ctx.font = `700 27px ${F}`
-    ctx.fillStyle = ink
-    ctx.fillText("VISIT US NOW", 176, 1724)
-    const wSize = fitFont(ctx, brand.site, 900, 58, F, 300)
-    ctx.font = `900 ${wSize}px ${F}`
-    ctx.fillStyle = brand.primary
-    ctx.fillText(brand.site, 176, 1792)
-    ctx.restore()
-  }
-
-  // ── Tagline + orange check circle, bottom-right over the blue panel. ──
-  const te = easeOutCubic((t01 - 0.7) / 0.14)
-  if (te > 0) {
-    ctx.save()
-    ctx.globalAlpha = Math.min(1, te * 1.5)
-    ctx.fillStyle = brand.accent
-    ctx.beginPath()
-    ctx.arc(696, 1836, 32, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.strokeStyle = "#ffffff"
-    ctx.lineWidth = 7
-    ctx.lineCap = "round"
-    ctx.lineJoin = "round"
-    ctx.beginPath()
-    ctx.moveTo(682, 1838)
-    ctx.lineTo(692, 1848)
-    ctx.lineTo(712, 1826)
-    ctx.stroke()
-    ctx.textAlign = "left"
-    ctx.textBaseline = "alphabetic"
-    ctx.font = `800 33px ${F}`
-    ctx.fillStyle = "#ffffff"
-    ctx.fillText("RENT SMART.", 744, 1824)
-    ctx.fillText("LIVE BETTER.", 744, 1864)
-    ctx.restore()
-  }
-}
 
 /**
  * Intro — FH Global Partners "luxury split" poster: cinematic full-width hero
@@ -1665,10 +1157,11 @@ function drawIntroFhPartners(
     ctx.globalAlpha = Math.min(1, h1e * 1.4)
     ctx.textAlign = "center"
     ctx.textBaseline = "alphabetic"
-    const s1 = fitFont(ctx, "LOOKING FOR", 900, 102, F, 940)
+    const line1 = headlineText(inputs)
+    const s1 = fitFont(ctx, line1, 900, 102, F, 940)
     ctx.font = `900 ${s1}px ${F}`
     ctx.fillStyle = brand.primary
-    ctx.fillText("LOOKING FOR", W / 2, 1044 + (1 - h1e) * 40)
+    ctx.fillText(line1, W / 2, 1044 + (1 - h1e) * 40)
     ctx.restore()
   }
   const h2e = easeOutCubic((t01 - 0.32) / 0.24)
@@ -1677,7 +1170,7 @@ function drawIntroFhPartners(
     ctx.globalAlpha = Math.min(1, h2e * 1.4)
     ctx.textAlign = "center"
     ctx.textBaseline = "alphabetic"
-    const big = isRent ? "RENT?" : "HOMES?"
+    const big = highlightText(inputs)
     const s2 = fitFont(ctx, big, 900, 178, F, 940)
     ctx.font = `900 ${s2}px ${F}`
     ctx.fillStyle = brand.accent
@@ -1981,25 +1474,31 @@ function drawIntroFhiGlobal(
     ctx.restore()
   }
 
-  // ── Headline: LOOKING / FOR in white 900, HOMES?/RENT? in gold. ──
-  const lookSize = fitFont(ctx, "LOOKING", 900, 118, F, 430)
-  const bigWord = isRent ? "RENT?" : "HOMES?"
+  // ── Headline: two white rows, then the highlight word in gold. ──
+  const [gRow1, gRow2] = headlineRows(inputs)
+  const lookSize = fitFont(ctx, gRow1 || "LOOKING", 900, 118, F, 430)
+  const bigWord = highlightText(inputs)
   const bigSize = fitFont(ctx, bigWord, 900, 150, F, 430)
   const words: Array<{ text: string; color: string; y: number; size: number; delay: number }> = [
-    { text: "LOOKING", color: "#ffffff", y: 476, size: lookSize, delay: 0.16 },
-    { text: "FOR", color: "#ffffff", y: 606, size: lookSize, delay: 0.23 },
+    { text: gRow1, color: "#ffffff", y: 476, size: lookSize, delay: 0.16 },
+    { text: gRow2, color: "#ffffff", y: 606, size: lookSize, delay: 0.23 },
     { text: bigWord, color: brand.accent, y: 772, size: bigSize, delay: 0.3 },
-  ]
+  ].filter((w) => w.text)
   for (const wd of words) {
     const we = easeOutCubic((t01 - wd.delay) / 0.22)
     if (we <= 0) continue
     ctx.save()
-    ctx.globalAlpha = Math.min(1, we * 1.4)
+    // Same wipe-up reveal as the other intros, so the headline animates in
+    // rather than simply fading on.
+    ctx.beginPath()
+    ctx.rect(0, wd.y - wd.size - 10, W, wd.size + 28)
+    ctx.clip()
+    ctx.globalAlpha = Math.min(1, we * 1.6)
     ctx.textAlign = "left"
     ctx.textBaseline = "alphabetic"
     ctx.font = `900 ${wd.size}px ${F}`
     ctx.fillStyle = wd.color
-    ctx.fillText(wd.text, 66 - (1 - we) * 60, wd.y)
+    ctx.fillText(wd.text, 66 - (1 - we) * 44, wd.y + (1 - we) * wd.size * 0.8)
     ctx.restore()
   }
 
@@ -2238,13 +1737,14 @@ function drawIntroRentsouq(
     ctx.globalAlpha = Math.min(1, h1 * 1.4)
     ctx.textAlign = "left"
     ctx.textBaseline = "alphabetic"
-    const s1 = fitFont(ctx, "LOOKING FOR", 900, 112, F, 948)
+    const line1 = headlineText(inputs)
+    const s1 = fitFont(ctx, line1, 900, 112, F, 948)
     ctx.font = `900 ${s1}px ${F}`
     ctx.fillStyle = night
-    ctx.fillText("LOOKING FOR", 66 - (1 - h1) * 70, 372)
+    ctx.fillText(line1, 66 - (1 - h1) * 70, 372)
     ctx.restore()
   }
-  const big = isRent ? "RENT?" : "HOMES?"
+  const big = highlightText(inputs)
   const h2 = easeOutCubic((t01 - 0.18) / 0.24)
   if (h2 > 0) {
     ctx.save()
@@ -2483,12 +1983,6 @@ function drawIntroForBrand(
     case "rentsouq":
       drawIntroRentsouq(ctx, t01, brand, inputs, assets)
       return
-    case "homesph":
-      drawIntroHomesPh(ctx, t01, brand, inputs, assets)
-      return
-    case "rentph":
-      drawIntroRentPh(ctx, t01, brand, inputs, assets)
-      return
     case "fhipartners":
       drawIntroFhPartners(ctx, t01, brand, inputs, assets)
       return
@@ -2519,7 +2013,12 @@ function drawFrame(
   let acc = 0
   for (const s of slides) {
     if (timeS < acc + s.dur || s === slides[slides.length - 1]) {
-      const t01 = Math.max(0, Math.min(1, (timeS - acc) / s.dur))
+      const elapsed = Math.max(0, timeS - acc)
+      // Animate over the slide's animation window, not its full duration, so a
+      // longer hold doesn't slow the motion down (see INTRO_ANIM_S).
+      const animS =
+        s.kind === "intro" ? INTRO_ANIM_S : s.kind === "outro" ? OUTRO_ANIM_S : s.dur
+      const t01 = Math.max(0, Math.min(1, elapsed / animS))
       if (s.kind === "intro") drawIntroForBrand(ctx, t01, brand, inputs, assets)
       else if (s.kind === "photo") drawPhoto(ctx, t01, brand, inputs, assets, s.photoIdx ?? 0)
       else drawOutro(ctx, t01, brand, inputs, assets)
@@ -2601,11 +2100,14 @@ function publishedDtoToListing(dto: PublishedListingDto): PickerListing {
 export function ReelsMakerClient({
   userId,
   userName,
+  avatarUrl,
   currentRole,
   initialListingId,
 }: {
   userId: string
   userName: string
+  /** Agent's profile photo, drawn on the outro. */
+  avatarUrl?: string | null
   currentRole: string
   initialListingId?: string | null
 }) {
@@ -2626,6 +2128,14 @@ export function ReelsMakerClient({
   const [price, setPrice] = useState("")
   const [agentName, setAgentName] = useState(userName)
   const [phone, setPhone] = useState("")
+  const [headline, setHeadline] = useState("")
+  const [highlight, setHighlight] = useState("")
+  /**
+   * Slide captions keyed by photo id, not by position — reordering or deleting
+   * a photo would otherwise leave every later caption on the wrong slide.
+   * The draw code still wants them in order, so the inputs memo flattens them.
+   */
+  const [captions, setCaptions] = useState<Record<string, string>>({})
   const [musicOn, setMusicOn] = useState(true)
 
   const [photos, setPhotos] = useState<PhotoItem[]>(() =>
@@ -2633,6 +2143,7 @@ export function ReelsMakerClient({
   )
   const [photoImgs, setPhotoImgs] = useState<HTMLImageElement[]>([])
   const [logoImg, setLogoImg] = useState<HTMLImageElement | null>(null)
+  const [avatarImg, setAvatarImg] = useState<HTMLImageElement | null>(null)
   const [fontFamily, setFontFamily] = useState<string>("Arial, sans-serif")
 
   const [playing, setPlaying] = useState(false)
@@ -2650,12 +2161,24 @@ export function ReelsMakerClient({
   const totalS = useMemo(() => slides.reduce((a, s) => a + s.dur, 0), [slides])
 
   const inputs: ReelInputs = useMemo(
-    () => ({ market, title, location, price, agentName, phone }),
-    [market, title, location, price, agentName, phone],
+    () => ({
+      market,
+      title,
+      location,
+      price,
+      agentName,
+      phone,
+      headline,
+      highlight,
+      slideTexts: photos.map((p) => captions[p.id] ?? ""),
+    }),
+    [market, title, location, price, agentName, phone, headline, highlight, photos, captions],
   )
   const assets: ReelAssets = useMemo(
-    () => ({ logo: logoImg, photos: photoImgs, font: fontFamily }),
-    [logoImg, photoImgs, fontFamily],
+    // Gate on avatarUrl rather than clearing the state in an effect, so an
+    // agent with no photo never shows a stale one.
+    () => ({ logo: logoImg, photos: photoImgs, font: fontFamily, avatar: avatarUrl ? avatarImg : null }),
+    [logoImg, photoImgs, fontFamily, avatarImg, avatarUrl],
   )
 
   // Resolve the Outfit font family that next/font registered, for canvas use.
@@ -2664,6 +2187,21 @@ export function ReelsMakerClient({
     if (fam) setFontFamily(`${fam}, Arial, sans-serif`)
     void document.fonts?.ready
   }, [])
+
+  // Agent's profile photo for the outro. Routed through the same-origin proxy
+  // as listing photos: a remote image drawn straight onto the canvas taints it
+  // and the video export then fails.
+  useEffect(() => {
+    if (!avatarUrl) return
+    let alive = true
+    const src = avatarUrl.startsWith("/") ? avatarUrl : proxiedListingPhoto(avatarUrl)
+    void loadImage(src).then((img) => {
+      if (alive) setAvatarImg(img)
+    })
+    return () => {
+      alive = false
+    }
+  }, [avatarUrl])
 
   // Brand switch: load logo, follow the brand's natural market, reset audio.
   useEffect(() => {
@@ -2943,6 +2481,14 @@ export function ReelsMakerClient({
     setPhotos((prev) => {
       const it = prev[idx]
       if (it?.src.startsWith("blob:")) URL.revokeObjectURL(it.src)
+      if (it) {
+        setCaptions((c) => {
+          if (!(it.id in c)) return c
+          const next = { ...c }
+          delete next[it.id]
+          return next
+        })
+      }
       return prev.filter((_, i) => i !== idx)
     })
   }, [])
@@ -3104,6 +2650,43 @@ export function ReelsMakerClient({
               </div>
             </div>
 
+            {/* Opening headline */}
+            <div className="bg-white rounded-2xl border border-[#e8eaed] p-5 space-y-4">
+              <div>
+                <p className={`${labelCls} mb-0`}>Opening headline</p>
+                <p className="text-xs text-[#9ca3af] mt-1">
+                  The first slide. Leave blank to use the default for the selected market.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Headline</label>
+                  <input
+                    className={inputCls}
+                    value={headline}
+                    onChange={(e) => setHeadline(e.target.value)}
+                    placeholder={DEFAULT_HEADLINE}
+                    maxLength={28}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Highlighted word</label>
+                  <input
+                    className={inputCls}
+                    value={highlight}
+                    onChange={(e) => setHighlight(e.target.value)}
+                    placeholder={defaultHighlight(market)}
+                    maxLength={18}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-[#6b7280]">
+                Preview:{" "}
+                <span className="font-bold text-[#111827]">{headlineText(inputs)}</span>{" "}
+                <span className="font-bold" style={{ color: brand.accent }}>{highlightText(inputs)}</span>
+              </p>
+            </div>
+
             {/* Listing details */}
             <div className="bg-white rounded-2xl border border-[#e8eaed] p-5 space-y-4">
               <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -3211,6 +2794,34 @@ export function ReelsMakerClient({
                 </div>
               )}
             </div>
+
+            {/* Slide captions — one per photo, all optional */}
+            {photos.length > 0 && (
+              <div className="bg-white rounded-2xl border border-[#e8eaed] p-5 space-y-3">
+                <div>
+                  <p className={`${labelCls} mb-0`}>Slide text</p>
+                  <p className="text-xs text-[#9ca3af] mt-1">
+                    Optional line shown over each photo. Leave blank to keep that slide clean.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {photos.map((p, i) => (
+                    <div key={p.id} className="flex items-center gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p.src} alt="" className="h-11 w-11 rounded-lg object-cover border border-[#e5e5e5] shrink-0" />
+                      <span className="text-xs font-bold text-[#9ca3af] w-6 shrink-0">{i + 1}</span>
+                      <input
+                        className={`${inputCls} mb-0`}
+                        value={captions[p.id] ?? ""}
+                        onChange={(e) => setCaptions((c) => ({ ...c, [p.id]: e.target.value }))}
+                        placeholder="e.g. Spacious living area"
+                        maxLength={80}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ── Preview + export ── */}

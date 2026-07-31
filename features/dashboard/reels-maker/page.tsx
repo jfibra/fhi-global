@@ -17,6 +17,7 @@ function ReelsMakerPageInner() {
     <ReelsMakerClient
       userId={user?.id ?? ""}
       userName={profile?.fullname ?? user?.email ?? "User"}
+      avatarUrl={profile?.profile_url ?? null}
       currentRole={role ?? "agent"}
       initialListingId={searchParams.get("listing")}
     />
