@@ -9,11 +9,29 @@
 // zoom, search, page jump and print all come from the native viewer.
 
 import { useMemo, useState } from "react"
+import dynamic from "next/dynamic"
 import Image from "next/image"
-import { ArrowLeft, BookOpen, Download, ExternalLink, Library } from "lucide-react"
+import { ArrowLeft, BookOpen, Download, ExternalLink, Library, Loader2 } from "lucide-react"
 import { ebookCategories, ebookCoverUrl, ebookFileName, type Ebook } from "@/lib/ebooks"
 
 const ALL = "All"
+
+/**
+ * Book view pulls in pdf.js and a page-flip library — a few hundred KB. Loading
+ * it on demand keeps that off the shelf and off Page view entirely.
+ */
+const BookView = dynamic(() => import("./book-view"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center">
+      <p className="inline-flex items-center gap-2 text-sm text-white/70">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading book view…
+      </p>
+    </div>
+  ),
+})
+
+type ViewMode = "page" | "book"
 
 export function EbooksClient({ books }: { books: Ebook[] }) {
   const [tab, setTab] = useState<string>(ALL)
@@ -142,6 +160,9 @@ function GeneratedCover({ title }: { title: string }) {
 }
 
 function Reader({ book, onBack }: { book: Ebook; onBack: () => void }) {
+  const [mode, setMode] = useState<ViewMode>("page")
+  const proxied = `/api/ebook-pdf?url=${encodeURIComponent(book.url)}`
+
   return (
     // Fills the shell's <main> (which already supplies p-6) and adds none of
     // its own, so the PDF gets the full width. The column is pinned to the
@@ -165,6 +186,26 @@ function Reader({ book, onBack }: { book: Ebook; onBack: () => void }) {
           </h1>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {/* Page view is the default: it keeps search, text selection, print
+              and thumbnails, which the rasterised Book view cannot offer. */}
+          <div className="flex items-center rounded-lg border border-[#e5e5e5] bg-white p-0.5">
+            {([
+              ["page", "Page"],
+              ["book", "Book"],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setMode(value)}
+                aria-pressed={mode === value}
+                className={`rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
+                  mode === value ? "bg-[#001f3f] text-white" : "text-[#6b7280] hover:text-[#001f3f]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <a
             href={book.url}
             target="_blank"
@@ -185,24 +226,30 @@ function Reader({ book, onBack }: { book: Ebook; onBack: () => void }) {
         </div>
       </div>
 
-      {/* The fallback sits behind the iframe, so it only shows if the viewer
-          fails to paint (host blocks framing, or no PDF viewer available). */}
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-black/[0.08] bg-[#525659]">
-        <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-          <p className="text-sm text-white/70">
-            Preparing the reader…{" "}
-            <a href={book.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#d6b357] underline">
-              open it in a new tab
-            </a>{" "}
-            if nothing appears.
-          </p>
-        </div>
-        <iframe
-          // #view=FitH opens fitted to the page width rather than zoomed in.
-          src={`${book.url}#view=FitH`}
-          title={book.title}
-          className="absolute inset-0 h-full w-full border-0"
-        />
+        {mode === "book" ? (
+          <BookView src={proxied} title={book.title} />
+        ) : (
+          <>
+            {/* The fallback sits behind the iframe, so it only shows if the
+                viewer fails to paint (host blocks framing, or no PDF viewer). */}
+            <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
+              <p className="text-sm text-white/70">
+                Preparing the reader…{" "}
+                <a href={book.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#d6b357] underline">
+                  open it in a new tab
+                </a>{" "}
+                if nothing appears.
+              </p>
+            </div>
+            <iframe
+              // #view=FitH opens fitted to the page width rather than zoomed in.
+              src={`${book.url}#view=FitH`}
+              title={book.title}
+              className="absolute inset-0 h-full w-full border-0"
+            />
+          </>
+        )}
       </div>
     </div>
   )
