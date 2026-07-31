@@ -40,6 +40,70 @@ export type PublicAgentListingRow = {
   updated_at: string
   projects: BuyRawProject | null
   agent_listing_images?: { url: string; sort_order: number }[] | null
+  /** Owning agent, for the enquiry card. Embedded only on the detail fetch. */
+  profiles?: PublicListingAgent | PublicListingAgent[] | null
+}
+
+/**
+ * The listing owner's public-facing details.
+ *
+ * Only what an enquiry needs: who they are, their photo and their phone. The
+ * phone lives in `profiles.metadata` (there is no column for it), same as the
+ * business card and public profile read it.
+ */
+export type PublicListingAgent = {
+  id: string
+  fullname: string | null
+  fname: string | null
+  lname: string | null
+  profile_url: string | null
+  role: string | null
+  status: string | null
+  is_deleted: boolean | null
+  metadata: Record<string, unknown> | null
+}
+
+/** Flatten the embed (PostgREST may hand back an array) and drop unusable rows. */
+export function listingAgentOf(row: PublicAgentListingRow): PublicListingAgent | null {
+  const raw = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+  if (!raw) return null
+  // A deactivated or deleted agent falls back to the house contact card.
+  if (raw.is_deleted === true || (raw.status ?? "active") !== "active") return null
+  return raw
+}
+
+/**
+ * E.164 phone for the agent, or "" when they have none saved.
+ *
+ * "+971" + "501234567" → "+971501234567". Not every profile is that tidy:
+ * some store the number with the country code already in it, and naively
+ * concatenating gives "+971+971501234567" — a link that dials nothing. So the
+ * dial code is only prepended when it isn't already there, and a leading zero
+ * on the local part is dropped.
+ */
+export function listingAgentPhone(agent: PublicListingAgent | null): string {
+  const meta = agent?.metadata ?? {}
+  const dialRaw = typeof meta.phone_country_code === "string" ? meta.phone_country_code.trim() : ""
+  const localRaw = typeof meta.phone_number === "string" ? meta.phone_number.trim() : ""
+  if (!localRaw) return ""
+
+  const digits = (s: string) => s.replace(/\D/g, "")
+  const dial = digits(dialRaw)
+  const local = digits(localRaw)
+  if (!local) return ""
+
+  // Already international (typed with a +, or repeats the dial code).
+  if (localRaw.startsWith("+") || (dial && local.startsWith(dial))) return `+${local}`
+  return `+${dial}${local.replace(/^0+/, "")}`
+}
+
+/** Display name, falling back through the same chain as the business card. */
+export function listingAgentName(agent: PublicListingAgent | null): string {
+  if (!agent) return ""
+  return (
+    (agent.fullname ?? "").trim() ||
+    [agent.fname, agent.lname].filter(Boolean).join(" ").trim()
+  )
 }
 
 const PROJECT_EMBED = `
@@ -108,7 +172,12 @@ export async function fetchPublicAgentListingById(idOrSlug: string): Promise<{
   const query = supabase
     .from("agent_listings")
     .select(
-      `id, slug, title, description, listing_kind, price, currency, unit_type, created_at, updated_at, projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
+      // The owning agent is embedded here but NOT on the list query above —
+      // the enquiry card only exists on the detail page, and the browse grids
+      // would be paying for a join they never read.
+      `id, slug, title, description, listing_kind, price, currency, unit_type, created_at, updated_at,
+       projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order ),
+       profiles:agent_id ( id, fullname, fname, lname, profile_url, role, status, is_deleted, metadata )`,
     )
     .eq("status", "published")
     .is("deleted_at", null)
