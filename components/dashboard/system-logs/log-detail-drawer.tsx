@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
-import { X, Globe, Monitor, Link2, Clock, User as UserIcon, ShieldCheck, Loader2 } from "lucide-react"
+import { X, Globe, Monitor, Link2, Clock, Mail, User as UserIcon, ShieldCheck, Loader2 } from "lucide-react"
 import { RoleBadge } from "@/components/role-badge"
 import {
   type AuditLogRow,
@@ -14,8 +14,14 @@ import {
   browserFromUserAgent,
 } from "./log-meta"
 
+// Large blob fields (e.g. a rendered email body) get their own section below,
+// so they're kept out of the key/value diff.
+const HIDDEN_CHANGE_KEYS = new Set(["html"])
+
 function ChangesDiff({ oldV, newV }: { oldV: Record<string, unknown> | null; newV: Record<string, unknown> | null }) {
-  const keys = Array.from(new Set([...Object.keys(oldV ?? {}), ...Object.keys(newV ?? {})]))
+  const keys = Array.from(new Set([...Object.keys(oldV ?? {}), ...Object.keys(newV ?? {})])).filter(
+    (k) => !HIDDEN_CHANGE_KEYS.has(k),
+  )
   if (keys.length === 0) return null
   const fmt = (v: unknown) =>
     v === null || v === undefined ? "—" : typeof v === "string" ? v : JSON.stringify(v)
@@ -48,6 +54,41 @@ function ChangesDiff({ oldV, newV }: { oldV: Record<string, unknown> | null; new
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// Rendered email body for "mailer" audit rows — a sandboxed preview + raw HTML.
+function EmailBody({ html }: { html: string }) {
+  const [tab, setTab] = useState<"preview" | "html">("preview")
+  return (
+    <div className="rounded-xl border border-[#e8eaed] overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-[#f9fafb] border-b border-[#e8eaed]">
+        <p className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">
+          <Mail className="w-3.5 h-3.5" /> Email Body
+        </p>
+        <div className="flex gap-1 rounded-lg border border-[#e8eaed] bg-white p-0.5">
+          {(["preview", "html"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold capitalize transition-colors ${
+                tab === t ? "bg-[#001f3f] text-white" : "text-[#6b7280] hover:text-[#374151]"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+      {tab === "preview" ? (
+        <iframe title="Email preview" sandbox="" srcDoc={html} className="w-full h-[420px] bg-white border-0" />
+      ) : (
+        <pre className="max-h-[420px] overflow-auto bg-white p-4 text-[11px] leading-relaxed text-[#374151] whitespace-pre-wrap break-all">
+          {html}
+        </pre>
+      )}
     </div>
   )
 }
@@ -100,6 +141,7 @@ export function LogDetailDrawer({ row, onClose }: { row: AuditLogRow; onClose: (
   const evColor = eventColor(row.event)
   const oldV = detail?.old_values ?? null
   const newV = detail?.new_values ?? null
+  const emailHtml = typeof newV?.html === "string" ? newV.html : null
   const ua = detail?.user_agent ?? null
   const url = detail?.url ?? null
   const ip = detail?.ip_address ?? row.ip_address ?? null
@@ -188,6 +230,7 @@ export function LogDetailDrawer({ row, onClose }: { row: AuditLogRow; onClose: (
           ) : (
             <>
               <ChangesDiff oldV={oldV} newV={newV} />
+              {emailHtml && <EmailBody html={emailHtml} />}
               {hasRequestInfo && (
                 <div className="space-y-3 pt-1 border-t border-[#f0f2f5]">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af] pt-3">Request Information</p>

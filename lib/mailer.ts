@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer"
 import { SITE_URL } from "@/lib/seo"
+import { logAuditEvent } from "@/lib/audit-log"
 
 /**
  * Server-only SMTP mailer. Used to deliver auth OTP codes ourselves instead of
@@ -45,6 +46,61 @@ function fromAddress() {
   const email = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || ""
   const name = process.env.SMTP_FROM_NAME || "FHI Global"
   return `${name} <${email}>`
+}
+
+type DeliverOptions = {
+  from: string
+  to: string | string[]
+  subject: string
+  text: string
+  html: string
+}
+
+// Cap the stored HTML so one huge email can't balloon an audit row.
+const AUDIT_HTML_CAP = 256 * 1024
+
+/**
+ * Send an email and record it in the audit trail under category "mailer", so
+ * every message shows up in System Logs with its recipients, subject, the
+ * sending "mailable", and a body preview. Auditing is best-effort
+ * (logAuditEvent never throws); a send FAILURE is logged then re-thrown so
+ * callers (e.g. the auth OTP flow) still see it.
+ */
+async function deliver(mailable: string, opts: DeliverOptions): Promise<void> {
+  const recipients = Array.isArray(opts.to) ? opts.to : [opts.to]
+  try {
+    await transport().sendMail(opts)
+  } catch (error) {
+    await auditMail(mailable, opts.subject, recipients, opts.html, error)
+    throw error
+  }
+  await auditMail(mailable, opts.subject, recipients, opts.html, null)
+}
+
+async function auditMail(
+  mailable: string,
+  subject: string,
+  recipients: string[],
+  html: string,
+  error: unknown,
+): Promise<void> {
+  const failed = error != null
+  const body = html.length > AUDIT_HTML_CAP ? `${html.slice(0, AUDIT_HTML_CAP)}\n<!-- truncated -->` : html
+  await logAuditEvent({
+    category: "mailer",
+    event: failed ? "email_failed" : "email_sent",
+    source: "system",
+    subjectType: "email",
+    subjectLabel: subject,
+    description: `${failed ? "Failed to send" : "Sent"} "${subject}" to ${recipients.join(", ")}`,
+    newValues: {
+      recipients,
+      subject,
+      mailable,
+      html: body,
+      ...(failed ? { error: error instanceof Error ? error.message : String(error) } : {}),
+    },
+  })
 }
 
 /** Send a numeric auth code. `purpose` tweaks the copy (sign in vs sign up). */
@@ -136,7 +192,7 @@ export async function sendOtpEmail(
 </body>
 </html>`
 
-  await transport().sendMail({
+  await deliver("OtpMailer", {
     from: fromAddress(),
     to,
     subject,
@@ -256,7 +312,7 @@ export async function sendEventRegistrationEmail(input: {
           </td>
         </tr>`
 
-  await transport().sendMail({
+  await deliver("EventRegistrationMailer", {
     from: fromAddress(),
     to: input.to,
     subject,
@@ -332,7 +388,7 @@ export async function sendRaffleWinnerEmail(input: {
           </td>
         </tr>`
 
-  await transport().sendMail({
+  await deliver("RaffleWinnerMailer", {
     from: fromAddress(),
     to: input.to,
     subject,
@@ -503,7 +559,7 @@ export async function sendSaleEncodedEmail(input: {
     dashboardUrl: d.dashboardUrl,
   })
 
-  await transport().sendMail({
+  await deliver("SaleEncodedMailer", {
     from: fromAddress(),
     to: input.to,
     subject,
@@ -621,7 +677,7 @@ export async function sendSaleStatusEmail(input: {
     dashboardUrl: d.dashboardUrl,
   })
 
-  await transport().sendMail({
+  await deliver("SaleStatusMailer", {
     from: fromAddress(),
     to: input.to,
     subject,
@@ -666,7 +722,7 @@ export async function sendSaleCommentEmail(input: {
     ctaLabel: "Open the discussion",
   })
 
-  await transport().sendMail({
+  await deliver("SaleCommentMailer", {
     from: fromAddress(),
     to: input.to,
     subject,

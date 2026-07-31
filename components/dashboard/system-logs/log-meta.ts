@@ -63,6 +63,7 @@ export const CATEGORY_META: Record<string, { label: string; bg: string; text: st
   contact: { label: "Contact", bg: "bg-cyan-50", text: "text-cyan-700" },
   auth: { label: "Auth", bg: "bg-rose-50", text: "text-rose-700" },
   security: { label: "Security", bg: "bg-red-50", text: "text-red-700" },
+  mailer: { label: "Mailer", bg: "bg-blue-50", text: "text-blue-700" },
   system: { label: "System", bg: "bg-slate-100", text: "text-slate-600" },
   data: { label: "Data", bg: "bg-slate-50", text: "text-slate-600" },
 }
@@ -88,6 +89,8 @@ export const EVENT_COLOR: Record<string, string> = {
   hard_deleted: "#b91c1c",
   cleared_logs: "#b91c1c",
   exported: "#0891b2",
+  email_sent: "#2563eb",
+  email_failed: "#dc2626",
 }
 
 export function eventColor(event: string): string {
