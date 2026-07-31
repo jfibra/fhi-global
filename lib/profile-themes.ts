@@ -42,6 +42,8 @@ export type ProfileTheme = {
   contactLayout: ContactDesignId
   /** A chosen surface for that card, or null to use the design's own. */
   contactBg: string | null
+  /** Set when the agent chose an ink, so the contact card can follow it too. */
+  textColor: string | null
   /** Glass panels — the contact card, social buttons. */
   panel: string
   panelBorder: string
@@ -82,7 +84,7 @@ type ThemeBase = Omit<
   ProfileTheme,
   | "pillRadius" | "pillBorder" | "pillPadY" | "pillFont"
   | "tileSize" | "tileRadius" | "tileBorder" | "showIcon" | "contactLayout"
-  | "contactBg"
+  | "contactBg" | "textColor"
 >
 
 export const PROFILE_THEMES: ThemeBase[] = [
@@ -295,6 +297,7 @@ function withControls(base: ThemeBase, choice: ThemeChoice): ProfileTheme {
   const iconStyle = choice.icons ?? DEFAULT_ICON_STYLE
   const contactLayout = choice.contact ?? DEFAULT_CONTACT_DESIGN
   const contactBg = choice.contactBg ?? null
+  const textColor = choice.textColor ?? null
 
   if (style === "outline" || style === "glass") {
     const pill = {
@@ -308,6 +311,7 @@ function withControls(base: ThemeBase, choice: ThemeChoice): ProfileTheme {
       ...pill,
       contactLayout,
       contactBg,
+      textColor,
       pillRadius: radius,
       pillBorder:
         style === "outline" ? `1.5px solid ${base.panelBorder}` : `1px solid ${base.panelBorder}`,
@@ -320,6 +324,7 @@ function withControls(base: ThemeBase, choice: ThemeChoice): ProfileTheme {
     ...sizing,
     contactLayout,
     contactBg,
+    textColor,
     pillRadius: radius,
     pillBorder: "none",
     ...iconTokens(base, iconStyle),
@@ -354,6 +359,8 @@ export type ThemeChoice = {
   id: string
   background?: CustomBackground
   accent?: string
+  /** Overrides the ink used over the background. */
+  textColor?: string
   buttons?: ButtonStyleId
   icons?: IconStyleId
   contact?: ContactDesignId
@@ -506,6 +513,7 @@ export function parseThemeChoice(input: unknown): ThemeChoice {
   }
 
   if (typeof raw.accent === "string" && HEX.test(raw.accent)) out.accent = raw.accent
+  if (typeof raw.textColor === "string" && HEX.test(raw.textColor)) out.textColor = raw.textColor
   if (BUTTON_STYLES.some((s2) => s2.id === raw.buttons)) out.buttons = raw.buttons as ButtonStyleId
   if (ICON_STYLES.some((s2) => s2.id === raw.icons)) out.icons = raw.icons as IconStyleId
   if (CONTACT_DESIGNS.some((s2) => s2.id === raw.contact)) out.contact = raw.contact as ContactDesignId
@@ -547,6 +555,13 @@ export function resolveTheme(choice: ThemeChoice): ProfileTheme {
     base = paintBackground(choice.background, accent, choice.overlay)
   }
   if (choice.accent) base = { ...base, accent, tile: `linear-gradient(180deg, ${accent} 0%, ${shade(accent, 0.25)} 100%)`, tileInk: luminance(accent) > 0.55 ? "#16202e" : "#ffffff" }
+
+  // Text over the background only. The buttons keep their own ink, because that
+  // is chosen against the PILL — tinting it here would put the page's colour on
+  // a white pill and lose the contrast the template was built with.
+  if (choice.textColor) {
+    base = { ...base, ink: choice.textColor, inkMuted: alpha(choice.textColor, 0.66) }
+  }
 
   return withControls(base, choice)
 }

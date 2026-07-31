@@ -31,6 +31,9 @@ const BG_PRESETS = ["#0b1220", "#001f3f", "#14141c", "#123b2e", "#3b1d2e", "#f4f
 /** Surfaces that hold a white QR bed and read well with either ink. */
 const CARD_BG_PRESETS = ["#0d2340", "#0b0b10", "#123b2e", "#3b1d2e", "#faf7f1", "#ffffff"]
 
+/** Inks that hold up over both dark and light backdrops. */
+const TEXT_PRESETS = ["#ffffff", "#f5f2ea", "#ffe9a8", "#12233c", "#0b0b10", "#3b1d2e"]
+
 /** Rough luminance check, only for choosing the swatch's preview ink. */
 function isDarkHex(hex: string): boolean {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) || 0)
@@ -786,6 +789,49 @@ export function DesignTab({
                 className="mt-2 text-[11px] font-semibold text-[#6b7280] hover:text-[#001f3f] underline"
               >
                 Reset to {resolved.name}&apos;s accent
+              </button>
+            )}
+          </div>
+
+          {/* Text colour */}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-[#374151] mb-2">Text colour</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {TEXT_PRESETS.map((hex) => (
+                <button
+                  key={hex}
+                  type="button"
+                  onClick={() => setCustom({ textColor: hex })}
+                  aria-label={`Text colour ${hex}`}
+                  aria-pressed={value.textColor?.toLowerCase() === hex}
+                  className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${
+                    value.textColor?.toLowerCase() === hex ? "border-[#0d1117]" : "border-[#e5e7eb] shadow"
+                  }`}
+                  style={{ background: hex }}
+                />
+              ))}
+              <label className="inline-flex items-center gap-2 ml-1 text-xs text-[#6b7280]">
+                <input
+                  type="color"
+                  value={value.textColor ?? resolved.ink}
+                  onChange={(e) => setCustom({ textColor: e.target.value })}
+                  aria-label="Pick any text colour"
+                  className="w-8 h-8 rounded-lg border border-[#e5e7eb] bg-white p-0.5 cursor-pointer"
+                />
+                any colour
+              </label>
+            </div>
+            <p className="mt-2 text-[11px] text-[#9ca3af]">
+              Your name, tagline and the details over the background. Buttons keep their own text
+              colour, which is picked against the button rather than the page.
+            </p>
+            {value.textColor && (
+              <button
+                type="button"
+                onClick={() => setCustom({ textColor: undefined })}
+                className="mt-1.5 text-[11px] font-semibold text-[#6b7280] hover:text-[#001f3f] underline"
+              >
+                Reset to {resolved.name}&apos;s text colour
               </button>
             )}
           </div>

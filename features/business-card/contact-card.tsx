@@ -39,20 +39,21 @@ type Spec = {
 function specFor(id: ContactDesignId, t: ProfileTheme): Spec {
   const light = { bg: IVORY, ink: "#12233c", inkMuted: "#5b6b7f" }
 
-  // A chosen surface wins over the design's own, and the ink is picked against it
-  // so a light choice does not end up with white text on it.
-  if (t.contactBg) return { bg: t.contactBg, ...inkFor(t.contactBg) }
+  // The surface first: a chosen colour wins over the design's own, and its ink is
+  // picked against it so a light choice does not end up with white text.
+  const base: Spec = t.contactBg
+    ? { bg: t.contactBg, ...inkFor(t.contactBg) }
+    : id === "panel"
+      ? // Glass: the page's own panel tokens, so it sits on whatever backdrop the
+        // theme paints instead of introducing a surface of its own.
+        { bg: t.panel, ink: t.ink, inkMuted: t.inkMuted }
+      : id === "ivory"
+        ? light
+        : { bg: NAVY, ink: "#ffffff", inkMuted: "rgba(255,255,255,0.72)" }
 
-  switch (id) {
-    case "panel":
-      // Glass: the page's own panel tokens, so it sits on whatever backdrop the
-      // theme paints instead of introducing a surface of its own.
-      return { bg: t.panel, ink: t.ink, inkMuted: t.inkMuted }
-    case "ivory":
-      return light
-    default:
-      return { bg: NAVY, ink: "#ffffff", inkMuted: "rgba(255,255,255,0.72)" }
-  }
+  // Then the ink. A chosen text colour applies inside the card as well, and it
+  // beats the automatic pick — an explicit choice should not be second-guessed.
+  return t.textColor ? { ...base, ink: t.ink, inkMuted: t.inkMuted } : base
 }
 
 /**
