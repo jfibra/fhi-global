@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
-  AlertCircle, ArrowDown, ArrowUp, CheckCircle2, Globe, Link2, Loader2, Lock,
+  AlertCircle, ArrowDown, ArrowUp, CheckCircle2, Loader2, Lock,
   Palette, Plus, Save, Star, SlidersHorizontal, Trash2,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
@@ -99,6 +99,26 @@ export default function PublicProfileMakerPage() {
     return () => clearTimeout(t)
   }, [saveState])
 
+  /**
+   * Everything Save sends, as one comparable string. Compared against the last
+   * saved copy so the button can say whether there is anything to save — the
+   * page previously offered Save at all times with no way to tell.
+   *
+   * Recomputed each render rather than memoised: it is a handful of short
+   * fields, and a useMemo here would be manual memoization the compiler then
+   * has to preserve.
+   */
+  const snapshot = JSON.stringify({
+    tagline,
+    socials,
+    // rowId is a client-side key, not part of the saved value.
+    buttons: buttons.map((b) => ({ label: b.label, url: b.url })),
+    fixedLabels,
+    theme,
+  })
+  const [savedSnapshot, setSavedSnapshot] = useState(snapshot)
+  const dirty = snapshot !== savedSnapshot
+
   const handleSave = useCallback(async () => {
     if (!user?.id) return
     setSaveState("saving")
@@ -138,13 +158,14 @@ export default function PublicProfileMakerPage() {
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error ?? `Error ${res.status}`)
       }
+      setSavedSnapshot(snapshot)
       setSaveState("success")
       router.refresh()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Save failed")
       setSaveState("error")
     }
-  }, [socials, tagline, buttons, fixedLabels, theme, user?.id, router])
+  }, [socials, tagline, buttons, fixedLabels, theme, snapshot, user?.id, router])
 
   // ── Preview data ─────────────────────────────────────────────────────────
   const fullName = profile?.fullname ?? user?.email?.split("@")[0] ?? ""
@@ -306,159 +327,143 @@ export default function PublicProfileMakerPage() {
               </div>
             </div>
 
-            {/* Custom buttons */}
-            <div className="bg-white rounded-2xl border border-[#e4e7ec] shadow-[0_2px_16px_-4px_rgba(0,31,63,0.08)] overflow-hidden">
-              <div className="px-6 pt-6 pb-4 border-b border-[#f0f2f5] flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-                <div>
-                  <h2 className={`${DISPLAY} text-base font-bold text-[#0d1117]`}>Buttons</h2>
-                  <p className="text-xs text-[#9ca3af] mt-0.5">
-                    Your own links come first, in this order, then the three below. You can rename
-                    every button; the last three always go where they say.
-                  </p>
-                </div>
-                <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-[#6b7280] bg-[#f0f2f5] rounded-full px-2.5 py-1">
-                  {buttons.length} of {CUSTOM_LINKS_MAX}
-                </span>
+            {/* Buttons */}
+          <div className="bg-white rounded-2xl border border-[#e4e7ec] shadow-[0_2px_16px_-4px_rgba(0,31,63,0.08)] overflow-hidden">
+            <div className="px-6 pt-6 pb-4 border-b border-[#f0f2f5] flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+              <div>
+                <h2 className={`${DISPLAY} text-base font-bold text-[#0d1117]`}>Buttons</h2>
+                <p className="text-xs text-[#9ca3af] mt-0.5">
+                  A label and a link each. The three at the bottom always go where they say, so
+                  those take a label only.
+                </p>
               </div>
-
-              <div className="px-6 py-5 space-y-3">
-                {buttons.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-[#d1d5db] px-4 py-8 text-center">
-                    <span className="w-10 h-10 rounded-xl bg-[#001f3f]/5 text-[#001f3f] flex items-center justify-center mx-auto mb-2.5">
-                      <Link2 className="w-5 h-5" />
-                    </span>
-                    <p className="text-sm text-[#6b7280]">No buttons yet. Add your first one below.</p>
-                  </div>
-                )}
-
-                {buttons.map((b, i) => {
-                  const labelOk = Boolean(normalizeLinkLabel(b.label))
-                  const urlTyped = b.url.trim()
-                  const urlOk = Boolean(normalizeLinkUrl(b.url))
-                  const urlBad = Boolean(urlTyped) && !urlOk
-                  return (
-                    <div key={b.rowId} className="rounded-xl border border-[#e5e7eb] bg-[#fcfcfd] p-3">
-                      <div className="flex items-start gap-2">
-                        <div className="flex-1 min-w-0 space-y-2">
-                          <input
-                            type="text"
-                            value={b.label}
-                            maxLength={LINK_LABEL_MAX}
-                            onChange={(e) => updateButton(b.rowId, { label: e.target.value })}
-                            placeholder="Button label — e.g. Browse my listings"
-                            aria-label={`Button ${i + 1} label`}
-                            className={`${inputBase} !bg-white`}
-                          />
-                          <input
-                            type="text"
-                            inputMode="url"
-                            autoComplete="off"
-                            spellCheck={false}
-                            value={b.url}
-                            onChange={(e) => updateButton(b.rowId, { url: e.target.value })}
-                            placeholder="fhiglobal.ae/buy"
-                            aria-label={`Button ${i + 1} link`}
-                            aria-invalid={urlBad}
-                            className={
-                              urlBad
-                                ? `${inputBase} !border-rose-300 !bg-rose-50 focus:!border-rose-500 focus:!ring-rose-500/10`
-                                : `${inputBase} !bg-white`
-                            }
-                          />
-                        </div>
-
-                        {/* Reorder + remove */}
-                        <div className="shrink-0 flex flex-col gap-1">
-                          <button
-                            type="button"
-                            onClick={() => moveButton(i, -1)}
-                            disabled={i === 0}
-                            aria-label={`Move button ${i + 1} up`}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg text-[#6b7280] hover:bg-[#eef1f5] hover:text-[#001f3f] disabled:opacity-30 disabled:hover:bg-transparent transition-all"
-                          >
-                            <ArrowUp className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveButton(i, 1)}
-                            disabled={i === buttons.length - 1}
-                            aria-label={`Move button ${i + 1} down`}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg text-[#6b7280] hover:bg-[#eef1f5] hover:text-[#001f3f] disabled:opacity-30 disabled:hover:bg-transparent transition-all"
-                          >
-                            <ArrowDown className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeButton(b.rowId)}
-                            aria-label={`Remove button ${i + 1}`}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg text-[#9ca3af] hover:bg-rose-50 hover:text-rose-600 transition-all"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {urlBad && (
-                        <p className="mt-2 text-[11px] text-rose-600 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 shrink-0" />
-                          Enter a web address, like fhiglobal.ae/buy
-                        </p>
-                      )}
-                      {!labelOk && urlOk && (
-                        <p className="mt-2 text-[11px] text-amber-600 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 shrink-0" />
-                          Give it a label so it has something to say
-                        </p>
-                      )}
-                    </div>
-                  )
-                })}
-
-                {/* Buttons whose destination the profile owns. Only the wording is
-                    yours, so there is a label field and no url field at all. */}
-                {FIXED_BUTTONS.map((b) => (
-                  <div key={b.key} className="rounded-xl border border-[#e0e7ff] bg-[#f8faff] p-3">
-                    <div className="flex items-start gap-2">
-                      <span className="w-9 h-9 shrink-0 rounded-xl bg-white border border-[#e0e7ff] flex items-center justify-center text-[#001f3f]">
-                        {b.key === "default" ? <Globe className="w-4 h-4" /> : <Star className="w-4 h-4" />}
-                      </span>
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <input
-                          type="text"
-                          value={fixedLabels[b.key]}
-                          maxLength={LINK_LABEL_MAX}
-                          onChange={(e) =>
-                            setFixedLabels((prev) => ({ ...prev, [b.key]: e.target.value }))
-                          }
-                          placeholder={b.fallback}
-                          aria-label={`${b.fallback} button label`}
-                          className={`${inputBase} !bg-white`}
-                        />
-                        <p className="flex items-center gap-1.5 text-[11px] text-[#6b7280]">
-                          <Lock className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{b.destination}</span>
-                        </p>
-                        {"requires" in b && b.requires && (
-                          <p className="text-[11px] text-[#9ca3af]">{b.requires}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={addButton}
-                  disabled={buttons.length >= CUSTOM_LINKS_MAX}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed border-[#c4c9d4] text-sm font-semibold text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] hover:bg-[#f8faff] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-[#c4c9d4] disabled:hover:bg-transparent transition-all"
-                >
-                  <Plus className="w-4 h-4" />
-                  {buttons.length >= CUSTOM_LINKS_MAX ? `That's all ${CUSTOM_LINKS_MAX}` : "Add a button"}
-                </button>
-              </div>
+              <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-[#6b7280] bg-[#f0f2f5] rounded-full px-2.5 py-1">
+                {buttons.length} of {CUSTOM_LINKS_MAX}
+              </span>
             </div>
 
-            {/* Social links */}
+            <div className="px-6 py-5 space-y-2">
+              {buttons.length === 0 && (
+                <p className="rounded-xl border border-dashed border-[#d1d5db] px-4 py-6 text-center text-xs text-[#6b7280]">
+                  No buttons of your own yet.
+                </p>
+              )}
+
+              {buttons.map((b, i) => {
+                const labelOk = Boolean(normalizeLinkLabel(b.label))
+                const urlTyped = b.url.trim()
+                const urlOk = Boolean(normalizeLinkUrl(b.url))
+                const urlBad = Boolean(urlTyped) && !urlOk
+                return (
+                  <div key={b.rowId}>
+                    {/* One line: label, link, controls. */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                      <input
+                        type="text"
+                        value={b.label}
+                        maxLength={LINK_LABEL_MAX}
+                        onChange={(e) => updateButton(b.rowId, { label: e.target.value })}
+                        placeholder="Label"
+                        aria-label={`Button ${i + 1} label`}
+                        className={`${inputBase} sm:flex-1 sm:min-w-0`}
+                      />
+                      <input
+                        type="text"
+                        inputMode="url"
+                        autoComplete="off"
+                        spellCheck={false}
+                        value={b.url}
+                        onChange={(e) => updateButton(b.rowId, { url: e.target.value })}
+                        placeholder="fhiglobal.ae/buy"
+                        aria-label={`Button ${i + 1} link`}
+                        aria-invalid={urlBad}
+                        className={
+                          urlBad
+                            ? `${inputBase} sm:flex-1 sm:min-w-0 !border-rose-300 !bg-rose-50 focus:!border-rose-500 focus:!ring-rose-500/10`
+                            : `${inputBase} sm:flex-1 sm:min-w-0`
+                        }
+                      />
+                      <span className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => moveButton(i, -1)}
+                          disabled={i === 0}
+                          aria-label={`Move button ${i + 1} up`}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-[#9ca3af] hover:bg-[#eef1f5] hover:text-[#001f3f] disabled:opacity-25 disabled:hover:bg-transparent transition-all"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveButton(i, 1)}
+                          disabled={i === buttons.length - 1}
+                          aria-label={`Move button ${i + 1} down`}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-[#9ca3af] hover:bg-[#eef1f5] hover:text-[#001f3f] disabled:opacity-25 disabled:hover:bg-transparent transition-all"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeButton(b.rowId)}
+                          aria-label={`Remove button ${i + 1}`}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-[#9ca3af] hover:bg-rose-50 hover:text-rose-600 transition-all"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </span>
+                    </div>
+
+                    {urlBad && (
+                      <p className="mt-1.5 text-[11px] text-rose-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" />
+                        Enter a web address, like fhiglobal.ae/buy
+                      </p>
+                    )}
+                    {!labelOk && urlOk && (
+                      <p className="mt-1.5 text-[11px] text-amber-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" />
+                        Give it a label so it has something to say
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+
+              <button
+                type="button"
+                onClick={addButton}
+                disabled={buttons.length >= CUSTOM_LINKS_MAX}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-[#c4c9d4] text-sm font-semibold text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] hover:bg-[#f8faff] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-[#c4c9d4] disabled:hover:bg-transparent transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                {buttons.length >= CUSTOM_LINKS_MAX ? `That's all ${CUSTOM_LINKS_MAX}` : "Add a button"}
+              </button>
+            </div>
+
+            {/* Fixed buttons — one input each, because the label is the only
+                part that is the agent's to change. */}
+            <div className="px-6 pb-6 pt-4 border-t border-[#f0f2f5] space-y-2">
+              {FIXED_BUTTONS.map((b) => (
+                <div key={b.key} className="flex flex-col sm:flex-row sm:items-center gap-x-3 gap-y-1">
+                  <span className="sm:w-40 shrink-0 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">
+                    <Lock className="w-3 h-3 shrink-0" />
+                    {b.destination}
+                  </span>
+                  <input
+                    type="text"
+                    value={fixedLabels[b.key]}
+                    maxLength={LINK_LABEL_MAX}
+                    onChange={(e) => setFixedLabels((prev) => ({ ...prev, [b.key]: e.target.value }))}
+                    placeholder={b.fallback}
+                    aria-label={`${b.fallback} button label`}
+                    className={`${inputBase} flex-1 min-w-0`}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Social links */}
             <div className="bg-white rounded-2xl border border-[#e4e7ec] shadow-[0_2px_16px_-4px_rgba(0,31,63,0.08)] overflow-hidden">
               <div className="px-6 pt-6 pb-4 border-b border-[#f0f2f5] flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
                 <div>
@@ -503,11 +508,19 @@ export default function PublicProfileMakerPage() {
                             : inputBase
                         }
                       />
-                      {bad && (
+                      {bad ? (
                         <p className="text-[11px] text-rose-600 flex items-center gap-1">
                           <AlertCircle className="w-3 h-3 shrink-0" />
                           Use your username, or a full {p.label} URL
                         </p>
+                      ) : (
+                        // A bare handle is encouraged, so show where it actually
+                        // lands rather than leaving the agent to guess.
+                        resolved && (
+                          <p className="text-[11px] text-[#9ca3af] truncate" title={resolved}>
+                            {resolved.replace(/^https:\/\//, "")}
+                          </p>
+                        )
                       )}
                     </div>
                   )
@@ -516,9 +529,16 @@ export default function PublicProfileMakerPage() {
 
             </div>
 
-            {/* One save for both sections above. */}
-            <div className="bg-white rounded-2xl border border-[#e4e7ec] shadow-[0_2px_16px_-4px_rgba(0,31,63,0.08)] px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
-              {saveState === "success" && (
+              </>
+          )}
+
+          {/* One save for every tab — the theme is edited under Design while the
+              fields are under Forms, so keeping it inside Forms left Design with
+              no visible Save. Sticky, because it otherwise sat below ~250 lines
+              of form and you had to scroll back down to use it. */}
+          <div className="sticky bottom-0 z-10 -mx-1 px-1 pb-1 pt-2 bg-gradient-to-t from-[#f4f6f9] via-[#f4f6f9] to-transparent">
+            <div className="bg-white rounded-2xl border border-[#e4e7ec] shadow-[0_-2px_16px_-4px_rgba(0,31,63,0.12)] px-5 py-3.5 flex items-center justify-between gap-4 flex-wrap">
+              {saveState === "success" && !dirty ? (
                 invalidPlatforms.length > 0 ? (
                   <span className="text-sm text-amber-700 flex items-center gap-1.5">
                     <AlertCircle className="w-4 h-4 shrink-0" />
@@ -529,23 +549,24 @@ export default function PublicProfileMakerPage() {
                     <CheckCircle2 className="w-4 h-4" /> Saved — your page is live
                   </span>
                 )
-              )}
-              {saveState === "error" && (
+              ) : saveState === "error" ? (
                 <span className="text-sm text-rose-600 flex items-center gap-1.5 min-w-0 truncate">
                   <AlertCircle className="w-4 h-4 shrink-0" /> {saveError}
                 </span>
-              )}
-              {(saveState === "idle" || saveState === "saving") && (
-                <span className="text-xs text-[#9ca3af]">
-                  {invalidPlatforms.length > 0
-                    ? `Everything else saves — fix the highlighted ${invalidPlatforms.length === 1 ? "field" : "fields"} to include ${invalidPlatforms.length === 1 ? "it" : "them"}.`
-                    : "Changes go live the moment you save."}
+              ) : dirty ? (
+                <span className="text-xs font-semibold text-[#8a6a10] flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357]" aria-hidden />
+                  Unsaved changes
+                  {invalidPlatforms.length > 0 &&
+                    ` · fix the highlighted ${invalidPlatforms.length === 1 ? "field" : "fields"} to include ${invalidPlatforms.length === 1 ? "it" : "them"}`}
                 </span>
+              ) : (
+                <span className="text-xs text-[#9ca3af]">Everything here is saved.</span>
               )}
 
               <button
                 onClick={handleSave}
-                disabled={saveState === "saving"}
+                disabled={saveState === "saving" || !dirty}
                 className="ml-auto flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold shadow-[0_4px_12px_-2px_rgba(0,31,63,0.35)] hover:shadow-[0_6px_18px_-2px_rgba(0,31,63,0.45)] hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-200"
               >
                 {saveState === "saving"
@@ -554,8 +575,7 @@ export default function PublicProfileMakerPage() {
                 }
               </button>
             </div>
-            </>
-          )}
+          </div>
 
           {/* Mounted always so the preview keeps mirroring the pins, hidden when
               another tab is showing. */}

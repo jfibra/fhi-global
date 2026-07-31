@@ -117,23 +117,25 @@ function ActionPill({
 
   const inner = (
     <>
-      {/* A tile of 0 is a deliberate choice, not an empty box — the glyph then
-          sits bare against the pill. */}
-      <span
-        className="shrink-0 flex items-center justify-center"
-        style={{
-          width: t.tileSize || 20,
-          height: t.tileSize || 20,
-          background: t.tileSize ? t.tile : "transparent",
-          border: t.tileSize ? t.tileBorder : "none",
-          borderRadius: t.tileRadius,
-          color: t.tileSize ? t.tileInk : t.pillInk,
-        }}
-      >
-        <span className="block" style={{ width: iconGlyph, height: iconGlyph }}>
-          <Icon className="w-full h-full" />
+      {/* The icon is skipped entirely under the None treatment, and a tile of 0
+          keeps the glyph but drops the chip behind it. */}
+      {t.showIcon && (
+        <span
+          className="shrink-0 flex items-center justify-center"
+          style={{
+            width: t.tileSize || 20,
+            height: t.tileSize || 20,
+            background: t.tileSize ? t.tile : "transparent",
+            border: t.tileSize ? t.tileBorder : "none",
+            borderRadius: t.tileRadius,
+            color: t.tileSize ? t.tileInk : t.pillInk,
+          }}
+        >
+          <span className="block" style={{ width: iconGlyph, height: iconGlyph }}>
+            <Icon className="w-full h-full" />
+          </span>
         </span>
-      </span>
+      )}
       <span className="flex-1 text-center">
         <span
           className={`${DISPLAY} block font-bold`}
@@ -147,8 +149,11 @@ function ActionPill({
           </span>
         )}
       </span>
-      {/* Balances the icon tile so the label stays optically centred. */}
-      <span className="shrink-0" style={{ width: t.tileSize || 20 }} aria-hidden />
+      {/* Balances the icon tile so the label stays optically centred. With no
+          icon there is nothing to balance, and the label centres on its own. */}
+      {t.showIcon && (
+        <span className="shrink-0" style={{ width: t.tileSize || 20 }} aria-hidden />
+      )}
     </>
   )
 

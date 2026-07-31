@@ -36,6 +36,8 @@ export type ProfileTheme = {
   tile: string
   tileInk: string
   tileBorder: string
+  /** False hides the icon entirely, leaving a label-only button. */
+  showIcon: boolean
   /** Glass panels — the contact card, social buttons. */
   panel: string
   panelBorder: string
@@ -75,7 +77,7 @@ function clampSize(key: SizeKey, raw: unknown): number | undefined {
 type ThemeBase = Omit<
   ProfileTheme,
   | "pillRadius" | "pillBorder" | "pillPadY" | "pillFont"
-  | "tileSize" | "tileRadius" | "tileBorder"
+  | "tileSize" | "tileRadius" | "tileBorder" | "showIcon"
 >
 
 export const PROFILE_THEMES: ThemeBase[] = [
@@ -192,7 +194,7 @@ export const ICON_STYLES = [
   { id: "solid", name: "Solid" },
   { id: "soft", name: "Soft" },
   { id: "outline", name: "Outline" },
-  { id: "invert", name: "Invert" },
+  { id: "none", name: "None" },
   { id: "plain", name: "Plain" },
 ] as const
 
@@ -200,46 +202,41 @@ export type IconStyleId = (typeof ICON_STYLES)[number]["id"]
 
 export const DEFAULT_ICON_STYLE: IconStyleId = "solid"
 
-/** Black or white, whichever stays legible on `hex`. Non-hex falls back to white. */
-function readableOn(hex: string): string {
-  if (!HEX.test(hex)) return "#ffffff"
-  return luminance(hex) > 0.55 ? "#16202e" : "#ffffff"
-}
-
 /** hex → rgba, for the washes the Soft treatment needs. */
 function alpha(hex: string, a: number): string {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
   return `rgba(${r}, ${g}, ${b}, ${a})`
 }
 
-/** Tile fill, border and glyph colour for one treatment. */
+/** Tile fill, border, glyph colour and whether there is an icon at all. */
 function iconTokens(
   base: Pick<ThemeBase, "accent" | "pillBg" | "pillInk">,
   style: IconStyleId,
-): Pick<ProfileTheme, "tile" | "tileInk" | "tileBorder"> {
+): Pick<ProfileTheme, "tile" | "tileInk" | "tileBorder" | "showIcon"> {
   const { accent } = base
   switch (style) {
     case "soft":
-      return { tile: alpha(accent, 0.18), tileInk: accent, tileBorder: "none" }
+      return { tile: alpha(accent, 0.18), tileInk: accent, tileBorder: "none", showIcon: true }
     case "outline":
-      return { tile: "transparent", tileInk: accent, tileBorder: `1.5px solid ${alpha(accent, 0.55)}` }
-    case "invert":
-      // The pill's own ink becomes the chip. The glyph is then chosen AGAINST
-      // that chip by luminance rather than being set to the pill's background —
-      // an outline or glass button makes that background transparent, which
-      // would render the glyph invisible.
       return {
-        tile: base.pillInk,
-        tileInk: readableOn(base.pillInk),
-        tileBorder: "none",
+        tile: "transparent",
+        tileInk: accent,
+        tileBorder: `1.5px solid ${alpha(accent, 0.55)}`,
+        showIcon: true,
       }
+    case "none":
+      // No icon at all — the button is its label. The other tokens still carry
+      // sane values so nothing downstream has to special-case them.
+      return { tile: "transparent", tileInk: accent, tileBorder: "none", showIcon: false }
     case "plain":
-      return { tile: "transparent", tileInk: accent, tileBorder: "none" }
+      // The glyph without a chip behind it.
+      return { tile: "transparent", tileInk: accent, tileBorder: "none", showIcon: true }
     default:
       return {
         tile: `linear-gradient(180deg, ${accent} 0%, ${shade(accent, 0.25)} 100%)`,
         tileInk: luminance(accent) > 0.55 ? "#16202e" : "#ffffff",
         tileBorder: "none",
+        showIcon: true,
       }
   }
 }

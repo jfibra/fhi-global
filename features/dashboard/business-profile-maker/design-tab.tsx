@@ -526,19 +526,27 @@ export function DesignTab({
                       className="flex h-9 items-center justify-center rounded-xl"
                       style={{ background: pv.pillBg, border: pv.pillBorder }}
                     >
-                      <span
-                        className="flex items-center justify-center"
-                        style={{
-                          width: 22,
-                          height: 22,
-                          background: pv.tile,
-                          border: pv.tileBorder,
-                          borderRadius: Math.min(pv.tileRadius, 11),
-                          color: pv.tileInk,
-                        }}
-                      >
-                        <Link2 className="w-3 h-3" />
-                      </span>
+                      {pv.showIcon ? (
+                        <span
+                          className="flex items-center justify-center"
+                          style={{
+                            width: 22,
+                            height: 22,
+                            background: pv.tile,
+                            border: pv.tileBorder,
+                            borderRadius: Math.min(pv.tileRadius, 11),
+                            color: pv.tileInk,
+                          }}
+                        >
+                          <Link2 className="w-3 h-3" />
+                        </span>
+                      ) : (
+                        // Label-only, which is what None produces.
+                        <span
+                          className="block h-1.5 w-10 rounded-full"
+                          style={{ background: pv.pillInk, opacity: 0.5 }}
+                        />
+                      )}
                     </span>
                     <span
                       className={`mt-1.5 block text-[10px] font-bold ${on ? "text-[#8a6a10]" : "text-[#6b7280]"}`}
