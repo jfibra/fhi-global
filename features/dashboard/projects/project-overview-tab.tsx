@@ -32,6 +32,23 @@ const INNER_TABS: TabDef[] = [
   { id: "contact",  label: "Sales Contact",   icon: Phone },
 ]
 
+// ─── Read-only formatters ─────────────────────────────────────────────────────
+
+const STATUS_LABELS: Record<string, string> = {
+  pre_launch: "Pre-Launch",
+  launch: "Launch",
+  under_construction: "Under Construction",
+  completed: "Completed",
+}
+
+function fmtDate(v: string | null | undefined): string {
+  if (!v) return "—"
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+}
+const fmtNum = (v: number | null | undefined): string => (v == null ? "—" : Number(v).toLocaleString())
+const fmtPct = (v: number | null | undefined): string => (v == null ? "—" : `${v}%`)
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -362,6 +379,112 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
     ),
   }
 
+  // ─── Read-only display panels (agents/members) ─────────────────────────────
+  const roRow = (label: string, value: React.ReactNode) => {
+    const empty = value == null || value === "" || value === "—"
+    return (
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9ca3af]">{label}</p>
+        <div className={`mt-1 text-sm break-words ${empty ? "text-[#c4c9d0]" : "text-[#111827]"}`}>{empty ? "—" : value}</div>
+      </div>
+    )
+  }
+  const roText = (label: string, value: string | null | undefined) => (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9ca3af]">{label}</p>
+      <p className={`mt-1 text-sm leading-relaxed whitespace-pre-wrap ${value?.trim() ? "text-[#374151]" : "text-[#c4c9d0]"}`}>
+        {value?.trim() ? value : "Not provided"}
+      </p>
+    </div>
+  )
+  const money = (v: number | null | undefined) => (v == null ? "—" : `${project.currency ?? "AED"} ${Number(v).toLocaleString()}`)
+
+  const readonlyPanels: Record<InnerTab, React.ReactNode> = {
+    basic: (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+          {roRow("Project Name", project.name)}
+          {roRow("Slug", project.slug)}
+          {roRow("Developer", project.developers?.name ?? "—")}
+          {roRow("Status", STATUS_LABELS[project.status] ?? project.status)}
+        </div>
+        {roText("Short Description", project.description)}
+        {roText("About Project", project.about_project)}
+      </div>
+    ),
+    location: (
+      <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+        {roRow("Location / Address", project.location)}
+        {roRow("City", project.city)}
+        {roRow("Country", project.country)}
+        {roRow("Region", project.region)}
+        {roRow("Community", project.community)}
+        {roRow("Sub-Community", project.sub_community)}
+        {roRow("Latitude", project.latitude)}
+        {roRow("Longitude", project.longitude)}
+      </div>
+    ),
+    pricing: (
+      <div className="space-y-6">
+        <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+          {roRow("Currency", project.currency ?? "AED")}
+          {roRow("Launch Price From", money(project.launch_price_from))}
+          {roRow("Launch Price To", money(project.launch_price_to))}
+          {roRow("Gov. Fee", fmtPct(project.government_fee_percentage))}
+          {roRow("Down Payment", fmtPct(project.down_payment_percentage))}
+          {roRow("Expected ROI", fmtPct(project.expected_roi))}
+          {roRow("Rental Yield", fmtPct(project.rental_yield))}
+          {roRow("Ownership Type", project.ownership_type)}
+          {roRow("Installment Available", project.installment_available ? "Yes" : "No")}
+          {roRow("Freehold", project.freehold ? "Yes" : "No")}
+        </div>
+        {roText("Payment Plan Details", project.payment_plan_details)}
+      </div>
+    ),
+    dates: (
+      <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+        {roRow("Booking Date", fmtDate(project.booking_date))}
+        {roRow("Construction Start", fmtDate(project.construction_start_date))}
+        {roRow("Expected Completion", fmtDate(project.expected_completion_date))}
+        {roRow("Delivery Date", fmtDate(project.delivery_date))}
+        {roRow("Delivery Quarter", project.delivery_quarter)}
+      </div>
+    ),
+    building: (
+      <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+        {roRow("No. of Buildings", fmtNum(project.number_of_buildings))}
+        {roRow("Total Units", fmtNum(project.total_units))}
+        {roRow("Floors", fmtNum(project.floors))}
+        <div className="col-span-3">
+          {roRow(
+            "Video URL",
+            project.video_url ? (
+              <a href={project.video_url} target="_blank" rel="noreferrer" className="text-[#001f3f] hover:underline break-all">
+                {project.video_url}
+              </a>
+            ) : "—",
+          )}
+        </div>
+      </div>
+    ),
+    contact: (
+      <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+        {roRow(
+          "Sales Phone",
+          project.sales_contact_phone ? (
+            <a href={`tel:${project.sales_contact_phone}`} className="text-[#001f3f] hover:underline">{project.sales_contact_phone}</a>
+          ) : "—",
+        )}
+        {roRow(
+          "Sales Email",
+          project.sales_contact_email ? (
+            <a href={`mailto:${project.sales_contact_email}`} className="text-[#001f3f] hover:underline">{project.sales_contact_email}</a>
+          ) : "—",
+        )}
+      </div>
+    ),
+  }
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -385,11 +508,9 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
         ))}
       </div>
 
-      {/* Panel */}
+      {/* Panel — read-only display for agents/members, edit form for admins. */}
       <div className="bg-white rounded-2xl border border-[#f0f0f0] p-6">
-        <fieldset disabled={readOnly} className="min-w-0 border-0 p-0 m-0">
-          {panels[active]}
-        </fieldset>
+        {readOnly ? readonlyPanels[active] : panels[active]}
       </div>
 
       {aiModalOpen && (
