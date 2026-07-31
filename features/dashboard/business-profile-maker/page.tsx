@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
-  AlertCircle, ArrowDown, ArrowUp, CheckCircle2, Loader2, Lock,
-  Palette, Plus, Save, Star, SlidersHorizontal, Trash2,
+  AlertCircle, ArrowDown, ArrowUp, CheckCircle2, ChevronLeft, ChevronRight,
+  Loader2, Lock, Palette, Plus, Save, Star, SlidersHorizontal, Trash2,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { roleToLabel } from "@/lib/app-roles"
@@ -217,6 +217,11 @@ export default function PublicProfileMakerPage() {
     socials, tagline, buttons, featured, fixedLabels, theme, fullName, rawAvatar, countryCode, phoneNumber,
     profile?.fname, profile?.lname, profile?.role, user?.id, user?.email,
   ])
+
+  // Tab order is the sequence the nav walks, so TABS stays the single source.
+  const tabIndex = TABS.findIndex((tb) => tb.key === tab)
+  const prevTab = tabIndex > 0 ? TABS[tabIndex - 1] : null
+  const nextTab = tabIndex < TABS.length - 1 ? TABS[tabIndex + 1] : null
 
   const filledCount = SOCIAL_PLATFORMS.filter((p) => (socials[p.id] ?? "").trim()).length
   const addButton = () =>
@@ -532,6 +537,12 @@ export default function PublicProfileMakerPage() {
               </>
           )}
 
+          {/* Mounted always so the preview keeps mirroring the pins, hidden when
+              another tab is showing. */}
+          <div className={tab === "featured" ? "" : "hidden"}>
+            <FeaturedPanel onSelectionChange={setFeatured} />
+          </div>
+
           {/* One save for every tab — the theme is edited under Design while the
               fields are under Forms, so keeping it inside Forms left Design with
               no visible Save. Sticky, because it otherwise sat below ~250 lines
@@ -564,10 +575,39 @@ export default function PublicProfileMakerPage() {
                 <span className="text-xs text-[#9ca3af]">Everything here is saved.</span>
               )}
 
+              {/* Step through the tabs without scrolling back up to the bar.
+                  Each button names where it goes, so the destination is known
+                  before the click. */}
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => prevTab && setTab(prevTab.key)}
+                  disabled={!prevTab}
+                  title={prevTab ? `Back to ${prevTab.label}` : undefined}
+                  className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-[#e4e7ec] bg-white text-xs font-bold text-[#374151] hover:text-[#001f3f] hover:border-[#c4c9d4] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{prevTab ? prevTab.label : "Back"}</span>
+                </button>
+                <span className="text-[11px] text-[#9ca3af] tabular-nums whitespace-nowrap">
+                  {tabIndex + 1} / {TABS.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => nextTab && setTab(nextTab.key)}
+                  disabled={!nextTab}
+                  title={nextTab ? `Next: ${nextTab.label}` : undefined}
+                  className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-[#e4e7ec] bg-white text-xs font-bold text-[#374151] hover:text-[#001f3f] hover:border-[#c4c9d4] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  <span className="hidden sm:inline">{nextTab ? nextTab.label : "Next"}</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
               <button
                 onClick={handleSave}
                 disabled={saveState === "saving" || !dirty}
-                className="ml-auto flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold shadow-[0_4px_12px_-2px_rgba(0,31,63,0.35)] hover:shadow-[0_6px_18px_-2px_rgba(0,31,63,0.45)] hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-200"
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold shadow-[0_4px_12px_-2px_rgba(0,31,63,0.35)] hover:shadow-[0_6px_18px_-2px_rgba(0,31,63,0.45)] hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-200"
               >
                 {saveState === "saving"
                   ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
@@ -575,12 +615,6 @@ export default function PublicProfileMakerPage() {
                 }
               </button>
             </div>
-          </div>
-
-          {/* Mounted always so the preview keeps mirroring the pins, hidden when
-              another tab is showing. */}
-          <div className={tab === "featured" ? "" : "hidden"}>
-            <FeaturedPanel onSelectionChange={setFeatured} />
           </div>
         </div>
 
