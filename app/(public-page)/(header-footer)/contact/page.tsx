@@ -21,14 +21,14 @@ const OFFICES = [
   {
     city: "Dubai (HQ)",
     address: "Office 98, 3rd Floor, Rigga Business Center (Ibis Hotel Building), Al Rigga, Deira, Dubai, UAE",
-    phone: "+63 977 815 0888",
+    phone: "+971 56 742 8288",
     email: "info@fhiglobal.ae",
     hours: "Sun–Thu: 9:00 AM – 6:00 PM",
   },
   {
     city: "Abu Dhabi",
     address: "Suite 501, Al Bateen Investment Complex, Abu Dhabi, UAE",
-    phone: "+63 977 815 0888",
+    phone: "+971 56 742 8288",
     email: "abudhabi@fhiglobal.ae",
     hours: "Sun–Thu: 9:00 AM – 6:00 PM",
   },
@@ -133,7 +133,7 @@ export default function ContactPage() {
               <div>
                 <p className="text-center text-sm font-bold uppercase tracking-[0.2em] text-[#d6b357] mb-4">Quick Contact</p>
                 {[
-                  { icon: Phone, label: "Main Office", value: "+63 977 815 0888", sub: "Sun–Thu, 9AM–6PM GST", href: "tel:+639778150888" },
+                  { icon: Phone, label: "Main Office", value: "+971 56 742 8288", sub: "Sun–Thu, 9AM–6PM GST", href: "tel:+971567428288" },
                   { icon: Mail,  label: "Email Us",    value: "info@fhiglobal.ae", sub: "We respond within one business day.", href: "mailto:info@fhiglobal.ae" },
                   { icon: MapPin, label: "HQ Location", value: "Al Rigga, Deira, Dubai, UAE", sub: "Visit our main office", href: "#offices" },
                   { icon: Clock,  label: "Working Hours", value: "Sun–Thu, 9AM–6PM GST", sub: "Friday & Saturday closed" },

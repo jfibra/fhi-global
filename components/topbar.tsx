@@ -25,12 +25,13 @@ export function TopBar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-9 flex items-center justify-between">
         {/* Left — contact info */}
         <div className="flex items-center gap-5">
+          {/* Dubai office line — the top bar fronts the UAE business. */}
           <a
-            href="tel:+639778150888"
+            href="tel:+971567428288"
             className="flex items-center gap-1.5 hover:text-[#d6b357] transition-colors duration-200"
           >
             <Phone className="w-3 h-3" />
-            <span>+63 977 815 0888</span>
+            <span>+971 56 742 8288</span>
           </a>
           <span className="hidden sm:block w-px h-3 bg-white/15" />
           <a

@@ -454,13 +454,13 @@ export function Header() {
             <p className="text-xs font-semibold uppercase tracking-widest text-white/30 mb-3">Contact Us</p>
             <div className="flex flex-col gap-2.5">
               <a
-                href="tel:+639778150888"
+                href="tel:+971567428288"
                 className="flex items-center gap-3 text-white/60 hover:text-[#d6b357] transition-colors text-sm"
               >
                 <div className="w-8 h-8 rounded-lg bg-white/8 flex items-center justify-center shrink-0">
                   <Phone className="w-3.5 h-3.5" />
                 </div>
-                +63 977 815 0888
+                +971 56 742 8288
               </a>
               <a
                 href="mailto:info@fhiglobal.ae"

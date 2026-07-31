@@ -41,8 +41,8 @@ export function PublicFooter() {
               Dubai&apos;s trusted real estate portal. Connecting buyers, investors, and developers across premium communities.
             </p>
             <div className="space-y-2">
-              <a href="tel:+639778150888" className="flex items-center gap-2.5 text-sm text-white/50 hover:text-white transition-colors">
-                <Phone className="w-4 h-4 text-[#d6b357]" /> +63 977 815 0888
+              <a href="tel:+971567428288" className="flex items-center gap-2.5 text-sm text-white/50 hover:text-white transition-colors">
+                <Phone className="w-4 h-4 text-[#d6b357]" /> +971 56 742 8288
               </a>
               <a href="mailto:info@fhiglobal.ae" className="flex items-center gap-2.5 text-sm text-white/50 hover:text-white transition-colors">
                 <Mail className="w-4 h-4 text-[#d6b357]" /> info@fhiglobal.ae
