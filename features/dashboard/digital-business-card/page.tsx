@@ -209,7 +209,10 @@ export default function PublicProfileMakerPage() {
   // Feeds the Business Card renderer — the same shape the Business Card page
   // builds, so both pages draw the identical card.
   const cardData: CardData = useMemo(() => ({
-    name: previewData.fullname,
+    // Stored names are often all caps because that is how they were typed at
+    // registration. The link preview is a public artefact — it should read the
+    // way the profile page reads, not the way the row is stored.
+    name: titleCaseName(previewData.fullname),
     phoneDial: dialFromValue(previewData.countryCode),
     phoneLocal: previewLocal,
     email: previewData.email,
