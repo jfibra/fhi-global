@@ -204,7 +204,7 @@ export function AllLogsTab({ scope, categoryCounts }: { scope?: "security"; cate
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2">
-                          <UserAvatar name={row.actor_name ?? "System"} size={24} />
+                          <UserAvatar name={row.actor_name ?? "System"} imageUrl={row.actor_avatar_url} size={24} />
                           <div className="min-w-0">
                             <p className="text-xs font-medium text-[#111827] truncate max-w-[120px]">{row.actor_name ?? "System"}</p>
                             {row.actor_role && <RoleBadge role={row.actor_role} />}

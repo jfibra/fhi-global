@@ -71,8 +71,21 @@ export async function GET(req: NextRequest) {
   const { data, count, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Enrich rows with the actor's avatar (profiles.profile_url) in one batched
+  // lookup, so the User column can show profile pictures where available.
+  const rows = data ?? []
+  const actorIds = [...new Set(rows.map((r) => r.actor_id).filter((id): id is string => !!id))]
+  let avatarById: Record<string, string | null> = {}
+  if (actorIds.length > 0) {
+    const { data: profiles } = await admin
+      .from("profiles")
+      .select("id, profile_url")
+      .in("id", actorIds)
+    avatarById = Object.fromEntries((profiles ?? []).map((p) => [p.id, p.profile_url]))
+  }
+
   return NextResponse.json({
-    rows: data ?? [],
+    rows: rows.map((r) => ({ ...r, actor_avatar_url: r.actor_id ? avatarById[r.actor_id] ?? null : null })),
     total: count ?? 0,
     page,
     perPage,

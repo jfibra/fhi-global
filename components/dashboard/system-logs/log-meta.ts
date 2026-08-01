@@ -11,6 +11,7 @@ export type AuditLogRow = {
   actor_id: string | null
   actor_name: string | null
   actor_role: string | null
+  actor_avatar_url: string | null
   subject_type: string | null
   subject_id: string | null
   subject_label: string | null
