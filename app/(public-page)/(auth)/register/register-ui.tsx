@@ -8,12 +8,13 @@ import {
   Sparkles, UserPlus, Check, Building2, TrendingUp, User, FileText, Info,
 } from "lucide-react"
 import { roleToLabel } from "@/lib/app-roles"
+import { nationalityFlag } from "@/lib/nationalities"
 import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
 import { OtpInput } from "@/components/auth/otp-input"
 import { sendRegisterOtp, verifyRegisterOtp } from "@/app/(public-page)/(auth)/register/actions"
 
 /** Public display info for the inviter behind ?ref (resolved server-side). */
-export type Referrer = { name: string; role: string; avatarUrl: string | null } | null
+export type Referrer = { name: string; role: string; avatarUrl: string | null; nationality: string | null } | null
 
 const RESEND_COOLDOWN = 60
 
@@ -44,7 +45,10 @@ function InvitedByChip({ referrer }: { referrer: NonNullable<Referrer> }) {
       </span>
       <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">Invited by</p>
-        <p className="text-sm font-bold text-[#0d1117] truncate">{referrer.name}</p>
+        <p className="text-sm font-bold text-[#0d1117] truncate">
+          {nationalityFlag(referrer.nationality) && <span className="mr-1.5">{nationalityFlag(referrer.nationality)}</span>}
+          {referrer.name}
+        </p>
       </div>
       <span className="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#b8913f] bg-[#d6b357]/15 border border-[#d6b357]/30 rounded-full px-2.5 py-1">
         {roleToLabel(referrer.role)}
@@ -75,9 +79,17 @@ function ReferralHero({ referrer }: { referrer: NonNullable<Referrer> }) {
       <h2 className="font-['Outfit'] text-4xl xl:text-[42px] font-bold text-white leading-tight drop-shadow-[0_2px_16px_rgba(0,10,30,0.7)] mt-1 mb-3">
         {referrer.name}
       </h2>
-      <span className="inline-block px-3.5 py-1.5 rounded-full bg-[#d6b357]/20 border border-[#d6b357]/45 text-[#f0d890] text-xs font-bold uppercase tracking-[0.15em] mb-8">
-        {roleToLabel(referrer.role)}
-      </span>
+      <div className="flex items-center justify-center flex-wrap gap-2 mb-8">
+        <span className="inline-block px-3.5 py-1.5 rounded-full bg-[#d6b357]/20 border border-[#d6b357]/45 text-[#f0d890] text-xs font-bold uppercase tracking-[0.15em]">
+          {roleToLabel(referrer.role)}
+        </span>
+        {nationalityFlag(referrer.nationality) && (
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/12 border border-white/25 text-white/90 text-xs font-semibold backdrop-blur-md">
+            <span className="text-base leading-none">{nationalityFlag(referrer.nationality)}</span>
+            {referrer.nationality}
+          </span>
+        )}
+      </div>
 
       <div className="flex items-start gap-3 text-left bg-white/10 border border-white/20 rounded-2xl backdrop-blur-md p-5">
         <div className="w-9 h-9 rounded-full bg-[#d6b357] flex items-center justify-center shrink-0">

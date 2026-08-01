@@ -21,15 +21,16 @@ async function resolveReferrer(refId: string | null): Promise<Referrer> {
     const admin = createAdminSupabase()
     const { data } = await admin
       .from("profiles")
-      .select("fname, lname, fullname, role, profile_url, is_deleted")
+      .select("fname, lname, fullname, role, profile_url, is_deleted, metadata")
       .eq("id", refId)
-      .maybeSingle<{ fname: string | null; lname: string | null; fullname: string | null; role: string | null; profile_url: string | null; is_deleted: boolean | null }>()
+      .maybeSingle<{ fname: string | null; lname: string | null; fullname: string | null; role: string | null; profile_url: string | null; is_deleted: boolean | null; metadata: Record<string, unknown> | null }>()
     if (!data || data.is_deleted === true) return null
     const name =
       data.fullname?.trim() ||
       [data.fname, data.lname].filter(Boolean).join(" ").trim() ||
       "Your inviter"
-    return { name, role: data.role ?? "agent", avatarUrl: data.profile_url ?? null }
+    const nationality = typeof data.metadata?.nationality === "string" ? data.metadata.nationality : null
+    return { name, role: data.role ?? "agent", avatarUrl: data.profile_url ?? null, nationality }
   } catch {
     return null
   }
