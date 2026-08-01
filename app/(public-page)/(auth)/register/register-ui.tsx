@@ -67,13 +67,15 @@ function ConfirmSponsorModal({ referrer, onConfirm }: { referrer: NonNullable<Re
             )}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onConfirm}
-          className="w-full py-3.5 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold uppercase tracking-wide transition-colors"
-        >
-          Confirm
-        </button>
+        <div className="px-7 pb-7">
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="w-full py-3.5 rounded-xl bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold uppercase tracking-wide transition-colors"
+          >
+            Confirm
+          </button>
+        </div>
       </div>
     </div>
   )
