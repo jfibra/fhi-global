@@ -5,7 +5,6 @@ import Link from "next/link"
 import {
   ArrowRight, ArrowLeft, Loader2, CheckCircle2, Mail, AlertCircle, Info, Phone,
 } from "lucide-react"
-import { roleToLabel } from "@/lib/app-roles"
 import { nationalityFlag } from "@/lib/nationalities"
 import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
 import { OtpInput } from "@/components/auth/otp-input"
@@ -24,13 +23,10 @@ function SponsorCard({ referrer }: { referrer: NonNullable<Referrer> }) {
   const flag = nationalityFlag(referrer.nationality)
   return (
     <div className="mb-6 rounded-xl border border-[#e8eaed] bg-[#f8faff] p-4 text-left">
-      <p className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af] mb-2.5">You&apos;re registering under</p>
+      <p className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af] mb-2.5">Sponsor</p>
       <div className="flex items-center gap-2">
         {flag && <span className="text-lg leading-none shrink-0">{flag}</span>}
         <p className="text-sm font-bold text-[#0d1117] truncate">{referrer.name}</p>
-        <span className="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#b8913f] bg-[#d6b357]/15 border border-[#d6b357]/30 rounded-full px-2 py-0.5">
-          {roleToLabel(referrer.role)}
-        </span>
       </div>
       {(referrer.email || referrer.phone) && (
         <div className="mt-2.5 space-y-1.5 text-xs text-[#6b7280]">
