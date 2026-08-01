@@ -251,21 +251,22 @@ export default function PublicProfileMakerPage() {
       // image rather than clearing it: losing the rest of the save over a flaky
       // upload would be the worse trade, and the tab says the card attaches on
       // save, not that it is the only thing being saved.
-      let ogImage = ogCard.image
-      try {
-        const dataUrl = await renderCard("front", activeDesign, cardData, PROFILE_OG_W, PROFILE_OG_H)
-        const blob = await (await fetch(dataUrl)).blob()
-        const form = new FormData()
-        form.append("file", blob, "link-preview.png")
-        const up = await fetch(`${API_BASE}/api/upload/profile-og`, { method: "POST", body: form })
-        if (up.ok) {
-          const { url } = (await up.json()) as { url?: string }
-          if (url) ogImage = url
-        }
-      } catch {
-        /* keep the previous image */
+      // This must not fail quietly. An earlier version swallowed the error and
+      // saved image:null, which looks like a successful save but silently leaves
+      // the old link preview in place — the failure is invisible until someone
+      // shares the link and sees the wrong card.
+      const dataUrl = await renderCard("front", activeDesign, cardData, PROFILE_OG_W, PROFILE_OG_H)
+      const blob = await (await fetch(dataUrl)).blob()
+      const form = new FormData()
+      form.append("file", blob, "link-preview.png")
+      const up = await fetch(`${API_BASE}/api/upload/profile-og`, { method: "POST", body: form })
+      if (!up.ok) {
+        const body = (await up.json().catch(() => ({}))) as { error?: string }
+        throw new Error(body.error ?? `Couldn't upload the link preview card (${up.status})`)
       }
-      const nextOgCard = { ...ogCard, image: ogImage }
+      const { url: uploadedUrl } = (await up.json()) as { url?: string }
+      if (!uploadedUrl) throw new Error("The link preview upload returned no URL")
+      const nextOgCard = { ...ogCard, image: uploadedUrl }
 
       const res = await fetch(`${API_BASE}/api/me/contact`, {
         method: "PATCH",
