@@ -546,58 +546,54 @@ export async function fetchAgentsForSale(): Promise<{ data: AgentOption[] | null
 
 // ─── Sales CRUD ───────────────────────────────────────────────────────────────
 
-export async function fetchSales(opts: {
-  page: number
-  perPage: number
+/** Everything that narrows a sales query. Shared by the paged list and the export. */
+export type SalesFilterOpts = {
   search?: string
   saleType?: SaleType
   agentId?: string
   developerId?: string
   projectId?: string
+  propertyType?: string
   commissionStatus?: CommissionStatus
   validationStatus?: ValidationStatus
   reservationDateFrom?: string
   reservationDateTo?: string
-  sortField?: SortField
-  sortDir?: SortDir
   currentRole?: string
   currentUserId?: string
-}): Promise<{ data: SaleRecord[] | null; total: number | null; error: string | null }> {
-  const supabase = createClient()
+}
+
+const SALE_SELECT = `
+  *,
+  developers(name),
+  projects(name),
+  project_units(unit_type),
+  clients(first_name,middle_name,last_name,email,phone,age,gender,occupation,street,city,state_province,country),
+  profiles:agent_id(fullname),
+  sales_attachments(id)
+`
+
+/** Structural shape of the PostgREST builder methods this helper needs. */
+type Narrowable<Q> = {
+  eq(column: string, value: unknown): Q
+  gte(column: string, value: unknown): Q
+  lte(column: string, value: unknown): Q
+  or(filters: string): Q
+}
+
+// Applies the role force-scope and every filter to a sales_reports query.
+// Extracted so the paged table, the export, and anything else built on top all
+// narrow identically — a filter that reached one but not the other would let an
+// export disagree with the report it was taken from.
+async function applySalesFilters<Q extends Narrowable<Q>>(
+  supabase: ReturnType<typeof createClient>,
+  query: Q,
+  opts: SalesFilterOpts,
+): Promise<Q> {
   const {
-    page,
-    perPage,
-    search,
-    saleType,
-    agentId,
-    developerId,
-    projectId,
-    commissionStatus,
-    validationStatus,
-    reservationDateFrom,
-    reservationDateTo,
-    sortField = "created_at",
-    sortDir = "desc",
-    currentRole,
-    currentUserId,
+    search, saleType, agentId, developerId, projectId, propertyType,
+    commissionStatus, validationStatus, reservationDateFrom, reservationDateTo,
+    currentRole, currentUserId,
   } = opts
-
-  const from = (page - 1) * perPage
-  const to = from + perPage - 1
-
-  let query = supabase
-    .from("sales_reports")
-    .select(`
-      *,
-      developers(name),
-      projects(name),
-      project_units(unit_type),
-      clients(first_name,middle_name,last_name,email,phone,age,gender,occupation,street,city,state_province,country),
-      profiles:agent_id(fullname),
-      sales_attachments(id)
-    `, { count: "exact" })
-    .range(from, to)
-    .order(sortField, { ascending: sortDir === "asc" })
 
   // Agent, team leader, and unit manager can only see their own sales
   if (isSalesPipelineRole(currentRole) && currentUserId) {
@@ -609,6 +605,7 @@ export async function fetchSales(opts: {
   if (saleType) query = query.eq("sale_type", saleType)
   if (developerId) query = query.eq("developer_id", developerId)
   if (projectId) query = query.eq("project_id", Number(projectId))
+  if (propertyType) query = query.eq("property_type", propertyType)
   if (commissionStatus) query = query.eq("commission_status", commissionStatus)
   if (validationStatus) query = query.eq("validation_status", validationStatus)
   if (reservationDateFrom) query = query.gte("reservation_date", reservationDateFrom)
@@ -621,7 +618,7 @@ export async function fetchSales(opts: {
   // .or() is ANDed with the agent force-scope above, so an agent's search still
   // only ever matches their own sales.
   if (search) {
-    const s = search.replace(/[,()"%*\\]/g, " ").replace(/\s+/g, " ").trim()
+    const s = sanitizeSearchTerm(search)
     if (s) {
       const [cRes, pRes, dRes] = await Promise.all([
         supabase.from("clients").select("id").or(`first_name.ilike.%${s}%,middle_name.ilike.%${s}%,last_name.ilike.%${s}%`),
@@ -646,6 +643,43 @@ export async function fetchSales(opts: {
     }
   }
 
+  return query
+}
+
+// Strips the characters that are .or() grammar or PostgREST wildcards. Exported
+// so the totals RPC gets the same term the row query actually used — passing the
+// raw string there would make "50%" a wildcard for the totals but a stripped
+// literal for the rows, and the tiles would disagree with the table.
+//
+// `_` is deliberately NOT stripped: it is a single-character wildcard for both
+// PostgREST's ilike and the RPC's ILIKE, so leaving it alone keeps them in
+// agreement — and removing it would break searching for "unit_5" style values.
+export function sanitizeSearchTerm(raw: string): string {
+  return raw.replace(/[,()"%*\\]/g, " ").replace(/\s+/g, " ").trim()
+}
+
+export async function fetchSales(opts: SalesFilterOpts & {
+  page: number
+  perPage: number
+  sortField?: SortField
+  sortDir?: SortDir
+}): Promise<{ data: SaleRecord[] | null; total: number | null; error: string | null }> {
+  const supabase = createClient()
+  const { page, perPage, sortField = "created_at", sortDir = "desc" } = opts
+
+  const from = (page - 1) * perPage
+  const to = from + perPage - 1
+
+  const query = await applySalesFilters(
+    supabase,
+    supabase
+      .from("sales_reports")
+      .select(SALE_SELECT, { count: "exact" })
+      .range(from, to)
+      .order(sortField, { ascending: sortDir === "asc" }),
+    opts,
+  )
+
   const { data, count, error } = await query
   if (error) return { data: null, total: null, error: error.message }
 
@@ -654,6 +688,49 @@ export async function fetchSales(opts: {
     total: count ?? 0,
     error: null,
   }
+}
+
+/** PostgREST caps a single response at 1000 rows regardless of .range(). */
+const EXPORT_CHUNK = 1000
+/** Ceiling on an export, so one unfiltered click can't pull the whole table. */
+export const EXPORT_MAX_ROWS = 5000
+
+// Every row matching the current filters, for Excel/PDF export — not just the
+// page on screen. Pages through in 1000-row chunks because PostgREST will not
+// return more than that at once, and reports `truncated` rather than silently
+// handing over a partial report the reader would take as complete.
+export async function fetchSalesForExport(opts: SalesFilterOpts & {
+  sortField?: SortField
+  sortDir?: SortDir
+  maxRows?: number
+}): Promise<{ data: SaleRecord[]; truncated: boolean; error: string | null }> {
+  const supabase = createClient()
+  const { sortField = "created_at", sortDir = "desc", maxRows = EXPORT_MAX_ROWS } = opts
+
+  const out: SaleRecord[] = []
+  for (let offset = 0; offset < maxRows; offset += EXPORT_CHUNK) {
+    const size = Math.min(EXPORT_CHUNK, maxRows - offset)
+    const query = await applySalesFilters(
+      supabase,
+      supabase
+        .from("sales_reports")
+        .select(SALE_SELECT)
+        .range(offset, offset + size - 1)
+        // id breaks ties so a row can't be skipped or repeated between chunks
+        // when many rows share a created_at.
+        .order(sortField, { ascending: sortDir === "asc" })
+        .order("id", { ascending: true }),
+      opts,
+    )
+    const { data, error } = await query
+    if (error) return { data: out, truncated: false, error: error.message }
+
+    const batch = (data ?? []).map(normalizeSale)
+    out.push(...batch)
+    if (batch.length < size) return { data: out, truncated: false, error: null }
+  }
+  // Filled the ceiling exactly — there may be more rows we didn't fetch.
+  return { data: out, truncated: true, error: null }
 }
 
 export type SaleTypeSummary = { dealCount: number; totalValue: number; pendingCount: number }
@@ -681,6 +758,99 @@ export async function fetchSalesSummary(opts: {
       totalValue: Number(row?.total_value ?? 0),
       pendingCount: Number(row?.pending_count ?? 0),
     },
+    error: null,
+  }
+}
+
+export type SalesSummaryFilters = {
+  propertyType?: string
+  developerId?: string
+  commissionStatus?: CommissionStatus
+  validationStatus?: ValidationStatus
+  reservationDateFrom?: string
+  reservationDateTo?: string
+  search?: string
+}
+
+// Same tiles as fetchSalesSummary, but narrowed by whatever the report's filter
+// bar has active, so "Total Contract Value" describes the rows on screen rather
+// than the whole sale type.
+//
+// saleType is optional — the per-agent drill-in lists all three types at once,
+// and omitting it totals across them.
+//
+// Backed by the sales_summary_filtered() RPC (migration 023). Two deliberate
+// fallbacks keep this from being a hard dependency on a migration the user runs
+// by hand:
+//   - no filters active  -> the original sales_summary(), unchanged behaviour
+//   - RPC missing        -> sales_summary() plus filtered:false, so the caller
+//                           can say the totals are unfiltered instead of
+//                           quietly presenting a wrong number (or 500ing).
+// Neither fallback can answer a cross-type question, so with no saleType a
+// missing RPC yields null data and the caller shows "—".
+// The returned `filtered` flag is what the tiles label themselves with — never
+// assume it is true.
+export async function fetchSalesSummaryFiltered(opts: {
+  saleType?: SaleType | null
+  agentId?: string
+  currentRole?: string
+  currentUserId?: string
+  filters?: SalesSummaryFilters
+}): Promise<{ data: SaleTypeSummary | null; filtered: boolean; error: string | null }> {
+  const supabase = createClient()
+  const { saleType, agentId, currentRole, currentUserId, filters = {} } = opts
+  const pAgent = isSalesPipelineRole(currentRole) && currentUserId ? currentUserId : (agentId || null)
+
+  // Same sanitisation the row query applies, so the tiles and the table are
+  // narrowed by the same term — an unstripped % or _ is an ILIKE wildcard in
+  // the RPC and would match a different set.
+  const search = sanitizeSearchTerm(filters.search ?? "")
+  const hasFilters = Boolean(
+    filters.propertyType ||
+    filters.developerId ||
+    filters.commissionStatus ||
+    filters.validationStatus ||
+    filters.reservationDateFrom ||
+    filters.reservationDateTo ||
+    search
+  )
+
+  const plain = async (filtered: boolean) => {
+    if (!saleType) return { data: null, filtered: false, error: null }
+    const { data, error } = await fetchSalesSummary({ saleType, agentId, currentRole, currentUserId })
+    return { data, filtered: filtered && Boolean(data), error }
+  }
+
+  if (!hasFilters && saleType) return plain(true)
+
+  const { data, error } = await supabase.rpc("sales_summary_filtered", {
+    p_sale_type: saleType ?? null,
+    p_agent_id: pAgent,
+    p_property_type: filters.propertyType || null,
+    p_developer_id: filters.developerId || null,
+    p_commission_status: filters.commissionStatus || null,
+    p_validation_status: filters.validationStatus || null,
+    p_from: filters.reservationDateFrom || null,
+    p_to: filters.reservationDateTo || null,
+    p_search: search || null,
+  })
+
+  if (error) {
+    // PGRST202 = function not in the schema cache, i.e. migration 023 hasn't
+    // been applied yet. Degrade to unfiltered totals rather than blanking the
+    // tiles; any other error is real and surfaces to the caller.
+    if (error.code === "PGRST202" || /find the function/i.test(error.message)) return plain(false)
+    return { data: null, filtered: false, error: error.message }
+  }
+
+  const row = Array.isArray(data) ? data[0] : data
+  return {
+    data: {
+      dealCount: Number(row?.deal_count ?? 0),
+      totalValue: Number(row?.total_value ?? 0),
+      pendingCount: Number(row?.pending_count ?? 0),
+    },
+    filtered: true,
     error: null,
   }
 }
