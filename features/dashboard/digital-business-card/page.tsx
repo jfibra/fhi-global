@@ -16,7 +16,7 @@ import {
 } from "@/lib/public-profile"
 import { SOCIAL_ICONS } from "@/features/business-card/social-icons"
 import {
-  DISP_W, dialFromValue, isDesignId, renderCard, stripLocal,
+  DISP_W, dataUrlToBlob, dialFromValue, isDesignId, renderCard, stripLocal,
   type CardData, type DesignId,
 } from "@/features/business-card/card-render"
 import { PublicProfile, type PublicProfileData } from "@/features/business-card/public-profile"
@@ -256,7 +256,7 @@ export default function PublicProfileMakerPage() {
       // the old link preview in place — the failure is invisible until someone
       // shares the link and sees the wrong card.
       const dataUrl = await renderCard("front", activeDesign, cardData, PROFILE_OG_W, PROFILE_OG_H)
-      const blob = await (await fetch(dataUrl)).blob()
+      const blob = dataUrlToBlob(dataUrl)
       const form = new FormData()
       form.append("file", blob, "link-preview.png")
       const up = await fetch(`${API_BASE}/api/upload/profile-og`, { method: "POST", body: form })

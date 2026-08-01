@@ -945,3 +945,23 @@ export async function renderCard(
 
   return canvas.toDataURL("image/png")
 }
+
+/**
+ * Decode a `data:` URL from renderCard into a Blob, for uploading.
+ *
+ * Deliberately not `await fetch(dataUrl).blob()`, which is the obvious way and
+ * fails: the app's CSP allows `data:` in img-src but not in connect-src, so
+ * fetching one throws a bare "Failed to fetch" TypeError. Widening connect-src
+ * to permit data: would weaken the policy for every request on the site to save
+ * these six lines, which is not a trade worth making.
+ */
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const comma = dataUrl.indexOf(",")
+  if (comma < 0) throw new Error("Not a data URL")
+  const header = dataUrl.slice(0, comma)
+  const mime = /:(.*?)[;,]/.exec(header)?.[1] || "image/png"
+  const binary = atob(dataUrl.slice(comma + 1))
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return new Blob([bytes], { type: mime })
+}
