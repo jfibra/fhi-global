@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 import { type ProfileTheme } from "@/lib/profile-themes"
 import { SITE_URL } from "@/lib/seo"
+import { type ProfileOgCard } from "@/lib/profile-og-card"
 import { ContactCard } from "./contact-card"
 import { ProfileActionBar } from "./profile-action-bar"
 import { SHARE_TARGETS } from "./share-targets"
@@ -52,6 +53,8 @@ export type PublicProfileData = {
   buttonLabels: Record<FixedButtonKey, string>
   /** Resolved look — see lib/profile-themes.ts. */
   theme: ProfileTheme
+  /** Link-preview card — used by generateMetadata, not rendered on the page. */
+  ogCard: ProfileOgCard
   socials: SocialLinks
 }
 

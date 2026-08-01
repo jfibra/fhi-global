@@ -4,24 +4,32 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   AlertCircle, ArrowDown, ArrowUp, CheckCircle2, ChevronLeft, ChevronRight,
-  Loader2, Lock, Palette, Plus, Save, Star, SlidersHorizontal, Trash2,
+  Image as ImageIcon, Loader2, Lock, Palette, Plus, Save, Star, SlidersHorizontal, Trash2,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { roleToLabel } from "@/lib/app-roles"
 import {
   CUSTOM_LINKS_MAX, FIXED_BUTTONS, LINK_LABEL_MAX, SOCIAL_PLATFORMS, TAGLINE_MAX,
   normalizeLinkLabel, normalizeLinkUrl, normalizeSocialUrl, normalizeTagline,
-  readCustomLinks, readFixedButtonLabels, readSocialLinks, readTagline,
+  readCustomLinks, readFixedButtonLabels, readSocialLinks, readTagline, titleCaseName,
   type CustomLink, type FeaturedItem, type FixedButtonKey, type SocialLinks,
 } from "@/lib/public-profile"
 import { SOCIAL_ICONS } from "@/features/business-card/social-icons"
+import {
+  DISP_W, dialFromValue, isDesignId, renderCard, stripLocal,
+  type CardData, type DesignId,
+} from "@/features/business-card/card-render"
 import { PublicProfile, type PublicProfileData } from "@/features/business-card/public-profile"
 import { ShareProfileLink } from "./share-profile-link"
 import { FeaturedPanel } from "./featured-panel"
 import { DesignTab } from "./design-tab"
+import { LinkPreviewTab } from "./link-preview-tab"
 import {
   readThemeChoice, resolveTheme, type ThemeChoice,
 } from "@/lib/profile-themes"
+import {
+  PROFILE_OG_H, PROFILE_OG_W, readProfileOgCard, type ProfileOgCard,
+} from "@/lib/profile-og-card"
 
 /**
  * Digital Business Card — edits the one page an agent actually shares
@@ -38,12 +46,13 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? ""
 
 type SaveState = "idle" | "saving" | "success" | "error"
 
-type TabKey = "design" | "forms" | "featured"
+type TabKey = "design" | "forms" | "featured" | "preview"
 
 const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: "design", label: "Design", icon: Palette },
   { key: "forms", label: "Forms", icon: SlidersHorizontal },
   { key: "featured", label: "Featured", icon: Star },
+  { key: "preview", label: "Link Preview", icon: ImageIcon },
 ]
 
 type ButtonRow = CustomLink & { rowId: string }
@@ -56,6 +65,31 @@ function newRowId(): string {
 }
 function toRow(link: CustomLink): ButtonRow {
   return { ...link, rowId: newRowId() }
+}
+
+/**
+ * The saved shape of the editor, as a comparable string. One function so the
+ * dirty check and the post-save reset can't diverge — the save swaps a freshly
+ * uploaded image into the card, and re-deriving that by hand is how a page ends
+ * up permanently dirty.
+ */
+function snapshotOf(x: {
+  tagline: string
+  socials: SocialLinks
+  buttons: ButtonRow[]
+  fixedLabels: Record<FixedButtonKey, string>
+  theme: ThemeChoice
+  ogCard: ProfileOgCard
+}): string {
+  return JSON.stringify({
+    tagline: x.tagline,
+    socials: x.socials,
+    // rowId is a client-side key, not part of the saved value.
+    buttons: x.buttons.map((b) => ({ label: b.label, url: b.url })),
+    fixedLabels: x.fixedLabels,
+    theme: x.theme,
+    ogCard: x.ogCard,
+  })
 }
 
 export default function PublicProfileMakerPage() {
@@ -74,6 +108,7 @@ export default function PublicProfileMakerPage() {
   const [tab, setTab] = useState<TabKey>("design")
   const [theme, setTheme] = useState<ThemeChoice>(() => readThemeChoice(profile?.metadata))
   const [tagline, setTagline] = useState(() => readTagline(profile?.metadata))
+  const [ogCard, setOgCard] = useState<ProfileOgCard>(() => readProfileOgCard(profile?.metadata))
   // Wording for the three buttons whose destination is fixed.
   const [fixedLabels, setFixedLabels] = useState<Record<FixedButtonKey, string>>(
     () => readFixedButtonLabels(profile?.metadata),
@@ -108,64 +143,10 @@ export default function PublicProfileMakerPage() {
    * fields, and a useMemo here would be manual memoization the compiler then
    * has to preserve.
    */
-  const snapshot = JSON.stringify({
-    tagline,
-    socials,
-    // rowId is a client-side key, not part of the saved value.
-    buttons: buttons.map((b) => ({ label: b.label, url: b.url })),
-    fixedLabels,
-    theme,
-  })
+  const snapshot = snapshotOf({ tagline, socials, buttons, fixedLabels, theme, ogCard })
   const [savedSnapshot, setSavedSnapshot] = useState(snapshot)
   const dirty = snapshot !== savedSnapshot
 
-  const handleSave = useCallback(async () => {
-    if (!user?.id) return
-    setSaveState("saving")
-    setSaveError("")
-    try {
-      // Normalise before sending. The route rejects the WHOLE payload on one
-      // bad link, so posting raw input meant a half-typed handle also threw away
-      // the tagline. Unrecognised values are dropped here and flagged in the
-      // form instead — the save itself always goes through.
-      const cleanSocials: Record<string, string> = {}
-      for (const p of SOCIAL_PLATFORMS) {
-        const url = normalizeSocialUrl(p.id, socials[p.id] ?? "")
-        if (url) cleanSocials[p.id] = url
-      }
-
-      // Same reason as the socials: send only rows the server will keep, so a
-      // half-typed button never costs the agent the rest of the save.
-      const cleanLinks: CustomLink[] = []
-      for (const b of buttons) {
-        const label = normalizeLinkLabel(b.label)
-        const url = normalizeLinkUrl(b.url)
-        if (label && url) cleanLinks.push({ label, url })
-      }
-
-      const res = await fetch(`${API_BASE}/api/me/contact`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          socials: cleanSocials,
-          tagline,
-          links: cleanLinks,
-          fixed_button_labels: fixedLabels,
-          theme,
-        }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error ?? `Error ${res.status}`)
-      }
-      setSavedSnapshot(snapshot)
-      setSaveState("success")
-      router.refresh()
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Save failed")
-      setSaveState("error")
-    }
-  }, [socials, tagline, buttons, fixedLabels, theme, snapshot, user?.id, router])
 
   // ── Preview data ─────────────────────────────────────────────────────────
   const fullName = profile?.fullname ?? user?.email?.split("@")[0] ?? ""
@@ -212,11 +193,130 @@ export default function PublicProfileMakerPage() {
         return acc
       }, {} as Record<FixedButtonKey, string>),
       theme: resolveTheme(theme),
+      ogCard,
     }
   }, [
-    socials, tagline, buttons, featured, fixedLabels, theme, fullName, rawAvatar, countryCode, phoneNumber,
+    socials, tagline, buttons, featured, fixedLabels, theme, ogCard, fullName, rawAvatar, countryCode, phoneNumber,
     profile?.fname, profile?.lname, profile?.role, user?.id, user?.email,
   ])
+
+  // What the Link Preview tab renders. Derived from previewData rather than
+  // re-read, so the tab and the phone frame can never disagree — and the two
+  // fallbacks are worded exactly as generateMetadata words them in
+  // app/business-card/[id]/page.tsx, or the preview would lie about the blank case.
+  const previewLocal = stripLocal(previewData.phoneNumber)
+
+  // Feeds the Business Card renderer — the same shape the Business Card page
+  // builds, so both pages draw the identical card.
+  const cardData: CardData = useMemo(() => ({
+    name: previewData.fullname,
+    phoneDial: dialFromValue(previewData.countryCode),
+    phoneLocal: previewLocal,
+    email: previewData.email,
+    avatarUrl: previewData.avatarUrl,
+    initials: previewData.initials,
+  }), [previewData.fullname, previewData.countryCode, previewLocal, previewData.email, previewData.avatarUrl, previewData.initials])
+
+  const inheritedDesign: DesignId = isDesignId(meta.business_card_design)
+    ? meta.business_card_design
+    : "classic"
+  const activeDesign: DesignId = ogCard.design || inheritedDesign
+
+  const handleSave = useCallback(async () => {
+    if (!user?.id) return
+    setSaveState("saving")
+    setSaveError("")
+    try {
+      // Normalise before sending. The route rejects the WHOLE payload on one
+      // bad link, so posting raw input meant a half-typed handle also threw away
+      // the tagline. Unrecognised values are dropped here and flagged in the
+      // form instead — the save itself always goes through.
+      const cleanSocials: Record<string, string> = {}
+      for (const p of SOCIAL_PLATFORMS) {
+        const url = normalizeSocialUrl(p.id, socials[p.id] ?? "")
+        if (url) cleanSocials[p.id] = url
+      }
+
+      // Same reason as the socials: send only rows the server will keep, so a
+      // half-typed button never costs the agent the rest of the save.
+      const cleanLinks: CustomLink[] = []
+      for (const b of buttons) {
+        const label = normalizeLinkLabel(b.label)
+        const url = normalizeLinkUrl(b.url)
+        if (label && url) cleanLinks.push({ label, url })
+      }
+
+      // Render the chosen Business Card front at OG size and upload it — this
+      // is what og:image points at. A failed upload keeps the previously saved
+      // image rather than clearing it: losing the rest of the save over a flaky
+      // upload would be the worse trade, and the tab says the card attaches on
+      // save, not that it is the only thing being saved.
+      let ogImage = ogCard.image
+      try {
+        const dataUrl = await renderCard("front", activeDesign, cardData, PROFILE_OG_W, PROFILE_OG_H)
+        const blob = await (await fetch(dataUrl)).blob()
+        const form = new FormData()
+        form.append("file", blob, "link-preview.png")
+        const up = await fetch(`${API_BASE}/api/upload/profile-og`, { method: "POST", body: form })
+        if (up.ok) {
+          const { url } = (await up.json()) as { url?: string }
+          if (url) ogImage = url
+        }
+      } catch {
+        /* keep the previous image */
+      }
+      const nextOgCard = { ...ogCard, image: ogImage }
+
+      const res = await fetch(`${API_BASE}/api/me/contact`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          socials: cleanSocials,
+          tagline,
+          links: cleanLinks,
+          fixed_button_labels: fixedLabels,
+          theme,
+          og_card: nextOgCard,
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? `Error ${res.status}`)
+      }
+      setOgCard(nextOgCard)
+      // Snapshot the value that was actually saved — `snapshot` was computed
+      // before the upload swapped the image in, so using it would leave the
+      // page permanently dirty.
+      setSavedSnapshot(snapshotOf({ tagline, socials, buttons, fixedLabels, theme, ogCard: nextOgCard }))
+      setSaveState("success")
+      router.refresh()
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Save failed")
+      setSaveState("error")
+    }
+  }, [socials, tagline, buttons, fixedLabels, theme, ogCard, activeDesign, cardData, user?.id, router])
+  const fallbackOgTitle = titleCaseName(previewData.fullname)
+  const fallbackOgDescription =
+    previewData.tagline ||
+    `${fallbackOgTitle} — ${previewData.roleLabel} at FHI Global. Call, message or save the contact details.`
+
+  /**
+   * The chosen design, rendered for the right-hand column. Drawn at the OG
+   * aspect (1.91:1) rather than the card's own 7:4 so the preview is framed the
+   * way a feed frames it, and only while the tab is open — the canvas render is
+   * not free and the other three tabs never show it.
+   */
+  const [linkCard, setLinkCard] = useState("")
+  useEffect(() => {
+    if (tab !== "preview") return
+    let alive = true
+    void renderCard("front", activeDesign, cardData, DISP_W, Math.round((DISP_W * 630) / 1200)).then((url) => {
+      if (alive) setLinkCard(url)
+    })
+    return () => {
+      alive = false
+    }
+  }, [tab, activeDesign, cardData])
 
   // Tab order is the sequence the nav walks, so TABS stays the single source.
   const tabIndex = TABS.findIndex((tb) => tb.key === tab)
@@ -295,6 +395,17 @@ export default function PublicProfileMakerPage() {
           </div>
 
           {tab === "design" && <DesignTab value={theme} onChange={setTheme} />}
+
+          {tab === "preview" && (
+            <LinkPreviewTab
+              value={ogCard}
+              onChange={setOgCard}
+              cardData={cardData}
+              inheritedDesign={inheritedDesign}
+              fallbackTitle={fallbackOgTitle}
+              fallbackDescription={fallbackOgDescription}
+            />
+          )}
 
           {tab === "forms" && (
             <>
@@ -623,18 +734,51 @@ export default function PublicProfileMakerPage() {
             in view however far down the editor you are. Falls back to normal
             flow on narrow screens, where the column is stacked anyway. */}
         <div className="xl:sticky xl:top-0">
-          {/* Phone frame. The preview is the real page component, not a mock. */}
-          <div className="mx-auto w-full max-w-[390px] rounded-[2.25rem] bg-[#0d1117] p-3 shadow-[0_18px_50px_-16px_rgba(0,31,63,0.55)]">
-            <div className="relative h-[680px] rounded-[1.75rem] overflow-y-auto overscroll-contain bg-[#001f3f]">
-              {user?.id ? (
-                <PublicProfile data={previewData} embedded />
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 text-[#d6b357] animate-spin" />
+          {tab === "preview" ? (
+            /* On the Link Preview tab this column previews the LINK, not the
+               page — the profile page is not what is being edited there. */
+            <div className="mx-auto w-full max-w-[500px]">
+              <p className={`${DISPLAY} text-sm font-bold text-[#0d1117]`}>How the link will look</p>
+              <p className="mt-0.5 text-xs text-[#6b7280]">
+                Shown at feed size. Facebook, LinkedIn and X all draw this card.
+              </p>
+              <div className="mt-3 overflow-hidden rounded-xl border border-[#dfe3e8] bg-white shadow-[0_8px_24px_-12px_rgba(0,31,63,0.35)]">
+                <div className="aspect-[1200/630] w-full bg-[#f3f5f8]">
+                  {linkCard ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={linkCard} alt="Link preview card" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <Loader2 className="w-5 h-5 text-[#9ca3af] animate-spin" />
+                    </div>
+                  )}
                 </div>
-              )}
+                {/* Title + description, the way a feed stacks them under the image. */}
+                <div className="border-t border-[#dfe3e8] px-3 py-2.5">
+                  <p className="text-[11px] uppercase tracking-wide text-[#65676b]">fhiglobal.ae</p>
+                  <p className="mt-0.5 text-[15px] font-bold leading-snug text-[#0d1117] line-clamp-1">
+                    {ogCard.title || fallbackOgTitle}
+                  </p>
+                  <p className="mt-0.5 text-[13px] leading-snug text-[#65676b] line-clamp-2">
+                    {ogCard.description || fallbackOgDescription}
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Phone frame. The preview is the real page component, not a mock. */
+            <div className="mx-auto w-full max-w-[390px] rounded-[2.25rem] bg-[#0d1117] p-3 shadow-[0_18px_50px_-16px_rgba(0,31,63,0.55)]">
+              <div className="relative h-[680px] rounded-[1.75rem] overflow-y-auto overscroll-contain bg-[#001f3f]">
+                {user?.id ? (
+                  <PublicProfile data={previewData} embedded />
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 text-[#d6b357] animate-spin" />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
     </div>
   )

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { parseBackdropLibrary, parseThemeChoice } from "@/lib/profile-themes"
+import { sanitizeProfileOgCard } from "@/lib/profile-og-card"
 import {
   normalizeTagline, parseCustomLinks, parseFeaturedProjects,
   parseFixedButtonLabels, parseSocialLinks,
@@ -28,6 +29,7 @@ export async function PATCH(req: Request) {
     fixed_button_labels?: unknown
     theme?: unknown
     backdrops?: unknown
+    og_card?: unknown
   }
   try {
     body = await req.json()
@@ -35,7 +37,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  const { phone, phone_country_code, phone_number, business_card_design, socials, tagline, links, featured_projects, fixed_button_labels, theme, backdrops } = body
+  const { phone, phone_country_code, phone_number, business_card_design, socials, tagline, links, featured_projects, fixed_button_labels, theme, backdrops, og_card } = body
 
   // ── Validate ───────────────────────────────────────────────────────────────
   const BUSINESS_CARD_DESIGNS = ["classic", "platinum", "noir"]
@@ -80,6 +82,18 @@ export async function PATCH(req: Request) {
   // Validated to a known template id, or to custom with a checked base + hex,
   // so a stored theme can never carry arbitrary css onto the public page.
   const parsedTheme = theme === undefined ? undefined : parseThemeChoice(theme)
+  // Same treatment as the theme: sanitized, never stored raw, so a stored card
+  // can't carry arbitrary text into a meta tag on the public page.
+  let parsedOgCard = og_card === undefined ? undefined : sanitizeProfileOgCard(og_card)
+  // The shared sanitizer can only check the key SHAPE — S3_PUBLIC_URL isn't
+  // readable from a client bundle. Here it is, so pin the host too: this URL is
+  // served to crawlers as og:image, and without the check a caller could PATCH
+  // it to any origin that mimics our key prefix.
+  if (parsedOgCard?.image) {
+    const base = (process.env.S3_PUBLIC_URL ?? "").replace(/\/$/, "")
+    const ours = base && parsedOgCard.image.startsWith(`${base}/FHI_GLOBAL/profile-og/`)
+    if (!ours) parsedOgCard = { ...parsedOgCard, image: null }
+  }
   const parsedBackdrops =
     backdrops === undefined ? undefined : parseBackdropLibrary(backdrops)
 
@@ -117,6 +131,7 @@ export async function PATCH(req: Request) {
     ...(fixedLabels ?? {}),
     ...(parsedTheme !== undefined ? { theme: parsedTheme } : {}),
     ...(parsedBackdrops !== undefined ? { backdrops: parsedBackdrops } : {}),
+    ...(parsedOgCard !== undefined ? { og_card: parsedOgCard } : {}),
   }
 
   const { error: profileErr } = await adminClient

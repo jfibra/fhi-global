@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { SITE_URL, createPageMetadata } from "@/lib/seo"
 import { readThemeChoice, resolveTheme } from "@/lib/profile-themes"
+import { readProfileOgCard, type ProfileOgCard } from "@/lib/profile-og-card"
 import { roleToLabel } from "@/lib/app-roles"
 import {
   readCustomLinks, readFeaturedProjects, readFixedButtonLabels, readSocialLinks,
@@ -164,9 +165,22 @@ async function loadProfile(id: string): Promise<PublicProfileData | null> {
     links: readCustomLinks(profile.metadata),
     buttonLabels: readFixedButtonLabels(profile.metadata),
     theme: resolveTheme(readThemeChoice(profile.metadata)),
+    ogCard: readProfileOgCard(profile.metadata),
     socials: readSocialLinks(profile.metadata),
     ...(await loadFeatured(admin, profile.id, readFeaturedProjects(profile.metadata))),
   }
+}
+
+/**
+ * Cache-buster for the OG image URL. A hash of the saved card rather than a
+ * timestamp: scrapers re-fetch when the design actually changes, and an
+ * unrelated profile write doesn't invalidate a preview Facebook already holds.
+ */
+function ogCardVersion(card: ProfileOgCard): number {
+  const s = JSON.stringify(card)
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0
+  return h >>> 0
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -178,24 +192,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description: "This business profile link is no longer active.",
     })
   }
-  // The person's own photo, absolute so a crawler can fetch it. Without this
-  // createPageMetadata falls back to DEFAULT_PREVIEW_IMAGE_URL, which meant every
-  // agent's shared card showed the same generic FHI logo instead of their face —
-  // on a personal business card the photo IS the preview.
-  const previewImage = data.avatarUrl
-    ? data.avatarUrl.startsWith("http")
-      ? data.avatarUrl
-      : `${SITE_URL}${data.avatarUrl}`
-    : null
+  // A designed 1200×630 card, never the bare avatar — a square portrait dropped
+  // into a 1.91:1 slot gets letterboxed or centre-cropped by every network.
+  //
+  // First choice is the Business Card front the agent rendered and uploaded from
+  // the Link Preview tab. Anyone who has never opened that tab falls back to the
+  // generated /og/business-card card, whose version param is a hash of the saved
+  // options so scrapers re-fetch on a change and not otherwise.
+  const previewImage =
+    data.ogCard.image ??
+    `${SITE_URL.replace(/\/$/, "")}/og/business-card/${data.id}?v=${ogCardVersion(data.ogCard)}`
+
+  const fallbackDescription =
+    data.tagline ||
+    `${titleCaseName(data.fullname)} — ${data.roleLabel} at FHI Global. Call, message or save the contact details.`
 
   return {
     ...createPageMetadata({
       // No " | FHI Global" suffix here — createPageMetadata's template
       // appends one, and spelling it out again doubled it in the tab.
-      title: titleCaseName(data.fullname),
-      description:
-        data.tagline ||
-        `${titleCaseName(data.fullname)} — ${data.roleLabel} at FHI Global. Call, message or save the contact details.`,
+      // Both texts are the agent's override when they set one.
+      title: data.ogCard.title || titleCaseName(data.fullname),
+      description: data.ogCard.description || fallbackDescription,
       imageUrl: previewImage,
       pathname: `/business-card/${data.id}`,
     }),
