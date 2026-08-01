@@ -5,7 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import {
   ArrowRight, ArrowLeft, Loader2, CheckCircle2, Mail, AlertCircle,
-  Sparkles, UserPlus, Check, Building2, TrendingUp, User, FileText, Info,
+  Sparkles, UserPlus, Check, Building2, TrendingUp, User, FileText, Info, Phone,
 } from "lucide-react"
 import { roleToLabel } from "@/lib/app-roles"
 import { nationalityFlag } from "@/lib/nationalities"
@@ -14,7 +14,7 @@ import { OtpInput } from "@/components/auth/otp-input"
 import { sendRegisterOtp, verifyRegisterOtp } from "@/app/(public-page)/(auth)/register/actions"
 
 /** Public display info for the inviter behind ?ref (resolved server-side). */
-export type Referrer = { name: string; role: string; avatarUrl: string | null; nationality: string | null } | null
+export type Referrer = { name: string; role: string; avatarUrl: string | null; nationality: string | null; email: string | null; phone: string | null } | null
 
 const RESEND_COOLDOWN = 60
 
@@ -79,7 +79,7 @@ function ReferralHero({ referrer }: { referrer: NonNullable<Referrer> }) {
       <h2 className="font-['Outfit'] text-4xl xl:text-[42px] font-bold text-white leading-tight drop-shadow-[0_2px_16px_rgba(0,10,30,0.7)] mt-1 mb-3">
         {referrer.name}
       </h2>
-      <div className="flex items-center justify-center flex-wrap gap-2 mb-8">
+      <div className="flex items-center justify-center flex-wrap gap-2 mb-5">
         <span className="inline-block px-3.5 py-1.5 rounded-full bg-[#d6b357]/20 border border-[#d6b357]/45 text-[#f0d890] text-xs font-bold uppercase tracking-[0.15em]">
           {roleToLabel(referrer.role)}
         </span>
@@ -91,6 +91,21 @@ function ReferralHero({ referrer }: { referrer: NonNullable<Referrer> }) {
         )}
       </div>
 
+      {(referrer.email || referrer.phone) && (
+        <div className="mb-8 flex flex-col items-center gap-2 text-sm text-white/85 drop-shadow-[0_1px_6px_rgba(0,10,30,0.7)]">
+          {referrer.email && (
+            <span className="inline-flex items-center gap-2 max-w-full truncate">
+              <Mail className="w-3.5 h-3.5 text-[#d6b357] shrink-0" /> <span className="truncate">{referrer.email}</span>
+            </span>
+          )}
+          {referrer.phone && (
+            <span className="inline-flex items-center gap-2">
+              <Phone className="w-3.5 h-3.5 text-[#d6b357] shrink-0" /> {referrer.phone}
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="flex items-start gap-3 text-left bg-white/10 border border-white/20 rounded-2xl backdrop-blur-md p-5">
         <div className="w-9 h-9 rounded-full bg-[#d6b357] flex items-center justify-center shrink-0">
           <Check className="w-4 h-4 text-[#001f3f]" />
@@ -99,6 +114,43 @@ function ReferralHero({ referrer }: { referrer: NonNullable<Referrer> }) {
           Complete your sign-up and your account will be registered under{" "}
           <span className="font-bold text-white">{referrer.name}</span>&apos;s referral, joining their FHI Global network.
         </p>
+      </div>
+    </div>
+  )
+}
+
+/** "Confirm your Sponsor" modal — shown once on load for a referral link. */
+function ConfirmSponsorModal({ referrer, onConfirm }: { referrer: NonNullable<Referrer>; onConfirm: () => void }) {
+  const flag = nationalityFlag(referrer.nationality)
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="px-7 pt-7">
+          <p className="text-lg font-semibold text-[#0d1117]">Confirm your Sponsor:</p>
+          <div className="mt-4 border-t border-[#eceef1] pt-5 pb-6 space-y-3">
+            <div className="flex items-center gap-2.5">
+              {flag && <span className="text-2xl leading-none">{flag}</span>}
+              <p className="text-lg font-bold text-[#0d1117]">{referrer.name}</p>
+            </div>
+            {referrer.email && (
+              <p className="flex items-center gap-2.5 text-[15px] text-[#374151] break-all">
+                <Mail className="w-4 h-4 text-[#9ca3af] shrink-0" /> {referrer.email}
+              </p>
+            )}
+            {referrer.phone && (
+              <p className="flex items-center gap-2.5 text-[15px] text-[#374151]">
+                <Phone className="w-4 h-4 text-[#9ca3af] shrink-0" /> {referrer.phone}
+              </p>
+            )}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="w-full py-3.5 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold uppercase tracking-wide transition-colors"
+        >
+          Confirm
+        </button>
       </div>
     </div>
   )
@@ -177,6 +229,7 @@ export function RegisterUI({
   const [error, setError]       = useState("")
   const [success, setSuccess]   = useState(false)
   const [cooldown, setCooldown] = useState(0)
+  const [sponsorConfirmed, setSponsorConfirmed] = useState(false)
   const [pending, startTransition] = useTransition()
 
   const isDeveloper = defaultAccountType === "developer"
@@ -217,6 +270,11 @@ export function RegisterUI({
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[minmax(440px,36%)_1fr] font-sans bg-white">
+      {/* LR-style sponsor confirmation, shown once on load for referral links. */}
+      {referrer && !sponsorConfirmed && (
+        <ConfirmSponsorModal referrer={referrer} onConfirm={() => setSponsorConfirmed(true)} />
+      )}
+
       {/* ══════════ LEFT: form ══════════ */}
       <div className="relative flex flex-col lg:justify-center px-6 sm:px-10 lg:px-16 py-10 min-h-screen lg:min-h-0">
         {/* Logo: in flow on mobile, absolute at top on desktop (so the form centers over full height) */}

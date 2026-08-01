@@ -29,8 +29,14 @@ async function resolveReferrer(refId: string | null): Promise<Referrer> {
       data.fullname?.trim() ||
       [data.fname, data.lname].filter(Boolean).join(" ").trim() ||
       "Your inviter"
-    const nationality = typeof data.metadata?.nationality === "string" ? data.metadata.nationality : null
-    return { name, role: data.role ?? "agent", avatarUrl: data.profile_url ?? null, nationality }
+    const meta = data.metadata ?? {}
+    const nationality = typeof meta.nationality === "string" ? meta.nationality : null
+    const dial = typeof meta.phone_country_code === "string" ? meta.phone_country_code : ""
+    const num = typeof meta.phone_number === "string" ? meta.phone_number : ""
+    const phone = num ? `${dial} ${num}`.trim() : null
+    const authRes = await admin.auth.admin.getUserById(refId).catch(() => null)
+    const email = authRes?.data?.user?.email ?? null
+    return { name, role: data.role ?? "agent", avatarUrl: data.profile_url ?? null, nationality, email, phone }
   } catch {
     return null
   }
