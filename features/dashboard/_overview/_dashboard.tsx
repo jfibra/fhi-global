@@ -176,7 +176,16 @@ async function loadAdminDashboard(roleValue: string, userId: string) {
     supabase.from("projects").select("id", { count: "exact", head: true }).is("deleted_at", null),
     supabase.from("projects").select("id", { count: "exact", head: true }).eq("is_published", true).is("deleted_at", null),
     supabase.from("sales_reports").select("id", { count: "exact", head: true }),
-    supabase.from("sales_reports").select("total_value:sum(contract_price)"),
+    // Company-wide contract value. NOT `select("sum(contract_price)")`:
+    // PostgREST aggregates are disabled on this project, so that syntax is
+    // parsed as an embed of a table called "sum" and 400s — which this file
+    // then swallowed into a permanent "AED 0". sales_summary (migration 016)
+    // does the sum in SQL; it takes one sale type, so the three are added up.
+    Promise.all(
+      (["project", "brokerage", "rental"] as const).map((t) =>
+        supabase.rpc("sales_summary", { p_sale_type: t, p_agent_id: null }),
+      ),
+    ),
     supabase.from("clients").select("id", { count: "exact", head: true }),
     supabase.from("purchases").select("id", { count: "exact", head: true }).is("deleted_at", null),
     supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "open"),
@@ -236,8 +245,15 @@ async function loadAdminDashboard(roleValue: string, userId: string) {
   const pendingValidations = safeCount(pendingValidationRes)
   const pendingCommissions = safeCount(pendingCommissionRes)
 
-  const rawSalesValueRow = !totalSalesValueRes.error ? totalSalesValueRes.data?.[0] : null
-  const totalSalesValue = Number((rawSalesValueRow as Record<string, unknown> | null | undefined)?.total_value ?? 0)
+  // Three sales_summary calls (one per sale type), summed.
+  const totalSalesValue = (totalSalesValueRes as Array<{ data: unknown; error: unknown }>).reduce(
+    (sum, res) => {
+      if (res.error) return sum
+      const row = (res.data as Array<{ total_value?: number | string }> | null)?.[0]
+      return sum + Number(row?.total_value ?? 0)
+    },
+    0,
+  )
 
   // ── Chart data ───────────────────────────────────────────────────────────────
   const monthlyRows = safeRows(monthlySalesRes) as { reservation_date: string | null; contract_price: string | null }[]
@@ -325,7 +341,9 @@ async function loadAdminDashboard(roleValue: string, userId: string) {
     { label: "Active Users",          value: fmtNumber(totalUsers),       detail: "Active Profiles"       },
     { label: "Active Developers",     value: fmtNumber(totalDevelopers),   detail: "Verified Partners"     },
     { label: "Total Projects",        value: fmtNumber(totalProjects),     detail: "Published"             },
-    { label: "Total Sales",           value: `${Math.round(totalSalesCount / 1000)}K`, detail: "All Sales Records" },
+    // Only switch to "K" once there are thousands — dividing by 1000 first
+    // rendered a single sale as "0K".
+    { label: "Total Sales",           value: totalSalesCount >= 1000 ? `${Math.round(totalSalesCount / 1000)}K` : fmtNumber(totalSalesCount), detail: "All Sales Records" },
     { label: "Sales Value",           value: `AED ${fmtNumber(Math.round(totalSalesValue))}`, detail: "Sum of Contract Prices" },
     { label: "Total Clients",         value: fmtNumber(totalClients),      detail: "Registered Leads"      },
     { label: "Total Purchases",       value: fmtNumber(totalPurchases),    detail: "Procurement Records"   },

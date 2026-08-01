@@ -555,7 +555,24 @@ export function SalesTable({
     <>
       <div className="space-y-6">
 
-        {activeTab === null ? (
+        {/* Drill-in is checked before the chooser so ?agent= works from the
+            sales root too — the Top Sales board on the Overview links straight
+            here, without having to pick a sale type first. */}
+        {isAdminUser && drillId ? (
+          /* ── Drill-in: one agent's full sales history ── */
+          <AgentSalesPanel
+            // Remount per agent so no filter or row state leaks between them.
+            key={drillId}
+            agentId={drillId}
+            agentName={agentDrill?.id === drillId ? agentDrill.name : null}
+            currentRole={currentRole}
+            currentUserId={currentUserId}
+            developers={developers}
+            backLabel={`Back to ${activeMeta?.label ?? "Sales"}`}
+            onBack={() => router.push(pathname, { scroll: false })}
+            onViewSale={(s) => openView(s)}
+          />
+        ) : activeTab === null ? (
           /* ── Chooser: pick a sale type (mirrors the Encode-a-Sale page) ── */
           <>
             <div className="flex items-center gap-3">
@@ -604,20 +621,6 @@ export function SalesTable({
               })}
             </div>
           </>
-        ) : isAdminUser && drillId ? (
-          /* ── Drill-in: one agent's full sales history ── */
-          <AgentSalesPanel
-            // Remount per agent so no filter or row state leaks between them.
-            key={drillId}
-            agentId={drillId}
-            agentName={agentDrill?.id === drillId ? agentDrill.name : null}
-            currentRole={currentRole}
-            currentUserId={currentUserId}
-            developers={developers}
-            backLabel={`Back to ${activeMeta?.label ?? "Sales"} Report`}
-            onBack={() => router.push(pathname, { scroll: false })}
-            onViewSale={(s) => openView(s)}
-          />
         ) : (
           /* ── Report: the table for the chosen sale type ── */
           <>

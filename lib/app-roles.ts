@@ -248,6 +248,25 @@ export const ROLES_SUPPORT_PORTAL: readonly AppRoleId[] = [...APP_ROLE_ORDER]
  */
 export const ROLES_INTERNAL_RESOURCES: readonly AppRoleId[] = APP_ROLE_ORDER.filter((r) => r !== "developer")
 
+/**
+ * Who may see the company Top Sales leaderboard (per-agent revenue).
+ *
+ * Listed explicitly rather than derived by exclusion: ROLES_INTERNAL_RESOURCES
+ * is deliberately fail-open so a future role inherits the training library by
+ * default, which is the wrong default for financial data. Editors are out —
+ * they are content-only and are excluded from sales everywhere else.
+ */
+export const ROLES_SALES_LEADERBOARD: readonly AppRoleId[] = [
+  "super_admin",
+  "admin",
+  "team_leader",
+  "unit_manager",
+  "agent",
+  "secretary",
+  "team_secretary",
+  "member",
+]
+
 /** Developer media/logo upload route (also allows content editors). */
 export const ROLES_ADMIN_OR_DEVELOPER: readonly AppRoleId[] = ["super_admin", "admin", "developer", "editor"]
 
