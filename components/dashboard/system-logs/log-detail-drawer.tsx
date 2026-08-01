@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
-import { X, Globe, Monitor, Link2, Clock, Mail, User as UserIcon, ShieldCheck, Loader2 } from "lucide-react"
+import { X, Globe, Monitor, Link2, Clock, Mail, ShieldCheck, Loader2 } from "lucide-react"
 import { RoleBadge } from "@/components/role-badge"
+import { UserAvatar } from "@/components/user-avatar"
 import {
   type AuditLogRow,
   type AuditLogDetail,
@@ -196,7 +197,7 @@ export function LogDetailDrawer({ row, onClose }: { row: AuditLogRow; onClose: (
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af] mb-1.5">User</p>
             <div className="flex items-center gap-2">
-              <UserIcon className="w-4 h-4 text-[#9ca3af]" />
+              <UserAvatar name={row.actor_name ?? "System"} imageUrl={row.actor_avatar_url} size={28} />
               <span className="text-sm font-medium text-[#111827]">{row.actor_name ?? "System"}</span>
               {row.actor_role && <RoleBadge role={row.actor_role} />}
             </div>
