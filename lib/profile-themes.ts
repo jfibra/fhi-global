@@ -240,6 +240,29 @@ export function inkFor(bgHex: string): { ink: string; inkMuted: string } {
     : { ink: "#ffffff", inkMuted: "rgba(255,255,255,0.74)" }
 }
 
+/**
+ * Ink chosen by measured WCAG contrast rather than a luminance cutoff.
+ *
+ * `inkFor`'s 0.45 threshold is tuned for the broad card surfaces it was written
+ * for, where either ink is comfortable. It is too blunt for small bold text sat
+ * directly on the accent: mid-brightness accents like #e8a33d land just under
+ * the line and get white at 2.16:1, which is unreadable. Comparing both
+ * candidates and taking the higher ratio picks correctly for every accent —
+ * that same gold scores 7.31:1 on dark ink.
+ *
+ * Kept separate from `inkFor` on purpose: changing that one would repaint every
+ * contact card that uses a chosen background.
+ */
+export function readableOn(bgHex: string): string {
+  if (!HEX.test(bgHex)) return "#ffffff"
+  const l = luminance(bgHex)
+  const against = (inkLum: number) => {
+    const [hi, lo] = l > inkLum ? [l, inkLum] : [inkLum, l]
+    return (hi + 0.05) / (lo + 0.05)
+  }
+  return against(luminance("#ffffff")) >= against(luminance("#12233c")) ? "#ffffff" : "#12233c"
+}
+
 /** hex → rgba, for the washes the Soft treatment needs. */
 function alpha(hex: string, a: number): string {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))

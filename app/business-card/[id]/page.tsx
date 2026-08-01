@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { createPageMetadata } from "@/lib/seo"
+import { SITE_URL, createPageMetadata } from "@/lib/seo"
 import { readThemeChoice, resolveTheme } from "@/lib/profile-themes"
 import { roleToLabel } from "@/lib/app-roles"
 import {
@@ -178,6 +178,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description: "This business profile link is no longer active.",
     })
   }
+  // The person's own photo, absolute so a crawler can fetch it. Without this
+  // createPageMetadata falls back to DEFAULT_PREVIEW_IMAGE_URL, which meant every
+  // agent's shared card showed the same generic FHI logo instead of their face —
+  // on a personal business card the photo IS the preview.
+  const previewImage = data.avatarUrl
+    ? data.avatarUrl.startsWith("http")
+      ? data.avatarUrl
+      : `${SITE_URL}${data.avatarUrl}`
+    : null
+
   return {
     ...createPageMetadata({
       // No " | FHI Global" suffix here — createPageMetadata's template
@@ -186,6 +196,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description:
         data.tagline ||
         `${titleCaseName(data.fullname)} — ${data.roleLabel} at FHI Global. Call, message or save the contact details.`,
+      imageUrl: previewImage,
       pathname: `/business-card/${data.id}`,
     }),
     // A personal contact page has no business in search results.
