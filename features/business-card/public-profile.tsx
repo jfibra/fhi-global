@@ -8,7 +8,7 @@ import {
 } from "lucide-react"
 import { type ProfileTheme } from "@/lib/profile-themes"
 import { SITE_URL } from "@/lib/seo"
-import { type ProfileOgCard } from "@/lib/profile-og-card"
+import { profileOgCardVersion, type ProfileOgCard } from "@/lib/profile-og-card"
 import { ContactCard } from "./contact-card"
 import { ProfileActionBar } from "./profile-action-bar"
 import { SHARE_TARGETS } from "./share-targets"
@@ -304,6 +304,16 @@ export function PublicProfile({
   const displayName = titleCaseName(data.fullname)
 
   const selfUrl = profileUrl(data.id)
+  /**
+   * The URL the share buttons and Copy send, stamped with the saved card's
+   * version. Facebook caches its link preview PER EXACT URL — sharing the bare
+   * URL after a redesign serves the old cached card for weeks unless someone
+   * runs the Sharing Debugger. A link that changes with every save is always a
+   * first-time URL to the crawler, so the new card shows up on its own. The QR,
+   * the visible URL text and the vCard keep the clean address: they lead people
+   * to a browser, which has no scrape cache to bust.
+   */
+  const shareUrl = `${selfUrl}?v=${profileOgCardVersion(data.ogCard)}`
 
   // Escape backs out of a collection view, matching the QR dialog.
   useEffect(() => {
@@ -336,7 +346,7 @@ export function PublicProfile({
   // takes neither and wants the URL. One string covers both pastes.
   const copyLink = useCallback(() => {
     if (!selfUrl) return
-    void navigator.clipboard.writeText(`${shareText} ${selfUrl}`).then(
+    void navigator.clipboard.writeText(`${shareText} ${shareUrl}`).then(
       () => {
         setCopied(true)
         setTimeout(() => setCopied(false), 2600)
@@ -345,7 +355,7 @@ export function PublicProfile({
         /* clipboard blocked — the URL above is selectable, which is the fallback */
       },
     )
-  }, [selfUrl, shareText])
+  }, [selfUrl, shareUrl, shareText])
 
   const downloadQr = useCallback(() => {
     const canvas = document.getElementById(QR_MODAL_ID) as HTMLCanvasElement | null
@@ -642,7 +652,7 @@ export function PublicProfile({
                 {SHARE_TARGETS.map(({ id, label, Icon, href, copyFirst }) => (
                   <a
                     key={id}
-                    href={selfUrl ? href(selfUrl, shareText) : undefined}
+                    href={selfUrl ? href(shareUrl, shareText) : undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     title={label}

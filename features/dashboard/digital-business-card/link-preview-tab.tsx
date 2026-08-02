@@ -181,9 +181,9 @@ export function LinkPreviewTab({
       <p className="flex items-start gap-2 rounded-xl bg-[#f2f6fb] px-3 py-2.5 text-xs leading-snug text-[#4b5563]">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#001f3f]" />
         <span>
-          The card is attached when you save. Networks cache a link&apos;s preview the first time
-          anyone shares it, so run the profile URL through Facebook&apos;s Sharing Debugger to make
-          them pick up a new one.
+          The card is attached when you save, and the share buttons on your profile page use a
+          fresh link each time — a redesign shows up there on its own. Only links you pasted
+          somewhere before the change keep the old card until Facebook re-checks them.
         </span>
       </p>
     </div>

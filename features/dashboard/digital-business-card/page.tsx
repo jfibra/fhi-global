@@ -57,6 +57,14 @@ const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?
 
 type ButtonRow = CustomLink & { rowId: string }
 
+/**
+ * Rendered link-preview cards, per profile snapshot per design. Keyed on the
+ * memoised cardData object itself: any change to the underlying details makes a
+ * new object, so its cache entry starts empty and the old one is garbage — a
+ * stale name in a cached render is the one thing this must never show.
+ */
+const ogRenderCache = new WeakMap<CardData, Map<DesignId, string>>()
+
 /** Monotonic, module-level: never reachable from render, so it stays pure. */
 let rowSeq = 0
 function newRowId(): string {
@@ -314,7 +322,19 @@ export default function PublicProfileMakerPage() {
   useEffect(() => {
     if (tab !== "preview") return
     let alive = true
-    void renderCard("front", activeDesign, cardData, DISP_W, Math.round((DISP_W * 630) / 1200)).then((url) => {
+    // A cache hit resolves in a microtask, so flipping between templates swaps
+    // instantly instead of re-paying a canvas render (fonts, avatar decode,
+    // skyline photo) on every click.
+    const perCard = ogRenderCache.get(cardData) ?? new Map<DesignId, string>()
+    ogRenderCache.set(cardData, perCard)
+    const hit = perCard.get(activeDesign)
+    const render = hit
+      ? Promise.resolve(hit)
+      : renderCard("front", activeDesign, cardData, DISP_W, Math.round((DISP_W * 630) / 1200)).then((url) => {
+          perCard.set(activeDesign, url)
+          return url
+        })
+    void render.then((url) => {
       if (alive) setLinkCard(url)
     })
     return () => {

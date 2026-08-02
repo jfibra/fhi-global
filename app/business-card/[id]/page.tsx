@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { SITE_URL, createPageMetadata } from "@/lib/seo"
 import { readThemeChoice, resolveTheme } from "@/lib/profile-themes"
-import { readProfileOgCard, type ProfileOgCard } from "@/lib/profile-og-card"
+import { profileOgCardVersion, readProfileOgCard } from "@/lib/profile-og-card"
 import { roleToLabel } from "@/lib/app-roles"
 import {
   readCustomLinks, readFeaturedProjects, readFixedButtonLabels, readSocialLinks,
@@ -171,18 +171,6 @@ async function loadProfile(id: string): Promise<PublicProfileData | null> {
   }
 }
 
-/**
- * Cache-buster for the OG image URL. A hash of the saved card rather than a
- * timestamp: scrapers re-fetch when the design actually changes, and an
- * unrelated profile write doesn't invalidate a preview Facebook already holds.
- */
-function ogCardVersion(card: ProfileOgCard): number {
-  const s = JSON.stringify(card)
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0
-  return h >>> 0
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   const data = await loadProfile(id)
@@ -199,9 +187,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // the Link Preview tab. Anyone who has never opened that tab falls back to the
   // generated /og/business-card card, whose version param is a hash of the saved
   // options so scrapers re-fetch on a change and not otherwise.
+  const version = profileOgCardVersion(data.ogCard)
   const previewImage =
-    data.ogCard.image ??
-    `${SITE_URL.replace(/\/$/, "")}/og/business-card/${data.id}?v=${ogCardVersion(data.ogCard)}`
+    data.ogCard.image ?? `${SITE_URL.replace(/\/$/, "")}/og/business-card/${data.id}?v=${version}`
 
   const fallbackDescription =
     data.tagline ||
@@ -215,7 +203,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: data.ogCard.title || titleCaseName(data.fullname),
       description: data.ogCard.description || fallbackDescription,
       imageUrl: previewImage,
-      pathname: `/business-card/${data.id}`,
+      // og:url carries the same version stamp the share buttons append.
+      // Facebook treats og:url as the canonical and reuses its cached metadata
+      // for it — a clean canonical here would collapse every versioned share
+      // back onto the stale cache entry and undo the cache-busting. The page is
+      // noindexed, so canonical hygiene costs nothing.
+      pathname: `/business-card/${data.id}?v=${version}`,
     }),
     // A personal contact page has no business in search results.
     robots: { index: false, follow: false },

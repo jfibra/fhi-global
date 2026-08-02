@@ -141,3 +141,25 @@ export function readProfileOgCard(metadata: unknown): ProfileOgCard {
   const meta = metadata && typeof metadata === "object" ? (metadata as Record<string, unknown>) : {}
   return sanitizeProfileOgCard(meta.og_card)
 }
+
+/**
+ * Version stamp of a saved card, for cache-busting.
+ *
+ * Two places append this to a URL, and they must agree:
+ *   • generateMetadata, on the fallback /og/business-card image URL;
+ *   • the public page's share buttons, on the PROFILE URL itself. Facebook
+ *     caches its scrape per exact URL, so a share link that changes with every
+ *     save is what makes a new design show up in the composer immediately —
+ *     without it, the old card sits in Facebook's cache for up to 30 days or
+ *     until someone runs the Sharing Debugger by hand.
+ *
+ * A hash of the card (which includes the uploaded image URL) rather than a
+ * timestamp: re-fetches happen when the design actually changes, and an
+ * unrelated profile write doesn't churn the link.
+ */
+export function profileOgCardVersion(card: ProfileOgCard): string {
+  const s = JSON.stringify(card)
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0
+  return (h >>> 0).toString(36)
+}
