@@ -159,7 +159,7 @@ export function ProfileAvatarUpload({
                   </div>
                 )}
               </div>
-              <p className="mt-3 text-[11px] text-[#9ca3af]">JPG, PNG, WEBP Â· max 10 MB</p>
+              <p className="mt-3 text-[11px] text-[#9ca3af]">JPG, PNG, WEBP · max 10 MB</p>
             </div>
 
             <div className="flex flex-col gap-3 px-6 pb-6">
@@ -188,7 +188,7 @@ export function ProfileAvatarUpload({
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#f0f0f0]">
               <div>
                 <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Crop Profile Photo</h3>
-                <p className="text-xs text-[#9ca3af] mt-0.5">Drag to reposition Â· scroll or slider to zoom</p>
+                <p className="text-xs text-[#9ca3af] mt-0.5">Drag to reposition · scroll or slider to zoom</p>
               </div>
               <button
                 onClick={handleCancelCrop}
