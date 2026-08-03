@@ -108,7 +108,6 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
   return (
     <JoinRegisterUI
       token={token}
-      autoActivate={resolved.config.autoActivate}
       boundDeveloper={resolved.config.developer}
       developers={developers}
     />

@@ -1,24 +1,20 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
-  Eye, EyeOff, Check, X, AlertCircle, Search, ChevronDown, CheckCircle2,
+  Check, AlertCircle, Search, ChevronDown, CheckCircle2,
   ShieldCheck, ArrowRight, ArrowLeft, Loader2, Building2, Layers, Images, Plus, Sparkles,
 } from "lucide-react"
 import { DeveloperLogo } from "@/components/developers/developer-logo"
 import { JoinGoogleButton } from "@/components/developers/join-google-button"
 import type { InviteDeveloper } from "@/lib/developer-invites"
+import { OtpInput } from "@/components/auth/otp-input"
+import { sendJoinOtp, verifyJoinOtp } from "./actions"
 
 const inputCls =
   "w-full px-4 py-3 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all duration-200"
-
-const PWD_RULES = [
-  { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
-  { label: "Contains a number", test: (p: string) => /\d/.test(p) },
-  { label: "Contains an uppercase letter", test: (p: string) => /[A-Z]/.test(p) },
-]
 
 function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
   return (
@@ -303,26 +299,30 @@ function SplitLayout({ hero, children }: { hero: React.ReactNode; children: Reac
 
 export function JoinRegisterUI({
   token,
-  autoActivate,
   boundDeveloper,
   developers,
 }: {
   token: string
-  autoActivate: boolean
   boundDeveloper: InviteDeveloper | null
   developers: InviteDeveloper[]
 }) {
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirm, setConfirm] = useState("")
-  const [showPwd, setShowPwd] = useState(false)
+  const [step, setStep] = useState<"email" | "code">("email")
+  const [code, setCode] = useState("")
+  const [challenge, setChallenge] = useState("")
+  const [cooldown, setCooldown] = useState(0)
   const [chosen, setChosen] = useState<InviteDeveloper | null>(null)
   const [newName, setNewName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [activated, setActivated] = useState(false)
+
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [cooldown])
 
   // What the registrant will join with: a bound developer, a chosen existing
   // one, or a to-be-created one (name only, created server-side on submit).
@@ -330,40 +330,40 @@ export function JoinRegisterUI({
   const selectionName = boundDeveloper?.name ?? chosen?.name ?? newName ?? ""
   const hero = boundDeveloper ? <BoundHero developer={boundDeveloper} /> : <MarketingHero />
 
-  const submit = async () => {
+  // Two steps, same as /register: send the code, then verify it — the invite
+  // token and developer choice ride along to the verify action, which claims
+  // one use of the link and provisions the developer account.
+  const sendCode = async () => {
     setError(null)
     if (!hasSelection) return setError("Please choose your developer.")
-    if (!firstName.trim() || !lastName.trim() || !email.trim()) return setError("All fields are required.")
-    if (!PWD_RULES.every((r) => r.test(password))) return setError("Password doesn't meet the requirements.")
-    if (password !== confirm) return setError("Passwords do not match.")
-
+    if (!email.trim()) return setError("Enter your email address.")
     setSubmitting(true)
-    try {
-      const res = await fetch("/api/developer-invite/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token,
-          developerId: boundDeveloper ? null : chosen?.id ?? null,
-          newDeveloperName: boundDeveloper ? null : newName,
-          firstName,
-          lastName,
-          email,
-          password,
-        }),
-      })
-      const json = (await res.json()) as { success?: boolean; error?: string }
-      if (!res.ok || !json.success) {
-        setError(json.error ?? "Could not create your account.")
-        setSubmitting(false)
-        return
-      }
+    const res = await sendJoinOtp(token, email)
+    setSubmitting(false)
+    if (res?.error) return setError(res.error)
+    setChallenge(res?.challenge ?? "")
+    setStep("code")
+    setCode("")
+    setCooldown(60)
+  }
+
+  const verify = async () => {
+    setError(null)
+    setSubmitting(true)
+    const res = await verifyJoinOtp(
+      token, email, code, challenge,
+      boundDeveloper ? null : chosen?.id ?? null,
+      boundDeveloper ? null : newName,
+    )
+    setSubmitting(false)
+    if (res?.error) return setError(res.error)
+    if (res?.success) {
+      setActivated(!!res.active)
       setSuccess(true)
-    } catch {
-      setError("Network error — please try again.")
-      setSubmitting(false)
     }
   }
+
+  const resend = () => { if (cooldown === 0 && !submitting) void sendCode() }
 
   if (success) {
     return (
@@ -375,15 +375,15 @@ export function JoinRegisterUI({
             </div>
             <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mb-3">Account created</h2>
             <p className="text-[#6b7280] text-sm mb-8 leading-relaxed">
-              {autoActivate
-                ? `You've joined ${selectionName}. You can sign in now.`
+              {activated
+                ? `You've joined ${selectionName} and you're signed in.`
                 : `You've joined ${selectionName}. An administrator will review and approve your access before you can sign in.`}
             </p>
             <Link
-              href="/login"
+              href={activated ? "/developer" : "/login"}
               className="inline-flex items-center justify-center gap-2 w-full py-3.5 px-4 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl shadow-[0_4px_16px_-2px_rgba(0,31,63,0.35)] hover:-translate-y-0.5 transition-all duration-200"
             >
-              Go to sign in <ArrowRight className="w-4 h-4" />
+              {activated ? "Go to your dashboard" : "Go to sign in"} <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
@@ -434,68 +434,63 @@ export function JoinRegisterUI({
           <div className="flex-1 h-px bg-[#f0f0f0]" />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="First name">
-            <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Ahmed" className={inputCls} autoComplete="given-name" />
-          </Field>
-          <Field label="Last name">
-            <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Al Rashidi" className={inputCls} autoComplete="family-name" />
-          </Field>
-        </div>
-        <Field label="Email address">
-          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@example.com" className={inputCls} autoComplete="email" />
-        </Field>
-        <Field label="Password">
-          <div className="relative">
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type={showPwd ? "text" : "password"}
-              placeholder="Min. 8 characters"
-              className={`${inputCls} pr-11`}
-              autoComplete="new-password"
-            />
-            <button type="button" onClick={() => setShowPwd((v) => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#001f3f]" aria-label="Toggle password">
-              {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        {step === "email" ? (
+          <form onSubmit={(e) => { e.preventDefault(); void sendCode() }} className="space-y-4">
+            <Field label="Email address">
+              <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@example.com" className={inputCls} autoComplete="email" required />
+            </Field>
+
+            {error && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+                <AlertCircle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+                <p className="text-sm text-rose-700">{error}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl shadow-[0_4px_14px_-2px_rgba(0,31,63,0.40)] hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 transition-all duration-200"
+            >
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {submitting ? "Sending code…" : "Send code"}
+              {!submitting && <ArrowRight className="w-4 h-4" />}
             </button>
-          </div>
-          {password && (
-            <div className="mt-2 space-y-1">
-              {PWD_RULES.map((r) => {
-                const ok = r.test(password)
-                return (
-                  <div key={r.label} className="flex items-center gap-2">
-                    <span className={`w-4 h-4 rounded-full flex items-center justify-center ${ok ? "bg-emerald-500" : "bg-[#e5e7eb]"}`}>
-                      {ok ? <Check className="w-2.5 h-2.5 text-white" /> : <X className="w-2 h-2 text-[#9ca3af]" />}
-                    </span>
-                    <span className={`text-xs ${ok ? "text-emerald-700" : "text-[#6b7280]"}`}>{r.label}</span>
-                  </div>
-                )
-              })}
+          </form>
+        ) : (
+          <form onSubmit={(e) => { e.preventDefault(); void verify() }} className="space-y-4">
+            <p className="text-sm text-[#6b7280]">
+              Enter the 6-digit code we sent to <span className="font-semibold text-[#374151]">{email}</span>.
+            </p>
+            <OtpInput value={code} onChange={setCode} disabled={submitting} autoFocus />
+
+            {error && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+                <AlertCircle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+                <p className="text-sm text-rose-700">{error}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl shadow-[0_4px_14px_-2px_rgba(0,31,63,0.40)] hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 transition-all duration-200"
+            >
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {submitting ? "Verifying…" : "Create account"}
+              {!submitting && <ArrowRight className="w-4 h-4" />}
+            </button>
+
+            <div className="flex items-center justify-between text-xs pt-0.5">
+              <button type="button" onClick={() => { setStep("email"); setCode(""); setError(null) }} className="inline-flex items-center gap-1 text-[#6b7280] hover:text-[#001f3f] font-semibold transition-colors">
+                <ArrowLeft className="w-3.5 h-3.5" /> Change email
+              </button>
+              <button type="button" onClick={resend} disabled={cooldown > 0} className="text-[#001f3f] font-semibold hover:underline disabled:text-[#9ca3af] disabled:no-underline disabled:cursor-not-allowed">
+                {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
+              </button>
             </div>
-          )}
-        </Field>
-        <Field label="Confirm password">
-          <input value={confirm} onChange={(e) => setConfirm(e.target.value)} type={showPwd ? "text" : "password"} placeholder="Re-enter password" className={inputCls} autoComplete="new-password" />
-        </Field>
-
-        {error && (
-          <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
-            <AlertCircle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
-            <p className="text-sm text-rose-700">{error}</p>
-          </div>
+          </form>
         )}
-
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={submitting}
-          className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 bg-[#001f3f] hover:bg-[#002952] text-white text-sm font-bold rounded-xl shadow-[0_4px_14px_-2px_rgba(0,31,63,0.40)] hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 transition-all duration-200"
-        >
-          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          {submitting ? "Creating account…" : "Create account"}
-          {!submitting && <ArrowRight className="w-4 h-4" />}
-        </button>
       </div>
     </SplitLayout>
   )
