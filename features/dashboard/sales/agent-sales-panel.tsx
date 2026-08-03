@@ -724,7 +724,14 @@ export function AgentSalesPanel({
                       </td>
                       <td className="px-4 py-2.5 text-[#374151] whitespace-nowrap">{formatDate(s.reservation_date)}</td>
                       <td className="px-4 py-2.5 whitespace-nowrap"><StatusBadge value={s.commission_status} type="commission" /></td>
-                      <td className="px-4 py-2.5 last:pr-6 whitespace-nowrap"><StatusBadge value={s.validation_status} type="validation" /></td>
+                      <td className="px-4 py-2.5 last:pr-6 whitespace-nowrap">
+                        <StatusBadge value={s.validation_status} type="validation" />
+                        {s.validation_changed_at && (
+                          <p className="mt-1 text-[10px] leading-tight text-[#9ca3af]">
+                            by {titleCase(s.validation_changed_by_name ?? "") || "—"} · {formatDate(s.validation_changed_at)}
+                          </p>
+                        )}
+                      </td>
                     </tr>
                   )
                 })

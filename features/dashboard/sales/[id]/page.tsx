@@ -19,6 +19,7 @@ import {
 import { useAuth } from "@/context/auth-context"
 import { createClient } from "@/lib/supabase/client"
 import { ValidationDiscussion } from "./validation-discussion"
+import { toTitleCase } from "../sale-ui"
 
 function formatDate(value: string | null) {
   if (!value) return "—"
@@ -274,6 +275,13 @@ export default function SaleDetailPage() {
           <div className="bg-white/60 backdrop-blur-xl rounded-[20px] border border-white/60 shadow-sm shadow-black/5 p-5">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af] mb-3">Validation Status</p>
             <StatusBadge value={sale.validation_status} />
+            {/* Audit stamp — who made this call, and when. */}
+            {sale.validation_changed_at && (
+              <p className="mt-2 text-[11px] text-[#6b7280]">
+                by <span className="font-semibold text-[#374151]">{toTitleCase(sale.validation_changed_by_name) || "—"}</span>
+                {" · "}{formatDate(sale.validation_changed_at)}
+              </p>
+            )}
           </div>
         </div>
 

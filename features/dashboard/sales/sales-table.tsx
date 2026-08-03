@@ -610,7 +610,7 @@ export function SalesTable({
     if (!isAdminUser || validationBusyRef.current.has(sale.id)) return
     validationBusyRef.current.add(sale.id)
     try {
-      const { data, error, previousStatus } = await updateSaleValidationStatus(sale.id, nextStatus, currentUserId, currentRole)
+      const { data, error, previousStatus } = await updateSaleValidationStatus(sale.id, nextStatus, currentUserId, currentRole, userName)
       if (error) { addToast("error", error); return }
       // Gate on the authoritative pre-update status, not the possibly-stale row.
       if (previousStatus !== nextStatus) notifySaleEvent(sale.id, "validation")
@@ -689,7 +689,22 @@ export function SalesTable({
   columns.push({ key: "price", header: "Contract Price", sortField: "contract_price", tdClassName: "text-right font-mono text-sm font-semibold text-[#0d1117]", cell: (s) => formatCurrency(s.contract_price) })
   columns.push({ key: "resv", header: "Reservation Date", sortField: "reservation_date", tdClassName: "text-[#374151]", cell: (s) => formatDate(s.reservation_date) })
   columns.push({ key: "comm", header: "Commission", cell: (s) => <StatusBadge value={s.commission_status} type="commission" /> })
-  columns.push({ key: "valid", header: "Validation", cell: (s) => <StatusBadge value={s.validation_status} type="validation" /> })
+  columns.push({
+    key: "valid",
+    header: "Validation",
+    // The badge answers "what state" — the line under it answers "who decided
+    // that, and when", which is the transparency the audit stamp exists for.
+    cell: (s) => (
+      <div className="min-w-0">
+        <StatusBadge value={s.validation_status} type="validation" />
+        {s.validation_changed_at && (
+          <p className="mt-1 text-[10px] leading-tight text-[#9ca3af] whitespace-nowrap">
+            by {toTitleCase(s.validation_changed_by_name) || "—"} · {formatDate(s.validation_changed_at)}
+          </p>
+        )}
+      </div>
+    ),
+  })
   columns.push({ key: "created", header: "Created", sortField: "created_at", tdClassName: "text-[#6b7280]", cell: (s) => formatDate(s.created_at) })
   columns.push({
     key: "files", header: "Files",

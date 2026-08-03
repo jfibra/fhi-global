@@ -27,6 +27,8 @@ export function formatCurrency(value: number) {
 export function toTitleCase(value: string | null | undefined) {
   if (!value) return ""
   return value
+    .replace(/\s+/g, " ") // several profiles store doubled spaces ("Juliecor  Repompo")
+    .trim()
     .toLowerCase()
     .replace(/(^|[\s\-'’.&/([])(\p{L})/gu, (_m, sep: string, c: string) => sep + c.toUpperCase())
 }

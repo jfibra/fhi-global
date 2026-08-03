@@ -98,6 +98,13 @@ export type SaleRecord = {
   total_area_sqm: number | null
   commission_status: CommissionStatus
   validation_status: ValidationStatus
+  // Who last changed the validation status (migration 024). The name is a
+  // snapshot taken at the moment of the change — deliberately not a join, so
+  // the audit stamp survives profile renames. Null until 024 is applied or
+  // until the status is first changed.
+  validation_changed_by: string | null
+  validation_changed_by_name: string | null
+  validation_changed_at: string | null
   proof_of_transaction_url: string | null
   remarks: string | null
   created_at: string
@@ -350,6 +357,9 @@ function normalizeSale(row: unknown): SaleRecord {
     total_area_sqm: raw.total_area_sqm != null ? Number(raw.total_area_sqm) : null,
     commission_status: (raw.commission_status as CommissionStatus) ?? "pending",
     validation_status: (raw.validation_status as ValidationStatus) ?? "pending",
+    validation_changed_by: typeof raw.validation_changed_by === "string" ? raw.validation_changed_by : null,
+    validation_changed_by_name: typeof raw.validation_changed_by_name === "string" ? raw.validation_changed_by_name : null,
+    validation_changed_at: typeof raw.validation_changed_at === "string" ? raw.validation_changed_at : null,
     proof_of_transaction_url: typeof raw.proof_of_transaction_url === "string" ? raw.proof_of_transaction_url : null,
     remarks: typeof raw.remarks === "string" ? raw.remarks : null,
     created_at: String(raw.created_at ?? ""),
@@ -1484,6 +1494,8 @@ export async function updateSaleValidationStatus(
   nextStatus: ValidationStatus,
   currentUserId: string,
   currentRole: string,
+  /** Display name of the acting admin, snapshotted onto the sale (migration 024). */
+  performerName?: string | null,
 ): Promise<{ data: SaleRecord | null; error: string | null; previousStatus?: string | null }> {
   const supabase = createClient()
 
@@ -1501,20 +1513,50 @@ export async function updateSaleValidationStatus(
     return { data: null, error: existingError?.message ?? "Sale not found" }
   }
 
-  const { data, error } = await supabase
-    .from("sales_reports")
-    .update({ validation_status: nextStatus, updated_by: currentUserId })
-    .eq("id", saleId)
-    .select(`
-      *,
-      developers(name),
-      projects(name),
-      project_units(unit_type),
-      clients(first_name,middle_name,last_name,email,phone,age,gender,occupation,street,city,state_province,country),
-      profiles:agent_id(fullname),
-      sales_attachments(id)
-    `)
-    .single()
+  const runUpdate = (payload: Record<string, unknown>) =>
+    supabase
+      .from("sales_reports")
+      .update(payload)
+      .eq("id", saleId)
+      .select(SALE_SELECT)
+      .single()
+
+  // Stamp who changed the status and when, alongside the change itself, so the
+  // report can answer "who validated this?" without opening the activity log.
+  // The name is a snapshot; if the caller has none (one live admin account has
+  // a blank profile name), fall back to the profile, then the email — a stamp
+  // that reads "chymeyap27" is transparent, a dash is not.
+  let stampName = performerName?.trim() || null
+  if (!stampName) {
+    const { data: me } = await supabase
+      .from("profiles")
+      .select("fullname, fname, lname")
+      .eq("id", currentUserId)
+      .maybeSingle()
+    stampName =
+      me?.fullname?.trim() ||
+      [me?.fname, me?.lname].filter(Boolean).join(" ").trim() ||
+      null
+    if (!stampName) {
+      const { data: au } = await supabase.auth.getUser()
+      stampName = au?.user?.email?.split("@")[0] ?? null
+    }
+  }
+
+  let { data, error } = await runUpdate({
+    validation_status: nextStatus,
+    updated_by: currentUserId,
+    validation_changed_by: currentUserId,
+    validation_changed_by_name: stampName,
+    validation_changed_at: new Date().toISOString(),
+  })
+
+  // PGRST204 = a column in the payload doesn't exist, i.e. migration 024 isn't
+  // applied yet. The status change must not be held hostage by the stamp —
+  // retry without it; the activity log below still records who acted.
+  if (error && (error.code === "PGRST204" || /validation_changed/i.test(error.message))) {
+    ;({ data, error } = await runUpdate({ validation_status: nextStatus, updated_by: currentUserId }))
+  }
 
   if (error) return { data: null, error: error.message }
 

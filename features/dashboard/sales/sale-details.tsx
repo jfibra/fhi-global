@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react"
 import type { SaleRecord, CommissionStatus, ValidationStatus } from "@/lib/sales-service"
+import { toTitleCase } from "./sale-ui"
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -124,7 +125,7 @@ export function SaleDetails({
                 <div>
                   <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{clientName}</h2>
                   <p className="text-xs text-[#9ca3af] mt-0.5">
-                    {sale.projects?.name ?? "—"} Â· {sale.developers?.name ?? "—"}
+                    {sale.projects?.name ?? "—"} · {sale.developers?.name ?? "—"}
                   </p>
                 </div>
               </div>
@@ -203,6 +204,13 @@ export function SaleDetails({
               <div className="bg-white/60 backdrop-blur-xl rounded-[20px] border border-white/60 shadow-sm shadow-black/5 p-5">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af] mb-2">Validation Status</p>
                 <StatusBadge value={sale.validation_status} />
+                {/* Audit stamp — who made this call, and when. */}
+                {sale.validation_changed_at && (
+                  <p className="mt-2 text-[11px] text-[#6b7280]">
+                    by <span className="font-semibold text-[#374151]">{toTitleCase(sale.validation_changed_by_name) || "—"}</span>
+                    {" · "}{formatDate(sale.validation_changed_at)}
+                  </p>
+                )}
               </div>
             </div>
 

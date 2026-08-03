@@ -98,6 +98,10 @@ export function exportColumnsFor(saleType: SaleType | null): ExportColumn[] {
     { header: "Contract Price (AED)", value: (s) => s.contract_price ?? 0, numeric: true },
     { header: "Commission", value: (s) => STATUS_WORDS(s.commission_status) },
     { header: "Validation", value: (s) => STATUS_WORDS(s.validation_status) },
+    // Audit stamp (migration 024) — who last set the validation status, and
+    // when, so the exported report answers it without the dashboard.
+    { header: "Validation By", value: (s) => s.validation_changed_by_name ?? "" },
+    { header: "Validation Date", value: (s) => (s.validation_changed_at ? s.validation_changed_at.slice(0, 10) : "") },
     { header: "Remarks", value: (s) => s.remarks ?? "" },
     { header: "Recorded On", value: (s) => (s.created_at ? s.created_at.slice(0, 10) : "") },
   ]
