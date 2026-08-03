@@ -28,7 +28,8 @@ import {
   readThemeChoice, resolveTheme, type ThemeChoice,
 } from "@/lib/profile-themes"
 import {
-  PROFILE_OG_H, PROFILE_OG_W, readProfileOgCard, type ProfileOgCard,
+  DEFAULT_OG_TITLE, PROFILE_OG_H, PROFILE_OG_W, readProfileOgCard, resolveOgLinkText,
+  type ProfileOgCard,
 } from "@/lib/profile-og-card"
 
 /**
@@ -307,10 +308,11 @@ export default function PublicProfileMakerPage() {
       setSaveState("error")
     }
   }, [socials, tagline, buttons, fixedLabels, theme, ogCard, activeDesign, cardData, user?.id, router])
-  const fallbackOgTitle = titleCaseName(previewData.fullname)
-  const fallbackOgDescription =
-    previewData.tagline ||
-    `${fallbackOgTitle} — ${previewData.roleLabel} at FHI Global. Call, message or save the contact details.`
+  // The feed preview's text, from the SAME resolver generateMetadata uses on
+  // the public page — computed from the PENDING edits (this tagline is the
+  // Forms tab's unsaved value), so the preview shows what a share will look
+  // like once these edits are saved.
+  const ogText = resolveOgLinkText(ogCard, { tagline: previewData.tagline })
 
   /**
    * The chosen design, rendered for the right-hand column. Drawn at the OG
@@ -426,8 +428,7 @@ export default function PublicProfileMakerPage() {
               onChange={setOgCard}
               cardData={cardData}
               inheritedDesign={inheritedDesign}
-              fallbackTitle={fallbackOgTitle}
-              fallbackDescription={fallbackOgDescription}
+              fallbackTitle={DEFAULT_OG_TITLE}
             />
           )}
 
@@ -781,11 +782,13 @@ export default function PublicProfileMakerPage() {
                 <div className="border-t border-[#dfe3e8] px-3 py-2.5">
                   <p className="text-[11px] uppercase tracking-wide text-[#65676b]">fhiglobal.ae</p>
                   <p className="mt-0.5 text-[15px] font-bold leading-snug text-[#0d1117] line-clamp-1">
-                    {ogCard.title || fallbackOgTitle}
+                    {ogText.title}
                   </p>
-                  <p className="mt-0.5 text-[13px] leading-snug text-[#65676b] line-clamp-2">
-                    {ogCard.description || fallbackOgDescription}
-                  </p>
+                  {ogText.description && (
+                    <p className="mt-0.5 text-[13px] leading-snug text-[#65676b] line-clamp-2">
+                      {ogText.description}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
