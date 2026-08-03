@@ -165,6 +165,10 @@ const PRIVATE_NOINDEX_HEADERS = SECURITY_HEADERS.map((header) => {
 })
 
 const nextConfig = {
+  // Debug escape hatch: lets a second `next dev` run from this directory
+  // without fighting the primary one over .next/dev/lock. Inert unless the
+  // env var is set.
+  ...(process.env.NEXT_DEBUG_DIST_DIR ? { distDir: process.env.NEXT_DEBUG_DIST_DIR } : {}),
   typescript: {
     ignoreBuildErrors: true,
   },
