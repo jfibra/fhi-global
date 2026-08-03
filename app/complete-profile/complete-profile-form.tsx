@@ -1,8 +1,9 @@
 "use client"
 
 import { useActionState, useState } from "react"
-import { ChevronDown, ArrowRight, AlertCircle } from "lucide-react"
+import { Camera, ChevronDown, ArrowRight, AlertCircle } from "lucide-react"
 import { PhoneCountrySelect } from "@/components/phone-country-select"
+import { ProfileAvatarUpload } from "@/components/profile-avatar-upload"
 import { NATIONALITIES } from "@/lib/nationalities"
 import { completeProfileAction, type CompleteProfileState } from "./actions"
 
@@ -92,25 +93,85 @@ function FloatingSelect({
   )
 }
 
-export function CompleteProfileForm({ initial }: { initial: CompleteProfileInitial }) {
+export function CompleteProfileForm({
+  initial,
+  userId,
+  displayName,
+  initialAvatarUrl,
+}: {
+  initial: CompleteProfileInitial
+  userId: string
+  displayName: string
+  initialAvatarUrl: string
+}) {
   const [state, formAction, pending] = useActionState(completeProfileAction, initialState)
   const [phoneCode, setPhoneCode] = useState(initial.phone_country_code || "+971")
   const [waCode, setWaCode] = useState(initial.whatsapp_country_code || "+971")
 
+  // Required photo. The cropper (the same one Profile settings uses) uploads to
+  // /api/upload/avatar and hands back the URL; the server action persists it as
+  // profile_url. Kept in state so submitting without one can be blocked with a
+  // message instead of a silent server round-trip.
+  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [avatarBusy, setAvatarBusy] = useState(false)
+  const [avatarError, setAvatarError] = useState("")
+  const [photoMissing, setPhotoMissing] = useState(false)
+
   return (
     <div className="min-h-screen bg-white py-10 px-4">
       <div className="mx-auto w-full max-w-4xl">
-        {/* Header */}
-        <div className="text-center mb-8">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logos/FHI_Branding Set_PNG Copies-02.png" alt="FHI Global" className="h-14 w-auto object-contain mx-auto mb-4" />
-          <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117]">Complete your profile</h1>
-          <p className="text-sm text-[#6b7280] mt-1.5 max-w-md mx-auto">
-            We need a few details before you can access your dashboard. Fields marked <span className="text-rose-500">*</span> are required.
-          </p>
-        </div>
+        <form
+          action={formAction}
+          onSubmit={(e) => {
+            // The one field HTML `required` can't cover — checked here so the
+            // user gets an inline message, and again in the server action.
+            if (!avatarUrl.trim() && !avatarBusy) {
+              e.preventDefault()
+              setPhotoMissing(true)
+            }
+          }}
+          className="space-y-5"
+        >
+          {/* Photo — required, like everything else on this form. A profile-style
+              circle with the camera badge on the rim; the whole thing opens the
+              same cropper the Profile settings page uses. */}
+          <input type="hidden" name="profile_url" value={avatarUrl} />
+          <div className="flex flex-col items-center gap-2 pb-1">
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              disabled={avatarBusy}
+              aria-label={avatarUrl ? "Change your photo" : "Add your photo"}
+              className="relative shrink-0 focus-visible:outline-none group"
+            >
+              <span
+                className={`block w-28 h-28 rounded-full overflow-hidden bg-[#f4f6f9] ring-4 flex items-center justify-center transition-shadow group-focus-visible:ring-[#001f3f]/25 ${
+                  photoMissing && !avatarUrl ? "ring-rose-300" : "ring-white shadow-[0_2px_12px_rgba(0,31,63,0.12)]"
+                }`}
+              >
+                {avatarBusy ? (
+                  <span className="w-7 h-7 m-auto border-2 border-[#001f3f]/20 border-t-[#001f3f] rounded-full animate-spin" />
+                ) : avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt="Your profile photo" className="w-full h-full object-cover" />
+                ) : (
+                  <Camera className="w-9 h-9 m-auto text-[#c3c9d2]" />
+                )}
+              </span>
+              {/* The camera badge, sitting on the rim like the reference. */}
+              <span className="absolute bottom-0.5 right-0.5 w-9 h-9 rounded-full bg-[#001f3f] border-[3px] border-white flex items-center justify-center group-hover:bg-[#002952] transition-colors">
+                <Camera className="w-4 h-4 text-white" />
+              </span>
+            </button>
+            <p className="text-sm font-bold text-[#111827]">Profile Picture</p>
+            {(avatarError || (photoMissing && !avatarUrl)) && (
+              <p className="text-xs text-rose-600 text-center">
+                {avatarError || "Please upload a profile photo to continue."}
+              </p>
+            )}
+          </div>
 
-        <form action={formAction} className="space-y-5">
           {/* Name */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <FloatingInput name="fname" label="First name" defaultValue={initial.fname} required />
@@ -203,6 +264,23 @@ export function CompleteProfileForm({ initial }: { initial: CompleteProfileIniti
             )}
           </button>
         </form>
+
+        <ProfileAvatarUpload
+          userId={userId}
+          displayName={displayName}
+          currentUrl={avatarUrl || null}
+          busy={avatarBusy}
+          open={pickerOpen}
+          onBusyChange={setAvatarBusy}
+          onUploaded={(url) => {
+            setAvatarUrl(url)
+            setAvatarError("")
+            setPhotoMissing(false)
+          }}
+          onRemoved={() => setAvatarUrl("")}
+          onClose={() => setPickerOpen(false)}
+          onError={setAvatarError}
+        />
       </div>
     </div>
   )

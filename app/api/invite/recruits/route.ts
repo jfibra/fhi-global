@@ -27,7 +27,7 @@ export async function GET() {
   const admin = createAdminSupabase()
   const { data, error } = await admin
     .from("profiles")
-    .select("id, fullname, role, status, joined_at, birthday, gender, fname, lname, timezone, metadata")
+    .select("id, fullname, role, status, joined_at, birthday, gender, fname, lname, timezone, profile_url, metadata")
     .eq("metadata->>invited_by", userId)
     .eq("is_deleted", false)
     .order("joined_at", { ascending: false })

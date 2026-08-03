@@ -190,10 +190,26 @@ export async function ensureProfileForUser(
   return refreshed
 }
 
+/**
+ * A photo the user actually uploaded. The Google avatar that OAuth sign-in
+ * copies onto profiles doesn't count: it's a 96px thumbnail of whatever they
+ * chose for Gmail years ago, and the directory/business cards need a real
+ * headshot — so it may sit on the profile for display, but it doesn't satisfy
+ * the minimum and complete-profile asks for an upload.
+ */
+export function isUploadedProfilePhoto(url: string | null | undefined): boolean {
+  const u = (url ?? "").trim()
+  return !!u && !/googleusercontent\.com/i.test(u)
+}
+
 export function isProfileMissingMinimumFields(profile: AppProfile) {
   const metadata = profile.metadata ?? {}
   const meta = (k: string) => (typeof metadata[k] === "string" ? (metadata[k] as string).trim() : "")
   return (
+    // The photo is part of the minimum: over half the directory had none while
+    // it was optional. NOTE — every caller must SELECT profile_url, or this
+    // reads undefined and marks complete profiles incomplete.
+    !isUploadedProfilePhoto(profile.profile_url) ||
     !profile.fname?.trim() ||
     !profile.lname?.trim() ||
     !profile.timezone?.trim() ||
@@ -206,7 +222,7 @@ export function isProfileMissingMinimumFields(profile: AppProfile) {
 }
 
 /**
- * Dashboard paths allowed before personal profile is complete (fname, lname, timezone, phone).
+ * Dashboard paths allowed before personal profile is complete (photo, fname, lname, timezone, phone).
  * Developers primarily use their own dashboard subtree; forcing profile first blocked every sidebar link.
  */
 export function isPathExemptFromProfileCompletionGate(pathname: string, role?: string | null) {

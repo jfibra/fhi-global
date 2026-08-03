@@ -173,6 +173,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
+    unoptimized: true,
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 300,
     // Next.js 16: any <Image quality={n}> must be listed here or rendering can warn/fail

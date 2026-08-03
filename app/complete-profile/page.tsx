@@ -6,6 +6,7 @@ import {
   getDashboardRouteByRole,
   isInactiveProfile,
   isProfileMissingMinimumFields,
+  isUploadedProfilePhoto,
 } from "@/lib/auth"
 import { CompleteProfileForm, type CompleteProfileInitial } from "./complete-profile-form"
 
@@ -29,7 +30,7 @@ export default async function CompleteProfilePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, status, is_deleted, fname, mname, lname, birthday, gender, timezone, metadata")
+    .select("id, role, status, is_deleted, fname, mname, lname, fullname, birthday, gender, timezone, profile_url, metadata")
     .eq("id", user.id)
     .single()
 
@@ -60,5 +61,14 @@ export default async function CompleteProfilePage() {
     bio: str(m.bio),
   }
 
-  return <CompleteProfileForm initial={initial} />
+  return (
+    <CompleteProfileForm
+      initial={initial}
+      userId={user.id}
+      displayName={str(profile.fullname) || [str(profile.fname), str(profile.lname)].filter(Boolean).join(" ")}
+      // Deliberately NOT the Google avatar (isUploadedProfilePhoto): the point
+      // of the requirement is a photo the user uploads themselves.
+      initialAvatarUrl={isUploadedProfilePhoto(profile.profile_url) ? str(profile.profile_url) : ""}
+    />
+  )
 }

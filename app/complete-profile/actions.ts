@@ -2,14 +2,19 @@
 
 import { redirect } from "next/navigation"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
-import { getDashboardRouteByRole, isInactiveProfile } from "@/lib/auth"
+import { getDashboardRouteByRole, isInactiveProfile, isUploadedProfilePhoto } from "@/lib/auth"
 
 export type CompleteProfileState = { error?: string }
 
 /**
  * Saves the required profile info for an incomplete account, then sends the user
- * to their role dashboard. Required: fname, lname, birthday, gender, nationality,
- * timezone, phone, whatsapp. Optional: mname, linkedin, facebook, license, bio.
+ * to their role dashboard. Required: photo, fname, lname, birthday, gender,
+ * nationality, timezone, phone, whatsapp. Optional: mname, linkedin, facebook,
+ * license, bio.
+ *
+ * The photo arrives as a URL: the form uploads it to /api/upload/avatar (which
+ * authenticates and returns the S3 location) and posts the result here. Only an
+ * https URL is accepted — profile_url lands in <img src> across the app.
  */
 export async function completeProfileAction(
   _: CompleteProfileState,
@@ -40,9 +45,18 @@ export async function completeProfileAction(
   const facebook = g("facebook")
   const license = g("license_number")
   const bio = g("bio")
+  const profileUrl = g("profile_url")
 
   if (!fname || !lname || !birthday || !gender || !nationality || !timezone || !phoneNumber || !waNumber) {
     return { error: "Please fill in all required fields." }
+  }
+  // Must be an UPLOADED photo — the copied-over Google avatar doesn't count
+  // (same rule the completeness gate applies; see isUploadedProfilePhoto).
+  if (!profileUrl || !isUploadedProfilePhoto(profileUrl)) {
+    return { error: "Please upload a profile photo." }
+  }
+  if (!/^https:\/\//.test(profileUrl)) {
+    return { error: "The profile photo didn't upload correctly — please try adding it again." }
   }
 
   const fullname = [fname, mname, lname].map((p) => p.trim()).filter(Boolean).join(" ")
@@ -76,6 +90,7 @@ export async function completeProfileAction(
       birthday,
       gender,
       timezone,
+      profile_url: profileUrl,
       metadata,
     })
     .eq("id", user.id)
