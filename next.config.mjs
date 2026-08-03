@@ -26,6 +26,13 @@ const MAPS_API       = "maps.googleapis.com"
 const MAPS_GSTATIC   = "maps.gstatic.com"
 // Ebook PDFs, framed by the dashboard reader (keep in sync with EBOOK_FRAME_HOSTS in lib/ebooks.ts)
 const EBOOK_PDF_HOST = "https://leuteriorealty.com"
+// S3 bucket holding uploaded files. Framed by the sale-attachments viewer so a
+// PDF previews in the browser's native reader instead of forcing a download.
+// The exact host is derived from S3_PUBLIC_URL rather than wildcarding
+// *.amazonaws.com — this directive should reach one bucket, not all of AWS.
+const S3_FRAME_HOST = process.env.S3_PUBLIC_URL
+  ? `https://${new URL(process.env.S3_PUBLIC_URL).host}`
+  : ""
 
 // ── Content-Security-Policy ──────────────────────────────────────────────────
 // next/font/google self-hosts fonts at build-time → no fonts.googleapis.com needed.
@@ -59,10 +66,11 @@ const CSP = [
   // No plugins / Flash / PDFs embedded via <object>/<embed>
   `object-src 'none'`,
 
-  // Only the ebook host may be framed — the dashboard reader embeds those PDFs
-  // in the browser's native viewer (see lib/ebooks.ts). Google sign-in uses a
-  // full-page redirect, not a frame, so nothing else needs framing.
-  `frame-src ${EBOOK_PDF_HOST}`,
+  // Only the ebook host and the uploads bucket may be framed — the dashboard
+  // reader embeds ebook PDFs (see lib/ebooks.ts) and the sale-attachments
+  // viewer embeds uploaded ones, both in the browser's native viewer. Google
+  // sign-in uses a full-page redirect, not a frame, so nothing else needs it.
+  `frame-src ${EBOOK_PDF_HOST}${S3_FRAME_HOST ? ` ${S3_FRAME_HOST}` : ""}`,
   // Prevent this app from being embedded in iframes elsewhere
   `frame-ancestors 'none'`,
 
