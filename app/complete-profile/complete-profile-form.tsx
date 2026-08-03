@@ -108,34 +108,24 @@ export function CompleteProfileForm({
   const [phoneCode, setPhoneCode] = useState(initial.phone_country_code || "+971")
   const [waCode, setWaCode] = useState(initial.whatsapp_country_code || "+971")
 
-  // Required photo. The cropper (the same one Profile settings uses) uploads to
+  // Optional photo. The cropper (the same one Profile settings uses) uploads to
   // /api/upload/avatar and hands back the URL; the server action persists it as
-  // profile_url. Kept in state so submitting without one can be blocked with a
-  // message instead of a silent server round-trip.
+  // profile_url. Not required here: the ProfilePhotoGate modal in the dashboard
+  // shell enforces the photo for every role, so this form stays about the
+  // written details and never blocks on an upload.
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [avatarBusy, setAvatarBusy] = useState(false)
   const [avatarError, setAvatarError] = useState("")
-  const [photoMissing, setPhotoMissing] = useState(false)
 
   return (
     <div className="min-h-screen bg-white py-10 px-4">
       <div className="mx-auto w-full max-w-4xl">
-        <form
-          action={formAction}
-          onSubmit={(e) => {
-            // The one field HTML `required` can't cover — checked here so the
-            // user gets an inline message, and again in the server action.
-            if (!avatarUrl.trim() && !avatarBusy) {
-              e.preventDefault()
-              setPhotoMissing(true)
-            }
-          }}
-          className="space-y-5"
-        >
-          {/* Photo — required, like everything else on this form. A profile-style
-              circle with the camera badge on the rim; the whole thing opens the
-              same cropper the Profile settings page uses. */}
+        <form action={formAction} className="space-y-5">
+          {/* Photo — a profile-style circle with the camera badge on the rim;
+              the whole thing opens the same cropper the Profile settings page
+              uses. Adding it here is a head start on the dashboard's photo
+              gate, not a requirement of this form. */}
           <input type="hidden" name="profile_url" value={avatarUrl} />
           <div className="flex flex-col items-center gap-2 pb-1">
             <button
@@ -145,11 +135,7 @@ export function CompleteProfileForm({
               aria-label={avatarUrl ? "Change your photo" : "Add your photo"}
               className="relative shrink-0 focus-visible:outline-none group"
             >
-              <span
-                className={`block w-28 h-28 rounded-full overflow-hidden bg-[#f4f6f9] ring-4 flex items-center justify-center transition-shadow group-focus-visible:ring-[#001f3f]/25 ${
-                  photoMissing && !avatarUrl ? "ring-rose-300" : "ring-white shadow-[0_2px_12px_rgba(0,31,63,0.12)]"
-                }`}
-              >
+              <span className="block w-28 h-28 rounded-full overflow-hidden bg-[#f4f6f9] ring-4 ring-white shadow-[0_2px_12px_rgba(0,31,63,0.12)] flex items-center justify-center transition-shadow group-focus-visible:ring-[#001f3f]/25">
                 {avatarBusy ? (
                   <span className="w-7 h-7 m-auto border-2 border-[#001f3f]/20 border-t-[#001f3f] rounded-full animate-spin" />
                 ) : avatarUrl ? (
@@ -165,11 +151,7 @@ export function CompleteProfileForm({
               </span>
             </button>
             <p className="text-sm font-bold text-[#111827]">Profile Picture</p>
-            {(avatarError || (photoMissing && !avatarUrl)) && (
-              <p className="text-xs text-rose-600 text-center">
-                {avatarError || "Please upload a profile photo to continue."}
-              </p>
-            )}
+            {avatarError && <p className="text-xs text-rose-600 text-center">{avatarError}</p>}
           </div>
 
           {/* Name */}
@@ -275,7 +257,6 @@ export function CompleteProfileForm({
           onUploaded={(url) => {
             setAvatarUrl(url)
             setAvatarError("")
-            setPhotoMissing(false)
           }}
           onRemoved={() => setAvatarUrl("")}
           onClose={() => setPickerOpen(false)}

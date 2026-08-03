@@ -7,7 +7,7 @@ import { AuthProvider } from "@/context/auth-context"
 import { DashboardShell } from "@/components/dashboard/shell"
 import { ProfilePhotoGate } from "@/components/dashboard/profile-photo-gate"
 import { PageLoader } from "@/components/ui/PageLoader"
-import { getProfileByUserId, isInactiveProfile, type AppProfile, type AppUser } from "@/lib/auth"
+import { getProfileByUserId, isInactiveProfile, isUploadedProfilePhoto, type AppProfile, type AppUser } from "@/lib/auth"
 
 /**
  * Client-side session provisioning for the dashboard.
@@ -65,7 +65,13 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
   // one instance, on the resolved profile this gate already has. The shell
   // still renders underneath: the gate is an overlay, so signing out or the
   // page behind it never gets torn down mid-upload.
-  const needsPhoto = !session.profile.profile_url?.trim()
+  //
+  // This modal is THE photo enforcement for all roles — /complete-profile
+  // handles the written details but deliberately doesn't require the photo.
+  // isUploadedProfilePhoto also rejects the Google avatar OAuth copies onto
+  // profiles: a 96px Gmail thumbnail isn't the professional headshot the
+  // directory and business cards need.
+  const needsPhoto = !isUploadedProfilePhoto(session.profile.profile_url)
 
   return (
     <AuthProvider user={session.user} profile={session.profile}>

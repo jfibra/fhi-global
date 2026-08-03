@@ -206,10 +206,11 @@ export function isProfileMissingMinimumFields(profile: AppProfile) {
   const metadata = profile.metadata ?? {}
   const meta = (k: string) => (typeof metadata[k] === "string" ? (metadata[k] as string).trim() : "")
   return (
-    // The photo is part of the minimum: over half the directory had none while
-    // it was optional. NOTE — every caller must SELECT profile_url, or this
-    // reads undefined and marks complete profiles incomplete.
-    !isUploadedProfilePhoto(profile.profile_url) ||
+    // The photo is deliberately NOT part of this minimum. This check drives the
+    // proxy's redirect to /complete-profile; the photo is instead enforced by
+    // the ProfilePhotoGate modal inside the dashboard shell, which covers every
+    // role (including admin staff, who are exempt from this gate) and uses the
+    // same isUploadedProfilePhoto rule so a copied Google avatar doesn't count.
     !profile.fname?.trim() ||
     !profile.lname?.trim() ||
     !profile.timezone?.trim() ||

@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
-import { getDashboardRouteByRole, isInactiveProfile, isUploadedProfilePhoto } from "@/lib/auth"
+import { getDashboardRouteByRole, isInactiveProfile } from "@/lib/auth"
 
 export type CompleteProfileState = { error?: string }
 
@@ -50,12 +50,11 @@ export async function completeProfileAction(
   if (!fname || !lname || !birthday || !gender || !nationality || !timezone || !phoneNumber || !waNumber) {
     return { error: "Please fill in all required fields." }
   }
-  // Must be an UPLOADED photo — the copied-over Google avatar doesn't count
-  // (same rule the completeness gate applies; see isUploadedProfilePhoto).
-  if (!profileUrl || !isUploadedProfilePhoto(profileUrl)) {
-    return { error: "Please upload a profile photo." }
-  }
-  if (!/^https:\/\//.test(profileUrl)) {
+  // The photo is optional HERE — the ProfilePhotoGate modal in the dashboard
+  // shell enforces it for every role, with the same "uploaded, not the copied
+  // Google avatar" rule (isUploadedProfilePhoto). If one was provided on this
+  // form it must at least be a real upload URL.
+  if (profileUrl && !/^https:\/\//.test(profileUrl)) {
     return { error: "The profile photo didn't upload correctly — please try adding it again." }
   }
 
@@ -90,7 +89,9 @@ export async function completeProfileAction(
       birthday,
       gender,
       timezone,
-      profile_url: profileUrl,
+      // Only overwrite when the form actually uploaded one — writing "" here
+      // would erase the Google avatar some profiles still display.
+      ...(profileUrl ? { profile_url: profileUrl } : {}),
       metadata,
     })
     .eq("id", user.id)
