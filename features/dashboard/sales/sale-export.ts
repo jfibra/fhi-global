@@ -34,7 +34,7 @@ export type ExportTotals = {
 export type ExportPayload = {
   /** e.g. "Brokerage / Ready Unit Report" */
   title: string
-  /** e.g. "Resale / private-owner deals — no developer." */
+  /** e.g. "Resale / private-owner sales — no developer." */
   subtitle?: string
   /** Human-readable "Property Type: Villa", "Period: March 2026", … */
   filterLines: string[]
@@ -130,7 +130,7 @@ export function buildCsv(p: ExportPayload): string {
 
   if (p.totals) {
     lines.push("")
-    lines.push([csvCell("Deals"), csvCell(p.totals.dealCount, true)].join(","))
+    lines.push([csvCell("Sales"), csvCell(p.totals.dealCount, true)].join(","))
     lines.push([csvCell("Total Contract Value (AED)"), csvCell(p.totals.totalValue, true)].join(","))
     lines.push([csvCell("Pending Validation"), csvCell(p.totals.pendingCount, true)].join(","))
     if (!p.totals.filtered) lines.push(csvCell("NOTE: totals above cover all records, not the filtered set."))
@@ -192,7 +192,7 @@ export function buildPrintableHtml(p: ExportPayload): string {
 
   const totals = p.totals
     ? `<div class="totals">
-         <div class="t"><span>Deals</span><strong>${p.totals.dealCount}</strong></div>
+         <div class="t"><span>Sales</span><strong>${p.totals.dealCount}</strong></div>
          <div class="t"><span>Total Contract Value</span><strong>AED ${money(p.totals.totalValue)}</strong></div>
          <div class="t"><span>Pending Validation</span><strong>${p.totals.pendingCount}</strong></div>
        </div>
