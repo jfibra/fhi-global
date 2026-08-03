@@ -145,19 +145,21 @@ export async function PATCH(
         ? requestedDeveloperId
         : (typeof nextMetadata.developer_id === "string" ? nextMetadata.developer_id : null)
 
-      if (!developerIdToUse) {
-        return NextResponse.json({ error: "Developer link is required for developer role." }, { status: 400 })
-      }
+      // The link is OPTIONAL: an admin can grant the developer role now and
+      // attach the company later (the developer dashboard just shows its empty
+      // states until then). Only an id that was actually provided is validated —
+      // a wrong link is an error, a missing one is not.
+      if (developerIdToUse) {
+        const { data: linkedDeveloper, error: developerError } = await admin
+          .from("developers")
+          .select("id")
+          .eq("id", developerIdToUse)
+          .is("deleted_at", null)
+          .single()
 
-      const { data: linkedDeveloper, error: developerError } = await admin
-        .from("developers")
-        .select("id")
-        .eq("id", developerIdToUse)
-        .is("deleted_at", null)
-        .single()
-
-      if (developerError || !linkedDeveloper) {
-        return NextResponse.json({ error: "Selected developer was not found." }, { status: 400 })
+        if (developerError || !linkedDeveloper) {
+          return NextResponse.json({ error: "Selected developer was not found." }, { status: 400 })
+        }
       }
 
       nextMetadata.developer_id = developerIdToUse
