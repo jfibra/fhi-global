@@ -263,7 +263,7 @@ export function CompanyClient({
                     className={inputCls + " font-mono text-xs"}
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#9ca3af]">
-                    /developer/{form.slug || "slug"}
+                    /developers/{form.slug || "slug"}
                   </span>
                 </div>
               </Field>
