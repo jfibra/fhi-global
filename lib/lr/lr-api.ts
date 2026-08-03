@@ -10,17 +10,20 @@ import type { AppRoleId } from "@/lib/app-roles"
 const LR_V1_AGENT = "https://api.leuteriorealty.com/lr/v1/public/api/agent"
 const LR_V2_AGENTS = "https://api.leuteriorealty.com/lr/v2/public/api/agents"
 
-// LR roleId → FHI role, mapped faithfully to whatever LR reports. Only genuine
-// LR staff/agent roles are elevated; anyone else (LR clients, unknown roleIds,
-// or emails not in LR) becomes a member. Note: an LR admin therefore receives
-// FHI admin on first Google sign-in — this is intentional (LR admins are
-// trusted), gated to verified LR members via the server-side lookup.
+// LR roleId → FHI role. ONLY LR admins carry their rank across; every other
+// LR role (agent, team leader, unit manager, secretary) maps to member and so
+// falls out of the import flow entirely (`mappedFhiRole === "member"` reads as
+// "not an LR agent" below) — they register/sign in as ordinary members, pending
+// approval, and get promoted through the Invite ladder or the admin user editor
+// like anyone else. The full rank import used to live here; if it ever comes
+// back, this table is the one place to restore it:
+//   7: unit_manager · 6: team_leader · 4: agent · 3: secretary
 const LR_ROLE_TO_FHI: Record<number, AppRoleId> = {
-  7: "unit_manager",
-  6: "team_leader",
-  4: "agent",
-  3: "secretary",
   1: "admin",
+  // 7: "unit_manager",
+  // 6: "team_leader",
+  // 4: "agent",
+  // 3: "secretary",
 }
 
 const LR_ROLE_LABELS: Record<number, string> = {
@@ -140,10 +143,10 @@ export type LrLookupResult =
   | { kind: "error" }
 
 /**
- * Look up an email in LR and classify it. `kind: "agent"` only for genuine LR
- * staff/agent roles (roleId 1/3/4/6/7); LR clients and unknown emails are
- * `not_agent`; an unreachable LR is `error` so the caller can avoid a
- * permanent downgrade and retry on the next sign-in.
+ * Look up an email in LR and classify it. `kind: "agent"` only for the roles
+ * LR_ROLE_TO_FHI elevates (admins, currently); LR clients, LR agents/leaders
+ * and unknown emails are `not_agent`; an unreachable LR is `error` so the
+ * caller can avoid a permanent downgrade and retry on the next sign-in.
  */
 export async function lookupLrAgent(email: string): Promise<LrLookupResult> {
   const clean = email.trim().toLowerCase()
@@ -156,7 +159,8 @@ export async function lookupLrAgent(email: string): Promise<LrLookupResult> {
 
   const roleId = typeof v1.roleId === "number" ? v1.roleId : null
   const mappedFhiRole = mapLrRoleToFhi(roleId)
-  // Found in LR but not a staff/agent role (LR client) → treat as a member.
+  // Anything that doesn't map to a rank — LR clients, and since the mapping
+  // was narrowed to admins-only, LR agents/leaders too — is a plain member.
   if (mappedFhiRole === "member") return { kind: "not_agent" }
 
   // v2 is best-effort and slow — its only unique adds are mobile/photo. A
