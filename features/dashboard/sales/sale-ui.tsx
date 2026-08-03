@@ -16,12 +16,19 @@ export function formatCurrency(value: number) {
 /**
  * Title-case a person / entity name for display, so mixed-casing source data
  * (e.g. "MICHELLE QUINTO GUINTO") renders uniformly as "Michelle Quinto Guinto".
- * Capitalises the first letter of every word, including after hyphens and
- * apostrophes (O'Brien, Jean-Paul). Returns "" for blank input.
+ * Capitalises after a separator — space, hyphen, apostrophe, dot, ampersand,
+ * slash, bracket — so O'Brien, Jean-Paul and H&H Development all survive.
+ * Returns "" for blank input.
+ *
+ * Boundaries are listed explicitly rather than using `\b`, which is ASCII-only:
+ * with \b, the non-ASCII letter in "Cañada" reads as a word boundary on both
+ * sides and the name renders "CaÑAda" (likewise "JosÉ áLvarez").
  */
 export function toTitleCase(value: string | null | undefined) {
   if (!value) return ""
-  return value.toLowerCase().replace(/\b\p{L}/gu, (c) => c.toUpperCase())
+  return value
+    .toLowerCase()
+    .replace(/(^|[\s\-'’.&/([])(\p{L})/gu, (_m, sep: string, c: string) => sep + c.toUpperCase())
 }
 
 /** Compact money for tiles: 4.1M / 940K / 12,500. */

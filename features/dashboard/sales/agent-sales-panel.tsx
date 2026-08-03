@@ -32,6 +32,7 @@ import {
   type ExportPayload,
 } from "./sale-export"
 import { SaleExportButton, type ExportFormat } from "./sale-export-button"
+import { FilterSelect, type FilterSelectOption } from "@/components/ui/filter-select"
 
 // Mirrors the (unexported) sort union in lib/sales-service.
 type SortField = "reservation_date" | "contract_price" | "created_at"
@@ -61,8 +62,31 @@ const pad2 = (n: number) => String(n).padStart(2, "0")
 
 // Word-initial capitals. `\b` is ASCII-only and would uppercase every accented
 // letter ("josé" → "JosÉ"), so boundaries are start-of-string or separators.
+// Declared above the option lists below, which call it at module load.
 const titleCase = (v: string) =>
   v.toLowerCase().replace(/(^|[\s\-'’.])(\p{L})/gu, (_m, sep: string, c: string) => sep + c.toUpperCase())
+
+// Fixed option lists — built once rather than per render.
+const SALE_TYPE_OPTIONS: FilterSelectOption[] = [
+  { label: "All types", value: "all" },
+  ...(Object.keys(SALE_TYPE_META) as SaleType[]).map((t) => ({ label: SALE_TYPE_META[t].label, value: t })),
+]
+const PROPERTY_TYPE_OPTIONS: FilterSelectOption[] = [
+  { label: "All Property Types", value: "all" },
+  ...SALE_PROPERTY_TYPES.map((t) => ({ label: t, value: t })),
+]
+const COMMISSION_OPTIONS: FilterSelectOption[] = [
+  { label: "Commission: All", value: "all" },
+  ...COMMISSION_STATUSES.map((s) => ({ label: titleCase(s.replace(/_/g, " ")), value: s })),
+]
+const VALIDATION_OPTIONS: FilterSelectOption[] = [
+  { label: "Validation: All", value: "all" },
+  ...VALIDATION_STATUSES.map((s) => ({ label: titleCase(s.replace(/_/g, " ")), value: s })),
+]
+const MONTH_OPTIONS: FilterSelectOption[] = [
+  { label: "All months", value: "all" },
+  ...MONTHS.map((m, i) => ({ label: m, value: String(i + 1) })),
+]
 
 function roleLabel(role: string | null): string {
   const key = (role ?? "member").toLowerCase()
@@ -300,6 +324,20 @@ export function AgentSalesPanel({
     return Array.from({ length: 5 }, (_, i) => y - i)
   }, [])
 
+  const yearSelectOptions = useMemo<FilterSelectOption[]>(
+    () => [{ label: "All years", value: "all" }, ...yearOptions.map((y) => ({ label: String(y), value: String(y) }))],
+    [yearOptions],
+  )
+
+  // Title-cased and sorted for the same reason as the report's filter bar: the
+  // source data mixes casing, and the list shouldn't disagree with the rows.
+  const developerOptions = useMemo<FilterSelectOption[]>(() => [
+    { label: "All Developers", value: "all" },
+    ...developers
+      .map((d) => ({ label: titleCase(d.name).replace(/\s+/g, " ").trim() || "Unnamed developer", value: d.id }))
+      .sort((x, y) => x.label.localeCompare(y.label)),
+  ], [developers])
+
   const activeFilters =
     (search ? 1 : 0) + (typeFilter !== "all" ? 1 : 0) + (developerFilter !== "all" ? 1 : 0) +
     (propertyTypeFilter !== "all" ? 1 : 0) +
@@ -376,8 +414,6 @@ export function AgentSalesPanel({
     if (truncated) setExportNote(`Export capped at ${EXPORT_MAX_ROWS} rows — narrow the filters for the complete set.`)
   }
 
-  const selectCls = "pl-3 pr-8 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white focus:outline-none focus:border-[#001f3f] cursor-pointer"
-
   return (
     <div className="space-y-5">
       <button
@@ -435,10 +471,11 @@ export function AgentSalesPanel({
             />
           </div>
 
-          <select
+          <FilterSelect
+            ariaLabel="Sale type"
             value={typeFilter}
-            onChange={(e) => {
-              const t = e.target.value as SaleType | "all"
+            onValueChange={(v) => {
+              const t = v as SaleType | "all"
               setTypeFilter(t)
               // Only project sales carry a developer — a developer filter on
               // brokerage/rental can never match, so drop it with the select.
@@ -447,74 +484,69 @@ export function AgentSalesPanel({
               if (t === "project") setPropertyTypeFilter("all")
               setPage(1)
             }}
-            className={selectCls}
-            aria-label="Sale type"
-          >
-            <option value="all">All types</option>
-            {(Object.keys(SALE_TYPE_META) as SaleType[]).map((t) => (
-              <option key={t} value={t}>{SALE_TYPE_META[t].label}</option>
-            ))}
-          </select>
+            options={SALE_TYPE_OPTIONS}
+          />
 
           {(typeFilter === "all" || typeFilter === "project") && (
-            <select value={developerFilter} onChange={(e) => { setDeveloperFilter(e.target.value); setPage(1) }} className={selectCls} aria-label="Developer">
-              <option value="all">All Developers</option>
-              {developers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
+            <FilterSelect
+              ariaLabel="Developer"
+              value={developerFilter}
+              onValueChange={(v) => { setDeveloperFilter(v); setPage(1) }}
+              searchPlaceholder="Search developers…"
+              options={developerOptions}
+            />
           )}
 
           {/* Property type is what brokerage and rental sales record in place of
               a developer/project — the mirror image of the developer select
               above, hidden for project sales, which never carry one. */}
           {typeFilter !== "project" && (
-            <select value={propertyTypeFilter} onChange={(e) => { setPropertyTypeFilter(e.target.value); setPage(1) }} className={selectCls} aria-label="Property type">
-              <option value="all">All Property Types</option>
-              {SALE_PROPERTY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <FilterSelect
+              ariaLabel="Property type"
+              value={propertyTypeFilter}
+              onValueChange={(v) => { setPropertyTypeFilter(v); setPage(1) }}
+              options={PROPERTY_TYPE_OPTIONS}
+            />
           )}
 
-          <select value={commissionFilter} onChange={(e) => { setCommissionFilter(e.target.value as CommissionStatus | "all"); setPage(1) }} className={selectCls} aria-label="Commission status">
-            <option value="all">Commission: All</option>
-            {COMMISSION_STATUSES.map((s) => <option key={s} value={s}>{titleCase(s.replace(/_/g, " "))}</option>)}
-          </select>
+          <FilterSelect
+            ariaLabel="Commission status"
+            value={commissionFilter}
+            onValueChange={(v) => { setCommissionFilter(v as CommissionStatus | "all"); setPage(1) }}
+            options={COMMISSION_OPTIONS}
+          />
 
-          <select value={validationFilter} onChange={(e) => { setValidationFilter(e.target.value as ValidationStatus | "all"); setPage(1) }} className={selectCls} aria-label="Validation status">
-            <option value="all">Validation: All</option>
-            {VALIDATION_STATUSES.map((s) => <option key={s} value={s}>{titleCase(s.replace(/_/g, " "))}</option>)}
-          </select>
+          <FilterSelect
+            ariaLabel="Validation status"
+            value={validationFilter}
+            onValueChange={(v) => { setValidationFilter(v as ValidationStatus | "all"); setPage(1) }}
+            options={VALIDATION_OPTIONS}
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <select
-            value={year}
-            onChange={(e) => {
-              const v = e.target.value
+          <FilterSelect
+            ariaLabel="Year"
+            value={String(year)}
+            onValueChange={(v) => {
               setYear(v === "all" ? "all" : Number(v))
               if (v === "all") setMonth("all") // a month with no year has no range
               setDateFrom(""); setDateTo(""); setPage(1)
             }}
-            className={selectCls}
-            aria-label="Year"
-          >
-            <option value="all">All years</option>
-            {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
+            options={yearSelectOptions}
+          />
 
-          <select
-            value={month}
-            onChange={(e) => {
-              const v = e.target.value
+          <FilterSelect
+            ariaLabel={year === "all" ? "Month — pick a year first" : "Month"}
+            title={year === "all" ? "Pick a year first" : undefined}
+            value={String(month)}
+            onValueChange={(v) => {
               setMonth(v === "all" ? "all" : Number(v))
               setDateFrom(""); setDateTo(""); setPage(1)
             }}
             disabled={year === "all"}
-            title={year === "all" ? "Pick a year first" : undefined}
-            className={`${selectCls} disabled:opacity-40 disabled:cursor-not-allowed`}
-            aria-label="Month"
-          >
-            <option value="all">All months</option>
-            {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-          </select>
+            options={MONTH_OPTIONS}
+          />
 
           <label className="text-xs text-[#9ca3af] font-semibold uppercase tracking-wider">Reservation date</label>
           <input

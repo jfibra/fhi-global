@@ -53,6 +53,7 @@ import {
   type AgentOption,
 } from "@/lib/sales-service"
 import { isSecretaryLikeRole } from "@/lib/app-roles"
+import { FilterSelect, type FilterSelectOption } from "@/components/ui/filter-select"
 import {
   buildCsv,
   buildPrintableHtml,
@@ -156,17 +157,32 @@ function ToastStack({
 
 const pad2 = (n: number) => String(n).padStart(2, "0")
 
-// A <select> sizes itself to its widest <option>, so an agent list of full names
-// would otherwise stretch one control past 340px and push the rest of the bar
-// onto a second line. Cap the width — the closed control only ever has to show
-// the short "All …" labels.
-const filterSelectCls =
-  "shrink-0 w-auto max-w-[190px] pl-3 pr-8 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
-
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ] as const
+
+// Fixed option lists — built once at module scope rather than per render.
+const PROPERTY_TYPE_OPTIONS: FilterSelectOption[] = [
+  { label: "All Property Types", value: "all" },
+  ...SALE_PROPERTY_TYPES.map((t) => ({ label: t, value: t })),
+]
+const COMMISSION_OPTIONS: FilterSelectOption[] = [
+  { label: "Commission: All", value: "all" },
+  ...COMMISSION_STATUSES.map((s) => ({ label: STATUS_LABEL[s] ?? s.replace(/_/g, " "), value: s })),
+]
+const VALIDATION_OPTIONS: FilterSelectOption[] = [
+  { label: "Validation: All", value: "all" },
+  ...VALIDATION_STATUSES.map((s) => ({ label: STATUS_LABEL[s] ?? s.replace(/_/g, " "), value: s })),
+]
+const MONTH_OPTIONS: FilterSelectOption[] = [
+  { label: "All Months", value: "all" },
+  ...MONTHS.map((m, i) => ({ label: m, value: String(i + 1) })),
+]
+const PER_PAGE_SELECT_OPTIONS: FilterSelectOption[] = PER_PAGE_OPTIONS.map((n) => ({
+  label: `${n} / page`,
+  value: String(n),
+}))
 
 function SummaryTile({ label, value, icon: Icon, hint }: { label: string; value: string; icon: LucideIcon; hint?: string }) {
   return (
@@ -345,6 +361,37 @@ export function SalesTable({
     const now = new Date().getFullYear()
     return Array.from({ length: Math.max(1, now - 2019) }, (_, i) => now - i)
   }, [])
+
+  const yearSelectOptions = useMemo<FilterSelectOption[]>(
+    () => [{ label: "All Years", value: "all" }, ...yearOptions.map((y) => ({ label: String(y), value: String(y) }))],
+    [yearOptions],
+  )
+
+  // Names are title-cased here for the same reason the table title-cases them:
+  // the source data mixes "AGNES WHITE" with "Abe Juego", and a filter list
+  // shouldn't disagree with the rows it filters. Sorted so the list is
+  // scannable even before anyone types in the search box.
+  //
+  // Two agents have no name at all; falling back to their uuid would put a
+  // wall of hex in the list, so they read as "Unnamed account" instead.
+  // Whitespace is collapsed because at least one name is stored with a double
+  // space ("Lito  Bibon").
+  const optionLabel = (raw: string | null, fallback: string) =>
+    toTitleCase(raw).replace(/\s+/g, " ").trim() || fallback
+
+  const agentOptions = useMemo<FilterSelectOption[]>(() => [
+    { label: "All Agents", value: "all" },
+    ...agents
+      .map((a) => ({ label: optionLabel(a.fullname, "Unnamed account"), value: a.id }))
+      .sort((x, y) => x.label.localeCompare(y.label)),
+  ], [agents])
+
+  const developerOptions = useMemo<FilterSelectOption[]>(() => [
+    { label: "All Developers", value: "all" },
+    ...developers
+      .map((d) => ({ label: optionLabel(d.name, "Unnamed developer"), value: d.id }))
+      .sort((x, y) => x.label.localeCompare(y.label)),
+  ], [developers])
 
   // Month / year is shorthand for a reservation-date range, so it collapses into
   // the same two bounds the query already takes instead of becoming a second,
@@ -958,70 +1005,47 @@ export function SalesTable({
               <Filter className="w-3.5 h-3.5 text-[#9ca3af] shrink-0" />
 
               {isAdminUser && (
-                <select
+                <FilterSelect
+                  ariaLabel="Agent"
                   value={agentFilter}
-                  onChange={(e) => { setAgentFilter(e.target.value); setPage(1) }}
-                  className={filterSelectCls}
-                  aria-label="Agent"
-                >
-                  <option value="all">All Agents</option>
-                  {agents.map((a) => (
-                    <option key={a.id} value={a.id}>{a.fullname ?? a.id}</option>
-                  ))}
-                </select>
+                  onValueChange={(v) => { setAgentFilter(v); setPage(1) }}
+                  searchPlaceholder="Search agents…"
+                  options={agentOptions}
+                />
               )}
 
               {activeTab === "project" ? (
-                <select
+                <FilterSelect
+                  ariaLabel="Developer"
                   value={developerFilter}
-                  onChange={(e) => { setDeveloperFilter(e.target.value); setPage(1) }}
-                  className={filterSelectCls}
-                  aria-label="Developer"
-                >
-                  <option value="all">All Developers</option>
-                  {developers.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
+                  onValueChange={(v) => { setDeveloperFilter(v); setPage(1) }}
+                  searchPlaceholder="Search developers…"
+                  options={developerOptions}
+                />
               ) : (
                 // Brokerage and rental sales record a free property type instead
                 // of a developer/project, so that's what they filter on.
-                <select
+                <FilterSelect
+                  ariaLabel="Property type"
                   value={propertyTypeFilter}
-                  onChange={(e) => { setPropertyTypeFilter(e.target.value); setPage(1) }}
-                  className={filterSelectCls}
-                  aria-label="Property type"
-                >
-                  <option value="all">All Property Types</option>
-                  {SALE_PROPERTY_TYPES.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
+                  onValueChange={(v) => { setPropertyTypeFilter(v); setPage(1) }}
+                  options={PROPERTY_TYPE_OPTIONS}
+                />
               )}
 
-              <select
+              <FilterSelect
+                ariaLabel="Commission status"
                 value={commissionFilter}
-                onChange={(e) => { setCommissionFilter(e.target.value as CommissionStatus | "all"); setPage(1) }}
-                className={filterSelectCls}
-                aria-label="Commission status"
-              >
-                <option value="all">Commission: All</option>
-                {COMMISSION_STATUSES.map((s) => (
-                  <option key={s} value={s}>{STATUS_LABEL[s] ?? s.replace(/_/g, " ")}</option>
-                ))}
-              </select>
+                onValueChange={(v) => { setCommissionFilter(v as CommissionStatus | "all"); setPage(1) }}
+                options={COMMISSION_OPTIONS}
+              />
 
-              <select
+              <FilterSelect
+                ariaLabel="Validation status"
                 value={validationFilter}
-                onChange={(e) => { setValidationFilter(e.target.value as ValidationStatus | "all"); setPage(1) }}
-                className={filterSelectCls}
-                aria-label="Validation status"
-              >
-                <option value="all">Validation: All</option>
-                {VALIDATION_STATUSES.map((s) => (
-                  <option key={s} value={s}>{STATUS_LABEL[s] ?? s.replace(/_/g, " ")}</option>
-                ))}
-              </select>
+                onValueChange={(v) => { setValidationFilter(v as ValidationStatus | "all"); setPage(1) }}
+                options={VALIDATION_OPTIONS}
+              />
 
               <button
                 type="button"
@@ -1038,31 +1062,21 @@ export function SalesTable({
             <div className="flex flex-wrap items-center gap-2 border-t border-[#f0f0f0] pt-3">
               <span className="text-xs text-[#9ca3af] font-medium">Period:</span>
 
-              <select
+              <FilterSelect
+                ariaLabel="Year"
                 value={yearFilter}
-                onChange={(e) => pickPeriod({ year: e.target.value })}
-                aria-label="Year"
-                className="pl-3 pr-8 py-2 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
-              >
-                <option value="all">All Years</option>
-                {yearOptions.map((y) => (
-                  <option key={y} value={String(y)}>{y}</option>
-                ))}
-              </select>
+                onValueChange={(v) => pickPeriod({ year: v })}
+                options={yearSelectOptions}
+              />
 
-              <select
-                value={monthFilter}
-                onChange={(e) => pickPeriod({ month: e.target.value })}
-                disabled={yearFilter === "all"}
-                aria-label={yearFilter === "all" ? "Month — pick a year first" : "Month"}
+              <FilterSelect
+                ariaLabel={yearFilter === "all" ? "Month — pick a year first" : "Month"}
                 title={yearFilter === "all" ? "Pick a year first" : undefined}
-                className="pl-3 pr-8 py-2 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <option value="all">All Months</option>
-                {MONTHS.map((m, i) => (
-                  <option key={m} value={String(i + 1)}>{m}</option>
-                ))}
-              </select>
+                value={monthFilter}
+                onValueChange={(v) => pickPeriod({ month: v })}
+                disabled={yearFilter === "all"}
+                options={MONTH_OPTIONS}
+              />
 
               <span className="hidden sm:inline text-xs text-[#d1d5db]">|</span>
               <span className="text-xs text-[#9ca3af] font-medium">Reservation date:</span>
@@ -1208,15 +1222,14 @@ export function SalesTable({
               Showing {total === 0 ? 0 : (page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
             </p>
             <div className="flex items-center gap-2">
-              <select
-                value={perPage}
-                onChange={(e) => { setPerPage(Number(e.target.value) as 10 | 20 | 50); setPage(1) }}
-                className="pl-3 pr-8 py-1.5 rounded-xl border border-[#e5e5e5] text-xs bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
-              >
-                {PER_PAGE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt} / page</option>
-                ))}
-              </select>
+              <FilterSelect
+                ariaLabel="Rows per page"
+                value={String(perPage)}
+                onValueChange={(v) => { setPerPage(Number(v) as 10 | 20 | 50); setPage(1) }}
+                options={PER_PAGE_SELECT_OPTIONS}
+                align="end"
+                className="py-1.5 text-xs"
+              />
               <button
                 type="button"
                 onClick={() => setPage((prev) => Math.max(1, prev - 1))}
