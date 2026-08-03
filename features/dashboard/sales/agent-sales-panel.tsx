@@ -485,12 +485,12 @@ export function AgentSalesPanel({
                           {Meta.label}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-[#374151] whitespace-nowrap">{s.developers?.name ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-[#374151] whitespace-nowrap">{titleCase(s.developers?.name ?? "") || "—"}</td>
                       <td className="px-4 py-2.5 text-[#374151] whitespace-nowrap">
-                        {s.projects?.name ?? s.property_address ?? s.property_type ?? "—"}
+                        {titleCase(s.projects?.name ?? s.property_address ?? s.property_type ?? "") || "—"}
                       </td>
                       <td className="px-4 py-2.5 font-semibold text-[#0d1117] whitespace-nowrap">
-                        {s.clients ? `${s.clients.first_name} ${s.clients.last_name}` : "—"}
+                        {s.clients ? titleCase(`${s.clients.first_name} ${s.clients.last_name}`) : "—"}
                       </td>
                       <td className="px-4 py-2.5 text-right font-mono text-sm font-semibold text-[#0d1117] whitespace-nowrap">
                         {formatCurrency(s.contract_price)}
