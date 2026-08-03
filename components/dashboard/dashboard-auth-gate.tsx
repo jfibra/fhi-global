@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { AuthProvider } from "@/context/auth-context"
 import { DashboardShell } from "@/components/dashboard/shell"
+import { ProfilePhotoGate } from "@/components/dashboard/profile-photo-gate"
 import { PageLoader } from "@/components/ui/PageLoader"
 import { getProfileByUserId, isInactiveProfile, type AppProfile, type AppUser } from "@/lib/auth"
 
@@ -60,9 +61,27 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
     return <PageLoader />
   }
 
+  // Mounted here rather than per-page so it covers every dashboard route with
+  // one instance, on the resolved profile this gate already has. The shell
+  // still renders underneath: the gate is an overlay, so signing out or the
+  // page behind it never gets torn down mid-upload.
+  const needsPhoto = !session.profile.profile_url?.trim()
+
   return (
     <AuthProvider user={session.user} profile={session.profile}>
       <DashboardShell>{children}</DashboardShell>
+      {needsPhoto && (
+        <ProfilePhotoGate
+          userId={session.user.id}
+          displayName={
+            session.profile.fullname
+            ?? [session.profile.fname, session.profile.lname].filter(Boolean).join(" ")
+          }
+          onSaved={(url) =>
+            setSession((prev) => (prev ? { ...prev, profile: { ...prev.profile, profile_url: url } } : prev))
+          }
+        />
+      )}
     </AuthProvider>
   )
 }

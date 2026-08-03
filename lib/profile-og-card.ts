@@ -38,6 +38,14 @@ export const PROFILE_OG_HIDE_LABELS: { value: ProfileOgHideKey; label: string }[
 export const OG_TITLE_MAX = 70
 export const OG_DESCRIPTION_MAX = 160
 
+/**
+ * The title a link carries when no custom one is typed — and also what the
+ * hide-title toggle resolves to, since a network always draws SOME title line.
+ * The brand wordmark's own phrasing ("FHi Global Property"), not the person's
+ * name: the name is already on the card image itself.
+ */
+export const DEFAULT_OG_TITLE = "FHI Global Property"
+
 export type ProfileOgCard = {
   /** Schema version so stored JSON can evolve safely. */
   v: 1
@@ -48,6 +56,12 @@ export type ProfileOgCard = {
   hide: ProfileOgHideKey[]
   /** Overrides og:title. Empty = the person's name. */
   title: string
+  /**
+   * Whether the link carries a title at all. Off → og:title is the plain
+   * "FHI Global" brand instead of the person's name; a network always renders
+   * SOME title line, so the neutral brand is the closest thing to "none".
+   */
+  showTitle: boolean
   /** Overrides og:description. Empty = the tagline, else a generated line. */
   description: string
   /**
@@ -78,6 +92,7 @@ export const DEFAULT_PROFILE_OG_CARD: ProfileOgCard = {
   accent: "#d6b357",
   hide: [],
   title: "",
+  showTitle: true,
   description: "",
   design: "",
   image: null,
@@ -119,6 +134,8 @@ export function sanitizeProfileOgCard(raw: unknown): ProfileOgCard {
       ? (o.hide.filter((h): h is ProfileOgHideKey => HIDE_KEYS.includes(h as ProfileOgHideKey)))
       : [],
     title: oneLine(o.title, OG_TITLE_MAX),
+    // Only an explicit false hides it — absent (older saves) means shown.
+    showTitle: o.showTitle !== false,
     description: oneLine(o.description, OG_DESCRIPTION_MAX),
     design: isDesignId(o.design) ? o.design : "",
     // Only our own bucket — this URL goes straight into a public meta tag, so a
@@ -162,4 +179,25 @@ export function profileOgCardVersion(card: ProfileOgCard): string {
   let h = 0
   for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0
   return (h >>> 0).toString(36)
+}
+
+/**
+ * The exact title and description a scraper receives for this card — THE
+ * resolver, used by generateMetadata on /business-card/[id] and by the maker's
+ * feed preview. One function on purpose: the preview's whole promise is
+ * "identical to what a share shows", and two hand-maintained copies of this
+ * logic is how previews start lying.
+ */
+export function resolveOgLinkText(
+  card: ProfileOgCard,
+  ctx: { tagline: string },
+): { title: string; description: string } {
+  return {
+    title: card.showTitle && card.title ? card.title : DEFAULT_OG_TITLE,
+    // The tagline, or nothing. An earlier fallback generated "<Name> — <Role>
+    // at FHI Global…" here, which read fine for agents and absurd for members —
+    // and a link with no og:description is perfectly valid: networks just draw
+    // domain + title. Blank means blank.
+    description: ctx.tagline.trim(),
+  }
 }

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { SITE_URL, createPageMetadata } from "@/lib/seo"
 import { readThemeChoice, resolveTheme } from "@/lib/profile-themes"
-import { profileOgCardVersion, readProfileOgCard } from "@/lib/profile-og-card"
+import { profileOgCardVersion, readProfileOgCard, resolveOgLinkText } from "@/lib/profile-og-card"
 import { roleToLabel } from "@/lib/app-roles"
 import {
   readCustomLinks, readFeaturedProjects, readFixedButtonLabels, readSocialLinks,
@@ -191,17 +191,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const previewImage =
     data.ogCard.image ?? `${SITE_URL.replace(/\/$/, "")}/og/business-card/${data.id}?v=${version}`
 
-  const fallbackDescription =
-    data.tagline ||
-    `${titleCaseName(data.fullname)} — ${data.roleLabel} at FHI Global. Call, message or save the contact details.`
+  // The link's text, from the SAME resolver the maker's feed preview renders —
+  // the preview's promise is "identical to a real share", which only one shared
+  // code path can keep. Title: custom when typed and shown, else the brand
+  // default (never an empty tag — crawlers replace those with the <title>, i.e.
+  // the name, defeating the hide toggle). Description: the tagline, else the
+  // generated line; the override lost its editor.
+  const og = resolveOgLinkText(data.ogCard, { tagline: data.tagline })
 
   return {
     ...createPageMetadata({
       // No " | FHI Global" suffix here — createPageMetadata's template
-      // appends one, and spelling it out again doubled it in the tab.
-      // Both texts are the agent's override when they set one.
+      // appends one, and spelling it out again doubled it in the tab. The
+      // browser-tab title keeps the name: hiding it from a feed shouldn't
+      // anonymise the tab.
       title: data.ogCard.title || titleCaseName(data.fullname),
-      description: data.ogCard.description || fallbackDescription,
+      openGraphTitle: og.title,
+      // Omitted entirely when blank — an empty content="" is noise, no tag is
+      // the honest "no description".
+      description: og.description || undefined,
       imageUrl: previewImage,
       // og:url carries the same version stamp the share buttons append.
       // Facebook treats og:url as the canonical and reuses its cached metadata

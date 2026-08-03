@@ -6,7 +6,6 @@ import {
   DESIGNS, THUMB_H, THUMB_W, renderCard, type CardData, type DesignId,
 } from "@/features/business-card/card-render"
 import {
-  OG_DESCRIPTION_MAX,
   OG_TITLE_MAX,
   type ProfileOgCard,
 } from "@/lib/profile-og-card"
@@ -34,9 +33,8 @@ type Props = {
   cardData: CardData
   /** The design set on the Business Card page, used when nothing is picked here. */
   inheritedDesign: DesignId
-  /** What the page falls back to when the override fields are blank. */
+  /** What the title falls back to when the override is blank. */
   fallbackTitle: string
-  fallbackDescription: string
 }
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
@@ -55,7 +53,6 @@ export function LinkPreviewTab({
   cardData,
   inheritedDesign,
   fallbackTitle,
-  fallbackDescription,
 }: Props) {
   const [thumbs, setThumbs] = useState<Partial<Record<DesignId, string>>>({})
 
@@ -141,51 +138,56 @@ export function LinkPreviewTab({
         )}
       </Section>
 
-      {/* ── Text ─────────────────────────────────────────────────────────── */}
-      <Section title="Title and description" hint="Leave blank to use your name and tagline.">
-        <div className="space-y-3">
-          <label className="block">
-            <span className="flex items-center justify-between text-xs font-semibold text-[#374151]">
-              Title
+      {/* ── Title ────────────────────────────────────────────────────────── */}
+      {/* No description editor: og:description is always the tagline (or the
+          generated line), which the Forms tab already owns — a second place to
+          write the same sentence invited the two to disagree. */}
+      <Section title="Title" hint="The bold line under the card. Leave blank to use “FHI Global Property”.">
+        {/* A div, not a wrapping <label>: the switch sits inside the row, and a
+            button inside a label re-dispatches its clicks to the input. */}
+        <div>
+          <span className="flex items-center justify-between text-xs font-semibold text-[#374151]">
+            <label htmlFor="og-title-input">
+              Custom title <span className="font-normal text-[#9ca3af]">optional</span>
+            </label>
+            {value.showTitle && (
               <span className={value.title.length > OG_TITLE_MAX - 10 ? "text-[#b45309]" : "text-[#9ca3af]"}>
                 {value.title.length}/{OG_TITLE_MAX}
               </span>
-            </span>
+            )}
+          </span>
+          {/* The switch lives INSIDE the input row: off disables the field but
+              the switch itself stays clickable, so re-enabling is one tap on the
+              same control that turned it off. */}
+          <span className="relative mt-1 block">
             <input
+              id="og-title-input"
               value={value.title}
               onChange={(e) => set("title", e.target.value.slice(0, OG_TITLE_MAX))}
-              placeholder={fallbackTitle}
-              className="mt-1 w-full rounded-xl border border-[#e5e8ed] px-3 py-2.5 text-sm text-[#0d1117] placeholder:text-[#9ca3af] focus:border-[#001f3f] focus:outline-none focus:ring-4 focus:ring-[#001f3f]/10 transition-all"
+              placeholder={value.showTitle ? fallbackTitle : "No custom title — the link shows “FHI Global Property”"}
+              disabled={!value.showTitle}
+              className="w-full rounded-xl border border-[#e5e8ed] py-2.5 pl-3 pr-14 text-sm text-[#0d1117] placeholder:text-[#9ca3af] focus:border-[#001f3f] focus:outline-none focus:ring-4 focus:ring-[#001f3f]/10 disabled:cursor-not-allowed disabled:bg-[#f7f8fa] disabled:text-[#9ca3af] transition-all"
             />
-          </label>
-          <label className="block">
-            <span className="flex items-center justify-between text-xs font-semibold text-[#374151]">
-              Description
+            <button
+              type="button"
+              onClick={() => set("showTitle", !value.showTitle)}
+              role="switch"
+              aria-checked={value.showTitle}
+              aria-label={value.showTitle ? "Hide the title on the link" : "Show a title on the link"}
+              title={value.showTitle ? "Hide the title on the link" : "Show a title on the link"}
+              className={`absolute right-2.5 top-1/2 h-5 w-9 -translate-y-1/2 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#001f3f]/20 ${
+                value.showTitle ? "bg-[#001f3f]" : "bg-[#d1d5db]"
+              }`}
+            >
               <span
-                className={value.description.length > OG_DESCRIPTION_MAX - 20 ? "text-[#b45309]" : "text-[#9ca3af]"}
-              >
-                {value.description.length}/{OG_DESCRIPTION_MAX}
-              </span>
-            </span>
-            <textarea
-              value={value.description}
-              onChange={(e) => set("description", e.target.value.slice(0, OG_DESCRIPTION_MAX))}
-              placeholder={fallbackDescription}
-              rows={2}
-              className="mt-1 w-full resize-none rounded-xl border border-[#e5e8ed] px-3 py-2.5 text-sm text-[#0d1117] placeholder:text-[#9ca3af] focus:border-[#001f3f] focus:outline-none focus:ring-4 focus:ring-[#001f3f]/10 transition-all"
-            />
-          </label>
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
+                  value.showTitle ? "left-[18px]" : "left-0.5"
+                }`}
+              />
+            </button>
+          </span>
         </div>
       </Section>
-
-      <p className="flex items-start gap-2 rounded-xl bg-[#f2f6fb] px-3 py-2.5 text-xs leading-snug text-[#4b5563]">
-        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#001f3f]" />
-        <span>
-          The card is attached when you save, and the share buttons on your profile page use a
-          fresh link each time — a redesign shows up there on its own. Only links you pasted
-          somewhere before the change keep the old card until Facebook re-checks them.
-        </span>
-      </p>
     </div>
   )
 }

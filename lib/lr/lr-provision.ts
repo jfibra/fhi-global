@@ -82,7 +82,8 @@ export async function resolveLrProvision(opts: {
  * curated accounts:
  *   • already flagged (lr_provisioned / google_provisioned) → skip;
  *   • curated non-member role → just stamp the flag (no lookup, no change);
- *   • un-curated member → look up LR and upgrade role + status if it's an agent,
+ *   • un-curated member → look up LR and upgrade role + status if it maps to a
+ *     rank (admins only, per LR_ROLE_TO_FHI in lr-api.ts),
  *     stamping the flag so future logins skip the lookup. LR unreachable → leave
  *     unflagged so the next login retries.
  * Writes with the service-role client and returns the effective role/status.
