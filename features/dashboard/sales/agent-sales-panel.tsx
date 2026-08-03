@@ -417,7 +417,7 @@ export function AgentSalesPanel({
       {/* ── Lifetime production — "—" until the brief loads, never fake zeros */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         <Tile icon={Wallet} label="Total contract value" value={brief ? formatCompactMoney(brief.sales.value) : "—"} hint="All sale types" />
-        <Tile icon={TrendingUp} label="Total deals" value={brief ? String(brief.sales.deals) : "—"} hint="Lifetime" />
+        <Tile icon={TrendingUp} label="Total sales" value={brief ? String(brief.sales.deals) : "—"} hint="Lifetime" />
         <Tile icon={Clock} label="Commission pending" value={brief ? String(brief.sales.pending) : "—"} />
         <Tile icon={TrendingUp} label="Commission released" value={brief ? String(brief.sales.released) : "—"} />
       </div>
@@ -555,7 +555,7 @@ export function AgentSalesPanel({
             </span>
             <span className="text-sm text-[#374151]">
               <strong className="font-bold text-[#0d1117]">{sliceReady ? slice.data!.dealCount : "—"}</strong>{" "}
-              deal{sliceReady && slice.data!.dealCount === 1 ? "" : "s"}
+              sale{sliceReady && slice.data!.dealCount === 1 ? "" : "s"}
             </span>
             <span className="text-sm text-[#374151]">
               <strong className="font-bold text-[#0d1117]">

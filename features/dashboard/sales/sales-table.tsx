@@ -93,7 +93,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // + description), reusing the same icons (Building2/Handshake/KeyRound).
 const SALE_TYPE_TABS: Array<{ type: SaleType; label: string; desc: string; icon: LucideIcon }> = [
   { type: "project",   label: "Project Sale / Off-Plan", desc: "Units sold within a developer's project.",      icon: Building2 },
-  { type: "brokerage", label: "Brokerage / Ready Unit",    desc: "Resale / private-owner deals — no developer.",  icon: Handshake },
+  { type: "brokerage", label: "Brokerage / Ready Unit",    desc: "Resale / private-owner sales — no developer.",  icon: Handshake },
   { type: "rental",    label: "Rental",       desc: "Rental transactions and lease contracts.",       icon: KeyRound },
 ]
 
@@ -842,7 +842,7 @@ export function SalesTable({
                 </h1>
                 <p className="text-sm text-[#6b7280]">
                   {isSecretaryLikeRole(currentRole)
-                    ? "Choose a report to monitor deals, join validation discussion, and attach documents."
+                    ? "Choose a report to monitor sales, join validation discussion, and attach documents."
                     : "Which report do you want to view? Choose one to start."}
                 </p>
               </div>
@@ -917,7 +917,7 @@ export function SalesTable({
                 aren't available, and says so rather than showing a wrong number. */}
             <div className={`grid grid-cols-1 sm:grid-cols-3 gap-3 transition-opacity ${loading ? "opacity-60" : ""}`}>
               <SummaryTile
-                label="Deals"
+                label="Sales"
                 value={tileSummary ? String(tileSummary.dealCount) : "—"}
                 icon={FileText}
                 hint={tileHint}
