@@ -207,6 +207,8 @@ export async function GET(req: NextRequest) {
         .from("profiles")
         .select("id, fullname, role, profile_url")
         .eq("metadata->>invited_by", callerId)
+        // Developer-invite registrations aren't recruits — exclude them.
+        .is("metadata->>developer_invite_id", null)
         .not("is_deleted", "is", true)
         .order("joined_at", { ascending: false })
         .limit(MEMBER_LIMIT),
@@ -214,6 +216,7 @@ export async function GET(req: NextRequest) {
         .from("profiles")
         .select("id")
         .eq("metadata->>invited_by", callerId)
+        .is("metadata->>developer_invite_id", null)
         .not("is_deleted", "is", true)
         .limit(2000),
       admin

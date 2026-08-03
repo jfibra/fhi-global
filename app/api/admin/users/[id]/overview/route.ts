@@ -98,6 +98,9 @@ async function loadRecruits(admin: Admin, userId: string): Promise<UserPerson[]>
     .from("profiles")
     .select("id, fullname, role, status, profile_url, joined_at")
     .eq("metadata->>invited_by", userId)
+    // Developer-invite registrations aren't personal recruits — they're tracked
+    // by developer_invite_id and shown under their own link's Registrations list.
+    .is("metadata->>developer_invite_id", null)
     .not("is_deleted", "is", true)
     .order("joined_at", { ascending: false })
     .limit(RECRUIT_LIMIT)
@@ -377,6 +380,8 @@ async function recruitsTotal(admin: Admin, userId: string): Promise<number> {
     .from("profiles")
     .select("id", { count: "exact", head: true })
     .eq("metadata->>invited_by", userId)
+    // Exclude developer-invite registrations (tracked by developer_invite_id).
+    .is("metadata->>developer_invite_id", null)
     .not("is_deleted", "is", true)
   return error ? 0 : (count ?? 0)
 }

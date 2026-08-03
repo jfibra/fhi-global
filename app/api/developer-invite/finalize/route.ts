@@ -143,7 +143,11 @@ export async function POST(req: NextRequest) {
         ...meta,
         developer_id: developer.id,
         developer_invite_id: config.id,
-        ...(config.createdBy ? { invited_by: config.createdBy } : {}),
+        // NB: do NOT stamp metadata.invited_by here. That field is the personal
+        // "My recruits" / downline attribution (set by the ?ref= invite flow);
+        // developer-invite registrations are tracked solely by developer_invite_id
+        // (see /api/admin/developer-invites/[id]/recruits). Stamping invited_by
+        // would leak these developers into the link creator's personal recruits.
         google_linked: true,
         google_provisioned: true,
       },

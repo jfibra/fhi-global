@@ -10,6 +10,12 @@ import { isProfileMissingMinimumFields, type AppProfile } from "@/lib/auth"
  * session-scoped: you can only ever see your own recruits. Includes the
  * recruit's email so the recruiter can identify/contact them (emails live in
  * auth.users, resolved via the admin API).
+ *
+ * Developer-invite registrations are deliberately EXCLUDED: those are a separate
+ * system tracked by metadata.developer_invite_id and shown under each developer
+ * invite link's own Registrations list (/api/admin/developer-invites/[id]/recruits).
+ * Newer registrations no longer stamp invited_by at all, but older rows still
+ * carry it, so the exclusion is filtered here rather than relied on at write time.
  */
 export async function GET() {
   const session = await requireActiveSession()
@@ -29,6 +35,9 @@ export async function GET() {
     .from("profiles")
     .select("id, fullname, role, status, joined_at, birthday, gender, fname, lname, timezone, profile_url, metadata")
     .eq("metadata->>invited_by", userId)
+    // Exclude developer-invite registrations — they belong to the link's own
+    // Registrations list, not the personal recruits list.
+    .is("metadata->>developer_invite_id", null)
     .eq("is_deleted", false)
     .order("joined_at", { ascending: false })
     .limit(200)
