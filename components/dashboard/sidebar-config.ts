@@ -226,8 +226,8 @@ const DEVELOPER_NAV: RoleNavEntry[] = [
 const salesPipelineNav = ({ projects = false, events = false, teamSales = false } = {}): RoleNavEntry[] => [
   OVERVIEW,
   { icon: ClipboardList, label: "My listings", to: "listings" },
-  // Agents get the read-only projects browser for the Poster/Reels studios
-  // (see ROLES_PROJECT_STUDIO_VIEWERS); team leaders / unit managers do not.
+  // The read-only projects browser for the Poster/Reels studios — the whole
+  // sales ladder has it (see ROLES_PROJECT_STUDIO_VIEWERS).
   ...(projects ? [PROJECTS] : []),
   REELS_MAKER,
   INVITE,
@@ -279,8 +279,8 @@ const ROLE_NAV: Record<AppRoleId, RoleNavEntry[]> = {
   admin:          ADMIN_NAV,
   editor:         EDITOR_NAV,
   developer:      DEVELOPER_NAV,
-  team_leader:    salesPipelineNav({ events: true, teamSales: true }),
-  unit_manager:   salesPipelineNav({ teamSales: true }),
+  team_leader:    salesPipelineNav({ projects: true, events: true, teamSales: true }),
+  unit_manager:   salesPipelineNav({ projects: true, teamSales: true }),
   agent:          salesPipelineNav({ projects: true }),
   secretary:      SECRETARY_NAV,
   team_secretary: SECRETARY_NAV,

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowRight,
@@ -12,6 +12,7 @@ import {
   Clock,
   Crown,
   Filter,
+  FileText,
   Handshake,
   History,
   KeyRound,
@@ -32,13 +33,17 @@ import {
   canEditSaleForRole,
   canManageSaleAttachmentsForRole,
   fetchSales,
+  fetchSalesForExport,
   fetchSalesSummary,
+  fetchSalesSummaryFiltered,
   fetchDevelopersForSale,
   fetchAgentsForSale,
   notifySaleEvent,
   updateSaleValidationStatus,
   deleteSale,
   isAdminRole,
+  EXPORT_MAX_ROWS,
+  SALE_PROPERTY_TYPES,
   type SaleRecord,
   type SaleType,
   type SaleTypeSummary,
@@ -48,6 +53,16 @@ import {
   type AgentOption,
 } from "@/lib/sales-service"
 import { isSecretaryLikeRole } from "@/lib/app-roles"
+import {
+  buildCsv,
+  buildPrintableHtml,
+  downloadCsv,
+  exportColumnsFor,
+  exportFilename,
+  printHtml,
+  type ExportPayload,
+} from "./sale-export"
+import { SaleExportButton, type ExportFormat } from "./sale-export-button"
 import { SaleActions } from "./sale-actions"
 import { SaleAttachmentsDialog } from "./sale-attachments-dialog"
 import { SaleConfirmDialog } from "./sale-confirm-dialog"
@@ -139,7 +154,21 @@ function ToastStack({
 // formatDate / formatCurrency / StatusBadge live in ./sale-ui so the per-agent
 // drill-in renders them identically.
 
-function SummaryTile({ label, value, icon: Icon }: { label: string; value: string; icon: LucideIcon }) {
+const pad2 = (n: number) => String(n).padStart(2, "0")
+
+// A <select> sizes itself to its widest <option>, so an agent list of full names
+// would otherwise stretch one control past 340px and push the rest of the bar
+// onto a second line. Cap the width — the closed control only ever has to show
+// the short "All …" labels.
+const filterSelectCls =
+  "shrink-0 w-auto max-w-[190px] pl-3 pr-8 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+] as const
+
+function SummaryTile({ label, value, icon: Icon, hint }: { label: string; value: string; icon: LucideIcon; hint?: string }) {
   return (
     <div className="bg-white/60 backdrop-blur-xl rounded-[20px] border border-white/60 shadow-sm shadow-black/5 p-4 flex items-center gap-3">
       <div className="w-10 h-10 rounded-xl bg-[#001f3f] flex items-center justify-center shrink-0">
@@ -148,6 +177,7 @@ function SummaryTile({ label, value, icon: Icon }: { label: string; value: strin
       <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">{label}</p>
         <p className="text-lg font-bold text-[#0d1117] truncate">{value}</p>
+        {hint && <p className="text-[11px] text-[#9ca3af] truncate">{hint}</p>}
       </div>
     </div>
   )
@@ -223,8 +253,11 @@ export function SalesTable({
   const [search, setSearch] = useState("")
   const [agentFilter, setAgentFilter] = useState("all")
   const [developerFilter, setDeveloperFilter] = useState("all")
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState("all")
   const [commissionFilter, setCommissionFilter] = useState<CommissionStatus | "all">("all")
   const [validationFilter, setValidationFilter] = useState<ValidationStatus | "all">("all")
+  const [monthFilter, setMonthFilter] = useState("all")
+  const [yearFilter, setYearFilter] = useState("all")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [sortField, setSortField] = useState<SortField>("created_at")
@@ -254,6 +287,18 @@ export function SalesTable({
     brokerage: { dealCount: 0, totalValue: 0, pendingCount: 0 },
     rental:    { dealCount: 0, totalValue: 0, pendingCount: 0 },
   })
+  // Totals for the tiles above the table. Separate from `summaries` (which feeds
+  // the chooser cards and must stay a whole-type overview) because these follow
+  // the filter bar. `data` null = not loaded yet, shown as "—" rather than 0.
+  // `filtered` false means the numbers are the unfiltered fallback and the tile
+  // has to say so. `key` records WHICH filter set produced them: without it the
+  // tiles keep last query's numbers while the hint already claims they match the
+  // new filters, and an export taken mid-change would stamp them into the file.
+  const [activeSummary, setActiveSummary] = useState<{
+    key: string
+    data: SaleTypeSummary | null
+    filtered: boolean
+  }>({ key: "", data: null, filtered: true })
 
   // dialog state
   const [showForm, setShowForm] = useState(false)
@@ -294,6 +339,83 @@ export function SalesTable({
 
   const totalPages = Math.max(1, Math.ceil(total / perPage))
 
+  // Current year back to 2020 — the platform has no sales older than that, and a
+  // longer list is worse to scan than the exact date inputs beside it.
+  const yearOptions = useMemo(() => {
+    const now = new Date().getFullYear()
+    return Array.from({ length: Math.max(1, now - 2019) }, (_, i) => now - i)
+  }, [])
+
+  // Month / year is shorthand for a reservation-date range, so it collapses into
+  // the same two bounds the query already takes instead of becoming a second,
+  // parallel date filter. A period wins over the manual inputs, and the handlers
+  // below clear whichever one the user isn't using — so the bar can never show
+  // "March 2026" next to a date range that contradicts it.
+  const period = useMemo(() => {
+    if (yearFilter === "all") return null
+    const y = Number(yearFilter)
+    if (monthFilter === "all") return { from: `${y}-01-01`, to: `${y}-12-31` }
+    const m = Number(monthFilter)
+    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate() // day 0 of next month
+    return { from: `${y}-${pad2(m)}-01`, to: `${y}-${pad2(m)}-${pad2(lastDay)}` }
+  }, [yearFilter, monthFilter])
+
+  const effectiveFrom = period?.from ?? dateFrom
+  const effectiveTo = period?.to ?? dateTo
+
+  const pickPeriod = (next: { month?: string; year?: string }) => {
+    if (next.month !== undefined) setMonthFilter(next.month)
+    if (next.year !== undefined) {
+      setYearFilter(next.year)
+      if (next.year === "all") setMonthFilter("all") // a month with no year has no range
+    }
+    setDateFrom("")
+    setDateTo("")
+    setPage(1)
+  }
+  const pickDate = (which: "from" | "to", value: string) => {
+    if (which === "from") setDateFrom(value)
+    else setDateTo(value)
+    setMonthFilter("all")
+    setYearFilter("all")
+    setPage(1)
+  }
+  const clearPeriod = () => {
+    setMonthFilter("all")
+    setYearFilter("all")
+    setDateFrom("")
+    setDateTo("")
+    setPage(1)
+  }
+
+  // agentFilter counts: it narrows the rows and the totals like any other, and
+  // leaving it out made "Reset all filters" quietly skip it.
+  const filtersActive =
+    propertyTypeFilter !== "all" ||
+    developerFilter !== "all" ||
+    commissionFilter !== "all" ||
+    validationFilter !== "all" ||
+    agentFilter !== "all" ||
+    Boolean(effectiveFrom || effectiveTo) ||
+    Boolean(search)
+
+  const resetFilters = () => {
+    setPropertyTypeFilter("all")
+    setDeveloperFilter("all")
+    setCommissionFilter("all")
+    setValidationFilter("all")
+    setAgentFilter("all")
+    setSearchInput("")
+    clearPeriod()
+  }
+
+  // Identifies the filter set a totals response belongs to. activeTab is part of
+  // it so switching report type can't briefly show the previous type's totals.
+  const summaryKey = [
+    activeTab, agentFilter, propertyTypeFilter, developerFilter,
+    commissionFilter, validationFilter, effectiveFrom, effectiveTo, search,
+  ].join("|")
+
   const loadReferenceData = useCallback(async () => {
     const [devsRes, agentsRes] = await Promise.all([
       fetchDevelopersForSale(),
@@ -303,8 +425,13 @@ export function SalesTable({
     if (!agentsRes.error) setAgents(agentsRes.data ?? [])
   }, [])
 
+  // Sequenced like the summary: filters can fire several of these in a row, and
+  // whichever resolves last would otherwise win — leaving the table showing a
+  // superseded filter's rows.
+  const salesSeqRef = useRef(0)
   const loadSales = useCallback(async () => {
     if (!activeTab) return // chooser screen — nothing to load yet
+    const seq = ++salesSeqRef.current
     setLoading(true)
     try {
       const { data, total: count, error } = await fetchSales({
@@ -314,26 +441,36 @@ export function SalesTable({
         saleType: activeTab,
         agentId: agentFilter === "all" ? undefined : agentFilter,
         developerId: developerFilter === "all" ? undefined : developerFilter,
+        propertyType: propertyTypeFilter === "all" ? undefined : propertyTypeFilter,
         commissionStatus: commissionFilter === "all" ? undefined : commissionFilter,
         validationStatus: validationFilter === "all" ? undefined : validationFilter,
-        reservationDateFrom: dateFrom || undefined,
-        reservationDateTo: dateTo || undefined,
+        reservationDateFrom: effectiveFrom || undefined,
+        reservationDateTo: effectiveTo || undefined,
         sortField,
         sortDir,
         currentRole,
         currentUserId,
       })
-      if (error) { addToast("error", error); return }
+      if (seq !== salesSeqRef.current) return // superseded by a newer filter set
+      if (error) {
+        // Clear rather than leave the previous filter's rows under the new
+        // filter bar — a stale table reads as a real (wrong) result.
+        addToast("error", error)
+        setSales([])
+        setTotal(0)
+        return
+      }
       setSales(data ?? [])
       setTotal(count ?? 0)
     } finally {
-      setLoading(false)
+      if (seq === salesSeqRef.current) setLoading(false)
     }
-  }, [page, perPage, search, activeTab, agentFilter, developerFilter, commissionFilter, validationFilter, dateFrom, dateTo, sortField, sortDir, currentRole, currentUserId])
+  }, [page, perPage, search, activeTab, agentFilter, developerFilter, propertyTypeFilter, commissionFilter, validationFilter, effectiveFrom, effectiveTo, sortField, sortDir, currentRole, currentUserId])
 
-  // Per-type summaries for the tab badges + tiles. Scoped like fetchSales (agents
-  // see only their own), and deliberately ignore the in-view filters so the numbers
-  // stay a stable overview — only re-fetched when the agent scope changes.
+  // Per-type summaries for the chooser cards' record counts. Scoped like
+  // fetchSales (agents see only their own) but deliberately unfiltered — the
+  // cards preview each type as a whole, before any filter exists. The tiles on
+  // the report use loadActiveSummary below instead.
   const loadSummaries = useCallback(async () => {
     const scope = { agentId: agentFilter === "all" ? undefined : agentFilter, currentRole, currentUserId }
     const [proj, brok, rent] = await Promise.all([
@@ -345,9 +482,40 @@ export function SalesTable({
     setSummaries({ project: proj.data ?? zero, brokerage: brok.data ?? zero, rental: rent.data ?? zero })
   }, [agentFilter, currentRole, currentUserId])
 
+  // Totals for the active report's tiles, narrowed by the same filters as the
+  // rows. Sequenced because the filter bar can fire several of these in quick
+  // succession and an older response landing last would show a total that
+  // doesn't match the table. Nothing is set before the await — the tiles ride
+  // the table's own `loading` flag instead, which avoids a cascading render on
+  // every keystroke in the search box.
+  const summarySeqRef = useRef(0)
+  const loadActiveSummary = useCallback(async () => {
+    if (!activeTab) return
+    const seq = ++summarySeqRef.current
+    const key = summaryKey
+    const res = await fetchSalesSummaryFiltered({
+      saleType: activeTab,
+      agentId: agentFilter === "all" ? undefined : agentFilter,
+      currentRole,
+      currentUserId,
+      filters: {
+        propertyType: propertyTypeFilter === "all" ? undefined : propertyTypeFilter,
+        developerId: developerFilter === "all" ? undefined : developerFilter,
+        commissionStatus: commissionFilter === "all" ? undefined : commissionFilter,
+        validationStatus: validationFilter === "all" ? undefined : validationFilter,
+        reservationDateFrom: effectiveFrom || undefined,
+        reservationDateTo: effectiveTo || undefined,
+        search: search || undefined,
+      },
+    })
+    if (seq !== summarySeqRef.current) return // superseded
+    setActiveSummary({ key, data: res.data, filtered: res.filtered })
+  }, [summaryKey, activeTab, agentFilter, propertyTypeFilter, developerFilter, commissionFilter, validationFilter, effectiveFrom, effectiveTo, search, currentRole, currentUserId])
+
   useEffect(() => { void loadReferenceData() }, [loadReferenceData])
   useEffect(() => { void loadSales() }, [loadSales])
   useEffect(() => { void loadSummaries() }, [loadSummaries])
+  useEffect(() => { void loadActiveSummary() }, [loadActiveSummary])
 
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput.trim()); setPage(1) }, 350)
@@ -363,7 +531,10 @@ export function SalesTable({
   const onTabChange = (t: SaleType) => {
     setActiveType(t)
     setPage(1)
+    // Each type owns a different set of columns, so drop the filters that don't
+    // exist on the one being opened rather than silently narrowing it.
     if (t !== "project") setDeveloperFilter("all") // brokerage/rental have no developer
+    else setPropertyTypeFilter("all")              // project sales carry a unit, not a property type
   }
   const openEdit = (s: SaleRecord) => {
     if (!canEditSaleForRole(currentRole, s)) {
@@ -398,7 +569,9 @@ export function SalesTable({
       if (previousStatus !== nextStatus) notifySaleEvent(sale.id, "validation")
       setSales((prev) => prev.map((item) => (item.id === sale.id ? data! : item)))
       addToast("success", `Validation set to ${STATUS_LABEL[nextStatus]}`)
-      void loadSummaries() // pending-validation count changed
+      // pending-validation count changed
+      void loadSummaries()
+      void loadActiveSummary()
     } finally {
       validationBusyRef.current.delete(sale.id)
     }
@@ -419,6 +592,7 @@ export function SalesTable({
           addToast("success", "Sale deleted")
           void loadSales()
           void loadSummaries()
+          void loadActiveSummary()
         }
       } else {
         await handleValidationShortcut(confirm.sale, confirm.nextStatus)
@@ -434,6 +608,7 @@ export function SalesTable({
     addToast("success", isEdit ? "Sale updated" : "Sale recorded successfully")
     void loadSales()
     void loadSummaries()
+    void loadActiveSummary()
   }
 
   const handleCountChange = (id: string, count: number) => {
@@ -551,6 +726,88 @@ export function SalesTable({
   const activeMeta = activeTab ? SALE_TYPE_TABS.find((t) => t.type === activeTab) : undefined
   const ActiveIcon = activeMeta?.icon ?? TrendingUp
 
+  // Tile numbers, but only if they were computed for the filters currently on
+  // screen. Null otherwise — shown as "—", never as 0 and never as a stale
+  // number the hint would then mislabel as "matching your filters".
+  const tileSummary = activeSummary.key === summaryKey ? activeSummary.data : null
+  const tileHint = !tileSummary
+    ? undefined
+    : !activeSummary.filtered
+      ? "all records — filtered totals unavailable"
+      : filtersActive
+        ? "matching your filters"
+        : undefined
+
+  // Plain-language description of what's in effect, stamped onto the export so
+  // a downloaded file can't be mistaken for the full report.
+  const filterLines = () => {
+    const out: string[] = []
+    if (activeMeta) out.push(`Sale type: ${activeMeta.label}`)
+    if (search) out.push(`Search: "${search}"`)
+    if (isAdminUser && agentFilter !== "all") {
+      out.push(`Agent: ${agents.find((a) => a.id === agentFilter)?.fullname ?? agentFilter}`)
+    }
+    if (developerFilter !== "all") {
+      out.push(`Developer: ${developers.find((d) => d.id === developerFilter)?.name ?? developerFilter}`)
+    }
+    if (propertyTypeFilter !== "all") out.push(`Property type: ${propertyTypeFilter}`)
+    if (commissionFilter !== "all") out.push(`Commission: ${STATUS_LABEL[commissionFilter] ?? commissionFilter}`)
+    if (validationFilter !== "all") out.push(`Validation: ${STATUS_LABEL[validationFilter] ?? validationFilter}`)
+    if (yearFilter !== "all") {
+      out.push(`Period: ${monthFilter === "all" ? yearFilter : `${MONTHS[Number(monthFilter) - 1]} ${yearFilter}`}`)
+    } else if (dateFrom || dateTo) {
+      out.push(`Reservation date: ${dateFrom || "any"} to ${dateTo || "any"}`)
+    }
+    return out
+  }
+
+  // Pulls every matching row (not just the page) with the filters currently in
+  // effect, then hands it to the CSV writer or the print document.
+  const handleExport = async (format: ExportFormat) => {
+    if (!activeTab) return
+    const { data, truncated, error } = await fetchSalesForExport({
+      search: search || undefined,
+      saleType: activeTab,
+      agentId: agentFilter === "all" ? undefined : agentFilter,
+      developerId: developerFilter === "all" ? undefined : developerFilter,
+      propertyType: propertyTypeFilter === "all" ? undefined : propertyTypeFilter,
+      commissionStatus: commissionFilter === "all" ? undefined : commissionFilter,
+      validationStatus: validationFilter === "all" ? undefined : validationFilter,
+      reservationDateFrom: effectiveFrom || undefined,
+      reservationDateTo: effectiveTo || undefined,
+      sortField,
+      sortDir,
+      currentRole,
+      currentUserId,
+    })
+    if (error) { addToast("error", `Export failed: ${error}`); return }
+    if (!data.length) { addToast("error", "Nothing to export — no sales match these filters."); return }
+
+    const title = `${activeMeta?.label ?? "Sales"} Report`
+    const payload: ExportPayload = {
+      title,
+      subtitle: activeMeta?.desc,
+      filterLines: filterLines(),
+      columns: exportColumnsFor(activeTab),
+      rows: data,
+      totals: tileSummary
+        ? { ...tileSummary, filtered: activeSummary.filtered }
+        : null,
+      truncated,
+      generatedBy: userName ?? null,
+    }
+
+    if (format === "csv") {
+      downloadCsv(exportFilename(title, "csv"), buildCsv(payload))
+      addToast("success", `Exported ${data.length} sale${data.length === 1 ? "" : "s"} to Excel`)
+    } else {
+      printHtml(buildPrintableHtml(payload))
+    }
+    if (truncated) {
+      addToast("error", `Export capped at ${EXPORT_MAX_ROWS} rows — narrow the filters for the complete set.`)
+    }
+  }
+
   return (
     <>
       <div className="space-y-6">
@@ -635,31 +892,60 @@ export function SalesTable({
                   </h1>
                   <p className="text-sm text-[#6b7280]">{activeMeta?.desc}</p>
                 </div>
-                {isAdminUser && (
-                  <button
-                    type="button"
-                    onClick={() => setShowTopSeller(true)}
-                    className="ml-auto shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
-                  >
-                    <Crown className="w-4 h-4" />
-                    Top Seller Poster
-                  </button>
-                )}
+                <div className="ml-auto flex items-center gap-2 shrink-0">
+                  {/* Exports every row matching the current filters, not the
+                      page on screen — available to every role, each scoped to
+                      the sales they can already see. */}
+                  <SaleExportButton onExport={handleExport} />
+                  {isAdminUser && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTopSeller(true)}
+                      className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
+                    >
+                      <Crown className="w-4 h-4" />
+                      Top Seller Poster
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Summary tiles for the active tab (deal count already shown on the cards) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <SummaryTile label="Total Contract Value" value={formatCurrency(summaries[activeTab].totalValue)} icon={Wallet} />
-              <SummaryTile label="Pending Validation" value={String(summaries[activeTab].pendingCount)} icon={Clock} />
+            {/* Summary tiles for the active tab — these follow the filter bar, so
+                they always describe the same set of sales as the rows below.
+                Falls back to the unfiltered type summary if the filtered totals
+                aren't available, and says so rather than showing a wrong number. */}
+            <div className={`grid grid-cols-1 sm:grid-cols-3 gap-3 transition-opacity ${loading ? "opacity-60" : ""}`}>
+              <SummaryTile
+                label="Deals"
+                value={tileSummary ? String(tileSummary.dealCount) : "—"}
+                icon={FileText}
+                hint={tileHint}
+              />
+              <SummaryTile
+                label="Total Contract Value"
+                value={tileSummary ? formatCurrency(tileSummary.totalValue) : "—"}
+                icon={Wallet}
+                hint={tileHint}
+              />
+              <SummaryTile
+                label="Pending Validation"
+                value={tileSummary ? String(tileSummary.pendingCount) : "—"}
+                icon={Clock}
+                hint={tileHint}
+              />
             </div>
 
         {/* Filters bar */}
         <div className="bg-white/60 backdrop-blur-xl rounded-[24px] border border-white/60 shadow-sm shadow-black/5 p-4">
           <div className="flex flex-col gap-3">
-            <div className="flex flex-col xl:flex-row gap-3">
-              <div className="relative flex-1 min-w-[220px]">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+            {/* One flat wrapping row with items-center. It must not be a
+                stretch row: when the controls wrap, a stretched search wrapper
+                grows to the full two-line height and its absolutely-centered
+                magnifier drifts below the input. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[240px]">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
                 <input
                   type="text"
                   value={searchInput}
@@ -669,91 +955,150 @@ export function SalesTable({
                 />
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
-                <Filter className="w-3.5 h-3.5 text-[#9ca3af]" />
+              <Filter className="w-3.5 h-3.5 text-[#9ca3af] shrink-0" />
 
-                {isAdminUser && (
-                  <select
-                    value={agentFilter}
-                    onChange={(e) => { setAgentFilter(e.target.value); setPage(1) }}
-                    className="pl-3 pr-8 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
-                  >
-                    <option value="all">All Agents</option>
-                    {agents.map((a) => (
-                      <option key={a.id} value={a.id}>{a.fullname ?? a.id}</option>
-                    ))}
-                  </select>
-                )}
-
-                {activeTab === "project" && (
-                  <select
-                    value={developerFilter}
-                    onChange={(e) => { setDeveloperFilter(e.target.value); setPage(1) }}
-                    className="pl-3 pr-8 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
-                  >
-                    <option value="all">All Developers</option>
-                    {developers.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                )}
-
+              {isAdminUser && (
                 <select
-                  value={commissionFilter}
-                  onChange={(e) => { setCommissionFilter(e.target.value as CommissionStatus | "all"); setPage(1) }}
-                  className="pl-3 pr-8 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
+                  value={agentFilter}
+                  onChange={(e) => { setAgentFilter(e.target.value); setPage(1) }}
+                  className={filterSelectCls}
+                  aria-label="Agent"
                 >
-                  <option value="all">Commission: All</option>
-                  {COMMISSION_STATUSES.map((s) => (
-                    <option key={s} value={s}>{STATUS_LABEL[s] ?? s.replace(/_/g, " ")}</option>
+                  <option value="all">All Agents</option>
+                  {agents.map((a) => (
+                    <option key={a.id} value={a.id}>{a.fullname ?? a.id}</option>
                   ))}
                 </select>
+              )}
 
+              {activeTab === "project" ? (
                 <select
-                  value={validationFilter}
-                  onChange={(e) => { setValidationFilter(e.target.value as ValidationStatus | "all"); setPage(1) }}
-                  className="pl-3 pr-8 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
+                  value={developerFilter}
+                  onChange={(e) => { setDeveloperFilter(e.target.value); setPage(1) }}
+                  className={filterSelectCls}
+                  aria-label="Developer"
                 >
-                  <option value="all">Validation: All</option>
-                  {VALIDATION_STATUSES.map((s) => (
-                    <option key={s} value={s}>{STATUS_LABEL[s] ?? s.replace(/_/g, " ")}</option>
+                  <option value="all">All Developers</option>
+                  {developers.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </select>
-
-                <button
-                  type="button"
-                  onClick={() => void loadSales()}
-                  className="p-2.5 rounded-2xl border border-[#e5e5e5] bg-white/80 text-[#6b7280] hover:text-[#001f3f] hover:border-[#001f3f]/20 transition-all"
-                  title="Refresh"
+              ) : (
+                // Brokerage and rental sales record a free property type instead
+                // of a developer/project, so that's what they filter on.
+                <select
+                  value={propertyTypeFilter}
+                  onChange={(e) => { setPropertyTypeFilter(e.target.value); setPage(1) }}
+                  className={filterSelectCls}
+                  aria-label="Property type"
                 >
-                  <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-                </button>
-              </div>
+                  <option value="all">All Property Types</option>
+                  {SALE_PROPERTY_TYPES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              )}
+
+              <select
+                value={commissionFilter}
+                onChange={(e) => { setCommissionFilter(e.target.value as CommissionStatus | "all"); setPage(1) }}
+                className={filterSelectCls}
+                aria-label="Commission status"
+              >
+                <option value="all">Commission: All</option>
+                {COMMISSION_STATUSES.map((s) => (
+                  <option key={s} value={s}>{STATUS_LABEL[s] ?? s.replace(/_/g, " ")}</option>
+                ))}
+              </select>
+
+              <select
+                value={validationFilter}
+                onChange={(e) => { setValidationFilter(e.target.value as ValidationStatus | "all"); setPage(1) }}
+                className={filterSelectCls}
+                aria-label="Validation status"
+              >
+                <option value="all">Validation: All</option>
+                {VALIDATION_STATUSES.map((s) => (
+                  <option key={s} value={s}>{STATUS_LABEL[s] ?? s.replace(/_/g, " ")}</option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={() => void loadSales()}
+                className="shrink-0 p-2.5 rounded-2xl border border-[#e5e5e5] bg-white/80 text-[#6b7280] hover:text-[#001f3f] hover:border-[#001f3f]/20 transition-all"
+                title="Refresh"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              </button>
             </div>
 
-            {/* Date range */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Period — a month/year shortcut and an exact range, both writing the
+                same reservation-date bounds. Picking one clears the other. */}
+            <div className="flex flex-wrap items-center gap-2 border-t border-[#f0f0f0] pt-3">
+              <span className="text-xs text-[#9ca3af] font-medium">Period:</span>
+
+              <select
+                value={yearFilter}
+                onChange={(e) => pickPeriod({ year: e.target.value })}
+                aria-label="Year"
+                className="pl-3 pr-8 py-2 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
+              >
+                <option value="all">All Years</option>
+                {yearOptions.map((y) => (
+                  <option key={y} value={String(y)}>{y}</option>
+                ))}
+              </select>
+
+              <select
+                value={monthFilter}
+                onChange={(e) => pickPeriod({ month: e.target.value })}
+                disabled={yearFilter === "all"}
+                aria-label={yearFilter === "all" ? "Month — pick a year first" : "Month"}
+                title={yearFilter === "all" ? "Pick a year first" : undefined}
+                className="pl-3 pr-8 py-2 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <option value="all">All Months</option>
+                {MONTHS.map((m, i) => (
+                  <option key={m} value={String(i + 1)}>{m}</option>
+                ))}
+              </select>
+
+              <span className="hidden sm:inline text-xs text-[#d1d5db]">|</span>
               <span className="text-xs text-[#9ca3af] font-medium">Reservation date:</span>
               <input
                 type="date"
                 value={dateFrom}
-                onChange={(e) => { setDateFrom(e.target.value); setPage(1) }}
+                onChange={(e) => pickDate("from", e.target.value)}
+                aria-label="Reservation date from"
                 className="px-3 py-2 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
               />
               <span className="text-xs text-[#9ca3af]">to</span>
               <input
                 type="date"
                 value={dateTo}
-                onChange={(e) => { setDateTo(e.target.value); setPage(1) }}
+                onChange={(e) => pickDate("to", e.target.value)}
+                aria-label="Reservation date to"
                 className="px-3 py-2 rounded-2xl border border-[#e5e5e5] text-sm bg-white/80 focus:outline-none focus:border-[#001f3f] cursor-pointer"
               />
-              {(dateFrom || dateTo) && (
+              {(effectiveFrom || effectiveTo) && (
                 <button
                   type="button"
-                  onClick={() => { setDateFrom(""); setDateTo(""); setPage(1) }}
+                  onClick={clearPeriod}
                   className="text-xs text-rose-500 hover:text-rose-700 transition-colors"
                 >
-                  Clear dates
+                  Clear period
+                </button>
+              )}
+
+              {filtersActive && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#e5e5e5] bg-white/80 text-xs font-semibold text-[#6b7280] hover:text-[#001f3f] hover:border-[#001f3f]/20 transition-all"
+                >
+                  <X className="w-3 h-3" />
+                  Reset all filters
                 </button>
               )}
             </div>

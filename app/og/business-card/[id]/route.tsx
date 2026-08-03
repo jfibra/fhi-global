@@ -19,6 +19,15 @@ import ProfileShareCard from "@/features/business-card/profile-share-card"
 
 export const runtime = "nodejs"
 
+/**
+ * ImageResponse's production default is a ONE-YEAR immutable cache — right for
+ * next/og's usual static use, wrong here: this image changes whenever the
+ * profile does, and a year-old copy pinned in a CDN or crawler cache is exactly
+ * the "thumbnail never updates" bug. Five minutes still absorbs a scrape burst
+ * (Facebook fetches once per share wave), but a redesign propagates on its own.
+ */
+const CACHE_HEADERS = { "cache-control": "public, max-age=300, s-maxage=300" }
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Internal partner accounts have no public card — same rule as the page. */
@@ -71,7 +80,7 @@ async function fallbackBrandCard() {
         </div>
       </div>
     ),
-    { width: PROFILE_OG_W, height: PROFILE_OG_H },
+    { width: PROFILE_OG_W, height: PROFILE_OG_H, headers: CACHE_HEADERS },
   )
 }
 
@@ -130,6 +139,6 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
         options={options}
       />
     ),
-    { width: PROFILE_OG_W, height: PROFILE_OG_H },
+    { width: PROFILE_OG_W, height: PROFILE_OG_H, headers: CACHE_HEADERS },
   )
 }

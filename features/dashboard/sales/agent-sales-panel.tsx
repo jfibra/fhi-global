@@ -12,11 +12,26 @@ import {
 import { UserAvatar } from "@/components/user-avatar"
 import {
   fetchSales,
+  fetchSalesForExport,
+  fetchSalesSummaryFiltered,
+  EXPORT_MAX_ROWS,
+  SALE_PROPERTY_TYPES,
   type SaleRecord,
   type SaleType,
+  type SaleTypeSummary,
   type CommissionStatus,
   type ValidationStatus,
 } from "@/lib/sales-service"
+import {
+  buildCsv,
+  buildPrintableHtml,
+  downloadCsv,
+  exportColumnsFor,
+  exportFilename,
+  printHtml,
+  type ExportPayload,
+} from "./sale-export"
+import { SaleExportButton, type ExportFormat } from "./sale-export-button"
 
 // Mirrors the (unexported) sort union in lib/sales-service.
 type SortField = "reservation_date" | "contract_price" | "created_at"
@@ -36,6 +51,13 @@ const SALE_TYPE_META: Record<SaleType, { label: string; icon: LucideIcon }> = {
 
 const COMMISSION_STATUSES: CommissionStatus[] = ["pending", "processing", "approved", "released", "rejected"]
 const VALIDATION_STATUSES: ValidationStatus[] = ["pending", "under_review", "validated", "invalid_sale"]
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+] as const
+
+const pad2 = (n: number) => String(n).padStart(2, "0")
 
 // Word-initial capitals. `\b` is ASCII-only and would uppercase every accented
 // letter ("josé" → "JosÉ"), so boundaries are start-of-string or separators.
@@ -116,9 +138,11 @@ export function AgentSalesPanel({
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState<SaleType | "all">("all")
   const [developerFilter, setDeveloperFilter] = useState("all")
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState("all")
   const [commissionFilter, setCommissionFilter] = useState<CommissionStatus | "all">("all")
   const [validationFilter, setValidationFilter] = useState<ValidationStatus | "all">("all")
   const [year, setYear] = useState<number | "all">("all")
+  const [month, setMonth] = useState<number | "all">("all")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   // created_at (never null) rather than reservation_date: PostgREST's bare
@@ -127,6 +151,9 @@ export function AgentSalesPanel({
   const [sortDir, setSortDir] = useState<SortDir>("desc")
   const [salesError, setSalesError] = useState<string | null>(null)
   const [retryTick, setRetryTick] = useState(0)
+  // Export failures get their own line — routing them through salesError would
+  // replace the table with an error panel the user never asked for.
+  const [exportNote, setExportNote] = useState<string | null>(null)
 
   const [brief, setBrief] = useState<AgentBrief | null>(null)
   const [briefState, setBriefState] = useState<"loading" | "done" | "failed">("loading")
@@ -134,13 +161,17 @@ export function AgentSalesPanel({
   const displayName = brief?.fullname ?? agentName
   const displayTitle = displayName ? titleCase(displayName) : "Agent"
 
-  // A year pick drives the date range; a manual range clears the year chip so
-  // only one of them is ever in effect.
-  const effectiveFrom = dateFrom || (year === "all" ? "" : `${year}-01-01`)
-  const effectiveTo = dateTo || (year === "all" ? "" : `${year}-12-31`)
+  // A year (optionally narrowed to one month) drives the date range; a manual
+  // range clears the year/month chips so only one of them is ever in effect.
+  const effectiveFrom = dateFrom || (year === "all" ? "" : month === "all"
+    ? `${year}-01-01`
+    : `${year}-${pad2(month)}-01`)
+  const effectiveTo = dateTo || (year === "all" ? "" : month === "all"
+    ? `${year}-12-31`
+    : `${year}-${pad2(month)}-${pad2(new Date(Date.UTC(year, month, 0)).getUTCDate())}`)
 
   const requestKey = [
-    page, search, typeFilter, developerFilter, commissionFilter, validationFilter,
+    page, search, typeFilter, developerFilter, propertyTypeFilter, commissionFilter, validationFilter,
     effectiveFrom, effectiveTo, sortField, sortDir, retryTick,
   ].join("|")
   const loading = loadedKey !== requestKey
@@ -166,6 +197,7 @@ export function AgentSalesPanel({
           saleType: typeFilter === "all" ? undefined : typeFilter,
           agentId,
           developerId: developerFilter === "all" ? undefined : developerFilter,
+          propertyType: propertyTypeFilter === "all" ? undefined : propertyTypeFilter,
           commissionStatus: commissionFilter === "all" ? undefined : commissionFilter,
           validationStatus: validationFilter === "all" ? undefined : validationFilter,
           reservationDateFrom: effectiveFrom || undefined,
@@ -191,8 +223,41 @@ export function AgentSalesPanel({
     return () => { alive = false }
   }, [
     loadedKey, requestKey, page, search, typeFilter, agentId, developerFilter,
-    commissionFilter, validationFilter, effectiveFrom, effectiveTo, sortField,
-    sortDir, currentRole, currentUserId,
+    propertyTypeFilter, commissionFilter, validationFilter, effectiveFrom, effectiveTo,
+    sortField, sortDir, currentRole, currentUserId,
+  ])
+
+  // Totals for the rows the filters currently select. The lifetime tiles above
+  // answer "how has this agent done overall"; this strip answers "…and in the
+  // slice I'm looking at", which is otherwise unanswerable from a paged list.
+  // Only rendered when a filter is on — unfiltered it would just restate the
+  // tiles. Keyed the same way as the list so the two can't disagree.
+  const [slice, setSlice] = useState<{ key: string; data: SaleTypeSummary | null; filtered: boolean }>(
+    { key: "", data: null, filtered: false })
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      const { data, filtered } = await fetchSalesSummaryFiltered({
+        saleType: typeFilter === "all" ? null : typeFilter,
+        agentId,
+        currentRole,
+        currentUserId,
+        filters: {
+          propertyType: propertyTypeFilter === "all" ? undefined : propertyTypeFilter,
+          developerId: developerFilter === "all" ? undefined : developerFilter,
+          commissionStatus: commissionFilter === "all" ? undefined : commissionFilter,
+          validationStatus: validationFilter === "all" ? undefined : validationFilter,
+          reservationDateFrom: effectiveFrom || undefined,
+          reservationDateTo: effectiveTo || undefined,
+          search: search || undefined,
+        },
+      })
+      if (alive) setSlice({ key: requestKey, data, filtered })
+    })()
+    return () => { alive = false }
+  }, [
+    requestKey, agentId, typeFilter, developerFilter, propertyTypeFilter, commissionFilter,
+    validationFilter, effectiveFrom, effectiveTo, search, currentRole, currentUserId,
   ])
 
   // Agent header + lifetime tiles, from the narrow admin brief endpoint.
@@ -237,13 +302,78 @@ export function AgentSalesPanel({
 
   const activeFilters =
     (search ? 1 : 0) + (typeFilter !== "all" ? 1 : 0) + (developerFilter !== "all" ? 1 : 0) +
+    (propertyTypeFilter !== "all" ? 1 : 0) +
     (commissionFilter !== "all" ? 1 : 0) + (validationFilter !== "all" ? 1 : 0) +
-    (year !== "all" ? 1 : 0) + (dateFrom || dateTo ? 1 : 0)
+    (year !== "all" ? 1 : 0) + (month !== "all" ? 1 : 0) + (dateFrom || dateTo ? 1 : 0)
 
   const resetFilters = () => {
     setSearchInput(""); setSearch(""); setTypeFilter("all"); setDeveloperFilter("all")
-    setCommissionFilter("all"); setValidationFilter("all"); setYear("all")
+    setPropertyTypeFilter("all")
+    setCommissionFilter("all"); setValidationFilter("all"); setYear("all"); setMonth("all")
     setDateFrom(""); setDateTo(""); setPage(1)
+  }
+
+  // Human label for the slice strip, so the numbers say what they're counting.
+  const sliceLabel = [
+    typeFilter === "all" ? "All types" : SALE_TYPE_META[typeFilter].label,
+    propertyTypeFilter !== "all" ? propertyTypeFilter : null,
+    year !== "all" ? (month === "all" ? String(year) : `${MONTHS[month - 1]} ${year}`) : null,
+    dateFrom || dateTo ? `${dateFrom || "…"} → ${dateTo || "…"}` : null,
+  ].filter(Boolean).join(" · ")
+
+  // The slice totals belong to `requestKey`'s filter set; anything else on
+  // screen is from a superseded fetch and must read as "—", not as a number.
+  const sliceReady = slice.key === requestKey && slice.data !== null
+
+  const exportFilters = {
+    search: search || undefined,
+    saleType: typeFilter === "all" ? undefined : typeFilter,
+    agentId,
+    developerId: developerFilter === "all" ? undefined : developerFilter,
+    propertyType: propertyTypeFilter === "all" ? undefined : propertyTypeFilter,
+    commissionStatus: commissionFilter === "all" ? undefined : commissionFilter,
+    validationStatus: validationFilter === "all" ? undefined : validationFilter,
+    reservationDateFrom: effectiveFrom || undefined,
+    reservationDateTo: effectiveTo || undefined,
+    currentRole,
+    currentUserId,
+  }
+
+  // Exports this agent's sales under the panel's own filters — the same rows
+  // the table is showing, all pages of them.
+  const handleExport = async (format: ExportFormat) => {
+    setExportNote(null)
+    const { data, truncated, error } = await fetchSalesForExport({ ...exportFilters, sortField, sortDir })
+    if (error) { setExportNote(`Export failed: ${error}`); return }
+    if (!data.length) { setExportNote("Nothing to export — no sales match these filters."); return }
+
+    const title = `${displayTitle} — Sales`
+    const lines = [
+      typeFilter === "all" ? "Sale type: All types" : `Sale type: ${SALE_TYPE_META[typeFilter].label}`,
+      search ? `Search: "${search}"` : null,
+      developerFilter !== "all" ? `Developer: ${developers.find((d) => d.id === developerFilter)?.name ?? developerFilter}` : null,
+      propertyTypeFilter !== "all" ? `Property type: ${propertyTypeFilter}` : null,
+      commissionFilter !== "all" ? `Commission: ${titleCase(commissionFilter.replace(/_/g, " "))}` : null,
+      validationFilter !== "all" ? `Validation: ${titleCase(validationFilter.replace(/_/g, " "))}` : null,
+      year !== "all" ? `Period: ${month === "all" ? year : `${MONTHS[month - 1]} ${year}`}` : null,
+      year === "all" && (dateFrom || dateTo) ? `Reservation date: ${dateFrom || "any"} to ${dateTo || "any"}` : null,
+    ].filter((v): v is string => Boolean(v))
+
+    const payload: ExportPayload = {
+      title,
+      subtitle: brief?.email ?? undefined,
+      filterLines: lines,
+      columns: exportColumnsFor(typeFilter === "all" ? null : typeFilter),
+      rows: data,
+      totals: sliceReady ? { ...slice.data!, filtered: slice.filtered } : null,
+      truncated,
+      generatedBy: null,
+    }
+
+    if (format === "csv") downloadCsv(exportFilename(title, "csv"), buildCsv(payload))
+    else printHtml(buildPrintableHtml(payload))
+
+    if (truncated) setExportNote(`Export capped at ${EXPORT_MAX_ROWS} rows — narrow the filters for the complete set.`)
   }
 
   const selectCls = "pl-3 pr-8 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm bg-white focus:outline-none focus:border-[#001f3f] cursor-pointer"
@@ -279,7 +409,9 @@ export function AgentSalesPanel({
               {briefState === "failed" && <span className="text-xs text-[#c0c6cf]">Agent details unavailable</span>}
             </div>
           </div>
+          <SaleExportButton onExport={handleExport} />
         </div>
+        {exportNote && <p className="mt-3 text-xs text-rose-600">{exportNote}</p>}
       </div>
 
       {/* ── Lifetime production — "—" until the brief loads, never fake zeros */}
@@ -310,7 +442,9 @@ export function AgentSalesPanel({
               setTypeFilter(t)
               // Only project sales carry a developer — a developer filter on
               // brokerage/rental can never match, so drop it with the select.
+              // Property type is the same story in reverse.
               if (t === "brokerage" || t === "rental") setDeveloperFilter("all")
+              if (t === "project") setPropertyTypeFilter("all")
               setPage(1)
             }}
             className={selectCls}
@@ -326,6 +460,16 @@ export function AgentSalesPanel({
             <select value={developerFilter} onChange={(e) => { setDeveloperFilter(e.target.value); setPage(1) }} className={selectCls} aria-label="Developer">
               <option value="all">All Developers</option>
               {developers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          )}
+
+          {/* Property type is what brokerage and rental sales record in place of
+              a developer/project — the mirror image of the developer select
+              above, hidden for project sales, which never carry one. */}
+          {typeFilter !== "project" && (
+            <select value={propertyTypeFilter} onChange={(e) => { setPropertyTypeFilter(e.target.value); setPage(1) }} className={selectCls} aria-label="Property type">
+              <option value="all">All Property Types</option>
+              {SALE_PROPERTY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           )}
 
@@ -346,6 +490,7 @@ export function AgentSalesPanel({
             onChange={(e) => {
               const v = e.target.value
               setYear(v === "all" ? "all" : Number(v))
+              if (v === "all") setMonth("all") // a month with no year has no range
               setDateFrom(""); setDateTo(""); setPage(1)
             }}
             className={selectCls}
@@ -355,11 +500,27 @@ export function AgentSalesPanel({
             {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
 
+          <select
+            value={month}
+            onChange={(e) => {
+              const v = e.target.value
+              setMonth(v === "all" ? "all" : Number(v))
+              setDateFrom(""); setDateTo(""); setPage(1)
+            }}
+            disabled={year === "all"}
+            title={year === "all" ? "Pick a year first" : undefined}
+            className={`${selectCls} disabled:opacity-40 disabled:cursor-not-allowed`}
+            aria-label="Month"
+          >
+            <option value="all">All months</option>
+            {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+          </select>
+
           <label className="text-xs text-[#9ca3af] font-semibold uppercase tracking-wider">Reservation date</label>
           <input
             type="date"
             value={dateFrom}
-            onChange={(e) => { setDateFrom(e.target.value); setYear("all"); setPage(1) }}
+            onChange={(e) => { setDateFrom(e.target.value); setYear("all"); setMonth("all"); setPage(1) }}
             className="px-3 py-2 rounded-2xl border border-[#e5e5e5] text-sm bg-white focus:outline-none focus:border-[#001f3f]"
             aria-label="Reservation date from"
           />
@@ -367,7 +528,7 @@ export function AgentSalesPanel({
           <input
             type="date"
             value={dateTo}
-            onChange={(e) => { setDateTo(e.target.value); setYear("all"); setPage(1) }}
+            onChange={(e) => { setDateTo(e.target.value); setYear("all"); setMonth("all"); setPage(1) }}
             className="px-3 py-2 rounded-2xl border border-[#e5e5e5] text-sm bg-white focus:outline-none focus:border-[#001f3f]"
             aria-label="Reservation date to"
           />
@@ -382,6 +543,40 @@ export function AgentSalesPanel({
             </button>
           )}
         </div>
+
+        {/* Totals for the filtered slice. The lifetime tiles above can't answer
+            "how much did they do in March", and a paged list only ever sums the
+            page you're on. Hidden when nothing is filtered — it would just
+            repeat the tiles. */}
+        {activeFilters > 0 && (
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl bg-[#f7f8fa] border border-[#eceef1] px-4 py-3">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">
+              {sliceReady && !slice.filtered ? "All records" : sliceLabel}
+            </span>
+            <span className="text-sm text-[#374151]">
+              <strong className="font-bold text-[#0d1117]">{sliceReady ? slice.data!.dealCount : "—"}</strong>{" "}
+              deal{sliceReady && slice.data!.dealCount === 1 ? "" : "s"}
+            </span>
+            <span className="text-sm text-[#374151]">
+              <strong className="font-bold text-[#0d1117]">
+                {sliceReady ? formatCompactMoney(slice.data!.totalValue) : "—"}
+              </strong>{" "}
+              contract value
+            </span>
+            <span className="text-sm text-[#374151]">
+              <strong className="font-bold text-[#0d1117]">{sliceReady ? slice.data!.pendingCount : "—"}</strong>{" "}
+              pending validation
+            </span>
+            {/* The numbers are the whole-type fallback, not this slice. Saying so
+                is the whole point of the `filtered` flag — the export already
+                carries the same warning. */}
+            {sliceReady && !slice.filtered && (
+              <span className="text-[11px] font-semibold text-[#b45309]">
+                filtered totals unavailable — these cover every record
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Sales table ──────────────────────────────────────────────────── */}

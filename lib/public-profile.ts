@@ -42,6 +42,11 @@ function oneLine(raw: unknown, max: number): string {
  */
 export function titleCaseName(raw: string): string {
   return raw
+    // Runs of whitespace collapse first. Stored names carry stray double spaces
+    // from registration ("Mark Lawrince  SARGADO"), which show up in the page
+    // heading, the og:title and the rendered link-preview card alike.
+    .replace(/\s+/g, " ")
+    .trim()
     .toLocaleLowerCase()
     .replace(/(^|[\s\-'\u2019])(\p{L})/gu, (_, sep: string, ch: string) => sep + ch.toLocaleUpperCase())
 }

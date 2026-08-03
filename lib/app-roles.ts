@@ -281,7 +281,7 @@ export const ROLES_REELS_MAKER: readonly AppRoleId[] = ["super_admin", "admin", 
  * open a project's Poster & Reels marketing studios. Content managers and
  * developers have their own full-access variants instead.
  */
-export const ROLES_PROJECT_STUDIO_VIEWERS: readonly AppRoleId[] = ["agent", "member"]
+export const ROLES_PROJECT_STUDIO_VIEWERS: readonly AppRoleId[] = ["agent", "team_leader", "unit_manager", "member"]
 
 export function isAdminStaffRole(role: string | null | undefined): boolean {
   return roleInList(role, ROLES_ADMIN_STAFF)

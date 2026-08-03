@@ -16,7 +16,7 @@ import {
 } from "@/lib/public-profile"
 import { SOCIAL_ICONS } from "@/features/business-card/social-icons"
 import {
-  DISP_W, dialFromValue, isDesignId, renderCard, stripLocal,
+  DISP_W, dataUrlToBlob, dialFromValue, isDesignId, renderCard, stripLocal,
   type CardData, type DesignId,
 } from "@/features/business-card/card-render"
 import { PublicProfile, type PublicProfileData } from "@/features/business-card/public-profile"
@@ -56,6 +56,14 @@ const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?
 ]
 
 type ButtonRow = CustomLink & { rowId: string }
+
+/**
+ * Rendered link-preview cards, per profile snapshot per design. Keyed on the
+ * memoised cardData object itself: any change to the underlying details makes a
+ * new object, so its cache entry starts empty and the old one is garbage — a
+ * stale name in a cached render is the one thing this must never show.
+ */
+const ogRenderCache = new WeakMap<CardData, Map<DesignId, string>>()
 
 /** Monotonic, module-level: never reachable from render, so it stays pure. */
 let rowSeq = 0
@@ -209,7 +217,10 @@ export default function PublicProfileMakerPage() {
   // Feeds the Business Card renderer — the same shape the Business Card page
   // builds, so both pages draw the identical card.
   const cardData: CardData = useMemo(() => ({
-    name: previewData.fullname,
+    // Stored names are often all caps because that is how they were typed at
+    // registration. The link preview is a public artefact — it should read the
+    // way the profile page reads, not the way the row is stored.
+    name: titleCaseName(previewData.fullname),
     phoneDial: dialFromValue(previewData.countryCode),
     phoneLocal: previewLocal,
     email: previewData.email,
@@ -256,7 +267,7 @@ export default function PublicProfileMakerPage() {
       // the old link preview in place — the failure is invisible until someone
       // shares the link and sees the wrong card.
       const dataUrl = await renderCard("front", activeDesign, cardData, PROFILE_OG_W, PROFILE_OG_H)
-      const blob = await (await fetch(dataUrl)).blob()
+      const blob = dataUrlToBlob(dataUrl)
       const form = new FormData()
       form.append("file", blob, "link-preview.png")
       const up = await fetch(`${API_BASE}/api/upload/profile-og`, { method: "POST", body: form })
@@ -311,7 +322,19 @@ export default function PublicProfileMakerPage() {
   useEffect(() => {
     if (tab !== "preview") return
     let alive = true
-    void renderCard("front", activeDesign, cardData, DISP_W, Math.round((DISP_W * 630) / 1200)).then((url) => {
+    // A cache hit resolves in a microtask, so flipping between templates swaps
+    // instantly instead of re-paying a canvas render (fonts, avatar decode,
+    // skyline photo) on every click.
+    const perCard = ogRenderCache.get(cardData) ?? new Map<DesignId, string>()
+    ogRenderCache.set(cardData, perCard)
+    const hit = perCard.get(activeDesign)
+    const render = hit
+      ? Promise.resolve(hit)
+      : renderCard("front", activeDesign, cardData, DISP_W, Math.round((DISP_W * 630) / 1200)).then((url) => {
+          perCard.set(activeDesign, url)
+          return url
+        })
+    void render.then((url) => {
       if (alive) setLinkCard(url)
     })
     return () => {
