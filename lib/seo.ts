@@ -6,6 +6,15 @@ export const DEFAULT_PREVIEW_IMAGE_URL =
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
 /**
+ * Serialize an object for a <script type="application/ld+json"> block.
+ * Escapes "<" so untrusted strings (e.g. external article titles) can never
+ * break out of the script element with a literal "</script>".
+ */
+export function jsonLdScript(schema: unknown): string {
+  return JSON.stringify(schema).replace(/</g, "\\u003c")
+}
+
+/**
  * Truncate a title on a word boundary so the layout's " | Suffix" doesn't push
  * it past Google's ~60-char display cutoff. Only appends "…" when truncated.
  */

@@ -1,5 +1,7 @@
 import "server-only"
 
+import { DEFAULT_PREVIEW_IMAGE_URL } from "@/lib/seo"
+
 /**
  * news-service.ts — server-only client for the HomesPH News external API
  * (api.homes.ph `/api/external/*`, site-key surface — see guides/NewsIntegration.md).
@@ -168,7 +170,9 @@ function str(value: unknown): string | undefined {
 }
 
 function normalize(raw: Record<string, unknown>): NewsArticle {
-  const image = str(raw.image) ?? "/img/1.png"
+  // Absolute, existing fallback — a relative path here would leak into JSON-LD
+  // image fields and OG tags, which require absolute URLs.
+  const image = str(raw.image) ?? DEFAULT_PREVIEW_IMAGE_URL
   const publishedAt = str(raw.published_at) ?? str(raw.created_at) ?? str(raw.date) ?? ""
   const updatedAt = str(raw.updated_at) ?? publishedAt
 

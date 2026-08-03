@@ -6,6 +6,7 @@ import {
   type SitemapIndexEntry,
 } from "@/lib/sitemap-helpers"
 import { countNewsShards, countSection, SUPABASE_PER_PAGE } from "@/lib/sitemap-sections"
+import { newsConfigured } from "@/lib/news-service"
 
 /**
  * /sitemap.xml — the <sitemapindex>. Sections are advertised only when they
@@ -56,7 +57,10 @@ export async function GET() {
   appendPaginated(sitemaps, "sitemap-listings", shards(listings), lastmod)
   appendPaginated(sitemaps, "sitemap-events", shards(events), lastmod)
   appendPaginated(sitemaps, "sitemap-news", newsShards, lastmod)
-  sitemaps.push({ loc: `${SITE_URL}/news-sitemap.xml`, lastmod })
+  // Google News sitemap only exists meaningfully when the news feature is on.
+  if (newsConfigured()) {
+    sitemaps.push({ loc: `${SITE_URL}/news-sitemap.xml`, lastmod })
+  }
 
   return sitemapResponse(buildSitemapIndexXml(sitemaps), { shortCache: degraded })
 }

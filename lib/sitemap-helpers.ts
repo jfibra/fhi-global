@@ -102,3 +102,19 @@ export function sitemapResponse(xml: string, opts: { shortCache?: boolean } = {}
     },
   })
 }
+
+/**
+ * Transient-failure answer for an ADVERTISED shard: 503 + Retry-After, never
+ * 404 — crawlers treat 5xx as "try again", while a 404 on a URL the index
+ * advertises reads as removed content.
+ */
+export function sitemapUnavailableResponse(): Response {
+  return new Response("Sitemap temporarily unavailable", {
+    status: 503,
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "public, max-age=60, s-maxage=60",
+      "Retry-After": "300",
+    },
+  })
+}

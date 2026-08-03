@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { createPageMetadata, SITE_URL } from "@/lib/seo"
+import { createPageMetadata, jsonLdScript, SITE_URL } from "@/lib/seo"
 import {
   fetchArticlesList,
   fetchCategoriesCountries,
@@ -254,7 +254,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
     <div className="min-h-screen bg-[#f5f5f5] font-sans">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(collectionSchema) }}
       />
 
       {/* ── TICKER ── */}

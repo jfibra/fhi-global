@@ -1,3 +1,4 @@
+import { after } from "next/server"
 import { buildNewsSitemapXml, sitemapResponse, SITE_URL, type NewsSitemapItem } from "@/lib/sitemap-helpers"
 import { fetchArticlesList, newsConfigured, toManilaIso } from "@/lib/news-service"
 import { submitToIndexNow } from "@/lib/indexnow"
@@ -16,7 +17,9 @@ const MAX_ITEMS = 1000
 
 export async function GET() {
   if (!newsConfigured()) {
-    return sitemapResponse(buildNewsSitemapXml([]), { shortCache: true })
+    // Unconfigured is a stable state (env changes need a redeploy) — use the
+    // NORMAL cache, not the degraded 60s one, or the CDN refetches forever.
+    return sitemapResponse(buildNewsSitemapXml([]))
   }
 
   const { articles } = await fetchArticlesList(
@@ -41,8 +44,11 @@ export async function GET() {
   }
 
   if (items.length > 0) {
-    // Fire-and-forget: tell IndexNow about the fresh articles.
-    void submitToIndexNow(items.map((i) => i.loc))
+    // Ping IndexNow about the fresh articles AFTER the response is sent —
+    // after() keeps the serverless function alive for the work, where a bare
+    // floating promise could be killed at response time.
+    const locs = items.map((i) => i.loc)
+    after(() => submitToIndexNow(locs))
   }
 
   return sitemapResponse(buildNewsSitemapXml(items), { shortCache: items.length === 0 })

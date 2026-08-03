@@ -1,4 +1,4 @@
-import { SITE_URL, buildUrlsetXml, sitemapResponse } from "@/lib/sitemap-helpers"
+import { SITE_URL, buildUrlsetXml, sitemapResponse, sitemapUnavailableResponse } from "@/lib/sitemap-helpers"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
 
 /** /sitemap-listings-N.xml — published agent listings (canonical path is slug ?? id). */
@@ -10,6 +10,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ page: string }
   if (!Number.isInteger(pageNum) || pageNum < 1) return new Response("Not found", { status: 404 })
 
   const rows = await fetchSectionPage("listings", pageNum)
+  if (rows === null) return sitemapUnavailableResponse() // transient upstream failure
   if (rows.length === 0) return new Response("Not found", { status: 404 })
 
   const urls = rows

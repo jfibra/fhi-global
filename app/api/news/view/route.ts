@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { newsConfigured, trackArticleView } from "@/lib/news-service"
+import { allowRequest, clientIp } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 
@@ -8,7 +9,8 @@ const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,254}$/i
 /**
  * Forwards a visitor's article read to the HomesPH News view counter with the
  * site key attached server-side. Always answers 204 — a failed count must
- * never surface to the reader.
+ * never surface to the reader. Rate-limited per IP so this open endpoint
+ * can't be used to burn the upstream API's shared request budget.
  */
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as {
@@ -21,6 +23,9 @@ export async function POST(req: NextRequest) {
   const slug = typeof body.slug === "string" ? body.slug : ""
   if (!SLUG_RE.test(slug) || !newsConfigured()) {
     return new NextResponse(null, { status: 204 })
+  }
+  if (!allowRequest(`news-view:${clientIp(req.headers)}`, 20, 60_000)) {
+    return new NextResponse(null, { status: 204 }) // silently dropped
   }
 
   const str = (v: unknown, max: number) =>

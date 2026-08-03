@@ -7,7 +7,7 @@ import {
   fetchArticlesList,
   toManilaIso,
 } from "@/lib/news-service"
-import { truncateTitle } from "@/lib/seo"
+import { DEFAULT_PREVIEW_IMAGE_URL, jsonLdScript, truncateTitle } from "@/lib/seo"
 import { ContentBlocks } from "@/components/news/content-blocks"
 import { NewsViewTracker } from "@/components/news/news-view-tracker"
 import { Clock, Play } from "lucide-react"
@@ -45,9 +45,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const canonical = `${siteUrl}/news/${article.slug}`
   const description = article.excerpt || article.title
-  const image = article.featuredImage && article.featuredImage !== "/img/1.png"
+  const image = article.featuredImage && article.featuredImage !== DEFAULT_PREVIEW_IMAGE_URL
     ? article.featuredImage
-    : article.img && article.img !== "/img/1.png"
+    : article.img && article.img !== DEFAULT_PREVIEW_IMAGE_URL
       ? article.img
       : undefined
   const keywords = [
@@ -88,20 +88,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 // ── Time ago label ─────────────────────────────────────────────────────────────
-function timeAgoLabel(dateStr: string): string {
-  if (!dateStr) return "UPDATED RECENTLY"
-  try {
-    const diff = Date.now() - new Date(dateStr).getTime()
-    const mins = Math.floor(diff / 60_000)
-    const hours = Math.floor(diff / 3_600_000)
-    const days = Math.floor(diff / 86_400_000)
-    if (mins < 60) return `UPDATED ${mins} MIN AGO`
-    if (hours < 24) return `UPDATED ${hours} HOUR${hours === 1 ? "" : "S"} AGO`
-    if (days < 30) return `UPDATED ${days} DAY${days === 1 ? "" : "S"} AGO`
-    return "UPDATED RECENTLY"
-  } catch {
-    return "UPDATED RECENTLY"
-  }
+// Expects an ISO string WITH offset (toManilaIso) — a naive upstream timestamp
+// would be parsed in the server's timezone and produce negative diffs on UTC.
+function timeAgoLabel(isoDate: string | null): string {
+  if (!isoDate) return "UPDATED RECENTLY"
+  const diff = Date.now() - new Date(isoDate).getTime()
+  if (!Number.isFinite(diff)) return "UPDATED RECENTLY"
+  if (diff < 60_000) return "JUST UPDATED" // includes clock skew (negative diffs)
+  const mins = Math.floor(diff / 60_000)
+  const hours = Math.floor(diff / 3_600_000)
+  const days = Math.floor(diff / 86_400_000)
+  if (mins < 60) return `UPDATED ${mins} MIN AGO`
+  if (hours < 24) return `UPDATED ${hours} HOUR${hours === 1 ? "" : "S"} AGO`
+  if (days < 30) return `UPDATED ${days} DAY${days === 1 ? "" : "S"} AGO`
+  return "UPDATED RECENTLY"
 }
 
 function fmt(dateStr: string) {
@@ -184,9 +184,9 @@ export default async function NewsDetailPage({ params }: PageProps) {
   }
 
   const articleUrl = `${siteUrl}/news/${article.slug}`
-  const timeLabel = timeAgoLabel(article.date)
   const publishedIso = toManilaIso(article.publishedAt || article.date)
   const modifiedIso = toManilaIso(article.updatedAt) ?? publishedIso
+  const timeLabel = timeAgoLabel(modifiedIso ?? publishedIso)
 
   const articleSchema = {
     "@context": "https://schema.org",
@@ -250,11 +250,11 @@ export default async function NewsDetailPage({ params }: PageProps) {
     <div className="min-h-screen bg-white font-sans">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(articleSchema) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(breadcrumbSchema) }}
       />
       <NewsViewTracker slug={article.slug} />
 

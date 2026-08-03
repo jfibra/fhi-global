@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { fetchCategoriesCountries, newsConfigured } from "@/lib/news-service"
+import { allowRequest, clientIp } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 
@@ -22,6 +23,11 @@ export async function POST(req: NextRequest) {
   }
   if (!newsConfigured()) {
     return NextResponse.json({ error: "Newsletter is not available right now." }, { status: 503 })
+  }
+  // Strict per-IP cap — this endpoint creates upstream subscribers and sends
+  // welcome emails, so it must not be usable for subscription bombing.
+  if (!allowRequest(`news-subscribe:${clientIp(req.headers)}`, 5, 10 * 60_000)) {
+    return NextResponse.json({ error: "Too many attempts — try again later." }, { status: 429 })
   }
 
   const pairs = await fetchCategoriesCountries()

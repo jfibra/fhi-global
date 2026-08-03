@@ -71,8 +71,15 @@ export async function countSection(section: SupabaseSection): Promise<number | n
   }
 }
 
-/** One shard page of rows (1-based), ordered stably for consistent pagination. */
-export async function fetchSectionPage(section: SupabaseSection, page: number): Promise<SectionRow[]> {
+/**
+ * One shard page of rows (1-based), ordered stably for consistent pagination.
+ * null = query FAILED (shard routes answer 503, not 404 — a transient error on
+ * an advertised shard must not read as "page doesn't exist" to crawlers).
+ */
+export async function fetchSectionPage(
+  section: SupabaseSection,
+  page: number,
+): Promise<SectionRow[] | null> {
   try {
     const supabase = createPublicSupabaseClient()
     let query = supabase.from(SECTION_TABLE[section]).select(SECTION_SELECT[section])
@@ -83,10 +90,10 @@ export async function fetchSectionPage(section: SupabaseSection, page: number): 
     const { data, error } = await query
       .order("id", { ascending: true })
       .range(from, from + SUPABASE_PER_PAGE - 1)
-    if (error || !data) return []
+    if (error || !data) return null
     return data as unknown as SectionRow[]
   } catch {
-    return []
+    return null
   }
 }
 
@@ -105,8 +112,14 @@ export async function countNewsShards(): Promise<number | null> {
 
 export type NewsShardRow = { slug: string; lastmod?: string }
 
-/** Aggregate up to 10 upstream pages (100 each) into one 1000-URL shard. */
-export async function fetchNewsShard(page: number): Promise<NewsShardRow[]> {
+/**
+ * Aggregate up to 10 upstream pages (100 each) into one 1000-URL shard.
+ * null = an upstream call FAILED (detected via the lastPage-0 sentinel from
+ * fetchArticlesList — a real Laravel page always reports last_page ≥ 1).
+ * Returning null instead of partial rows prevents a mid-aggregation failure
+ * from caching a silently truncated shard as healthy for an hour.
+ */
+export async function fetchNewsShard(page: number): Promise<NewsShardRow[] | null> {
   if (!newsConfigured() || page < 1) return []
 
   const apiPagesPerShard = NEWS_SHARD_SIZE / NEWS_API_PER_PAGE
@@ -118,6 +131,7 @@ export async function fetchNewsShard(page: number): Promise<NewsShardRow[]> {
   for (let i = 0; i < apiPagesPerShard; i++) {
     const apiPage = firstApiPage + i
     const { articles, lastPage } = await fetchArticlesList({ page: apiPage, perPage: NEWS_API_PER_PAGE })
+    if (lastPage === 0) return null // upstream failure, not end-of-data
     for (const a of articles) {
       if (!a.slug || seen.has(a.slug)) continue
       seen.add(a.slug)
