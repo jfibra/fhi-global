@@ -9,6 +9,7 @@ import {
 } from "@/lib/news-service"
 import { DEFAULT_PREVIEW_IMAGE_URL, jsonLdScript, truncateTitle } from "@/lib/seo"
 import { ContentBlocks } from "@/components/news/content-blocks"
+import { CopyLinkButton } from "@/components/news/copy-link-button"
 import { NewsViewTracker } from "@/components/news/news-view-tracker"
 import { Clock, Play } from "lucide-react"
 
@@ -150,6 +151,7 @@ function ShareStrip({ url, title, compact }: { url: string; title: string; compa
       >
         <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" /><rect x="2" y="9" width="4" height="12" /><circle cx="4" cy="4" r="2" /></svg>
       </a>
+      <CopyLinkButton url={url} />
     </div>
   )
 }
