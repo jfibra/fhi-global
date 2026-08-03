@@ -25,6 +25,12 @@ import { compressImageForUpload } from "@/lib/upload/compress-image"
 const MAX_BYTES = 10 * 1024 * 1024
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"]
 
+const PHOTO_TIPS = [
+  "A clear, recent headshot — just you",
+  "Face the camera, in good lighting",
+  "A plain background works best",
+]
+
 export function ProfilePhotoGate({
   userId,
   displayName,
@@ -150,58 +156,88 @@ export function ProfilePhotoGate({
       aria-modal="true"
       aria-labelledby="photo-gate-title"
       ref={dialogRef}
-      className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-[#001f3f]/70 backdrop-blur-sm"
+      className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-[#001f3f]/75 backdrop-blur-sm"
     >
-      <div className="w-full max-w-md bg-white rounded-[28px] shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
-        <div className="h-[3px] bg-[#d6b357] shrink-0" />
-
-        <div className="px-7 pt-6 pb-5 text-center shrink-0">
-          <h2 id="photo-gate-title" className="font-['Outfit'] text-xl font-bold text-[#0d1117]">
-            {firstName ? `Welcome, ${firstName}!` : "Welcome!"}
+      <div className="w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden max-h-[94vh] flex flex-col">
+        {/* Masthead — solid navy with the gold hairline, like the report headers */}
+        <div className="relative shrink-0 bg-[#001f3f] px-8 sm:px-10 pt-7 pb-6">
+          <div className="absolute inset-x-0 top-0 h-[3px] bg-[#d6b357]" />
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
+            FHI Global · Profile Setup
+          </p>
+          <h2 id="photo-gate-title" className="font-['Outfit'] text-2xl font-bold text-white mt-1.5">
+            {firstName ? `Welcome, ${firstName}` : "Welcome"}
           </h2>
-          <p className="text-sm text-[#6b7280] mt-1.5 leading-relaxed">
-            Let&rsquo;s add your photo to finish setting up your account. A clear, professional
-            headshot helps your team and your clients recognize you.
+          <p className="text-sm text-[#b9c5d6] mt-1.5 leading-relaxed max-w-lg">
+            One last step — add a professional photo so your team and your clients
+            recognize you across FHI Global.
           </p>
         </div>
 
         {!imageSrc ? (
-          <div className="px-7 pb-7 flex flex-col items-center gap-5">
-            <div className="w-28 h-28 rounded-full bg-[#001f3f] flex items-center justify-center text-4xl font-bold text-white shadow-lg">
-              {initial}
+          <div className="flex-1 overflow-y-auto">
+            <div className="px-8 sm:px-10 py-8 flex flex-col sm:flex-row items-center gap-8 sm:gap-10">
+              {/* Avatar placeholder with a gold camera badge */}
+              <div className="relative shrink-0">
+                <div className="w-36 h-36 rounded-full bg-[#f4f6f9] ring-1 ring-[#e3e8ee] flex items-center justify-center text-5xl font-bold text-[#001f3f]">
+                  {initial}
+                </div>
+                <div className="absolute bottom-1 right-1 w-11 h-11 rounded-full bg-[#d6b357] border-4 border-white flex items-center justify-center shadow-sm">
+                  <Camera className="w-4.5 h-4.5 text-[#001f3f]" />
+                </div>
+              </div>
+
+              <div className="flex-1 min-w-0 w-full">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">
+                  What makes a great photo
+                </p>
+                <ul className="mt-3.5 space-y-3">
+                  {PHOTO_TIPS.map((tip) => (
+                    <li key={tip} className="flex items-start gap-3 text-[15px] text-[#374151]">
+                      <span className="mt-0.5 w-5 h-5 rounded-full bg-[#d6b357]/15 flex items-center justify-center shrink-0">
+                        <Check className="w-3 h-3 text-[#a07c1f]" strokeWidth={3} />
+                      </span>
+                      {tip}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-full bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
-            >
-              <Camera className="w-4 h-4" />
-              Choose a photo
-            </button>
+            <div className="px-8 sm:px-10 pb-7">
+              {error && (
+                <p role="alert" className="mb-4 text-center text-sm text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-4 py-3">
+                  {error}
+                </p>
+              )}
 
-            <p className="text-[11px] text-[#9ca3af] text-center">
-              JPG, PNG, or WEBP · up to 10 MB. You can change it any time from your profile.
-            </p>
-
-            {error && (
-              <p role="alert" className="w-full text-center text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-2xl px-4 py-2.5">
-                {error}
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                className="w-full inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-lg bg-[#d6b357] text-[#001f3f] text-[15px] font-bold hover:bg-[#c8a544] transition-colors"
+              >
+                <Camera className="w-5 h-5" />
+                Choose your photo
+              </button>
+              <p className="text-xs text-[#9ca3af] mt-3 text-center">
+                JPG, PNG, or WEBP · up to 10 MB · you can change it any time from your profile
               </p>
-            )}
 
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#9ca3af] hover:text-[#6b7280] transition-colors"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              Sign out instead
-            </button>
+              <div className="mt-6 pt-5 border-t border-[#f0f2f5] flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => void signOut()}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#9ca3af] hover:text-[#6b7280] transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Sign out instead
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <>
-            <div className="relative w-full bg-[#0d1117] shrink-0" style={{ height: 300 }}>
+            <div className="relative w-full bg-[#0d1117] shrink-0" style={{ height: 360 }}>
               <Cropper
                 image={imageSrc}
                 crop={crop}
@@ -222,13 +258,13 @@ export function ProfilePhotoGate({
               />
             </div>
 
-            <div className="px-7 py-4 border-t border-[#f0f2f5] shrink-0">
+            <div className="px-8 sm:px-10 py-4 border-t border-[#f0f2f5] shrink-0">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   aria-label="Zoom out"
                   onClick={() => setZoom((z) => Math.max(1, +(z - 0.1).toFixed(2)))}
-                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-[#f4f6f9] hover:bg-[#e8eaed] text-[#6b7280] transition-all"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#f4f6f9] hover:bg-[#e8eaed] text-[#6b7280] transition-all"
                 >
                   <ZoomOut className="w-4 h-4" />
                 </button>
@@ -246,7 +282,7 @@ export function ProfilePhotoGate({
                   type="button"
                   aria-label="Zoom in"
                   onClick={() => setZoom((z) => Math.min(3, +(z + 0.1).toFixed(2)))}
-                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-[#f4f6f9] hover:bg-[#e8eaed] text-[#6b7280] transition-all"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#f4f6f9] hover:bg-[#e8eaed] text-[#6b7280] transition-all"
                 >
                   <ZoomIn className="w-4 h-4" />
                 </button>
@@ -257,19 +293,19 @@ export function ProfilePhotoGate({
             </div>
 
             {error && (
-              <p role="alert" className="mx-7 mb-3 text-center text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-2xl px-4 py-2.5 shrink-0">
+              <p role="alert" className="mx-8 sm:mx-10 mb-3 text-center text-sm text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-4 py-3 shrink-0">
                 {error}
               </p>
             )}
 
-            <div className="flex gap-3 px-7 pb-6 shrink-0">
-              {/* "Pick a different photo", not "Cancel" — there is nothing to
-                  cancel out to, and a dead Cancel button reads as a bug. */}
+            <div className="flex gap-3 px-8 sm:px-10 pb-7 pt-1 shrink-0">
+              {/* "Choose another", not "Cancel" — there is nothing to cancel out
+                  to, and a dead Cancel button reads as a bug. */}
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => { setImageSrc(null); setError(null) }}
-                className="flex-1 px-5 py-3 rounded-full font-semibold text-sm border border-[#e5e5e5] text-[#4b5563] hover:bg-[#f7f8fa] transition-all disabled:opacity-50"
+                className="flex-1 px-5 py-3.5 rounded-lg font-semibold text-sm border border-[#d8dee6] text-[#4b5563] hover:bg-[#f7f8fa] transition-all disabled:opacity-50"
               >
                 Choose another
               </button>
@@ -277,7 +313,7 @@ export function ProfilePhotoGate({
                 type="button"
                 disabled={busy}
                 onClick={() => void handleSave()}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full font-bold text-sm bg-[#d6b357] text-[#001f3f] hover:bg-[#c8a544] transition-colors disabled:opacity-60"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-lg font-bold text-sm bg-[#d6b357] text-[#001f3f] hover:bg-[#c8a544] transition-colors disabled:opacity-60"
               >
                 {busy
                   ? <span className="w-4 h-4 rounded-full border-2 border-[#001f3f]/30 border-t-[#001f3f] animate-spin" />
