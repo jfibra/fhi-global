@@ -118,7 +118,7 @@ function SidebarNav({
   const pathname = usePathname()
 
   // px-5 matches the account header above, so the active row's highlight lines
-  // up with the account card and the Encode Sale button instead of bleeding 8px
+  // up with the account card and the Record Your Sale button instead of bleeding 8px
   // wider on each side.
   return (
     <nav className="flex-1 overflow-y-auto px-5 py-3 scrollbar-none space-y-0.5">
@@ -150,7 +150,7 @@ function SidebarNav({
   )
 }
 
-// ─── User identity card + account dropdown + Encode Sale ─────────────────────
+// ─── User identity card + account dropdown + Record Your Sale ────────────────
 // Owns `profileMenuOpen` so toggling the dropdown re-renders this card only.
 function SidebarAccount({
   displayName,
@@ -250,7 +250,8 @@ function SidebarAccount({
         </div>
       </div>
 
-      {/* Encode Sale — the seller's most important action, always one tap away */}
+      {/* Record Your Sale — the seller's most important action, always one tap
+          away. The route stays /sales/encode; only the wording changed. */}
       {showEncodeSale && (
         <Link
           href={`${dashboardBase}/sales/encode`}
@@ -258,7 +259,7 @@ function SidebarAccount({
           className="mt-4 w-full inline-flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-xl bg-[#d6b357] text-[#001428] font-['Outfit'] font-bold text-[17px] hover:bg-[#c9a449] hover:-translate-y-0.5 transition-all duration-200 shadow-md"
         >
           <Plus className="w-5 h-5" strokeWidth={2.5} />
-          Encode Sale
+          Record Your Sale
         </Link>
       )}
     </>

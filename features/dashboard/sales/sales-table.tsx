@@ -90,7 +90,7 @@ export const SALE_TYPE_SLUGS: Record<SaleType, string> = {
 const TYPE_SLUG_RE = new RegExp(`/(${Object.values(SALE_TYPE_SLUGS).join("|")})$`)
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-// Sale-type selector cards — mirror the "Encode a Sale" 3-card page (icon + title
+// Sale-type selector cards — mirror the "Record Your Sale" 3-card page (icon + title
 // + description), reusing the same icons (Building2/Handshake/KeyRound).
 const SALE_TYPE_TABS: Array<{ type: SaleType; label: string; desc: string; icon: LucideIcon }> = [
   { type: "project",   label: "Project Sale / Off-Plan", desc: "Units sold within a developer's project.",      icon: Building2 },
@@ -1188,7 +1188,7 @@ export function SalesTable({
                         <TrendingUp className="w-9 h-9 opacity-40" />
                         <p className="text-sm font-medium text-[#6b7280]">No sales recorded for this type yet.</p>
                         <p className="text-xs">
-                          Use the <span className="font-semibold text-[#001f3f]">Encode Sale</span> button in the sidebar to record one.
+                          Use the <span className="font-semibold text-[#001f3f]">Record Your Sale</span> button in the sidebar to record one.
                         </p>
                       </div>
                     </td>

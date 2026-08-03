@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * Encode Sale — full-page stepper (deliberately not a modal). The agent first
+ * Record Your Sale — full-page stepper (deliberately not a modal). The agent first
  * picks the deal type on three cards:
  *   · Project Sale  — developer → project → unit (the classic flow)
  *   · Brokerage     — no developer/project; property type + address instead
@@ -319,7 +319,7 @@ export function EncodeSaleClient({
     return (
       <div className="w-full max-w-5xl mx-auto">
         <div className="mb-12">
-          <h1 className="font-['Outfit'] text-3xl sm:text-4xl font-bold text-[#0d1117]">Encode a Sale</h1>
+          <h1 className="font-['Outfit'] text-3xl sm:text-4xl font-bold text-[#0d1117]">Record Your Sale</h1>
           <span className="block w-16 h-1 rounded-full bg-[#d6b357] mt-4 mb-5" aria-hidden="true" />
           <p className="text-base text-[#6b7280]">
             What kind of deal are you recording? Choose one to start.
@@ -354,7 +354,7 @@ export function EncodeSaleClient({
       {/* Header + type badge */}
       <div className="flex items-center justify-between gap-3 mb-7">
         <div>
-          <h1 className="font-['Outfit'] text-2xl sm:text-3xl font-bold text-[#0d1117]">Encode a Sale</h1>
+          <h1 className="font-['Outfit'] text-2xl sm:text-3xl font-bold text-[#0d1117]">Record Your Sale</h1>
           <p className="text-sm text-[#6b7280] mt-1">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#d6b357]/15 border border-[#d6b357]/40 text-[#8a6d2a] text-xs font-bold">
               {SALE_TYPE_LABELS[saleType]}

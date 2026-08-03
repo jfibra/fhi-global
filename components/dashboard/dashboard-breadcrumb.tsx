@@ -24,13 +24,13 @@ import { ROLE_DASHBOARD_MAP, resolveAppRoleOrMember } from "@/lib/app-roles"
  * it, so the trail must not nest them underneath. Keyed by the path relative to
  * the role's dashboard base.
  *
- * `sales/encode` is the case that matters: Encode Sale writes a new sale and is
- * reached only from the sidebar's own Encode Sale button — Sales Reports (which
+ * `sales/encode` is the case that matters: Record Your Sale writes a new sale and
+ * is reached only from the sidebar's own button — Sales Reports (which
  * views existing sales) never links to it. Nesting it would read as though you
  * encode a sale from inside the reports.
  */
 const STANDALONE: Record<string, string> = {
-  "sales/encode": "Encode Sale",
+  "sales/encode": "Record Your Sale",
 }
 
 // Segments that aren't nav destinations and don't title-case cleanly.

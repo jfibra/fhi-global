@@ -80,7 +80,7 @@ type QuickAction = { label: string; desc: string; href: string; icon: LucideIcon
 const QUICK_ACTIONS: QuickAction[] = [
   { label: "Add Developer",        desc: "Invite a partner firm",     href: "/developers", icon: Users       },
   { label: "Add Project",          desc: "Publish a new launch",      href: "/projects",   icon: Building2   },
-  { label: "Encode Sale",          desc: "Log a reservation",         href: "/sales",      icon: ShoppingCart },
+  { label: "Record Your Sale",     desc: "Log a reservation",         href: "/sales",      icon: ShoppingCart },
   { label: "Create Support Ticket",desc: "Raise an incident",         href: "/support",    icon: LifeBuoy    },
   { label: "Create Purchase",      desc: "Track procurement spend",   href: "/purchases",  icon: FileText    },
 ]

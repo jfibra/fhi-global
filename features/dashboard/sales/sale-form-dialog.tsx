@@ -438,7 +438,7 @@ export function SaleFormDialog({
 
   if (!open) return null
 
-  const title = viewMode ? "View Sale" : isEdit ? "Edit Sale" : "Encode Sale"
+  const title = viewMode ? "View Sale" : isEdit ? "Edit Sale" : "Record Sale"
 
   return (
     <Portal>
@@ -1164,8 +1164,8 @@ export function SaleFormDialog({
                     : isEdit
                     ? "Save Changes"
                     : pendingFiles.length > 0
-                    ? `Encode Sale + ${pendingFiles.length} file${pendingFiles.length > 1 ? "s" : ""}`
-                    : "Encode Sale"
+                    ? `Record Sale + ${pendingFiles.length} file${pendingFiles.length > 1 ? "s" : ""}`
+                    : "Record Sale"
                   }
                 </button>
               </div>
