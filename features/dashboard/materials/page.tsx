@@ -24,11 +24,6 @@ export default async function MaterialsPage() {
             Shared marketing artwork — click any image to view it full size, or download the original.
           </p>
         </div>
-        {materials.length > 0 && (
-          <span className="ml-auto shrink-0 rounded-full bg-[#f3f4f6] px-3 py-1.5 text-xs font-bold text-[#6b7280]">
-            {materials.length} {materials.length === 1 ? "image" : "images"}
-          </span>
-        )}
       </div>
 
       <MaterialsGallery materials={materials} />
