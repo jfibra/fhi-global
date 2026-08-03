@@ -248,11 +248,8 @@ export async function POST(req: NextRequest) {
     ? (typeof developer_id === "string" && developer_id.trim() ? developer_id.trim() : null)
     : null
 
-  if (normalizedRole === "developer" && !linkedDeveloperId) {
-    await admin.auth.admin.deleteUser(newUserId)
-    return NextResponse.json({ error: "Developer link is required for developer role." }, { status: 400 })
-  }
-
+  // The link is optional — a developer account can be created first and the
+  // company attached later. Only a provided id gets validated below.
   if (linkedDeveloperId) {
     const { data: linkedDeveloper, error: developerError } = await admin
       .from("developers")

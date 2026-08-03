@@ -127,10 +127,6 @@ export function UserForm({
       onBanner("error", "Email, password, first name, and last name are required.")
       return
     }
-    if (create.role === "developer" && !create.developer_id) {
-      onBanner("error", "Please link a developer company for developer role.")
-      return
-    }
     setBusy(true)
     const res = await fetch("/api/admin/users", {
       method: "POST",
@@ -149,10 +145,6 @@ export function UserForm({
   // ── Edit handler ─────────────────────────────────────────────────────────────
   const handleEdit = async () => {
     if (!editUser) return
-    if (edit.role === "developer" && !edit.developer_id) {
-      onBanner("error", "Please link a developer company for developer role.")
-      return
-    }
     setBusy(true)
     const res = await fetch(`/api/admin/users/${editUser.id}`, {
       method: "PATCH",
@@ -392,7 +384,7 @@ export function UserForm({
 
             {(isEdit ? (edit.role ?? "member") : create.role) === "developer" && (
               <div className="mt-3">
-                <label className={LABEL}>Linked Developer Company *</label>
+                <label className={LABEL}>Linked Developer Company <span className="font-normal text-[#9ca3af]">(optional — can be linked later)</span></label>
                 <select
                   className={SELECT}
                   value={isEdit ? (edit.developer_id ?? "") : (create.developer_id ?? "")}
