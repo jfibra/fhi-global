@@ -1,11 +1,33 @@
+import "server-only"
+
 /**
- * news-service.ts — server-only module
- * Calls the HomesPH News external API using server-side env vars.
- * The API key is never sent to the browser.
+ * news-service.ts — server-only client for the HomesPH News external API
+ * (api.homes.ph `/api/external/*`, site-key surface — see guides/NewsIntegration.md).
+ *
+ * Env (feature-gated: everything silently no-ops when unset):
+ *   HOMESPH_NEWS_API_URL — the BARE api base, e.g. https://api.homes.ph/api
+ *   HOMESPH_NEWS_API_KEY — the 64-char site key. Never sent to the browser.
+ *
+ * Upstream quirks this module absorbs:
+ *   · list envelope is two-level: { site, data: { data: [...], last_page, ... } }
+ *   · detail envelope is { article: {...} } — the ONLY response with content_blocks
+ *   · per_page is hard-capped at 100 (silently clamped upstream)
+ *   · `keywords` is a comma-joined STRING, not an array
+ *   · dates are naive "Y-m-d H:i:s" in the upstream server's locale (Asia/Manila)
  */
 
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+export type NewsContentBlock = {
+  id?: string | number
+  type: string
+  content?: unknown
+  settings?: Record<string, unknown>
+}
+
 export type NewsArticle = {
-  id: number
+  /** Upstream UUID, kept verbatim (used for dedup + React keys). */
+  id: string
   slug: string
   title: string
   excerpt: string
@@ -21,10 +43,66 @@ export type NewsArticle = {
   readTime?: string
   hasVideo?: boolean
   author?: string
+  /** Legacy plain-HTML body (older articles only — modern body is contentBlocks). */
   content?: string
+  contentBlocks: NewsContentBlock[]
+  category?: string
+  categorySlug?: string
+  country?: string
+  location?: string
+  topics: string[]
+  keywords: string[]
+  viewsCount?: number
+}
+
+export type ArticleListParams = {
+  page?: number
+  perPage?: number
+  categorySlug?: string
+  countrySlug?: string
+  search?: string
+}
+
+export type ArticleListResult = {
+  articles: NewsArticle[]
+  currentPage: number
+  lastPage: number
+  total: number
+}
+
+export type NewsCategoryCountry = {
+  category: string
+  categorySlug: string
+  country: string
+  countryId: string
+  articleCount: number
+}
+
+const EMPTY_LIST: ArticleListResult = { articles: [], currentPage: 1, lastPage: 0, total: 0 }
+
+/** Upstream hard cap — values above this are silently clamped by the API. */
+const PER_PAGE_CAP = 100
+
+// ── Config ─────────────────────────────────────────────────────────────────────
+
+function newsBase(): string {
+  const raw = (process.env.HOMESPH_NEWS_API_URL ?? "").trim().replace(/\/+$/, "")
+  // Defensive: older deployments stored the FULL articles endpoint in this var.
+  // Strip that suffix so both conventions resolve to the bare api base.
+  return raw.replace(/\/external\/articles$/, "")
+}
+
+function apiKey(): string {
+  return process.env.HOMESPH_NEWS_API_KEY ?? ""
+}
+
+/** True when both env vars are present — the whole feature gates on this. */
+export function newsConfigured(): boolean {
+  return Boolean(newsBase() && apiKey())
 }
 
 // ── Slugify ────────────────────────────────────────────────────────────────────
+
 export function slugify(text: string): string {
   return (text ?? "")
     .toString()
@@ -36,24 +114,79 @@ export function slugify(text: string): string {
     .replace(/^-+|-+$/g, "") || "news"
 }
 
-// ── Normalize a single raw API object ─────────────────────────────────────────
-function normalize(raw: Record<string, any>, idx: number): NewsArticle {
-  const image = raw?.featured_image ?? raw?.image ?? raw?.image_url ?? raw?.cover ?? "/img/1.png"
-  const publishedAt = raw?.published_at ?? raw?.publish_at ?? raw?.created_at ?? ""
-  const updatedAt = raw?.updated_at ?? publishedAt
-  const tags = Array.isArray(raw?.tags)
-    ? raw.tags.map((t: unknown) => String(t)).filter(Boolean)
-    : typeof raw?.tags === "string"
-      ? raw.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
+// ── Dates ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Upstream timestamps are naive "Y-m-d H:i:s" wall-clock in the API server's
+ * locale (Philippines). Pin them to +08:00 so schema.org dates and the Google
+ * News sitemap carry a real offset instead of being reinterpreted as UTC.
+ */
+export function toManilaIso(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/.exec(raw.trim())
+  if (!m) return null
+  return `${m[1]}T${m[2]}+08:00`
+}
+
+// ── Fetch ──────────────────────────────────────────────────────────────────────
+
+type ApiFetchOptions = {
+  revalidate?: number
+  noStore?: boolean
+  method?: "GET" | "POST"
+  body?: unknown
+  signal?: AbortSignal
+}
+
+async function apiFetch(path: string, opts: ApiFetchOptions = {}): Promise<unknown> {
+  if (!newsConfigured()) return null
+  try {
+    const res = await fetch(`${newsBase()}${path}`, {
+      method: opts.method ?? "GET",
+      headers: {
+        "X-Site-Api-Key": apiKey(),
+        Accept: "application/json",
+        ...(opts.body !== undefined ? { "Content-Type": "application/json" } : {}),
+      },
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      ...(opts.noStore || opts.method === "POST"
+        ? { cache: "no-store" as const }
+        : { next: { revalidate: opts.revalidate ?? 300 } }),
+      signal: opts.signal,
+    })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+// ── Normalize ──────────────────────────────────────────────────────────────────
+
+function str(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined
+}
+
+function normalize(raw: Record<string, unknown>): NewsArticle {
+  const image = str(raw.image) ?? "/img/1.png"
+  const publishedAt = str(raw.published_at) ?? str(raw.created_at) ?? str(raw.date) ?? ""
+  const updatedAt = str(raw.updated_at) ?? publishedAt
+
+  const topics: string[] = Array.isArray(raw.topics)
+    ? raw.topics.map((t) => String(t)).filter(Boolean)
+    : []
+  const keywords: string[] = typeof raw.keywords === "string"
+    ? raw.keywords.split(",").map((k) => k.trim()).filter(Boolean)
+    : Array.isArray(raw.keywords)
+      ? raw.keywords.map((k) => String(k)).filter(Boolean)
       : []
 
-  const title = raw?.title ?? raw?.headline ?? raw?.subject ?? "Untitled"
-  const content = raw?.content ?? raw?.body ?? raw?.content_html ?? raw?.body_html ?? raw?.description_html ?? raw?.text ?? raw?.description ?? ""
-  const excerpt = raw?.excerpt ?? raw?.summary ?? (content.length > 160 ? content.replace(/<[^>]*>/g, "").substring(0, 157) + "..." : content.replace(/<[^>]*>/g, ""))
+  const title = str(raw.title) ?? "Untitled"
+  const excerpt = str(raw.summary) ?? str(raw.description) ?? ""
 
   return {
-    id: typeof raw?.id === "number" ? raw.id : idx + 1,
-    slug: raw?.slug || slugify(title),
+    id: String(raw.id ?? raw.slug ?? slugify(title)),
+    slug: str(raw.slug) ?? slugify(title),
     title,
     excerpt,
     date: publishedAt,
@@ -61,148 +194,108 @@ function normalize(raw: Record<string, any>, idx: number): NewsArticle {
     featuredImage: image,
     publishedAt,
     updatedAt,
-    isPublished: typeof raw?.is_published === "boolean" ? raw.is_published : true,
-    tags,
-    language: raw?.language ?? "en",
-    badge: raw?.badge ?? undefined,
-    readTime: raw?.read_time ?? raw?.readTime ?? undefined,
-    hasVideo: !!(raw?.has_video ?? raw?.hasVideo),
-    author: raw?.author ?? raw?.author_name ?? undefined,
-    content,
-  }
-}
-
-// ── Unwrap flexible API response shapes ───────────────────────────────────────
-// List responses: { data: { data: [...] } }  → result.data.data
-// Single article: { data: { id, title, … } } → result.data  (object, not array)
-// Fallback array or bare object also handled.
-function extractArray(result: unknown): Record<string, any>[] {
-  if (!result || typeof result !== "object" || result === null) return []
-  const d = result as Record<string, any>
-
-  // 1. Paginated list: { data: { data: [...] } }
-  if (Array.isArray(d?.data?.data)) return d.data.data
-
-  // 2. Flat list in data: { data: [...] }
-  if (Array.isArray(d?.data)) return d.data
-
-  // 3. Single article in common wrappers
-  // Try to find the most likely article object
-  const candidates = [
-    d?.article,
-    d?.post,
-    d?.data?.article,
-    d?.data?.post,
-    d?.data
-  ]
-
-  for (const c of candidates) {
-    if (c && typeof c === "object" && !Array.isArray(c)) {
-      if (c.title || c.slug || c.id || c.content || c.body) {
-        return [c as Record<string, any>]
-      }
-    }
-  }
-
-  // 4. Bare array at root
-  if (Array.isArray(d)) return d
-
-  // 5. Bare single object at root
-  if (d.title || d.slug || d.id || d.content || d.body) {
-    return [d]
-  }
-
-  return []
-}
-
-// ── Base URL helper (strips trailing slash) ───────────────────────────────────
-function baseUrl(): string {
-  return (process.env.HOMESPH_NEWS_API_URL ?? "").replace(/\/$/, "")
-}
-
-function apiKey(): string {
-  return process.env.HOMESPH_NEWS_API_KEY ?? ""
-}
-
-// ── Low-level fetch wrapper ────────────────────────────────────────────────────
-async function apiFetch(url: string, init?: { signal?: AbortSignal }): Promise<unknown> {
-  const key = apiKey()
-  if (!url || !key) return null
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "X-Site-Api-Key": key,
-        Accept: "application/json",
-      },
-      next: { revalidate: 300 },
-      signal: init?.signal,
-    })
-    if (!res.ok) return null
-    return res.json()
-  } catch {
-    return null
+    isPublished: raw.status ? raw.status === "published" : true,
+    tags: topics.length ? topics : keywords,
+    language: "en",
+    badge: str(raw.category),
+    author: str(raw.author),
+    content: typeof raw.content === "string" ? raw.content : "",
+    contentBlocks: Array.isArray(raw.content_blocks) ? (raw.content_blocks as NewsContentBlock[]) : [],
+    category: str(raw.category),
+    categorySlug: str(raw.category_slug),
+    country: str(raw.country),
+    location: str(raw.location),
+    topics,
+    keywords,
+    viewsCount: Number.isFinite(Number(raw.views_count)) ? Number(raw.views_count) : undefined,
   }
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────────
 
-/** Fetch a paginated list of articles. */
+/** Paginated article list with filters. Failure/unconfigured → empty result. */
+export async function fetchArticlesList(
+  params: ArticleListParams = {},
+  init?: { signal?: AbortSignal; revalidate?: number },
+): Promise<ArticleListResult> {
+  const qs = new URLSearchParams()
+  qs.set("page", String(Math.max(1, params.page ?? 1)))
+  qs.set("per_page", String(Math.min(PER_PAGE_CAP, Math.max(1, params.perPage ?? 20))))
+  if (params.categorySlug) qs.set("category_slug", params.categorySlug)
+  if (params.countrySlug) qs.set("country_slug", params.countrySlug)
+  if (params.search) qs.set("search", params.search)
+
+  const result = (await apiFetch(`/external/articles?${qs.toString()}`, {
+    revalidate: init?.revalidate,
+    signal: init?.signal,
+  })) as {
+    data?: { data?: unknown; current_page?: unknown; last_page?: unknown; total?: unknown }
+  } | null
+
+  const data = result?.data
+  if (!data || !Array.isArray(data.data)) return EMPTY_LIST
+
+  return {
+    articles: data.data.map((row) => normalize(row as Record<string, unknown>)),
+    currentPage: Number(data.current_page) || 1,
+    lastPage: Number(data.last_page) || 1,
+    total: Number(data.total) || data.data.length,
+  }
+}
+
+/** Back-compat wrapper (existing callers: buy-sidebar). */
 export async function fetchArticles(
   page = 1,
-  init?: { signal?: AbortSignal }
+  init?: { signal?: AbortSignal },
 ): Promise<NewsArticle[]> {
-  const base = baseUrl()
-  if (!base) return []
-  const result = await apiFetch(`${base}?page=${page}`, init)
-  return extractArray(result).map(normalize)
+  return (await fetchArticlesList({ page }, init)).articles
+}
+
+/** Article detail — the only call that returns populated contentBlocks. */
+export async function fetchArticleBySlug(slug: string): Promise<NewsArticle | null> {
+  if (!slug) return null
+  const result = (await apiFetch(`/external/articles/${encodeURIComponent(slug)}`)) as
+    | { article?: unknown }
+    | null
+  const article = result?.article
+  if (!article || typeof article !== "object") return null
+  return normalize(article as Record<string, unknown>)
+}
+
+/** Category × country pairs (with counts) for content distributed to this site. */
+export async function fetchCategoriesCountries(): Promise<NewsCategoryCountry[]> {
+  const result = (await apiFetch(`/external/categories/countries`, { revalidate: 3600 })) as
+    | { data?: unknown }
+    | null
+  const rows = result?.data
+  if (!Array.isArray(rows)) return []
+  return rows
+    .map((row) => {
+      const r = row as Record<string, unknown>
+      return {
+        category: String(r.category ?? ""),
+        categorySlug: String(r.category_slug ?? ""),
+        country: String(r.country ?? ""),
+        countryId: String(r.country_id ?? ""),
+        articleCount: Number(r.article_count) || 0,
+      }
+    })
+    .filter((r) => r.category && r.categorySlug)
 }
 
 /**
- * Fetch a single article by slug.
- *
- * Strategy (in order):
- *   1. Path segment:  BASE/{slug}          — standard REST detail endpoint
- *   2. Query param:   BASE?slug={slug}      — alternate API convention
- *   3. List scan:     fetch pages 1–3 and match by slug or slugified title
- *      (guaranteed to work even if the API has no dedicated detail route)
+ * Forward a visitor's read to the upstream view counter. `visitor_id` must be
+ * the visitor's own stable id (not the server's), or the 12h dedup collapses
+ * every reader into one.
  */
-export async function fetchArticleBySlug(slug: string): Promise<NewsArticle | null> {
-  const base = baseUrl()
-  if (!base || !slug) return null
-
-  // ── Strategy 1: path segment ───────────────────────────────────────────────
-  const byPath = await apiFetch(`${base}/${slug}`)
-  if (byPath) {
-    const arr = extractArray(byPath)
-    if (arr.length > 0) {
-      const article = normalize(arr[0], 0)
-      // Extra guard: make sure the returned item is actually the requested article
-      // (some APIs return list results even on path endpoints)
-      if (Array.isArray((byPath as any)?.data?.data)) {
-        // Got a list back — fall through to scan
-      } else {
-        return article
-      }
-    }
-  }
-
-  // ── Strategy 2: query param ────────────────────────────────────────────────
-  const byQuery = await apiFetch(`${base}?slug=${encodeURIComponent(slug)}`)
-  if (byQuery) {
-    const arr = extractArray(byQuery)
-    // Accept only if it didn't come back as a full list (which would just be page 1)
-    if (arr.length > 0 && !Array.isArray((byQuery as any)?.data?.data)) {
-      return normalize(arr[0], 0)
-    }
-  }
-
-  // ── Strategy 3: scan list pages 1–3 and match by slug ─────────────────────
-  for (let page = 1; page <= 3; page++) {
-    const articles = await fetchArticles(page)
-    if (articles.length === 0) break
-    const match = articles.find((a) => a.slug === slug)
-    if (match) return match
-  }
-
-  return null
+export async function trackArticleView(
+  slug: string,
+  payload: { placement?: string; referrer?: string; visitor_id?: string } = {},
+): Promise<boolean> {
+  if (!slug) return false
+  const result = await apiFetch(`/external/articles/${encodeURIComponent(slug)}/view`, {
+    method: "POST",
+    body: payload,
+  })
+  return result !== null
 }

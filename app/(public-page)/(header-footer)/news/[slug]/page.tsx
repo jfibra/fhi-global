@@ -2,10 +2,32 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { fetchArticleBySlug, fetchArticles, type NewsArticle } from "@/lib/news-service"
+import {
+  fetchArticleBySlug,
+  fetchArticlesList,
+  toManilaIso,
+} from "@/lib/news-service"
+import { truncateTitle } from "@/lib/seo"
+import { ContentBlocks } from "@/components/news/content-blocks"
+import { NewsViewTracker } from "@/components/news/news-view-tracker"
 import { Clock, Play } from "lucide-react"
 
 export const revalidate = 300
+
+/**
+ * Prerender only the newest articles, and only in production — everything
+ * else is on-demand ISR (cached on first hit, refreshed every 5 minutes).
+ * Locally VERCEL_ENV is unset, so dev/CI builds never depend on the API.
+ */
+export async function generateStaticParams(): Promise<{ slug: string }[]> {
+  if (process.env.VERCEL_ENV !== "production") return []
+  try {
+    const { articles } = await fetchArticlesList({ page: 1, perPage: 12 })
+    return articles.filter((a) => a.slug).map((a) => ({ slug: a.slug }))
+  } catch {
+    return []
+  }
+}
 
 // ── Metadata ───────────────────────────────────────────────────────────────────
 type PageProps = { params: Promise<{ slug: string }> }
@@ -29,16 +51,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       ? article.img
       : undefined
   const keywords = [
-    ...(article.tags ?? []),
+    ...article.keywords,
+    ...article.topics,
+    article.category,
     article.author,
     "Dubai real estate news",
     "FHI Global news",
   ].filter(Boolean) as string[]
-  const publishedTime = article.publishedAt || article.date || undefined
-  const modifiedTime = article.updatedAt || publishedTime
+  const publishedTime = toManilaIso(article.publishedAt || article.date) ?? undefined
+  const modifiedTime = toManilaIso(article.updatedAt) ?? publishedTime
 
   return {
-    title: `${article.title} | FHI Global News`,
+    title: `${truncateTitle(article.title)} | FHI Global News`,
     description,
     metadataBase: new URL(siteUrl),
     keywords,
@@ -130,38 +154,18 @@ function ShareStrip({ url, title, compact }: { url: string; title: string; compa
   )
 }
 
-// ── Article content renderer ───────────────────────────────────────────────────
-function ArticleContent({ content }: { content: string }) {
-  if (!content) {
-    return <p className="text-gray-400 italic text-sm">No content available.</p>
-  }
-  
-  // More robust HTML detection: check if it starts with < OR contains multiple common tags
-  const isHtml = content.trimStart().startsWith("<") || 
-                (/<[a-z][\s\S]*>/i.test(content) && (content.includes("<p") || content.includes("<br") || content.includes("<div")));
-
-  if (isHtml) {
-    return (
-      <div
-        className="prose prose-sm sm:prose max-w-none prose-headings:text-[#001428] prose-headings:font-black prose-a:text-[#d6b357] prose-a:no-underline hover:prose-a:underline prose-img:rounded"
-        dangerouslySetInnerHTML={{ __html: content }}
-      />
-    )
-  }
-  // Otherwise, split by blank lines into paragraphs
-  const paragraphs = content
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean)
-  return (
-    <>
-      {paragraphs.map((p, i) => (
-        <p key={i} className="text-gray-700 text-sm sm:text-base leading-relaxed mb-4">
-          {p}
-        </p>
-      ))}
-    </>
-  )
+// ── Author schema heuristic ────────────────────────────────────────────────────
+// Human bylines ("Maria Dela Cruz") → Person; desk names ("HOMESPH NEWS",
+// "FHI Global Editorial Team") → Organization. E-E-A-T signal for Google.
+function authorSchema(author: string | undefined) {
+  const name = (author ?? "").trim() || "FHI Global Editorial Team"
+  const words = name.split(/\s+/)
+  const looksHuman =
+    words.length >= 2 &&
+    words.length <= 4 &&
+    words.every((w) => /^[A-Za-zÀ-ÿ.'-]+$/.test(w)) &&
+    !/\b(news|team|desk|editorial|global|staff|inc|llc|media)\b/i.test(name)
+  return { "@type": looksHuman ? "Person" : "Organization", name }
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────────
@@ -170,9 +174,9 @@ export default async function NewsDetailPage({ params }: PageProps) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
   // Fetch in parallel
-  const [article, latestNews] = await Promise.all([
+  const [article, latestList] = await Promise.all([
     fetchArticleBySlug(slug),
-    fetchArticles(1),
+    fetchArticlesList({ page: 1, perPage: 20 }),
   ])
 
   if (!article) {
@@ -181,16 +185,17 @@ export default async function NewsDetailPage({ params }: PageProps) {
 
   const articleUrl = `${siteUrl}/news/${article.slug}`
   const timeLabel = timeAgoLabel(article.date)
+  const publishedIso = toManilaIso(article.publishedAt || article.date)
+  const modifiedIso = toManilaIso(article.updatedAt) ?? publishedIso
+
   const articleSchema = {
     "@context": "https://schema.org",
-    "@type": "Article",
+    "@type": "NewsArticle",
     headline: article.title,
     description: article.excerpt || article.title,
     image: article.featuredImage || article.img,
-    author: {
-      "@type": "Person",
-      name: article.author || "FHI Global Editorial Team",
-    },
+    inLanguage: "en",
+    author: authorSchema(article.author),
     publisher: {
       "@type": "Organization",
       name: "FHI Global",
@@ -199,22 +204,47 @@ export default async function NewsDetailPage({ params }: PageProps) {
         url: `${siteUrl}/android-chrome-512x512.png`,
       },
     },
-    datePublished: article.publishedAt || article.date || new Date().toISOString(),
-    dateModified: article.updatedAt || article.publishedAt || article.date || new Date().toISOString(),
+    ...(publishedIso ? { datePublished: publishedIso } : {}),
+    ...(modifiedIso ? { dateModified: modifiedIso } : {}),
     mainEntityOfPage: {
       "@type": "WebPage",
       "@id": articleUrl,
     },
+    ...(article.category ? { articleSection: article.category } : {}),
+    ...(article.keywords.length ? { keywords: article.keywords.join(", ") } : {}),
   }
 
-  // Related stories: latest news excluding current, shuffled, take 6
-  const related = latestNews
-    .filter((a) => a.slug !== article.slug)
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 6)
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: siteUrl },
+      { "@type": "ListItem", position: 2, name: "News", item: `${siteUrl}/news` },
+      ...(article.category && article.categorySlug
+        ? [{
+            "@type": "ListItem",
+            position: 3,
+            name: article.category,
+            item: `${siteUrl}/news?category=${encodeURIComponent(article.categorySlug)}`,
+          }]
+        : []),
+      {
+        "@type": "ListItem",
+        position: article.category && article.categorySlug ? 4 : 3,
+        name: article.title,
+        item: articleUrl,
+      },
+    ],
+  }
+
+  // Related stories — deterministic: same category first, then most recent.
+  const pool = latestList.articles.filter((a) => a.slug !== article.slug)
+  const sameCategory = pool.filter((a) => a.categorySlug && a.categorySlug === article.categorySlug)
+  const others = pool.filter((a) => !sameCategory.includes(a))
+  const related = [...sameCategory, ...others].slice(0, 7)
 
   const latestStories = related.slice(0, 4)
-  const trending = related.slice(3, 6)
+  const trending = related.slice(4, 7)
 
   return (
     <div className="min-h-screen bg-white font-sans">
@@ -222,6 +252,11 @@ export default async function NewsDetailPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
       />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
+      <NewsViewTracker slug={article.slug} />
 
       {/* ── Breadcrumb ─────────────────────────────────────────────────────── */}
       <div className="border-b border-gray-200 bg-gray-50">
@@ -295,7 +330,11 @@ export default async function NewsDetailPage({ params }: PageProps) {
 
             {/* Article content */}
             <div className="mb-8">
-              <ArticleContent content={article.content ?? ""} />
+              <ContentBlocks
+                blocks={article.contentBlocks}
+                heroSrc={article.img}
+                legacyHtml={article.content}
+              />
             </div>
 
             {/* Bottom share section */}

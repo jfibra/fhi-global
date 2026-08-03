@@ -5,6 +5,18 @@ export const DEFAULT_PREVIEW_IMAGE_URL =
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
+/**
+ * Truncate a title on a word boundary so the layout's " | Suffix" doesn't push
+ * it past Google's ~60-char display cutoff. Only appends "…" when truncated.
+ */
+export function truncateTitle(title: string, max = 43): string {
+  const t = (title ?? "").trim()
+  if (t.length <= max) return t
+  const cut = t.slice(0, max + 1)
+  const lastSpace = cut.lastIndexOf(" ")
+  return `${(lastSpace > 20 ? cut.slice(0, lastSpace) : cut.slice(0, max)).trimEnd()}…`
+}
+
 function buildCanonical(pathname: string | undefined) {
   if (!pathname) return undefined
   const path = pathname.startsWith("/") ? pathname : `/${pathname}`

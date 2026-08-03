@@ -1,50 +1,61 @@
-# News Module
+# News (HomesPH News integration)
 
-## Environment Variables
+The public News section (`/news`, `/news/[slug]`) renders articles distributed to the
+**fhiglobal** site by the HomesPH News service (`api.homes.ph`). The full upstream API
+contract is documented in [`NewsIntegration.md`](./NewsIntegration.md) — read that before
+touching the integration.
 
-Add the following to your `.env.local` (server-only — never expose to the browser):
-
-```
-HOMESPH_NEWS_API_URL=https://homesphnews-api-394504332858.asia-southeast1.run.app/api/external/articles
-HOMESPH_NEWS_API_KEY=<your-key>
-```
-
-Optional (for canonical URLs and share links):
-```
-NEXT_PUBLIC_SITE_URL=https://fhiglobal.ae
-```
-
-## Proxy Security
-
-The `HOMESPH_NEWS_API_KEY` is **never sent to the browser**. It lives only in server-side environment variables and is injected by two server-side layers:
-
-1. **`lib/news-service.ts`** — a server-only module that constructs and fires the external API request, injecting `X-Site-Api-Key` in the request headers. Imported only by server components and API route handlers.
-
-2. **`app/api/news/articles/route.ts`** and **`app/api/news/article/route.ts`** — internal Next.js API routes that act as a public-facing proxy for any client-side callers. They delegate to `news-service` and return sanitized JSON with no keys or secrets.
-
-The News pages (`/news` and `/news/[slug]`) are **Server Components** that call `news-service` directly (avoiding the extra network hop of calling the internal API routes). This is safe because those files are never bundled for the browser.
-
-## File Structure
+## Env
 
 ```
-lib/
-  news-service.ts          # Server-only: external API fetching + normalization
-
-app/
-  api/
-    news/
-      articles/route.ts    # GET /api/news/articles?page=N
-      article/route.ts     # GET /api/news/article?slug=...
-  news/
-    page.tsx               # /news — All News page (ISR, revalidate 300s)
-    [slug]/
-      page.tsx             # /news/[slug] — News Detail page (ISR, revalidate 300s)
+HOMESPH_NEWS_API_URL=https://api.homes.ph/api   # BARE api base — code appends /external/*
+HOMESPH_NEWS_API_KEY=<64-char site key>          # server-side only, never in client bundles
 ```
 
-## Fetch Interval
+Feature-gated: with either var unset, everything silently no-ops (hub shows the empty
+state, sitemap index skips news shards, view/subscribe endpoints answer without error).
 
-All fetch calls use `next: { revalidate: 300 }` (5 minutes). Pages also export `export const revalidate = 300`.
+## Architecture
 
-## Slug Redirect
+- `lib/news-service.ts` — server-only client (`import "server-only"`). List
+  (`fetchArticlesList`, per_page hard-capped at 100 upstream), detail
+  (`fetchArticleBySlug` — the only call with populated `content_blocks`), category
+  pairs (`fetchCategoriesCountries`), view forwarding (`trackArticleView`), and
+  `toManilaIso()` (upstream dates are naive Asia/Manila wall-clock → `+08:00`).
+- `lib/news-sanitize.ts` — `sanitizeNewsHtml()` (sanitize-html allowlist). The upstream
+  stores rich-text blocks as RAW UNSANITIZED HTML — every text block must pass through
+  this before `dangerouslySetInnerHTML`.
+- `components/news/content-blocks.tsx` — Server Component renderer for the
+  `content_blocks[]` body (text / image / centered-image / left|right-image /
+  split-* / grid / dynamic-images; unknown types skipped; legacy plain-`content`
+  fallback).
+- `components/news/news-view-tracker.tsx` → `POST /api/news/view` — client fires one
+  view per session per article with a stable localStorage `visitor_id`; the route
+  forwards it upstream with the key (12h dedup happens upstream).
+- `components/news/newsletter-signup.tsx` → `POST /api/news/subscribe` — forwards to
+  `/external/subscribe` with categories/countries derived from the live distributed
+  category × country pairs.
+- Pages are ISR (`revalidate = 300`); the detail page prerenders the newest 12 slugs
+  in production only (`generateStaticParams` gated on `VERCEL_ENV`).
+- SEO: NewsArticle + BreadcrumbList JSON-LD on detail, CollectionPage + ItemList on the
+  hub; titles truncated ~43 chars (`truncateTitle` in `lib/seo.ts`).
+- Hub extras: category filter chips (`/news?category=<slug>` fed by the category ×
+  country counts) and the `?title=` → slug redirect (legacy shared links).
 
-Visiting `/news?title=Some+Article+Title` will redirect to `/news/some-article-title` via the `slugify()` helper.
+## Sitemaps
+
+- `/sitemap-news-N.xml` — all distributed articles (1000-URL shards aggregated from
+  upstream pages of 100), part of the sitemap index. See `lib/sitemap-sections.ts`.
+- `/news-sitemap.xml` — Google News sitemap: ONLY articles published in the last 48
+  hours, `publication_date` normalized to `+08:00`. Fresh articles are also pinged to
+  IndexNow from this route.
+
+## Gotchas
+
+- The old env convention stored the FULL articles endpoint in `HOMESPH_NEWS_API_URL`;
+  `newsBase()` strips a legacy `/external/articles` suffix defensively, but new
+  deployments should use the bare base.
+- `keywords` from the API is a comma-joined STRING, not an array.
+- Article `id` is a UUID string — never coerce to number.
+- An empty feed is almost always a distribution problem (articles are targeted at the
+  `fhiglobal` site name upstream), not an auth problem.

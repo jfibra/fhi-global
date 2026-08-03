@@ -2,8 +2,14 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { createPageMetadata } from "@/lib/seo"
-import { fetchArticles, slugify, type NewsArticle } from "@/lib/news-service"
+import { createPageMetadata, SITE_URL } from "@/lib/seo"
+import {
+  fetchArticlesList,
+  fetchCategoriesCountries,
+  slugify,
+  type NewsArticle,
+} from "@/lib/news-service"
+import { NewsletterSignup } from "@/components/news/newsletter-signup"
 import { Clock, Play, TrendingUp, Clock3, ChevronRight } from "lucide-react"
 
 export const revalidate = 300
@@ -16,7 +22,7 @@ export const metadata: Metadata = createPageMetadata({
   keywords: ["Dubai real estate news", "UAE property updates", "FHI Global news", "property market insights"],
 })
 
-type SearchParams = Promise<{ title?: string }>
+type SearchParams = Promise<{ title?: string; category?: string }>
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function safe(arr: NewsArticle[], i: number): NewsArticle | null {
@@ -149,29 +155,36 @@ function ArchiveRow({ item, rank }: { item: NewsArticle; rank?: number }) {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default async function NewsPage({ searchParams }: { searchParams: SearchParams }) {
-  const { title } = await searchParams
+  const { title, category } = await searchParams
 
   if (title) {
     redirect(`/news/${slugify(title)}`)
   }
 
-  // Fetch up to 5 pages in parallel; deduplicate by id
-  const pages = await Promise.all([
-    fetchArticles(1),
-    fetchArticles(2),
-    fetchArticles(3),
-    fetchArticles(4),
-    fetchArticles(5),
+  // One list call (per_page is capped at 100 upstream) + the category pairs
+  // that power the filter chips. Dedup by UUID id as a cheap guard.
+  const activeCategory = typeof category === "string" && category.trim() ? category.trim() : undefined
+  const [{ articles: fetched, total }, categoryPairs] = await Promise.all([
+    fetchArticlesList({ page: 1, perPage: 100, categorySlug: activeCategory }),
+    fetchCategoriesCountries(),
   ])
-  const seen = new Set<number | string>()
+  const seen = new Set<string>()
   const all: NewsArticle[] = []
-  for (const page of pages) {
-    for (const a of page) {
-      if (!seen.has(a.id)) { seen.add(a.id); all.push(a) }
-    }
+  for (const a of fetched) {
+    if (!seen.has(a.id)) { seen.add(a.id); all.push(a) }
   }
 
-  if (all.length === 0) {
+  // Distinct categories (pairs are category × country) with summed counts.
+  const categoryChips = [...categoryPairs
+    .reduce((map, p) => {
+      const existing = map.get(p.categorySlug)
+      if (existing) existing.articleCount += p.articleCount
+      else map.set(p.categorySlug, { ...p })
+      return map
+    }, new Map<string, (typeof categoryPairs)[number]>())
+    .values()].sort((a, b) => b.articleCount - a.articleCount)
+
+  if (all.length === 0 && !activeCategory) {
     return (
       <div className="min-h-screen bg-white flex flex-col">
         <main className="flex-1 flex flex-col items-center justify-center py-24 px-4">
@@ -216,36 +229,103 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
     thumbGrid.length === 2 ? "grid-cols-2" :
                              "grid-cols-2 sm:grid-cols-3"
 
+  const shownCount = total > 0 && !activeCategory ? total : all.length
+
+  // CollectionPage + ItemList structured data for the news hub.
+  const collectionSchema = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "FHI Global News",
+    description:
+      "The latest real estate news, market trends, and investment insights from FHI Global.",
+    url: `${SITE_URL}/news`,
+    mainEntity: {
+      "@type": "ItemList",
+      itemListElement: all.slice(0, 10).map((item, i) => ({
+        "@type": "ListItem",
+        position: i + 1,
+        url: `${SITE_URL}/news/${item.slug}`,
+        name: item.title,
+      })),
+    },
+  }
+
   return (
     <div className="min-h-screen bg-[#f5f5f5] font-sans">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }}
+      />
 
       {/* ── TICKER ── */}
-      <div className="bg-[#001428]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-9 flex items-center overflow-hidden">
-          <span className="shrink-0 bg-[#d6b357] text-[#001428] text-[10px] font-black uppercase tracking-widest px-3 py-1 mr-4">
-            BREAKING
-          </span>
-          <div className="flex items-center overflow-hidden gap-0 min-w-0">
-            {all.slice(0, 6).map((item, i) => (
-              <span key={item.id} className="flex items-center shrink-0">
-                {i > 0 && <span className="w-px h-3 bg-white/20 mx-3" />}
-                <Link href={`/news/${item.slug}`}
-                  className="text-white/80 text-[11px] hover:text-[#d6b357] transition-colors truncate max-w-[200px]">
-                  {item.title}
-                </Link>
-              </span>
-            ))}
+      {all.length > 0 && (
+        <div className="bg-[#001428]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-9 flex items-center overflow-hidden">
+            <span className="shrink-0 bg-[#d6b357] text-[#001428] text-[10px] font-black uppercase tracking-widest px-3 py-1 mr-4">
+              BREAKING
+            </span>
+            <div className="flex items-center overflow-hidden gap-0 min-w-0">
+              {all.slice(0, 6).map((item, i) => (
+                <span key={item.id} className="flex items-center shrink-0">
+                  {i > 0 && <span className="w-px h-3 bg-white/20 mx-3" />}
+                  <Link href={`/news/${item.slug}`}
+                    className="text-white/80 text-[11px] hover:text-[#d6b357] transition-colors truncate max-w-[200px]">
+                    {item.title}
+                  </Link>
+                </span>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── PAGE HEADER ── */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
           <h1 className="text-xl font-black tracking-tight text-[#001428] uppercase">Latest News</h1>
-          <span className="text-[10px] text-gray-400">{all.length} article{all.length !== 1 ? "s" : ""}</span>
+          <span className="text-[10px] text-gray-400">{shownCount} article{shownCount !== 1 ? "s" : ""}</span>
         </div>
+        {/* Category filter chips */}
+        {categoryChips.length > 0 && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-3 flex items-center gap-2 overflow-x-auto scrollbar-none">
+            <Link
+              href="/news"
+              className={`shrink-0 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 border transition-colors ${
+                !activeCategory
+                  ? "bg-[#001428] text-white border-[#001428]"
+                  : "bg-white text-[#001428] border-gray-300 hover:border-[#001428]"
+              }`}
+            >
+              All
+            </Link>
+            {categoryChips.map((chip) => (
+              <Link
+                key={chip.categorySlug}
+                href={`/news?category=${encodeURIComponent(chip.categorySlug)}`}
+                className={`shrink-0 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 border transition-colors ${
+                  activeCategory === chip.categorySlug
+                    ? "bg-[#001428] text-white border-[#001428]"
+                    : "bg-white text-[#001428] border-gray-300 hover:border-[#001428]"
+                }`}
+              >
+                {chip.category}
+                <span className="ml-1.5 text-[#d6b357]">{chip.articleCount}</span>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* ── Filtered empty state ── */}
+      {all.length === 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+          <h2 className="text-lg font-bold text-gray-800 mb-2">No articles in this category yet</h2>
+          <p className="text-gray-500 text-sm">
+            Try another category or{" "}
+            <Link href="/news" className="text-[#d6b357] font-semibold hover:underline">view all news</Link>.
+          </p>
+        </div>
+      )}
 
       {/* ── HERO OVERLAY CARDS ── */}
       <div className="bg-[#001428] py-5">
@@ -378,6 +458,9 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
                   </ul>
                 </div>
               )}
+
+              {/* Newsletter signup */}
+              <NewsletterSignup />
 
               {/* About this feed */}
               <div className="bg-[#001428] p-4">

@@ -1,75 +1,49 @@
-import { NextResponse } from "next/server"
-import { fetchArticles } from "@/lib/news-service"
+import { buildNewsSitemapXml, sitemapResponse, SITE_URL, type NewsSitemapItem } from "@/lib/sitemap-helpers"
+import { fetchArticlesList, newsConfigured, toManilaIso } from "@/lib/news-service"
+import { submitToIndexNow } from "@/lib/indexnow"
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
+/**
+ * /news-sitemap.xml — Google News sitemap. Per the News sitemap spec this
+ * carries ONLY articles published in the last 48 hours (older coverage lives
+ * in the regular sitemap-news-N.xml shards). Upstream timestamps are naive
+ * Manila wall-clock, normalized to +08:00. Fresh articles are also pinged to
+ * IndexNow (idempotent; the CDN cache on this route bounds ping frequency).
+ */
+export const dynamic = "force-dynamic"
 
-async function fetchPublishedNews(maxPages = 8) {
-  const all = [] as Awaited<ReturnType<typeof fetchArticles>>
-  const seen = new Set<string>()
-
-  for (let page = 1; page <= maxPages; page++) {
-    const batch = await fetchArticles(page)
-    if (!batch.length) break
-
-    for (const article of batch) {
-      if (!article.slug || seen.has(article.slug)) continue
-      seen.add(article.slug)
-      if (article.isPublished === false) continue
-      all.push(article)
-    }
-  }
-
-  return all
-}
-
-function xmlEscape(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll("\"", "&quot;")
-    .replaceAll("'", "&apos;")
-}
+const WINDOW_MS = 48 * 60 * 60 * 1000
+const MAX_ITEMS = 1000
 
 export async function GET() {
-  const news = await fetchPublishedNews()
+  if (!newsConfigured()) {
+    return sitemapResponse(buildNewsSitemapXml([]), { shortCache: true })
+  }
 
-  const xmlItems = news
-    .map((article) => {
-      const loc = `${SITE_URL}/news/${article.slug}`
-      const pubDate = article.publishedAt || article.date || new Date().toISOString()
-      const language = article.language || "en"
-      const author = article.author || "FHI Global"
+  const { articles } = await fetchArticlesList(
+    { page: 1, perPage: 100 },
+    { revalidate: 900 },
+  )
 
-      return `
-  <url>
-    <loc>${xmlEscape(loc)}</loc>
-    <news:news>
-      <news:publication>
-        <news:name>FHI Global News</news:name>
-        <news:language>${xmlEscape(language)}</news:language>
-      </news:publication>
-      <news:publication_date>${xmlEscape(pubDate)}</news:publication_date>
-      <news:title>${xmlEscape(article.title)}</news:title>
-      <news:keywords>${xmlEscape((article.tags ?? []).join(", "))}</news:keywords>
-      <news:author>${xmlEscape(author)}</news:author>
-    </news:news>
-    <lastmod>${xmlEscape(article.updatedAt || pubDate)}</lastmod>
-  </url>`
+  const now = Date.now()
+  const items: NewsSitemapItem[] = []
+  for (const article of articles) {
+    if (!article.slug || article.isPublished === false) continue
+    const iso = toManilaIso(article.publishedAt || article.date)
+    if (!iso) continue
+    const publishedMs = Date.parse(iso)
+    if (!Number.isFinite(publishedMs) || now - publishedMs > WINDOW_MS) continue
+    items.push({
+      loc: `${SITE_URL}/news/${article.slug}`,
+      title: article.title,
+      publicationDate: iso,
     })
-    .join("\n")
+    if (items.length >= MAX_ITEMS) break
+  }
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
-${xmlItems}
-</urlset>`
+  if (items.length > 0) {
+    // Fire-and-forget: tell IndexNow about the fresh articles.
+    void submitToIndexNow(items.map((i) => i.loc))
+  }
 
-  return new NextResponse(xml, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/xml; charset=utf-8",
-      "Cache-Control": "s-maxage=900, stale-while-revalidate=3600",
-    },
-  })
+  return sitemapResponse(buildNewsSitemapXml(items), { shortCache: items.length === 0 })
 }
