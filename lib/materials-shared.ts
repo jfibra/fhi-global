@@ -19,7 +19,16 @@ export type Material = {
   height: number | null
   /** Inline base64 LQIP, or null when the image couldn't be probed. */
   blurDataURL: string | null
+  /** Display label of the folder the file sits in — "Motivation",
+   *  "Inspiration"… Files at the root of public/materials get GENERAL. */
+  category: string
 }
+
+/** Bucket for files sitting directly in public/materials, uncategorised. */
+export const GENERAL_CATEGORY = "General"
+
+/** Label of the "show everything" tab. */
+export const ALL_CATEGORY = "All"
 
 /** "84 KB" / "1.0 MB" — matches how the rest of the dashboard shows file sizes. */
 export function formatBytes(bytes: number): string {

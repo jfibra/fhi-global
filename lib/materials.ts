@@ -1,8 +1,9 @@
 import "server-only"
 import fs from "node:fs/promises"
+import type { Dirent } from "node:fs"
 import path from "node:path"
 import sharp from "sharp"
-import type { Material } from "./materials-shared"
+import { GENERAL_CATEGORY, type Material } from "./materials-shared"
 
 export type { Material } from "./materials-shared"
 
@@ -13,6 +14,13 @@ export type { Material } from "./materials-shared"
  * reads the folder and hands the dashboard gallery everything it needs to
  * render without layout shift: real pixel dimensions and a tiny inline blur
  * placeholder per image.
+ *
+ * CATEGORIES ARE FOLDERS. `public/materials/motivation/poster.jpg` shows up
+ * under a "Motivation" tab; creating the folder is the entire act of creating
+ * a category, which keeps the no-code promise above intact. Files left at the
+ * root land in GENERAL. Only one level is scanned — deeper nesting is ignored
+ * rather than silently flattened, so a stray folder can't scatter its contents
+ * across the gallery.
  *
  * The listing is read on the server and the page has no dynamic inputs, so
  * Next prerenders it at build time: visitors pay nothing for the directory
@@ -47,8 +55,8 @@ function humanize(fileName: string): string {
 /** Digit-aware sort so "materials2" precedes "materials10". */
 const byName = new Intl.Collator("en", { numeric: true, sensitivity: "base" })
 
-async function describe(file: string): Promise<Material> {
-  const absolute = path.join(MATERIALS_DIR, file)
+async function describe(file: string, dir: string): Promise<Material> {
+  const absolute = path.join(MATERIALS_DIR, dir, file)
   const [stat, probe] = await Promise.all([
     fs.stat(absolute),
     // A corrupt or unreadable image must not take the whole gallery down —
@@ -70,10 +78,15 @@ async function describe(file: string): Promise<Material> {
   ])
 
   return {
-    file,
-    src: `/materials/${encodeURIComponent(file)}`,
+    // Prefixed with the folder so two files can share a name across
+    // categories without colliding as React keys.
+    file: dir ? `${dir}/${file}` : file,
+    src: dir
+      ? `/materials/${encodeURIComponent(dir)}/${encodeURIComponent(file)}`
+      : `/materials/${encodeURIComponent(file)}`,
     title: humanize(file),
     bytes: stat.size,
+    category: dir ? humanize(dir) : GENERAL_CATEGORY,
     ...probe,
   }
 }
@@ -85,16 +98,35 @@ async function describe(file: string): Promise<Material> {
  * before anyone added artwork) renders the empty state instead of erroring.
  */
 export async function listMaterials(): Promise<Material[]> {
-  let entries: string[]
+  let entries: Dirent[]
   try {
-    entries = await fs.readdir(MATERIALS_DIR)
+    entries = await fs.readdir(MATERIALS_DIR, { withFileTypes: true })
   } catch {
     return []
   }
 
-  const files = entries
-    .filter((name) => IMAGE_EXTENSIONS.has(path.extname(name).toLowerCase()))
-    .sort(byName.compare)
+  const isImage = (name: string) => IMAGE_EXTENSIONS.has(path.extname(name).toLowerCase())
 
-  return Promise.all(files.map(describe))
+  // Root-level files first, then each category folder in name order, so the
+  // gallery's "All" tab reads in a stable, predictable sequence.
+  const jobs: Array<Promise<Material>> = entries
+    .filter((e) => e.isFile() && isImage(e.name))
+    .map((e) => e.name)
+    .sort(byName.compare)
+    .map((name) => describe(name, ""))
+
+  const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort(byName.compare)
+  for (const dir of dirs) {
+    let inner: string[]
+    try {
+      inner = await fs.readdir(path.join(MATERIALS_DIR, dir))
+    } catch {
+      continue // unreadable folder shouldn't take the whole gallery down
+    }
+    for (const name of inner.filter(isImage).sort(byName.compare)) {
+      jobs.push(describe(name, dir))
+    }
+  }
+
+  return Promise.all(jobs)
 }

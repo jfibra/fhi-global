@@ -5,19 +5,52 @@
 // next/image: off-screen tiles are never fetched, and the ones that are come
 // down as small AVIF/WebP copies sized to the tile, not the original file.
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import Image from "next/image"
 import { ChevronLeft, ChevronRight, Download, ImageOff, X, ZoomIn } from "lucide-react"
 // Imported from the client-safe module, never from lib/materials (server-only).
-import { formatBytes, type Material } from "@/lib/materials-shared"
+import { ALL_CATEGORY, GENERAL_CATEGORY, formatBytes, type Material } from "@/lib/materials-shared"
 
 /** Widths the browser should pick from — mirrors the grid's breakpoints. */
 const TILE_SIZES = "(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
 
 export function MaterialsGallery({ materials }: { materials: Material[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
-  const open = openIndex === null ? null : materials[openIndex] ?? null
+  const [category, setCategory] = useState<string>(ALL_CATEGORY)
+
+  // Tabs are derived from what's actually on disk, so an empty category never
+  // shows and a new folder needs no code. General sorts last: it is the
+  // uncategorised bucket, not a real category.
+  const tabs = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const m of materials) counts.set(m.category, (counts.get(m.category) ?? 0) + 1)
+    const named = [...counts.keys()]
+      .filter((c) => c !== GENERAL_CATEGORY)
+      .sort((a, b) => a.localeCompare(b))
+    if (counts.has(GENERAL_CATEGORY)) named.push(GENERAL_CATEGORY)
+    return [
+      { label: ALL_CATEGORY, count: materials.length },
+      ...named.map((label) => ({ label, count: counts.get(label) ?? 0 })),
+    ]
+  }, [materials])
+
+  // The viewer pages through what's on screen, so it indexes the FILTERED
+  // list — not the full one — or Next would jump to a hidden image.
+  const visible = useMemo(
+    () => (category === ALL_CATEGORY ? materials : materials.filter((m) => m.category === category)),
+    [materials, category],
+  )
+
+  const open = openIndex === null ? null : visible[openIndex] ?? null
+
+  // Switching category while the viewer is open would leave openIndex pointing
+  // into a different list, so close it as part of the switch (a handler, not an
+  // effect — no cascading render).
+  const pickCategory = (label: string) => {
+    setOpenIndex(null)
+    setCategory(label)
+  }
 
   // The viewer is portalled to <body>: page transitions put a `transform` on an
   // ancestor, which would otherwise make `position: fixed` resolve against that
@@ -28,8 +61,8 @@ export function MaterialsGallery({ materials }: { materials: Material[] }) {
   const close = useCallback(() => setOpenIndex(null), [])
   const step = useCallback(
     (delta: number) =>
-      setOpenIndex((i) => (i === null ? null : (i + delta + materials.length) % materials.length)),
-    [materials.length],
+      setOpenIndex((i) => (i === null ? null : (i + delta + visible.length) % visible.length)),
+    [visible.length],
   )
 
   // Arrow keys page through the viewer, Escape closes it.
@@ -71,8 +104,42 @@ export function MaterialsGallery({ materials }: { materials: Material[] }) {
 
   return (
     <>
+      {/* Category tabs — only rendered when there is more than one bucket, so a
+          single-folder gallery doesn't grow a pointless "All" row. */}
+      {tabs.length > 1 && (
+        <div className="mb-5 flex flex-wrap gap-2" role="tablist" aria-label="Material categories">
+          {tabs.map((t) => {
+            const active = t.label === category
+            return (
+              <button
+                key={t.label}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => pickCategory(t.label)}
+                className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-bold transition-colors ${
+                  active
+                    ? "bg-[#001f3f] text-white"
+                    : "border border-black/[0.08] bg-white text-[#374151] hover:border-[#001f3f]/30 hover:text-[#001f3f]"
+                }`}
+              >
+                {t.label}
+                <span className={active ? "text-white/60" : "text-[#9ca3af]"}>{t.count}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {visible.length === 0 ? (
+        <div className="border border-black/[0.08] bg-white px-6 py-14 text-center">
+          <p className="text-sm text-[#6b7280]">
+            Nothing in <strong className="text-[#0d1117]">{category}</strong> yet.
+          </p>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {materials.map((m, i) => (
+        {visible.map((m, i) => (
           <figure
             key={m.file}
             className="group overflow-hidden rounded-lg border border-black/[0.08] bg-white transition-shadow hover:shadow-[0_10px_32px_-14px_rgba(0,31,63,0.4)]"
@@ -117,6 +184,7 @@ export function MaterialsGallery({ materials }: { materials: Material[] }) {
           </figure>
         ))}
       </div>
+      )}
 
       {/* ── One-at-a-time viewer ─────────────────────────────────────────── */}
       {open && createPortal(
