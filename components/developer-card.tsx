@@ -34,10 +34,10 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
     return (
       <Link
         href={`/${slug}`}
-        className="group flex flex-row gap-3 sm:gap-4 rounded-lg border border-[#e8eaed] bg-white p-3 sm:p-4 shadow-sm transition-shadow hover:shadow-md"
+        className="group flex flex-row gap-3 sm:gap-4 border border-[#e5e8ec] bg-white p-3 sm:p-4 transition-shadow hover:shadow-md"
       >
         <div
-          className="relative h-[100px] w-[100px] shrink-0 rounded-lg flex items-center justify-center overflow-hidden sm:h-[112px] sm:w-[112px]"
+          className="relative h-[100px] w-[100px] shrink-0 flex items-center justify-center overflow-hidden sm:h-[112px] sm:w-[112px]"
           style={{ backgroundColor: logoBg ?? "#eef2f6" }}
         >
           {logo_url ? (
@@ -88,7 +88,7 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
             <p className="line-clamp-2 text-[13px] leading-relaxed text-[#6b7280]">{description}</p>
           ) : null}
           <div className="mt-auto w-full border-t border-transparent pt-2">
-            <span className="flex w-full items-center justify-center rounded-lg bg-[#0f2940] py-2.5 text-center text-sm font-semibold text-white transition-colors group-hover:bg-[#001f3f]">
+            <span className="flex w-full items-center justify-center bg-[#0f2940] py-2.5 text-center text-sm font-semibold text-white transition-colors group-hover:bg-[#001f3f]">
               View Details
             </span>
           </div>
@@ -100,7 +100,7 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
   return (
     <Link
       href={`/${slug}`}
-      className="group relative flex flex-row bg-white rounded-[24px] p-4 border border-[#eaecf0] overflow-hidden transition-all duration-500 hover:shadow-[0_20px_60px_-8px_rgba(0,31,63,0.2)] hover:-translate-y-1 shadow-[0_2px_16px_rgba(0,0,0,0.05)]"
+      className="group relative flex flex-row bg-white p-4 border border-[#e5e8ec] overflow-hidden transition-shadow duration-300 hover:shadow-[0_14px_40px_-16px_rgba(0,20,40,0.25)]"
     >
       {/* ── Left: Logo Panel ── */}
       <div
@@ -141,7 +141,7 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
             {name}
           </h3>
           {is_verified && (
-            <div className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
+            <div className="shrink-0 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white border border-emerald-300">
               <BadgeCheck className="w-3 h-3 text-emerald-500" />
               <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wide">Verified</span>
             </div>
@@ -177,7 +177,7 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
         )}
 
         {/* Row 4: Footer — project count + CTA */}
-        <div className="flex items-center justify-between pt-1 mt-auto">
+        <div className="flex items-center justify-between pt-3 mt-auto border-t border-[#eef0f3]">
           {project_count != null && project_count > 0 ? (
             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#6b7280]">
               <Layers className="w-3 h-3 text-[#001f3f]/40" />
@@ -186,9 +186,9 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
           ) : (
             <span className="text-[10px] font-semibold text-[#d1d5db] uppercase tracking-widest">Developer</span>
           )}
-          <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#001f3f] text-white text-[11px] font-bold tracking-wide transition-all duration-300 group-hover:bg-gradient-to-r group-hover:from-[#c9a94e] group-hover:to-[#f0d890] group-hover:text-[#001f3f] group-hover:shadow-[0_6px_20px_rgba(214,179,87,0.4)] shrink-0">
+          <div className="flex items-center gap-1.5 text-[13px] font-bold text-[#0d1117] transition-colors duration-200 group-hover:text-[#b8913f] shrink-0">
             View Details
-            <ArrowUpRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            <ArrowUpRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </div>
         </div>
       </div>

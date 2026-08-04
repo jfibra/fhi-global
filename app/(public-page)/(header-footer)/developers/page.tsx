@@ -33,11 +33,11 @@ function FiltersFallback() {
 }
 
 function SearchFallback() {
-  return <div className="h-14 rounded-2xl bg-white border border-[#e8eaed] animate-pulse" aria-hidden />
+  return <div className="h-14 bg-white border border-[#e8eaed] animate-pulse" aria-hidden />
 }
 
 function ToolbarFallback() {
-  return <div className="h-10 w-36 rounded-full bg-[#f1f5f9] animate-pulse shrink-0" aria-hidden />
+  return <div className="h-10 w-36 bg-[#f1f5f9] animate-pulse shrink-0" aria-hidden />
 }
 
 export default async function DevelopersPage({ searchParams }: { searchParams: SearchParams }) {
@@ -81,7 +81,7 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
 
   const emptyState = (
     <div className="flex flex-col items-center justify-center py-20 lg:py-24 text-center">
-      <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#001f3f]/6 to-[#d6b357]/6 border border-[#e8eaed] flex items-center justify-center mb-6 shadow-sm">
+      <div className="w-20 h-20 bg-[#001f3f]/5 border border-[#e8eaed] flex items-center justify-center mb-6">
         <Building2 className="w-9 h-9 text-[#001f3f]/25" />
       </div>
       <h3 className="font-['Outfit'] font-bold text-[#0d1117] text-xl mb-2">No developers found</h3>
@@ -202,7 +202,7 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-8">
             <div>
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 border border-white/25 rounded-full text-xs font-medium text-white/90 mb-5 backdrop-blur-sm">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 border border-white/25 text-xs font-medium text-white/90 mb-5 backdrop-blur-sm">
                 <Building2 className="w-3.5 h-3.5 text-[#d6b357]" />
                 Trusted Developers
               </div>
@@ -216,7 +216,7 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
                 </span>
               </h1>
               {/* Gold underline bar (mockup) */}
-              <span className="block w-14 h-1 rounded-full bg-[#d6b357] mb-5" aria-hidden="true" />
+              <span className="block w-14 h-1 bg-[#d6b357] mb-5" aria-hidden="true" />
               <p
                 className="text-white/90 text-lg max-w-lg leading-relaxed"
                 style={{ textShadow: "0 1px 10px rgba(0,10,30,0.7)" }}
@@ -228,14 +228,14 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
 
             {/* Quick stats — solid navy tiles with gold icons (mockup) */}
             <div className="flex gap-4 shrink-0">
-              <div className="bg-[#0a1f38]/90 backdrop-blur-sm border border-[#d6b357]/40 rounded-2xl px-6 py-5 text-center min-w-[130px] shadow-[0_16px_40px_-12px_rgba(0,10,25,0.6)]">
+              <div className="bg-[#0a1f38]/90 backdrop-blur-sm border border-[#d6b357]/40 px-6 py-5 text-center min-w-[130px]">
                 <Building2 className="w-5 h-5 text-[#d6b357] mx-auto mb-2" />
                 <p className="font-['Outfit'] text-3xl font-bold text-white leading-none">{developers?.length ?? 0}</p>
                 <p className="text-[10px] font-bold text-white/65 mt-2 uppercase tracking-wider leading-tight">
                   Total<br />Developers
                 </p>
               </div>
-              <div className="bg-[#0a1f38]/90 backdrop-blur-sm border border-[#d6b357]/40 rounded-2xl px-6 py-5 text-center min-w-[130px] shadow-[0_16px_40px_-12px_rgba(0,10,25,0.6)]">
+              <div className="bg-[#0a1f38]/90 backdrop-blur-sm border border-[#d6b357]/40 px-6 py-5 text-center min-w-[130px]">
                 <ShieldCheck className="w-5 h-5 text-[#d6b357] mx-auto mb-2" />
                 <p className="font-['Outfit'] text-3xl font-bold text-[#d6b357] leading-none">{verifiedCount}</p>
                 <p className="text-[10px] font-bold text-white/65 mt-2 uppercase tracking-wider leading-tight">
@@ -250,7 +250,7 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
       {/* ─── Content — search card overlaps the hero (mockup) ─── */}
       <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20 pb-14">
         {/* Floating search card */}
-        <div className="bg-white rounded-[24px] border border-[#e8eaed] shadow-[0_18px_50px_-15px_rgba(0,20,40,0.25)] p-4 sm:p-5 mb-8">
+        <div className="bg-white border border-[#e5e8ec] shadow-[0_10px_34px_-18px_rgba(0,20,40,0.25)] p-4 sm:p-5 mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center gap-4">
             <div className="flex-1 min-w-0">
               <Suspense fallback={<SearchFallback />}>
@@ -258,7 +258,7 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
               </Suspense>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 shrink-0">
-              <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#f9fafb] border border-[#e8eaed] rounded-full self-start">
+              <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#f9fafb] border border-[#e8eaed] self-start">
                 <Users className="w-3.5 h-3.5 text-[#d6b357]" />
                 <span className="text-sm font-semibold text-[#0d1117]">{developers?.length ?? 0}</span>
                 <span className="text-sm text-[#6b7280]">
