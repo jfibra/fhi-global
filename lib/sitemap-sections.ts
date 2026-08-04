@@ -26,6 +26,8 @@ export type SectionRow = {
   slug: string | null
   id?: string | number
   updated_at: string | null
+  /** projects only: parent developer slug, for the nested /<dev>/<project> URL. */
+  developers?: { slug: string | null } | null
 }
 
 const SECTION_TABLE: Record<SupabaseSection, string> = {
@@ -36,7 +38,7 @@ const SECTION_TABLE: Record<SupabaseSection, string> = {
 }
 
 const SECTION_SELECT: Record<SupabaseSection, string> = {
-  projects: "slug, updated_at",
+  projects: "slug, updated_at, developers(slug)",
   developers: "slug, updated_at",
   listings: "id, slug, updated_at",
   events: "id, slug, updated_at",

@@ -49,7 +49,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
   return (
     <Link
-      href={`/projects/${slug}`}
+      href={developers?.slug ? `/${developers.slug}/${slug}` : `/projects/${slug}`}
       className="group block bg-white rounded-[24px] border border-[#eee] overflow-hidden transition-all duration-300 hover:translate-y-[-10px] hover:shadow-2xl shadow-sky-950/5"
     >
       {/* Image */}

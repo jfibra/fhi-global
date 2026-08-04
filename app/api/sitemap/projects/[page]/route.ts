@@ -16,7 +16,11 @@ export async function GET(_req: Request, ctx: { params: Promise<{ page: string }
   const urls = rows
     .filter((row) => row.slug)
     .map((row) => ({
-      loc: `${SITE_URL}/projects/${row.slug}`,
+      // Nested under the developer when it has one; the legacy /projects/<slug>
+      // route 308s there anyway, but the sitemap should name the canonical.
+      loc: row.developers?.slug
+        ? `${SITE_URL}/${row.developers.slug}/${row.slug}`
+        : `${SITE_URL}/projects/${row.slug}`,
       lastmod: row.updated_at?.slice(0, 10) ?? undefined,
     }))
   return sitemapResponse(buildUrlsetXml(urls))

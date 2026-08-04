@@ -582,13 +582,13 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
 async function SeoGuidePage({ seo }: { seo: SeoPage }) {
   const supabase = createPublicSupabaseClient()
 
-  type Photo = { url: string; name: string; slug: string | null }
+  type Photo = { url: string; name: string; slug: string | null; devSlug: string | null }
   let photo: Photo | null = null
 
   if (seo.imageQuery) {
     const { data } = await supabase
       .from("projects")
-      .select("name, slug, main_image")
+      .select("name, slug, main_image, developers(slug)")
       .eq("is_active", true)
       .eq("is_published", true)
       .not("main_image", "is", null)
@@ -597,14 +597,14 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
       .or(`location.ilike.%${seo.imageQuery}%,name.ilike.%${seo.imageQuery}%`)
       .limit(1)
       .maybeSingle()
-    if (data?.main_image) photo = { url: data.main_image, name: data.name, slug: data.slug }
+    if (data?.main_image) photo = { url: data.main_image, name: data.name, slug: data.slug, devSlug: (data.developers as unknown as { slug: string | null } | null)?.slug ?? null }
   }
   if (!photo) {
     // No project in this exact area yet — pick from the Dubai pool, keyed by
     // the slug so each guide keeps a stable, distinct photo between builds.
     const { data: pool } = await supabase
       .from("projects")
-      .select("name, slug, main_image")
+      .select("name, slug, main_image, developers(slug)")
       .eq("is_active", true)
       .eq("is_published", true)
       .not("main_image", "is", null)
@@ -616,7 +616,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
     if (pool?.length) {
       const idx = [...seo.slug].reduce((a, c) => a + c.charCodeAt(0), 0) % pool.length
       const pick = pool[idx]
-      photo = { url: pick.main_image!, name: pick.name, slug: pick.slug }
+      photo = { url: pick.main_image!, name: pick.name, slug: pick.slug, devSlug: (pick.developers as unknown as { slug: string | null } | null)?.slug ?? null }
     }
   }
 
@@ -658,7 +658,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
               </div>
               {photo.slug && (
                 <Link
-                  href={`/projects/${photo.slug}`}
+                  href={photo.devSlug ? `/${photo.devSlug}/${photo.slug}` : `/projects/${photo.slug}`}
                   className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors"
                 >
                   From our portfolio: {photo.name}

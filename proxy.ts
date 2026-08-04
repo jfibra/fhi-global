@@ -45,6 +45,37 @@ function forwardIdentity(
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // Legacy project URLs: /projects/<slug> moved under the developer
+  // (/samana-developers/samana-miami-2). The page tree streams (so a
+  // page-level permanentRedirect can only ship a client-side redirect in the
+  // RSC payload with HTTP 200) — a genuine 308 for crawlers and old backlinks
+  // must be issued here, before anything streams. One anon PostgREST lookup,
+  // on this narrow path only; on any failure, fall through and let the page's
+  // own redirect handle the visitor.
+  const legacyProject = pathname.match(/^\/projects\/([^/]+)$/)
+  if (legacyProject) {
+    try {
+      const base = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (base && anon) {
+        const q = `${base}/rest/v1/projects?slug=eq.${encodeURIComponent(legacyProject[1])}&deleted_at=is.null&select=slug,developers(slug)&limit=1`
+        const res = await fetch(q, { headers: { apikey: anon, Authorization: `Bearer ${anon}` } })
+        if (res.ok) {
+          const rows = (await res.json()) as Array<{ slug: string; developers: { slug: string | null } | null }>
+          const dev = rows[0]?.developers?.slug
+          if (dev) {
+            const dest = request.nextUrl.clone()
+            dest.pathname = `/${dev}/${rows[0].slug}`
+            return NextResponse.redirect(dest, 308)
+          }
+        }
+      }
+    } catch {
+      // fall through to the page
+    }
+    return NextResponse.next()
+  }
   const firstSegment = pathname.split("/").filter(Boolean)[0] ?? ""
   // Dashboard routes are now role-prefixed (`/admin/*`, `/agent/*`, …); `/dashboard`
   // is kept only as a role-agnostic redirect stub.
@@ -165,6 +196,7 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/projects/:slug",
     "/login",
     "/account-inactive",
     "/dashboard",
