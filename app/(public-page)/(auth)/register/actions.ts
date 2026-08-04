@@ -7,7 +7,6 @@ import { logAuditEvent, requestContextFromHeaders } from "@/lib/audit-log"
 import { sendOtpEmail } from "@/lib/mailer"
 import { generateOtpCode, storeOtpChallenge, checkOtpChallenge, clearOtpChallenge } from "@/lib/auth-otp"
 import { DEFAULT_ACCOUNT_PASSWORD } from "@/lib/account-password"
-import { resolveLrProvision } from "@/lib/lr/lr-provision"
 import { emailTypoMessage } from "@/lib/email-typo"
 import { checkEmailDeliverable } from "@/lib/email-validate"
 
@@ -177,28 +176,13 @@ export async function verifyRegisterOtp(
     if (inviter) invitedBy = ref
   }
 
-  // Parity with Google sign-in: for self-service member signups, check Leuterio
-  // Realty and provision the LR role + active status when the email is a genuine
-  // agent (shared logic — see lib/lr/lr-provision.ts). Developer signups are
-  // intentional and skip the LR mapping (they stay developer/pending).
-  let finalRole = role
-  let finalStatus = "pending"
-  let lrIsAgent = false
-  let lrMetadata: Record<string, unknown> = {}
-  if (accountType === "member") {
-    const prov = await resolveLrProvision({ email, currentRole: "member", currentStatus: "pending" })
-    finalRole = prov.role
-    finalStatus = prov.status
-    lrIsAgent = prov.isLrAgent
-    // Don't stamp LR metadata when the lookup was unreachable (unknown answer).
-    lrMetadata = prov.lrUnreachable
-      ? {}
-      : { ...prov.lrMetadata, ...(prov.isLrAgent ? { lr_provisioned: true } : {}) }
-  }
+  // Least privilege: every self-registration lands as-is — member (or
+  // developer on that path) with status pending until an admin approves.
+  const finalRole = role
+  const finalStatus = "pending"
 
   const mergedMetadata = {
     ...(current?.metadata ?? {}),
-    ...lrMetadata,
     ...(invitedBy ? { invited_by: invitedBy } : {}),
   }
 
@@ -227,9 +211,7 @@ export async function verifyRegisterOtp(
     subjectType: "profiles",
     subjectId: userId,
     subjectLabel: data.user.email ?? email,
-    description: lrIsAgent
-      ? `Self-registered via email OTP → linked Leuterio Realty agent (${finalRole}, ${finalStatus})`
-      : `Self-registered as ${finalRole} via email OTP (${finalStatus})`,
+    description: `Self-registered as ${finalRole} via email OTP (${finalStatus})`,
     ...ctx,
   })
 

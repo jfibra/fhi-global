@@ -1,13 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { Loader2, Sparkles } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 // Redirect-based Google sign-in. Navigates the whole page to Google via
 // Supabase OAuth (no popup / no third-party cookies — reliable across
-// browsers), returns to /auth/callback, then /auth/google/continue shows the
-// Leuterio Realty account modal before provisioning.
+// browsers), returns to /auth/callback, then /auth/google/continue finishes
+// provisioning (new accounts land as member + pending) and redirects.
 
 function GoogleGlyph({ className }: { className?: string }) {
   return (
@@ -74,11 +74,6 @@ export default function GoogleAuthFlow({
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <GoogleGlyph className="w-4 h-4" />}
         {loading ? "Redirecting…" : variant === "register" ? "Sign up with Google" : "Continue with Google"}
       </button>
-
-      {/* <p className="flex items-center justify-center gap-1.5 text-[11px] text-[#9ca3af] text-center leading-relaxed px-4">
-        <Sparkles className="w-3 h-3 text-[#d6b357] shrink-0" />
-        Using a Leuterio Realty email? Continue with Google to auto-import your agent profile.
-      </p> */}
 
       {error && <p className="text-center text-xs text-rose-600">{error}</p>}
     </div>

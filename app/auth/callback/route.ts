@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import type { User } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { parseName } from "@/lib/lr/lr-api"
+import { parseName } from "@/lib/parse-name"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
 // OAuth redirect landing. Supabase sends the browser here with ?code=... after
 // Google sign-in; we exchange it for a cookie session, then hand off to
-// /auth/google/continue which shows the Leuterio Realty account modal and
-// provisions the profile. `next` (a safe relative post-login target) is
+// /auth/google/continue which finishes provisioning the profile (new accounts
+// are member + pending). `next` (a safe relative post-login target) is
 // threaded through.
 
 export const runtime = "nodejs"

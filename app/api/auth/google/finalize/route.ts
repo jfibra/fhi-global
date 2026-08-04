@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { resolveLrProvision } from "@/lib/lr/lr-provision"
+import { parseName } from "@/lib/parse-name"
 import { pickSafePostLoginRedirect } from "@/lib/auth"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
-// Completes Google sign-in AFTER the client established the Supabase session via
-// signInWithIdToken. Runs as the newly-signed-in user (cookie session), reads
-// their Supabase-verified email, re-looks up LR, and — only on the first link —
-// provisions the profile (role/status/name/metadata) with the service-role
-// client (RLS blocks client writes to role/status). Idempotent and safe for
-// returning users and for pre-existing email/password accounts.
+// Completes Google sign-in AFTER the client established the Supabase session.
+// Runs as the newly-signed-in user (cookie session) and — only on the first
+// link — provisions the profile (name/avatar/metadata) with the service-role
+// client (RLS blocks client writes to role/status). Every new Google account
+// is member + pending, exactly like self-registration; an existing role or
+// status assigned by an admin is preserved. Idempotent and safe for returning
+// users and for pre-existing email/password accounts.
 
 export const runtime = "nodejs"
 
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
   // best-effort and only applied on first provision (see below).
   const refRaw = typeof body?.ref === "string" ? body.ref.trim() : ""
 
-  // Must be signed in (the client just did signInWithIdToken).
+  // Must be signed in (the client just established the session).
   const supabase = await createClient()
   const { data: userData } = await supabase.auth.getUser()
   const user = userData.user
@@ -40,7 +41,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
   }
 
-  const email = (user.email ?? "").toLowerCase()
   const admin = createAdminSupabase()
 
   // Load the profile (the handle_new_user trigger creates a default row on auth
@@ -63,27 +63,18 @@ export async function POST(req: NextRequest) {
 
   const metadata = (profile.metadata ?? {}) as Record<string, unknown>
 
-  // Returning Google user: never re-map (respects later admin role changes).
+  // Returning Google user: never re-provision (respects later admin role changes).
   if (metadata.google_provisioned === true) {
     return NextResponse.json({ redirect: pickSafePostLoginRedirect(nextRaw, profile.role) })
   }
 
+  // Least privilege: a brand-new account stays member + pending (the DB
+  // defaults); a role/status an admin already assigned is kept as-is.
+  const finalRole = profile.role?.trim() || "member"
+  const finalStatus = profile.status?.trim() || "pending"
+
   const googleName = typeof user.user_metadata?.name === "string" ? user.user_metadata.name : null
-
-  // Shared LR provisioning: look up the LR agent and decide role/status/metadata.
-  // (Same logic the email-OTP register flow uses — see lib/lr/lr-provision.ts.)
-  const prov = await resolveLrProvision({
-    email,
-    currentRole: profile.role,
-    currentStatus: profile.status,
-    nameHint: googleName,
-  })
-  const lrIsAgent = prov.isLrAgent
-  const lrUnreachable = prov.lrUnreachable
-  const lrMetadata = prov.lrMetadata
-  const finalRole = prov.role
-  const finalStatus = prov.status
-
+  const parsed = parseName(googleName)
   const googleGiven = typeof user.user_metadata?.given_name === "string" ? user.user_metadata.given_name.trim() : ""
   const googleFamily = typeof user.user_metadata?.family_name === "string" ? user.user_metadata.family_name.trim() : ""
   const googleAvatar =
@@ -93,8 +84,8 @@ export async function POST(req: NextRequest) {
         ? user.user_metadata.picture
         : null
 
-  const fname = prov.parsedName.first || googleGiven || profile.fname || null
-  const lname = prov.parsedName.last || googleFamily || profile.lname || null
+  const fname = googleGiven || parsed.first || profile.fname || null
+  const lname = googleFamily || parsed.last || profile.lname || null
   const profileUrl = profile.profile_url || googleAvatar || null
 
   // Referral attribution — mirror the email/password register flow: validate the
@@ -114,10 +105,9 @@ export async function POST(req: NextRequest) {
 
   const nextMetadata = {
     ...metadata,
-    ...lrMetadata,
     google_linked: true,
+    google_provisioned: true,
     ...(invitedBy ? { invited_by: invitedBy } : {}),
-    ...(lrUnreachable ? {} : { google_provisioned: true }),
   }
 
   const { error: updateError } = await admin
@@ -141,23 +131,17 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Security-relevant: first-link provisioning applied a role/status. The
-  // profiles trigger records the data change (as "System"); this row names the
-  // event, carries request info, and flags a genuine privilege elevation.
-  const roleElevated = finalRole !== (profile.role ?? "member") && finalRole !== "member"
   const displayName = [fname, lname].filter(Boolean).join(" ") || user.email || null
   const ctx = requestContextFromRequest(req)
   await logAuditEvent({
     category: "security",
-    event: roleElevated ? "role_granted" : "user_provisioned",
+    event: "user_provisioned",
     source: "auth",
     actor: { id: user.id, name: displayName, role: finalRole },
     subjectType: "profiles",
     subjectId: user.id,
     subjectLabel: displayName,
-    description: lrIsAgent
-      ? `Google sign-in linked Leuterio Realty agent → ${finalRole}`
-      : `Google sign-in provisioned account → ${finalRole}`,
+    description: `Google sign-in provisioned account → ${finalRole} (${finalStatus})`,
     oldValues: { role: profile.role ?? null, status: profile.status ?? null },
     newValues: { role: finalRole, status: finalStatus },
     changedKeys: ["role", "status"],

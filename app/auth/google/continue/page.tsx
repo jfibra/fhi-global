@@ -4,9 +4,9 @@ import { getProfileByUserId, pickSafePostLoginRedirect } from "@/lib/auth"
 import GoogleContinuePanel from "./continue-panel"
 
 // Post-Google-redirect landing. The session is already established (by
-// /auth/callback). First-time Google users see the Leuterio Realty account
-// modal here before provisioning; already-provisioned users are sent straight
-// to their dashboard.
+// /auth/callback). Provisioning finishes here immediately (new accounts are
+// member + pending); already-provisioned users are sent straight to their
+// dashboard.
 
 export const dynamic = "force-dynamic"
 export const metadata = { robots: { index: false, follow: false } }

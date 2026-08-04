@@ -9,7 +9,6 @@ import { logAuditEvent, requestContextFromHeaders } from "@/lib/audit-log"
 import { sendOtpEmail } from "@/lib/mailer"
 import { generateOtpCode, storeOtpChallenge, checkOtpChallenge, clearOtpChallenge } from "@/lib/auth-otp"
 import { DEFAULT_ACCOUNT_PASSWORD } from "@/lib/account-password"
-import { provisionLrForOtpLogin } from "@/lib/lr/lr-provision"
 import { emailTypoMessage } from "@/lib/email-typo"
 import { checkEmailDeliverable } from "@/lib/email-validate"
 
@@ -185,12 +184,7 @@ export async function verifyLoginOtp(
     return { error: "Profile setup failed. Please contact administrator." }
   }
 
-  // Parity with Google sign-in: on the first sign-in for an un-curated member,
-  // check Leuterio Realty and upgrade to the agent role + active status. Guarded
-  // and idempotent (see provisionLrForOtpLogin) so returning/curated accounts are
-  // never re-mapped. Reflect any change in the profile used by the gates/redirect.
-  const prov = await provisionLrForOtpLogin(admin, data.user.id, email)
-  const effProfile = prov.changed ? { ...profile, role: prov.role, status: prov.status } : profile
+  const effProfile = profile
 
   // Incomplete profile → finish it first, even while the account is pending.
   if (!isAdminStaffRole(effProfile.role) && isProfileMissingMinimumFields(effProfile)) {
@@ -208,9 +202,7 @@ export async function verifyLoginOtp(
     event: "login",
     source: "auth",
     actor: { id: data.user.id, name: effProfile.fullname, role: effProfile.role },
-    description: prov.changed
-      ? "Signed in with email OTP — linked Leuterio Realty agent"
-      : "Signed in with email OTP",
+    description: "Signed in with email OTP",
     ...ctx,
   })
 
@@ -260,11 +252,7 @@ export async function passwordLoginAction(_: LoginState, formData: FormData): Pr
     return { error: profileError?.message ? `Profile setup failed: ${profileError.message}` : "Profile setup failed." }
   }
 
-  // Same guarded LR provisioning as the OTP login (accounts share a password, so
-  // a member could sign in here too). Idempotent — no-op for curated/returning.
-  const admin = createAdminSupabase()
-  const prov = await provisionLrForOtpLogin(admin, data.user.id, email)
-  const effProfile = prov.changed ? { ...profile, role: prov.role, status: prov.status } : profile
+  const effProfile = profile
 
   // Incomplete profile → finish it first, even while the account is pending.
   if (!isAdminStaffRole(effProfile.role) && isProfileMissingMinimumFields(effProfile)) {
@@ -282,9 +270,7 @@ export async function passwordLoginAction(_: LoginState, formData: FormData): Pr
     event: "login",
     source: "auth",
     actor: { id: data.user.id, name: effProfile.fullname, role: effProfile.role },
-    description: prov.changed
-      ? "Signed in with password — linked Leuterio Realty agent"
-      : "Signed in with password",
+    description: "Signed in with password",
     ...ctx,
   })
 
