@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
-import { isSalesPipelineRole } from "@/lib/app-roles"
+import { isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { assembleListingMarketingData, type MarketingListingRow } from "@/lib/flyer/marketing-data"
 
@@ -14,7 +14,10 @@ export const runtime = "nodejs"
 export async function GET(req: NextRequest) {
   const session = await requireActiveSession()
   if (!session.ok) return session.response
-  if (!isSalesPipelineRole(session.context.profile.role)) {
+  // Sales pipeline roles market their own listings; admin staff use the
+  // Poster Maker studio over any listing (RLS grants them read-all).
+  const role = session.context.profile.role
+  if (!isSalesPipelineRole(role) && !isAdminStaffRole(role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
@@ -25,7 +28,7 @@ export async function GET(req: NextRequest) {
 
   const supabase = await createClient()
 
-  // RLS restricts this to listings the session user owns.
+  // RLS restricts this to listings the session user owns (staff read all).
   const { data: listing, error } = await supabase
     .from("agent_listings")
     .select(
