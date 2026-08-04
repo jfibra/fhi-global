@@ -638,7 +638,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
             <span className="block w-14 h-1 rounded-full bg-[#d6b357] mt-4 mb-6" aria-hidden="true" />
             <div className="space-y-4">
               {seo.intro.map((paragraph) => (
-                <p key={paragraph.slice(0, 32)} className="text-[15.5px] leading-relaxed text-[#374151]">
+                <p key={paragraph.slice(0, 32)} className="text-[16.5px] leading-[1.75] text-[#374151]">
                   {paragraph}
                 </p>
               ))}
@@ -647,13 +647,13 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
 
           {photo && (
             <div>
-              <div className="relative aspect-[4/3] rounded-lg overflow-hidden ring-1 ring-[#e8eaed] shadow-[0_18px_44px_-18px_rgba(0,20,40,0.35)]">
+              <div className="group relative aspect-[4/3] rounded-lg overflow-hidden ring-1 ring-[#e8eaed] shadow-[0_18px_44px_-18px_rgba(0,20,40,0.35)]">
                 <Image
                   src={photo.url}
                   alt={photo.name}
                   fill
                   sizes="(max-width: 1024px) 100vw, 50vw"
-                  className="object-cover"
+                  className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
                 />
               </div>
               {photo.slug && (
@@ -679,12 +679,15 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
           <span className="block w-14 h-1 rounded-full bg-[#d6b357] mt-3 mb-8 mx-auto" aria-hidden="true" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto">
             {seo.facts.map((f) => (
-              <div key={f.label} className="bg-white rounded-lg border border-[#e8eaed] p-6">
-                <span className="inline-flex w-9 h-9 rounded-full bg-[#d6b357]/12 items-center justify-center">
-                  <CheckCircle2 className="w-5 h-5 text-[#d6b357]" />
+              <div
+                key={f.label}
+                className="group bg-white rounded-lg border border-[#e8eaed] p-6 transition-all duration-200 hover:-translate-y-1 hover:border-[#d6b357]/50 hover:bg-[#d6b357]/[0.07] hover:shadow-[0_14px_32px_-16px_rgba(0,20,40,0.35)]"
+              >
+                <span className="inline-flex w-9 h-9 rounded-full bg-[#d6b357]/12 items-center justify-center transition-colors duration-200 group-hover:bg-[#d6b357]">
+                  <CheckCircle2 className="w-5 h-5 text-[#d6b357] transition-colors duration-200 group-hover:text-white" />
                 </span>
                 <p className="mt-3.5 font-['Outfit'] text-lg font-bold text-[#0d1117]">{f.label}</p>
-                <p className="mt-1.5 text-sm leading-relaxed text-[#4b5563]">{f.value}</p>
+                <p className="mt-1.5 text-[15px] leading-relaxed text-[#4b5563]">{f.value}</p>
               </div>
             ))}
           </div>
@@ -692,14 +695,16 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
       )}
 
       {/* Prose sections */}
-      <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 space-y-10">
-        {seo.sections?.map((s) => (
-          <div key={s.heading}>
-            <h2 className="font-['Outfit'] text-2xl font-bold text-[#001f3f]">{s.heading}</h2>
-            <span className="block w-10 h-1 rounded-full bg-[#d6b357] mt-2 mb-4" aria-hidden="true" />
-            <p className="text-[15.5px] leading-relaxed text-[#374151]">{s.body}</p>
-          </div>
-        ))}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-14 gap-y-10">
+          {seo.sections?.map((s) => (
+            <div key={s.heading}>
+              <h2 className="font-['Outfit'] text-2xl font-bold text-[#001f3f]">{s.heading}</h2>
+              <span className="block w-10 h-1 rounded-full bg-[#d6b357] mt-2 mb-4" aria-hidden="true" />
+              <p className="text-[16.5px] leading-[1.75] text-[#374151]">{s.body}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
