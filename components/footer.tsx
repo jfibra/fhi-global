@@ -61,6 +61,61 @@ export function Footer() {
         <div className="absolute inset-0 bg-[#001428]/95" />
       </div>
 
+      {/* ── Popular searches & area guides ───────────────
+          The SEO interlinking rail, sitting at the top of the footer so it
+          is the first thing seen rather than buried under the columns: every
+          public page links to the landing pages in lib/seo-pages.ts plus the
+          strongest developer portfolios, so crawlers — and readers — reach
+          them from anywhere on the site. */}
+      <div className="bg-[#f7f8fa] border-t border-[#e8eaed]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#a07c1f] mb-4">
+              Popular Searches in Dubai &amp; UAE
+            </p>
+            <ul className="flex flex-wrap gap-x-6 gap-y-2.5">
+              {[
+                ...SEO_SEARCH_PAGES.map((p) => ({ label: p.label, href: `/${p.slug}` })),
+                // Top developer portfolios by live project count (see the
+                // matching curation note in lib/seo-pages.ts).
+                { label: "Samana Developers Projects", href: "/samana-developers" },
+                { label: "Reportage Properties Projects", href: "/reportage-properties" },
+                { label: "Azizi Developments Projects", href: "/azizi-developments" },
+                { label: "Properties for Sale in Dubai", href: "/buy" },
+                { label: "Properties for Rent in Dubai", href: "/rent" },
+              ].map(({ label, href }) => (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    className="text-sm text-[#4b5563] hover:text-[#001f3f] hover:underline underline-offset-4 transition-colors duration-200 inline-block"
+                  >
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#a07c1f] mb-4">
+              Dubai Area Guides
+            </p>
+            <ul className="flex flex-wrap gap-x-6 gap-y-2.5">
+              {SEO_AREA_GUIDES.map((p) => (
+                <li key={p.slug}>
+                  <Link
+                    href={`/${p.slug}`}
+                    className="text-sm text-[#4b5563] hover:text-[#001f3f] hover:underline underline-offset-4 transition-colors duration-200 inline-block"
+                  >
+                    {p.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
       {/* Gold top accent strip */}
       <div className="relative z-10">
         <div className="h-[2px] bg-gradient-to-r from-transparent via-[#d6b357]/65 to-transparent" />
@@ -228,52 +283,6 @@ export function Footer() {
           </div>
         </div>
 
-        {/* ── Popular searches ─────────────────────────────
-            The SEO interlinking rail: every public page links to the
-            landing pages in lib/seo-pages.ts plus the strongest developer
-            portfolios, so crawlers reach them from anywhere on the site. */}
-        <div className="mt-12 pt-8 border-t border-white/[0.06]">
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#d6b357] mb-4">
-            Popular Searches in Dubai &amp; UAE
-          </p>
-          <ul className="flex flex-wrap gap-x-6 gap-y-2.5">
-            {[
-              ...SEO_SEARCH_PAGES.map((p) => ({ label: p.label, href: `/${p.slug}` })),
-              // Top developer portfolios by live project count (see the
-              // matching curation note in lib/seo-pages.ts).
-              { label: "Samana Developers Projects", href: "/samana-developers" },
-              { label: "Reportage Properties Projects", href: "/reportage-properties" },
-              { label: "Azizi Developments Projects", href: "/azizi-developments" },
-              { label: "Properties for Sale in Dubai", href: "/buy" },
-              { label: "Properties for Rent in Dubai", href: "/rent" },
-            ].map(({ label, href }) => (
-              <li key={href}>
-                <Link
-                  href={href}
-                  className="text-sm text-white/45 hover:text-[#d6b357] transition-colors duration-200 inline-block"
-                >
-                  {label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#d6b357] mb-4 mt-8">
-            Dubai Area Guides
-          </p>
-          <ul className="flex flex-wrap gap-x-6 gap-y-2.5">
-            {SEO_AREA_GUIDES.map((p) => (
-              <li key={p.slug}>
-                <Link
-                  href={`/${p.slug}`}
-                  className="text-sm text-white/45 hover:text-[#d6b357] transition-colors duration-200 inline-block"
-                >
-                  {p.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
       </div>
 
       {/* Bottom bar */}
