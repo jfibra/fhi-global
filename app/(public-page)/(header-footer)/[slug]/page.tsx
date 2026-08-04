@@ -447,6 +447,10 @@ export default async function DeveloperDetailPage({ params }: Props) {
 // developer portfolio above — no picture anywhere, no card — so these pages
 // can never degrade into grids of grey placeholders.
 async function SeoLandingPage({ seo }: { seo: SeoPage }) {
+  // Area guides are fully static content pages — no inventory query at all.
+  if (seo.kind === "guide") return <SeoGuidePage seo={seo} />
+
+  const filter = seo.filter ?? {}
   const supabase = createPublicSupabaseClient()
 
   let query = supabase
@@ -456,14 +460,14 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
     .eq("is_published", true)
     .order("created_at", { ascending: false })
 
-  if (seo.filter.cityLike) {
-    query = query.ilike("city", `%${seo.filter.cityLike}%`)
+  if (filter.cityLike) {
+    query = query.ilike("city", `%${filter.cityLike}%`)
   } else {
     // Portfolio-wide pages say "UAE" — keep the one-off foreign projects out
     // so the claim stays true.
     for (const c of NON_UAE_CITIES) query = query.not("city", "ilike", `%${c}%`)
   }
-  if (seo.filter.statuses?.length) query = query.in("status", seo.filter.statuses)
+  if (filter.statuses?.length) query = query.in("status", filter.statuses)
 
   const { data: projects } = await query
 
@@ -563,6 +567,195 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
               >
                 All Developers
               </Link>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Area guide (kind: "guide") — competitor-style static info page: editorial
+// intro beside a photo from OUR OWN portfolio, a "why invest here" card grid,
+// prose sections, then routes into the live inventory pages. The photo is a
+// real project we sell (and links to it) — not stock imagery.
+async function SeoGuidePage({ seo }: { seo: SeoPage }) {
+  const supabase = createPublicSupabaseClient()
+
+  type Photo = { url: string; name: string; slug: string | null }
+  let photo: Photo | null = null
+
+  if (seo.imageQuery) {
+    const { data } = await supabase
+      .from("projects")
+      .select("name, slug, main_image")
+      .eq("is_active", true)
+      .eq("is_published", true)
+      .not("main_image", "is", null)
+      .neq("main_image", "")
+      .not("name", "ilike", "%test%")
+      .or(`location.ilike.%${seo.imageQuery}%,name.ilike.%${seo.imageQuery}%`)
+      .limit(1)
+      .maybeSingle()
+    if (data?.main_image) photo = { url: data.main_image, name: data.name, slug: data.slug }
+  }
+  if (!photo) {
+    // No project in this exact area yet — pick from the Dubai pool, keyed by
+    // the slug so each guide keeps a stable, distinct photo between builds.
+    const { data: pool } = await supabase
+      .from("projects")
+      .select("name, slug, main_image")
+      .eq("is_active", true)
+      .eq("is_published", true)
+      .not("main_image", "is", null)
+      .neq("main_image", "")
+      .not("name", "ilike", "%test%")
+      .ilike("city", "%dubai%")
+      .order("created_at", { ascending: true })
+      .limit(12)
+    if (pool?.length) {
+      const idx = [...seo.slug].reduce((a, c) => a + c.charCodeAt(0), 0) % pool.length
+      const pick = pool[idx]
+      photo = { url: pick.main_image!, name: pick.name, slug: pick.slug }
+    }
+  }
+
+  const related = seo.related.map(getSeoPage).filter((r): r is SeoPage => Boolean(r))
+
+  return (
+    <div className="bg-white">
+      {/* Editorial intro — headline and copy on the left, our project photo on
+          the right, like the area pages on the major portals. */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-4">
+        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
+          FHI Global · Dubai Area Guide
+        </p>
+        <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-start">
+          <div>
+            <h1 className="font-['Outfit'] text-3xl md:text-[40px] font-bold text-[#001f3f] leading-tight">
+              {seo.h1}
+            </h1>
+            <span className="block w-14 h-1 rounded-full bg-[#d6b357] mt-4 mb-6" aria-hidden="true" />
+            <div className="space-y-4">
+              {seo.intro.map((paragraph) => (
+                <p key={paragraph.slice(0, 32)} className="text-[15.5px] leading-relaxed text-[#374151]">
+                  {paragraph}
+                </p>
+              ))}
+            </div>
+          </div>
+
+          {photo && (
+            <div>
+              <div className="relative aspect-[4/3] rounded-lg overflow-hidden ring-1 ring-[#e8eaed] shadow-[0_18px_44px_-18px_rgba(0,20,40,0.35)]">
+                <Image
+                  src={photo.url}
+                  alt={photo.name}
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  className="object-cover"
+                />
+              </div>
+              {photo.slug && (
+                <Link
+                  href={`/projects/${photo.slug}`}
+                  className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors"
+                >
+                  From our portfolio: {photo.name}
+                  <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Why invest here — the competitor-style check-card grid. */}
+      {seo.facts && seo.facts.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <h2 className="font-['Outfit'] text-2xl md:text-3xl font-bold text-[#001f3f] text-center">
+            Why invest in {seo.label}
+          </h2>
+          <span className="block w-14 h-1 rounded-full bg-[#d6b357] mt-3 mb-8 mx-auto" aria-hidden="true" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-4xl mx-auto">
+            {seo.facts.map((f) => (
+              <div key={f.label} className="bg-white rounded-lg border border-[#e8eaed] p-6">
+                <span className="inline-flex w-9 h-9 rounded-full bg-[#d6b357]/12 items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5 text-[#d6b357]" />
+                </span>
+                <p className="mt-3.5 font-['Outfit'] text-lg font-bold text-[#0d1117]">{f.label}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-[#4b5563]">{f.value}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Prose sections */}
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 space-y-10">
+        {seo.sections?.map((s) => (
+          <div key={s.heading}>
+            <h2 className="font-['Outfit'] text-2xl font-bold text-[#001f3f]">{s.heading}</h2>
+            <span className="block w-10 h-1 rounded-full bg-[#d6b357] mt-2 mb-4" aria-hidden="true" />
+            <p className="text-[15.5px] leading-relaxed text-[#374151]">{s.body}</p>
+          </div>
+        ))}
+      </section>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+        {/* Route into live inventory */}
+        <div className="bg-[#001f3f] rounded-lg p-6 sm:p-8">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#d6b357]">
+            Ready to look at properties?
+          </p>
+          <p className="mt-1.5 text-lg font-bold text-white">
+            See what&rsquo;s on the market right now.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/new-projects-in-dubai"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
+            >
+              New Projects in Dubai
+            </Link>
+            <Link
+              href="/buy"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-white/25 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-colors"
+            >
+              Buy
+            </Link>
+            <Link
+              href="/rent"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-white/25 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-colors"
+            >
+              Rent
+            </Link>
+            <Link
+              href="/contact"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-white/25 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-colors"
+            >
+              Talk to a consultant
+            </Link>
+          </div>
+        </div>
+
+        {/* Related guides & searches — the pages link into each other, so a
+            visitor (or crawler) can walk the whole set from any entry point. */}
+        {related.length > 0 && (
+          <div className="bg-[#f8fafc] rounded-lg border border-[#e8eaed] p-6">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af] mb-4">
+              Related areas &amp; searches
+            </p>
+            <div className="flex flex-wrap gap-2.5">
+              {related.map((r) => (
+                <Link
+                  key={r.slug}
+                  href={`/${r.slug}`}
+                  className="px-4 py-2 rounded-full border border-[#e5e5e5] bg-white text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] hover:bg-[#d6b357]/10 transition-colors"
+                >
+                  {r.label}
+                </Link>
+              ))}
             </div>
           </div>
         )}

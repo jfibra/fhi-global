@@ -2,7 +2,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { Phone, Mail, MapPin } from "lucide-react"
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
-import { SEO_PAGES } from "@/lib/seo-pages"
+import { SEO_SEARCH_PAGES, SEO_AREA_GUIDES } from "@/lib/seo-pages"
 
 function FacebookIcon() {
   return (
@@ -35,12 +35,14 @@ const ACCOUNT_LINKS = [
   { label: "Create Account", href: "/register" },
   { label: "Dashboard", href: "/dashboard" },
 ]
+// Pretty URLs, not query strings: /projects?status=… canonicalises back to
+// /projects, so those links passed no SEO value and looked like machine URLs
+// on hover. The landing pages in lib/seo-pages.ts are the crawlable versions.
 const PROJECT_LINKS = [
   { label: "All Projects",    href: "/projects" },
-  { label: "Featured",        href: "/projects?featured=true" },
-  { label: "Off-Plan",        href: "/projects?status=pre_launch" },
-  { label: "Ready to Move",   href: "/projects?status=completed" },
-  { label: "Latest Launches", href: "/projects?status=launch" },
+  { label: "Off-Plan",        href: "/off-plan-projects-in-uae" },
+  { label: "Ready to Move",   href: "/ready-properties-in-dubai" },
+  { label: "Latest Launches", href: "/new-projects-in-dubai" },
 ]
 
 export function Footer() {
@@ -236,7 +238,7 @@ export function Footer() {
           </p>
           <ul className="flex flex-wrap gap-x-6 gap-y-2.5">
             {[
-              ...SEO_PAGES.map((p) => ({ label: p.label, href: `/${p.slug}` })),
+              ...SEO_SEARCH_PAGES.map((p) => ({ label: p.label, href: `/${p.slug}` })),
               // Top developer portfolios by live project count (see the
               // matching curation note in lib/seo-pages.ts).
               { label: "Samana Developers Projects", href: "/samana-developers" },
@@ -251,6 +253,22 @@ export function Footer() {
                   className="text-sm text-white/45 hover:text-[#d6b357] transition-colors duration-200 inline-block"
                 >
                   {label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#d6b357] mb-4 mt-8">
+            Dubai Area Guides
+          </p>
+          <ul className="flex flex-wrap gap-x-6 gap-y-2.5">
+            {SEO_AREA_GUIDES.map((p) => (
+              <li key={p.slug}>
+                <Link
+                  href={`/${p.slug}`}
+                  className="text-sm text-white/45 hover:text-[#d6b357] transition-colors duration-200 inline-block"
+                >
+                  {p.label}
                 </Link>
               </li>
             ))}
