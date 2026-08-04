@@ -7,7 +7,7 @@ import { AuthProvider } from "@/context/auth-context"
 import { DashboardShell } from "@/components/dashboard/shell"
 import { ProfilePhotoGate } from "@/components/dashboard/profile-photo-gate"
 import { PageLoader } from "@/components/ui/PageLoader"
-import { getProfileByUserId, isInactiveProfile, isUploadedProfilePhoto, type AppProfile, type AppUser } from "@/lib/auth"
+import { getProfileByUserId, googleAvatarUrl, hasProfilePhoto, isInactiveProfile, type AppProfile, type AppUser } from "@/lib/auth"
 
 /**
  * Client-side session provisioning for the dashboard.
@@ -50,7 +50,20 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
         router.replace("/account-inactive")
         return
       }
-      setSession({ user: { id: user.id, email: user.email ?? null }, profile })
+      // If there's no saved photo yet but the user signed in with Google, adopt
+      // their Google avatar as the profile photo (persist best-effort so it
+      // displays everywhere and sticks) rather than forcing them to upload one
+      // they effectively already have. Only ever fills an empty profile_url —
+      // never overwrites an existing photo.
+      let resolved = profile
+      if (!hasProfilePhoto(profile.profile_url)) {
+        const gAvatar = googleAvatarUrl(user.user_metadata)
+        if (gAvatar) {
+          resolved = { ...profile, profile_url: gAvatar }
+          void supabase.from("profiles").update({ profile_url: gAvatar }).eq("id", user.id)
+        }
+      }
+      setSession({ user: { id: user.id, email: user.email ?? null }, profile: resolved })
     })()
     return () => {
       active = false
@@ -67,11 +80,12 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
   // page behind it never gets torn down mid-upload.
   //
   // This modal is THE photo enforcement for all roles — /complete-profile
-  // handles the written details but deliberately doesn't require the photo.
-  // isUploadedProfilePhoto also rejects the Google avatar OAuth copies onto
-  // profiles: a 96px Gmail thumbnail isn't the professional headshot the
-  // directory and business cards need.
-  const needsPhoto = !isUploadedProfilePhoto(session.profile.profile_url)
+  // handles the written details but deliberately doesn't require the photo. It
+  // is satisfied by ANY saved photo (an uploaded headshot or the Google avatar
+  // adopted above), so it only appears for accounts with no photo at all — e.g.
+  // email/password sign-ups. (isUploadedProfilePhoto, the stricter "real upload"
+  // rule, still governs spots where headshot quality specifically matters.)
+  const needsPhoto = !hasProfilePhoto(session.profile.profile_url)
 
   return (
     <AuthProvider user={session.user} profile={session.profile}>

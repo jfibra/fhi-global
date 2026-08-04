@@ -202,6 +202,26 @@ export function isUploadedProfilePhoto(url: string | null | undefined): boolean 
   return !!u && !/googleusercontent\.com/i.test(u)
 }
 
+/**
+ * Any usable profile photo for the dashboard photo gate — an uploaded headshot
+ * OR the Google avatar OAuth copies onto the profile. The gate only exists to
+ * stop the directory being full of blank initials, and a Google photo already
+ * clears that bar, so it should not force an upload on top of one. This is the
+ * looser counterpart to isUploadedProfilePhoto, which stays the rule anywhere
+ * headshot quality specifically matters (e.g. business-card / top-seller art).
+ */
+export function hasProfilePhoto(url: string | null | undefined): boolean {
+  return !!(url ?? "").trim()
+}
+
+/** The avatar a Supabase OAuth user carries in user_metadata (Google sets both
+ *  `avatar_url` and `picture`), or null when there isn't one. */
+export function googleAvatarUrl(userMetadata: Record<string, unknown> | null | undefined): string | null {
+  const m = userMetadata ?? {}
+  const raw = typeof m.avatar_url === "string" ? m.avatar_url : typeof m.picture === "string" ? m.picture : ""
+  return raw.trim() || null
+}
+
 export function isProfileMissingMinimumFields(profile: AppProfile) {
   const metadata = profile.metadata ?? {}
   const meta = (k: string) => (typeof metadata[k] === "string" ? (metadata[k] as string).trim() : "")

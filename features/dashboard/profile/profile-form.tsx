@@ -39,7 +39,10 @@ function getProfileCompletion(profile: DashboardProfile) {
     profile.birthday,
     profile.gender,
     profile.profile_url,
-    toSafeString(metadata.phone),
+    // The mobile number is stored under metadata.phone_number (set by the
+    // profile form and /complete-profile), not metadata.phone — checking the
+    // wrong key left a filled-in phone permanently uncounted.
+    toSafeString(metadata.phone_number),
     toSafeString(metadata.bio),
     toSafeString(metadata.linkedin),
   ]
