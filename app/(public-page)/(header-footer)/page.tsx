@@ -236,12 +236,12 @@ export default async function HomePage() {
           </div>
 
           {/* Navy sweep with gold trim along the bottom edge (mockup) */}
-          <div className="absolute bottom-0 left-0 right-0 pointer-events-none" aria-hidden="true">
+          {/* <div className="absolute bottom-0 left-0 right-0 pointer-events-none" aria-hidden="true">
             <svg viewBox="0 0 1440 110" preserveAspectRatio="none" className="block w-full h-[70px] sm:h-[90px]">
               <path d="M0,110 L0,58 C420,100 980,4 1440,44 L1440,110 Z" fill="#d6b357" />
               <path d="M0,110 L0,72 C420,112 980,20 1440,58 L1440,110 Z" fill="#001f3f" />
             </svg>
-          </div>
+          </div> */}
         </section>
       )}
 
