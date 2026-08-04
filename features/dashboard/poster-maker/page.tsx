@@ -3,38 +3,38 @@
 import { Suspense } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { ArrowLeft, ArrowRight, Building2, Clapperboard } from "lucide-react"
+import { ArrowLeft, ArrowRight, FileImage, LayoutTemplate } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
-import { canUseReelsMaker, isAdminStaffRole } from "@/lib/app-roles"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
-import { ReelsMakerClient } from "./reels-maker-client"
+import { PosterMakerClient } from "./poster-maker-client"
 
 const STUDIOS = [
   {
     type: "listings",
-    icon: Clapperboard,
-    title: "Listing Reels",
-    desc: "Build a branded 9:16 video reel from an agent listing — photos, title, price, and sale/rent fill in with one click.",
+    icon: FileImage,
+    title: "Listing Posters",
+    desc: "Create flyers and Just Listed / Sold announcement posters from any published listing — multiple templates and skins.",
   },
   {
     type: "projects",
-    icon: Building2,
-    title: "Project Reels",
-    desc: "Build a branded 9:16 video reel from a published project — gallery photos, location, and launch price fill in with one click.",
+    icon: LayoutTemplate,
+    title: "Project Posters",
+    desc: "Open a published project's Poster Studio — three designs across story, square, and print formats.",
   },
 ] as const
 
-/** Admin/super admin landing: choose which reel studio to open. */
+/** Landing: choose which poster studio to open. */
 function StudioBento({ pathname }: { pathname: string }) {
   return (
     <div className="w-full space-y-6">
       <div>
         <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] flex items-center gap-2">
-          <Clapperboard className="w-6 h-6 text-[#001f3f]" />
-          Reels Maker
+          <LayoutTemplate className="w-6 h-6 text-[#001f3f]" />
+          Poster Maker
         </h1>
         <p className="text-sm text-[#6b7280] mt-1">
-          Choose a studio — create branded 9:16 video reels for Facebook and Instagram.
+          Choose a studio — create branded flyers and posters for print and social media.
         </p>
       </div>
 
@@ -61,52 +61,36 @@ function StudioBento({ pathname }: { pathname: string }) {
   )
 }
 
-function ReelsMakerPageInner() {
-  const { user, profile, role } = useAuth()
+function PosterMakerPageInner() {
+  const { role } = useAuth()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const allowed = useRequireAllowed(canUseReelsMaker(role))
+  const allowed = useRequireAllowed(isAdminStaffRole(role))
   if (!allowed) return null
 
-  const initialListingId = searchParams.get("listing")
   const type = searchParams.get("type")
-  const hasBento = isAdminStaffRole(role)
-  const source = hasBento && type === "projects" ? "projects" : "listings"
-
-  // Admin staff land on the studio chooser; a ?listing= deep link from
-  // My listings still opens the listing studio directly.
-  if (hasBento && !type && !initialListingId) {
+  if (type !== "listings" && type !== "projects") {
     return <StudioBento pathname={pathname} />
   }
 
   return (
     <div className="w-full space-y-4">
-      {hasBento && (
-        <Link
-          href={pathname}
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          All studios
-        </Link>
-      )}
-      <ReelsMakerClient
-        key={source}
-        userId={user?.id ?? ""}
-        userName={profile?.fullname ?? user?.email ?? "User"}
-        avatarUrl={profile?.profile_url ?? null}
-        currentRole={role ?? "agent"}
-        initialListingId={initialListingId}
-        source={source}
-      />
+      <Link
+        href={pathname}
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        All studios
+      </Link>
+      <PosterMakerClient key={type} source={type} />
     </div>
   )
 }
 
-export default function ReelsMakerPage() {
+export default function PosterMakerPage() {
   return (
     <Suspense fallback={null}>
-      <ReelsMakerPageInner />
+      <PosterMakerPageInner />
     </Suspense>
   )
 }

@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Building2, Layers, Images,
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
-  Clapperboard, QrCode, ScrollText, Inbox, CalendarDays,
+  Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library,
 } from "lucide-react"
 import {
@@ -116,6 +116,7 @@ const EVENTS: NavEntry = { icon: CalendarDays, label: "Events", to: "events" }
 const PROJECTS: NavEntry = { icon: FolderOpen, label: "Projects", to: "projects" }
 const INVITE: NavEntry = { icon: QrCode, label: "Invite", to: "invite" }
 const REELS_MAKER: NavEntry = { icon: Clapperboard, label: "Reels Maker", to: "reels-maker" }
+const POSTER_MAKER: NavEntry = { icon: LayoutTemplate, label: "Poster Maker", to: "poster-maker" }
 const BUSINESS_CARD: NavEntry = { icon: CreditCard, label: "Business Card", to: "business-card" }
 const DIGITAL_CARD: NavEntry = { icon: Globe, label: "Digital Business Card", to: "digital-business-card" }
 const SALES_REPORTS: NavEntry = { icon: TrendingUp, label: "Sales Reports", to: "sales" }
@@ -173,7 +174,8 @@ const ADMIN_NAV: RoleNavEntry[] = [
     items: [
       { ...BUSINESS_CARD,  description: "Your shareable digital business card." },
       { ...DIGITAL_CARD, description: "The one link you share — contacts, socials and QR." },
-      { ...REELS_MAKER,   description: "Turn a listing into a shareable reel." },
+      { ...REELS_MAKER,   description: "Turn a listing or project into a shareable reel." },
+      { ...POSTER_MAKER,  description: "Flyers and posters from any listing or project." },
     ],
   },
   {

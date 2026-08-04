@@ -2077,9 +2077,14 @@ function proxiedListingPhoto(url: string) {
   return `/api/map-marker-image?url=${encodeURIComponent(url)}`
 }
 
-// A picker entry: the agent's own listing, or (for members) another agent's
-// published listing served by /api/reels-maker/listings with the agent's name.
-type PickerListing = AgentListing & { pickerAgentName?: string | null }
+// A picker entry: the agent's own listing, (for members) another agent's
+// published listing served by /api/reels-maker/listings with the agent's name,
+// or (in the Project Reels studio) a published project dressed as a listing.
+type PickerListing = AgentListing & {
+  pickerAgentName?: string | null
+  /** Set for Project Reels entries — prices render as "From …". */
+  pickerIsProject?: boolean
+}
 
 type PublishedListingDto = {
   id: string
@@ -2116,6 +2121,42 @@ function publishedDtoToListing(dto: PublishedListingDto): PickerListing {
   }
 }
 
+type ProjectDto = {
+  id: string
+  name: string
+  location: string | null
+  priceFrom: number | null
+  currency: string
+  developerName: string | null
+  images: { id: string; url: string; sort_order: number }[]
+}
+
+/** Dress a published project as a picker listing so the one-click flow —
+ *  photos, title, location, price — works unchanged for Project Reels. */
+function projectDtoToListing(dto: ProjectDto): PickerListing {
+  return {
+    id: dto.id,
+    agent_id: "",
+    project_id: null,
+    is_featured: false,
+    title: dto.name,
+    description: null,
+    listing_kind: "sale",
+    price: dto.priceFrom,
+    currency: dto.currency,
+    status: "published",
+    unit_type: null,
+    created_at: "",
+    updated_at: "",
+    deleted_at: null,
+    // applyListing reads projects?.name as the reel's location line.
+    projects: dto.location ? { id: 0, name: dto.location } : null,
+    agent_listing_images: dto.images,
+    pickerAgentName: dto.developerName,
+    pickerIsProject: true,
+  }
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export function ReelsMakerClient({
@@ -2124,6 +2165,7 @@ export function ReelsMakerClient({
   avatarUrl,
   currentRole,
   initialListingId,
+  source = "listings",
 }: {
   userId: string
   userName: string
@@ -2131,6 +2173,8 @@ export function ReelsMakerClient({
   avatarUrl?: string | null
   currentRole: string
   initialListingId?: string | null
+  /** What the one-click picker offers: agent listings or published projects. */
+  source?: "listings" | "projects"
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -2262,12 +2306,23 @@ export function ReelsMakerClient({
     }
   }, [])
 
-  // ── One-click reel: agents pick from their own listings; members (who can't
+  // ── One-click reel: the Project Reels studio browses published projects;
+  // otherwise agents pick from their own listings and members (who can't
   // create listings) browse every agent's published listings instead. ──
-  const isMemberPicker = currentRole.toLowerCase().trim() === "member"
+  const isProjectPicker = source === "projects"
+  const isMemberPicker = !isProjectPicker && currentRole.toLowerCase().trim() === "member"
   useEffect(() => {
     let alive = true
-    if (isMemberPicker) {
+    if (isProjectPicker) {
+      void fetch("/api/reels-maker/projects", { cache: "no-store" })
+        .then(async (res) => (res.ok ? ((await res.json()) as { projects?: ProjectDto[] }) : { projects: [] }))
+        .catch(() => ({ projects: [] as ProjectDto[] }))
+        .then((json) => {
+          if (!alive) return
+          setMyListings((json.projects ?? []).map(projectDtoToListing))
+          setListingsLoading(false)
+        })
+    } else if (isMemberPicker) {
       void fetch("/api/reels-maker/listings", { cache: "no-store" })
         .then(async (res) => (res.ok ? ((await res.json()) as { listings?: PublishedListingDto[] }) : { listings: [] }))
         .catch(() => ({ listings: [] as PublishedListingDto[] }))
@@ -2286,10 +2341,10 @@ export function ReelsMakerClient({
     return () => {
       alive = false
     }
-  }, [userId, isMemberPicker])
+  }, [userId, isMemberPicker, isProjectPicker])
 
   const applyListing = useCallback(
-    (listing: AgentListing) => {
+    (listing: PickerListing) => {
       stopPlayback()
       pausedAtRef.current = 0
       setProgress(0)
@@ -2299,7 +2354,9 @@ export function ReelsMakerClient({
       setLocation(listing.projects?.name ?? "")
       if (listing.price != null) {
         const amount = Number(listing.price).toLocaleString()
-        setPrice(`${listing.currency} ${amount}${listing.listing_kind === "rent" ? " / month" : ""}`)
+        // Projects advertise their launch price, so it reads as "From …".
+        const prefix = listing.pickerIsProject ? "From " : ""
+        setPrice(`${prefix}${listing.currency} ${amount}${listing.listing_kind === "rent" ? " / month" : ""}`)
       } else {
         setPrice("")
       }
@@ -2521,8 +2578,9 @@ export function ReelsMakerClient({
     })
   }, [])
 
+  const hasPickerSearch = isMemberPicker || isProjectPicker
   const listingQuery = listingSearch.trim().toLowerCase()
-  const visibleListings = !isMemberPicker || !listingQuery
+  const visibleListings = !hasPickerSearch || !listingQuery
     ? myListings
     : myListings.filter((l) =>
         [l.title, l.pickerAgentName ?? "", l.projects?.name ?? ""].some((s) => s.toLowerCase().includes(listingQuery)),
@@ -2548,18 +2606,24 @@ export function ReelsMakerClient({
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-6 items-start">
           {/* ── Controls ── */}
           <div className="space-y-5">
-            {/* One-click reel from a listing */}
+            {/* One-click reel from a listing or project */}
             <div className="bg-white rounded-2xl border border-[#e8eaed] p-5">
               <p className={labelCls}>
-                {isMemberPicker ? "One-click reel — pick a listing" : "One-click reel — pick one of my listings"}
+                {isProjectPicker
+                  ? "One-click reel — pick a project"
+                  : isMemberPicker
+                    ? "One-click reel — pick a listing"
+                    : "One-click reel — pick one of my listings"}
               </p>
               {listingsLoading ? (
                 <p className="text-sm text-[#9ca3af] flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Loading listings…
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading {isProjectPicker ? "projects" : "listings"}…
                 </p>
               ) : myListings.length === 0 ? (
                 <p className="text-sm text-[#9ca3af]">
-                  {isMemberPicker ? (
+                  {isProjectPicker ? (
+                    <>No published projects available yet — build a reel manually below.</>
+                  ) : isMemberPicker ? (
                     <>No published listings available yet — build a reel manually below.</>
                   ) : (
                     <>
@@ -2570,14 +2634,18 @@ export function ReelsMakerClient({
                 </p>
               ) : (
                 <>
-                  {isMemberPicker && (
+                  {hasPickerSearch && (
                     <div className="mb-3 flex items-center gap-2 bg-[#f3f4f6] rounded-xl px-3.5 py-2.5 border border-transparent focus-within:border-[#001f3f]/25 transition-all">
                       <Search className="w-4 h-4 text-[#9ca3af] flex-shrink-0" />
                       <input
                         type="text"
                         value={listingSearch}
                         onChange={(e) => setListingSearch(e.target.value)}
-                        placeholder="Search by property, agent, or project…"
+                        placeholder={
+                          isProjectPicker
+                            ? "Search by project, developer, or location…"
+                            : "Search by property, agent, or project…"
+                        }
                         className="flex-1 bg-transparent text-sm text-[#111827] placeholder-[#9ca3af] outline-none min-w-0"
                       />
                       {listingSearch && (
@@ -2586,7 +2654,9 @@ export function ReelsMakerClient({
                     </div>
                   )}
                   {visibleListings.length === 0 && (
-                    <p className="text-sm text-[#9ca3af]">No listings match your search.</p>
+                    <p className="text-sm text-[#9ca3af]">
+                      No {isProjectPicker ? "projects" : "listings"} match your search.
+                    </p>
                   )}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[420px] overflow-y-auto">
                     {visibleListings.map((l) => {
@@ -2625,7 +2695,7 @@ export function ReelsMakerClient({
                           </div>
                           <div className="p-2">
                             <p className="text-xs font-bold text-[#111827] truncate">{l.title}</p>
-                            {isMemberPicker && l.pickerAgentName && (
+                            {hasPickerSearch && l.pickerAgentName && (
                               <p className="text-[10px] font-semibold text-[#001f3f] truncate">{l.pickerAgentName}</p>
                             )}
                             <p className="text-[10px] text-[#6b7280] truncate">
@@ -2640,7 +2710,9 @@ export function ReelsMakerClient({
                     })}
                   </div>
                   <p className="mt-2 text-[11px] text-[#9ca3af]">
-                    Click a listing — photos, title, price, and sale/rent fill in automatically and stay editable below.
+                    {isProjectPicker
+                      ? "Click a project — photos, name, location, and launch price fill in automatically and stay editable below."
+                      : "Click a listing — photos, title, price, and sale/rent fill in automatically and stay editable below."}
                   </p>
                 </>
               )}
