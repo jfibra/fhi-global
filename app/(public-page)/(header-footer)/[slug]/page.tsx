@@ -5,8 +5,11 @@ import Link from "next/link"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
 import { ProjectCard, type ProjectCardData } from "@/components/project-card"
-import { SocialShare } from "@/components/social-share"
-import { Building2, Globe, Phone, Mail, MapPin, Star, CheckCircle2, ArrowLeft } from "lucide-react"
+import { SOCIAL_URLS } from "@/lib/social"
+import { Building2, Facebook, Mail, MapPin, Star, CheckCircle2, ArrowLeft } from "lucide-react"
+
+/** The company inbox shown across the public site (contact page, footer). */
+const CONTACT_EMAIL = "info@fhiglobal.ae"
 
 export const revalidate = 120
 
@@ -222,12 +225,39 @@ export default async function DeveloperDetailPage({ params }: Props) {
             </div>
           </div>
 
-          <div className="mt-8">
-            <SocialShare
-              title={`${developer.name} | FHI Global`}
-              text={`Explore projects by ${developer.name} on FHI Global.`}
-              variant="dark"
-            />
+          {/* Two calls to action, not a share rail. The old strip offered six
+              ways to hand our page to someone else; this asks the visitor to
+              follow us and to get in touch. Sized to be the loudest thing
+              below the developer name. */}
+          <div className="mt-8 rounded-[22px] border border-white/15 bg-[#001428]/55 backdrop-blur-md p-5 sm:p-6">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
+              Stay in the loop
+            </p>
+            <p className="mt-1.5 text-lg sm:text-xl font-bold text-white leading-snug">
+              New Dubai launches, price drops and open houses — first.
+            </p>
+
+            <div className="mt-5 flex flex-col sm:flex-row gap-3">
+              <a
+                href={SOCIAL_URLS.facebook}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Follow FHI Global on Facebook"
+                className="group inline-flex flex-1 items-center justify-center gap-3 rounded-2xl bg-[#1877F2] px-6 py-4 text-base font-bold text-white shadow-lg shadow-[#1877F2]/25 transition-all hover:bg-[#0f63d2] hover:-translate-y-0.5"
+              >
+                <Facebook className="h-6 w-6 shrink-0 fill-current" />
+                Follow us on Facebook
+              </a>
+
+              <a
+                href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Enquiry — ${developer.name}`)}`}
+                aria-label={`Email FHI Global about ${developer.name}`}
+                className="group inline-flex flex-1 items-center justify-center gap-3 rounded-2xl bg-[#d6b357] px-6 py-4 text-base font-bold text-[#001f3f] shadow-lg shadow-[#d6b357]/25 transition-all hover:bg-[#c8a544] hover:-translate-y-0.5"
+              >
+                <Mail className="h-6 w-6 shrink-0" />
+                {CONTACT_EMAIL}
+              </a>
+            </div>
           </div>
         </div>
       </section>
