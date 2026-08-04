@@ -770,37 +770,64 @@ function UserCard({
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(user) }
       }}
       aria-label={`Open ${displayName}'s account details`}
-      className="cursor-pointer rounded-2xl border border-black/[0.08] bg-white shadow-sm hover:shadow-md hover:border-[#001f3f]/25 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#001f3f]/15 transition-all p-4 sm:p-5"
+      className="group cursor-pointer overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-[0_2px_10px_rgba(0,20,40,0.06)] hover:shadow-[0_14px_40px_-14px_rgba(0,20,40,0.25)] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#001f3f]/15 transition-shadow flex flex-col md:flex-row"
     >
-      {/* Header — avatar + name + email + role (+ actions) */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="relative shrink-0">
-            <UserAvatar name={displayName} imageUrl={user.profile_url} size={52} />
-            <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full ring-2 ring-white ${dotColor}`} title={isDeleted ? "Deleted" : status} />
+      {/* ── Identity panel: navy, big avatar, name, role, email ───────────
+          The curved right edge is the design's signature; on mobile the
+          panel stacks and the curve moves to the bottom. */}
+      <div className="relative shrink-0 bg-[#0a2647] md:w-[300px] px-6 py-8 md:rounded-r-[64px] flex flex-col items-center justify-center text-center overflow-hidden">
+        {/* Faint concentric rings, echoing the mockup's depth */}
+        <span aria-hidden="true" className="pointer-events-none absolute -left-16 -top-16 w-64 h-64 rounded-full border border-white/[0.06]" />
+        <span aria-hidden="true" className="pointer-events-none absolute -right-24 -bottom-10 w-72 h-72 rounded-full border border-white/[0.05]" />
+
+        <div className="relative">
+          {/* White ring + status dot, sized big — the point of the redesign. */}
+          <div className="rounded-full ring-[3px] ring-white/90 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+            <UserAvatar name={displayName} imageUrl={user.profile_url} size={116} />
           </div>
-          <div className="min-w-0">
-            {/* Name + role on one line, email below */}
-            <div className="flex items-center gap-2 min-w-0">
-              <button type="button" onClick={() => onOpen(user)} className="min-w-0 text-left group/name">
-                <h3 className="text-[15px] font-bold text-[#0d1117] leading-tight truncate group-hover/name:text-[#001f3f] transition-colors">{displayName}</h3>
-              </button>
-              <span className="shrink-0" onClick={stop}>
-                <ChipSelect size="sm" value={(user.role ?? "member").toLowerCase()} onChange={(v) => onPatch(user.id, { role: v })} options={ROLE_OPTIONS} colorClass={roleChipCls(user.role)} />
-              </span>
-              {isDeleted && <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-600 font-bold uppercase tracking-wide">Deleted</span>}
-            </div>
-            <p className="text-xs text-[#6b7280] truncate mt-0.5">{user.email || "—"}</p>
-          </div>
+          <span
+            className={`absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full ring-[3px] ring-[#0a2647] ${dotColor}`}
+            title={isDeleted ? "Deleted" : status}
+          />
         </div>
 
-        {/* Actions — top right */}
-        <div className="flex items-center gap-3 shrink-0">
+        <button type="button" onClick={() => onOpen(user)} className="mt-5 max-w-full">
+          <h3 className="font-['Outfit'] text-[19px] font-bold text-white leading-snug break-words">
+            {displayName}
+          </h3>
+        </button>
+
+        <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2" onClick={stop}>
+          <ChipSelect
+            size="sm"
+            value={(user.role ?? "member").toLowerCase()}
+            onChange={(v) => onPatch(user.id, { role: v })}
+            options={ROLE_OPTIONS}
+            colorClass={roleChipCls(user.role)}
+          />
+          {isDeleted && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-200 font-bold uppercase tracking-wide">
+              Deleted
+            </span>
+          )}
+        </div>
+
+        {user.email && (
+          <p className="mt-3 flex items-center justify-center gap-1.5 text-[13px] text-white/70 max-w-full">
+            <Mail className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{user.email}</span>
+          </p>
+        )}
+      </div>
+
+      {/* ── Details panel ─────────────────────────────────────────────── */}
+      <div className="flex-1 min-w-0 p-5 sm:p-6">
+        <div className="flex items-center justify-end gap-3 mb-4">
           {isDeleted && (
             <button
               type="button"
               onClick={(e) => { stop(e); onRestore(user.id) }}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 hover:underline"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
             >
               <RotateCcw className="w-4 h-4" />
               Restore
@@ -809,66 +836,60 @@ function UserCard({
           <button
             type="button"
             onClick={() => onOpen(user)}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#001f3f] hover:underline"
+            className="inline-flex items-center gap-2 rounded-xl border border-black/[0.08] bg-white px-4 py-2.5 text-sm font-bold text-[#0d1117] shadow-sm hover:border-[#001f3f]/30 hover:text-[#001f3f] transition-colors"
           >
             <Eye className="w-4 h-4" />
             View details
           </button>
         </div>
-      </div>
 
-      {/* Details — three explicit columns */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 border-t border-[#f0f2f5] mt-4 pt-4">
-        {/* Column 1 — contact */}
-        <div className="space-y-4">
-          <CardField label="Phone" icon={<Phone />} iconClass={iconBlue}>
-            {phone || cardDash}
-          </CardField>
-          <CardField label="WhatsApp" icon={<WhatsAppIcon />} iconClass={iconGreen}>
-            {whatsapp || cardDash}
-          </CardField>
-          <CardField label="Facebook" icon={<Facebook />} iconClass={iconBlue}>
-            {facebook ? (
-              <a href={facebook} target="_blank" rel="noopener noreferrer" onClick={stop} title={facebook} className="block truncate text-blue-600 hover:underline">{facebook}</a>
-            ) : cardDash}
-          </CardField>
-          <CardField label="LinkedIn" icon={<Linkedin />} iconClass={iconBlue}>
-            {linkedin ? (
-              <a href={linkedin} target="_blank" rel="noopener noreferrer" onClick={stop} title={linkedin} className="block truncate text-blue-600 hover:underline">{linkedin}</a>
-            ) : cardDash}
-          </CardField>
-        </div>
+        {/* Two columns of fields, hairline-separated like the design. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
+          <div className="divide-y divide-[#f0f2f5]">
+            <CardField label="Phone" icon={<Phone />} iconClass={iconBlue} className="py-3.5 first:pt-0">
+              {phone || cardDash}
+            </CardField>
+            <CardField label="WhatsApp" icon={<WhatsAppIcon />} iconClass={iconGreen} className="py-3.5">
+              {whatsapp || cardDash}
+            </CardField>
+            <CardField label="Facebook" icon={<Facebook />} iconClass={iconBlue} className="py-3.5">
+              {facebook ? (
+                <a href={facebook} target="_blank" rel="noopener noreferrer" onClick={stop} title={facebook} className="block truncate text-blue-600 hover:underline">{facebook}</a>
+              ) : cardDash}
+            </CardField>
+            <CardField label="LinkedIn" icon={<Linkedin />} iconClass={iconBlue} className="py-3.5">
+              {linkedin ? (
+                <a href={linkedin} target="_blank" rel="noopener noreferrer" onClick={stop} title={linkedin} className="block truncate text-blue-600 hover:underline">{linkedin}</a>
+              ) : cardDash}
+            </CardField>
+            <CardField label="Team" icon={<Building2 />} iconClass={iconBlue} className="py-3.5 sm:last:pb-0">
+              {cardDash}
+            </CardField>
+          </div>
 
-        {/* Column 2 — team */}
-        <div className="space-y-4">
-          <CardField label="Team" icon={<Building2 />} iconClass={iconBlue}>
-            {cardDash}
-          </CardField>
-          <CardField label="Team Position" icon={<Briefcase />} iconClass={iconBlue}>
-            {cardDash}
-          </CardField>
-          <CardField label="Timezone" icon={<Clock />} iconClass={iconBlue}>
-            <span className="truncate block">{user.timezone ? timezoneLabel(user.timezone) : cardDash}</span>
-          </CardField>
-        </div>
-
-        {/* Column 3 — network */}
-        <div className="space-y-4">
-          <CardField label="Referred by" icon={<Users />} iconClass={iconBlue}>
-            <span className="capitalize">
-              {invitedBy
-                ? toTitleCase(user.referred_by_name ?? referrerName.get(invitedBy) ?? "Unknown")
-                : cardDash}
-            </span>
-          </CardField>
-          <CardField label="Joined" icon={<Calendar />} iconClass={iconBlue}>
-            <span className="tabular-nums">{user.joined_at ? `${formatDateInZone(user.joined_at, "Asia/Dubai")} · ${formatTimeInZone(user.joined_at, "Asia/Dubai")} GST` : cardDash}</span>
-          </CardField>
-          <CardField label="Status" icon={<BadgeCheck />} iconClass={iconBlue}>
-            <span className="inline-block" onClick={stop}>
-              <ChipSelect size="sm" value={status} onChange={(v) => onPatch(user.id, { status: v })} options={STATUS_OPTIONS} colorClass={statusChipCls(user.status)} />
-            </span>
-          </CardField>
+          <div className="divide-y divide-[#f0f2f5]">
+            <CardField label="Referred by" icon={<Users />} iconClass={iconBlue} className="py-3.5 sm:first:pt-0">
+              <span className="capitalize">
+                {invitedBy
+                  ? toTitleCase(user.referred_by_name ?? referrerName.get(invitedBy) ?? "Unknown")
+                  : cardDash}
+              </span>
+            </CardField>
+            <CardField label="Joined" icon={<Calendar />} iconClass={iconBlue} className="py-3.5">
+              <span className="tabular-nums">{user.joined_at ? `${formatDateInZone(user.joined_at, "Asia/Dubai")} · ${formatTimeInZone(user.joined_at, "Asia/Dubai")} GST` : cardDash}</span>
+            </CardField>
+            <CardField label="Status" icon={<BadgeCheck />} iconClass={iconBlue} className="py-3.5">
+              <span className="inline-block" onClick={stop}>
+                <ChipSelect size="sm" value={status} onChange={(v) => onPatch(user.id, { status: v })} options={STATUS_OPTIONS} colorClass={statusChipCls(user.status)} />
+              </span>
+            </CardField>
+            <CardField label="Timezone" icon={<Clock />} iconClass={iconBlue} className="py-3.5">
+              <span className="truncate block">{user.timezone ? timezoneLabel(user.timezone) : cardDash}</span>
+            </CardField>
+            <CardField label="Team Position" icon={<Briefcase />} iconClass={iconBlue} className="py-3.5 sm:last:pb-0">
+              {cardDash}
+            </CardField>
+          </div>
         </div>
       </div>
     </div>
