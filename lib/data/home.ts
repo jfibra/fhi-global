@@ -2,6 +2,26 @@ import { unstable_cache } from "next/cache"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 
 /**
+ * The 11 developers shown in the homepage "Featured Developers" strip.
+ * DAMAC is not in the developers table yet — both slug variants are listed so
+ * it appears automatically once it's added under either.
+ */
+const FEATURED_DEVELOPER_SLUGS = [
+  "acube-developments",
+  "aldar-development",
+  "azizi-developments",
+  "damac",
+  "damac-properties",
+  "danube-properties",
+  "dugasta",
+  "ellington-properties",
+  "imtiaz-development",
+  "qube-development",
+  "samana-developers",
+  "sobha-realty",
+]
+
+/**
  * Cached home payload: avoids repeated Supabase round-trips during revalidate window
  * and removes an unbounded "all cities" scan (capped to recent projects).
  */
@@ -13,10 +33,10 @@ async function loadHomePageData() {
       supabase
         .from("developers")
         .select("id, name, slug, description, logo_url, rating, is_verified")
+        .in("slug", FEATURED_DEVELOPER_SLUGS)
         .eq("is_active", true)
         .is("deleted_at", null)
-        .order("name")
-        .limit(8),
+        .order("name"),
       supabase
         .from("projects")
         .select(

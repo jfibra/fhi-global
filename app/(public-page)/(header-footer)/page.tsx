@@ -6,9 +6,9 @@ import { createPageMetadata } from "@/lib/seo";
 import { HeroSection } from "@/components/hero-section";
 import { Reveal } from "@/components/public/reveal";
 import {
-  DeveloperCard,
-  type DeveloperCardData,
-} from "@/components/developer-card";
+  DeveloperLogoCarousel,
+  type DeveloperLogoItem,
+} from "@/components/public/developer-logo-carousel";
 import { ProjectCard, type ProjectCardData } from "@/components/project-card";
 import {
   Building2,
@@ -209,54 +209,30 @@ export default async function HomePage() {
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Section header */}
             <Reveal>
-            <div className="flex items-end justify-between mb-14">
-              <div>
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-[#d6b357]/50 rounded-full text-xs font-bold uppercase tracking-wider text-[#001f3f] mb-5 shadow-sm">
-                  <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" />
-                  Our Partners
-                </div>
-                <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight">
-                  <span className="text-[#0d1117]">Featured</span>{" "}
-                  <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
-                    Developers
-                  </span>
-                </h2>
-                <p className="text-[#4b5563] text-base leading-relaxed mt-4 max-w-xl">
-                  We collaborate with the most trusted and innovative real estate developers in Dubai
-                  to bring you exceptional properties and investment opportunities.
-                </p>
+            <div className="text-center mb-14">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-[#d6b357]/50 rounded-full text-xs font-bold uppercase tracking-wider text-[#001f3f] mb-5 shadow-sm">
+                <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" />
+                Our Partners
               </div>
-              <Link
-                href="/developers"
-                className="hidden sm:inline-flex items-center gap-3 bg-[#001f3f] text-white pl-6 pr-2 py-2 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-[0_10px_30px_-6px_rgba(0,31,63,0.5)] shadow-md shrink-0"
-              >
-                View All Developers
-                <span className="w-8 h-8 rounded-full bg-gradient-to-br from-[#d6b357] to-[#b8913f] flex items-center justify-center">
-                  <ArrowRight className="w-4 h-4 text-[#001f3f]" />
+              <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight">
+                <span className="text-[#0d1117]">Trusted</span>{" "}
+                <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
+                  Partners
                 </span>
-              </Link>
+              </h2>
+              <p className="text-[#4b5563] text-base leading-relaxed mt-4 max-w-xl mx-auto">
+                We collaborate with the most trusted and innovative real estate developers in Dubai
+                to bring you exceptional properties and investment opportunities.
+              </p>
             </div>
             </Reveal>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {developers.map((dev, i) => (
-                <Reveal key={dev.id} delay={(i % 2) * 130}>
-                  <DeveloperCard developer={dev as DeveloperCardData} />
-                </Reveal>
-              ))}
-            </div>
+            <Reveal>
+              <DeveloperLogoCarousel
+                developers={developers as DeveloperLogoItem[]}
+              />
+            </Reveal>
 
-            <div className="mt-8 sm:hidden text-center">
-              <Link
-                href="/developers"
-                className="bg-[#001f3f] text-white pl-6 pr-2 py-2 rounded-full font-semibold text-sm inline-flex items-center gap-3"
-              >
-                View All Developers
-                <span className="w-8 h-8 rounded-full bg-gradient-to-br from-[#d6b357] to-[#b8913f] flex items-center justify-center">
-                  <ArrowRight className="w-4 h-4 text-[#001f3f]" />
-                </span>
-              </Link>
-            </div>
           </div>
 
           {/* Navy sweep with gold trim along the bottom edge (mockup) */}
