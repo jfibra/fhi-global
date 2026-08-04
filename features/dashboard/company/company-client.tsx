@@ -274,7 +274,7 @@ export function CompanyClient({
                     className={inputCls + " font-mono text-xs pr-40"}
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#9ca3af] pointer-events-none">
-                    /developers/{form.slug || "slug"}
+                    /{form.slug || "slug"}
                   </span>
                 </div>
                 <p className="text-[11px] text-[#9ca3af] mt-1.5 ml-1">
@@ -288,7 +288,7 @@ export function CompanyClient({
                 <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                 <span>
                   Slug change to <span className="font-mono font-semibold">{developer.pending_slug}</span> is awaiting admin approval.
-                  Your live URL is still <span className="font-mono">/developers/{developer.slug}</span>.
+                  Your live URL is still <span className="font-mono">/{developer.slug}</span>.
                 </span>
               </div>
             )}

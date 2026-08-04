@@ -109,7 +109,9 @@ export function ProjectSeoTab({ project, onSave, showToast }: Props) {
             <p className="text-[#1a0dab] text-base font-medium leading-tight hover:underline cursor-pointer truncate">
               {metaTitle || project.name}
             </p>
-            <p className="text-[#006621] text-xs">https://fhiglobal.ae/projects/{project.slug}</p>
+            <p className="text-[#006621] text-xs">
+              https://fhiglobal.ae{project.developers?.slug ? `/${project.developers.slug}/${project.slug}` : `/projects/${project.slug}`}
+            </p>
             <p className="text-[#545454] text-sm leading-snug line-clamp-2">{metaDescription || project.description || "No description"}</p>
           </div>
         </div>

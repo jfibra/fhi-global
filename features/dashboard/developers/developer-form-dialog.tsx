@@ -237,9 +237,9 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-amber-900">Slug change requested</p>
                     <p className="text-xs text-amber-800 mt-0.5">
-                      <span className="font-mono">/developers/{editDeveloper.slug}</span>
+                      <span className="font-mono">/{editDeveloper.slug}</span>
                       <span className="mx-1.5">→</span>
-                      <span className="font-mono font-semibold">/developers/{editDeveloper.pending_slug}</span>
+                      <span className="font-mono font-semibold">/{editDeveloper.pending_slug}</span>
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">

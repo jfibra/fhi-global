@@ -221,7 +221,7 @@ export function FeaturedPanel({
       if (!p) return []
       return [{
         kind: "project" as const,
-        href: `/projects/${p.slug}`,
+        href: p.developers?.slug ? `/${p.developers.slug}/${p.slug}` : `/projects/${p.slug}`,
         title: p.name,
         subtitle: p.city ?? "",
         price: money(p.launch_price_from, p.currency),

@@ -69,18 +69,18 @@ export function locationLineFor(project: Project): string {
 
 /** Rows returned by createProject/duplicateProject lack the developers join —
  *  fall back to fetching the developer directly so branding never goes blank. */
-async function resolveDeveloper(project: Project): Promise<{ name: string; logo_url: string | null }> {
+async function resolveDeveloper(project: Project): Promise<{ name: string; logo_url: string | null; slug: string | null }> {
   if (project.developers?.name) {
-    return { name: project.developers.name, logo_url: project.developers.logo_url ?? null }
+    return { name: project.developers.name, logo_url: project.developers.logo_url ?? null, slug: project.developers.slug ?? null }
   }
-  if (!project.developer_id) return { name: "", logo_url: null }
+  if (!project.developer_id) return { name: "", logo_url: null, slug: null }
   const { data } = await createClient()
     .from("developers")
-    .select("name, logo_url")
+    .select("name, logo_url, slug")
     .eq("id", project.developer_id)
     .maybeSingle()
-  const dev = data as { name: string; logo_url: string | null } | null
-  return { name: dev?.name ?? "", logo_url: dev?.logo_url ?? null }
+  const dev = data as { name: string; logo_url: string | null; slug: string | null } | null
+  return { name: dev?.name ?? "", logo_url: dev?.logo_url ?? null, slug: dev?.slug ?? null }
 }
 
 export async function assembleProjectMarketing(project: Project): Promise<ProjectMarketingData> {
@@ -119,7 +119,9 @@ export async function assembleProjectMarketing(project: Project): Promise<Projec
     amenities,
     contactPhone: project.sales_contact_phone?.trim() || null,
     contactEmail: project.sales_contact_email?.trim() || null,
-    publicUrl: `${SITE_URL}/projects/${project.slug}`,
+    publicUrl: developer.slug
+      ? `${SITE_URL}/${developer.slug}/${project.slug}`
+      : `${SITE_URL}/projects/${project.slug}`,
     tagline: project.description?.trim() || "",
   }
 }

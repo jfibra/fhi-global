@@ -63,7 +63,7 @@ async function loadFeatured(
     projectIds.length
       ? admin
           .from("projects")
-          .select("id, name, slug, city, main_image, launch_price_from, currency")
+          .select("id, name, slug, city, main_image, launch_price_from, currency, developers(slug)")
           .in("id", projectIds)
           .eq("is_published", true)
           .is("deleted_at", null)
@@ -97,9 +97,10 @@ async function loadFeatured(
   const projects: FeaturedItem[] = projectIds.flatMap((pid) => {
     const p = byId.get(pid)
     if (!p) return []
+    const dev = p.developers as { slug?: string | null } | null
     return [{
       kind: "project" as const,
-      href: `/projects/${p.slug as string}`,
+      href: dev?.slug ? `/${dev.slug}/${p.slug as string}` : `/projects/${p.slug as string}`,
       title: String(p.name ?? "Project"),
       subtitle: typeof p.city === "string" ? p.city : "",
       price: money(p.launch_price_from as number | null, p.currency as string | null),

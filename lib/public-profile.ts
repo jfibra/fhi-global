@@ -374,7 +374,7 @@ export function readFeaturedProjects(metadata: unknown): number[] {
  */
 export type FeaturedItem = {
   kind: "listing" | "project"
-  /** Public path — /listings/<slug> or /projects/<slug>. */
+  /** Public path — /listings/<slug> or /<developer>/<project>. */
   href: string
   title: string
   /** Location for a project, unit/kind for a listing. Blank hides the line. */

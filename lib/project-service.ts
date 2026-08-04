@@ -276,7 +276,7 @@ export async function fetchProjects(params: {
 
   let q = supabase
     .from("projects")
-    .select("id, uuid, name, slug, listing_type, status, developer_id, city, country, main_image, is_active, is_published, is_featured, is_premium, launch_price_from, launch_price_to, currency, created_at, updated_at, deleted_at, developers(name, logo_url)", { count: "exact" })
+    .select("id, uuid, name, slug, listing_type, status, developer_id, city, country, main_image, is_active, is_published, is_featured, is_premium, launch_price_from, launch_price_to, currency, created_at, updated_at, deleted_at, developers(name, logo_url, slug)", { count: "exact" })
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .range(from, to)

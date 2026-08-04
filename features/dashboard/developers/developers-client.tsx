@@ -1024,7 +1024,7 @@ export function DevelopersClient({ currentRole }: Props) {
         onSlugReviewed={(dev, approved) => {
           setShowForm(false)
           setDevs((prev) => prev.map((d) => d.id === dev.id ? dev : d))
-          addToast("success", approved ? `Slug approved — now /developers/${dev.slug}` : "Slug change rejected.")
+          addToast("success", approved ? `Slug approved — now /${dev.slug}` : "Slug change rejected.")
         }}
         onError={(msg) => addToast("error", msg)}
       />

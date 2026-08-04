@@ -297,7 +297,7 @@ export default async function PublicAgentListingPage({ params }: Props) {
             {proj?.slug && (
               <p>
                 <Link
-                  href={`/projects/${proj.slug}`}
+                  href={proj.developers?.slug ? `/${proj.developers.slug}/${proj.slug}` : `/projects/${proj.slug}`}
                   className="text-sm font-semibold text-[#001f3f] hover:text-[#d6b357] underline underline-offset-2"
                 >
                   View developer project: {proj.name}
