@@ -67,7 +67,7 @@ export function SocialShare({ title, text, variant = "light" }: SocialShareProps
     ? "text-xs font-bold uppercase tracking-[0.2em] text-[#d6b357]"
     : "text-xs font-bold uppercase tracking-widest text-[#6b7280]"
   const btnBase = isBare
-    ? "group inline-flex w-[62px] flex-col items-center gap-1.5 py-1 text-[10.5px] font-semibold text-white/70 hover:text-[#d6b357] transition-colors"
+    ? "group inline-flex w-[58px] flex-col items-center gap-1.5 py-1 text-[10.5px] font-semibold text-white/70 hover:text-[#d6b357] transition-colors"
     : isDark
     ? "inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/[0.06] px-4 py-2 text-xs font-semibold text-white hover:border-[#d6b357]/70 hover:bg-[#d6b357]/15 hover:text-[#f0d890] transition-colors"
     : "inline-flex items-center gap-2 rounded-xl border border-[#e8eaed] bg-white px-3 py-2 text-xs font-semibold text-[#0d1117] hover:bg-[#fafafa] transition-colors"

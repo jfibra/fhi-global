@@ -210,9 +210,9 @@ export default async function ProjectDetailPage({ params }: Props) {
         )}
         {/* Left-weighted scrim: keeps the copy legible while the photo stays
             visible on the right, where the building usually is. */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/90 via-[#001428]/55 to-[#001428]/15" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/75 via-[#001428]/35 to-[#001428]/5" />
 
-        <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="relative w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-10 lg:gap-14 items-end">
             <div className="max-w-2xl">
               <div className="flex items-center gap-3 mb-5">
@@ -289,7 +289,7 @@ export default async function ProjectDetailPage({ params }: Props) {
 
       {/* Back link — out of the hero so it doesn't crowd the title. */}
       <div className="bg-white border-b border-[#e8eaed]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <Link
             href={developer?.slug ? `/${developer.slug}` : "/projects"}
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors"
@@ -304,7 +304,7 @@ export default async function ProjectDetailPage({ params }: Props) {
              stats, rather than leaving an empty navy strip under the hero. ── */}
       {quickStats.length > 0 && (
       <div className="bg-[#001f3f] border-b border-[#d6b357]/25">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-wrap gap-x-10 gap-y-5">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-wrap gap-x-10 gap-y-5">
           {[
             { icon: Calendar, label: "Completion", value: project.delivery_quarter ?? (project.expected_completion_date ? new Date(project.expected_completion_date).toLocaleDateString("en-AE", { month: "short", year: "numeric" }) : null) },
             { icon: Home, label: "Total Units", value: project.total_units?.toLocaleString() },
@@ -333,7 +333,7 @@ export default async function ProjectDetailPage({ params }: Props) {
       {/* ── Main content — flat editorial layout, per the approved mockup:
              uppercase section headings with a hairline, content directly on
              the white page. No floating cards, no rounded corners. ── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-3 gap-10 lg:gap-12">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-3 gap-10 lg:gap-12">
         {/* Left / main column */}
         <div className="lg:col-span-2 space-y-12">
 
