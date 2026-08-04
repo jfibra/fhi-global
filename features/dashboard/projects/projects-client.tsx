@@ -53,7 +53,21 @@ const titleCase = (s: string) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpp
 // Background adapts to the logo's own baked-in background color (sampled from
 // its corner pixels); white when there's no confident answer. The bottom border
 // keeps a visible separation when that color is white like the card body.
-function DevLogoCover({ url, name, verified, active }: { url: string | null; name: string; verified: boolean; active: boolean }) {
+function DevLogoCover({
+  url,
+  name,
+  verified,
+  active,
+  showStatus,
+}: {
+  url: string | null
+  name: string
+  /** Show the Verified badge — only when the Verifications filter is applied. */
+  verified: boolean
+  active: boolean
+  /** Show the Active/Inactive badge — only when the Status filter is applied. */
+  showStatus: boolean
+}) {
   const [bg, setBg] = useState<string | null>(null)
   useEffect(() => {
     if (!url) return
@@ -68,7 +82,7 @@ function DevLogoCover({ url, name, verified, active }: { url: string | null; nam
 
   return (
     <div
-      className="relative m-3 mb-0 h-44 border-b border-[#e5e7eb] flex items-center justify-center overflow-hidden"
+      className="relative m-3 mb-0 h-44 border border-[#e5e7eb] flex items-center justify-center overflow-hidden"
       style={{ backgroundColor: bg ?? "#ffffff" }}
     >
       {url ? (
@@ -86,9 +100,11 @@ function DevLogoCover({ url, name, verified, active }: { url: string | null; nam
           Verified
         </span>
       )}
-      <span className="absolute top-3 right-3 text-[11px] px-3 py-1 font-bold tracking-wider bg-[#232d3b]/95 text-white">
-        {active ? "Active" : "Inactive"}
-      </span>
+      {showStatus && (
+        <span className="absolute top-3 right-3 text-[11px] px-3 py-1 font-bold tracking-wider bg-[#232d3b]/95 text-white">
+          {active ? "Active" : "Inactive"}
+        </span>
+      )}
     </div>
   )
 }
@@ -741,7 +757,13 @@ export function ProjectsClient({
                       onClick={() => openDeveloperProjects(d.id)}
                       className="group text-left bg-white border border-[#eceef2] overflow-hidden shadow-[0_2px_12px_-6px_rgba(0,31,63,0.10)] hover:shadow-[0_16px_40px_-12px_rgba(0,31,63,0.28)] hover:-translate-y-1 hover:border-[#d6b357]/60 transition-all duration-200"
                     >
-                      <DevLogoCover url={d.logo_url} name={d.name} verified={d.is_verified} active={d.is_active} />
+                      <DevLogoCover
+                        url={d.logo_url}
+                        name={d.name}
+                        verified={devVerified !== "all" && d.is_verified}
+                        active={d.is_active}
+                        showStatus={devStatus !== "all"}
+                      />
                       <div className="p-4 pt-3.5">
                         <p className="font-['Outfit'] text-[17px] font-bold text-[#0f2940] truncate">{d.name}</p>
                         <p className="mt-1.5 flex items-center gap-2 text-[13px] text-[#6b7280]">
