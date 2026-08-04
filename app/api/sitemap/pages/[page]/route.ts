@@ -1,9 +1,10 @@
 import { SITE_URL, buildUrlsetXml, sitemapResponse } from "@/lib/sitemap-helpers"
+import { SEO_PAGES } from "@/lib/seo-pages"
 
 /** /sitemap-pages-1.xml — the static top-level pages. */
 export const dynamic = "force-dynamic"
 
-const PAGES_LASTMOD = "2026-08-03"
+const PAGES_LASTMOD = "2026-08-04"
 
 const STATIC_PATHS = [
   "/",
@@ -15,6 +16,9 @@ const STATIC_PATHS = [
   "/news",
   "/about",
   "/contact",
+  // Popular-searches landing pages (lib/seo-pages.ts) — derived from the
+  // catalog so a new entry is in the sitemap the moment it ships.
+  ...SEO_PAGES.map((p) => `/${p.slug}`),
 ]
 
 export async function GET(_req: Request, ctx: { params: Promise<{ page: string }> }) {

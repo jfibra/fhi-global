@@ -2,6 +2,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { Phone, Mail, MapPin } from "lucide-react"
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
+import { SEO_PAGES } from "@/lib/seo-pages"
 
 function FacebookIcon() {
   return (
@@ -223,6 +224,37 @@ export function Footer() {
               ))}
             </ul>
           </div>
+        </div>
+
+        {/* ── Popular searches ─────────────────────────────
+            The SEO interlinking rail: every public page links to the
+            landing pages in lib/seo-pages.ts plus the strongest developer
+            portfolios, so crawlers reach them from anywhere on the site. */}
+        <div className="mt-12 pt-8 border-t border-white/[0.06]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#d6b357] mb-4">
+            Popular Searches in Dubai &amp; UAE
+          </p>
+          <ul className="flex flex-wrap gap-x-6 gap-y-2.5">
+            {[
+              ...SEO_PAGES.map((p) => ({ label: p.label, href: `/${p.slug}` })),
+              // Top developer portfolios by live project count (see the
+              // matching curation note in lib/seo-pages.ts).
+              { label: "Samana Developers Projects", href: "/samana-developers" },
+              { label: "Reportage Properties Projects", href: "/reportage-properties" },
+              { label: "Azizi Developments Projects", href: "/azizi-developments" },
+              { label: "Properties for Sale in Dubai", href: "/buy" },
+              { label: "Properties for Rent in Dubai", href: "/rent" },
+            ].map(({ label, href }) => (
+              <li key={href}>
+                <Link
+                  href={href}
+                  className="text-sm text-white/45 hover:text-[#d6b357] transition-colors duration-200 inline-block"
+                >
+                  {label}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 

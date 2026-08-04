@@ -6,6 +6,7 @@ import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
 import { ProjectCard, type ProjectCardData } from "@/components/project-card"
 import { SOCIAL_URLS } from "@/lib/social"
+import { getSeoPage, NON_UAE_CITIES, type SeoPage } from "@/lib/seo-pages"
 import { Building2, Facebook, Mail, MapPin, Star, CheckCircle2, ArrowLeft } from "lucide-react"
 
 /** The company inbox shown across the public site (contact page, footer). */
@@ -25,12 +26,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     .eq("slug", slug)
     .is("deleted_at", null)
     .maybeSingle()
-  // notFound() here, not a placeholder title: as the root-level catch-all,
-  // this page answers every unmatched URL on the site. Returning metadata
-  // lets the route start streaming, after which the page body's notFound()
-  // can only swap the UI — the 200 is already on the wire. Aborting in
-  // metadata is what turns a mistyped URL into a real HTTP 404.
-  if (!data) notFound()
+  // Not a developer? The slug may be one of the curated SEO landing pages
+  // (new-projects-in-dubai, …) served by this same root segment.
+  if (!data) {
+    const seo = getSeoPage(slug)
+    if (seo) {
+      return createPageMetadata({
+        title: `${seo.title} | FHI Global`,
+        description: seo.description,
+        openGraphTitle: `${seo.h1} | FHI Global`,
+        openGraphDescription: seo.description,
+        pathname: `/${seo.slug}`,
+        keywords: [seo.h1, "Dubai real estate", "UAE property", "off-plan Dubai"],
+      })
+    }
+    // notFound() here, not a placeholder title: as the root-level catch-all,
+    // this page answers every unmatched URL on the site. Returning metadata
+    // lets the route start streaming, after which the page body's notFound()
+    // can only swap the UI — the 200 is already on the wire. Aborting in
+    // metadata is what turns a mistyped URL into a real HTTP 404.
+    notFound()
+  }
 
   const ogImage = `${siteUrl}/og/developer/${slug}`
   const description = data.description ?? `Explore projects by ${data.name} on FHI Global.`
@@ -62,7 +78,13 @@ export default async function DeveloperDetailPage({ params }: Props) {
     console.error("[developer-detail] query error:", devError.message)
     notFound()
   }
-  if (!developer) notFound()
+  if (!developer) {
+    // Same fallthrough as generateMetadata: curated SEO landing pages share
+    // this root segment with developer profiles. Developers win on collision.
+    const seo = getSeoPage(slug)
+    if (seo) return <SeoLandingPage seo={seo} />
+    notFound()
+  }
 
   const { data: projects } = await supabase
     .from("projects")
@@ -415,6 +437,136 @@ export default async function DeveloperDetailPage({ params }: Props) {
         </section>
       </div>
 
+    </div>
+  )
+}
+
+// ─── SEO landing pages ─────────────────────────────────────────────────────
+// fhiglobal.ae/new-projects-in-dubai and friends: a curated intro + a live,
+// server-rendered project grid. The grid uses the same visibility rule as the
+// developer portfolio above — no picture anywhere, no card — so these pages
+// can never degrade into grids of grey placeholders.
+async function SeoLandingPage({ seo }: { seo: SeoPage }) {
+  const supabase = createPublicSupabaseClient()
+
+  let query = supabase
+    .from("projects")
+    .select("id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)")
+    .eq("is_active", true)
+    .eq("is_published", true)
+    .order("created_at", { ascending: false })
+
+  if (seo.filter.cityLike) {
+    query = query.ilike("city", `%${seo.filter.cityLike}%`)
+  } else {
+    // Portfolio-wide pages say "UAE" — keep the one-off foreign projects out
+    // so the claim stays true.
+    for (const c of NON_UAE_CITIES) query = query.not("city", "ilike", `%${c}%`)
+  }
+  if (seo.filter.statuses?.length) query = query.in("status", seo.filter.statuses)
+
+  const { data: projects } = await query
+
+  const missingIds = (projects ?? []).filter((p) => !p.main_image?.trim()).map((p) => p.id)
+  const galleryFallback = new Map<number, string>()
+  if (missingIds.length > 0) {
+    const { data: gallery } = await supabase
+      .from("project_images")
+      .select("project_id, url, is_main, rank")
+      .in("project_id", missingIds)
+      .order("is_main", { ascending: false })
+      .order("rank", { ascending: true })
+    for (const g of gallery ?? []) {
+      if (g.url && !galleryFallback.has(g.project_id)) galleryFallback.set(g.project_id, g.url)
+    }
+  }
+  const visible = (projects ?? [])
+    .map((p) => ({ ...p, main_image: p.main_image?.trim() || galleryFallback.get(p.id) || null }))
+    .filter((p) => p.main_image)
+
+  const shown = visible.slice(0, 24)
+  const related = seo.related.map(getSeoPage).filter((r): r is SeoPage => Boolean(r))
+
+  return (
+    <div className="bg-[#f7f8fa]">
+      {/* Compact navy masthead — these pages open on the content, not a hero. */}
+      <section className="bg-[#001f3f]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-10">
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
+            FHI Global · Popular Searches
+          </p>
+          <h1 className="font-['Outfit'] text-3xl md:text-4xl font-bold text-white mt-2 leading-tight">
+            {seo.h1}
+          </h1>
+          <div className="flex items-center gap-2 mt-4">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 border border-white/20 rounded-full text-sm font-semibold text-white">
+              <span className="w-2 h-2 rounded-full bg-[#d6b357]" />
+              {visible.length} project{visible.length === 1 ? "" : "s"} available
+            </span>
+          </div>
+          <div className="mt-6 max-w-3xl space-y-3">
+            {seo.intro.map((paragraph) => (
+              <p key={paragraph.slice(0, 32)} className="text-[15px] leading-relaxed text-[#c2cddd]">
+                {paragraph}
+              </p>
+            ))}
+          </div>
+        </div>
+        <div className="h-[3px] bg-[#d6b357]" />
+      </section>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
+        {shown.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {shown.map((p) => (
+              <ProjectCard key={p.id} project={p as unknown as ProjectCardData} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[28px] border border-[#e8eaed] text-center">
+            <Building2 className="w-8 h-8 text-[#001f3f]/25 mb-3" />
+            <p className="font-['Outfit'] font-semibold text-[#0d1117] text-sm mb-1">Nothing here right now</p>
+            <p className="text-[#6b7280] text-xs">New launches land regularly — check the full projects browser.</p>
+          </div>
+        )}
+
+        {visible.length > shown.length && (
+          <div className="text-center">
+            <Link
+              href="/projects"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00152b] transition-colors"
+            >
+              Browse all {visible.length} projects <ArrowLeft className="w-4 h-4 rotate-180" />
+            </Link>
+          </div>
+        )}
+
+        {/* Related searches — the interlinking is half the SEO value. */}
+        {related.length > 0 && (
+          <div className="bg-white rounded-[24px] border border-[#e8eaed] p-6">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af] mb-4">
+              Related searches
+            </p>
+            <div className="flex flex-wrap gap-2.5">
+              {related.map((r) => (
+                <Link
+                  key={r.slug}
+                  href={`/${r.slug}`}
+                  className="px-4 py-2 rounded-full border border-[#e5e5e5] bg-[#f8fafc] text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] hover:bg-[#d6b357]/10 transition-colors"
+                >
+                  {r.label}
+                </Link>
+              ))}
+              <Link
+                href="/developers"
+                className="px-4 py-2 rounded-full border border-[#e5e5e5] bg-[#f8fafc] text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] hover:bg-[#d6b357]/10 transition-colors"
+              >
+                All Developers
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
