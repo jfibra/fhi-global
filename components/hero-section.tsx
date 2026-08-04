@@ -77,7 +77,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
         {/* ═══ Hero copy + search ═══ */}
         <div className="max-w-3xl">
           {/* Badge */}
-          <div className="animate-hero-item inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 border border-white/25 rounded-full text-xs font-medium text-white/90 mb-7 backdrop-blur-sm" style={{ animationDelay: "0.05s" }}>
+          <div className="animate-hero-item inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 border border-white/25 text-xs font-medium text-white/90 mb-7 backdrop-blur-sm" style={{ animationDelay: "0.05s" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="https://flagcdn.com/w20/ae.png"
@@ -106,11 +106,11 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
           {/* ── Search form ── */}
           <form
             onSubmit={handleSearch}
-            className="animate-hero-item bg-[#06182e]/70 backdrop-blur-2xl border border-white/15 rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.45)] w-full"
+            className="animate-hero-item bg-[#06182e]/70 backdrop-blur-2xl border border-white/15 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.45)] w-full"
             style={{ animationDelay: "0.46s" }}
           >
             {/* 4-column field row */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-white/[0.08] rounded-xl overflow-hidden mb-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-white/[0.08] overflow-hidden mb-3">
               {/* Project Name */}
               <div className="bg-[#0d2440]/85 border border-white/10 px-4 py-3 hover:bg-white/5 transition-colors">
                 <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#d6b357] mb-1.5">
@@ -188,7 +188,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
             {/* Search Button */}
             <button
               type="submit"
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#d6b357] to-[#f0d890] hover:from-[#c9a449] hover:to-[#e8d080] text-[#001428] font-bold text-sm tracking-wide transition-all duration-300 hover:shadow-[0_8px_24px_rgba(214,179,87,0.4)] hover:translate-y-[-1px] flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-[#d6b357] hover:bg-[#c8a544] text-[#001428] font-bold text-sm tracking-wide transition-colors duration-300 flex items-center justify-center gap-2"
             >
               <Search className="w-4 h-4" /> Search Properties
             </button>
@@ -202,7 +202,7 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
                 key={area}
                 type="button"
                 onClick={() => setCity(area)}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs text-white/80 hover:text-white hover:border-white/40 hover:bg-white/20 backdrop-blur-sm transition-all duration-200"
+                className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/10 border border-white/20 text-xs text-white/80 hover:text-white hover:border-white/40 hover:bg-white/20 backdrop-blur-sm transition-all duration-200"
               >
                 <MapPin className="w-2.5 h-2.5" /> {area}
               </button>
@@ -212,12 +212,12 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
 
         {/* ═══ Highlight band (mockup's bottom strip) ═══ */}
         <div
-          className="animate-hero-item mt-12 lg:mt-14 rounded-2xl bg-[#06182e]/65 backdrop-blur-xl border border-white/10 shadow-[0_16px_50px_rgba(0,0,0,0.35)] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 lg:divide-x divide-white/10"
+          className="animate-hero-item mt-12 lg:mt-14 bg-[#06182e]/65 backdrop-blur-xl border border-white/10 shadow-[0_16px_50px_rgba(0,0,0,0.35)] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 lg:divide-x divide-white/10"
           style={{ animationDelay: "0.62s" }}
         >
           {HIGHLIGHTS.map(({ icon: Icon, title, desc }) => (
             <div key={title} className="flex items-center gap-4 px-6 py-5">
-              <span className="w-12 h-12 rounded-full border-2 border-[#d6b357]/70 bg-[#d6b357]/10 flex items-center justify-center shrink-0">
+              <span className="w-12 h-12 border-2 border-[#d6b357]/70 bg-[#d6b357]/10 flex items-center justify-center shrink-0">
                 <Icon className="w-5 h-5 text-[#d6b357]" />
               </span>
               <div>

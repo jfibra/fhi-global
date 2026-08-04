@@ -174,7 +174,7 @@ export default async function HomePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-0 md:divide-x md:divide-white/10">
             {STATS.map(({ icon: Icon, label, value, sub }) => (
               <div key={label} className="flex items-center gap-4 px-4 md:px-8 first:pl-0 last:pr-0">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#d6b357]/25 to-[#d6b357]/10 border border-[#d6b357]/20 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 bg-[#d6b357]/15 border border-[#d6b357]/25 flex items-center justify-center shrink-0">
                   <Icon className="w-5 h-5 text-[#d6b357]" />
                 </div>
                 <div>
@@ -210,8 +210,7 @@ export default async function HomePage() {
             {/* Section header */}
             <Reveal>
             <div className="text-center mb-14">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-[#d6b357]/50 rounded-full text-xs font-bold uppercase tracking-wider text-[#001f3f] mb-5 shadow-sm">
-                <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" />
+              <div className="inline-flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-[#0d1117] mb-5"><span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true"></span>
                 Our Partners
               </div>
               <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight">
@@ -266,8 +265,7 @@ export default async function HomePage() {
             <Reveal>
             <div className="flex items-end justify-between mb-14">
               <div>
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-[#d6b357]/50 rounded-full text-xs font-bold uppercase tracking-wider text-[#001f3f] mb-5 shadow-sm">
-                  <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" />
+                <div className="inline-flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-[#0d1117] mb-5"><span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true"></span>
                   Hand-Picked Selection
                 </div>
                 <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight">
@@ -283,10 +281,10 @@ export default async function HomePage() {
               </div>
               <Link
                 href="/projects?featured=true"
-                className="hidden sm:inline-flex items-center gap-3 bg-[#001f3f] text-white pl-6 pr-2 py-2 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-[0_10px_30px_-6px_rgba(0,31,63,0.5)] shadow-md shrink-0"
+                className="hidden sm:inline-flex items-center gap-2 text-sm font-bold text-[#0d1117] hover:text-[#b8913f] transition-colors shrink-0"
               >
                 Browse All Projects
-                <span className="w-8 h-8 rounded-full bg-gradient-to-br from-[#d6b357] to-[#b8913f] flex items-center justify-center">
+                <span className="w-8 h-8 bg-[#d6b357] flex items-center justify-center">
                   <ArrowRight className="w-4 h-4 text-[#001f3f]" />
                 </span>
               </Link>
@@ -328,8 +326,7 @@ export default async function HomePage() {
           {/* Header */}
           <Reveal>
           <div className="text-center max-w-2xl mx-auto mb-14">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-[#d6b357]/50 rounded-full text-xs font-bold uppercase tracking-wider text-[#001f3f] mb-5 shadow-sm">
-              <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" />
+            <div className="inline-flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-[#0d1117] mb-5"><span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true"></span>
               Why FHI Global
             </div>
             <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight mb-4">
@@ -356,19 +353,19 @@ export default async function HomePage() {
             {WHY_US.map(({ icon: Icon, title, desc }, i) => (
               <Reveal key={title} delay={(i % 3) * 120} className="h-full">
               <div
-                className="group relative h-full bg-white rounded-[24px] p-8 shadow-[0_12px_40px_-8px_rgba(0,20,40,0.25)] overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_-10px_rgba(0,20,40,0.35)]"
+                className="group relative h-full bg-white border border-[#e5e8ec] p-8 overflow-hidden transition-shadow duration-300 hover:shadow-[0_14px_40px_-16px_rgba(0,20,40,0.25)]"
               >
                 {/* Gold top trim */}
                 <span className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-[#d6b357]/30" aria-hidden="true" />
                 {/* Faint gold watermark */}
                 <Icon className="absolute -bottom-7 -right-7 w-36 h-36 text-[#d6b357]/10 -rotate-6" aria-hidden="true" />
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#003366] flex items-center justify-center shadow-md mb-5">
+                <div className="w-14 h-14 bg-[#001f3f] flex items-center justify-center mb-5">
                   <Icon className="w-6 h-6 text-[#d6b357]" />
                 </div>
                 <h3 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mb-2">
                   {title}
                 </h3>
-                <span className="block w-9 h-[3px] rounded-full bg-[#d6b357] mb-3" aria-hidden="true" />
+                <span className="block w-9 h-[3px] bg-[#d6b357] mb-3" aria-hidden="true" />
                 <p className="relative text-sm text-[#555] leading-relaxed">{desc}</p>
               </div>
               </Reveal>
@@ -397,7 +394,7 @@ export default async function HomePage() {
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
           {/* Solid navy card with gold border (approved mockup) */}
           <Reveal direction="zoom">
-          <div className="relative overflow-hidden bg-gradient-to-b from-[#0a1f38] to-[#04101f] border-2 border-[#d6b357]/70 rounded-[40px] px-8 md:px-16 py-14 shadow-[0_30px_90px_-20px_rgba(0,10,25,0.8)]">
+          <div className="relative overflow-hidden bg-[#04101f] border border-[#d6b357]/60 px-8 md:px-16 py-14">
             {/* Subtle dot texture inside the card */}
             <div
               className="absolute inset-0 opacity-[0.05]"
@@ -409,7 +406,7 @@ export default async function HomePage() {
               aria-hidden="true"
             />
             <div className="relative">
-              <div className="inline-flex items-center gap-2 px-5 py-2 border border-[#d6b357]/60 rounded-full text-xs font-bold uppercase tracking-[0.15em] text-[#d6b357] mb-8">
+              <div className="inline-flex items-center gap-2 px-5 py-2 border border-[#d6b357]/60 text-xs font-bold uppercase tracking-[0.15em] text-[#d6b357] mb-8">
                 <Sparkles className="w-3.5 h-3.5" />
                 Ready to Invest?
               </div>
@@ -433,14 +430,14 @@ export default async function HomePage() {
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
                   href="/projects"
-                  className="bg-gradient-to-r from-[#d6b357] to-[#f0d890] text-[#001f3f] px-9 py-[18px] rounded-full font-bold text-base transition-all duration-300 hover:translate-y-[-2px] hover:shadow-[0_12px_28px_rgba(214,179,87,0.4)] flex items-center gap-2"
+                  className="bg-[#d6b357] hover:bg-[#c8a544] text-[#001f3f] px-9 py-[18px] font-bold text-base transition-colors duration-300 flex items-center gap-2"
                 >
                   <Building2 className="w-5 h-5" />
                   Browse Projects <ArrowRight className="w-5 h-5" />
                 </Link>
                 <Link
                   href="/contact"
-                  className="px-9 py-[18px] rounded-full font-semibold text-base border border-[#d6b357]/60 text-white transition-all hover:bg-[#d6b357]/10 hover:border-[#d6b357] flex items-center gap-2"
+                  className="px-9 py-[18px] font-semibold text-base border border-[#d6b357]/60 text-white transition-all hover:bg-[#d6b357]/10 hover:border-[#d6b357] flex items-center gap-2"
                 >
                   Contact Us <MessageCircle className="w-5 h-5 text-[#d6b357]" />
                 </Link>
