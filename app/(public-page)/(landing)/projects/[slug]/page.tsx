@@ -148,7 +148,7 @@ export default async function ProjectDetailPage({ params }: Props) {
       ? {
           "@type": "Organization",
           name: developer.name,
-          url: developer.slug ? `${siteUrl}/developers/${developer.slug}` : undefined,
+          url: developer.slug ? `${siteUrl}/${developer.slug}` : undefined,
         }
       : undefined,
   }
@@ -221,7 +221,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                   by{" "}
                   {developer.slug ? (
                     <Link
-                      href={`/developers/${developer.slug}`}
+                      href={`/${developer.slug}`}
                       className="font-bold text-[#d6b357] hover:text-[#f0d890] transition-colors"
                     >
                       {developer.name}
@@ -503,7 +503,7 @@ export default async function ProjectDetailPage({ params }: Props) {
             <div className="relative bg-white rounded-[28px] border border-[#e8eaed] p-6 shadow-sm hover:shadow-xl hover:border-[#001f3f]/20 transition-all duration-300 overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#001f3f] via-[#002a52] to-transparent" />
               <p className="text-xs font-bold uppercase tracking-widest text-[#9ca3af] mt-1 mb-4">Developer</p>
-              <Link href={`/developers/${developer.slug}`} className="flex items-center gap-4 group mb-4">
+              <Link href={`/${developer.slug}`} className="flex items-center gap-4 group mb-4">
                 <div className="w-14 h-14 rounded-2xl bg-[#f7f8fa] border border-[#e8eaed] flex items-center justify-center overflow-hidden shrink-0">
                   {developer.logo_url ? (
                     <Image
@@ -539,7 +539,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                 )}
               </div>
               <Link
-                href={`/developers/${developer.slug}`}
+                href={`/${developer.slug}`}
                 className="mt-4 flex items-center justify-center gap-1.5 w-full py-2.5 rounded-full bg-gradient-to-r from-[#001f3f] to-[#002a52] hover:from-[#002a52] hover:to-[#003366] text-white text-sm font-semibold shadow-md hover:shadow-[0_8px_24px_rgba(0,31,63,0.3)] hover:-translate-y-0.5 transition-all duration-300"
               >
                 View Developer Profile

@@ -232,6 +232,18 @@ const nextConfig = {
       destination: `/api/sitemap/${section}/:page`,
     }))
   },
+  async redirects() {
+    return [
+      // Developer pages moved from /developers/<slug> to root-level /<slug>.
+      // 301 keeps every shared link, bookmark, and indexed URL working; the
+      // /developers index itself doesn't match (:slug requires a segment).
+      {
+        source: "/developers/:slug",
+        destination: "/:slug",
+        permanent: true,
+      },
+    ]
+  },
   async headers() {
     return [
       {

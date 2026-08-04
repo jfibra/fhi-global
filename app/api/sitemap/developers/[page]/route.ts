@@ -16,7 +16,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ page: string }
   const urls = rows
     .filter((row) => row.slug)
     .map((row) => ({
-      loc: `${SITE_URL}/developers/${row.slug}`,
+      loc: `${SITE_URL}/${row.slug}`,
       lastmod: row.updated_at?.slice(0, 10) ?? undefined,
     }))
   return sitemapResponse(buildUrlsetXml(urls))

@@ -22,7 +22,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     .eq("slug", slug)
     .is("deleted_at", null)
     .maybeSingle()
-  if (!data) return { title: "Developer Not Found" }
+  // notFound() here, not a placeholder title: as the root-level catch-all,
+  // this page answers every unmatched URL on the site. Returning metadata
+  // lets the route start streaming, after which the page body's notFound()
+  // can only swap the UI — the 200 is already on the wire. Aborting in
+  // metadata is what turns a mistyped URL into a real HTTP 404.
+  if (!data) notFound()
 
   const ogImage = `${siteUrl}/og/developer/${slug}`
   const description = data.description ?? `Explore projects by ${data.name} on FHI Global.`
@@ -34,7 +39,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraphTitle: `${data.name} | FHI Global`,
     openGraphDescription: description,
     imageUrl: ogImage || data.logo_url,
-    pathname: `/developers/${slug}`,
+    pathname: `/${slug}`,
     keywords,
   })
 }
@@ -63,6 +68,29 @@ export default async function DeveloperDetailPage({ params }: Props) {
     .eq("is_active", true)
     .eq("is_published", true)
     .order("created_at", { ascending: false })
+
+  // A project with no picture doesn't appear on the public page — a grid of
+  // grey "No Image" cards undersells the developer. But main_image being unset
+  // doesn't mean the project has no photos: try its gallery first, and hide
+  // only the projects with genuinely nothing to show. The portfolio grid, its
+  // count pill, and the hero snapshot all use this filtered list; the listings
+  // section below deliberately does not (listings carry their own photos).
+  const missingImageIds = (projects ?? []).filter((p) => !p.main_image?.trim()).map((p) => p.id)
+  const galleryFallback = new Map<number, string>()
+  if (missingImageIds.length > 0) {
+    const { data: gallery } = await supabase
+      .from("project_images")
+      .select("project_id, url, is_main, rank")
+      .in("project_id", missingImageIds)
+      .order("is_main", { ascending: false })
+      .order("rank", { ascending: true })
+    for (const g of gallery ?? []) {
+      if (g.url && !galleryFallback.has(g.project_id)) galleryFallback.set(g.project_id, g.url)
+    }
+  }
+  const visibleProjects = (projects ?? [])
+    .map((p) => ({ ...p, main_image: p.main_image?.trim() || galleryFallback.get(p.id) || null }))
+    .filter((p) => p.main_image)
 
   // Published agent listings under this developer's projects (the "on the
   // market right now" view — bridges the projects catalog to buy/rent).
@@ -220,17 +248,17 @@ export default async function DeveloperDetailPage({ params }: Props) {
                 <span className="block w-14 h-1 rounded-full bg-[#d6b357] mb-6" aria-hidden="true" />
                 <p className="text-[#374151] text-base leading-relaxed whitespace-pre-line">{developer.description}</p>
               </div>
-              {projects?.[0]?.main_image && (
+              {visibleProjects[0]?.main_image && (
                 <div className="relative hidden lg:block rounded-[20px] overflow-hidden ring-1 ring-[#e8eaed] shadow-[0_20px_50px_-16px_rgba(0,20,40,0.3)] aspect-[3/4]">
                   <Image
-                    src={projects[0].main_image}
+                    src={visibleProjects[0].main_image}
                     alt={`${developer.name} project`}
                     fill
                     sizes="320px"
                     className="object-cover"
                   />
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#001428]/80 to-transparent px-4 pb-3 pt-10">
-                    <p className="text-white text-sm font-bold truncate">{projects[0].name}</p>
+                    <p className="text-white text-sm font-bold truncate">{visibleProjects[0].name}</p>
                   </div>
                 </div>
               )}
@@ -333,15 +361,15 @@ export default async function DeveloperDetailPage({ params }: Props) {
             </div>
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#e8eaed] rounded-full shadow-sm">
               <span className="w-2 h-2 rounded-full bg-[#d6b357]" />
-              <span className="text-sm font-semibold text-[#0d1117]">{projects?.length ?? 0}</span>
-              <span className="text-sm text-[#6b7280]">project{(projects?.length ?? 0) !== 1 ? "s" : ""}</span>
+              <span className="text-sm font-semibold text-[#0d1117]">{visibleProjects.length}</span>
+              <span className="text-sm text-[#6b7280]">project{visibleProjects.length !== 1 ? "s" : ""}</span>
             </div>
           </div>
           <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-8" />
 
-          {projects && projects.length > 0 ? (
+          {visibleProjects.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {projects.map((p) => (
+              {visibleProjects.map((p) => (
                 <ProjectCard key={p.id} project={p as unknown as ProjectCardData} />
               ))}
             </div>

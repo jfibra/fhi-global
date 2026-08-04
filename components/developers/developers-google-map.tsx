@@ -192,7 +192,7 @@ export function DevelopersGoogleMap({
           icon,
         })
         mk.addListener("click", () => {
-          router.push(`/developers/${m.slug}`)
+          router.push(`/${m.slug}`)
         })
         markerObjsRef.current.push(mk)
       })

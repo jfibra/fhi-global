@@ -148,7 +148,7 @@ function RowActions({ dev, onEdit, onLogo, onInviteLink, onToggleVerified, onTog
                 ...(dev.deleted_at ? [] : [{
                   label: "View public page",
                   icon: <Eye className="w-3.5 h-3.5" />,
-                  action: () => { window.open(`/developers/${dev.slug}`, "_blank", "noopener,noreferrer") },
+                  action: () => { window.open(`/${dev.slug}`, "_blank", "noopener,noreferrer") },
                 }]),
                 { label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, action: onEdit },
                 { label: "Upload Logo", icon: <ImageIcon className="w-3.5 h-3.5" />, action: onLogo },
@@ -452,7 +452,7 @@ function DeveloperCard({
               <p className="text-[15px] font-bold text-[#0d1117] font-['Outfit'] truncate">{dev.name}</p>
             ) : (
               <a
-                href={`/developers/${dev.slug}`}
+                href={`/${dev.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 title={`View ${dev.name} public page`}
@@ -838,7 +838,7 @@ export function DevelopersClient({ currentRole }: Props) {
                       <p className="text-sm font-semibold text-[#0d1117] truncate">{dev.name}</p>
                     ) : (
                       <a
-                        href={`/developers/${dev.slug}`}
+                        href={`/${dev.slug}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         title={`View ${dev.name} public page`}
@@ -922,7 +922,7 @@ export function DevelopersClient({ currentRole }: Props) {
                             <p className="text-sm font-semibold text-[#0d1117]">{dev.name}</p>
                           ) : (
                             <a
-                              href={`/developers/${dev.slug}`}
+                              href={`/${dev.slug}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 text-sm font-semibold text-[#0d1117] hover:text-[#001f3f] hover:underline transition-colors"

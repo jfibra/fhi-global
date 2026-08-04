@@ -26,7 +26,7 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
   if (variant === "directory") {
     return (
       <Link
-        href={`/developers/${slug}`}
+        href={`/${slug}`}
         className="group flex flex-row gap-3 sm:gap-4 rounded-lg border border-[#e8eaed] bg-white p-3 sm:p-4 shadow-sm transition-shadow hover:shadow-md"
       >
         <div className="relative h-[100px] w-[100px] shrink-0 rounded-lg bg-[#eef2f6] flex items-center justify-center overflow-hidden sm:h-[112px] sm:w-[112px]">
@@ -82,7 +82,7 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
 
   return (
     <Link
-      href={`/developers/${slug}`}
+      href={`/${slug}`}
       className="group relative flex flex-row bg-white rounded-[24px] p-4 border border-[#eaecf0] overflow-hidden transition-all duration-500 hover:shadow-[0_20px_60px_-8px_rgba(0,31,63,0.2)] hover:-translate-y-1 shadow-[0_2px_16px_rgba(0,0,0,0.05)]"
     >
       {/* ── Left: Logo Panel ── */}

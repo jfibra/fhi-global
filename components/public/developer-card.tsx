@@ -14,7 +14,7 @@ export type DeveloperCardData = {
 export function DeveloperCard({ developer }: { developer: DeveloperCardData }) {
   return (
     <Link
-      href={`/developers/${developer.slug}`}
+      href={`/${developer.slug}`}
       className="group block bg-white rounded-[24px] border border-[#e8eaed] p-6 transition-all duration-300 hover:translate-y-[-6px] hover:shadow-2xl hover:shadow-[#001f3f]/8 hover:border-[#001f3f]/20"
     >
       {/* Logo */}
