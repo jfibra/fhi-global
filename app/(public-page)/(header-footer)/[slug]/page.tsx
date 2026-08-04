@@ -189,10 +189,8 @@ export default async function DeveloperDetailPage({ params }: Props) {
         </div>
         {/* Gold accents: top rule + faint arcs on the left (mockup's line art) */}
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#d6b357]/70 to-transparent" />
-        <div className="absolute -left-24 top-10 w-[340px] h-[340px] rounded-full border border-[#d6b357]/20 pointer-events-none" aria-hidden="true" />
-        <div className="absolute -left-14 top-24 w-[240px] h-[240px] rounded-full border border-[#d6b357]/15 pointer-events-none" aria-hidden="true" />
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
           {/* Back */}
           <Link
             href="/developers"
@@ -203,7 +201,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
 
           <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
             {/* Logo */}
-            <div className="w-32 h-32 md:w-36 md:h-36 rounded-[28px] bg-white ring-1 ring-white/60 shadow-[0_24px_70px_-16px_rgba(0,10,25,0.7)] flex items-center justify-center shrink-0 overflow-hidden">
+            <div className="w-32 h-32 md:w-36 md:h-36 bg-white ring-1 ring-white/60 shadow-[0_18px_50px_-16px_rgba(0,10,25,0.6)] flex items-center justify-center shrink-0 overflow-hidden">
               {developer.logo_url ? (
                 <Image
                   src={developer.logo_url}
@@ -231,14 +229,10 @@ export default async function DeveloperDetailPage({ params }: Props) {
                   </span>
                 )}
               </div>
-              {developer.rating > 0 && (
-                <div className="flex items-center gap-1.5 mb-3">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Star key={s} className={`w-5 h-5 ${s <= Math.round(developer.rating) ? "text-[#d6b357] fill-[#d6b357]" : "text-white/25"}`} />
-                  ))}
-                  <span className="text-base font-bold text-white ml-1.5">{Number(developer.rating).toFixed(1)}</span>
-                </div>
-              )}
+              <span className="block w-14 h-1 bg-[#d6b357] mb-4" aria-hidden="true" />
+              <p className="text-lg text-white/85 max-w-2xl mb-2" style={{ textShadow: "0 1px 8px rgba(0,10,30,0.7)" }}>
+                New Dubai launches, price drops and open houses — first.
+              </p>
               {developer.address && (
                 <div className="flex items-start gap-2 text-base text-white/85 max-w-xl" style={{ textShadow: "0 1px 8px rgba(0,10,30,0.7)" }}>
                   <MapPin className="w-4 h-4 text-[#d6b357] shrink-0 mt-1" /> {developer.address}
@@ -247,61 +241,61 @@ export default async function DeveloperDetailPage({ params }: Props) {
             </div>
           </div>
 
-          {/* Two calls to action, not a share rail. The old strip offered six
-              ways to hand our page to someone else; this asks the visitor to
-              follow us and to get in touch. Sized to be the loudest thing
-              below the developer name. */}
-          <div className="mt-8 rounded-[22px] border border-white/15 bg-[#001428]/55 backdrop-blur-md p-5 sm:p-6">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
-              Stay in the loop
-            </p>
-            <p className="mt-1.5 text-lg sm:text-xl font-bold text-white leading-snug">
-              New Dubai launches, price drops and open houses — first.
-            </p>
-
-            <div className="mt-5 flex flex-col sm:flex-row gap-3">
-              <a
-                href={SOCIAL_URLS.facebook}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Follow FHI Global on Facebook"
-                className="group inline-flex flex-1 items-center justify-center gap-3 rounded-2xl bg-[#1877F2] px-6 py-4 text-base font-bold text-white shadow-lg shadow-[#1877F2]/25 transition-all hover:bg-[#0f63d2] hover:-translate-y-0.5"
-              >
-                <Facebook className="h-6 w-6 shrink-0 fill-current" />
-                Follow us on Facebook
-              </a>
-
-              <a
-                href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Enquiry — ${developer.name}`)}`}
-                aria-label={`Email FHI Global about ${developer.name}`}
-                className="group inline-flex flex-1 items-center justify-center gap-3 rounded-2xl bg-[#d6b357] px-6 py-4 text-base font-bold text-[#001f3f] shadow-lg shadow-[#d6b357]/25 transition-all hover:bg-[#c8a544] hover:-translate-y-0.5"
-              >
-                <Mail className="h-6 w-6 shrink-0" />
-                {CONTACT_EMAIL}
-              </a>
-            </div>
+          {/* Two calls to action in the mockup's flat band: icon block,
+              title, subline, arrow. Square everything. */}
+          <div className="mt-8 border border-white/15 bg-[#001428]/70 backdrop-blur-md grid grid-cols-1 sm:grid-cols-2">
+            <a
+              href={SOCIAL_URLS.facebook}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Follow FHI Global on Facebook"
+              className="group flex items-center gap-4 px-6 py-5 border-b sm:border-b-0 sm:border-r border-white/10 hover:bg-white/[0.05] transition-colors"
+            >
+              <span className="w-11 h-11 bg-[#1877F2] flex items-center justify-center shrink-0">
+                <Facebook className="w-5 h-5 text-white fill-current" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-bold text-white">Follow us on Facebook</span>
+                <span className="block text-xs text-white/60 mt-0.5">Stay updated with the latest news and launches.</span>
+              </span>
+              <ArrowLeft className="w-5 h-5 rotate-180 text-[#d6b357] shrink-0 transition-transform group-hover:translate-x-1" />
+            </a>
+            <a
+              href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Enquiry — ${developer.name}`)}`}
+              aria-label={`Email FHI Global about ${developer.name}`}
+              className="group flex items-center gap-4 px-6 py-5 hover:bg-white/[0.05] transition-colors"
+            >
+              <span className="w-11 h-11 bg-[#d6b357] flex items-center justify-center shrink-0">
+                <Mail className="w-5 h-5 text-[#001f3f]" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-bold text-white">{CONTACT_EMAIL}</span>
+                <span className="block text-xs text-white/60 mt-0.5">Get in touch with us.</span>
+              </span>
+              <ArrowLeft className="w-5 h-5 rotate-180 text-[#d6b357] shrink-0 transition-transform group-hover:translate-x-1" />
+            </a>
           </div>
         </div>
       </section>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
         {/* About */}
         {developer.description && (
-          <section className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 md:p-10 shadow-[0_16px_50px_-16px_rgba(0,20,40,0.15)] overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
+          <section>
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8 lg:gap-12 items-start">
               <div>
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#d6b357]/15 border border-[#d6b357]/40 rounded-full text-xs font-bold uppercase tracking-wider text-[#8a6d2a] mb-4">
-                  <Building2 className="w-3.5 h-3.5 text-[#b8913f]" /> About
+                <div className="flex items-center gap-2.5 mb-3">
+                  <span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true" />
+                  <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0d1117]">About</span>
                 </div>
                 <h2 className="font-['Outfit'] text-2xl md:text-3xl font-bold text-[#0d1117] mb-3">
                   About {developer.name}
                 </h2>
-                <span className="block w-14 h-1 rounded-full bg-[#d6b357] mb-6" aria-hidden="true" />
+                <span className="block w-14 h-1 bg-[#d6b357] mb-6" aria-hidden="true" />
                 <p className="text-[#374151] text-base leading-relaxed whitespace-pre-line">{developer.description}</p>
               </div>
               {visibleProjects[0]?.main_image && (
-                <div className="relative hidden lg:block rounded-[20px] overflow-hidden ring-1 ring-[#e8eaed] shadow-[0_20px_50px_-16px_rgba(0,20,40,0.3)] aspect-[3/4]">
+                <div className="relative hidden lg:block overflow-hidden ring-1 ring-[#e8eaed] aspect-[3/4]">
                   <Image
                     src={visibleProjects[0].main_image}
                     alt={`${developer.name} project`}
@@ -323,30 +317,25 @@ export default async function DeveloperDetailPage({ params }: Props) {
           <section>
             <div className="flex items-end justify-between mb-5">
               <div>
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-[#d6b357]/50 rounded-full text-xs font-bold uppercase tracking-wider text-[#001f3f] mb-3 shadow-sm">
-                  <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" /> On the Market
+                <div className="flex items-center gap-2.5 mb-3">
+                  <span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true" />
+                  <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0d1117]">On the Market</span>
                 </div>
                 <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] leading-tight">
                   Available Listings from{" "}
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">
-                    {developer.name}
-                  </span>
+                  <span className="text-[#b8913f]">{developer.name}</span>
                 </h2>
               </div>
               <div className="hidden sm:flex items-center gap-2">
                 {forSaleCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#d6b357]/15 border border-[#d6b357]/40 text-xs font-bold text-[#8a6d2a]">
-                    {forSaleCount} for sale
-                  </span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#8a6d2a]">{forSaleCount} for sale</span>
                 )}
                 {forRentCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#2f6fe4]/10 border border-[#2f6fe4]/30 text-xs font-bold text-[#2456b3]">
-                    {forRentCount} for rent
-                  </span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#2456b3]">{forRentCount} for rent</span>
                 )}
               </div>
             </div>
-            <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-8" />
+            <div className="h-px bg-[#e5e8ec] mb-8" />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {listings.map((l) => {
@@ -356,9 +345,8 @@ export default async function DeveloperDetailPage({ params }: Props) {
                   <Link
                     key={l.id}
                     href={`/listings/${l.slug ?? l.id}`}
-                    className="group relative bg-white rounded-2xl border border-[#e8eaed] overflow-hidden shadow-sm hover:shadow-[0_16px_44px_-14px_rgba(0,20,40,0.3)] hover:-translate-y-1 transition-all duration-300"
+                    className="group relative bg-white border border-[#e5e8ec] overflow-hidden transition-shadow duration-300 hover:shadow-[0_14px_40px_-16px_rgba(0,20,40,0.25)]"
                   >
-                    <span className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-[#d6b357]/30 z-10" aria-hidden="true" />
                     <div className="relative h-44 bg-[#eef1f5]">
                       {cover ? (
                         <Image
@@ -374,7 +362,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
                         </div>
                       )}
                       <span
-                        className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-bold text-white shadow ${
+                        className={`absolute top-3 left-3 px-2.5 py-1 text-[11px] font-bold text-white ${
                           l.listing_kind === "rent" ? "bg-[#2f6fe4]" : "bg-[#d6b357]"
                         }`}
                       >
@@ -403,21 +391,31 @@ export default async function DeveloperDetailPage({ params }: Props) {
         <section>
           <div className="flex items-end justify-between mb-5">
             <div>
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-[#d6b357]/50 rounded-full text-xs font-bold uppercase tracking-wider text-[#001f3f] mb-3 shadow-sm">
-                <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" /> Portfolio
+              <div className="flex items-center gap-2.5 mb-3">
+                <span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true" />
+                <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0d1117]">Portfolio</span>
               </div>
               <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] leading-tight">
                 Projects by{" "}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#001f3f] to-[#d6b357]">{developer.name}</span>
+                <span className="text-[#b8913f]">{developer.name}</span>
               </h2>
             </div>
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#e8eaed] rounded-full shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-[#d6b357]" />
-              <span className="text-sm font-semibold text-[#0d1117]">{visibleProjects.length}</span>
-              <span className="text-sm text-[#6b7280]">project{visibleProjects.length !== 1 ? "s" : ""}</span>
+            <div className="flex items-center gap-6">
+              <Link
+                href="/projects"
+                className="hidden sm:inline-flex items-center gap-1.5 text-sm font-bold text-[#0d1117] hover:text-[#b8913f] transition-colors"
+              >
+                View All Projects <ArrowLeft className="w-4 h-4 rotate-180" />
+              </Link>
+              <div className="border border-[#e5e8ec] bg-white px-6 py-3 text-center">
+                <p className="font-['Outfit'] text-3xl font-bold text-[#0d1117] leading-none">{visibleProjects.length}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#6b7280] mt-1">
+                  Project{visibleProjects.length !== 1 ? "s" : ""}
+                </p>
+              </div>
             </div>
           </div>
-          <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-8" />
+          <div className="h-px bg-[#e5e8ec] mb-8" />
 
           {visibleProjects.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -426,8 +424,8 @@ export default async function DeveloperDetailPage({ params }: Props) {
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-20 bg-gradient-to-br from-[#f8f6f0] to-white rounded-[28px] border border-[#e8eaed] text-center">
-              <div className="w-14 h-14 rounded-2xl bg-[#001f3f]/6 flex items-center justify-center mb-4">
+            <div className="flex flex-col items-center justify-center py-20 bg-white border border-[#e5e8ec] text-center">
+              <div className="w-14 h-14 bg-[#001f3f]/5 flex items-center justify-center mb-4">
                 <Building2 className="w-7 h-7 text-[#001f3f]/25" />
               </div>
               <p className="font-['Outfit'] font-semibold text-[#0d1117] text-sm mb-1">No projects yet</p>
@@ -495,7 +493,7 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
     <div className="bg-[#f7f8fa]">
       {/* Compact navy masthead — these pages open on the content, not a hero. */}
       <section className="bg-[#001f3f]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-10">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-10">
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
             FHI Global · Popular Searches
           </p>
@@ -519,7 +517,7 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
         <div className="h-[3px] bg-[#d6b357]" />
       </section>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
         {shown.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {shown.map((p) => (
@@ -626,7 +624,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
     <div className="bg-white">
       {/* Editorial intro — headline and copy on the left, our project photo on
           the right, like the area pages on the major portals. */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-4">
+      <section className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-4">
         <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
           FHI Global · Dubai Area Guide
         </p>
@@ -672,7 +670,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
 
       {/* Why invest here — the competitor-style check-card grid. */}
       {seo.facts && seo.facts.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <section className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <h2 className="font-['Outfit'] text-2xl md:text-3xl font-bold text-[#001f3f] text-center">
             Why invest in {seo.label}
           </h2>
@@ -707,7 +705,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
         </div>
       </section>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
         {/* Route into live inventory */}
         <div className="bg-[#001f3f] rounded-lg p-6 sm:p-8">
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#d6b357]">

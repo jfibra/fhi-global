@@ -50,7 +50,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
   return (
     <Link
       href={developers?.slug ? `/${developers.slug}/${slug}` : `/projects/${slug}`}
-      className="group block bg-white rounded-[24px] border border-[#eee] overflow-hidden transition-all duration-300 hover:translate-y-[-10px] hover:shadow-2xl shadow-sky-950/5"
+      className="group block bg-white border border-[#e5e8ec] overflow-hidden transition-shadow duration-300 hover:shadow-[0_14px_40px_-16px_rgba(0,20,40,0.25)]"
     >
       {/* Image */}
       <div className="relative w-full aspect-[4/3] bg-[#f4f6f9] overflow-hidden">
@@ -76,22 +76,22 @@ export function ProjectCard({ project }: ProjectCardProps) {
         {/* Badges */}
         <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
           {s && (
-            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border backdrop-blur-sm ${s.bg} ${s.text} ${s.border}`}>
+            <span className={`text-[10px] font-bold px-2.5 py-1 border backdrop-blur-sm ${s.bg} ${s.text} ${s.border}`}>
               {s.label}
             </span>
           )}
           {is_featured && (
-            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-gradient-to-r from-[#d6b357] to-[#f0d890] text-[#001f3f] border border-[#d6b357]/50">
-              ? Featured
+            <span className="text-[10px] font-bold px-2.5 py-1 bg-[#d6b357] text-[#001f3f]">
+              Featured
             </span>
           )}
         </div>
 
         {/* Developer logo bottom-left */}
         {developers && (
-          <div className="absolute bottom-3 left-3 flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white/15 backdrop-blur-md border border-white/25">
+          <div className="absolute bottom-3 left-3 flex items-center gap-2 px-2.5 py-1.5 bg-white/15 backdrop-blur-md border border-white/25">
             {developers.logo_url ? (
-              <Image src={developers.logo_url} alt={developers.name} width={16} height={16} className="object-contain rounded" />
+              <Image src={developers.logo_url} alt={developers.name} width={16} height={16} className="object-contain" />
             ) : (
               <Building2 className="w-3 h-3 text-white/70" />
             )}
@@ -109,7 +109,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
         {/* Location */}
         {displayLocation && (
-          <div className="flex items-center gap-1 text-xs text-[#9ca3af] mb-4">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[#9ca3af] mb-4">
             <MapPin className="w-3 h-3 shrink-0 text-[#d6b357]" />
             <span className="truncate">{displayLocation}</span>
           </div>
@@ -129,7 +129,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
               <span className="text-xs font-medium text-[#9ca3af]">Price on request</span>
             )}
           </div>
-          <div className="w-9 h-9 rounded-full bg-[#001f3f]/6 group-hover:bg-gradient-to-br group-hover:from-[#d6b357] group-hover:to-[#f0d890] flex items-center justify-center transition-all duration-300 shadow-sm group-hover:shadow-md">
+          <div className="w-9 h-9 bg-[#001f3f]/5 group-hover:bg-[#d6b357] flex items-center justify-center transition-colors duration-300">
             <ArrowRight className="w-4 h-4 text-[#001f3f] transition-transform duration-200 group-hover:translate-x-0.5" />
           </div>
         </div>
