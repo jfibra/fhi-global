@@ -67,7 +67,7 @@ export function Footer() {
           public page links to the landing pages in lib/seo-pages.ts plus the
           strongest developer portfolios, so crawlers — and readers — reach
           them from anywhere on the site. */}
-      <div className="bg-[#f7f8fa] border-t border-[#e8eaed]">
+      <div className="relative z-10 bg-[#f7f8fa] border-t border-[#e8eaed]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#a07c1f] mb-4">
