@@ -182,6 +182,8 @@ const AREA_GUIDES: SeoPage[] = [
       { label: "Who it suits", value: "Professionals, investors chasing rental yield, weekend-lifestyle buyers" },
       { label: "Getting around", value: "Dubai Tram, DMCC & Sobha Realty Metro stations, Sheikh Zayed Road" },
       { label: "Character", value: "Dense, walkable, waterfront — restaurants and nightlife at street level" },
+      { label: "Investment angle", value: "Deep tenant demand and strong furnished/short-let performance keep yields near the top of established Dubai" },
+      { label: "Lifestyle & amenities", value: "Marina Walk dining, JBR beach on foot, yacht berths and a seven-kilometre waterfront loop" },
     ],
     sections: [
       {
@@ -214,6 +216,8 @@ const AREA_GUIDES: SeoPage[] = [
       { label: "Who it suits", value: "End-users, prestige buyers, short-let investors" },
       { label: "Getting around", value: "Burj Khalifa/Dubai Mall Metro, Financial Centre Road, DIFC on foot" },
       { label: "Character", value: "Iconic, busy, tourist-facing — quietest inside Old Town" },
+      { label: "Investment angle", value: "Fixed supply in a built-out district — value defends in soft markets and leads in strong ones" },
+      { label: "Lifestyle & amenities", value: "Dubai Mall, the Opera and the fountain promenade as the daily neighbourhood" },
     ],
     sections: [
       {
@@ -246,6 +250,8 @@ const AREA_GUIDES: SeoPage[] = [
       { label: "Who it suits", value: "Yield investors, young professionals, first-time Dubai buyers" },
       { label: "Getting around", value: "Business Bay Metro, Al Khail & Sheikh Zayed Roads, Downtown on foot from north towers" },
       { label: "Character", value: "Commercial-residential mix — livelier by day, canal walk in the evening" },
+      { label: "Investment angle", value: "Downtown-adjacent rents at Bay entry prices; one-beds turn over fast in sale and let alike" },
+      { label: "Lifestyle & amenities", value: "Canal boardwalk runs, rooftop pools and a dining scene closing the gap on Downtown's" },
     ],
     sections: [
       {
@@ -278,6 +284,8 @@ const AREA_GUIDES: SeoPage[] = [
       { label: "Who it suits", value: "Family end-users, ultra-prime buyers, beach-led lifestyle purchases" },
       { label: "Getting around", value: "Palm Monorail, one road in and out via the trunk — plan around peak hours" },
       { label: "Character", value: "Resort-quiet on the fronds, hotel-lively on the crescent" },
+      { label: "Investment angle", value: "Supply capped by geography — frond villas are among the city's few genuinely scarce assets" },
+      { label: "Lifestyle & amenities", value: "Private beach at home, Palm West Beach street life, hotel beach clubs and spas as neighbourhood amenities" },
     ],
     sections: [
       {
@@ -310,6 +318,8 @@ const AREA_GUIDES: SeoPage[] = [
       { label: "Who it suits", value: "First-time buyers, yield investors, families on a budget" },
       { label: "Getting around", value: "Al Khail and Hessa Street by car — no Metro yet, so parking ratios matter" },
       { label: "Character", value: "Residential, low-key, park-dotted — amenity clusters vary block to block" },
+      { label: "Investment angle", value: "The strongest mainstream gross yields in the city, on the longest developer payment plans" },
+      { label: "Lifestyle & amenities", value: "Circle Mall, thirty-plus pocket parks, and rooftop-pool buildings at value prices" },
     ],
     sections: [
       {
@@ -342,6 +352,8 @@ const AREA_GUIDES: SeoPage[] = [
       { label: "Who it suits", value: "Off-plan investors, buyers priced out of Downtown, long-horizon holders" },
       { label: "Getting around", value: "Ras Al Khor Road; planned Metro links — today it's a driving district" },
       { label: "Character", value: "New, quiet, waterfront — a district still growing into itself" },
+      { label: "Investment angle", value: "Downtown DNA at a discount, with phase-on-phase appreciation as the masterplan builds out" },
+      { label: "Lifestyle & amenities", value: "Creek Marina, the promenade and flamingo-sanctuary views — a calmer waterfront than the Marina" },
     ],
     sections: [
       {
@@ -374,6 +386,8 @@ const AREA_GUIDES: SeoPage[] = [
       { label: "Who it suits", value: "Families settling long-term, villa upgraders, school-run households" },
       { label: "Getting around", value: "Al Khail Road spine — fifteen minutes to Downtown or the Marina off-peak" },
       { label: "Character", value: "Green, ordered, family-paced — golf course quiet at its centre" },
+      { label: "Investment angle", value: "Villa demand consistently outruns supply; golf-line addresses set the district premium" },
+      { label: "Schools & family", value: "GEMS schools inside the community, King's College Hospital, and the Hills Park lawn for the weekends" },
     ],
     sections: [
       {
@@ -406,6 +420,8 @@ const AREA_GUIDES: SeoPage[] = [
       { label: "Who it suits", value: "Beach-first buyers, short-let investors, space hunters" },
       { label: "Getting around", value: "Dubai Tram along the strip, Marina Metro stations behind" },
       { label: "Character", value: "Holiday-lively at street level, surprisingly residential upstairs" },
+      { label: "Investment angle", value: "Beach footfall sustains one of the city's strongest short-let occupancy bands year-round" },
+      { label: "Lifestyle & amenities", value: "The Walk's cafes, The Beach mall and open sea from the larger sea-view layouts" },
     ],
     sections: [
       {
@@ -438,6 +454,8 @@ const AREA_GUIDES: SeoPage[] = [
       { label: "Who it suits", value: "Settled families, equestrian and golf households, long-term residents" },
       { label: "Getting around", value: "Sheikh Mohammed bin Zayed Road & Umm Suqeim Street — car country" },
       { label: "Character", value: "Suburban, green, quiet — the school run is the rush hour" },
+      { label: "Investment angle", value: "Two decades of street-by-street price history and multi-year family tenancies — a stability hold" },
+      { label: "Schools & family", value: "JESS Ranches in-community, the polo and golf clubs, and parks that have had twenty years to mature" },
     ],
     sections: [
       {
@@ -470,6 +488,8 @@ const AREA_GUIDES: SeoPage[] = [
       { label: "Who it suits", value: "Commuting families, first villa buyers, Metro-dependent tenants" },
       { label: "Getting around", value: "Two Route 2020 Metro stations, Sheikh Zayed Road & Mohammed bin Zayed Road" },
       { label: "Character", value: "Unshowy, functional, improving year on year" },
+      { label: "Investment angle", value: "Metro-walkable townhouses are rare in Dubai — that proximity prices into both rent and resale" },
+      { label: "Lifestyle & amenities", value: "Ibn Battuta Mall next door, a growing community retail spine, Expo City ten minutes out" },
     ],
     sections: [
       {
@@ -502,6 +522,8 @@ const AREA_GUIDES: SeoPage[] = [
       { label: "Who it suits", value: "Finance professionals, art-and-dining loyalists, pied-à-terre buyers" },
       { label: "Getting around", value: "Financial Centre Metro, Gate Avenue on foot, Downtown ten minutes' walk" },
       { label: "Character", value: "Polished, adult, gallery-quiet at weekends" },
+      { label: "Investment angle", value: "Institutional tenant covenants and slow-turning stock keep voids short and values steady" },
+      { label: "Lifestyle & amenities", value: "Gate Avenue's retail spine, the arts cluster and the city's densest fine-dining bench" },
     ],
     sections: [
       {
@@ -534,6 +556,8 @@ const AREA_GUIDES: SeoPage[] = [
       { label: "Who it suits", value: "Budget-led families, first-time buyers, long-horizon investors" },
       { label: "Getting around", value: "Sheikh Mohammed bin Zayed & Emirates Roads — commutes are real; price them in" },
       { label: "Character", value: "New, spread out, community-by-community — each masterplan is its own world" },
+      { label: "Investment angle", value: "The widest price-to-rent spread in the city — JVC's arithmetic, one belt further out" },
+      { label: "Schools & family", value: "Self-contained communities with pools, parks and in-gate schools as the standard package" },
     ],
     sections: [
       {

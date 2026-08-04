@@ -677,7 +677,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
             Why invest in {seo.label}
           </h2>
           <span className="block w-14 h-1 rounded-full bg-[#d6b357] mt-3 mb-8 mx-auto" aria-hidden="true" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto">
             {seo.facts.map((f) => (
               <div key={f.label} className="bg-white rounded-lg border border-[#e8eaed] p-6">
                 <span className="inline-flex w-9 h-9 rounded-full bg-[#d6b357]/12 items-center justify-center">
