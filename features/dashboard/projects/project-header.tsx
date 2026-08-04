@@ -32,8 +32,9 @@ interface Props {
   readOnly?: boolean
 }
 
-/** Full-screen modal shell for the Poster / Reels studios. */
-function StudioModal({
+/** Full-screen modal shell for the Poster / Reels studios. Exported so the
+ *  projects list can open the studios straight from a card. */
+export function StudioModal({
   title,
   onClose,
   children,

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams, usePathname, useRouter } from "next/navigation"
 import { createPortal } from "react-dom"
-import { Plus, Search, Upload, Image as ImageIcon } from "lucide-react"
+import { Plus, Search, Upload, Image as ImageIcon, LayoutTemplate, Clapperboard, Loader2 } from "lucide-react"
 import { DeveloperCombobox } from "@/components/developers/developer-combobox"
 import {
   type Project,
@@ -24,7 +24,9 @@ import {
 } from "@/lib/project-service"
 
 import { ProjectDataTab } from "./project-data-tab"
-import { ProjectHeader } from "./project-header"
+import { ProjectHeader, StudioModal } from "./project-header"
+import { ProjectPosterTab } from "./project-poster-tab"
+import { ProjectReelsTab } from "./project-reels-tab"
 import { ProjectOverviewTab } from "./project-overview-tab"
 import { ProjectUnitsTab } from "./project-units-tab"
 import { ProjectImagesTab } from "./project-images-tab"
@@ -384,6 +386,18 @@ export function ProjectsClient({
   }
   const closeProject = () => router.push(listPath, { scroll: false })
 
+  // ── Poster / Reels studios straight from a list card ────────────────────────
+  const [cardStudio, setCardStudio] = useState<{ kind: "poster" | "reels"; project: Project } | null>(null)
+  const [cardStudioOpening, setCardStudioOpening] = useState<number | null>(null)
+  const openCardStudio = async (projectId: number, kind: "poster" | "reels") => {
+    if (cardStudioOpening !== null) return
+    setCardStudioOpening(projectId)
+    const { data } = await fetchProject(projectId)
+    setCardStudioOpening(null)
+    if (data) setCardStudio({ kind, project: data })
+    else showToast("error", "Could not load that project.")
+  }
+
   // ── `?project=<id>` IS the detail view ──────────────────────────────────────
   // The URL is the single source of truth, not a mirror of local state. That
   // matters because the breadcrumb's "Projects" crumb links to the bare path:
@@ -599,11 +613,42 @@ export function ProjectsClient({
                       {p.city ? ` · ${p.city}` : ""}
                     </p>
                     <div className="mt-3 flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold text-[#001f3f]">
-                        {p.launch_price_from
-                          ? `${p.currency?.trim() || "AED"} ${Number(p.launch_price_from).toLocaleString("en-US")}`
-                          : "Price on request"}
-                      </span>
+                      {p.launch_price_from ? (
+                        <span className="text-sm font-bold text-[#001f3f]">
+                          {`${p.currency?.trim() || "AED"} ${Number(p.launch_price_from).toLocaleString("en-US")}`}
+                        </span>
+                      ) : p.main_image ? (
+                        <span className="flex items-center gap-1.5">
+                          {cardStudioOpening === p.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-[#001f3f]" />
+                          ) : (
+                            <>
+                              <span
+                                role="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  void openCardStudio(p.id, "poster")
+                                }}
+                                className="inline-flex items-center gap-1 rounded-full bg-[#001f3f] text-white text-[10px] font-bold px-2.5 py-1 hover:bg-[#00284f] transition-colors"
+                              >
+                                <LayoutTemplate className="w-3 h-3" /> Poster
+                              </span>
+                              <span
+                                role="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  void openCardStudio(p.id, "reels")
+                                }}
+                                className="inline-flex items-center gap-1 rounded-full border border-[#001f3f]/25 text-[#001f3f] text-[10px] font-bold px-2.5 py-1 hover:bg-[#f3f6fa] transition-colors"
+                              >
+                                <Clapperboard className="w-3 h-3" /> Reels
+                              </span>
+                            </>
+                          )}
+                        </span>
+                      ) : (
+                        <span aria-hidden />
+                      )}
                       <span className="text-[11px] font-semibold text-[#8a6a10] bg-[#fdf6e3] border border-[#f0e8c8] rounded-full px-2.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         Open →
                       </span>
@@ -627,6 +672,20 @@ export function ProjectsClient({
                 Next →
               </button>
             </div>
+          )}
+
+          {/* Poster / Reels studio opened from a card */}
+          {cardStudio && (
+            <StudioModal
+              title={`${cardStudio.kind === "poster" ? "Poster" : "Reels"} Studio — ${cardStudio.project.name}`}
+              onClose={() => setCardStudio(null)}
+            >
+              {cardStudio.kind === "poster" ? (
+                <ProjectPosterTab project={cardStudio.project} showToast={showToast} />
+              ) : (
+                <ProjectReelsTab project={cardStudio.project} showToast={showToast} />
+              )}
+            </StudioModal>
           )}
         </div>
       ) : loadingProject ? (
