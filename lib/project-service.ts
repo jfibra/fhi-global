@@ -267,6 +267,8 @@ export async function fetchProjects(params: {
   isPublished?: boolean | null
   /** Featured-only, for the Featured page. */
   isFeatured?: boolean
+  sortField?: "created_at" | "name"
+  sortDir?: "asc" | "desc"
 }): Promise<{ data: Project[]; total: number; error: string | null }> {
   const supabase = createClient()
   const page = params.page ?? 1
@@ -278,7 +280,7 @@ export async function fetchProjects(params: {
     .from("projects")
     .select("id, uuid, name, slug, listing_type, status, developer_id, city, country, main_image, is_active, is_published, is_featured, is_premium, launch_price_from, launch_price_to, currency, created_at, updated_at, deleted_at, developers(name, logo_url, slug)", { count: "exact" })
     .is("deleted_at", null)
-    .order("created_at", { ascending: false })
+    .order(params.sortField ?? "created_at", { ascending: params.sortDir === "asc" })
     .range(from, to)
 
   if (params.search) {
@@ -781,6 +783,29 @@ export async function fetchProjectStats(projectId: number): Promise<{ data: Proj
 }
 
 // ─── Developers ────────────────────────────────────────────────────────────────
+
+/** Project totals per developer for the Developers browse grid. Counts live
+ *  (non-deleted) projects; pass isPublished for the read-only studio browser. */
+export async function fetchProjectCountsByDeveloper(params: {
+  isPublished?: boolean
+} = {}): Promise<Record<string, number>> {
+  const supabase = createClient()
+  let q = supabase
+    .from("projects")
+    .select("developer_id")
+    .is("deleted_at", null)
+    .not("developer_id", "is", null)
+    .limit(5000)
+  if (params.isPublished !== undefined) q = q.eq("is_published", params.isPublished)
+
+  const { data, error } = await q
+  if (error || !data) return {}
+  const counts: Record<string, number> = {}
+  for (const row of data as { developer_id: string }[]) {
+    counts[row.developer_id] = (counts[row.developer_id] ?? 0) + 1
+  }
+  return counts
+}
 
 export async function fetchDevelopersForSelect(): Promise<{ data: Developer[]; error: string | null }> {
   const supabase = createClient()

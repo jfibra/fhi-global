@@ -3,8 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams, usePathname, useRouter } from "next/navigation"
 import { createPortal } from "react-dom"
-import { Plus, Search, Upload, Image as ImageIcon, LayoutTemplate, Clapperboard, Loader2 } from "lucide-react"
+import { Plus, Search, Upload, Image as ImageIcon, LayoutTemplate, Clapperboard, Loader2, Building2, ArrowUpRight, Layers } from "lucide-react"
 import { DeveloperCombobox } from "@/components/developers/developer-combobox"
+import { TOOLBAR_GRADIENT } from "@/components/common/header-toolbar"
+import {
+  fetchDevelopers as fetchDeveloperDirectory,
+  type Developer as DirectoryDeveloper,
+} from "@/lib/developer-service"
 import {
   type Project,
   type Developer,
@@ -19,6 +24,7 @@ import {
   duplicateProject,
   publishProject,
   fetchDevelopersForSelect,
+  fetchProjectCountsByDeveloper,
   generateProjectSlug,
   addProjectImage,
 } from "@/lib/project-service"
@@ -38,6 +44,54 @@ import { ProjectNearbyTab } from "./project-nearby-tab"
 import { ProjectSeoTab } from "./project-seo-tab"
 import { ProjectSettingsTab } from "./project-settings-tab"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
+import { sampleLogoBgFromUrl } from "@/lib/logo-bg"
+
+/** Title-case regardless of how the value is cased in the DB. */
+const titleCase = (s: string) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+
+// ─── Developer card cover ───────────────────────────────────────────────────────
+// Background adapts to the logo's own baked-in background color (sampled from
+// its corner pixels); white when there's no confident answer. The bottom border
+// keeps a visible separation when that color is white like the card body.
+function DevLogoCover({ url, name, verified, active }: { url: string | null; name: string; verified: boolean; active: boolean }) {
+  const [bg, setBg] = useState<string | null>(null)
+  useEffect(() => {
+    if (!url) return
+    let alive = true
+    void sampleLogoBgFromUrl(url).then((c) => {
+      if (alive) setBg(c)
+    })
+    return () => {
+      alive = false
+    }
+  }, [url])
+
+  return (
+    <div
+      className="relative m-3 mb-0 h-44 border-b border-[#e5e7eb] flex items-center justify-center overflow-hidden"
+      style={{ backgroundColor: bg ?? "#ffffff" }}
+    >
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt={name}
+          className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-300"
+        />
+      ) : (
+        <Building2 className="w-10 h-10 text-[#001f3f]/20" />
+      )}
+      {verified && (
+        <span className="absolute top-3 left-3 text-[11px] px-3 py-1 font-bold uppercase tracking-wider bg-emerald-500/95 text-white">
+          Verified
+        </span>
+      )}
+      <span className="absolute top-3 right-3 text-[11px] px-3 py-1 font-bold tracking-wider bg-[#232d3b]/95 text-white">
+        {active ? "Active" : "Inactive"}
+      </span>
+    </div>
+  )
+}
 
 // ─── Portal ────────────────────────────────────────────────────────────────────
 function Portal({ children }: { children: React.ReactNode }) {
@@ -294,7 +348,7 @@ function NewProjectModal({
                 Cancel
               </button>
               <button type="submit" disabled={saving || !name.trim()}
-                className="flex-1 px-5 py-2.5 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50">
+                className="flex-1 px-5 py-2.5 bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50">
                 {saving ? "Creating…" : "Create Project"}
               </button>
             </div>
@@ -324,6 +378,7 @@ export function ProjectsClient({
   const [search, setSearch]         = useState("")
   const [filterDev, setFilterDev]   = useState("")
   const [filterStatus, setStatus]   = useState("")
+  const [sort, setSort] = useState<"" | "newest" | "oldest" | "name_asc" | "name_desc">("")
   const [loading, setLoading]       = useState(false)
 
   const router = useRouter()
@@ -364,12 +419,14 @@ export function ProjectsClient({
       developerId: filterDev || undefined,
       status: filterStatus || undefined,
       isPublished: readOnly ? true : undefined,
+      sortField: sort === "name_asc" || sort === "name_desc" ? "name" : "created_at",
+      sortDir: sort === "oldest" || sort === "name_asc" ? "asc" : "desc",
     })
     setLoading(false)
     if (error) { showToast("error", error); return }
     setProjects(data)
     setTotal(t)
-  }, [page, search, filterDev, filterStatus, readOnly, showToast])
+  }, [page, search, filterDev, filterStatus, readOnly, sort, showToast])
 
   // Only the list route needs the list — a detail route would waste the query.
   useEffect(() => { if (slug === null) void loadList() }, [loadList, slug])
@@ -385,6 +442,28 @@ export function ProjectsClient({
     router.push(`${listPath}/${project.slug}`, { scroll: false })
   }
   const closeProject = () => router.push(listPath, { scroll: false })
+
+  // ── Browse mode: the project grid, or an all-developers grid whose cards
+  // drill into that developer's projects. ─────────────────────────────────────
+  const [viewMode, setViewMode] = useState<"projects" | "developers">("projects")
+  const openDeveloperProjects = (developerId: string) => {
+    setFilterDev(developerId)
+    setPage(1)
+    setViewMode("projects")
+  }
+
+  // Developer directory for the Developers view — richer than the combobox list
+  // (is_active + created_at for the status filter and sorting). Loaded once,
+  // lazily, the first time the view is opened; filtered/sorted client-side.
+  const [devDirectory, setDevDirectory] = useState<DirectoryDeveloper[] | null>(null)
+  const [devProjectCounts, setDevProjectCounts] = useState<Record<string, number>>({})
+  const [devVerified, setDevVerified] = useState("all")
+  const [devStatus, setDevStatus] = useState("all")
+  useEffect(() => {
+    if (viewMode !== "developers" || devDirectory !== null) return
+    void fetchDeveloperDirectory({ perPage: 500 }).then(({ data }) => setDevDirectory(data ?? []))
+    void fetchProjectCountsByDeveloper({ isPublished: readOnly ? true : undefined }).then(setDevProjectCounts)
+  }, [viewMode, devDirectory, readOnly])
 
   // ── Poster / Reels studios straight from a list card ────────────────────────
   const [cardStudio, setCardStudio] = useState<{ kind: "poster" | "reels"; project: Project } | null>(null)
@@ -486,13 +565,18 @@ export function ProjectsClient({
 
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE))
 
-  const statusLabel = (s: string | null) => (s ?? "").replace(/_/g, " ")
+  // Title-case regardless of how the status is cased in the DB.
+  const statusLabel = (s: string | null) =>
+    (s ?? "")
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase())
 
   return (
-    <div className="min-h-screen bg-[#f9fafb]">
+    <div>
       {!selected && !loadingProject ? (
         /* ══ BROWSE — card grid with search & filters ═══════════════════════ */
-        <div className="max-w-[1400px] mx-auto px-6 py-8">
+        <div className="max-w-[1400px] mx-auto">
           {/* heading row */}
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div>
@@ -503,62 +587,189 @@ export function ProjectsClient({
             </div>
             {!readOnly && (
               <button onClick={() => setShowNew(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
                 <Plus className="w-4 h-4" /> New Project
               </button>
             )}
           </div>
 
           {/* toolbar */}
-          <div className="bg-white rounded-2xl border border-[#e5e5e5] p-3 mb-6 flex flex-col sm:flex-row gap-2.5">
-            <div className="flex items-center gap-2 bg-[#f3f4f6] rounded-xl px-3.5 py-2.5 border border-transparent focus-within:border-[#001f3f]/25 transition-all flex-1 min-w-0">
+          <div className="bg-white border border-[#e5e5e5] p-3 mb-6 flex flex-col sm:flex-row gap-2.5">
+            <div className="flex items-center gap-2 bg-[#f3f4f6] px-3.5 py-2.5 border border-transparent focus-within:border-[#001f3f]/25 transition-all flex-1 min-w-0">
               <Search className="w-4 h-4 text-[#9ca3af] flex-shrink-0" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-                placeholder="Search projects by name or city…"
+                placeholder={viewMode === "developers" ? "Search developers…" : "Search projects by name or city…"}
                 className="flex-1 bg-transparent text-sm text-[#111827] placeholder-[#9ca3af] outline-none min-w-0"
               />
               {search && (
                 <button type="button" onClick={() => { setSearch(""); setPage(1) }} className="text-[#9ca3af] hover:text-[#374151] text-xs">✕</button>
               )}
             </div>
-            <div className="flex gap-2.5">
-              <div className="w-60">
-                <DeveloperCombobox
-                  developers={developers}
-                  value={filterDev}
-                  onChange={(id) => { setFilterDev(id); setPage(1) }}
-                  clearLabel="All Developers"
-                />
-              </div>
-              <div className="flex items-center bg-[#f3f4f6] rounded-xl px-3 py-2.5">
-                <select
-                  value={filterStatus}
-                  onChange={(e) => { setStatus(e.target.value); setPage(1) }}
-                  className="bg-transparent text-sm text-[#374151] outline-none cursor-pointer"
+            {/* view-mode switch: browse projects directly, or drill in per developer */}
+            <div className="flex shrink-0 items-stretch gap-1 border border-[#e0e3e8] bg-white p-1">
+              {(
+                [
+                  { mode: "projects", label: "Projects", Icon: Layers },
+                  { mode: "developers", label: "Developers", Icon: Building2 },
+                ] as const
+              ).map(({ mode, label, Icon }) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setViewMode(mode)}
+                  className={`flex items-center gap-2 px-4 py-2 text-[15px] font-semibold transition-colors ${
+                    viewMode === mode
+                      ? `${TOOLBAR_GRADIENT} text-white`
+                      : "bg-white text-[#6b7280] hover:bg-[#f6f7f9]"
+                  }`}
                 >
-                  <option value="">All Statuses</option>
-                  <option value="pre_launch">Pre-Launch</option>
-                  <option value="launch">Launch</option>
-                  <option value="under_construction">Under Construction</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </div>
+                  <Icon className={`w-4.5 h-4.5 ${viewMode === mode ? "text-white" : "text-[#9ca3af]"}`} />
+                  {label}
+                </button>
+              ))}
             </div>
+            {/* sort — applies to whichever grid is showing */}
+            <div className="flex items-center bg-white border border-[#e5e7eb] px-3 py-2.5 hover:border-[#001f3f]/40 transition-all">
+              <select
+                value={sort}
+                onChange={(e) => { setSort(e.target.value as typeof sort); setPage(1) }}
+                className="w-[105px] truncate bg-transparent text-sm font-semibold text-[#374151] outline-none cursor-pointer"
+              >
+                <option value="">Sort by</option>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="name_asc">Name A–Z</option>
+                <option value="name_desc">Name Z–A</option>
+              </select>
+            </div>
+            {viewMode === "projects" ? (
+              <div className="flex gap-2.5">
+                <div className="w-[172px]">
+                  <DeveloperCombobox
+                    developers={developers}
+                    value={filterDev}
+                    onChange={(id) => { setFilterDev(id); setPage(1) }}
+                    clearLabel="All Developers"
+                    flat
+                    bare
+                  />
+                </div>
+                <div className="flex items-center bg-white border border-[#e5e7eb] px-3 py-2.5 hover:border-[#001f3f]/40 transition-all">
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => { setStatus(e.target.value); setPage(1) }}
+                    className="w-[80px] truncate bg-transparent text-sm font-semibold text-[#374151] outline-none cursor-pointer"
+                  >
+                    <option value="">Status</option>
+                    <option value="pre_launch">Pre-Launch</option>
+                    <option value="launch">Launch</option>
+                    <option value="under_construction">Under Construction</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2.5">
+                <div className="flex items-center bg-white border border-[#e5e7eb] px-3 py-2.5 hover:border-[#001f3f]/40 transition-all">
+                  <select
+                    value={devVerified}
+                    onChange={(e) => setDevVerified(e.target.value)}
+                    className="w-[115px] truncate bg-transparent text-sm font-semibold text-[#374151] outline-none cursor-pointer"
+                  >
+                    <option value="all">Verifications</option>
+                    <option value="verified">Verified</option>
+                    <option value="unverified">Unverified</option>
+                  </select>
+                </div>
+                <div className="flex items-center bg-white border border-[#e5e7eb] px-3 py-2.5 hover:border-[#001f3f]/40 transition-all">
+                  <select
+                    value={devStatus}
+                    onChange={(e) => setDevStatus(e.target.value)}
+                    className="w-[80px] truncate bg-transparent text-sm font-semibold text-[#374151] outline-none cursor-pointer"
+                  >
+                    <option value="all">Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* card grid */}
-          {loading ? (
+          {viewMode === "developers" ? (
+            /* All developers — same card language as the project grid; clicking
+               one drills into that developer's projects. */
+            (() => {
+              if (devDirectory === null) {
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="h-72 bg-[#f3f4f6] animate-pulse" />
+                    ))}
+                  </div>
+                )
+              }
+              const q = search.trim().toLowerCase()
+              const visibleDevs = devDirectory
+                .filter((d) => !q || d.name.toLowerCase().includes(q))
+                .filter((d) => devVerified === "all" || d.is_verified === (devVerified === "verified"))
+                .filter((d) => devStatus === "all" || d.is_active === (devStatus === "active"))
+                .sort((a, b) => {
+                  if (sort === "name_asc") return a.name.localeCompare(b.name)
+                  if (sort === "name_desc") return b.name.localeCompare(a.name)
+                  const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                  return sort === "oldest" ? diff : -diff
+                })
+              return visibleDevs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-24 text-center">
+                  <div className="w-20 h-20 bg-gradient-to-br from-[#001f3f]/10 to-[#d6b357]/20 flex items-center justify-center mb-5">
+                    <Building2 className="w-9 h-9 text-[#001f3f]/40" />
+                  </div>
+                  <p className="text-[#374151] font-semibold text-lg font-['Outfit']">No developers found</p>
+                  <p className="text-sm text-[#9ca3af] mt-1">Try a different search</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                  {visibleDevs.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => openDeveloperProjects(d.id)}
+                      className="group text-left bg-white border border-[#eceef2] overflow-hidden shadow-[0_2px_12px_-6px_rgba(0,31,63,0.10)] hover:shadow-[0_16px_40px_-12px_rgba(0,31,63,0.28)] hover:-translate-y-1 hover:border-[#d6b357]/60 transition-all duration-200"
+                    >
+                      <DevLogoCover url={d.logo_url} name={d.name} verified={d.is_verified} active={d.is_active} />
+                      <div className="p-4 pt-3.5">
+                        <p className="font-['Outfit'] text-[17px] font-bold text-[#0f2940] truncate">{d.name}</p>
+                        <p className="mt-1.5 flex items-center gap-2 text-[13px] text-[#6b7280]">
+                          <Layers className="w-4 h-4 shrink-0" />
+                          <span className="truncate">
+                            {devProjectCounts[d.id] ?? 0} Project{(devProjectCounts[d.id] ?? 0) === 1 ? "" : "s"}
+                          </span>
+                        </p>
+                        <div className="mt-3.5 flex items-center">
+                          <span className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap px-2 py-2 text-[12px] font-semibold text-white transition-all group-hover:brightness-110 ${TOOLBAR_GRADIENT}`}>
+                            View Projects <ArrowUpRight className="w-4 h-4" />
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )
+            })()
+          ) : loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="h-72 rounded-3xl bg-[#f3f4f6] animate-pulse" />
+                <div key={i} className="h-72 bg-[#f3f4f6] animate-pulse" />
               ))}
             </div>
           ) : projects.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
-              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#001f3f]/10 to-[#d6b357]/20 flex items-center justify-center mb-5">
+              <div className="w-20 h-20 bg-gradient-to-br from-[#001f3f]/10 to-[#d6b357]/20 flex items-center justify-center mb-5">
                 <svg className="w-9 h-9 text-[#001f3f]/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 21V7l9-4 9 4v14M12 21V13m-4 8v-5m8 5v-5" />
                 </svg>
@@ -569,7 +780,7 @@ export function ProjectsClient({
               </p>
               {!readOnly && (
                 <button onClick={() => setShowNew(true)}
-                  className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
+                  className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all">
                   <Plus className="w-4 h-4" /> New Project
                 </button>
               )}
@@ -581,10 +792,12 @@ export function ProjectsClient({
                   key={p.id}
                   type="button"
                   onClick={() => openProject(p)}
-                  className="group text-left bg-white rounded-3xl border border-[#eceef2] overflow-hidden shadow-[0_2px_12px_-6px_rgba(0,31,63,0.10)] hover:shadow-[0_16px_40px_-12px_rgba(0,31,63,0.28)] hover:-translate-y-1 hover:border-[#d6b357]/60 transition-all duration-200"
+                  className="group text-left bg-white border border-[#eceef2] overflow-hidden shadow-[0_2px_12px_-6px_rgba(0,31,63,0.10)] hover:shadow-[0_16px_40px_-12px_rgba(0,31,63,0.28)] hover:-translate-y-1 hover:border-[#d6b357]/60 transition-all duration-200"
                 >
-                  {/* cover */}
-                  <div className="relative h-40 bg-gradient-to-br from-[#001f3f] to-[#0a3a66] overflow-hidden">
+                  {/* cover — inset on the studio browser (flat, no radius) */}
+                  <div className={`relative bg-gradient-to-br from-[#001f3f] to-[#0a3a66] overflow-hidden ${
+                    readOnly ? "m-3 mb-0 h-44" : "h-40"
+                  }`}>
                     {p.main_image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={p.main_image} alt={p.name}
@@ -596,16 +809,68 @@ export function ProjectsClient({
                         </svg>
                       </div>
                     )}
-                    <span className={`absolute top-3 left-3 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                    <span className={`absolute top-3 left-3 font-bold uppercase tracking-wider ${
+                      readOnly ? "text-[11px] px-3 py-1" : "text-[10px] px-2.5 py-1"
+                    } ${
                       p.is_published ? "bg-emerald-500/95 text-white" : "bg-white/90 text-[#6b7280]"
                     }`}>
                       {p.is_published ? "Live" : "Draft"}
                     </span>
-                    <span className="absolute top-3 right-3 text-[10px] font-bold tracking-wider px-2.5 py-1 rounded-full bg-[#001f3f]/85 text-[#d6b357] capitalize">
+                    <span className={`absolute top-3 right-3 font-bold tracking-wider bg-[#232d3b]/95 text-white ${
+                      readOnly ? "text-[11px] px-3 py-1" : "text-[10px] px-2.5 py-1"
+                    }`}>
                       {statusLabel(p.status)}
                     </span>
                   </div>
                   {/* body */}
+                  {readOnly ? (
+                    /* Studio browser card (agents/members) — mockup layout:
+                       bold title, developer line, always-visible action row. */
+                    <div className="p-4 pt-3.5">
+                      <p className="font-['Outfit'] text-[17px] font-bold text-[#0f2940] truncate">
+                        {p.name}
+                      </p>
+                      <p className="mt-1.5 flex items-center gap-2 text-[13px] text-[#6b7280]">
+                        <Building2 className="w-4 h-4 shrink-0" />
+                        <span className="truncate">{p.developers?.name ? titleCase(p.developers.name) : "—"}</span>
+                      </p>
+                      <div className="mt-3.5 flex items-center gap-2">
+                        {cardStudioOpening === p.id ? (
+                          <Loader2 className="w-5 h-5 animate-spin text-[#001f3f]" />
+                        ) : (
+                          <>
+                            {p.main_image && (
+                              <>
+                                <span
+                                  role="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    void openCardStudio(p.id, "poster")
+                                  }}
+                                  className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap border border-[#cfe0f1] bg-[#eaf2fb] px-2 py-2 text-[12px] font-semibold text-[#0a3d6b] transition-colors hover:bg-[#ddebf7]"
+                                >
+                                  <LayoutTemplate className="w-4 h-4" /> Poster
+                                </span>
+                                <span
+                                  role="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    void openCardStudio(p.id, "reels")
+                                  }}
+                                  className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap border border-[#e1e4ea] bg-white px-2 py-2 text-[12px] font-semibold text-[#0d1b2e] transition-colors hover:bg-[#f3f6fa]"
+                                >
+                                  <Clapperboard className="w-4 h-4" /> Reels
+                                </span>
+                              </>
+                            )}
+                            <span className={`flex flex-1 items-center justify-center gap-1 whitespace-nowrap px-2 py-2 text-[12px] font-semibold text-white transition-all hover:brightness-110 ${TOOLBAR_GRADIENT}`}>
+                              Open <ArrowUpRight className="w-4 h-4" />
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
                   <div className="p-4">
                     <p className="text-[15px] font-bold text-[#111827] font-['Outfit'] truncate group-hover:text-[#001f3f]">{p.name}</p>
                     <p className="text-xs text-[#6b7280] mt-0.5 truncate">
@@ -629,7 +894,7 @@ export function ProjectsClient({
                                   e.stopPropagation()
                                   void openCardStudio(p.id, "poster")
                                 }}
-                                className="inline-flex items-center gap-1 rounded-full bg-[#001f3f] text-white text-[10px] font-bold px-2.5 py-1 hover:bg-[#00284f] transition-colors"
+                                className="inline-flex items-center gap-1 bg-[#001f3f] text-white text-[10px] font-bold px-2.5 py-1 hover:bg-[#00284f] transition-colors"
                               >
                                 <LayoutTemplate className="w-3 h-3" /> Poster
                               </span>
@@ -639,7 +904,7 @@ export function ProjectsClient({
                                   e.stopPropagation()
                                   void openCardStudio(p.id, "reels")
                                 }}
-                                className="inline-flex items-center gap-1 rounded-full border border-[#001f3f]/25 text-[#001f3f] text-[10px] font-bold px-2.5 py-1 hover:bg-[#f3f6fa] transition-colors"
+                                className="inline-flex items-center gap-1 border border-[#001f3f]/25 text-[#001f3f] text-[10px] font-bold px-2.5 py-1 hover:bg-[#f3f6fa] transition-colors"
                               >
                                 <Clapperboard className="w-3 h-3" /> Reels
                               </span>
@@ -649,26 +914,27 @@ export function ProjectsClient({
                       ) : (
                         <span aria-hidden />
                       )}
-                      <span className="text-[11px] font-semibold text-[#8a6a10] bg-[#fdf6e3] border border-[#f0e8c8] rounded-full px-2.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-[11px] font-semibold text-[#8a6a10] bg-[#fdf6e3] border border-[#f0e8c8] px-2.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         Open →
                       </span>
                     </div>
                   </div>
+                  )}
                 </button>
               ))}
             </div>
           )}
 
           {/* pagination */}
-          {totalPages > 1 && (
+          {viewMode === "projects" && totalPages > 1 && (
             <div className="flex items-center justify-center gap-4 mt-8 text-sm text-[#6b7280]">
               <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
-                className="px-4 py-2 rounded-xl border border-[#e5e5e5] bg-white disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
+                className="px-4 py-2 border border-[#e5e5e5] bg-white disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
                 ← Prev
               </button>
               <span className="font-semibold">{page} / {totalPages}</span>
               <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}
-                className="px-4 py-2 rounded-xl border border-[#e5e5e5] bg-white disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
+                className="px-4 py-2 border border-[#e5e5e5] bg-white disabled:opacity-40 hover:border-[#001f3f] transition-colors font-medium">
                 Next →
               </button>
             </div>
@@ -690,7 +956,7 @@ export function ProjectsClient({
         </div>
       ) : loadingProject ? (
         /* ══ DETAIL — loading ═══════════════════════════════════════════════ */
-        <div className="max-w-[1400px] mx-auto px-6 py-8 space-y-4">
+        <div className="max-w-[1400px] mx-auto space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className={`h-14 rounded-2xl bg-[#f3f4f6] animate-pulse ${i === 0 ? "h-28" : ""}`} />
           ))}

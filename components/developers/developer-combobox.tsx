@@ -21,6 +21,8 @@ export function DeveloperCombobox({
   placeholder = "Select developer…",
   clearLabel,
   id,
+  flat = false,
+  bare = false,
 }: {
   developers: DeveloperOption[]
   value: string
@@ -30,6 +32,11 @@ export function DeveloperCombobox({
   /** Filter mode: label for a top row that clears the selection (onChange("")), e.g. "All Developers". Also shown in the trigger while nothing is selected. */
   clearLabel?: string
   id?: string
+  /** Square corners (trigger + panel) for flat-design pages. */
+  flat?: boolean
+  /** Text-only mode: no logos or verified badges (trigger and rows) — for tight
+   *  filter bars where the control truncates instead of growing. */
+  bare?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState("")
@@ -64,22 +71,22 @@ export function DeveloperCombobox({
   }, [open, place])
 
   return (
-    <div className="relative">
+    <div className={`relative ${flat ? "h-full" : ""}`}>
       <button
         id={id}
         ref={btnRef}
         type="button"
         disabled={disabled}
         onClick={() => (open ? close() : openMenu())}
-        className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl border bg-white text-left transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+        className={`w-full flex items-center gap-3 px-3.5 ${flat ? "h-full py-2.5" : "py-3 rounded-xl"} border bg-white text-left transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
           open ? "border-[#001f3f] ring-4 ring-[#001f3f]/6" : "border-[#e5e7eb] hover:border-[#001f3f]/40"
         }`}
       >
         {selected ? (
           <>
-            <DeveloperLogo url={selected.logo_url} name={selected.name} size={28} />
+            {!bare && <DeveloperLogo url={selected.logo_url} name={selected.name} size={28} />}
             <span className="flex-1 text-sm font-semibold text-[#111827] truncate">{selected.name}</span>
-            {selected.is_verified && <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />}
+            {!bare && selected.is_verified && <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />}
           </>
         ) : clearLabel ? (
           <span className="flex-1 text-sm font-semibold text-[#374151] truncate">{clearLabel}</span>
@@ -95,8 +102,22 @@ export function DeveloperCombobox({
             {/* Click-away overlay */}
             <div className="fixed inset-0" style={{ zIndex: 1000 }} onClick={close} aria-hidden />
             <div
-              style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width, zIndex: 1001 }}
-              className="bg-white rounded-2xl border border-[#e8eaed] shadow-xl overflow-hidden"
+              style={
+                bare
+                  ? {
+                      // Size to the longest developer name (rows don't wrap),
+                      // never narrower than the trigger, never past the viewport.
+                      position: "fixed",
+                      top: pos.top,
+                      left: pos.left,
+                      width: "max-content",
+                      minWidth: pos.width,
+                      maxWidth: `calc(100vw - ${pos.left + 12}px)`,
+                      zIndex: 1001,
+                    }
+                  : { position: "fixed", top: pos.top, left: pos.left, width: pos.width, zIndex: 1001 }
+              }
+              className={`bg-white ${flat ? "" : "rounded-2xl"} border border-[#e8eaed] shadow-xl overflow-hidden`}
             >
               <div className="p-2 border-b border-[#f0f2f5]">
                 <div className="relative">
@@ -106,7 +127,7 @@ export function DeveloperCombobox({
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     placeholder="Search developers"
-                    className="w-full h-9 pl-9 pr-3 rounded-lg border border-[#e5e7eb] text-sm focus:outline-none focus:border-[#001f3f]"
+                    className={`w-full h-9 pl-9 pr-3 ${flat ? "" : "rounded-lg"} border border-[#e5e7eb] text-sm focus:outline-none focus:border-[#001f3f]`}
                   />
                 </div>
               </div>
@@ -131,9 +152,9 @@ export function DeveloperCombobox({
                       onClick={() => { onChange(d.id); close() }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#f9fafb] text-left"
                     >
-                      <DeveloperLogo url={d.logo_url} name={d.name} size={28} />
-                      <span className="flex-1 text-sm font-medium text-[#111827] truncate">{d.name}</span>
-                      {d.is_verified && <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />}
+                      {!bare && <DeveloperLogo url={d.logo_url} name={d.name} size={28} />}
+                      <span className={`flex-1 text-sm font-medium text-[#111827] ${bare ? "whitespace-nowrap" : "truncate"}`}>{d.name}</span>
+                      {!bare && d.is_verified && <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />}
                       {value === d.id && <Check className="w-4 h-4 text-[#001f3f] shrink-0" />}
                     </button>
                   ))

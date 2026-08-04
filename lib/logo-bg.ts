@@ -24,6 +24,19 @@ function getSamplerCtx() {
   return samplerCtx
 }
 
+/** Sample from a raw URL via an offscreen CORS-enabled image, so the visible
+ *  <img> is untouched. Resolves null (use the caller's default) whenever the
+ *  host blocks CORS or the pixels can't be read. */
+export function sampleLogoBgFromUrl(url: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => resolve(sampleLogoBg(img))
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
+
 export function sampleLogoBg(img: HTMLImageElement): string | null {
   try {
     const w = img.naturalWidth
