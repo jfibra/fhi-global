@@ -127,6 +127,11 @@ export default async function ProjectDetailPage({ params }: Props) {
   const media = (project.project_media ?? []) as { id:number; media_type:string|null; url:string }[]
   const propertyTypes = ((project.project_property_types ?? []) as { property_types: { name: string } | null }[])
     .map((pt) => pt.property_types?.name).filter(Boolean) as string[]
+  const quickStats = [
+    project.delivery_quarter ?? project.expected_completion_date,
+    project.total_units, project.number_of_buildings, project.floors,
+    project.expected_roi, project.rental_yield, project.down_payment_percentage,
+  ].filter(Boolean)
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
   const listingSchema = {
     "@context": "https://schema.org",
@@ -176,117 +181,138 @@ export default async function ProjectDetailPage({ params }: Props) {
       <TopBar />
       <Header />
 
-      {/* ── Hero ──────────────────────────────────────────── */}
-      <section className="relative min-h-[60vh] flex items-end overflow-hidden">
-        {/* BG image */}
+      {/* ── Hero ──────────────────────────────────────────────
+          Editorial layout: one calm left column (eyebrow, title, blurb, fact
+          row) over a scrimmed photo, with a quiet bordered share panel to the
+          right. The old version stacked pills, title, and a loud navy CTA card
+          in the same space — seven fat share buttons ended up shouting louder
+          than the project name. */}
+      <section className="relative min-h-[70vh] flex items-center overflow-hidden">
         {project.main_image ? (
           <Image
             src={project.main_image}
             alt={project.name}
             fill
             sizes="100vw"
+            priority
             className="absolute inset-0 object-cover"
           />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f] to-[#002a52]" />
+          <div className="absolute inset-0 bg-[#001f3f]" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#001428]/95 via-[#001428]/35 to-[#001428]/10" />
-        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#d6b357]/70 to-transparent" />
+        {/* Left-weighted scrim: keeps the copy legible while the photo stays
+            visible on the right, where the building usually is. */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/95 via-[#001428]/70 to-[#001428]/25" />
 
-        <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 pt-16">
-          {/* Back */}
-          <Link href="/projects" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#d6b357] hover:text-[#f0d890] transition-colors mb-6">
-            <ArrowLeft className="w-4 h-4" /> All Projects
-          </Link>
-
-          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+        <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-10 lg:gap-14 items-end">
             <div className="max-w-2xl">
-              {/* Tags row */}
-              <div className="flex flex-wrap items-center gap-2 mb-4">
-                <span
-                  className="px-3 py-1 rounded-full text-xs font-bold"
-                  style={{ backgroundColor: status.bg, color: status.text, border: `1px solid ${status.border}` }}
-                >
+              <div className="flex items-center gap-3 mb-5">
+                <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
                   {status.label}
                 </span>
+                <span className="h-px w-10 bg-[#d6b357]/70" aria-hidden="true" />
                 {project.is_featured && (
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#d6b357] text-[#001f3f]">Featured</span>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">Featured</span>
                 )}
-                {propertyTypes.map((t) => (
-                  <span key={t} className="px-3 py-1 rounded-full text-xs font-medium bg-white/15 text-white border border-white/20 backdrop-blur-sm">
-                    {t}
-                  </span>
-                ))}
               </div>
 
               <h1
-                className="font-['Outfit'] text-5xl md:text-6xl font-bold text-white leading-[1.05] mb-3"
+                className="font-['Outfit'] text-5xl md:text-6xl font-bold text-white leading-[1.04]"
                 style={{ textShadow: "0 2px 30px rgba(0,10,30,0.6)" }}
               >
                 {project.name}
               </h1>
-              <span className="block w-14 h-1 rounded-full bg-[#d6b357] mb-4" aria-hidden="true" />
+              <span className="block w-14 h-1 rounded-full bg-[#d6b357] mt-5 mb-6" aria-hidden="true" />
 
-              {developer && (
-                <p className="text-white/80 text-base mb-2" style={{ textShadow: "0 1px 8px rgba(0,10,30,0.7)" }}>
-                  by{" "}
-                  {developer.slug ? (
-                    <Link
-                      href={`/${developer.slug}`}
-                      className="font-bold text-[#d6b357] hover:text-[#f0d890] transition-colors"
-                    >
-                      {developer.name}
-                    </Link>
-                  ) : (
-                    <span className="font-bold text-white">{developer.name}</span>
-                  )}
+              {(project.description || project.about_project) && (
+                <p
+                  className="text-[16.5px] leading-[1.75] text-white/80 max-w-xl line-clamp-3"
+                  style={{ textShadow: "0 1px 10px rgba(0,10,30,0.7)" }}
+                >
+                  {project.description || project.about_project}
                 </p>
               )}
 
-              {locationStr && (
-                <div className="flex items-center gap-1.5 text-white/85 text-sm" style={{ textShadow: "0 1px 8px rgba(0,10,30,0.7)" }}>
-                  <MapPin className="w-4 h-4 text-[#d6b357]" /> {locationStr}
-                </div>
-              )}
-            </div>
+              {/* Fact row — the mockup's Developer / Location / Type / Status
+                  strip. Empty fields drop out rather than printing a dash. */}
+              <dl className="mt-9 flex flex-wrap gap-x-12 gap-y-6">
+                {[
+                  {
+                    label: "Developer",
+                    node: developer
+                      ? (developer.slug
+                          ? <Link href={`/${developer.slug}`} className="text-white hover:text-[#d6b357] transition-colors">{developer.name}</Link>
+                          : developer.name)
+                      : null,
+                  },
+                  { label: "Location", node: locationStr || null },
+                  { label: "Type", node: propertyTypes[0] ?? null },
+                  { label: "Status", node: status.label },
+                  { label: "Starting From", node: price },
+                ]
+                  .filter((f) => f.node)
+                  .map((f) => (
+                    <div key={f.label}>
+                      <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#d6b357] mb-1.5">
+                        {f.label}
+                      </dt>
+                      <dd className="text-[15px] font-semibold text-white" style={{ textShadow: "0 1px 8px rgba(0,10,30,0.7)" }}>
+                        {f.node}
+                      </dd>
+                    </div>
+                  ))}
+              </dl>
 
-            {/* Price + CTA — solid navy card with gold ring (premium look) */}
-            <div className="bg-[#0a1f38]/95 backdrop-blur-md ring-1 ring-[#d6b357]/40 rounded-[20px] p-6 min-w-[280px] shadow-[0_30px_80px_-20px_rgba(0,10,25,0.8)]">
-              {price ? (
-                <div className="mb-5">
-                  <p className="text-xs text-[#d6b357] uppercase tracking-[0.2em] font-bold mb-1.5">Starting From</p>
-                  <p className="font-['Outfit'] text-3xl font-bold text-white leading-none">{price}</p>
-                </div>
-              ) : null}
-              <div className="flex flex-col gap-2.5">
-                {developer?.phone && (
-                  <a
-                    href={`tel:${developer.phone}`}
-                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[#d6b357] to-[#c9a449] hover:from-[#c9a449] hover:to-[#b8913f] text-[#001f3f] text-sm font-bold transition-all shadow-[0_8px_24px_-6px_rgba(214,179,87,0.5)]"
-                  >
-                    <Phone className="w-3.5 h-3.5" /> Contact Agent
-                  </a>
-                )}
+              <div className="mt-9 flex flex-wrap gap-3">
                 <a
                   href="#units"
-                  className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-[#d6b357]/50 text-white text-sm font-semibold hover:bg-[#d6b357]/15 hover:border-[#d6b357] transition-all"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
                 >
                   View Units
                 </a>
+                {developer?.phone && (
+                  <a
+                    href={`tel:${developer.phone}`}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-white/30 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-colors"
+                  >
+                    <Phone className="w-4 h-4" /> Contact Agent
+                  </a>
+                )}
               </div>
+            </div>
 
+            {/* Share — a bordered panel, not a stack of pills. */}
+            <div className="lg:w-[360px] shrink-0 border border-white/20 bg-[#001428]/55 backdrop-blur-md p-6">
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white">Share this project</p>
+              <span className="block w-full h-px bg-white/15 mt-3 mb-4" aria-hidden="true" />
               <SocialShare
                 title={`${project.name} | FHI Global`}
                 text={`Discover ${project.name} on FHI Global.`}
-                variant="dark"
+                variant="bare"
               />
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Quick stats band — navy with gold-ringed icons (premium) ── */}
-      <div className="bg-gradient-to-r from-[#001f3f] to-[#002a52] border-b border-[#d6b357]/25">
+      {/* Back link — out of the hero so it doesn't crowd the title. */}
+      <div className="bg-white border-b border-[#e8eaed]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <Link
+            href={developer?.slug ? `/${developer.slug}` : "/projects"}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            {developer?.name ? `All ${developer.name} projects` : "All Projects"}
+          </Link>
+        </div>
+      </div>
+
+      {/* ── Quick stats band — omitted entirely when a project carries no
+             stats, rather than leaving an empty navy strip under the hero. ── */}
+      {quickStats.length > 0 && (
+      <div className="bg-[#001f3f] border-b border-[#d6b357]/25">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-wrap gap-x-10 gap-y-5">
           {[
             { icon: Calendar, label: "Completion", value: project.delivery_quarter ?? (project.expected_completion_date ? new Date(project.expected_completion_date).toLocaleDateString("en-AE", { month: "short", year: "numeric" }) : null) },
@@ -311,6 +337,7 @@ export default async function ProjectDetailPage({ params }: Props) {
             ))}
         </div>
       </div>
+      )}
 
       {/* ── Main content ─────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -319,9 +346,8 @@ export default async function ProjectDetailPage({ params }: Props) {
 
           {/* Overview */}
           {(project.description || project.about_project) && (
-            <section className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Project Overview</h2>
+            <section className="relative bg-white rounded-lg border border-[#e8eaed] p-8 overflow-hidden">
+                            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Project Overview</h2>
               <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
               {project.description && (
                 <p className="text-[#374151] leading-relaxed mb-4">{project.description}</p>
@@ -337,9 +363,8 @@ export default async function ProjectDetailPage({ params }: Props) {
 
           {/* Features */}
           {features.length > 0 && (
-            <section className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Key Features</h2>
+            <section className="relative bg-white rounded-lg border border-[#e8eaed] p-8 overflow-hidden">
+                            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Key Features</h2>
               <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {features.map((f) => (
@@ -356,10 +381,9 @@ export default async function ProjectDetailPage({ params }: Props) {
 
           {/* Gallery */}
           {images.length > 0 && (
-            <section className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">
-                Gallery <span className="text-sm font-normal text-[#9ca3af]">({images.length} photos)</span>
+            <section className="relative bg-white rounded-lg border border-[#e8eaed] p-8 overflow-hidden">
+                            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">
+                Gallery
               </h2>
               <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
               <ProjectGallery images={images} />
@@ -368,9 +392,8 @@ export default async function ProjectDetailPage({ params }: Props) {
 
           {/* Units */}
           {units.length > 0 && (
-            <section id="units" className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 hover:-translate-y-1 transition-all duration-300 overflow-hidden scroll-mt-24">
-              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Available Unit Types</h2>
+            <section id="units" className="relative bg-white rounded-lg border border-[#e8eaed] p-8 overflow-hidden scroll-mt-24">
+                            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Available Unit Types</h2>
               <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -424,9 +447,8 @@ export default async function ProjectDetailPage({ params }: Props) {
 
           {/* Amenities */}
           {project.project_amenities && project.project_amenities.length > 0 && (
-            <section className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Amenities</h2>
+            <section className="relative bg-white rounded-lg border border-[#e8eaed] p-8 overflow-hidden">
+                            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Amenities</h2>
               <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
               <AmenitiesGrid amenities={project.project_amenities as any} />
             </section>
@@ -434,9 +456,8 @@ export default async function ProjectDetailPage({ params }: Props) {
 
           {/* Nearby */}
           {((project.project_points && project.project_points.length > 0) || (project.project_neighbors && project.project_neighbors.length > 0)) && (
-            <section className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Nearby Places</h2>
+            <section className="relative bg-white rounded-lg border border-[#e8eaed] p-8 overflow-hidden">
+                            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Nearby Places</h2>
               <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
               <NearbyPlaces
                 points={(project.project_points as any[])?.map((p) => ({ ...p, place_type: p.category }))}
@@ -447,9 +468,8 @@ export default async function ProjectDetailPage({ params }: Props) {
 
           {/* Media */}
           {media.length > 0 && (
-            <section className="relative bg-white rounded-[28px] border border-[#e8eaed] p-8 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Media & Virtual Tours</h2>
+            <section className="relative bg-white rounded-lg border border-[#e8eaed] p-8 overflow-hidden">
+                            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Media & Virtual Tours</h2>
               <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {media.map((m) => (
@@ -481,8 +501,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           {/* Payment plan */}
           {(project.down_payment_percentage || project.payment_plan_details || project.installment_available) && (
             <div className="relative bg-white rounded-[28px] border border-[#e8eaed] p-6 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 transition-all duration-300 overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-transparent" />
-              <h3 className="font-['Outfit'] font-bold text-[#0d1117] mt-1 mb-4">Payment Plan</h3>
+                            <h3 className="font-['Outfit'] font-bold text-[#0d1117] mt-1 mb-4">Payment Plan</h3>
               <div className="space-y-3">
                 {project.down_payment_percentage && (
                   <div className="flex items-center justify-between text-sm">
