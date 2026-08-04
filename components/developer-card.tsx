@@ -1,6 +1,10 @@
+"use client"
+
+import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Building2, Star, BadgeCheck, ArrowUpRight, Layers, Check } from "lucide-react"
+import { sampleLogoBg } from "@/lib/logo-bg"
 
 export interface DeveloperCardData {
   id: string
@@ -22,6 +26,9 @@ interface DeveloperCardProps {
 export function DeveloperCard({ developer, variant = "default" }: DeveloperCardProps) {
   const { name, slug, description, logo_url, rating, is_verified, project_count } = developer
   const stars = rating != null ? Math.round(rating) : 0
+  // Logo panel background sampled from the logo image itself, so baked-in
+  // logo backgrounds (e.g. white) fill the panel instead of floating in it.
+  const [logoBg, setLogoBg] = useState<string | null>(null)
 
   if (variant === "directory") {
     return (
@@ -29,9 +36,19 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
         href={`/${slug}`}
         className="group flex flex-row gap-3 sm:gap-4 rounded-lg border border-[#e8eaed] bg-white p-3 sm:p-4 shadow-sm transition-shadow hover:shadow-md"
       >
-        <div className="relative h-[100px] w-[100px] shrink-0 rounded-lg bg-[#eef2f6] flex items-center justify-center overflow-hidden sm:h-[112px] sm:w-[112px]">
+        <div
+          className="relative h-[100px] w-[100px] shrink-0 rounded-lg flex items-center justify-center overflow-hidden sm:h-[112px] sm:w-[112px]"
+          style={{ backgroundColor: logoBg ?? "#eef2f6" }}
+        >
           {logo_url ? (
-            <Image src={logo_url} alt={name} width={80} height={80} className="object-contain p-2" />
+            <Image
+              src={logo_url}
+              alt={name}
+              width={80}
+              height={80}
+              onLoad={(e) => setLogoBg(sampleLogoBg(e.currentTarget))}
+              className="object-contain p-2"
+            />
           ) : (
             <Building2 className="h-9 w-9 text-[#001f3f]/20" aria-hidden />
           )}
@@ -86,7 +103,10 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
       className="group relative flex flex-row bg-white rounded-[24px] p-4 border border-[#eaecf0] overflow-hidden transition-all duration-500 hover:shadow-[0_20px_60px_-8px_rgba(0,31,63,0.2)] hover:-translate-y-1 shadow-[0_2px_16px_rgba(0,0,0,0.05)]"
     >
       {/* ── Left: Logo Panel ── */}
-      <div className="relative w-[160px] sm:w-[225px] shrink-0 bg-gradient-to-br bg-[#e5edf5] flex flex-col items-center justify-center overflow-hidden">
+      <div
+        className="relative w-[160px] sm:w-[225px] shrink-0 flex flex-col items-center justify-center overflow-hidden"
+        style={{ backgroundColor: logoBg ?? "#e5edf5" }}
+      >
         {/* dot grid texture */}
         <div
           className="absolute inset-0 opacity-[0.07]"
@@ -104,6 +124,7 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
             alt={name}
             width={72}
             height={72}
+            onLoad={(e) => setLogoBg(sampleLogoBg(e.currentTarget))}
             className="object-contain w-[74%] h-[74%]"
           />
         ) : (
