@@ -31,7 +31,7 @@ export async function GET() {
 
   const { data, error } = await admin
     .from("developers")
-    .select("id, name, slug")
+    .select("id, name, slug, logo_url, is_verified")
     .is("deleted_at", null)
     .eq("is_active", true)
     .order("name", { ascending: true })

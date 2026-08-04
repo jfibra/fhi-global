@@ -1063,7 +1063,7 @@ export function DevelopersClient({ currentRole }: Props) {
         open={showAccount}
         preset={accountPreset ? { id: accountPreset.id, name: accountPreset.name } : null}
         onClose={() => setShowAccount(false)}
-        onSaved={(username) => { setShowAccount(false); addToast("success", `Developer account @${username} created.`) }}
+        onSaved={(username) => addToast("success", `Developer account @${username} created.`)}
         onError={(msg) => addToast("error", msg)}
       />
 

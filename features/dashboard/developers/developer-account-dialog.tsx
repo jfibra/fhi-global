@@ -1,8 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { createPortal } from "react-dom"
-import { X, Check, UserPlus, User, Lock, Building2, Eye, EyeOff, IdCard } from "lucide-react"
+import { X, Check, UserPlus, User, Lock, Eye, EyeOff, IdCard, Users } from "lucide-react"
+import { DeveloperCombobox } from "@/components/developers/developer-combobox"
+import { UserAvatar } from "@/components/user-avatar"
+import type { DeveloperOption } from "@/lib/sales-service"
 
 // ─── Portal ────────────────────────────────────────────────────────────────────
 function Portal({ children }: { children: React.ReactNode }) {
@@ -12,7 +15,14 @@ function Portal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body)
 }
 
-type DeveloperOption = { id: string; name: string; slug: string }
+type DeveloperAccount = {
+  id: string
+  fullname: string | null
+  username: string | null
+  status: string | null
+  profile_url: string | null
+  joined_at: string | null
+}
 
 /** A developer company preselected when the dialog is opened from a row. */
 export type AccountPreset = { id: string; name: string } | null
@@ -38,7 +48,9 @@ const inp =
  * Admin-only "Create Developer Account" modal (replaces the removed invite flow).
  * Provisions a username + password login bound to a developer company via
  * POST /api/admin/developer-accounts. The username maps to a synthetic email
- * server-side; the developer signs in at /developer-login.
+ * server-side; the developer signs in at /developer-login. The company picker is
+ * a searchable combobox (logo + name), and the existing accounts for the chosen
+ * company are listed so the admin can see who already has access.
  */
 export function DeveloperAccountDialog({ open, preset, onClose, onSaved, onError }: Props) {
   const [username, setUsername] = useState("")
@@ -47,6 +59,8 @@ export function DeveloperAccountDialog({ open, preset, onClose, onSaved, onError
   const [displayName, setDisplayName] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [developers, setDevelopers] = useState<DeveloperOption[]>([])
+  const [accounts, setAccounts] = useState<DeveloperAccount[]>([])
+  const [accountsLoading, setAccountsLoading] = useState(false)
   const [busy, setBusy] = useState(false)
 
   // Reset on open; preselect the company if launched from a row.
@@ -59,7 +73,7 @@ export function DeveloperAccountDialog({ open, preset, onClose, onSaved, onError
     setDeveloperId(preset?.id ?? "")
   }, [open, preset])
 
-  // Load active companies for the picker (same source as the user form).
+  // Load active companies for the picker (id, name, slug, logo, verified).
   useEffect(() => {
     if (!open) return
     let cancelled = false
@@ -74,6 +88,26 @@ export function DeveloperAccountDialog({ open, preset, onClose, onSaved, onError
     })()
     return () => { cancelled = true }
   }, [open])
+
+  // The developer user accounts already linked to the selected company.
+  const loadAccounts = useCallback(async (devId: string) => {
+    if (!devId) { setAccounts([]); return }
+    setAccountsLoading(true)
+    try {
+      const res = await fetch(`/api/admin/developers/${devId}/accounts`)
+      const json = (await res.json()) as { accounts?: DeveloperAccount[] }
+      if (res.ok) setAccounts(json.accounts ?? [])
+    } catch {
+      /* non-fatal */
+    } finally {
+      setAccountsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    void loadAccounts(developerId)
+  }, [open, developerId, loadAccounts])
 
   const handleSubmit = async () => {
     const uname = username.trim().toLowerCase()
@@ -108,6 +142,12 @@ export function DeveloperAccountDialog({ open, preset, onClose, onSaved, onError
         return
       }
       onSaved(json.username ?? uname)
+      // Keep the dialog open so the admin sees the new account appear and can add
+      // another for the same company; clear the credential fields.
+      setUsername("")
+      setPassword("")
+      setDisplayName("")
+      void loadAccounts(developerId)
     } catch {
       onError("Failed to create developer account. Please try again.")
     } finally {
@@ -145,21 +185,46 @@ export function DeveloperAccountDialog({ open, preset, onClose, onSaved, onError
             {/* Developer company */}
             <div>
               <FieldLabel text="Developer Company" required />
-              <div className="relative">
-                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
-                <select
-                  className={`${inp} pl-11 appearance-none`}
-                  value={developerId}
-                  onChange={(e) => setDeveloperId(e.target.value)}
-                >
-                  <option value="">Select developer…</option>
-                  {developers.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name} ({d.slug})</option>
-                  ))}
-                </select>
-              </div>
+              <DeveloperCombobox
+                developers={developers}
+                value={developerId}
+                onChange={setDeveloperId}
+                placeholder="Search and select developer…"
+              />
               <p className="text-[11px] text-[#9ca3af] mt-1 ml-1">The account will be linked to this company.</p>
             </div>
+
+            {/* Existing accounts for the selected company */}
+            {developerId && (
+              <div className="rounded-2xl border border-[#eef0f2] bg-[#f9fafb] p-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af] mb-2.5 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" />
+                  Existing accounts{accounts.length > 0 ? ` (${accounts.length})` : ""}
+                </p>
+                {accountsLoading ? (
+                  <p className="text-xs text-[#9ca3af] py-1.5">Loading…</p>
+                ) : accounts.length === 0 ? (
+                  <p className="text-xs text-[#9ca3af] py-1.5">No accounts yet for this developer.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-44 overflow-y-auto">
+                    {accounts.map((a) => (
+                      <div key={a.id} className="flex items-center gap-2.5 rounded-xl bg-white border border-[#eef0f2] px-3 py-2">
+                        <UserAvatar name={a.fullname ?? a.username ?? "?"} imageUrl={a.profile_url} size={28} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-[#111827] truncate">{a.fullname || a.username || "Unnamed"}</p>
+                          {a.username && <p className="text-[10px] font-mono text-[#9ca3af] truncate">@{a.username}</p>}
+                        </div>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                          a.status === "active" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
+                        }`}>
+                          {a.status ?? "—"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Username */}
             <div>
@@ -220,7 +285,7 @@ export function DeveloperAccountDialog({ open, preset, onClose, onSaved, onError
           <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#f0f0f0] flex-shrink-0">
             <button type="button" onClick={onClose}
               className="px-6 py-3 rounded-full border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] transition-all">
-              Cancel
+              Done
             </button>
             <button type="button" onClick={() => void handleSubmit()} disabled={busy}
               className="bg-[#001f3f] hover:bg-[#002b57] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2">
