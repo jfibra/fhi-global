@@ -10,6 +10,7 @@ import { Footer } from "@/components/footer"
 import { SocialShare } from "@/components/social-share"
 import { ProjectGallery } from "@/components/public/project-gallery"
 import { AmenitiesGrid, NearbyPlaces } from "@/components/public/amenities-grid"
+import { ProjectInquireForm } from "@/components/public/project-inquire-form"
 import {
   MapPin, Building2, Calendar, Home, Layers, Phone, Mail, ArrowLeft,
   CheckCircle2, Play, Globe, BedDouble, Bath, Maximize2, DollarSign,
@@ -585,21 +586,28 @@ export default async function ProjectDetailPage({ params }: Props) {
             </SidePanel>
           )}
 
-          {/* Contact */}
-          <SidePanel title="Get in Touch">
+          {/* Inquire Now — lead capture, with direct contact as secondary links */}
+          <SidePanel title="Inquire Now">
             <p className="text-sm text-[#6b7280] leading-relaxed">
-              Talk to our team for availability, payment plans and exclusive offers on this project.
+              Leave your details and our team will reach out with availability, payment plans and exclusive offers.
             </p>
-            <div className="mt-4 flex flex-col gap-2.5">
+            <div className="mt-4">
+              <ProjectInquireForm
+                projectId={Number(project.id)}
+                projectName={project.name}
+                defaultCategory={project.status === "completed" ? "ready" : "off_plan"}
+              />
+            </div>
+            <div className="mt-4 pt-4 border-t border-[#eef0f3] flex flex-col gap-2">
               {(project.sales_contact_phone || developer?.phone) && (
                 <a href={`tel:${project.sales_contact_phone ?? developer?.phone}`}
-                  className="flex items-center justify-center gap-2 py-3 bg-[#d6b357] hover:bg-[#c8a544] text-[#001f3f] text-sm font-bold transition-colors">
-                  <Phone className="w-3.5 h-3.5" /> {project.sales_contact_phone ?? "Contact Agent"}
+                  className="inline-flex items-center gap-2 text-[13px] font-semibold text-[#001f3f] hover:text-[#c8a544] transition-colors">
+                  <Phone className="w-3.5 h-3.5 text-[#d6b357]" /> {project.sales_contact_phone ?? "Call our team"}
                 </a>
               )}
               <a href={`mailto:${project.sales_contact_email ?? "info@fhiglobal.ae"}`}
-                className="flex items-center justify-center gap-2 py-3 border border-[#001f3f]/25 hover:border-[#001f3f] text-[#001f3f] text-sm font-bold transition-colors">
-                <Mail className="w-3.5 h-3.5" /> Email Us
+                className="inline-flex items-center gap-2 text-[13px] font-semibold text-[#001f3f] hover:text-[#c8a544] transition-colors">
+                <Mail className="w-3.5 h-3.5 text-[#d6b357]" /> {project.sales_contact_email ?? "info@fhiglobal.ae"}
               </a>
             </div>
           </SidePanel>

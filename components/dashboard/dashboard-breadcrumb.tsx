@@ -42,6 +42,7 @@ const LABELS: Record<string, string> = {
   profile: "Profile Settings",
   "system-logs": "Activity Logs",
   "contact-inbox": "Contact Inbox",
+  leads: "Leads Inquiries",
   "purchase-categories": "Purchase Categories",
   "tax-entities": "Tax Entities",
   "business-card": "Business Card",

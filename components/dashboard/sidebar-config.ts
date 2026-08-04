@@ -5,6 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library,
+  UserSearch,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -132,6 +133,9 @@ const EBOOKS: NavEntry = { icon: Library, label: "Ebooks", to: "ebooks" }
 /** super_admin + admin — the full back office, behind five hub pages. */
 const ADMIN_NAV: RoleNavEntry[] = [
   OVERVIEW,
+  // Top-level rather than inside the Communication hub: fresh leads are the
+  // first thing admins check, so they sit one click away right under Overview.
+  { icon: UserSearch, label: "Leads Inquiries", to: "leads" },
   {
     group: "Accounts & Invites",
     to: "accounts",

@@ -734,3 +734,74 @@ export async function sendSaleCommentEmail(input: {
     }),
   })
 }
+
+/** Sent to each admin when a visitor submits an Inquire Now lead on a project page. */
+export async function sendLeadInquiryEmail(input: {
+  to: string
+  adminName: string | null
+  lead: {
+    name: string
+    email: string
+    phone: string
+    lookingFor: string
+    propertyCategory: string
+    projectName: string | null
+    developerName: string | null
+  }
+  dashboardUrl: string
+}): Promise<void> {
+  const { lead } = input
+  const name = greetingName(input.adminName)
+  const subject = `New lead — ${lead.name}${lead.projectName ? ` · ${lead.projectName}` : ""}`
+
+  const detailsHtml = [
+    detailRow("Name", lead.name),
+    detailRow("Email", lead.email),
+    detailRow("Phone", lead.phone),
+    detailRow("Looking for", lead.lookingFor),
+    detailRow("Category", lead.propertyCategory),
+    lead.projectName ? detailRow("Project", lead.projectName) : "",
+    lead.developerName ? detailRow("Developer", lead.developerName) : "",
+  ].join("")
+
+  const bodyHtml = `
+        <tr>
+          <td style="padding:36px 40px 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">New lead</p>
+            <h1 style="margin:0 0 12px;font-size:23px;line-height:1.3;font-weight:700;color:#0d1117;">A new inquiry just came in, ${esc(name)} 📥</h1>
+            <p style="margin:0;font-size:15px;line-height:1.65;color:#4b5563;">
+              <strong>${esc(lead.name)}</strong> submitted an Inquire Now form${lead.projectName ? ` on <strong>${esc(lead.projectName)}</strong>` : ""}.
+              Leads go cold fast — reach out while it's warm.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px 6px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafd;border:1px solid #e2e8f2;border-radius:14px;">
+              <tr><td style="padding:16px 20px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${detailsHtml}</table>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:22px 40px 34px;">
+            <a href="${esc(input.dashboardUrl)}"
+               style="display:inline-block;background:${NAVY};color:#ffffff;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;text-decoration:none;padding:13px 34px;border-radius:12px;border-bottom:3px solid ${GOLD};">
+              View lead
+            </a>
+          </td>
+        </tr>`
+
+  await deliver("LeadInquiryMailer", {
+    from: fromAddress(),
+    to: input.to,
+    subject,
+    text: `New lead from ${lead.name}${lead.projectName ? ` on ${lead.projectName}` : ""}.\n\nName: ${lead.name}\nEmail: ${lead.email}\nPhone: ${lead.phone}\nLooking for: ${lead.lookingFor}\nCategory: ${lead.propertyCategory}${lead.projectName ? `\nProject: ${lead.projectName}` : ""}${lead.developerName ? `\nDeveloper: ${lead.developerName}` : ""}\n\n${input.dashboardUrl}`,
+    html: eventEmailShell({
+      subject,
+      preheader: `${lead.name} inquired${lead.projectName ? ` about ${lead.projectName}` : ""}.`,
+      bodyHtml,
+    }),
+  })
+}
