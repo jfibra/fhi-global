@@ -31,7 +31,7 @@ const COMPANY_LINKS = [
 ]
 
 const ACCOUNT_LINKS = [
-  { label: "Login", href: "/login" },
+  { label: "Login", href: "/staff-login" },
   { label: "Create Account", href: "/register" },
   { label: "Dashboard", href: "/dashboard" },
 ]

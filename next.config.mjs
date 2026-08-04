@@ -242,6 +242,13 @@ const nextConfig = {
         destination: "/:slug",
         permanent: true,
       },
+      // Staff sign-in moved from /login to /staff-login. Temporary redirect keeps
+      // existing bookmarks/links working; the target is noindexed either way.
+      {
+        source: "/login",
+        destination: "/staff-login",
+        permanent: false,
+      },
     ]
   },
   async headers() {
@@ -301,7 +308,11 @@ const nextConfig = {
         headers: PRIVATE_NOINDEX_HEADERS,
       },
       {
-        source: "/login/:path*",
+        source: "/staff-login/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      {
+        source: "/developer-login/:path*",
         headers: PRIVATE_NOINDEX_HEADERS,
       },
       {

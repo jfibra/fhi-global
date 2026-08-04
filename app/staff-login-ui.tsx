@@ -4,7 +4,7 @@ import { useActionState, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Info } from "lucide-react"
-import { passwordLoginAction, type LoginState } from "@/app/(public-page)/(auth)/login/actions"
+import { passwordLoginAction, type LoginState } from "@/app/(public-page)/(auth)/staff-login/actions"
 
 const initialState: LoginState = {}
 
@@ -12,11 +12,11 @@ const inputCls =
   "w-full px-4 py-3 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all duration-200"
 
 /**
- * /login — password sign-in for admin/staff (accessed by URL). Public visitors
- * use the OTP modal in the navbar instead; there are no public links here.
- * Left form panel; right keeps the Dubai backdrop.
+ * /staff-login — password sign-in for admin/staff (accessed by URL). Public
+ * visitors use the OTP modal in the navbar instead; there are no public links
+ * here. Left form panel; right keeps the Dubai backdrop.
  */
-export function HomeLoginUI({ nextRedirect }: { nextRedirect?: string }) {
+export function StaffLoginUI({ nextRedirect }: { nextRedirect?: string }) {
   const [showPassword, setShowPassword] = useState(false)
   const [state, formAction, pending] = useActionState(passwordLoginAction, initialState)
 

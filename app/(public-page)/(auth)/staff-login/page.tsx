@@ -3,13 +3,13 @@ import { redirect } from "next/navigation"
 import { ensureProfileForUser, isInactiveProfile, pickSafePostLoginRedirect } from "@/lib/auth"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
 import { createPageMetadata } from "@/lib/seo"
-import { HomeLoginUI } from "@/app/home-login-ui"
+import { StaffLoginUI } from "@/app/staff-login-ui"
 
 export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
   ...createPageMetadata({
-    title: "Sign In | FHI Global Operations",
+    title: "Staff Sign In | FHI Global Operations",
     description: "Sign in to the FHI Global operations portal — sales reports, commission tracking, team management, developer directory, and support, all in one place.",
   }),
   // Private portal page: overrides the root layout's index,follow so Google drops it.
@@ -57,5 +57,5 @@ export default async function LoginPage({
     }
   }
 
-  return <HomeLoginUI nextRedirect={nextParam} />
+  return <StaffLoginUI nextRedirect={nextParam} />
 }

@@ -218,9 +218,9 @@ export async function verifyLoginOtp(
 }
 
 /**
- * Password sign-in for the /login page (admin/staff access; the public uses the
- * OTP modal). Since every account shares DEFAULT_ACCOUNT_PASSWORD, an admin can
- * sign in as any account with its email + that password.
+ * Password sign-in for the /staff-login page (admin/staff access; the public
+ * uses the OTP modal). Since every account shares DEFAULT_ACCOUNT_PASSWORD, an
+ * admin can sign in as any account with its email + that password.
  */
 export async function passwordLoginAction(_: LoginState, formData: FormData): Promise<LoginState> {
   if (!hasServerSupabaseEnv()) {

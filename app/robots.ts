@@ -11,8 +11,9 @@ export default function robots(): MetadataRoute.Robots {
       // Dashboards are now role-prefixed (`/admin`, `/agent`, …). "/developer/" keeps a
       // trailing slash so it does NOT block the public "/developers" pages; the exact
       // "/developer" root is still noindexed via the X-Robots-Tag header in next.config.
-      // "/login" is deliberately NOT listed — Google already indexed it, and a crawler
-      // must be able to fetch the page to see its noindex signal and drop it.
+      // "/staff-login" and "/developer-login" are deliberately NOT listed — a crawler
+      // must be able to fetch the page to see its noindex signal and drop it (the old
+      // "/login" was indexed and 302-redirects to "/staff-login").
       disallow: [
         "/dashboard",
         "/api",

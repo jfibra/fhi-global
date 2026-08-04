@@ -5,7 +5,7 @@ import { X, Mail, ArrowLeft, ArrowRight, Loader2 } from "lucide-react"
 import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
 import { OtpInput } from "@/components/auth/otp-input"
 import { toast } from "sonner"
-import { sendAuthOtp, verifyLoginOtp } from "@/app/(public-page)/(auth)/login/actions"
+import { sendAuthOtp, verifyLoginOtp } from "@/app/(public-page)/(auth)/staff-login/actions"
 
 const RESEND_COOLDOWN = 60
 
@@ -14,7 +14,7 @@ type Step = "email" | "code"
 /**
  * Public auth modal (navbar). One passwordless flow that logs in an existing
  * email or creates a new account, via a 6-digit email code + Google. Password
- * sign-in lives on /login for admins only.
+ * sign-in lives on /staff-login for admins only.
  * Mounted only while open (by the parent), so state starts fresh each time.
  */
 export function AuthModal({ onClose }: { onClose: () => void }) {

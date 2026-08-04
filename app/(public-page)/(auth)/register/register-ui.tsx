@@ -232,7 +232,7 @@ export function RegisterUI({
 
               <p className="text-center text-sm text-[#6b7280] mt-6">
                 Already have an account?{" "}
-                <Link href="/login" className="text-[#001f3f] font-bold hover:underline">Sign in</Link>
+                <Link href="/staff-login" className="text-[#001f3f] font-bold hover:underline">Sign in</Link>
               </p>
             </>
           )}

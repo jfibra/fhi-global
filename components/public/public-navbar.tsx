@@ -76,7 +76,7 @@ export function PublicNavbar() {
         {/* CTA */}
         <div className="hidden md:flex items-center gap-3">
           <Link
-            href="/login"
+            href="/staff-login"
             className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#002a52] transition-all shadow-sm hover:shadow-md"
           >
             Agent Login <ChevronRight className="w-3.5 h-3.5" />
@@ -108,7 +108,7 @@ export function PublicNavbar() {
             </Link>
           ))}
           <Link
-            href="/login"
+            href="/staff-login"
             onClick={() => setMobileOpen(false)}
             className="flex items-center justify-center gap-1.5 mt-2 px-4 py-3 rounded-xl bg-[#001f3f] text-white text-sm font-semibold"
           >

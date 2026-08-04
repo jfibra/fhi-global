@@ -2,15 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
-function slugify(text: string) {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-}
-
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export async function POST(req: NextRequest) {
@@ -22,18 +13,18 @@ export async function POST(req: NextRequest) {
     const emailRaw = String(fd.get("email") ?? "").trim()
     const email = emailRaw.toLowerCase()
     const password = String(fd.get("password") ?? "")
-    const companyName = fd.get("companyName") as string | null
 
     if (!accountTypeRaw || !firstName || !lastName || !email || !password) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    if (accountTypeRaw !== "member" && accountTypeRaw !== "developer") {
+    // Developer accounts are created only by admins (Developers → Create Account).
+    // Public self-registration is member-only.
+    if (accountTypeRaw !== "member") {
       return NextResponse.json({ error: "Invalid account type" }, { status: 400 })
     }
 
-    const isDeveloper = accountTypeRaw === "developer"
-    const role = isDeveloper ? "developer" : "member"
+    const role = "member"
 
     const supabase = createAdminSupabase()
 
@@ -79,18 +70,6 @@ export async function POST(req: NextRequest) {
         ...(invitedBy ? { metadata: { invited_by: invitedBy } } : {}),
       })
       .eq("id", userId)
-
-    if (isDeveloper && companyName?.trim()) {
-      const baseSlug = slugify(companyName)
-      const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 7)}`
-      await supabase.from("developers").insert({
-        name: companyName.trim(),
-        slug,
-        email,
-        is_active: false,
-        is_verified: false,
-      })
-    }
 
     const ctx = requestContextFromRequest(req)
     await logAuditEvent({

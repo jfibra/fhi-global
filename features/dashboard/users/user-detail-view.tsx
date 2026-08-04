@@ -1,12 +1,12 @@
 "use client"
 
 // Account 360 — the drill-in view behind an Account Directory card. Everything
-// about one account on one screen: profile, upline, team, recruits, invitations,
+// about one account on one screen: profile, upline, team, recruits,
 // sales, listings and activity, all from a single /overview request.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import {
-  ArrowLeft, Edit3, Mail, Phone, Linkedin, Facebook, Users, Network, Ticket,
+  ArrowLeft, Edit3, Mail, Phone, Linkedin, Facebook, Users, Network,
   TrendingUp, Building2, Clock, Calendar, BadgeCheck, Loader2,
   ChevronLeft, ChevronRight, UserPlus, Briefcase, Globe, Search, ArrowUpRight,
 } from "lucide-react"
@@ -20,7 +20,7 @@ import type { UserOverview, UserPerson } from "@/lib/user-overview"
 const ACTIVITY_PER_PAGE = 10
 const PEOPLE_PER_PAGE = 8
 
-type TabId = "overview" | "network" | "invites" | "sales" | "listings" | "activity"
+type TabId = "overview" | "network" | "sales" | "listings" | "activity"
 
 type ActivityRow = {
   id: string
@@ -418,7 +418,6 @@ export function UserDetailView({
   const TABS: { id: TabId; label: string; badge?: number }[] = [
     { id: "overview", label: "Overview" },
     { id: "network", label: "Team & Recruits", badge: (data?.teammatesTotal ?? 0) + (data?.recruitsTotal ?? 0) },
-    { id: "invites", label: "Invitations", badge: data?.invites.length },
     { id: "sales", label: "Sales Reports", badge: data?.sales.count },
     { id: "listings", label: "Listings", badge: data?.listings.count },
     { id: "activity", label: "Activity", badge: data?.activityTotal },
@@ -519,7 +518,6 @@ export function UserDetailView({
             <StatTile icon={<TrendingUp />} label="Own sales" value={String(data?.sales.count ?? 0)} hint={money(data?.sales.totalValue ?? 0)} tone="emerald" />
             <StatTile icon={<Users />} label="Group sales" value={String(data?.groupSales.combined.count ?? 0)} hint={money(data?.groupSales.combined.value ?? 0)} tone="gold" />
             <StatTile icon={<Building2 />} label="Listings" value={String(data?.listings.count ?? 0)} hint={`${data?.listings.byStatus.published ?? 0} published`} tone="sky" />
-            <StatTile icon={<Ticket />} label="Invitations" value={String(data?.invites.length ?? 0)} hint={`${data?.invites.filter((i) => i.status === "active").length ?? 0} active`} tone="violet" />
           </>
         )}
       </div>
@@ -674,53 +672,6 @@ export function UserDetailView({
                     />
                   </div>
                 </div>
-              )}
-
-              {/* ── Invitations ──────────────────────────────────────── */}
-              {tab === "invites" && (
-                <Panel title="Invitation links created" count={data?.invites.length ?? 0}>
-                  {(data?.invites.length ?? 0) === 0 ? (
-                    <EmptyRow>This account hasn&apos;t created any invitation links.</EmptyRow>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-[13px]">
-                        <thead>
-                          <tr className="text-[10px] uppercase tracking-wider text-black/40 border-b border-[#f0f2f5]">
-                            <th className="text-left font-bold px-5 py-2.5">Label</th>
-                            <th className="text-left font-bold px-5 py-2.5">Developer</th>
-                            <th className="text-left font-bold px-5 py-2.5">Uses</th>
-                            <th className="text-left font-bold px-5 py-2.5">Expires</th>
-                            <th className="text-left font-bold px-5 py-2.5">Status</th>
-                            <th className="text-left font-bold px-5 py-2.5">Created</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data?.invites.map((inv) => (
-                            <tr key={inv.id} className="border-b border-[#f6f7f9] last:border-0">
-                              <td className="px-5 py-3 font-semibold text-[#0d1117]">{inv.label || "Untitled link"}</td>
-                              <td className="px-5 py-3 text-[#6b7280]">{inv.developerName || "Any"}</td>
-                              <td className="px-5 py-3 tabular-nums text-[#374151]">
-                                {inv.useCount}{inv.maxUses ? ` / ${inv.maxUses}` : ""}
-                              </td>
-                              <td className="px-5 py-3 text-[#6b7280]">{inv.expiresAt ? formatDate(inv.expiresAt) : "Never"}</td>
-                              <td className="px-5 py-3">
-                                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                                  inv.status === "active" ? "bg-emerald-50 text-emerald-600"
-                                    : inv.status === "expired" ? "bg-amber-50 text-amber-600"
-                                    : inv.status === "used_up" ? "bg-sky-50 text-sky-600"
-                                    : "bg-rose-50 text-rose-600"
-                                }`}>
-                                  {inv.status.replace("_", " ")}
-                                </span>
-                              </td>
-                              <td className="px-5 py-3 text-[#9ca3af]">{inv.createdAt ? formatDate(inv.createdAt) : dash}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </Panel>
               )}
 
               {/* ── Sales ────────────────────────────────────────────── */}

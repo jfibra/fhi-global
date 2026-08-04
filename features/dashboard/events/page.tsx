@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic"
 export default async function EventsAdminPage() {
   const identity = await getSessionIdentity()
 
-  if (!identity) redirect("/login")
+  if (!identity) redirect("/staff-login")
   const { profile } = identity
   if (isInactiveProfile(profile)) redirect("/account-inactive")
 

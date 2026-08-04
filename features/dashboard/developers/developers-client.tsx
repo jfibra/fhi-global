@@ -7,7 +7,7 @@ import {
   Search, Plus, RefreshCw, MoreHorizontal, Pencil, ImageIcon,
   CheckCircle2, XCircle, Archive, ArchiveRestore, Eye, ExternalLink,
   Building2, ChevronLeft, ChevronRight, ChevronDown, Star, Globe,
-  Phone, Mail, Filter, SortAsc, Trash2, QrCode,
+  Phone, Mail, Filter, SortAsc, Trash2, UserPlus,
   LayoutGrid, Table as TableIcon,
 } from "lucide-react"
 import {
@@ -23,7 +23,7 @@ import { isAdminStaffRole, canManageDeveloperContent } from "@/lib/app-roles"
 import { formatDateTime, formatLongDateAtTime, relativeTime } from "@/lib/utils"
 import { DeveloperFormDialog } from "./developer-form-dialog"
 import { DeveloperLogoUpload } from "./developer-logo-upload"
-import { DeveloperInviteDialog } from "./developer-invite-dialog"
+import { DeveloperAccountDialog } from "./developer-account-dialog"
 
 // ─── Toast ─────────────────────────────────────────────────────────────────────
 function Portal({ children }: { children: React.ReactNode }) {
@@ -75,15 +75,15 @@ interface RowActionsProps {
   dev: Developer
   onEdit: () => void
   onLogo: () => void
-  onInviteLink: () => void
+  onCreateAccount: () => void
   onToggleVerified: () => void
   onToggleActive: () => void
   onDelete: () => void
   onRestore: () => void
-  canInvite: boolean // developer invite-registration is admin-staff only
+  canCreateAccount: boolean // creating developer accounts is admin-staff only
 }
 
-function RowActions({ dev, onEdit, onLogo, onInviteLink, onToggleVerified, onToggleActive, onDelete, onRestore, canInvite }: RowActionsProps) {
+function RowActions({ dev, onEdit, onLogo, onCreateAccount, onToggleVerified, onToggleActive, onDelete, onRestore, canCreateAccount }: RowActionsProps) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -152,10 +152,10 @@ function RowActions({ dev, onEdit, onLogo, onInviteLink, onToggleVerified, onTog
                 }]),
                 { label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, action: onEdit },
                 { label: "Upload Logo", icon: <ImageIcon className="w-3.5 h-3.5" />, action: onLogo },
-                ...(dev.deleted_at || !canInvite ? [] : [{
-                  label: "Invite link",
-                  icon: <QrCode className="w-3.5 h-3.5" />,
-                  action: onInviteLink,
+                ...(dev.deleted_at || !canCreateAccount ? [] : [{
+                  label: "Create account",
+                  icon: <UserPlus className="w-3.5 h-3.5" />,
+                  action: onCreateAccount,
                 }]),
                 { label: dev.is_verified ? "Unverify" : "Verify", icon: dev.is_verified ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />, action: onToggleVerified },
                 { label: dev.is_active ? "Deactivate" : "Activate", icon: dev.is_active ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />, action: onToggleActive },
@@ -372,14 +372,14 @@ function FilterSelect<T extends string>({
 
 // ─── Developer card (grid view) ──────────────────────────────────────────────
 function DeveloperCard({
-  dev, canManage, isAdmin, onEdit, onLogo, onInviteLink, onToggleVerified, onToggleActive, onDelete, onRestore,
+  dev, canManage, isAdmin, onEdit, onLogo, onCreateAccount, onToggleVerified, onToggleActive, onDelete, onRestore,
 }: {
   dev: Developer
   canManage: boolean
   isAdmin: boolean
   onEdit: () => void
   onLogo: () => void
-  onInviteLink: () => void
+  onCreateAccount: () => void
   onToggleVerified: () => void
   onToggleActive: () => void
   onDelete: () => void
@@ -470,10 +470,10 @@ function DeveloperCard({
             <span className="relative z-[2] flex-shrink-0">
               <RowActions
                 dev={dev}
-                canInvite={isAdmin}
+                canCreateAccount={isAdmin}
                 onEdit={onEdit}
                 onLogo={onLogo}
-                onInviteLink={onInviteLink}
+                onCreateAccount={onCreateAccount}
                 onToggleVerified={onToggleVerified}
                 onToggleActive={onToggleActive}
                 onDelete={onDelete}
@@ -550,8 +550,8 @@ export function DevelopersClient({ currentRole }: Props) {
   const [editDev, setEditDev]           = useState<Developer | null>(null)
   const [showLogo, setShowLogo]         = useState(false)
   const [logoTarget, setLogoTarget]     = useState<Developer | null>(null)
-  const [showInvite, setShowInvite]     = useState(false)
-  const [invitePreset, setInvitePreset] = useState<Developer | null>(null)
+  const [showAccount, setShowAccount]     = useState(false)
+  const [accountPreset, setAccountPreset] = useState<Developer | null>(null)
   const [confirm, setConfirm]           = useState<{ message: string; action: () => void } | null>(null)
   const [toasts, setToasts]             = useState<ToastMsg[]>([])
 
@@ -656,9 +656,9 @@ export function DevelopersClient({ currentRole }: Props) {
           {canManage && (
             <div className="flex items-center gap-3 self-start sm:self-auto">
               {isAdmin && (
-                <button type="button" onClick={() => { setInvitePreset(null); setShowInvite(true) }}
+                <button type="button" onClick={() => { setAccountPreset(null); setShowAccount(true) }}
                   className="inline-flex items-center gap-2 border border-[#e5e5e5] text-[#374151] px-5 py-3 rounded-full font-semibold text-sm transition-all hover:border-[#001f3f] hover:text-[#001f3f]">
-                  <QrCode className="w-4 h-4" /> Invite Registration
+                  <UserPlus className="w-4 h-4" /> Create Account
                 </button>
               )}
               <button type="button" onClick={() => { setEditDev(null); setShowForm(true) }}
@@ -790,7 +790,7 @@ export function DevelopersClient({ currentRole }: Props) {
                   isAdmin={isAdmin}
                   onEdit={() => { setEditDev(dev); setShowForm(true) }}
                   onLogo={() => { setLogoTarget(dev); setShowLogo(true) }}
-                  onInviteLink={() => { setInvitePreset(dev); setShowInvite(true) }}
+                  onCreateAccount={() => { setAccountPreset(dev); setShowAccount(true) }}
                   onToggleVerified={() => void handleToggleVerified(dev)}
                   onToggleActive={() => void handleToggleActive(dev)}
                   onDelete={() => handleDelete(dev)}
@@ -897,10 +897,10 @@ export function DevelopersClient({ currentRole }: Props) {
                   {canManage && (
                     <RowActions
                       dev={dev}
-                      canInvite={isAdmin}
+                      canCreateAccount={isAdmin}
                       onEdit={() => { setEditDev(dev); setShowForm(true) }}
                       onLogo={() => { setLogoTarget(dev); setShowLogo(true) }}
-                      onInviteLink={() => { setInvitePreset(dev); setShowInvite(true) }}
+                      onCreateAccount={() => { setAccountPreset(dev); setShowAccount(true) }}
                       onToggleVerified={() => void handleToggleVerified(dev)}
                       onToggleActive={() => void handleToggleActive(dev)}
                       onDelete={() => handleDelete(dev)}
@@ -936,10 +936,10 @@ export function DevelopersClient({ currentRole }: Props) {
                         {canManage && (
                           <RowActions
                             dev={dev}
-                            canInvite={isAdmin}
+                            canCreateAccount={isAdmin}
                             onEdit={() => { setEditDev(dev); setShowForm(true) }}
                             onLogo={() => { setLogoTarget(dev); setShowLogo(true) }}
-                            onInviteLink={() => { setInvitePreset(dev); setShowInvite(true) }}
+                            onCreateAccount={() => { setAccountPreset(dev); setShowAccount(true) }}
                             onToggleVerified={() => void handleToggleVerified(dev)}
                             onToggleActive={() => void handleToggleActive(dev)}
                             onDelete={() => handleDelete(dev)}
@@ -1049,10 +1049,11 @@ export function DevelopersClient({ currentRole }: Props) {
         />
       )}
 
-      <DeveloperInviteDialog
-        open={showInvite}
-        presetDeveloper={invitePreset}
-        onClose={() => setShowInvite(false)}
+      <DeveloperAccountDialog
+        open={showAccount}
+        preset={accountPreset ? { id: accountPreset.id, name: accountPreset.name } : null}
+        onClose={() => setShowAccount(false)}
+        onSaved={(username) => { setShowAccount(false); addToast("success", `Developer account @${username} created.`) }}
         onError={(msg) => addToast("error", msg)}
       />
 

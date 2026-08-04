@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth-guard"
 import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import type {
-  UserOverview, UserTeam, UserPerson, UserInvite, SalesTotals,
+  UserOverview, UserTeam, UserPerson, SalesTotals,
 } from "@/lib/user-overview"
 
 /**
@@ -211,50 +211,6 @@ function sumTotals(people: UserPerson[]): SalesTotals {
   )
 }
 
-function inviteStatus(row: {
-  is_active: boolean | null
-  expires_at: string | null
-  max_uses: number | null
-  use_count: number | null
-}): UserInvite["status"] {
-  if (row.is_active === false) return "revoked"
-  if (row.expires_at && new Date(row.expires_at).getTime() < Date.now()) return "expired"
-  if (row.max_uses != null && (row.use_count ?? 0) >= row.max_uses) return "used_up"
-  return "active"
-}
-
-async function loadInvites(admin: Admin, userId: string): Promise<UserInvite[]> {
-  const { data, error } = await admin
-    .from("developer_invites")
-    .select("id, label, is_active, expires_at, max_uses, use_count, created_at, developers(name)")
-    .eq("created_by", userId)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(50)
-
-  if (error || !data) return []
-
-  return (data as unknown as Array<{
-    id: string
-    label: string | null
-    is_active: boolean | null
-    expires_at: string | null
-    max_uses: number | null
-    use_count: number | null
-    created_at: string | null
-    developers: { name: string | null } | null
-  }>).map((r) => ({
-    id: r.id,
-    label: r.label,
-    status: inviteStatus(r),
-    useCount: r.use_count ?? 0,
-    maxUses: r.max_uses,
-    expiresAt: r.expires_at,
-    createdAt: r.created_at,
-    developerName: r.developers?.name ?? null,
-  }))
-}
-
 async function loadSales(admin: Admin, userId: string): Promise<UserOverview["sales"]> {
   // Totals come from the SQL aggregate (migration 017) so they stay exact past
   // PostgREST's row cap; the fallback mirrors the old capped client-side sum.
@@ -425,7 +381,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     recruits,
     recruitTotal,
     upline,
-    invites,
     sales,
     listings,
     reported,
@@ -439,7 +394,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     loadRecruits(admin, id),
     recruitsTotal(admin, id),
     loadUpline(admin, id),
-    loadInvites(admin, id),
     loadSales(admin, id),
     loadListings(admin, id),
     headCount(admin, "support_tickets", "reported_by", id),
@@ -487,7 +441,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       recruits: sumTotals(recruits),
       combined,
     },
-    invites,
     sales,
     listings,
     support: { reported, assigned },

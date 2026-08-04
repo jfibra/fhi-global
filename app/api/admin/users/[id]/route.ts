@@ -321,22 +321,6 @@ export async function DELETE(
     }
     await admin.from("profiles").delete().eq("id", id)
 
-    // If this account was created by redeeming a developer invite link, free the
-    // slot it consumed (use_count -1, clamped at 0). Best-effort — a permanent
-    // deletion should never be blocked by invite accounting. Only on hard delete:
-    // a soft delete is recoverable, so its slot must stay reserved.
-    const inviteId =
-      prof?.metadata && typeof prof.metadata.developer_invite_id === "string"
-        ? prof.metadata.developer_invite_id
-        : null
-    if (inviteId) {
-      try {
-        await admin.rpc("release_developer_invite", { _id: inviteId })
-      } catch {
-        /* best-effort */
-      }
-    }
-
     // The profiles trigger can't record this (the row is gone) — the app row is
     // the only trace of a permanent deletion, so it's high-value.
     await logAuditEvent({

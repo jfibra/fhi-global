@@ -28,19 +28,6 @@ export type UserPerson = {
 /** Aggregated production of a group of people. */
 export type SalesTotals = { count: number; value: number }
 
-export type UserInviteStatus = "revoked" | "expired" | "used_up" | "active"
-
-export type UserInvite = {
-  id: string
-  label: string | null
-  status: UserInviteStatus
-  useCount: number
-  maxUses: number | null
-  expiresAt: string | null
-  createdAt: string | null
-  developerName: string | null
-}
-
 export type UserSaleRow = {
   id: string
   projectName: string | null
@@ -83,7 +70,6 @@ export type UserOverview = {
     /** Teammates + recruits (deduped) + this account's own sales. */
     combined: SalesTotals
   }
-  invites: UserInvite[]
   sales: {
     count: number
     totalValue: number

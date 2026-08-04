@@ -142,7 +142,7 @@ export function ProfilePhotoGate({
 
   const signOut = async () => {
     await createClient().auth.signOut()
-    window.location.href = "/login"
+    window.location.href = "/staff-login"
   }
 
   const initial = (displayName.trim().charAt(0) || "?").toUpperCase()

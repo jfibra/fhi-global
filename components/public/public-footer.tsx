@@ -6,7 +6,7 @@ const FOOTER_LINKS = {
   Company: [
     { label: "About Us", href: "/#about" },
     { label: "Contact", href: "/#contact" },
-    { label: "Agent Login", href: "/login" },
+    { label: "Agent Login", href: "/staff-login" },
   ],
   Explore: [
     { label: "All Developers", href: "/developers" },
