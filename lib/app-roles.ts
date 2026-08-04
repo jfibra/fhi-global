@@ -336,8 +336,11 @@ export function canBrowseProjectStudios(role: string | null | undefined): boolea
  * link — the single source of truth for the Invite page and both
  * `/api/invite/recruits/[id]/{approve,role}` routes.
  *
- * A rank may only grant ranks below its own, so nobody can clone or promote past
- * themselves.
+ * A rank may only grant ranks below its own, so nobody can promote past
+ * themselves. Agents are the deliberate exception at the bottom of the ladder:
+ * they may grant their own rank, so they can promote a recruit from member to
+ * agent (and back). Recruits still always REGISTER as member/pending — this
+ * ladder only governs what the recruiter may change them to afterwards.
  *
  * Admin staff are the one exception: they get a team leader's reach PLUS
  * team_leader itself, which is the only rank on this ladder nobody else can hand
@@ -361,7 +364,7 @@ export const INVITE_GRANTABLE_ROLES: Record<string, readonly AppRoleId[]> = {
   admin: ["team_leader", ...TEAM_LEADER_GRANTS],
   team_leader: TEAM_LEADER_GRANTS,
   unit_manager: ["agent", "member"],
-  agent: ["member"],
+  agent: ["agent", "member"],
 }
 
 export function invitableRolesFor(role: string | null | undefined): readonly AppRoleId[] {
