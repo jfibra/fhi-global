@@ -7,7 +7,7 @@ import {
   Search, Plus, RefreshCw, MoreHorizontal, Pencil, ImageIcon,
   CheckCircle2, XCircle, Archive, ArchiveRestore, Eye, ExternalLink,
   Building2, ChevronLeft, ChevronRight, ChevronDown, Star, Globe,
-  Phone, Mail, Filter, SortAsc, Trash2, UserPlus,
+  Phone, Mail, Filter, SortAsc, Trash2, UserPlus, Clock,
   LayoutGrid, Table as TableIcon,
 } from "lucide-react"
 import {
@@ -465,6 +465,11 @@ function DeveloperCard({
             <p className="text-xs text-[#9ca3af] mt-0.5 line-clamp-2 min-h-[2rem]">
               {dev.description || "No description yet."}
             </p>
+            {dev.pending_slug && dev.pending_slug !== dev.slug && (
+              <span className="relative z-[2] inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700" title={`Requested slug: ${dev.pending_slug}`}>
+                <Clock className="w-2.5 h-2.5" /> Slug change requested
+              </span>
+            )}
           </div>
           {canManage && (
             <span className="relative z-[2] flex-shrink-0">
@@ -1015,6 +1020,11 @@ export function DevelopersClient({ currentRole }: Props) {
           setShowForm(false)
           addToast("success", isEdit ? "Developer updated." : "Developer added.")
           void loadWithCount()
+        }}
+        onSlugReviewed={(dev, approved) => {
+          setShowForm(false)
+          setDevs((prev) => prev.map((d) => d.id === dev.id ? dev : d))
+          addToast("success", approved ? `Slug approved — now /developers/${dev.slug}` : "Slug change rejected.")
         }}
         onError={(msg) => addToast("error", msg)}
       />

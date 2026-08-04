@@ -16,6 +16,10 @@ export type Developer = {
   created_at: string
   updated_at: string
   deleted_at: string | null
+  // Developer-requested slug awaiting admin approval (migration 027); null = none.
+  pending_slug: string | null
+  pending_slug_at: string | null
+  pending_slug_by: string | null
 }
 
 export type DeveloperFormData = {
@@ -89,6 +93,26 @@ export async function fetchDevelopers(params: {
   const { data, count, error } = await query
   if (error) return { data: null, total: null, error: error.message }
   return { data: (data ?? []) as Developer[], total: count ?? 0, error: null }
+}
+
+// ─── Slug-change review (admin) ─────────────────────────────────────────────────
+/** Approve (slug ← pending_slug) or reject a developer's pending slug request. */
+export async function reviewDeveloperSlug(
+  developerId: string,
+  action: "approve" | "reject",
+): Promise<{ data: Developer | null; error: string | null }> {
+  try {
+    const res = await fetch(`/api/admin/developers/${developerId}/slug`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    })
+    const json = (await res.json()) as { developer?: Developer; error?: string }
+    if (!res.ok) return { data: null, error: json.error ?? "Failed to update the slug request." }
+    return { data: json.developer ?? null, error: null }
+  } catch {
+    return { data: null, error: "Failed to update the slug request. Please try again." }
+  }
 }
 
 // ─── Create ────────────────────────────────────────────────────────────────────

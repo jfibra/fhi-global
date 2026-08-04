@@ -56,29 +56,28 @@ export type DeveloperCompanyFormData = {
   address: string
 }
 
+/**
+ * Save the caller's own company profile. Goes through the server API (service
+ * role, ownership-checked) rather than the browser client so it isn't gated by
+ * table RLS, and so a slug change is captured as a pending admin-approval
+ * request instead of being applied to the live public URL. `slugRequested` is
+ * true when the submitted slug differed and a request was filed.
+ */
 export async function updateDeveloperCompany(
-  developerId: string,
   formData: DeveloperCompanyFormData,
-): Promise<{ data: Developer | null; error: string | null }> {
-  const supabase = createClient()
-
-  const { data, error } = await supabase
-    .from("developers")
-    .update({
-      name:        formData.name.trim(),
-      slug:        formData.slug.trim(),
-      description: formData.description.trim() || null,
-      website_url: formData.website_url.trim() || null,
-      phone:       formData.phone.trim() || null,
-      email:       formData.email.trim() || null,
-      address:     formData.address.trim() || null,
+): Promise<{ data: Developer | null; error: string | null; slugRequested: boolean }> {
+  try {
+    const res = await fetch("/api/developer/company", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
     })
-    .eq("id", developerId)
-    .select()
-    .single<Developer>()
-
-  if (error) return { data: null, error: error.message }
-  return { data, error: null }
+    const json = (await res.json()) as { developer?: Developer; slugRequested?: boolean; error?: string }
+    if (!res.ok) return { data: null, error: json.error ?? "Failed to update company information.", slugRequested: false }
+    return { data: json.developer ?? null, error: null, slugRequested: json.slugRequested ?? false }
+  } catch {
+    return { data: null, error: "Failed to update company information. Please try again.", slugRequested: false }
+  }
 }
 
 // ─── Projects (scoped) ────────────────────────────────────────────────────────

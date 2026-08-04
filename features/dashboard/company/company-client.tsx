@@ -10,7 +10,7 @@ import {
   MapPin,
   Camera,
   AlertCircle,
-  Check,
+  Clock,
   Save,
   ExternalLink,
 } from "lucide-react"
@@ -114,7 +114,8 @@ export function CompanyClient({
   // Form state (synced from developer)
   const [form, setForm] = useState<DeveloperCompanyFormData>(() => ({
     name:        developer?.name        ?? "",
-    slug:        developer?.slug        ?? "",
+    // Show the pending (requested) slug in the field if one is awaiting approval.
+    slug:        developer?.pending_slug ?? developer?.slug ?? "",
     description: developer?.description ?? "",
     website_url: developer?.website_url ?? "",
     phone:       developer?.phone       ?? "",
@@ -152,7 +153,7 @@ export function CompanyClient({
     }
 
     setSaving(true)
-    const { data, error } = await updateDeveloperCompany(developer.id, form)
+    const { data, error, slugRequested } = await updateDeveloperCompany(form)
     setSaving(false)
 
     if (error) {
@@ -161,7 +162,12 @@ export function CompanyClient({
     }
 
     if (data) setDeveloper(data)
-    showToast("success", "Company information updated.")
+    showToast(
+      "success",
+      slugRequested
+        ? "Saved. Your slug change was submitted for admin approval."
+        : "Company information updated.",
+    )
   }
 
   return (
@@ -219,6 +225,11 @@ export function CompanyClient({
                       ★ {developer.rating}
                     </span>
                   )}
+                  {developer.pending_slug && developer.pending_slug !== developer.slug && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                      <Clock className="w-3 h-3" /> Slug pending
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -260,14 +271,27 @@ export function CompanyClient({
                     value={form.slug}
                     onChange={(e) => setForm((p) => ({ ...p, slug: e.target.value }))}
                     placeholder="e.g. ayala-land"
-                    className={inputCls + " font-mono text-xs"}
+                    className={inputCls + " font-mono text-xs pr-40"}
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#9ca3af]">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#9ca3af] pointer-events-none">
                     /developers/{form.slug || "slug"}
                   </span>
                 </div>
+                <p className="text-[11px] text-[#9ca3af] mt-1.5 ml-1">
+                  Changing the slug needs admin approval — your public URL stays the same until it&apos;s approved.
+                </p>
               </Field>
             </div>
+
+            {developer.pending_slug && developer.pending_slug !== developer.slug && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs text-amber-800 flex items-start gap-2">
+                <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span>
+                  Slug change to <span className="font-mono font-semibold">{developer.pending_slug}</span> is awaiting admin approval.
+                  Your live URL is still <span className="font-mono">/developers/{developer.slug}</span>.
+                </span>
+              </div>
+            )}
 
             <Field label="Description">
               <textarea

@@ -6,7 +6,7 @@ import Image from "next/image"
 import {
   X, Check, Building2, Globe, Phone, Mail, MapPin,
   Star, Landmark, Plus, Pencil, CalendarPlus, CalendarClock,
-  ImageIcon, Upload, Trash2,
+  ImageIcon, Upload, Trash2, Clock,
 } from "lucide-react"
 import {
   type Developer,
@@ -15,6 +15,7 @@ import {
   createDeveloper,
   updateDeveloper,
   updateDeveloperLogoUrl,
+  reviewDeveloperSlug,
 } from "@/lib/developer-service"
 import { formatDateTime, relativeTime } from "@/lib/utils"
 import { DeveloperLogoUpload } from "./developer-logo-upload"
@@ -55,11 +56,13 @@ interface Props {
   onClose: () => void
   onSaved: (dev: Developer, isEdit: boolean) => void
   onError: (msg: string) => void
+  onSlugReviewed?: (dev: Developer, approved: boolean) => void
 }
 
-export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onError }: Props) {
+export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onError, onSlugReviewed }: Props) {
   const [form, setForm]   = useState<DeveloperFormData>(EMPTY_FORM)
   const [busy, setBusy]   = useState(false)
+  const [reviewing, setReviewing] = useState<"approve" | "reject" | null>(null)
   const [errors, setErrors] = useState<Partial<Record<keyof DeveloperFormData, string>>>({})
   const [slugManual, setSlugManual] = useState(false)
   // Cropped logo held locally; uploaded to S3 when the developer is saved.
@@ -180,9 +183,19 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
     }
   }
 
+  const handleReview = async (action: "approve" | "reject") => {
+    if (!editDeveloper) return
+    setReviewing(action)
+    const { data, error } = await reviewDeveloperSlug(editDeveloper.id, action)
+    setReviewing(null)
+    if (error || !data) { onError(error ?? "Failed to update the slug request."); return }
+    onSlugReviewed?.(data, action === "approve")
+  }
+
   if (!open) return null
 
   const inp = "w-full px-5 py-3.5 rounded-2xl border bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
+  const hasPendingSlug = !!editDeveloper?.pending_slug && editDeveloper.pending_slug !== editDeveloper.slug
 
   // What the Logo field currently shows: a pending crop wins, otherwise the
   // saved logo (unless it's marked for removal).
@@ -216,6 +229,33 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
 
           {/* Body */}
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+            {/* Pending slug-change request — admin approves or rejects */}
+            {hasPendingSlug && editDeveloper && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <Clock className="w-5 h-5 text-amber-600 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-amber-900">Slug change requested</p>
+                    <p className="text-xs text-amber-800 mt-0.5">
+                      <span className="font-mono">/developers/{editDeveloper.slug}</span>
+                      <span className="mx-1.5">→</span>
+                      <span className="font-mono font-semibold">/developers/{editDeveloper.pending_slug}</span>
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button type="button" disabled={reviewing !== null} onClick={() => void handleReview("reject")}
+                      className="px-4 py-2 rounded-full text-xs font-semibold border border-amber-300 text-amber-800 hover:bg-amber-100 transition-all disabled:opacity-50">
+                      {reviewing === "reject" ? "Rejecting…" : "Reject"}
+                    </button>
+                    <button type="button" disabled={reviewing !== null} onClick={() => void handleReview("approve")}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 transition-all disabled:opacity-50">
+                      {reviewing === "approve" ? "Approving…" : <><Check className="w-3.5 h-3.5" /> Approve</>}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Name + Slug */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
