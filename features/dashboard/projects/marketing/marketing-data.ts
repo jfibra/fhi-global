@@ -19,6 +19,9 @@ export type ProjectMarketingData = {
   developerLogo: string | null
   priceFrom: number | null
   currency: string
+  /** Optional free-text override for the poster's price line — when set, the
+   *  designs render it verbatim instead of formatting priceFrom. */
+  priceLabel?: string | null
   locationLine: string
   handoverLabel: string | null
   /** Gallery URLs, cover first then by rank. */

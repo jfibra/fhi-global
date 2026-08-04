@@ -38,6 +38,8 @@ export function ProjectPosterTab({ project, showToast }: Props) {
   const [design, setDesign] = useState<PosterDesignId>("goldenhour")
   const [format, setFormat] = useState<PosterFormatId>("story")
   const [heroUrl, setHeroUrl] = useState<string | null>(null)
+  const [title, setTitle] = useState("")
+  const [price, setPrice] = useState("")
   const [headline, setHeadline] = useState("")
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
@@ -56,6 +58,8 @@ export function ProjectPosterTab({ project, showToast }: Props) {
       if (!alive) return
       setData(d)
       setHeroUrl(d.gallery[0] ?? null)
+      setTitle(d.name)
+      setPrice(d.priceFrom ? Number(d.priceFrom).toLocaleString("en-US") : "")
       setHeadline(d.tagline)
       setPhone(d.contactPhone ?? "")
       setEmail(d.contactEmail ?? "")
@@ -74,9 +78,24 @@ export function ProjectPosterTab({ project, showToast }: Props) {
   const posterProps = useMemo(
     () =>
       data
-        ? { data, design, format, headline, heroUrl, showQr, phone, email }
+        ? {
+            // Editable overrides: project name and the AED price line
+            // (empty price deliberately hides the line).
+            data: {
+              ...data,
+              name: title.trim() || data.name,
+              priceLabel: price.trim() ? `AED ${price.trim()}` : "",
+            },
+            design,
+            format,
+            headline,
+            heroUrl,
+            showQr,
+            phone,
+            email,
+          }
         : null,
-    [data, design, format, headline, heroUrl, showQr, phone, email],
+    [data, design, format, title, price, headline, heroUrl, showQr, phone, email],
   )
 
   const fmt = POSTER_FORMATS[format]
@@ -99,7 +118,7 @@ export function ProjectPosterTab({ project, showToast }: Props) {
           country: project.country ?? "UAE",
           developerName: project.developers?.name ?? "",
           customPrompt:
-            "Write ONE luxurious poster headline for this development — under 12 words, no quotes, no emojis, confident and premium in tone.",
+            "Write ONE luxurious poster description for this development — a single sentence under 20 words, no quotes, no emojis, confident and premium in tone.",
         }),
       })
       const body = await res.json().catch(() => ({}))
@@ -275,10 +294,43 @@ export function ProjectPosterTab({ project, showToast }: Props) {
 
           {/* Copy + contact */}
           <div className="bg-white rounded-2xl border border-[#e5e5e5] p-5 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="poster-title" className={labelCls}>Project name</label>
+                <input
+                  id="poster-title"
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={data.name}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label htmlFor="poster-price" className={labelCls}>Price (AED)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#6b7280] pointer-events-none">
+                    AED
+                  </span>
+                  <input
+                    id="poster-price"
+                    type="text"
+                    inputMode="numeric"
+                    value={price}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, "")
+                      setPrice(digits ? Number(digits).toLocaleString("en-US") : "")
+                    }}
+                    placeholder="1,200,000 — clear to hide"
+                    className={`${inputCls} pl-12`}
+                  />
+                </div>
+              </div>
+            </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label htmlFor="poster-headline" className="text-xs font-semibold text-[#6b7280]">
-                  Headline
+                  Description
                 </label>
                 <button
                   type="button"
@@ -294,13 +346,13 @@ export function ProjectPosterTab({ project, showToast }: Props) {
                 id="poster-headline"
                 value={headline}
                 onChange={(e) => setHeadline(e.target.value)}
-                rows={2}
-                placeholder="A short premium tagline for the poster…"
+                rows={3}
+                placeholder="A short premium description for the poster…"
                 className={`${inputCls} resize-none`}
               />
               {format === "square" && (
                 <p className="text-[11px] text-[#9ca3af] mt-1">
-                  The Square format keeps the layout compact and doesn&apos;t show the headline.
+                  The Square format keeps the layout compact and doesn&apos;t show the description.
                 </p>
               )}
             </div>

@@ -110,7 +110,7 @@ function ListingPosterStudio() {
   return (
     <div className="bg-white rounded-2xl border border-[#e8eaed] p-5">
       <p className="block text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-1.5">
-        Pick a listing, then choose Flyer or Poster
+        Pick a listing, then choose Flyer or Just Listed/Sold
       </p>
       {loading ? (
         <p className="text-sm text-[#9ca3af] flex items-center gap-2">
@@ -174,7 +174,7 @@ function ListingPosterStudio() {
                         onClick={() => setActive({ listing: l, tool: "announce" })}
                         className="inline-flex items-center justify-center gap-1 rounded-lg border border-[#001f3f]/25 px-2 py-1.5 text-[10px] font-bold text-[#001f3f] hover:bg-[#f3f6fa] transition-colors"
                       >
-                        <Megaphone className="w-3 h-3" /> Poster
+                        <Megaphone className="w-3 h-3" /> Just Listed/Sold
                       </button>
                     </div>
                   </div>

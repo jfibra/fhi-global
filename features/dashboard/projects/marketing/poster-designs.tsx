@@ -57,7 +57,15 @@ export type PosterProps = {
 }
 
 function priceText(data: ProjectMarketingData): string {
+  // A provided label wins verbatim — an empty one deliberately blanks the line.
+  if (data.priceLabel != null) return data.priceLabel.trim()
   return formatPrice(data.priceFrom ?? 0, data.currency)
+}
+
+/** Whether the poster has a price worth labelling ("Starting From"). */
+function hasPrice(data: ProjectMarketingData): boolean {
+  if (data.priceLabel != null) return data.priceLabel.trim().length > 0
+  return Boolean(data.priceFrom)
 }
 
 /* ────────────────────────── Golden Hour (dark) ─────────────────────────── */
@@ -115,7 +123,7 @@ function GoldenHour({ data, format, headline, heroUrl, showQr, phone, email }: P
         )}
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 24 * u }}>
           <div>
-            {data.priceFrom ? (
+            {hasPrice(data) ? (
               <div style={{ color: GOLD, fontSize: 23 * u, fontWeight: 700, letterSpacing: "0.24em", textTransform: "uppercase", marginBottom: 8 * u }}>
                 Starting From
               </div>
@@ -236,7 +244,7 @@ function Pearl({ data, format, headline, heroUrl, showQr, phone, email }: Poster
         {/* price band */}
         <div style={{ background: NAVY, borderRadius: 26 * u, padding: `${32 * u}px ${40 * u}px`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 * u }}>
           <div>
-            {data.priceFrom ? (
+            {hasPrice(data) ? (
               <div style={{ color: GOLD, fontSize: 22 * u, fontWeight: 700, letterSpacing: "0.24em", textTransform: "uppercase", marginBottom: 8 * u }}>
                 Starting From
               </div>
@@ -324,7 +332,7 @@ function Obsidian({ data, format, headline, heroUrl, showQr, phone, email }: Pos
           <div style={{ flex: 1, height: 1.5, background: "rgba(214,179,87,0.45)" }} />
         </div>
 
-        {data.priceFrom ? (
+        {hasPrice(data) ? (
           <div style={{ marginTop: 30 * u, color: GOLD, fontSize: 22 * u, fontWeight: 700, letterSpacing: "0.26em", textTransform: "uppercase" }}>
             Starting From
           </div>
