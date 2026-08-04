@@ -501,7 +501,7 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
             {seo.h1}
           </h1>
           <div className="flex items-center gap-2 mt-4">
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 border border-white/20 rounded-full text-sm font-semibold text-white">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 border border-white/20 text-sm font-semibold text-white">
               <span className="w-2 h-2 rounded-full bg-[#d6b357]" />
               {visible.length} project{visible.length === 1 ? "" : "s"} available
             </span>
@@ -525,7 +525,7 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[28px] border border-[#e8eaed] text-center">
+          <div className="flex flex-col items-center justify-center py-20 bg-white border border-[#e8eaed] text-center">
             <Building2 className="w-8 h-8 text-[#001f3f]/25 mb-3" />
             <p className="font-['Outfit'] font-semibold text-[#0d1117] text-sm mb-1">Nothing here right now</p>
             <p className="text-[#6b7280] text-xs">New launches land regularly — check the full projects browser.</p>
@@ -536,7 +536,7 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
           <div className="text-center">
             <Link
               href="/projects"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00152b] transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00152b] transition-colors"
             >
               Browse all {visible.length} projects <ArrowLeft className="w-4 h-4 rotate-180" />
             </Link>
@@ -545,7 +545,7 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
 
         {/* Related searches — the interlinking is half the SEO value. */}
         {related.length > 0 && (
-          <div className="bg-white rounded-[24px] border border-[#e8eaed] p-6">
+          <div className="bg-white border border-[#e8eaed] p-6">
             <p className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af] mb-4">
               Related searches
             </p>
@@ -554,14 +554,14 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
                 <Link
                   key={r.slug}
                   href={`/${r.slug}`}
-                  className="px-4 py-2 rounded-full border border-[#e5e5e5] bg-[#f8fafc] text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] hover:bg-[#d6b357]/10 transition-colors"
+                  className="px-4 py-2 border border-[#e5e5e5] bg-[#f8fafc] text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] hover:bg-[#d6b357]/10 transition-colors"
                 >
                   {r.label}
                 </Link>
               ))}
               <Link
                 href="/developers"
-                className="px-4 py-2 rounded-full border border-[#e5e5e5] bg-[#f8fafc] text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] hover:bg-[#d6b357]/10 transition-colors"
+                className="px-4 py-2 border border-[#e5e5e5] bg-[#f8fafc] text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] hover:bg-[#d6b357]/10 transition-colors"
               >
                 All Developers
               </Link>
@@ -633,7 +633,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
             <h1 className="font-['Outfit'] text-3xl md:text-[40px] font-bold text-[#001f3f] leading-tight">
               {seo.h1}
             </h1>
-            <span className="block w-14 h-1 rounded-full bg-[#d6b357] mt-4 mb-6" aria-hidden="true" />
+            <span className="block w-14 h-1 bg-[#d6b357] mt-4 mb-6" aria-hidden="true" />
             <div className="space-y-4">
               {seo.intro.map((paragraph) => (
                 <p key={paragraph.slice(0, 32)} className="text-[16.5px] leading-[1.75] text-[#374151]">
@@ -645,7 +645,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
 
           {photo && (
             <div>
-              <div className="group relative aspect-[4/3] rounded-lg overflow-hidden ring-1 ring-[#e8eaed] shadow-[0_18px_44px_-18px_rgba(0,20,40,0.35)]">
+              <div className="group relative aspect-[4/3] overflow-hidden ring-1 ring-[#e8eaed] shadow-[0_18px_44px_-18px_rgba(0,20,40,0.35)]">
                 <Image
                   src={photo.url}
                   alt={photo.name}
@@ -674,14 +674,14 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
           <h2 className="font-['Outfit'] text-2xl md:text-3xl font-bold text-[#001f3f] text-center">
             Why invest in {seo.label}
           </h2>
-          <span className="block w-14 h-1 rounded-full bg-[#d6b357] mt-3 mb-8 mx-auto" aria-hidden="true" />
+          <span className="block w-14 h-1 bg-[#d6b357] mt-3 mb-8 mx-auto" aria-hidden="true" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto">
             {seo.facts.map((f) => (
               <div
                 key={f.label}
-                className="group bg-white rounded-lg border border-[#e8eaed] p-6 transition-all duration-200 hover:-translate-y-1 hover:border-[#d6b357]/50 hover:bg-[#d6b357]/[0.07] hover:shadow-[0_14px_32px_-16px_rgba(0,20,40,0.35)]"
+                className="group bg-white border border-[#e8eaed] p-6 transition-all duration-200 hover:border-[#d6b357]/50 hover:bg-[#d6b357]/[0.07] hover:shadow-[0_14px_32px_-16px_rgba(0,20,40,0.35)]"
               >
-                <span className="inline-flex w-9 h-9 rounded-full bg-[#d6b357]/12 items-center justify-center transition-colors duration-200 group-hover:bg-[#d6b357]">
+                <span className="inline-flex w-9 h-9 bg-[#d6b357]/12 items-center justify-center transition-colors duration-200 group-hover:bg-[#d6b357]">
                   <CheckCircle2 className="w-5 h-5 text-[#d6b357] transition-colors duration-200 group-hover:text-white" />
                 </span>
                 <p className="mt-3.5 font-['Outfit'] text-lg font-bold text-[#0d1117]">{f.label}</p>
@@ -698,7 +698,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
           {seo.sections?.map((s) => (
             <div key={s.heading}>
               <h2 className="font-['Outfit'] text-2xl font-bold text-[#001f3f]">{s.heading}</h2>
-              <span className="block w-10 h-1 rounded-full bg-[#d6b357] mt-2 mb-4" aria-hidden="true" />
+              <span className="block w-10 h-1 bg-[#d6b357] mt-2 mb-4" aria-hidden="true" />
               <p className="text-[16.5px] leading-[1.75] text-[#374151]">{s.body}</p>
             </div>
           ))}
@@ -707,7 +707,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
 
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
         {/* Route into live inventory */}
-        <div className="bg-[#001f3f] rounded-lg p-6 sm:p-8">
+        <div className="bg-[#001f3f] p-6 sm:p-8">
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#d6b357]">
             Ready to look at properties?
           </p>
@@ -717,25 +717,25 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
               href="/new-projects-in-dubai"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
             >
               New Projects in Dubai
             </Link>
             <Link
               href="/buy"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-white/25 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/25 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-colors"
             >
               Buy
             </Link>
             <Link
               href="/rent"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-white/25 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/25 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-colors"
             >
               Rent
             </Link>
             <Link
               href="/contact"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-white/25 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/25 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-colors"
             >
               Talk to a consultant
             </Link>
@@ -745,7 +745,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
         {/* Related guides & searches — the pages link into each other, so a
             visitor (or crawler) can walk the whole set from any entry point. */}
         {related.length > 0 && (
-          <div className="bg-[#f8fafc] rounded-lg border border-[#e8eaed] p-6">
+          <div className="bg-[#f8fafc] border border-[#e8eaed] p-6">
             <p className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af] mb-4">
               Related areas &amp; searches
             </p>
@@ -754,7 +754,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
                 <Link
                   key={r.slug}
                   href={`/${r.slug}`}
-                  className="px-4 py-2 rounded-full border border-[#e5e5e5] bg-white text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] hover:bg-[#d6b357]/10 transition-colors"
+                  className="px-4 py-2 border border-[#e5e5e5] bg-white text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] hover:bg-[#d6b357]/10 transition-colors"
                 >
                   {r.label}
                 </Link>
