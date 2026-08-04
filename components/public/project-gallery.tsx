@@ -26,7 +26,7 @@ export function ProjectGallery({ images }: { images: ProjectImage[] }) {
           <button
             key={img.id}
             onClick={() => setLightboxIndex(idx)}
-            className="group relative aspect-square rounded-2xl overflow-hidden bg-[#f3f4f6] border border-[#e8eaed] hover:border-[#001f3f]/20 transition-all hover:shadow-lg"
+            className="group relative aspect-square overflow-hidden bg-[#f3f4f6] border border-[#e8eaed] hover:border-[#001f3f]/30 transition-all"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -71,7 +71,7 @@ export function ProjectGallery({ images }: { images: ProjectImage[] }) {
             <img
               src={images[lightboxIndex].image_url}
               alt={images[lightboxIndex].caption ?? ""}
-              className="max-h-[80vh] w-auto rounded-2xl shadow-2xl object-contain"
+              className="max-h-[80vh] w-auto shadow-2xl object-contain"
             />
             {images[lightboxIndex].caption && (
               <p className="text-sm text-white/60">{images[lightboxIndex].caption}</p>

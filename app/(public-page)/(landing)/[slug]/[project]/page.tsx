@@ -127,6 +127,14 @@ export default async function ProjectDetailPage({ params }: Props) {
   const media = (project.project_media ?? []) as { id:number; media_type:string|null; url:string }[]
   const propertyTypes = ((project.project_property_types ?? []) as { property_types: { name: string } | null }[])
     .map((pt) => pt.property_types?.name).filter(Boolean) as string[]
+  const quickFacts = [
+    { icon: CheckCircle2, label: "Ownership", value: project.ownership_type ?? (project.freehold ? "Freehold" : null) },
+    { icon: MapPin, label: "Region", value: project.region },
+    { icon: Home, label: "Community", value: project.community },
+    { icon: Building2, label: "City", value: project.city },
+    { icon: Globe, label: "Country", value: project.country },
+    { icon: DollarSign, label: "Currency", value: project.currency },
+  ].filter((f) => f.value) as { icon: typeof MapPin; label: string; value: string }[]
   const quickStats = [
     project.delivery_quarter ?? project.expected_completion_date,
     project.total_units, project.number_of_buildings, project.floors,
@@ -187,7 +195,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           right. The old version stacked pills, title, and a loud navy CTA card
           in the same space — seven fat share buttons ended up shouting louder
           than the project name. */}
-      <section className="relative min-h-[70vh] flex items-center overflow-hidden">
+      <section className="relative min-h-[560px] flex items-center overflow-hidden">
         {project.main_image ? (
           <Image
             src={project.main_image}
@@ -202,7 +210,7 @@ export default async function ProjectDetailPage({ params }: Props) {
         )}
         {/* Left-weighted scrim: keeps the copy legible while the photo stays
             visible on the right, where the building usually is. */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/95 via-[#001428]/70 to-[#001428]/25" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/90 via-[#001428]/55 to-[#001428]/15" />
 
         <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-10 lg:gap-14 items-end">
@@ -263,27 +271,10 @@ export default async function ProjectDetailPage({ params }: Props) {
                     </div>
                   ))}
               </dl>
-
-              <div className="mt-9 flex flex-wrap gap-3">
-                <a
-                  href="#units"
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
-                >
-                  View Units
-                </a>
-                {developer?.phone && (
-                  <a
-                    href={`tel:${developer.phone}`}
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-white/30 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-colors"
-                  >
-                    <Phone className="w-4 h-4" /> Contact Agent
-                  </a>
-                )}
-              </div>
             </div>
 
             {/* Share — a bordered panel, not a stack of pills. */}
-            <div className="lg:w-[360px] shrink-0 border border-white/20 bg-[#001428]/55 backdrop-blur-md p-6">
+            <div className="lg:w-[500px] shrink-0 border border-white/20 bg-[#001428]/60 backdrop-blur-md p-6">
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white">Share this project</p>
               <span className="block w-full h-px bg-white/15 mt-3 mb-4" aria-hidden="true" />
               <SocialShare
@@ -339,40 +330,35 @@ export default async function ProjectDetailPage({ params }: Props) {
       </div>
       )}
 
-      {/* ── Main content ─────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* ── Main content — flat editorial layout, per the approved mockup:
+             uppercase section headings with a hairline, content directly on
+             the white page. No floating cards, no rounded corners. ── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-3 gap-10 lg:gap-12">
         {/* Left / main column */}
-        <div className="lg:col-span-2 space-y-10">
+        <div className="lg:col-span-2 space-y-12">
 
           {/* Overview */}
           {(project.description || project.about_project) && (
-            <section className="relative bg-white rounded-lg border border-[#e8eaed] p-8 overflow-hidden">
-                            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Project Overview</h2>
-              <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
+            <section>
+              <SectionHeading title="Overview" />
               {project.description && (
-                <p className="text-[#374151] leading-relaxed mb-4">{project.description}</p>
+                <p className="mt-5 text-[15.5px] leading-[1.8] text-[#374151]">{project.description}</p>
               )}
               {project.about_project && project.about_project !== project.description && (
-                <div className="pt-4 border-t border-[#f3f4f6]">
-                  <h3 className="font-semibold text-[#0d1117] mb-2 text-sm">About This Project</h3>
-                  <p className="text-[#374151] leading-relaxed text-sm">{project.about_project}</p>
-                </div>
+                <p className="mt-4 text-[15.5px] leading-[1.8] text-[#374151]">{project.about_project}</p>
               )}
             </section>
           )}
 
           {/* Features */}
           {features.length > 0 && (
-            <section className="relative bg-white rounded-lg border border-[#e8eaed] p-8 overflow-hidden">
-                            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Key Features</h2>
-              <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <section>
+              <SectionHeading title="Key Features" />
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
                 {features.map((f) => (
-                  <div key={f.id} className="flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-br from-[#fdf9f0] to-white border border-[#d6b357]/20 hover:border-[#d6b357]/40 hover:shadow-md transition-all duration-200">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#d6b357] to-[#f0d890] flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-[#001f3f]" />
-                    </div>
-                    <p className="text-sm text-[#374151] leading-relaxed">{f.description}</p>
+                  <div key={f.id} className="flex items-start gap-3">
+                    <CheckCircle2 className="w-[18px] h-[18px] text-[#d6b357] shrink-0 mt-0.5" />
+                    <p className="text-[15px] text-[#374151] leading-relaxed">{f.description}</p>
                   </div>
                 ))}
               </div>
@@ -381,60 +367,63 @@ export default async function ProjectDetailPage({ params }: Props) {
 
           {/* Gallery */}
           {images.length > 0 && (
-            <section className="relative bg-white rounded-lg border border-[#e8eaed] p-8 overflow-hidden">
-                            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">
-                Gallery
-              </h2>
-              <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
-              <ProjectGallery images={images} />
+            <section>
+              <SectionHeading
+                title="Gallery"
+                action={
+                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#6b7280]">
+                    {images.length} photos
+                  </span>
+                }
+              />
+              <div className="mt-5">
+                <ProjectGallery images={images} />
+              </div>
             </section>
           )}
 
           {/* Units */}
           {units.length > 0 && (
-            <section id="units" className="relative bg-white rounded-lg border border-[#e8eaed] p-8 overflow-hidden scroll-mt-24">
-                            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Available Unit Types</h2>
-              <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
-              <div className="overflow-x-auto">
+            <section id="units" className="scroll-mt-24">
+              <SectionHeading title="Available Unit Types" />
+              <div className="mt-5 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b-2 border-[#d6b357]/20 bg-gradient-to-r from-[#fdf9f0] to-white">
+                    <tr className="border-b-2 border-[#0d1117]">
                       {["Type", "Beds", "Baths", "Size (sqft)", "Starting Price", "Status"].map((h) => (
-                        <th key={h} className="text-left text-xs font-bold text-[#001f3f] uppercase tracking-wider py-3 pr-6 last:pr-0">{h}</th>
+                        <th key={h} className="text-left text-[11px] font-bold text-[#0d1117] uppercase tracking-wider py-3 pr-6 last:pr-0">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {units.map((u) => (
-                      <tr key={u.id} className="border-b border-[#f9fafb] hover:bg-[#fdf9f0] transition-colors">
-                        <td className="py-3 pr-6 font-semibold text-[#0d1117]">{u.unit_type ?? "—"}</td>
-                        <td className="py-3 pr-6 text-[#374151]">
+                      <tr key={u.id} className="border-b border-[#eef0f3]">
+                        <td className="py-3.5 pr-6 font-semibold text-[#0d1117]">{u.unit_type ?? "—"}</td>
+                        <td className="py-3.5 pr-6 text-[#374151]">
                           {u.bedrooms !== null ? (
                             <span className="flex items-center gap-1"><BedDouble className="w-3.5 h-3.5 text-[#9ca3af]" />{u.bedrooms}</span>
                           ) : "—"}
                         </td>
-                        <td className="py-3 pr-6 text-[#374151]">
+                        <td className="py-3.5 pr-6 text-[#374151]">
                           {u.bathrooms !== null ? (
                             <span className="flex items-center gap-1"><Bath className="w-3.5 h-3.5 text-[#9ca3af]" />{u.bathrooms}</span>
                           ) : "—"}
                         </td>
-                        <td className="py-3 pr-6 text-[#374151]">
+                        <td className="py-3.5 pr-6 text-[#374151]">
                           {u.size_sqft ? (
                             <span className="flex items-center gap-1"><Maximize2 className="w-3.5 h-3.5 text-[#9ca3af]" />{u.size_sqft.toLocaleString()}</span>
                           ) : "—"}
                         </td>
-                        <td className="py-3 pr-6 font-semibold text-[#001f3f]">
+                        <td className="py-3.5 pr-6 font-semibold text-[#001f3f]">
                           {u.price_from ? formatPrice(u.price_from, u.price_to, project.currency) : "On Request"}
                         </td>
-                        <td className="py-3">
+                        <td className="py-3.5">
                           {u.is_available !== false ? (
-                            <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#f0fdf4] text-[#15803d]">
+                            <span className="text-[13px] font-semibold text-[#15803d]">
                               {u.available_units != null ? `${u.available_units} available` : "Available"}
                             </span>
                           ) : (
-                            <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#fef2f2] text-[#dc2626]">
-                              Sold Out
-                            </span>
+                            <span className="text-[13px] font-semibold text-[#dc2626]">Sold Out</span>
                           )}
                         </td>
                       </tr>
@@ -447,44 +436,45 @@ export default async function ProjectDetailPage({ params }: Props) {
 
           {/* Amenities */}
           {project.project_amenities && project.project_amenities.length > 0 && (
-            <section className="relative bg-white rounded-lg border border-[#e8eaed] p-8 overflow-hidden">
-                            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Amenities</h2>
-              <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
-              <AmenitiesGrid amenities={project.project_amenities as any} />
+            <section>
+              <SectionHeading title="Amenities" />
+              <div className="mt-5">
+                <AmenitiesGrid amenities={project.project_amenities as any} />
+              </div>
             </section>
           )}
 
           {/* Nearby */}
           {((project.project_points && project.project_points.length > 0) || (project.project_neighbors && project.project_neighbors.length > 0)) && (
-            <section className="relative bg-white rounded-lg border border-[#e8eaed] p-8 overflow-hidden">
-                            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Nearby Places</h2>
-              <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
-              <NearbyPlaces
-                points={(project.project_points as any[])?.map((p) => ({ ...p, place_type: p.category }))}
-                neighbors={(project.project_neighbors as any[])?.map((p) => ({ ...p, place_type: p.category }))}
-              />
+            <section>
+              <SectionHeading title="Nearby Places" />
+              <div className="mt-5">
+                <NearbyPlaces
+                  points={(project.project_points as any[])?.map((p) => ({ ...p, place_type: p.category }))}
+                  neighbors={(project.project_neighbors as any[])?.map((p) => ({ ...p, place_type: p.category }))}
+                />
+              </div>
             </section>
           )}
 
           {/* Media */}
           {media.length > 0 && (
-            <section className="relative bg-white rounded-lg border border-[#e8eaed] p-8 overflow-hidden">
-                            <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mt-1 mb-2">Media & Virtual Tours</h2>
-              <div className="h-px bg-gradient-to-r from-[#d6b357]/40 via-[#d6b357]/15 to-transparent mb-5" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <section>
+              <SectionHeading title="Media & Virtual Tours" />
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {media.map((m) => (
                   <a
                     key={m.id}
                     href={m.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group flex items-center gap-4 p-4 rounded-2xl bg-[#f7f8fa] border border-[#e8eaed] hover:border-[#001f3f]/20 hover:bg-[#001f3f]/4 transition-all"
+                    className="group flex items-center gap-4 p-4 border border-[#e5e8ec] hover:border-[#001f3f]/40 transition-colors"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-[#001f3f] flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 bg-[#001f3f] flex items-center justify-center shrink-0">
                       <Play className="w-4 h-4 text-[#d6b357]" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-[#0d1117] group-hover:text-[#001f3f] transition-colors">
+                      <p className="text-sm font-semibold text-[#0d1117]">
                         {m.media_type === "video" ? "Watch Video" : "Virtual Tour"}
                       </p>
                       <p className="text-xs text-[#9ca3af] capitalize">{m.media_type ?? "media"}</p>
@@ -496,45 +486,13 @@ export default async function ProjectDetailPage({ params }: Props) {
           )}
         </div>
 
-        {/* ── Right sidebar ───────────────────────────────── */}
-        <div className="space-y-6">
-          {/* Payment plan */}
-          {(project.down_payment_percentage || project.payment_plan_details || project.installment_available) && (
-            <div className="relative bg-white rounded-[28px] border border-[#e8eaed] p-6 shadow-sm hover:shadow-xl hover:border-[#d6b357]/25 transition-all duration-300 overflow-hidden">
-                            <h3 className="font-['Outfit'] font-bold text-[#0d1117] mt-1 mb-4">Payment Plan</h3>
-              <div className="space-y-3">
-                {project.down_payment_percentage && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-[#6b7280]">Down Payment</span>
-                    <span className="px-2.5 py-1 rounded-full bg-gradient-to-r from-[#d6b357]/15 to-[#f0d890]/15 border border-[#d6b357]/30 font-bold text-[#001f3f] text-xs">{project.down_payment_percentage}%</span>
-                  </div>
-                )}
-                {project.government_fee_percentage && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-[#6b7280]">DLD Fee</span>
-                    <span className="px-2.5 py-1 rounded-full bg-[#f3f4f6] border border-[#e5e7eb] font-bold text-[#0d1117] text-xs">{project.government_fee_percentage}%</span>
-                  </div>
-                )}
-                {project.installment_available && (
-                  <div className="flex items-center gap-2 p-3 rounded-xl bg-[#f0fdf4] border border-[#bbf7d0]">
-                    <CheckCircle2 className="w-4 h-4 text-[#15803d]" />
-                    <span className="text-sm font-medium text-[#15803d]">Installment Available</span>
-                  </div>
-                )}
-                {project.payment_plan_details && (
-                  <p className="text-xs text-[#6b7280] leading-relaxed">{project.payment_plan_details}</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Developer card */}
+        {/* ── Right sidebar — headings sit on the page, panels are square. ── */}
+        <div className="space-y-10">
+          {/* Developer */}
           {developer && (
-            <div className="relative bg-white rounded-[28px] border border-[#e8eaed] p-6 shadow-sm hover:shadow-xl hover:border-[#001f3f]/20 transition-all duration-300 overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#001f3f] via-[#002a52] to-transparent" />
-              <p className="text-xs font-bold uppercase tracking-widest text-[#9ca3af] mt-1 mb-4">Developer</p>
-              <Link href={`/${developer.slug}`} className="flex items-center gap-4 group mb-4">
-                <div className="w-14 h-14 rounded-2xl bg-[#f7f8fa] border border-[#e8eaed] flex items-center justify-center overflow-hidden shrink-0">
+            <SidePanel title="Developer">
+              <Link href={`/${developer.slug}`} className="flex items-center gap-4 group">
+                <div className="w-14 h-14 border border-[#e5e8ec] bg-white flex items-center justify-center overflow-hidden shrink-0">
                   {developer.logo_url ? (
                     <Image
                       src={developer.logo_url}
@@ -548,88 +506,135 @@ export default async function ProjectDetailPage({ params }: Props) {
                   )}
                 </div>
                 <div>
-                  <p className="font-bold text-[#0d1117] group-hover:text-[#001f3f] transition-colors">{developer.name}</p>
+                  <p className="font-['Outfit'] font-bold text-[#0d1117] group-hover:text-[#001f3f] transition-colors">{developer.name}</p>
                   {developer.is_verified && (
-                    <span className="text-xs text-[#15803d] flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Verified</span>
+                    <span className="text-xs text-[#15803d] flex items-center gap-1 mt-0.5"><CheckCircle2 className="w-3 h-3" /> Verified</span>
                   )}
                 </div>
               </Link>
-              <div className="flex flex-col gap-2">
-                {developer.website_url && (
-                  <a href={developer.website_url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-xs text-[#6b7280] hover:text-[#001f3f] transition-colors">
-                    <Globe className="w-3.5 h-3.5" /> {developer.website_url.replace(/^https?:\/\//, "")}
-                  </a>
-                )}
-                {developer.email && (
-                  <a href={`mailto:${developer.email}`}
-                    className="flex items-center gap-2 text-xs text-[#6b7280] hover:text-[#001f3f] transition-colors">
-                    <Mail className="w-3.5 h-3.5" /> {developer.email}
-                  </a>
-                )}
+              {(developer.website_url || developer.email) && (
+                <div className="mt-4 pt-4 border-t border-[#eef0f3] flex flex-col gap-2">
+                  {developer.website_url && (
+                    <a href={developer.website_url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-xs text-[#6b7280] hover:text-[#001f3f] transition-colors">
+                      <Globe className="w-3.5 h-3.5" /> {developer.website_url.replace(/^https?:\/\//, "")}
+                    </a>
+                  )}
+                  {developer.email && (
+                    <a href={`mailto:${developer.email}`}
+                      className="flex items-center gap-2 text-xs text-[#6b7280] hover:text-[#001f3f] transition-colors">
+                      <Mail className="w-3.5 h-3.5" /> {developer.email}
+                    </a>
+                  )}
+                </div>
+              )}
+              <div className="mt-4 pt-4 border-t border-[#eef0f3]">
+                <Link
+                  href={`/${developer.slug}`}
+                  className="inline-flex items-center gap-1.5 text-sm font-bold text-[#001f3f] hover:text-[#d6b357] transition-colors"
+                >
+                  View Developer Profile <ArrowLeft className="w-4 h-4 rotate-180" />
+                </Link>
               </div>
-              <Link
-                href={`/${developer.slug}`}
-                className="mt-4 flex items-center justify-center gap-1.5 w-full py-2.5 rounded-full bg-gradient-to-r from-[#001f3f] to-[#002a52] hover:from-[#002a52] hover:to-[#003366] text-white text-sm font-semibold shadow-md hover:shadow-[0_8px_24px_rgba(0,31,63,0.3)] hover:-translate-y-0.5 transition-all duration-300"
-              >
-                View Developer Profile
-              </Link>
-            </div>
+            </SidePanel>
           )}
 
-          {/* Quick facts */}
-          <div className="bg-gradient-to-br from-[#001f3f] to-[#001428] rounded-[28px] p-6 shadow-lg">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="w-1.5 h-5 rounded-full bg-gradient-to-b from-[#d6b357] to-[#f0d890]" />
-              <h3 className="font-['Outfit'] font-bold text-white">Quick Facts</h3>
-            </div>
-            <div className="space-y-3">
-              {[
-                { label: "Ownership", value: project.ownership_type ?? (project.freehold ? "Freehold" : null) },
-                { label: "Region", value: project.region },
-                { label: "Community", value: project.community },
-                { label: "City", value: project.city },
-                { label: "Country", value: project.country },
-                { label: "Currency", value: project.currency },
-              ].filter((f) => f.value).map(({ label, value }) => (
-                <div key={label} className="flex items-center justify-between text-sm border-b border-white/10 pb-2 last:border-0 last:pb-0">
-                  <span className="text-white/50">{label}</span>
-                  <span className="font-medium text-white">{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Payment plan */}
+          {(project.down_payment_percentage || project.payment_plan_details || project.installment_available) && (
+            <SidePanel title="Payment Plan">
+              <div className="space-y-3">
+                {project.down_payment_percentage && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-[#6b7280]">Down Payment</span>
+                    <span className="font-bold text-[#0d1117]">{project.down_payment_percentage}%</span>
+                  </div>
+                )}
+                {project.government_fee_percentage && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-[#6b7280]">DLD Fee</span>
+                    <span className="font-bold text-[#0d1117]">{project.government_fee_percentage}%</span>
+                  </div>
+                )}
+                {project.installment_available && (
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[#15803d]">
+                    <CheckCircle2 className="w-4 h-4" /> Installment Available
+                  </div>
+                )}
+                {project.payment_plan_details && (
+                  <p className="text-xs text-[#6b7280] leading-relaxed pt-2 border-t border-[#eef0f3]">{project.payment_plan_details}</p>
+                )}
+              </div>
+            </SidePanel>
+          )}
 
-          {/* Contact CTA */}
-          <div className="bg-gradient-to-br from-[#d6b357] to-[#c9a449] rounded-[28px] p-6 shadow-[0_8px_32px_rgba(214,179,87,0.4)]">
-            <h3 className="font-['Outfit'] font-bold text-[#001f3f] text-lg mb-2">Interested in this project?</h3>
-            <p className="text-[#001f3f]/70 text-sm mb-4">Get in touch with our team for more details and exclusive offers.</p>
-            <div className="flex flex-col gap-2.5">
-              {project.sales_contact_phone && (
-                <a href={`tel:${project.sales_contact_phone}`}
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#001f3f] text-white text-sm font-bold transition-colors hover:bg-[#002a52]">
-                  <Phone className="w-3.5 h-3.5" /> {project.sales_contact_phone}
+          {/* Quick facts — 2-col icon grid, like the mockup (built from real
+              fields; the mockup's own box had garbled labels). */}
+          {quickFacts.length > 0 && (
+            <SidePanel title="Quick Facts">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+                {quickFacts.map(({ icon: Icon, label, value }) => (
+                  <div key={label} className="flex items-start gap-2.5">
+                    <Icon className="w-4 h-4 text-[#d6b357] shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-[#6b7280]">{label}</p>
+                      <p className="text-[13px] font-semibold text-[#0d1117] leading-snug">{value}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SidePanel>
+          )}
+
+          {/* Contact */}
+          <SidePanel title="Get in Touch">
+            <p className="text-sm text-[#6b7280] leading-relaxed">
+              Talk to our team for availability, payment plans and exclusive offers on this project.
+            </p>
+            <div className="mt-4 flex flex-col gap-2.5">
+              {(project.sales_contact_phone || developer?.phone) && (
+                <a href={`tel:${project.sales_contact_phone ?? developer?.phone}`}
+                  className="flex items-center justify-center gap-2 py-3 bg-[#d6b357] hover:bg-[#c8a544] text-[#001f3f] text-sm font-bold transition-colors">
+                  <Phone className="w-3.5 h-3.5" /> {project.sales_contact_phone ?? "Contact Agent"}
                 </a>
               )}
-              {project.sales_contact_email && (
-                <a href={`mailto:${project.sales_contact_email}`}
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/40 hover:bg-white/60 text-[#001f3f] text-sm font-semibold transition-colors">
-                  <Mail className="w-3.5 h-3.5" /> Email Us
-                </a>
-              )}
-              {!project.sales_contact_phone && !project.sales_contact_email && developer?.phone && (
-                <a href={`tel:${developer.phone}`}
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#001f3f] text-white text-sm font-bold transition-colors hover:bg-[#002a52]">
-                  <Phone className="w-3.5 h-3.5" /> Contact Agent
-                </a>
-              )}
+              <a href={`mailto:${project.sales_contact_email ?? "info@fhiglobal.ae"}`}
+                className="flex items-center justify-center gap-2 py-3 border border-[#001f3f]/25 hover:border-[#001f3f] text-[#001f3f] text-sm font-bold transition-colors">
+                <Mail className="w-3.5 h-3.5" /> Email Us
+              </a>
             </div>
-          </div>
+          </SidePanel>
         </div>
       </div>
 
       <Footer />
     </div>
     </>
+  )
+}
+
+// ── Flat-layout helpers (approved mockup): headings live on the page, not in
+//    cards, and every surface is square. ──────────────────────────────────────
+function SectionHeading({ title, action }: { title: string; action?: React.ReactNode }) {
+  return (
+    <div>
+      <div className="flex items-end justify-between gap-4">
+        <h2 className="font-['Outfit'] text-[19px] font-bold uppercase tracking-[0.1em] text-[#0d1117]">
+          {title}
+        </h2>
+        {action}
+      </div>
+      <div className="h-px bg-[#e5e8ec] mt-3" />
+    </div>
+  )
+}
+
+function SidePanel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="font-['Outfit'] text-[13px] font-bold uppercase tracking-[0.16em] text-[#0d1117] mb-3">
+        {title}
+      </p>
+      <div className="border border-[#e5e8ec] bg-white p-6">{children}</div>
+    </div>
   )
 }
