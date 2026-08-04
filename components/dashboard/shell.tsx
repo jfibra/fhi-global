@@ -13,6 +13,7 @@ import { useAuth } from "@/context/auth-context"
 import { getSidebarNavItems, getRoleColor, type NavItem } from "@/components/dashboard/sidebar-config"
 import { DashboardBreadcrumb } from "@/components/dashboard/dashboard-breadcrumb"
 import { DashboardSearch } from "@/components/dashboard/dashboard-search"
+import { useNewLeadsCount } from "@/components/dashboard/use-new-leads-count"
 import { RequiredSaleProofGate } from "@/components/dashboard/required-sale-proof-gate"
 import { ROLE_SHELL_BADGE, normalizeAppRole, isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
 
@@ -102,7 +103,10 @@ function NavLink({
 
 // ─── Nav ─────────────────────────────────────────────────────────────────────
 // A flat list — no section headers, no collapse. The ONLY part of the shell
-// that reads the pathname (see rule 1 above), and it holds no state at all.
+// that reads the pathname (see rule 1 above). Its only state is the unread-
+// leads badge count, which lives here (not in DashboardShell) per rule 2:
+// the nav is the piece that displays it, so a count update re-renders the
+// nav alone.
 function SidebarNav({
   items,
   accentColor,
@@ -116,6 +120,11 @@ function SidebarNav({
   onNavigate: () => void
 }) {
   const pathname = usePathname()
+
+  // Unread-leads badge — only fetched when this role's list actually has the
+  // Leads Inquiries row (admin + superadmin).
+  const leadsHref = `${dashboardBase}/leads`
+  const newLeads = useNewLeadsCount(items.some((i) => i.href === leadsHref), pathname)
 
   // px-5 matches the account header above, so the active row's highlight lines
   // up with the account card and the Record Your Sale button instead of bleeding 8px
@@ -136,10 +145,12 @@ function SidebarNav({
           item.href === dashboardBase
             ? pathname === item.href
             : pathname === item.href || pathname.startsWith(`${item.href}/`)
+        const resolved =
+          item.href === leadsHref && newLeads > 0 ? { ...item, badge: newLeads } : item
         return (
           <NavLink
             key={item.href}
-            item={item}
+            item={resolved}
             isActive={isActive}
             accentColor={accentColor}
             onNavigate={onNavigate}
