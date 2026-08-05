@@ -89,13 +89,19 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
         {/* Developer logo bottom-left */}
         {developers && (
-          <div className="absolute bottom-3 left-3 flex items-center gap-2 px-2.5 py-1.5 bg-white/15 backdrop-blur-md border border-white/25">
+          <div className="absolute bottom-3 left-3 flex items-center gap-2.5 px-3 py-2 bg-white/95 backdrop-blur-sm border border-white shadow-sm">
             {developers.logo_url ? (
-              <Image src={developers.logo_url} alt={developers.name} width={16} height={16} className="object-contain" />
+              <Image
+                src={developers.logo_url}
+                alt={developers.name}
+                width={96}
+                height={28}
+                className="h-7 w-auto max-w-[86px] object-contain"
+              />
             ) : (
-              <Building2 className="w-3 h-3 text-white/70" />
+              <Building2 className="w-4 h-4 text-[#001f3f]/60" />
             )}
-            <span className="text-[10px] font-semibold text-white truncate max-w-[100px]">{developers.name}</span>
+            <span className="text-[12px] font-bold text-[#0d1117] truncate max-w-[130px]">{developers.name}</span>
           </div>
         )}
       </div>
