@@ -1,7 +1,13 @@
-// Client helpers for per-project construction updates. All management goes
-// through service-role API routes (ownership-checked server-side) rather than
-// the browser Supabase client, so a developer can manage updates on their own
-// unpublished projects (which the public read policy would otherwise hide).
+// Client helpers for per-project construction updates. Row management goes
+// through service-role API routes (ownership-checked server-side) so a developer
+// can manage updates on their own unpublished projects. The FILE, however, is
+// uploaded straight from the browser to Supabase Storage — construction PDFs run
+// tens of MB and would exceed the ~4.5 MB Vercel serverless body limit if POSTed
+// through an API route (and this avoids touching the shared S3 bucket's CORS).
+
+import { createClient } from "@/lib/supabase/client"
+
+const STORAGE_BUCKET = "construction-updates"
 
 export type ConstructionUpdate = {
   id: string
@@ -61,21 +67,32 @@ export async function deleteConstructionUpdate(
   }
 }
 
-/** Upload a construction-update file (PDF or image) to S3; returns its public URL. */
+/**
+ * Upload a construction-update file (PDF or image) straight to Supabase Storage
+ * (browser → Supabase, so it bypasses Vercel's request-body limit) and return
+ * its public URL. The bucket is public; per-project discovery is still gated by
+ * the construction_updates row policy.
+ */
 export async function uploadConstructionFile(
   file: File,
   developerSlug: string,
   projectSlug: string,
 ): Promise<{ url: string | null; error: string | null }> {
   try {
-    const fd = new FormData()
-    fd.append("file", file, file.name)
-    fd.append("developer_slug", developerSlug || "unknown")
-    fd.append("project_slug", projectSlug || "general")
-    const res = await fetch("/api/upload/construction-update", { method: "POST", body: fd })
-    const json = (await res.json()) as { url?: string; error?: string }
-    if (!res.ok || !json.url) return { url: null, error: json.error ?? "File upload failed." }
-    return { url: json.url, error: null }
+    const supabase = createClient()
+    const ext = (file.name.split(".").pop() ?? "bin").toLowerCase()
+    const safeDev = (developerSlug || "unknown").replace(/[^a-z0-9._-]/gi, "-")
+    const safeProj = (projectSlug || "general").replace(/[^a-z0-9._-]/gi, "-")
+    const path = `${safeDev}/${safeProj}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+
+    const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
+      contentType: file.type || undefined,
+      upsert: false,
+    })
+    if (error) return { url: null, error: error.message || "Upload to storage failed. Please try again." }
+
+    const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path)
+    return { url: data.publicUrl, error: null }
   } catch {
     return { url: null, error: "File upload failed." }
   }
