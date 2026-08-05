@@ -45,7 +45,6 @@ export function ProjectFilters({ developers, cities }: Omit<ProjectFiltersProps,
 
   return (
     <div className="relative bg-white border border-[#e5e8ec] p-6 overflow-hidden">
-      <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#001f3f] via-[#d6b357] to-transparent" />
       <div className="flex items-center gap-2 mb-5">
         <div className="w-7 h-7 bg-[#f0f2f5] flex items-center justify-center">
           <SlidersHorizontal className="w-3.5 h-3.5 text-[#001f3f]" />

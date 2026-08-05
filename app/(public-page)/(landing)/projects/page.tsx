@@ -83,7 +83,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
             className="object-cover object-center"
             aria-hidden="true"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f]/88 via-[#002a52]/85 to-[#001428]/92" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#001f3f]/85 via-[#001f3f]/55 to-[#001f3f]/25" />
         </div>
         <div
           className="absolute inset-0 opacity-[0.05]"
@@ -94,11 +94,11 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
             <Building2 className="w-3.5 h-3.5 text-[#d6b357]" />
             {featured === "true" ? "Featured Projects" : "All Projects"}
           </div>
-          <h1 className="font-['Outfit'] text-4xl md:text-5xl font-bold text-white leading-tight mb-3" style={{ textShadow: "0 2px 20px rgba(0,0,0,0.4)" }}>
+          <h1 className="font-['Outfit'] text-5xl md:text-[64px] font-bold text-white leading-[1.05] tracking-tight mb-4" style={{ textShadow: "0 2px 24px rgba(0,10,30,0.55)" }}>
             Discover Premium<br />
             <span className="text-[#d6b357]">Property Projects</span>
           </h1>
-          <p className="text-white/55 text-lg max-w-xl">
+          <p className="text-white/85 text-lg max-w-xl" style={{ textShadow: "0 1px 10px rgba(0,10,30,0.6)" }}>
             Browse off-plan and ready properties from Dubai&apos;s most trusted developers.
           </p>
         </div>

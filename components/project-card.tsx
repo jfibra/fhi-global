@@ -22,10 +22,10 @@ export interface ProjectCardData {
 }
 
 const STATUS_STYLES: Record<string, { label: string; bg: string; text: string; border: string }> = {
-  pre_launch:         { label: "Pre-Launch",         bg: "bg-purple-50",  text: "text-purple-700", border: "border-purple-200" },
-  launch:             { label: "Launching Now",       bg: "bg-blue-50",    text: "text-blue-700",   border: "border-blue-200"   },
-  under_construction: { label: "Under Construction", bg: "bg-amber-50",   text: "text-amber-700",  border: "border-amber-200"  },
-  completed:          { label: "Ready to Move",      bg: "bg-emerald-50", text: "text-emerald-700",border: "border-emerald-200" },
+  pre_launch:         { label: "Pre-Launch",         bg: "bg-[#0a2647]",  text: "text-white", border: "border-transparent" },
+  launch:             { label: "Launching Now",      bg: "bg-[#0a2647]",  text: "text-white", border: "border-transparent" },
+  under_construction: { label: "Under Construction", bg: "bg-[#0a2647]",  text: "text-white", border: "border-transparent" },
+  completed:          { label: "Ready to Move",      bg: "bg-[#0a2647]",  text: "text-white", border: "border-transparent" },
 }
 
 function formatPrice(value: number, currency = "AED"): string {
@@ -76,7 +76,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
         {/* Badges */}
         <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
           {s && (
-            <span className={`text-[10px] font-bold px-2.5 py-1 border backdrop-blur-sm ${s.bg} ${s.text} ${s.border}`}>
+            <span className={`text-[11px] font-bold uppercase tracking-[0.08em] px-3 py-1.5 border ${s.bg} ${s.text} ${s.border}`}>
               {s.label}
             </span>
           )}
