@@ -267,9 +267,7 @@ export default async function HomePage() {
                 </div>
                 <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight">
                   <span className="text-[#0d1117]">Featured</span>{" "}
-                  <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
-                    Projects
-                  </span>
+                  <span className="text-[#b8913f]">Projects</span>
                 </h2>
                 <p className="text-[#4b5563] text-base leading-relaxed mt-4 max-w-xl">
                   A curated selection of Dubai&apos;s most sought-after developments,
@@ -277,7 +275,7 @@ export default async function HomePage() {
                 </p>
               </div>
               <Link
-                href="/projects?featured=true"
+                href="/projects"
                 className="hidden sm:inline-flex items-center gap-2 text-sm font-bold text-[#0d1117] hover:text-[#b8913f] transition-colors shrink-0"
               >
                 Browse All Projects
