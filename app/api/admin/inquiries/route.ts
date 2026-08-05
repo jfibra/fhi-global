@@ -57,13 +57,19 @@ export async function GET(req: NextRequest) {
     return query
   }
 
-  let result = await buildQuery(LIST_COLUMNS)
-  // 42703 = undefined column: migration 031 not applied yet.
-  if (result.error?.code === "42703") result = await buildQuery(LEGACY_COLUMNS)
+  // List and summary ride in one parallel batch — sequential awaits here were
+  // most of the page's perceived latency (every query is a Supabase round trip).
+  const [result, summary] = await Promise.all([
+    (async () => {
+      let r = await buildQuery(LIST_COLUMNS)
+      // 42703 = undefined column: migration 031 not applied yet.
+      if (r.error?.code === "42703") r = await buildQuery(LEGACY_COLUMNS)
+      return r
+    })(),
+    buildSummary(admin),
+  ])
   const { data, count, error } = result
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  const summary = await buildSummary(admin)
 
   return NextResponse.json({ rows: data ?? [], total: count ?? 0, page, perPage, summary })
 }
@@ -71,17 +77,20 @@ export async function GET(req: NextRequest) {
 async function buildSummary(admin: ReturnType<typeof createAdminSupabase>) {
   const base = () =>
     admin.from("inquiries").select("id", { count: "exact", head: true }).is("deleted_at", null)
-  const countFor = async (filter?: (q: ReturnType<typeof base>) => ReturnType<typeof base>) => {
-    const q = base()
-    const { count } = await (filter ? filter(q) : q)
-    return count ?? 0
+  // All four counts in parallel — one round-trip's worth of waiting, not four.
+  const [totalRes, freshRes, unreadRes, sentRes] = await Promise.all([
+    base(),
+    base().eq("status", "new"),
+    // Pre-migration-031 there is no read_at — fall back to the 'new' count.
+    base().is("read_at", null),
+    // Sent tab counter. Errors (e.g. table missing pre-migration) just mean 0.
+    admin.from("inquiry_emails").select("id", { count: "exact", head: true }),
+  ])
+  const fresh = freshRes.count ?? 0
+  return {
+    total: totalRes.count ?? 0,
+    new: fresh,
+    unread: unreadRes.error ? fresh : unreadRes.count ?? 0,
+    sent: sentRes.error ? 0 : sentRes.count ?? 0,
   }
-  const [total, fresh] = await Promise.all([countFor(), countFor((q) => q.eq("status", "new"))])
-  // Pre-migration-031 there is no read_at — treat 'new' as unread.
-  const unreadRes = await base().is("read_at", null)
-  const unread = unreadRes.error ? fresh : unreadRes.count ?? 0
-  // Sent tab counter. Errors (e.g. table missing pre-migration) just mean 0.
-  const sentRes = await admin.from("inquiry_emails").select("id", { count: "exact", head: true })
-  const sent = sentRes.error ? 0 : sentRes.count ?? 0
-  return { total, new: fresh, unread, sent }
 }

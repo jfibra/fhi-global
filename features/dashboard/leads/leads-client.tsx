@@ -157,18 +157,37 @@ export function LeadsClient() {
   // may still be in flight — without it, a slow Sent request resolving late
   // stomps the Inbox you already switched back to.
   const loadSeq = useRef(0)
+  // Stale-while-revalidate: the last snapshot per folder/page/filter combo.
+  // Returning to a folder paints it instantly from here (no skeleton) while a
+  // silent refresh runs underneath — the Gmail feel.
+  const cacheRef = useRef(new Map<string, { rows?: Inquiry[]; sent?: SentEmail[]; total: number }>())
   const load = useCallback(async () => {
     const seq = ++loadSeq.current
-    setLoading(true)
+    const cacheKey = `${folder}|${page}|${search}|${status}|${category}`
+    const cached = cacheRef.current.get(cacheKey)
+    if (cached) {
+      if (folder === "sent") setSentRows(cached.sent ?? [])
+      else setRows(cached.rows ?? [])
+      setTotal(cached.total)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
     setListError(null)
     setSelected(new Set())
     try {
       if (folder === "sent") {
         const { data, total: t, error } = await fetchSentEmails({ page, perPage: PER_PAGE, search })
         if (seq !== loadSeq.current) return
-        if (error) { setListError(error); setSentRows([]); setTotal(0); return }
+        if (error) {
+          // A snapshot on screen beats an error page — keep it, note the failure.
+          if (cached) setNotice(error)
+          else { setListError(error); setSentRows([]); setTotal(0) }
+          return
+        }
         setSentRows(data)
         setTotal(t)
+        cacheRef.current.set(cacheKey, { sent: data, total: t })
         // Keep the Sent tab counter honest while browsing this folder.
         if (!search) setSummary((s) => (s ? { ...s, sent: t } : { total: 0, new: 0, sent: t }))
       } else {
@@ -179,10 +198,15 @@ export function LeadsClient() {
           archivedOnly: folder === "archived",
         })
         if (seq !== loadSeq.current) return
-        if (error) { setListError(error); setRows([]); setTotal(0); return }
+        if (error) {
+          if (cached) setNotice(error)
+          else { setListError(error); setRows([]); setTotal(0) }
+          return
+        }
         setRows(data)
         setTotal(t)
         setSummary(s)
+        cacheRef.current.set(cacheKey, { rows: data, total: t })
       }
     } finally {
       if (seq === loadSeq.current) setLoading(false)
@@ -201,6 +225,22 @@ export function LeadsClient() {
     return () => clearTimeout(t)
   }, [searchInput])
 
+  // Update one conversation everywhere it appears: the visible list, the open
+  // thread, and the folder snapshots — otherwise the instant repaint on the
+  // next folder switch would briefly resurrect the old read/status state.
+  const patchRow = useCallback((id: string, patch: Partial<Inquiry>) => {
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+    setThread((t) => (t && t.inquiry.id === id ? { ...t, inquiry: { ...t.inquiry, ...patch } } : t))
+    for (const [key, snap] of cacheRef.current) {
+      if (snap.rows?.some((r) => r.id === id)) {
+        cacheRef.current.set(key, {
+          ...snap,
+          rows: snap.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+        })
+      }
+    }
+  }, [])
+
   // Load the open conversation. Also marks it read (deep links included) —
   // opening mail is what "read" means. Fire-and-forget; unread counts adjust
   // locally so the badge doesn't wait a round trip. Deferred a tick so no
@@ -217,14 +257,12 @@ export function LeadsClient() {
       setThread({ inquiry: data, emails })
       if (!data.read_at) {
         void setInquiryRead(data.id, true)
-        const stamp = new Date().toISOString()
-        setThread((th) => (th && th.inquiry.id === data.id ? { ...th, inquiry: { ...th.inquiry, read_at: stamp } } : th))
-        setRows((rs) => rs.map((r) => (r.id === data.id ? { ...r, read_at: stamp } : r)))
+        patchRow(data.id, { read_at: new Date().toISOString() })
         setSummary((s) => (s ? { ...s, unread: Math.max(0, (s.unread ?? 0) - 1) } : s))
       }
     }, 0)
     return () => { cancelled = true; clearTimeout(t) }
-  }, [openId, folder])
+  }, [openId, folder, patchRow])
 
   // Toast auto-dismiss.
   useEffect(() => {
@@ -232,11 +270,6 @@ export function LeadsClient() {
     const t = setTimeout(() => setNotice(null), 4000)
     return () => clearTimeout(t)
   }, [notice])
-
-  const patchRow = (id: string, patch: Partial<Inquiry>) => {
-    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
-    setThread((t) => (t && t.inquiry.id === id ? { ...t, inquiry: { ...t.inquiry, ...patch } } : t))
-  }
 
   // ── pane actions ────────────────────────────────────────────────────────
   const markUnread = async (lead: Inquiry) => {
