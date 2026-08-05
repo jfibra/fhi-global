@@ -5,9 +5,10 @@
 // allowlisted S3 bucket, so nothing trips the CSP.
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { QRCodeSVG } from "qrcode.react"
 import {
-  ArrowRight, Award, Bath, BedDouble, Building2, CalendarCheck, Check, Facebook, Globe2,
+  ArrowRight, Award, Bath, BedDouble, CalendarCheck, Check, Facebook, Globe2,
   Eye, Handshake, Heart, HomeIcon, Instagram, KeyRound, Landmark, Linkedin, Mail, MapPin,
   Maximize, MessageCircle, Phone, Play, QrCode, Star, TrendingUp, Users, Youtube,
 } from "lucide-react"
@@ -54,13 +55,22 @@ const AGENT = {
   office: "Business Bay, Dubai, UAE",
 }
 
-const NAV_LINKS = ["Home", "Properties", "Projects", "About", "Dubai Guide", "Blog", "Contact"]
+const NAV_LINKS: { label: string; href: string }[] = [
+  { label: "Home", href: "#home" },
+  { label: "Projects", href: "#projects" },
+  { label: "Buy", href: "#properties" },
+  { label: "Rent", href: "#properties" },
+  { label: "About", href: "#about" },
+  { label: "Service Areas", href: "#areas" },
+  { label: "Reviews", href: "#reviews" },
+  { label: "Agent Profile", href: "#about" },
+]
 
 const HERO_STATS = [
   { icon: Award, value: "8+", label: "Years Experience" },
   { icon: HomeIcon, value: "150+", label: "Properties Sold" },
   { icon: TrendingUp, value: "AED 500M+", label: "Sales Volume" },
-  { icon: Star, value: "TOP 5%", label: "Agents in Dubai" },
+  { icon: Star, value: "TOP 5%", label: "Agent in FHI Global" },
 ]
 
 const PROPERTIES = [
@@ -110,6 +120,9 @@ const TESTIMONIALS = [
   { quote: "From viewing to handover, everything was smooth and transparent. He made our Dubai investment effortless.", name: "Michael T.", where: "London, UK" },
 ]
 
+const ABOUT_TEXT =
+    "With years of experience in Dubai's dynamic real estate market, I help clients buy, sell, and invest with confidence. My focus is on understanding each client's goals first — whether that's a family home in a quiet community, a high-yield off-plan investment, or a waterfront residence with iconic views. I work closely with Dubai's most trusted developers and keep a close eye on market movements, so my clients always act on current, reliable information. From the first viewing to final handover, I handle the details — negotiations, paperwork, and everything in between — so the journey stays simple and transparent. With years of experience in Dubai's dynamic real estate market, I help clients buy, sell, and invest with confidence. My focus is on understanding each client's goals first — whether that's a family home in a quiet community, a high-yield off-plan investment, or a waterfront residence with iconic views. I work closely with Dubai's most trusted developers and keep a close eye on market movements, so my clients always act on current, reliable information. From the first viewing to final handover, I handle the details — negotiations, paperwork, and everything in between — so the journey stays simple and transparent."
+
 const script = { fontFamily: "'Snell Roundhand', 'Segoe Script', 'Brush Script MT', cursive" }
 
 function Eyebrow({ children, center }: { children: React.ReactNode; center?: boolean }) {
@@ -146,6 +159,24 @@ export function SampleSite() {
   // sliding back to the start after the last position.
   const positions = Math.max(1, TESTIMONIALS.length - 2)
   const [reviewIdx, setReviewIdx] = useState(0)
+  // About column: collapsed shows a clamped bio + credentials/stats; expanded
+  // hides that group and lets the full bio scroll — never taller than the photo.
+  const [aboutExpanded, setAboutExpanded] = useState(false)
+  // The clamp is measured, not fixed: the bio fills whatever space remains
+  // above the pinned credentials/stats group, clamped to whole lines.
+  const BIO_LINE_H = 23.5 // 14.5px × leading-relaxed (1.625)
+  const [bioEl, setBioEl] = useState<HTMLDivElement | null>(null)
+  const [bioLines, setBioLines] = useState(3)
+  useEffect(() => {
+    if (!bioEl) return
+    const ro = new ResizeObserver(() => {
+      // +6px tolerance: a line that ALMOST fits still counts, so the slack
+      // under the last line stays smaller than a full row.
+      if (bioEl.clientHeight > 0) setBioLines(Math.max(2, Math.floor((bioEl.clientHeight + 6) / BIO_LINE_H)))
+    })
+    ro.observe(bioEl)
+    return () => ro.disconnect()
+  }, [bioEl])
   useEffect(() => {
     const id = setInterval(() => setReviewIdx((i) => (i + 1) % positions), 3500)
     return () => clearInterval(id)
@@ -154,42 +185,47 @@ export function SampleSite() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: IVORY }}>
       {/* ══ NAVBAR ══════════════════════════════════════════════════════════ */}
-      <header className="sticky top-0 z-50" style={{ backgroundColor: INK }}>
+      <header className="sticky top-0 z-50" style={{ backgroundColor: "#001f3f" }}>
         <div className="mx-auto flex max-w-[1400px] items-center gap-8 px-5 py-4 sm:px-8">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center border" style={{ borderColor: GOLD }}>
-              <Building2 className="h-5 w-5" style={{ color: GOLD }} />
-            </span>
-            <span>
-              <span className="block text-[15px] font-bold uppercase tracking-[0.14em] text-white">{AGENT.name}</span>
-              <span className="block text-[9px] font-semibold uppercase tracking-[0.4em]" style={{ color: GOLD }}>
-                Real Estate
-              </span>
-            </span>
-          </div>
+          <Link href="/" className="flex items-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/FHI_Branding_White.png" alt="FHI Global" className="h-10 w-auto" />
+          </Link>
           <nav className="ml-auto hidden items-center gap-7 lg:flex">
-            {NAV_LINKS.map((label, i) => (
-              <span
+            {NAV_LINKS.map(({ label, href }, i) => (
+              <a
                 key={label}
-                className={`cursor-pointer text-[13.5px] font-semibold ${i === 0 ? "" : "text-white/75 hover:text-white"} transition-colors`}
-                style={i === 0 ? { color: GOLD, borderBottom: `2px solid ${GOLD}`, paddingBottom: 2 } : undefined}
+                href={href}
+                className={`relative cursor-pointer text-[13.5px] font-semibold transition-colors ${
+                  i === 0 ? "" : "text-white/75 hover:text-white"
+                }`}
+                style={i === 0 ? { color: GOLD } : undefined}
               >
                 {label}
-              </span>
+                {/* Absolute underline: the active label keeps the exact same
+                    baseline as its siblings instead of lifting. */}
+                {i === 0 && (
+                  <span
+                    className="absolute -bottom-1.5 left-0 right-0 h-[2px]"
+                    style={{ backgroundColor: GOLD }}
+                    aria-hidden
+                  />
+                )}
+              </a>
             ))}
           </nav>
           <a
-            href={`mailto:${AGENT.email}`}
+            href="#contact"
             className="hidden items-center gap-2 px-5 py-2.5 text-[13px] font-bold sm:inline-flex"
             style={{ backgroundColor: GOLD_SOFT, color: INK }}
           >
-            <CalendarCheck className="h-4 w-4" /> Book a Consultation
+            <Mail className="h-4 w-4" /> Get in Touch
           </a>
         </div>
       </header>
 
       {/* ══ HERO ════════════════════════════════════════════════════════════ */}
-      <section className="relative overflow-hidden" style={{ backgroundColor: INK }}>
+      <section id="home" className="relative overflow-hidden" style={{ backgroundColor: INK }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={IMG.hero} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-center" />
         <div className="relative mx-auto max-w-[1400px] px-5 sm:px-8">
@@ -295,50 +331,103 @@ export function SampleSite() {
             </p>
           </div>
 
-          {/* Copy + credentials */}
-          <div>
+          {/* Copy + credentials — capped at the portrait's height (420px).
+              Collapsed: clamped bio + the credentials/stats group.
+              Expanded: the group hides and the full bio scrolls instead. */}
+          <div className="flex flex-col lg:h-[420px] lg:overflow-hidden">
             <Eyebrow>About me</Eyebrow>
-            <h2 className="mt-3 font-serif text-3xl font-bold tracking-tight sm:text-4xl" style={{ color: NAVY }}>
+            <h2 className="mt-2 font-serif text-3xl font-bold tracking-tight" style={{ color: NAVY }}>
               Dedicated to Delivering
               <br />
               Exceptional Results
             </h2>
-            <p className="mt-4 max-w-lg text-[14.5px] leading-relaxed text-[#3d4451]">
-              With years of experience in Dubai&apos;s dynamic real estate market, I help clients buy, sell, and invest with confidence.
-            </p>
-            <div className="mt-7 grid max-w-lg grid-cols-1 gap-x-10 gap-y-5 sm:grid-cols-2">
-              {[
-                { icon: Check, label: "RERA Licensed Broker", value: `BRN: ${AGENT.brn}` },
-                { icon: Check, label: "Brokerage", value: "Filipino Homes Dubai" },
-                { icon: Check, label: "Office Registration", value: "ORN: 98765" },
-              ].map(({ icon: Icon, label, value }) => (
-                <div key={label} className="flex items-start gap-3">
-                  <Icon className="mt-0.5 h-4 w-4 shrink-0" style={{ color: GOLD }} />
-                  <span>
-                    <span className="block text-[12px] font-bold" style={{ color: NAVY }}>{label}</span>
-                    <span className="block text-[12px] leading-relaxed text-[#6b7280]">{value}</span>
-                  </span>
+
+            {aboutExpanded ? (
+              <>
+                <div className="mt-4 min-h-0 max-w-lg flex-1 overflow-y-auto pr-2">
+                  <p className="whitespace-pre-line text-justify text-[14.5px] leading-relaxed text-[#3d4451]">{ABOUT_TEXT}</p>
                 </div>
-              ))}
-            </div>
-            <div className="mt-8 max-w-lg border-t border-[#eceadf]" />
-            <div className="mt-6 flex flex-wrap items-center gap-x-10 gap-y-4">
-              {[
-                { icon: Eye, value: "12.5K", label: "Views" },
-                { icon: HomeIcon, value: "24", label: "Listings" },
-                { icon: Star, value: "4.9/5", label: "Rating" },
-              ].map(({ icon: Icon, value, label }) => (
-                <div key={label} className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: "#faf5e8", color: GOLD }}>
-                    <Icon className="h-4 w-4" strokeWidth={1.8} />
-                  </span>
-                  <span>
-                    <span className="block text-[18px] font-bold leading-tight" style={{ color: NAVY }}>{value}</span>
-                    <span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-[#9aa0aa]">{label}</span>
-                  </span>
+                <div className="mt-2 flex max-w-lg justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setAboutExpanded(false)}
+                    className="text-[13px] font-bold hover:underline"
+                    style={{ color: GOLD }}
+                  >
+                    Show less
+                  </button>
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <>
+                {/* Fills the space above the pinned group; the clamp is
+                    measured from the container height. "Show more" overlays
+                    the end of the last visible line. */}
+                <div ref={setBioEl} className="relative mt-3 min-h-0 max-w-lg flex-1 overflow-hidden">
+                  <p
+                    className="text-justify text-[14.5px] leading-relaxed text-[#3d4451]"
+                    style={{
+                      display: "-webkit-box",
+                      WebkitBoxOrient: "vertical",
+                      WebkitLineClamp: bioLines,
+                      overflow: "hidden",
+                    }}
+                  >
+                    {ABOUT_TEXT}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setAboutExpanded(true)}
+                    className="absolute right-0 pl-10 text-[13px] font-bold hover:underline"
+                    style={{
+                      top: `${(bioLines - 1) * BIO_LINE_H}px`,
+                      lineHeight: `${BIO_LINE_H}px`,
+                      color: GOLD,
+                      background: "linear-gradient(90deg, rgba(255,255,255,0), #ffffff 32%)",
+                    }}
+                  >
+                    Show more
+                  </button>
+                </div>
+
+                {/* Credentials + stats — one group pinned to the photo's bottom edge; hidden while expanded */}
+                <div className="mt-auto pt-2">
+                  <div className="grid max-w-lg grid-cols-1 gap-x-10 gap-y-3 sm:grid-cols-2">
+                    {[
+                      { icon: Check, label: "RERA Licensed Broker", value: `BRN: ${AGENT.brn}` },
+                      { icon: Check, label: "Brokerage", value: "Filipino Homes Dubai" },
+                      { icon: Check, label: "Office Registration", value: "ORN: 98765" },
+                    ].map(({ icon: Icon, label, value }) => (
+                      <div key={label} className="flex items-start gap-3">
+                        <Icon className="mt-0.5 h-4 w-4 shrink-0" style={{ color: GOLD }} />
+                        <span>
+                          <span className="block text-[12px] font-bold" style={{ color: NAVY }}>{label}</span>
+                          <span className="block text-[12px] leading-relaxed text-[#6b7280]">{value}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 max-w-lg border-t border-[#eceadf]" />
+                  <div className="mt-3 flex flex-wrap items-center gap-x-10 gap-y-4">
+                    {[
+                      { icon: Eye, value: "12.5K", label: "Views" },
+                      { icon: HomeIcon, value: "24", label: "Listings" },
+                      { icon: Star, value: "4.9/5", label: "Rating" },
+                    ].map(({ icon: Icon, value, label }) => (
+                      <div key={label} className="flex items-center gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: "#faf5e8", color: GOLD }}>
+                          <Icon className="h-4 w-4" strokeWidth={1.8} />
+                        </span>
+                        <span>
+                          <span className="block text-[18px] font-bold leading-tight" style={{ color: NAVY }}>{value}</span>
+                          <span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-[#9aa0aa]">{label}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* QR + socials */}
@@ -369,7 +458,7 @@ export function SampleSite() {
       </section>
 
       {/* ══ FEATURED PROJECTS ═══════════════════════════════════════════════ */}
-      <section className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
+      <section id="projects" className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="font-serif text-3xl font-bold tracking-tight" style={{ color: NAVY }}>
             Featured Projects
@@ -422,24 +511,11 @@ export function SampleSite() {
       <section id="properties" className="mx-auto max-w-[1400px] px-5 pb-16 sm:px-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="font-serif text-3xl font-bold tracking-tight" style={{ color: NAVY }}>
-            Featured Properties
+            Featured Listings
           </h2>
           <span className="inline-flex cursor-pointer items-center gap-1.5 text-[13px] font-bold" style={{ color: NAVY }}>
             View All Properties <ArrowRight className="h-4 w-4" style={{ color: GOLD }} />
           </span>
-        </div>
-        <div className="mt-5 flex flex-wrap gap-2">
-          {["All", "For Sale", "For Rent", "Off Plan", "Commercial"].map((chip, i) => (
-            <span
-              key={chip}
-              className={`cursor-pointer rounded-full px-4 py-1.5 text-[12px] font-bold ${
-                i === 0 ? "text-white" : "border border-[#d8d3c6] text-[#5b6472] hover:border-[#9aa0aa]"
-              }`}
-              style={i === 0 ? { backgroundColor: NAVY } : undefined}
-            >
-              {chip}
-            </span>
-          ))}
         </div>
         <div className="mt-7 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {PROPERTIES.map((p) => (
@@ -492,10 +568,10 @@ export function SampleSite() {
       </section>
 
       {/* ══ AREAS — hover-to-expand accordion strip ═════════════════════════ */}
-      <section className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
+      <section id="areas" className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="font-serif text-2xl font-bold tracking-tight" style={{ color: NAVY }}>
-            Areas I Specialize In
+            Service Areas
           </h2>
           <span className="inline-flex cursor-pointer items-center gap-1.5 text-[13px] font-bold" style={{ color: NAVY }}>
             View All Areas <ArrowRight className="h-4 w-4" style={{ color: GOLD }} />
@@ -539,7 +615,7 @@ export function SampleSite() {
       </section>
 
       {/* ══ TESTIMONIALS ════════════════════════════════════════════════════ */}
-      <section className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
+      <section id="reviews" className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
         <Eyebrow center>Client Testimonials</Eyebrow>
         <h2 className="mt-3 text-center font-serif text-3xl font-bold tracking-tight sm:text-4xl" style={{ color: NAVY }}>
           What My Clients Say
@@ -588,7 +664,7 @@ export function SampleSite() {
       </section>
 
       {/* ══ CLOSING CTA ═════════════════════════════════════════════════════ */}
-      <section className="relative overflow-hidden" style={{ backgroundColor: INK }}>
+      <section id="contact" className="relative overflow-hidden" style={{ backgroundColor: INK }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={IMG.skylineA} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover opacity-25" />
         <div className="relative mx-auto grid max-w-[1400px] items-center gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[1.2fr_1fr]">
