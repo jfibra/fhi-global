@@ -6,7 +6,7 @@ import {
   getDashboardRouteByRole,
   isInactiveProfile,
   isProfileMissingMinimumFields,
-  isUploadedProfilePhoto,
+  hasProfilePhoto,
 } from "@/lib/auth"
 import { CompleteProfileForm, type CompleteProfileInitial } from "./complete-profile-form"
 
@@ -66,9 +66,11 @@ export default async function CompleteProfilePage() {
       initial={initial}
       userId={user.id}
       displayName={str(profile.fullname) || [str(profile.fname), str(profile.lname)].filter(Boolean).join(" ")}
-      // Deliberately NOT the Google avatar (isUploadedProfilePhoto): the point
-      // of the requirement is a photo the user uploads themselves.
-      initialAvatarUrl={isUploadedProfilePhoto(profile.profile_url) ? str(profile.profile_url) : ""}
+      // Any existing photo counts — including the Google avatar OAuth copies onto
+      // the profile (hasProfilePhoto). A Google-login user already has a picture,
+      // so the form shows it as their current photo instead of prompting for an
+      // upload — matching the dashboard photo gate (which also accepts it).
+      initialAvatarUrl={hasProfilePhoto(profile.profile_url) ? str(profile.profile_url) : ""}
     />
   )
 }
