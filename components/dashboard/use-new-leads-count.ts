@@ -37,7 +37,15 @@ export function useNewLeadsCount(enabled: boolean, refreshKey: string): number {
             .eq("status", "new")
             .is("deleted_at", null))
         }
-        if (!cancelled && !error) setCount(fresh ?? 0)
+        // Unread replies to composed mail count too; errors (pre-migration
+        // 033/034) just contribute 0.
+        const { count: replies, error: repliesError } = await supabase
+          .from("inquiry_emails")
+          .select("id", { count: "exact", head: true })
+          .eq("direction", "inbound")
+          .is("inquiry_id", null)
+          .is("read_at", null)
+        if (!cancelled && !error) setCount((fresh ?? 0) + (repliesError ? 0 : replies ?? 0))
       } catch {
         // Network hiccup — keep the last known count.
       }

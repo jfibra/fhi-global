@@ -12,8 +12,12 @@ import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 export const runtime = "nodejs"
 
 const FULL_COLUMNS =
-  "id, name, email, phone_country_code, phone, looking_for, property_category, project_id, project_name, developer_name, status, source, ip_address, user_agent, created_at, contacted_at, read_at, updated_at, deleted_at"
-const EMAIL_COLUMNS =
+  "id, name, email, phone_country_code, phone, looking_for, property_category, project_id, project_name, developer_name, status, source, ip_address, user_agent, created_at, contacted_at, read_at, starred_at, updated_at, deleted_at"
+// Typed as plain string so the two fallback selects unify to one row shape.
+const EMAIL_COLUMNS: string =
+  "id, inquiry_id, to_email, to_name, subject, body_text, sent_by, sent_by_name, status, error, direction, from_email, from_name, created_at"
+// Pre-migration-033 shape (no direction/from columns).
+const EMAIL_COLUMNS_LEGACY: string =
   "id, inquiry_id, to_email, to_name, subject, body_text, sent_by, sent_by_name, status, error, created_at"
 const STATUSES = new Set(["new", "contacted", "closed"])
 
@@ -27,29 +31,39 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
   const { id } = await context.params
 
   const admin = createAdminSupabase()
-  let result = await admin.from("inquiries").select(FULL_COLUMNS).eq("id", id).maybeSingle()
-  // 42703 = read_at doesn't exist yet (migration 031 not applied).
-  if (result.error?.code === "42703") {
-    result = await admin
-      .from("inquiries")
-      .select(FULL_COLUMNS.replace(", read_at", ""))
-      .eq("id", id)
-      .maybeSingle()
+  // 42703 = a column doesn't exist yet — walk down until the shape matches
+  // what migrations 031/032 have actually created.
+  const tiers = [
+    FULL_COLUMNS,
+    FULL_COLUMNS.replace(", starred_at", ""),
+    FULL_COLUMNS.replace(", read_at", "").replace(", starred_at", ""),
+  ]
+  let result = await admin.from("inquiries").select(tiers[0]).eq("id", id).maybeSingle()
+  for (let tier = 1; tier < tiers.length && result.error?.code === "42703"; tier++) {
+    result = await admin.from("inquiries").select(tiers[tier]).eq("id", id).maybeSingle()
   }
   const { data, error } = result
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: "Lead not found." }, { status: 404 })
 
-  // The Emails page shows the lead as a conversation — include every email
-  // sent from the dashboard on this thread, oldest first.
-  const { data: emails } = await admin
+  // The Emails page shows the lead as a conversation — every email on this
+  // thread, ours and theirs, oldest first.
+  let emailsRes = await admin
     .from("inquiry_emails")
     .select(EMAIL_COLUMNS)
     .eq("inquiry_id", id)
     .order("created_at", { ascending: true })
+  // 42703: migration 033 not applied yet — only outbound columns exist.
+  if (emailsRes.error?.code === "42703") {
+    emailsRes = await admin
+      .from("inquiry_emails")
+      .select(EMAIL_COLUMNS_LEGACY)
+      .eq("inquiry_id", id)
+      .order("created_at", { ascending: true })
+  }
 
-  return NextResponse.json({ inquiry: data, emails: emails ?? [] })
+  return NextResponse.json({ inquiry: data, emails: emailsRes.data ?? [] })
 }
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -57,24 +71,26 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   if (!guard.ok) return guard.response
   const { id } = await context.params
 
-  let body: { status?: string; read?: boolean }
+  let body: { status?: string; read?: boolean; starred?: boolean }
   try {
-    body = (await req.json()) as { status?: string; read?: boolean }
+    body = (await req.json()) as { status?: string; read?: boolean; starred?: boolean }
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
   }
 
   const admin = createAdminSupabase()
 
-  // Read/unread is inbox state, not a business event — no status change, no
-  // audit row. Opening an email fires this on every click.
-  if (typeof body.read === "boolean" && body.status === undefined) {
-    const { error } = await admin
-      .from("inquiries")
-      .update({ read_at: body.read ? new Date().toISOString() : null })
-      .eq("id", id)
-    // 42703: migration 031 not applied — read state is a no-op until then.
-    if (error && error.code !== "42703") {
+  // Read/unread and starred are inbox state, not business events — no status
+  // change, no audit row. Opening an email fires the read one on every click.
+  if ((typeof body.read === "boolean" || typeof body.starred === "boolean") && body.status === undefined) {
+    const now = new Date().toISOString()
+    const patch: Record<string, string | null> = {}
+    if (typeof body.read === "boolean") patch.read_at = body.read ? now : null
+    if (typeof body.starred === "boolean") patch.starred_at = body.starred ? now : null
+    const { error } = await admin.from("inquiries").update(patch).eq("id", id)
+    // Migration 031/032 not applied — inbox state is a no-op until then.
+    // 42703 = missing column in a filter; PGRST204 = missing in the payload.
+    if (error && error.code !== "42703" && error.code !== "PGRST204") {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
     return NextResponse.json({ ok: true })

@@ -25,11 +25,16 @@ export type Inquiry = {
   created_at: string
   contacted_at: string | null
   read_at?: string | null
+  starred_at?: string | null
   updated_at?: string
   deleted_at: string | null
 }
 
-/** One email sent from the dashboard — a reply (inquiry_id set) or a compose. */
+/**
+ * One email on a thread. Outbound = sent from the dashboard (a reply or a
+ * compose); inbound = a lead's reply pulled from the company mailbox by the
+ * IMAP sync (status "received").
+ */
 export type SentEmail = {
   id: string
   inquiry_id: string | null
@@ -39,12 +44,27 @@ export type SentEmail = {
   body_text: string
   sent_by: string | null
   sent_by_name: string | null
-  status: "sent" | "failed"
+  status: "sent" | "failed" | "received"
   error: string | null
+  direction?: "outbound" | "inbound"
+  from_email?: string | null
+  from_name?: string | null
+  /** Inbound only: NULL until its correspondence is opened. */
+  read_at?: string | null
   created_at: string
 }
 
-export type InquiriesSummary = { total: number; new: number; unread?: number; sent?: number }
+export type InquiriesSummary = {
+  total: number
+  new: number
+  unread?: number
+  starred?: number
+  sent?: number
+  /** Unread replies to composed mail — the attention badge on Sent. */
+  sentUnread?: number
+  /** Per-category counts (not archived) for the mailbox rail. */
+  categories?: Record<InquiryCategory, number>
+}
 
 export type InquiriesQuery = {
   page: number
@@ -56,6 +76,8 @@ export type InquiriesQuery = {
   /** Archived folder — only soft-deleted rows. */
   archivedOnly?: boolean
   unreadOnly?: boolean
+  /** Starred folder — only flagged rows. */
+  starredOnly?: boolean
 }
 
 export type InquiriesResult = {
@@ -93,6 +115,7 @@ export async function fetchInquiries(query: InquiriesQuery): Promise<InquiriesRe
   if (query.showDeleted) sp.set("showDeleted", "true")
   if (query.archivedOnly) sp.set("archived", "only")
   if (query.unreadOnly) sp.set("unread", "true")
+  if (query.starredOnly) sp.set("starred", "true")
 
   try {
     const res = await fetch(`/api/admin/inquiries?${sp.toString()}`, { cache: "no-store" })
@@ -129,6 +152,21 @@ export async function setInquiryRead(id: string, read: boolean): Promise<{ error
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ read }),
+    })
+    if (!res.ok) return { error: await readError(res) }
+    return { error: null }
+  } catch (error) {
+    return { error: (error as Error).message }
+  }
+}
+
+/** Star/unstar a conversation — pins it to the Starred folder. */
+export async function setInquiryStarred(id: string, starred: boolean): Promise<{ error: string | null }> {
+  try {
+    const res = await fetch(`/api/admin/inquiries/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ starred }),
     })
     if (!res.ok) return { error: await readError(res) }
     return { error: null }
@@ -178,6 +216,39 @@ export async function sendComposedEmail(input: {
   }
 }
 
+/**
+ * Pull new lead replies from the company mailbox into their threads. A 503
+ * means the server has no IMAP config — treated as "nothing to sync", so the
+ * page works identically with the feature unconfigured.
+ */
+export async function syncInbox(): Promise<{ ingested: number; error: string | null }> {
+  try {
+    const res = await fetch(`/api/admin/emails/sync`, { method: "POST" })
+    if (res.status === 503) return { ingested: 0, error: null }
+    if (!res.ok) return { ingested: 0, error: await readError(res) }
+    const json = (await res.json()) as { ingested?: number }
+    return { ingested: json.ingested ?? 0, error: null }
+  } catch (error) {
+    return { ingested: 0, error: (error as Error).message }
+  }
+}
+
+/** Full correspondence with one address (composed mail + its replies). */
+export async function fetchEmailThread(
+  address: string,
+): Promise<{ rows: SentEmail[]; error: string | null }> {
+  try {
+    const res = await fetch(`/api/admin/emails/thread?address=${encodeURIComponent(address)}`, {
+      cache: "no-store",
+    })
+    if (!res.ok) return { rows: [], error: await readError(res) }
+    const json = (await res.json()) as { rows: SentEmail[] }
+    return { rows: json.rows ?? [], error: null }
+  } catch (error) {
+    return { rows: [], error: (error as Error).message }
+  }
+}
+
 /** Permanently remove a sent-email record (the delivered email is unaffected). */
 export async function deleteSentEmail(id: string): Promise<{ error: string | null }> {
   try {
@@ -194,16 +265,46 @@ export async function fetchSentEmails(query: {
   page: number
   perPage: number
   search?: string
-}): Promise<{ data: SentEmail[]; total: number; error: string | null }> {
+}): Promise<{
+  data: SentEmail[]
+  total: number
+  /** Unread replies per correspondent (lowercased address → count). */
+  unreadByAddress: Record<string, number>
+  error: string | null
+}> {
   const sp = new URLSearchParams({ page: String(query.page), perPage: String(query.perPage) })
   if (query.search) sp.set("search", query.search)
   try {
     const res = await fetch(`/api/admin/emails?${sp.toString()}`, { cache: "no-store" })
-    if (!res.ok) return { data: [], total: 0, error: await readError(res) }
-    const json = (await res.json()) as { rows: SentEmail[]; total: number }
-    return { data: json.rows ?? [], total: json.total ?? 0, error: null }
+    if (!res.ok) return { data: [], total: 0, unreadByAddress: {}, error: await readError(res) }
+    const json = (await res.json()) as {
+      rows: SentEmail[]
+      total: number
+      unreadByAddress?: Record<string, number>
+    }
+    return {
+      data: json.rows ?? [],
+      total: json.total ?? 0,
+      unreadByAddress: json.unreadByAddress ?? {},
+      error: null,
+    }
   } catch (error) {
-    return { data: [], total: 0, error: (error as Error).message }
+    return { data: [], total: 0, unreadByAddress: {}, error: (error as Error).message }
+  }
+}
+
+/** Opening a correspondence marks its replies read. */
+export async function markEmailThreadRead(address: string): Promise<{ error: string | null }> {
+  try {
+    const res = await fetch(`/api/admin/emails/thread`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address }),
+    })
+    if (!res.ok) return { error: await readError(res) }
+    return { error: null }
+  } catch (error) {
+    return { error: (error as Error).message }
   }
 }
 

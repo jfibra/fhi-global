@@ -15,30 +15,35 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   Archive, ArrowLeft, Building2, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight,
   Clock, Globe, Inbox, Loader2, Mail, MailOpen, MessageCircle, MonitorSmartphone,
-  PenSquare, Phone, PhoneCall, RefreshCw, RotateCcw, Search, Send, Trash2, Undo2, X,
+  PenSquare, Phone, PhoneCall, RefreshCw, RotateCcw, Search, Send, Star, Tag, Trash2, Undo2, X,
 } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
 import { formatDateTime, relativeTime } from "@/lib/utils"
 import {
   type Inquiry,
   type InquiriesSummary,
+  type InquiryCategory,
   type InquiryStatus,
   type SentEmail,
+  fetchEmailThread,
   fetchInquiries,
   fetchInquiry,
   fetchSentEmails,
   deleteSentEmail,
+  markEmailThreadRead,
   sendComposedEmail,
   sendInquiryReply,
   setInquiryDeleted,
   setInquiryRead,
+  setInquiryStarred,
   setInquiryStatus,
+  syncInbox,
   LOOKING_FOR_LABELS,
   CATEGORY_LABELS,
 } from "@/lib/inquiries-service"
 
 const PER_PAGE = 25
-type Folder = "inbox" | "sent" | "archived"
+type Folder = "inbox" | "starred" | "sent" | "archived"
 
 /** Gmail-style time: clock time today, "Aug 5" this year, date otherwise. */
 function mailTime(iso: string): string {
@@ -107,6 +112,8 @@ export function LeadsClient() {
   // ── list state ──────────────────────────────────────────────────────────
   const [rows, setRows] = useState<Inquiry[]>([])
   const [sentRows, setSentRows] = useState<SentEmail[]>([])
+  // Unread replies per correspondent (lowercased address → count).
+  const [sentUnread, setSentUnread] = useState<Record<string, number>>({})
   const [total, setTotal] = useState(0)
   const [summary, setSummary] = useState<InquiriesSummary | null>(null)
   const [page, setPage] = useState(1)
@@ -120,11 +127,14 @@ export function LeadsClient() {
   // ── reading pane state ──────────────────────────────────────────────────
   const [thread, setThread] = useState<{ inquiry: Inquiry; emails: SentEmail[] } | null>(null)
   const [threadLoading, setThreadLoading] = useState(false)
+  // Bumped when the inbox sync lands new replies, so an open thread refetches.
+  const [threadVersion, setThreadVersion] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
-  // ── compose window ──────────────────────────────────────────────────────
-  const [composeOpen, setComposeOpen] = useState(false)
+  // ── compose window (null = closed; fields prefill a reply) ───────────────
+  const [compose, setCompose] = useState<{ to?: string; toName?: string; subject?: string } | null>(null)
 
   // ── row selection (inbox/archived) — Gmail checkboxes for bulk actions ───
   // Always a subset of the current page: load() resets it on every fetch, so
@@ -177,7 +187,7 @@ export function LeadsClient() {
     setSelected(new Set())
     try {
       if (folder === "sent") {
-        const { data, total: t, error } = await fetchSentEmails({ page, perPage: PER_PAGE, search })
+        const { data, total: t, unreadByAddress, error } = await fetchSentEmails({ page, perPage: PER_PAGE, search })
         if (seq !== loadSeq.current) return
         if (error) {
           // A snapshot on screen beats an error page — keep it, note the failure.
@@ -186,6 +196,7 @@ export function LeadsClient() {
           return
         }
         setSentRows(data)
+        setSentUnread(unreadByAddress)
         setTotal(t)
         cacheRef.current.set(cacheKey, { sent: data, total: t })
         // Keep the Sent tab counter honest while browsing this folder.
@@ -196,6 +207,7 @@ export function LeadsClient() {
           status: status || undefined,
           category: category || undefined,
           archivedOnly: folder === "archived",
+          starredOnly: folder === "starred",
         })
         if (seq !== loadSeq.current) return
         if (error) {
@@ -224,6 +236,37 @@ export function LeadsClient() {
     const t = setTimeout(() => { setSearch(searchInput); setPage(1) }, 400)
     return () => clearTimeout(t)
   }, [searchInput])
+
+  // Pull lead replies from the company mailbox once per visit. Silent when
+  // nothing is new (or IMAP isn't configured); on fresh replies the list and
+  // any open thread refetch so the conversation shows both sides.
+  const syncedRef = useRef(false)
+  useEffect(() => {
+    if (syncedRef.current) return
+    syncedRef.current = true
+    const t = setTimeout(async () => {
+      const { ingested } = await syncInbox()
+      if (ingested > 0) {
+        setNotice(`${ingested} new ${ingested === 1 ? "reply" : "replies"} from your mailbox.`)
+        setThreadVersion((v) => v + 1)
+        void load()
+      }
+    }, 100)
+    return () => clearTimeout(t)
+  }, [load])
+
+  /** Manual refresh = check the mailbox first, then reload the list. */
+  const handleRefresh = async () => {
+    setSyncing(true)
+    const { ingested, error } = await syncInbox()
+    setSyncing(false)
+    if (error) setNotice(error)
+    if (ingested > 0) {
+      setNotice(`${ingested} new ${ingested === 1 ? "reply" : "replies"} from your mailbox.`)
+      setThreadVersion((v) => v + 1)
+    }
+    void load()
+  }
 
   // Update one conversation everywhere it appears: the visible list, the open
   // thread, and the folder snapshots — otherwise the instant repaint on the
@@ -262,7 +305,7 @@ export function LeadsClient() {
       }
     }, 0)
     return () => { cancelled = true; clearTimeout(t) }
-  }, [openId, folder, patchRow])
+  }, [openId, folder, patchRow, threadVersion])
 
   // Toast auto-dismiss.
   useEffect(() => {
@@ -278,6 +321,33 @@ export function LeadsClient() {
     patchRow(lead.id, { read_at: null })
     setSummary((s) => (s ? { ...s, unread: (s.unread ?? 0) + 1 } : s))
     setParams({ open: null })
+  }
+
+  /** A correspondence was opened — clear its unread badge everywhere. */
+  const onCorrespondenceRead = useCallback((address: string, count: number) => {
+    setSentUnread((m) => {
+      if (!(address in m)) return m
+      const next = { ...m }
+      delete next[address]
+      return next
+    })
+    setSummary((s) => (s ? { ...s, sentUnread: Math.max(0, (s.sentUnread ?? 0) - count) } : s))
+  }, [])
+
+  /** Optimistic star/unstar — flips instantly, rolls back if the save fails. */
+  const toggleStar = async (row: Inquiry) => {
+    const starring = !row.starred_at
+    patchRow(row.id, { starred_at: starring ? new Date().toISOString() : null })
+    setSummary((s) => (s ? { ...s, starred: Math.max(0, (s.starred ?? 0) + (starring ? 1 : -1)) } : s))
+    const { error } = await setInquiryStarred(row.id, starring)
+    if (error) {
+      patchRow(row.id, { starred_at: row.starred_at ?? null })
+      setSummary((s) => (s ? { ...s, starred: Math.max(0, (s.starred ?? 0) + (starring ? -1 : 1)) } : s))
+      setNotice(error)
+      return
+    }
+    // Unstarring while inside Starred removes the row from this folder.
+    if (folder === "starred" && !starring) void load()
   }
 
   const changeStatus = async (lead: Inquiry, next: InquiryStatus, message: string) => {
@@ -368,11 +438,25 @@ export function LeadsClient() {
   const paneOpen = folder === "sent" ? Boolean(selectedSent) : Boolean(openId)
 
   // ── render ──────────────────────────────────────────────────────────────
-  const tabs: Array<{ key: Folder; label: string; icon: typeof Inbox; count?: number }> = [
-    { key: "inbox", label: "Inbox", icon: Inbox, count: unread },
-    { key: "sent", label: "Sent", icon: Send, count: summary?.sent ?? 0 },
+  // `urgent` renders as the gold attention badge (unread things); `count` is
+  // the quiet gray total shown when nothing needs attention.
+  const folderItems: Array<{ key: Folder; label: string; icon: typeof Inbox; count?: number; urgent?: number }> = [
+    { key: "inbox", label: "Inbox", icon: Inbox, urgent: unread },
+    { key: "starred", label: "Starred", icon: Star, count: summary?.starred ?? 0 },
+    { key: "sent", label: "Sent", icon: Send, count: summary?.sent ?? 0, urgent: summary?.sentUnread ?? 0 },
     { key: "archived", label: "Archived", icon: Archive },
   ]
+  const categoryItems: Array<{ key: InquiryCategory; label: string; count: number }> = (
+    ["off_plan", "ready", "rent"] as InquiryCategory[]
+  ).map((key) => ({ key, label: CATEGORY_LABELS[key], count: summary?.categories?.[key] ?? 0 }))
+
+  // Rail categories filter the inquiry folders; from Sent they jump to Inbox.
+  const pickCategory = (key: InquiryCategory) => {
+    const next = category === key ? "" : key
+    setCategory(next)
+    setPage(1)
+    if (folder === "sent") setParams({ folder: null, open: null })
+  }
 
   return (
     <div className="space-y-4">
@@ -386,40 +470,11 @@ export function LeadsClient() {
         <div className="flex items-center gap-2 flex-wrap px-4 py-3 border-b border-[#f0f0f0]">
           <button
             type="button"
-            onClick={() => setComposeOpen(true)}
+            onClick={() => setCompose({})}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#d6b357] text-[#1a1408] text-sm font-bold hover:brightness-95 transition-all shadow-sm"
           >
             <PenSquare className="w-4 h-4" /> Compose
           </button>
-
-          <div className="flex items-center border border-[#e5e8ec] bg-white p-1">
-            {tabs.map((t) => {
-              const active = folder === t.key
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => openFolder(t.key)}
-                  className={`inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition-all ${
-                    active ? "bg-[#001f3f] text-white" : "text-[#5f6368] hover:text-[#001f3f]"
-                  }`}
-                >
-                  <t.icon className="w-3.5 h-3.5" /> {t.label}
-                  {(t.count ?? 0) > 0 && (
-                    <span className={`min-w-[18px] h-[18px] px-1 text-[10px] font-bold flex items-center justify-center ${
-                      t.key === "inbox"
-                        ? "bg-[#d6b357] text-[#1a1408]"
-                        : active
-                          ? "bg-white/20 text-white"
-                          : "bg-[#e8eaed] text-[#5f6368]"
-                    }`}>
-                      {t.count}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
 
           <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
@@ -443,10 +498,11 @@ export function LeadsClient() {
                 <option value="contacted">Contacted</option>
                 <option value="closed">Closed</option>
               </select>
+              {/* Desktop picks categories from the rail; this is the mobile fallback. */}
               <select
                 value={category}
                 onChange={(e) => { setCategory(e.target.value); setPage(1) }}
-                className="px-3.5 py-2.5 border border-[#e5e8ec] bg-white text-xs font-semibold text-[#374151] focus:outline-none focus:border-[#001f3f]"
+                className="md:hidden px-3.5 py-2.5 border border-[#e5e8ec] bg-white text-xs font-semibold text-[#374151] focus:outline-none focus:border-[#001f3f]"
               >
                 <option value="">All categories</option>
                 <option value="off_plan">Off Plan</option>
@@ -456,15 +512,88 @@ export function LeadsClient() {
             </>
           )}
 
-          <IconBtn title="Refresh" onClick={() => void load()}>
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          <IconBtn title="Check for new mail" onClick={() => void handleRefresh()}>
+            <RefreshCw className={`w-4 h-4 ${loading || syncing ? "animate-spin" : ""}`} />
           </IconBtn>
         </div>
 
         {/* Panes */}
         <div className="flex flex-1 min-h-0">
+          {/* Mailbox rail — folders + categories (desktop) */}
+          <aside className="hidden md:flex flex-col w-[190px] shrink-0 border-r border-[#f0f0f0] py-3 overflow-y-auto">
+            <p className="px-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">Mailbox</p>
+            {folderItems.map((f) => {
+              const active = folder === f.key
+              return (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => openFolder(f.key)}
+                  className={`relative w-full flex items-center gap-2.5 px-4 py-2 text-[13px] font-semibold transition-colors ${
+                    active ? "bg-[#faf7ee] text-[#0d1117]" : "text-[#5f6368] hover:bg-[#f5f6f8] hover:text-[#0d1117]"
+                  }`}
+                >
+                  {active && <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#d6b357]" aria-hidden="true" />}
+                  <f.icon className={`w-4 h-4 shrink-0 ${active ? "text-[#b8913f]" : ""}`} />
+                  <span className="flex-1 text-left truncate">{f.label}</span>
+                  {(f.urgent ?? 0) > 0 ? (
+                    <span className="min-w-[18px] h-[18px] px-1 text-[10px] font-bold flex items-center justify-center bg-[#d6b357] text-[#1a1408]">
+                      {f.urgent}
+                    </span>
+                  ) : (f.count ?? 0) > 0 ? (
+                    <span className="text-[11px] font-semibold text-[#9ca3af]">{f.count}</span>
+                  ) : null}
+                </button>
+              )
+            })}
+
+            <p className="px-4 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">Categories</p>
+            {categoryItems.map((c) => {
+              const active = category === c.key
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => pickCategory(c.key)}
+                  title={active ? `Stop filtering by ${c.label}` : `Show only ${c.label} inquiries`}
+                  className={`relative w-full flex items-center gap-2.5 px-4 py-2 text-[13px] font-semibold transition-colors ${
+                    active ? "bg-[#faf7ee] text-[#0d1117]" : "text-[#5f6368] hover:bg-[#f5f6f8] hover:text-[#0d1117]"
+                  }`}
+                >
+                  {active && <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#d6b357]" aria-hidden="true" />}
+                  <Tag className={`w-4 h-4 shrink-0 ${active ? "text-[#b8913f]" : ""}`} />
+                  <span className="flex-1 text-left truncate">{c.label}</span>
+                  {c.count > 0 && <span className="text-[11px] font-semibold text-[#9ca3af]">{c.count}</span>}
+                </button>
+              )
+            })}
+          </aside>
+
           {/* Message list */}
           <div className={`${paneOpen ? "hidden lg:flex" : "flex"} flex-col w-full lg:w-[400px] xl:w-[440px] lg:border-r border-[#f0f0f0] min-h-0`}>
+            {/* Mobile folder strip — the rail is hidden below md */}
+            <div className="md:hidden flex items-center gap-1 px-2 py-2 border-b border-[#f0f0f0] overflow-x-auto">
+              {folderItems.map((f) => {
+                const active = folder === f.key
+                return (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => openFolder(f.key)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+                      active ? "bg-[#001f3f] text-white" : "text-[#5f6368] hover:bg-[#f5f6f8]"
+                    }`}
+                  >
+                    <f.icon className="w-3.5 h-3.5" /> {f.label}
+                    {(f.urgent ?? 0) > 0 && (
+                      <span className="min-w-[16px] h-[16px] px-1 text-[10px] font-bold flex items-center justify-center bg-[#d6b357] text-[#1a1408]">
+                        {f.urgent}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
             {/* Select-all bar — bulk archive/restore/delete for checked rows */}
             {!loading && pageIds.length > 0 && (
               <div className="flex items-center gap-3 px-4 py-2 border-b border-[#f0f0f0] bg-[#fafbfc]">
@@ -479,7 +608,7 @@ export function LeadsClient() {
                 {selected.size > 0 ? (
                   <>
                     <span className="text-xs font-semibold text-[#374151]">{selected.size} selected</span>
-                    {folder === "inbox" ? (
+                    {folder === "inbox" || folder === "starred" ? (
                       <button
                         type="button"
                         onClick={() => void bulkSetDeleted(true)}
@@ -528,6 +657,7 @@ export function LeadsClient() {
                 ) : (
                   sentRows.map((m) => {
                     const active = openId === m.id
+                    const unreadReplies = m.inquiry_id ? 0 : sentUnread[m.to_email.toLowerCase()] ?? 0
                     return (
                       <div
                         key={m.id}
@@ -536,7 +666,7 @@ export function LeadsClient() {
                         onClick={() => setParams({ open: m.id })}
                         onKeyDown={(e) => { if (e.key === "Enter") setParams({ open: m.id }) }}
                         className={`w-full text-left px-4 py-3 border-b border-[#f5f5f5] cursor-pointer transition-colors ${
-                          active ? "bg-[#001f3f]/[0.05]" : "hover:bg-[#f8f9fa]"
+                          active ? "bg-[#001f3f]/[0.05]" : unreadReplies > 0 ? "bg-white hover:bg-[#f8f9fa]" : "hover:bg-[#f8f9fa]"
                         }`}
                       >
                         <div className="flex items-start gap-3">
@@ -550,15 +680,20 @@ export function LeadsClient() {
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <p className="flex-1 min-w-0 text-sm font-semibold text-[#374151] truncate">
+                              <p className={`flex-1 min-w-0 text-sm truncate ${unreadReplies > 0 ? "font-bold text-[#0d1117]" : "font-semibold text-[#374151]"}`}>
                                 To: {m.to_name || m.to_email}
                               </p>
+                              {unreadReplies > 0 && (
+                                <span className="min-w-[18px] h-[18px] px-1 text-[10px] font-bold flex items-center justify-center bg-[#d6b357] text-[#1a1408] shrink-0">
+                                  {unreadReplies}
+                                </span>
+                              )}
                               {m.status === "failed" && (
                                 <span className="px-2 py-0.5 text-[10px] font-semibold bg-rose-50 text-rose-600">Failed</span>
                               )}
-                              <span className="text-[11px] text-[#9ca3af] shrink-0">{mailTime(m.created_at)}</span>
+                              <span className={`text-[11px] shrink-0 ${unreadReplies > 0 ? "font-bold text-[#0d1117]" : "text-[#9ca3af]"}`}>{mailTime(m.created_at)}</span>
                             </div>
-                            <p className="text-[13px] text-[#0d1117] font-medium truncate mt-0.5">{m.subject}</p>
+                            <p className={`text-[13px] truncate mt-0.5 ${unreadReplies > 0 ? "font-bold text-[#0d1117]" : "text-[#0d1117] font-medium"}`}>{m.subject}</p>
                             <p className="text-xs text-[#9ca3af] truncate mt-0.5">{m.body_text}</p>
                           </div>
                         </div>
@@ -568,9 +703,17 @@ export function LeadsClient() {
                 )
               ) : rows.length === 0 ? (
                 <EmptyList
-                  icon={folder === "archived" ? Archive : Inbox}
-                  title={folder === "archived" ? "No archived conversations" : "Inbox zero"}
-                  hint={folder === "archived" ? "Archived leads will appear here." : "Inquiries from the Inquire Now form on project pages will appear here."}
+                  icon={folder === "archived" ? Archive : folder === "starred" ? Star : Inbox}
+                  title={
+                    folder === "archived" ? "No archived conversations"
+                    : folder === "starred" ? "No starred emails"
+                    : "Inbox zero"
+                  }
+                  hint={
+                    folder === "archived" ? "Archived leads will appear here."
+                    : folder === "starred" ? "Click the star on an email to keep it here."
+                    : "Inquiries from the Inquire Now form on project pages will appear here."
+                  }
                 />
               ) : (
                 rows.map((row) => {
@@ -598,6 +741,17 @@ export function LeadsClient() {
                           aria-label={`Select conversation from ${row.name}`}
                           className="w-4 h-4 accent-[#001f3f] cursor-pointer shrink-0"
                         />
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); void toggleStar(row) }}
+                          aria-label={row.starred_at ? `Unstar ${row.name}` : `Star ${row.name}`}
+                          title={row.starred_at ? "Unstar" : "Star"}
+                          className="shrink-0 p-0.5"
+                        >
+                          <Star className={`w-4 h-4 transition-colors ${
+                            row.starred_at ? "fill-[#d6b357] text-[#d6b357]" : "text-[#cdd2d9] hover:text-[#b8913f]"
+                          }`} />
+                        </button>
                         <UserAvatar name={row.name} size={38} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
@@ -648,8 +802,15 @@ export function LeadsClient() {
               selectedSent ? (
                 <SentReader
                   email={selectedSent}
+                  threadVersion={threadVersion}
                   onBack={() => setParams({ open: null })}
                   onOpenLead={(inquiryId) => setParams({ folder: null, open: inquiryId })}
+                  onMarkedRead={onCorrespondenceRead}
+                  onSent={(m) => {
+                    setNotice(`Email sent to ${m.to_email}.`)
+                    setSummary((s) => (s ? { ...s, sent: (s.sent ?? 0) + 1 } : s))
+                    setSentRows((rs) => [m, ...rs])
+                  }}
                 />
               ) : (
                 <EmptyPane />
@@ -664,6 +825,7 @@ export function LeadsClient() {
                   thread={thread}
                   busy={busy}
                   onBack={() => setParams({ open: null })}
+                  onToggleStar={() => void toggleStar(thread.inquiry)}
                   onMarkUnread={() => void markUnread(thread.inquiry)}
                   onStatus={(s, msg) => void changeStatus(thread.inquiry, s, msg)}
                   onArchive={() => void toggleArchive(thread.inquiry)}
@@ -686,13 +848,15 @@ export function LeadsClient() {
         </div>
       </div>
 
-      {composeOpen && (
+      {compose && (
         <ComposeWindow
-          onClose={() => setComposeOpen(false)}
+          initial={compose}
+          onClose={() => setCompose(null)}
           onSent={(email) => {
-            setComposeOpen(false)
+            setCompose(null)
             setNotice(`Email sent to ${email.to_email}.`)
             setSummary((s) => (s ? { ...s, sent: (s.sent ?? 0) + 1 } : s))
+            setThreadVersion((v) => v + 1)
             if (folder === "sent") setSentRows((rs) => [email, ...rs])
           }}
         />
@@ -728,11 +892,12 @@ function EmptyPane() {
 // ─── Reading pane: a lead conversation ────────────────────────────────────────
 
 function ThreadReader({
-  thread, busy, onBack, onMarkUnread, onStatus, onArchive, onReplied, onNotice,
+  thread, busy, onBack, onToggleStar, onMarkUnread, onStatus, onArchive, onReplied, onNotice,
 }: {
   thread: { inquiry: Inquiry; emails: SentEmail[] }
   busy: boolean
   onBack: () => void
+  onToggleStar: () => void
   onMarkUnread: () => void
   onStatus: (s: InquiryStatus, message: string) => void
   onArchive: () => void
@@ -757,6 +922,9 @@ function ThreadReader({
         <div className="flex-1 min-w-0 px-1">
           <p className="text-sm font-bold text-[#0d1117] truncate">{subjectLine}</p>
         </div>
+        <IconBtn title={l.starred_at ? "Unstar" : "Star"} onClick={onToggleStar} disabled={busy}>
+          <Star className={`w-4 h-4 ${l.starred_at ? "fill-[#d6b357] text-[#b8913f]" : ""}`} />
+        </IconBtn>
         <IconBtn title="Mark as unread" onClick={onMarkUnread} disabled={busy}>
           <Mail className="w-4 h-4" />
         </IconBtn>
@@ -855,33 +1023,9 @@ function ThreadReader({
             </div>
           </div>
 
-          {/* Sent replies */}
+          {/* The conversation — our messages and the lead's replies */}
           {thread.emails.map((m) => (
-            <div key={m.id} className={`border ${m.status === "failed" ? "border-rose-200 bg-rose-50/40" : "border-[#eef0f2] bg-[#fbfcfd]"}`}>
-              <div className="flex items-start gap-3 px-5 pt-4">
-                <div className="w-10 h-10 rounded-full bg-[#001f3f] flex items-center justify-center shrink-0">
-                  <span className="text-white text-xs font-bold">FHI</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    <p className="text-sm font-bold text-[#0d1117]">{m.sent_by_name ?? "FHI Global"}</p>
-                    <span className="text-xs text-[#6b7280] truncate">to {m.to_email}</span>
-                  </div>
-                  <p className="text-[13px] font-semibold text-[#374151] mt-0.5 truncate">{m.subject}</p>
-                </div>
-                <span className="text-[11px] text-[#9ca3af] shrink-0" title={formatDateTime(m.created_at)}>
-                  {formatDateTime(m.created_at)}
-                </span>
-              </div>
-              <div className="px-5 py-4">
-                {m.status === "failed" && (
-                  <p className="mb-2 text-xs font-semibold text-rose-600">
-                    Failed to send{m.error ? ` — ${m.error}` : ""}. This message was not delivered.
-                  </p>
-                )}
-                <p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">{m.body_text}</p>
-              </div>
-            </div>
+            <EmailMessageCard key={m.id} m={m} counterpartName={l.name} />
           ))}
 
           {/* Reply composer — keyed by lead so drafts reset per conversation */}
@@ -1013,15 +1157,138 @@ function ReplyBox({
   )
 }
 
-// ─── Reading pane: a sent email ───────────────────────────────────────────────
+// ─── One message in a conversation (ours or theirs) ──────────────────────────
+
+/**
+ * Split a reply into the fresh text and the quoted history mail clients drag
+ * along ("On ... wrote:", "> ..." lines, Outlook separators). Display-only —
+ * the stored body keeps everything.
+ */
+function splitQuoted(text: string): { visible: string; quoted: string } {
+  const t = text.replace(/\r\n/g, "\n")
+  const patterns = [
+    /^On [\s\S]{0,400}?wrote:\s*$/m, // Gmail/Apple attribution (may wrap lines)
+    /^\s*>/m, // first quoted line
+    /^-{3,}\s*Original Message\s*-{3,}/im,
+    /^_{8,}\s*$/m, // Outlook separator
+  ]
+  let cut = -1
+  for (const re of patterns) {
+    const idx = t.search(re)
+    if (idx !== -1 && (cut === -1 || idx < cut)) cut = idx
+  }
+  // No quote found, or the message IS the quote (bottom-posted) — show it all.
+  if (cut <= 0) return { visible: t.trim(), quoted: "" }
+  const visible = t.slice(0, cut).trim()
+  if (!visible) return { visible: t.trim(), quoted: "" }
+  return { visible, quoted: t.slice(cut).trim() }
+}
+
+function EmailMessageCard({ m, counterpartName }: { m: SentEmail; counterpartName: string | null }) {
+  const inbound = m.direction === "inbound"
+  const { visible, quoted } = inbound ? splitQuoted(m.body_text) : { visible: m.body_text, quoted: "" }
+  const [showQuoted, setShowQuoted] = useState(false)
+  return (
+    <div
+      className={`border ${
+        m.status === "failed" ? "border-rose-200 bg-rose-50/40" : inbound ? "border-[#e5e8ec] bg-white" : "border-[#eef0f2] bg-[#fbfcfd]"
+      }`}
+    >
+      <div className="flex items-start gap-3 px-5 pt-4">
+        {inbound ? (
+          <UserAvatar name={m.from_name ?? counterpartName ?? m.from_email ?? "?"} size={40} />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-[#001f3f] flex items-center justify-center shrink-0">
+            <span className="text-white text-xs font-bold">FHI</span>
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <p className="text-sm font-bold text-[#0d1117]">
+              {inbound ? m.from_name ?? counterpartName ?? m.from_email : m.sent_by_name ?? "FHI Global"}
+            </p>
+            <span className="text-xs text-[#6b7280] truncate">
+              {inbound ? "replied to FHI Global" : `to ${m.to_email}`}
+            </span>
+          </div>
+          <p className="text-[13px] font-semibold text-[#374151] mt-0.5 truncate">{m.subject}</p>
+        </div>
+        <span className="text-[11px] text-[#9ca3af] shrink-0" title={formatDateTime(m.created_at)}>
+          {formatDateTime(m.created_at)}
+        </span>
+      </div>
+      <div className="px-5 py-4">
+        {m.status === "failed" && (
+          <p className="mb-2 text-xs font-semibold text-rose-600">
+            Failed to send{m.error ? ` — ${m.error}` : ""}. This message was not delivered.
+          </p>
+        )}
+        <p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">{visible}</p>
+        {quoted && (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowQuoted((v) => !v)}
+              aria-expanded={showQuoted}
+              className="mt-3 px-2 py-0.5 text-[11px] font-bold tracking-wider text-[#9ca3af] bg-[#f1f3f4] hover:text-[#374151] transition-colors"
+              title={showQuoted ? "Hide quoted text" : "Show quoted text"}
+            >
+              •••
+            </button>
+            {showQuoted && (
+              <p className="mt-3 pl-3 border-l-2 border-[#e5e8ec] text-[13px] text-[#9ca3af] leading-relaxed whitespace-pre-wrap">
+                {quoted}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Reading pane: a sent email / correspondence with one address ─────────────
 
 function SentReader({
-  email, onBack, onOpenLead,
+  email, threadVersion, onBack, onOpenLead, onMarkedRead, onSent,
 }: {
   email: SentEmail
+  /** Bumped by the parent when the mailbox sync lands new messages. */
+  threadVersion: number
   onBack: () => void
   onOpenLead: (inquiryId: string) => void
+  /** Stable callback (parent useCallback) — this effect depends on it. */
+  onMarkedRead: (address: string, count: number) => void
+  onSent: (m: SentEmail) => void
 }) {
+  // A reply to a lead lives on that lead's thread — link over to it. Composed
+  // mail has no lead, so the full back-and-forth with that address loads here.
+  const isLeadReply = Boolean(email.inquiry_id)
+  const [rows, setRows] = useState<SentEmail[] | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const t = setTimeout(async () => {
+      if (isLeadReply) { setRows(null); return }
+      const { rows: r } = await fetchEmailThread(email.to_email)
+      if (cancelled) return
+      // Opening the conversation reads it — stamp locally (so a refetch can't
+      // double-count) and persist in the background.
+      const unreadCount = r.filter((x) => x.direction === "inbound" && !x.read_at).length
+      if (unreadCount > 0) {
+        void markEmailThreadRead(email.to_email)
+        onMarkedRead(email.to_email.toLowerCase(), unreadCount)
+        const stamp = new Date().toISOString()
+        setRows(r.map((x) => (x.direction === "inbound" && !x.read_at ? { ...x, read_at: stamp } : x)))
+      } else {
+        setRows(r)
+      }
+    }, 0)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [email.id, email.to_email, isLeadReply, threadVersion, onMarkedRead])
+
+  const messages = isLeadReply ? [email] : rows && rows.length > 0 ? rows : [email]
+
   return (
     <>
       <div className="flex items-center gap-1 px-3 py-2 border-b border-[#f0f0f0]">
@@ -1031,7 +1298,7 @@ function SentReader({
         <div className="flex-1 min-w-0 px-1">
           <p className="text-sm font-bold text-[#0d1117] truncate">{email.subject}</p>
         </div>
-        {email.inquiry_id && (
+        {isLeadReply && (
           <button
             type="button"
             onClick={() => onOpenLead(email.inquiry_id!)}
@@ -1043,47 +1310,142 @@ function SentReader({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5">
-          <div className="border border-[#e5e8ec] bg-white">
-            <div className="flex items-start gap-3 px-5 pt-4">
-              <div className="w-10 h-10 rounded-full bg-[#001f3f] flex items-center justify-center shrink-0">
-                <span className="text-white text-xs font-bold">FHI</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-[#0d1117]">{email.sent_by_name ?? "FHI Global"}</p>
-                <p className="text-xs text-[#6b7280] truncate">to {email.to_name ? `${email.to_name} <${email.to_email}>` : email.to_email}</p>
-              </div>
-              <span className="text-[11px] text-[#9ca3af] shrink-0" title={formatDateTime(email.created_at)}>
-                {formatDateTime(email.created_at)}
-              </span>
-            </div>
-            <div className="px-5 py-4">
-              {email.status === "failed" && (
-                <p className="mb-3 text-xs font-semibold text-rose-600">
-                  Failed to send{email.error ? ` — ${email.error}` : ""}. This message was not delivered.
-                </p>
-              )}
-              <h2 className="font-['Outfit'] text-base font-bold text-[#0d1117] mb-3">{email.subject}</h2>
-              <p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">{email.body_text}</p>
-            </div>
-          </div>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-4">
+          {messages.map((m) => (
+            <EmailMessageCard key={m.id} m={m} counterpartName={email.to_name} />
+          ))}
+
+          {/* Reply sits under the last message, like any mail client. Lead
+              replies are answered on the lead's own thread instead. */}
+          {!isLeadReply && (
+            <SentReplyBox
+              key={email.id}
+              toEmail={email.to_email}
+              toName={email.to_name}
+              defaultSubject={/^re:/i.test(email.subject) ? email.subject : `Re: ${email.subject}`}
+              onSent={(m) => {
+                setRows((r) => [...(r ?? [email]), m])
+                onSent(m)
+              }}
+            />
+          )}
         </div>
       </div>
     </>
   )
 }
 
+// ─── Reply box under a Sent correspondence ────────────────────────────────────
+
+function SentReplyBox({
+  toEmail, toName, defaultSubject, onSent,
+}: {
+  toEmail: string
+  toName: string | null
+  defaultSubject: string
+  onSent: (m: SentEmail) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [subject, setSubject] = useState(defaultSubject)
+  const [message, setMessage] = useState("")
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  if (!open) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-2 px-6 py-2.5 border border-[#e5e8ec] text-sm font-bold text-[#001f3f] hover:bg-[#001f3f] hover:text-white transition-all"
+        >
+          <Send className="w-4 h-4" /> Reply
+        </button>
+      </div>
+    )
+  }
+
+  const send = async () => {
+    if (!subject.trim() || !message.trim()) { setError("Write a subject and a message first."); return }
+    setSending(true)
+    setError(null)
+    const { email, error: err } = await sendComposedEmail({
+      to: toEmail,
+      toName: toName ?? undefined,
+      subject: subject.trim(),
+      message: message.trim(),
+    })
+    setSending(false)
+    if (err) { setError(err); return }
+    if (email) onSent(email)
+    setOpen(false)
+    setMessage("")
+  }
+
+  return (
+    <div className="border border-[#e5e8ec] bg-white overflow-hidden">
+      <div className="px-5 pt-4 pb-1">
+        <p className="text-xs text-[#6b7280]">
+          Replying to <span className="font-semibold text-[#374151]">{toName || toEmail}</span>
+          {toName ? <> &lt;{toEmail}&gt;</> : null}
+        </p>
+      </div>
+      <div className="px-5 py-2">
+        <input
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          maxLength={200}
+          placeholder="Subject"
+          className="w-full py-2 text-sm font-semibold text-[#0d1117] border-b border-[#f0f0f0] focus:outline-none focus:border-[#001f3f]/40"
+        />
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          maxLength={10_000}
+          rows={6}
+          autoFocus
+          placeholder={`Hi ${(toName || "there").split(/\s+/)[0]},`}
+          className="w-full py-3 text-sm text-[#374151] leading-relaxed resize-y focus:outline-none"
+        />
+      </div>
+      {error && <p className="px-5 pb-1 text-xs font-semibold text-rose-600">{error}</p>}
+      <div className="flex items-center gap-2 px-5 py-3 border-t border-[#f0f0f0]">
+        <button
+          type="button"
+          onClick={() => void send()}
+          disabled={sending}
+          className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#0a3d6b] disabled:opacity-60 transition-all"
+        >
+          {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          {sending ? "Sending…" : "Send"}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setError(null) }}
+          disabled={sending}
+          className="px-4 py-2.5 text-sm font-semibold text-[#6b7280] hover:bg-[#f1f3f4] transition-all"
+        >
+          Discard
+        </button>
+        <span className="ml-auto text-[11px] text-[#c4c4c4]">Sent from your FHI Global email</span>
+      </div>
+    </div>
+  )
+}
+
 // ─── Compose window (Gmail-style, bottom-right) ───────────────────────────────
 
 function ComposeWindow({
-  onClose, onSent,
+  initial, onClose, onSent,
 }: {
+  /** Prefill for reply-from-Sent; empty object for a blank compose. */
+  initial: { to?: string; toName?: string; subject?: string }
   onClose: () => void
   onSent: (email: SentEmail) => void
 }) {
-  const [to, setTo] = useState("")
-  const [toName, setToName] = useState("")
-  const [subject, setSubject] = useState("")
+  const [to, setTo] = useState(initial.to ?? "")
+  const [toName, setToName] = useState(initial.toName ?? "")
+  const [subject, setSubject] = useState(initial.subject ?? "")
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)

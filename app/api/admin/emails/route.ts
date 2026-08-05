@@ -13,6 +13,9 @@ import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 export const runtime = "nodejs"
 
 const SENT_COLUMNS =
+  "id, inquiry_id, to_email, to_name, subject, body_text, sent_by, sent_by_name, status, error, direction, from_email, from_name, created_at"
+// Pre-migration-033 shape (no direction/from columns).
+const SENT_COLUMNS_LEGACY =
   "id, inquiry_id, to_email, to_name, subject, body_text, sent_by, sent_by_name, status, error, created_at"
 const MAX_SUBJECT = 200
 const MAX_MESSAGE = 10_000
@@ -31,18 +34,48 @@ export async function GET(req: NextRequest) {
   const admin = createAdminSupabase()
   const rangeFrom = (page - 1) * perPage
 
-  let query = admin
-    .from("inquiry_emails")
-    .select(SENT_COLUMNS, { count: "exact" })
-    .order("created_at", { ascending: false })
-    .range(rangeFrom, rangeFrom + perPage - 1)
-
-  if (search) {
-    const safe = search.replace(/[%,()]/g, " ")
-    query = query.or(`to_email.ilike.%${safe}%,to_name.ilike.%${safe}%,subject.ilike.%${safe}%`)
+  // The Sent folder lists what WE sent — inbound replies live on the threads.
+  const buildQuery = (columns: string, withDirection: boolean) => {
+    let query = admin
+      .from("inquiry_emails")
+      .select(columns, { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(rangeFrom, rangeFrom + perPage - 1)
+    if (withDirection) query = query.eq("direction", "outbound")
+    if (search) {
+      const safe = search.replace(/[%,()]/g, " ")
+      query = query.or(`to_email.ilike.%${safe}%,to_name.ilike.%${safe}%,subject.ilike.%${safe}%`)
+    }
+    return query
   }
 
-  const { data, count, error } = await query
+  const [listResult, unreadResult] = await Promise.all([
+    (async () => {
+      let r = await buildQuery(SENT_COLUMNS, true)
+      // 42703: migration 033 not applied yet — no direction column, all rows are ours.
+      if (r.error?.code === "42703") r = await buildQuery(SENT_COLUMNS_LEGACY, false)
+      return r
+    })(),
+    // Unread replies to composed mail, grouped by sender — drives the bold
+    // rows and the count badge in the Sent folder. Errors (pre-migration-034)
+    // just mean an empty map.
+    admin
+      .from("inquiry_emails")
+      .select("from_email")
+      .eq("direction", "inbound")
+      .is("inquiry_id", null)
+      .is("read_at", null)
+      .limit(500),
+  ])
+  const { data, count, error } = listResult
+
+  const unreadByAddress: Record<string, number> = {}
+  if (!unreadResult.error) {
+    for (const row of (unreadResult.data ?? []) as Array<{ from_email: string | null }>) {
+      const key = (row.from_email ?? "").toLowerCase()
+      if (key) unreadByAddress[key] = (unreadByAddress[key] ?? 0) + 1
+    }
+  }
   if (error) {
     // 42P01 / PGRST205: inquiry_emails doesn't exist yet (migration 031 not
     // applied) — an empty Sent folder, not an error page.
@@ -52,7 +85,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ rows: data ?? [], total: count ?? 0, page, perPage })
+  return NextResponse.json({ rows: data ?? [], total: count ?? 0, page, perPage, unreadByAddress })
 }
 
 export async function POST(req: NextRequest) {

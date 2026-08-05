@@ -112,7 +112,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     .eq("id", lead.id)
   // Pre-migration-031 the read_at column doesn't exist — retry without it so
   // the contacted stamp still lands. The email is already out either way.
-  if (stampError?.code === "42703") {
+  // (42703 = missing column in a filter; PGRST204 = missing in the payload.)
+  if (stampError?.code === "42703" || stampError?.code === "PGRST204") {
     await admin
       .from("inquiries")
       .update({
