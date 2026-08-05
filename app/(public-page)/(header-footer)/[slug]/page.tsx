@@ -486,35 +486,92 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
     .map((p) => ({ ...p, main_image: p.main_image?.trim() || galleryFallback.get(p.id) || null }))
     .filter((p) => p.main_image)
 
+  // Hero backdrop + facts, all from the projects already loaded — no extra
+  // query, and the photo is guaranteed to be one of the results below.
+  const heroPhoto = visible[0]?.main_image ? { url: visible[0].main_image } : null
+  const developerCount = new Set(
+    visible.map((p) => (p.developers as { name?: string } | null)?.name).filter(Boolean),
+  ).size
+  const cheapest = visible
+    .map((p) => Number(p.launch_price_from))
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .sort((a, b) => a - b)[0]
+  const priceFrom = cheapest
+    ? `${(visible.find((p) => Number(p.launch_price_from) === cheapest)?.currency ?? "AED").toUpperCase()} ${
+        cheapest >= 1_000_000 ? `${(cheapest / 1_000_000).toFixed(1).replace(/\.0$/, "")}M` : cheapest.toLocaleString("en-AE", { maximumFractionDigits: 0 })
+      }`
+    : null
+
   const shown = visible.slice(0, 24)
   const related = seo.related.map(getSeoPage).filter((r): r is SeoPage => Boolean(r))
 
   return (
     <div className="bg-[#f7f8fa]">
-      {/* Compact navy masthead — these pages open on the content, not a hero. */}
-      <section className="bg-[#001f3f]">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-10">
+      {/* Masthead — the copy sits over a real project from the very list below,
+          rather than a flat navy block or stock imagery. Left-weighted scrim so
+          the text stays legible while the building shows through on the right. */}
+      <section className="relative bg-[#001f3f] overflow-hidden">
+        {heroPhoto && (
+          <>
+            <Image
+              src={heroPhoto.url}
+              alt=""
+              fill
+              sizes="100vw"
+              priority
+              className="absolute inset-0 object-cover"
+              aria-hidden="true"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/95 via-[#001428]/80 to-[#001428]/45" />
+          </>
+        )}
+
+        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-12">
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
             FHI Global · Popular Searches
           </p>
-          <h1 className="font-['Outfit'] text-3xl md:text-4xl font-bold text-white mt-2 leading-tight">
+          <h1
+            className="font-['Outfit'] text-4xl md:text-[46px] font-bold text-white mt-2.5 leading-[1.1] tracking-tight"
+            style={{ textShadow: "0 2px 22px rgba(0,10,30,0.55)" }}
+          >
             {seo.h1}
           </h1>
-          <div className="flex items-center gap-2 mt-4">
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 border border-white/20 text-sm font-semibold text-white">
-              <span className="w-2 h-2 rounded-full bg-[#d6b357]" />
-              {visible.length} project{visible.length === 1 ? "" : "s"} available
-            </span>
-          </div>
+          <span className="block w-14 h-[3px] bg-[#d6b357] mt-5" aria-hidden="true" />
           <div className="mt-6 max-w-3xl space-y-3">
             {seo.intro.map((paragraph) => (
-              <p key={paragraph.slice(0, 32)} className="text-[15px] leading-relaxed text-[#c2cddd]">
+              <p
+                key={paragraph.slice(0, 32)}
+                className="text-[15px] leading-relaxed text-[#c9d4e2]"
+                style={{ textShadow: "0 1px 10px rgba(0,10,30,0.5)" }}
+              >
                 {paragraph}
               </p>
             ))}
           </div>
+
+          {/* Facts strip — the count plus what the filter actually means, so the
+              header carries information instead of one lonely pill. */}
+          <dl className="mt-8 flex flex-wrap gap-x-12 gap-y-5">
+            {[
+              { label: "Projects available", value: String(visible.length) },
+              { label: "Developers", value: String(developerCount) },
+              ...(priceFrom ? [{ label: "Starting from", value: priceFrom }] : []),
+            ].map((f) => (
+              <div key={f.label}>
+                <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#d6b357] mb-1.5">
+                  {f.label}
+                </dt>
+                <dd
+                  className="font-['Outfit'] text-2xl font-bold text-white leading-none"
+                  style={{ textShadow: "0 1px 10px rgba(0,10,30,0.5)" }}
+                >
+                  {f.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
-        <div className="h-[3px] bg-[#d6b357]" />
+        <div className="relative h-[3px] bg-[#d6b357]" />
       </section>
 
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
