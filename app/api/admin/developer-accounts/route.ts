@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   // The linked company must exist and not be soft-deleted.
   const { data: developer, error: developerError } = await admin
     .from("developers")
-    .select("id, name")
+    .select("id, name, logo_url")
     .eq("id", developerId)
     .is("deleted_at", null)
     .single()
@@ -97,6 +97,9 @@ export async function POST(req: NextRequest) {
     role: "developer",
     status: "active",
     timezone: "Asia/Dubai",
+    // Default the avatar to the company logo; the developer can change it later
+    // in profile settings.
+    profile_url: developer.logo_url ?? null,
     metadata: { developer_id: developerId },
   })
   if (profileError) {
