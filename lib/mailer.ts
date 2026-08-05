@@ -805,3 +805,53 @@ export async function sendLeadInquiryEmail(input: {
     }),
   })
 }
+
+/**
+ * A personal message written by an admin on the Emails page — a reply to a
+ * lead or a standalone composed email. The admin's text is the whole body
+ * (greeting included, like any mail client); we only wrap it in the brand
+ * shell and sign it with the sender's name.
+ */
+export async function sendAdminDirectEmail(input: {
+  to: string
+  subject: string
+  /** Plain text as typed by the admin; line breaks are preserved. */
+  message: string
+  senderName: string | null
+  /** Context line, e.g. "Azizi Venice · Azizi Developments" — reply emails only. */
+  regarding?: string | null
+}): Promise<void> {
+  const signer = input.senderName?.trim() || "The FHI Global Team"
+  const messageHtml = esc(input.message).replace(/\r?\n/g, "<br>")
+
+  const bodyHtml = `
+        <tr>
+          <td style="padding:36px 40px 8px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">A message from FHI Global</p>
+            <div style="font-size:15px;line-height:1.75;color:#374151;">${messageHtml}</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:22px 40px 30px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr><td style="border-top:1px solid #eef0f3;padding-top:16px;">
+                <p style="margin:0;font-size:14px;font-weight:700;color:#0d1117;">${esc(signer)}</p>
+                <p style="margin:2px 0 0;font-size:12.5px;color:#6b7280;">FHI Global · Dubai, UAE</p>
+                ${input.regarding ? `<p style="margin:10px 0 0;font-size:11.5px;color:#9ca3af;">Sent regarding your inquiry about ${esc(input.regarding)}. Just reply to this email to continue the conversation.</p>` : `<p style="margin:10px 0 0;font-size:11.5px;color:#9ca3af;">Just reply to this email to continue the conversation.</p>`}
+              </td></tr>
+            </table>
+          </td>
+        </tr>`
+
+  await deliver("AdminDirectMailer", {
+    from: fromAddress(),
+    to: input.to,
+    subject: input.subject,
+    text: `${input.message}\n\n—\n${signer}\nFHI Global · Dubai, UAE${input.regarding ? `\nSent regarding your inquiry about ${input.regarding}.` : ""}`,
+    html: eventEmailShell({
+      subject: input.subject,
+      preheader: input.message.slice(0, 120),
+      bodyHtml,
+    }),
+  })
+}

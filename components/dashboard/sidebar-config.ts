@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library,
-  UserSearch,
+  Mail,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -135,7 +135,8 @@ const ADMIN_NAV: RoleNavEntry[] = [
   OVERVIEW,
   // Top-level rather than inside the Communication hub: fresh leads are the
   // first thing admins check, so they sit one click away right under Overview.
-  { icon: UserSearch, label: "Leads Inquiries", to: "leads" },
+  // Gmail-style client — leads read as an inbox, replies go out as real email.
+  { icon: Mail, label: "Emails", to: "leads" },
   {
     group: "Accounts & Invites",
     to: "accounts",

@@ -1,51 +1,112 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Search, RefreshCw, UserSearch, ChevronLeft, ChevronRight } from "lucide-react"
+// The admin Emails page — the old Leads Inquiries table rebuilt as a
+// Gmail-style client. Left pane lists conversations (each "Inquire Now" lead
+// is an incoming email), the right pane reads the selected one, replies are
+// real emails sent through SMTP and recorded on the thread, and Compose sends
+// a standalone email to any address. Folders: Inbox (leads), Sent (everything
+// sent from the dashboard), Archived (soft-deleted leads).
+//
+// Selection and folder live in the URL (?folder=&open=) so refresh/back and
+// shared links restore the same view — same pattern as the Account Directory.
+
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import {
+  Archive, ArrowLeft, Building2, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight,
+  Clock, Globe, Inbox, Loader2, Mail, MailOpen, MessageCircle, MonitorSmartphone,
+  PenSquare, Phone, PhoneCall, RefreshCw, RotateCcw, Search, Send, Trash2, Undo2, X,
+} from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
-import { formatDate, relativeTime, formatDateTime } from "@/lib/utils"
+import { formatDateTime, relativeTime } from "@/lib/utils"
 import {
   type Inquiry,
   type InquiriesSummary,
+  type InquiryStatus,
+  type SentEmail,
   fetchInquiries,
+  fetchInquiry,
+  fetchSentEmails,
+  deleteSentEmail,
+  sendComposedEmail,
+  sendInquiryReply,
+  setInquiryDeleted,
+  setInquiryRead,
+  setInquiryStatus,
   LOOKING_FOR_LABELS,
   CATEGORY_LABELS,
 } from "@/lib/inquiries-service"
-import { useAuth } from "@/context/auth-context"
-import { getDashboardRouteByRole } from "@/lib/auth"
 
-const PER_PAGE = 20
+const PER_PAGE = 25
+type Folder = "inbox" | "sent" | "archived"
 
-function StatusBadge({ row }: { row: Inquiry }) {
-  if (row.deleted_at) {
-    return <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 w-fit">Archived</span>
+/** Gmail-style time: clock time today, "Aug 5" this year, date otherwise. */
+function mailTime(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  const now = new Date()
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
   }
-  if (row.status === "new") {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#d6b357]/15 text-[#8a6d1f] w-fit">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357]" /> New
-      </span>
-    )
+  if (d.getFullYear() === now.getFullYear()) {
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
   }
-  if (row.status === "contacted") {
-    return <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 w-fit">Contacted</span>
-  }
-  return <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 w-fit">Closed</span>
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-function CategoryChip({ category }: { category: Inquiry["property_category"] }) {
+function StatusChip({ row }: { row: Inquiry }) {
+  if (row.deleted_at) {
+    return <span className="px-2 py-0.5 text-[10px] font-semibold bg-rose-50 text-rose-600">Archived</span>
+  }
+  if (row.status === "contacted") {
+    return <span className="px-2 py-0.5 text-[10px] font-semibold bg-sky-50 text-sky-700">Contacted</span>
+  }
+  if (row.status === "closed") {
+    return <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700">Closed</span>
+  }
+  return null
+}
+
+/** Square icon button used across the reading-pane toolbar. */
+function IconBtn({
+  title, onClick, disabled, tone = "default", children,
+}: {
+  title: string
+  onClick: () => void
+  disabled?: boolean
+  tone?: "default" | "danger" | "success"
+  children: ReactNode
+}) {
+  const tones = {
+    default: "text-[#5f6368] hover:bg-[#f1f3f4] hover:text-[#001f3f]",
+    danger: "text-[#5f6368] hover:bg-rose-50 hover:text-rose-600",
+    success: "text-[#5f6368] hover:bg-emerald-50 hover:text-emerald-600",
+  }
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#f3f4f6] text-[#374151] w-fit">
-      {CATEGORY_LABELS[category] ?? category}
-    </span>
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-9 h-9 flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${tones[tone]}`}
+    >
+      {children}
+    </button>
   )
 }
 
 export function LeadsClient() {
   const router = useRouter()
-  const base = getDashboardRouteByRole(useAuth().role)
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const folder = (searchParams.get("folder") as Folder) || "inbox"
+  const openId = searchParams.get("open") || ""
+
+  // ── list state ──────────────────────────────────────────────────────────
   const [rows, setRows] = useState<Inquiry[]>([])
+  const [sentRows, setSentRows] = useState<SentEmail[]>([])
   const [total, setTotal] = useState(0)
   const [summary, setSummary] = useState<InquiriesSummary | null>(null)
   const [page, setPage] = useState(1)
@@ -53,28 +114,80 @@ export function LeadsClient() {
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState("")
   const [category, setCategory] = useState("")
-  const [showDeleted, setShowDeleted] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [listError, setListError] = useState<string | null>(null)
+
+  // ── reading pane state ──────────────────────────────────────────────────
+  const [thread, setThread] = useState<{ inquiry: Inquiry; emails: SentEmail[] } | null>(null)
+  const [threadLoading, setThreadLoading] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  // ── compose window ──────────────────────────────────────────────────────
+  const [composeOpen, setComposeOpen] = useState(false)
+
+  // ── row selection (inbox/archived) — Gmail checkboxes for bulk actions ───
+  // Always a subset of the current page: load() resets it on every fetch, so
+  // pagination, filters and folder switches can't carry hidden selections.
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE))
+  const unread = summary?.unread ?? 0
 
+  const setParams = useCallback(
+    (patch: Record<string, string | null>) => {
+      const sp = new URLSearchParams(searchParams.toString())
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === null || v === "") sp.delete(k)
+        else sp.set(k, v)
+      }
+      const qs = sp.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    },
+    [router, pathname, searchParams],
+  )
+
+  const openFolder = (next: Folder) => {
+    setPage(1)
+    setParams({ folder: next === "inbox" ? null : next, open: null })
+  }
+
+  // ── loads ───────────────────────────────────────────────────────────────
+  // Sequence guard: switching folders fires a new load while the previous one
+  // may still be in flight — without it, a slow Sent request resolving late
+  // stomps the Inbox you already switched back to.
+  const loadSeq = useRef(0)
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current
     setLoading(true)
+    setListError(null)
+    setSelected(new Set())
     try {
-      const { data, total: t, summary: s, error } = await fetchInquiries({
-        page, perPage: PER_PAGE, search,
-        status: status || undefined,
-        category: category || undefined,
-        showDeleted,
-      })
-      if (error) return
-      setRows(data)
-      setTotal(t)
-      setSummary(s)
+      if (folder === "sent") {
+        const { data, total: t, error } = await fetchSentEmails({ page, perPage: PER_PAGE, search })
+        if (seq !== loadSeq.current) return
+        if (error) { setListError(error); setSentRows([]); setTotal(0); return }
+        setSentRows(data)
+        setTotal(t)
+        // Keep the Sent tab counter honest while browsing this folder.
+        if (!search) setSummary((s) => (s ? { ...s, sent: t } : { total: 0, new: 0, sent: t }))
+      } else {
+        const { data, total: t, summary: s, error } = await fetchInquiries({
+          page, perPage: PER_PAGE, search,
+          status: status || undefined,
+          category: category || undefined,
+          archivedOnly: folder === "archived",
+        })
+        if (seq !== loadSeq.current) return
+        if (error) { setListError(error); setRows([]); setTotal(0); return }
+        setRows(data)
+        setTotal(t)
+        setSummary(s)
+      }
     } finally {
-      setLoading(false)
+      if (seq === loadSeq.current) setLoading(false)
     }
-  }, [page, search, status, category, showDeleted])
+  }, [folder, page, search, status, category])
 
   // Deferred a tick so state updates happen outside the effect body
   // (react-hooks/set-state-in-effect) and rapid filter changes coalesce.
@@ -88,169 +201,944 @@ export function LeadsClient() {
     return () => clearTimeout(t)
   }, [searchInput])
 
-  const selectCls = "px-4 py-3 rounded-2xl border border-[#e5e5e5] bg-white text-sm text-[#374151] focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 transition-all"
+  // Load the open conversation. Also marks it read (deep links included) —
+  // opening mail is what "read" means. Fire-and-forget; unread counts adjust
+  // locally so the badge doesn't wait a round trip. Deferred a tick so no
+  // state is set synchronously in the effect body.
+  useEffect(() => {
+    let cancelled = false
+    const t = setTimeout(async () => {
+      if (!openId || folder === "sent") { setThread(null); return }
+      setThreadLoading(true)
+      const { data, emails, error } = await fetchInquiry(openId)
+      if (cancelled) return
+      setThreadLoading(false)
+      if (error || !data) { setThread(null); setNotice(error ?? "Conversation not found."); return }
+      setThread({ inquiry: data, emails })
+      if (!data.read_at) {
+        void setInquiryRead(data.id, true)
+        const stamp = new Date().toISOString()
+        setThread((th) => (th && th.inquiry.id === data.id ? { ...th, inquiry: { ...th.inquiry, read_at: stamp } } : th))
+        setRows((rs) => rs.map((r) => (r.id === data.id ? { ...r, read_at: stamp } : r)))
+        setSummary((s) => (s ? { ...s, unread: Math.max(0, (s.unread ?? 0) - 1) } : s))
+      }
+    }, 0)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [openId, folder])
+
+  // Toast auto-dismiss.
+  useEffect(() => {
+    if (!notice) return
+    const t = setTimeout(() => setNotice(null), 4000)
+    return () => clearTimeout(t)
+  }, [notice])
+
+  const patchRow = (id: string, patch: Partial<Inquiry>) => {
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+    setThread((t) => (t && t.inquiry.id === id ? { ...t, inquiry: { ...t.inquiry, ...patch } } : t))
+  }
+
+  // ── pane actions ────────────────────────────────────────────────────────
+  const markUnread = async (lead: Inquiry) => {
+    const { error } = await setInquiryRead(lead.id, false)
+    if (error) { setNotice(error); return }
+    patchRow(lead.id, { read_at: null })
+    setSummary((s) => (s ? { ...s, unread: (s.unread ?? 0) + 1 } : s))
+    setParams({ open: null })
+  }
+
+  const changeStatus = async (lead: Inquiry, next: InquiryStatus, message: string) => {
+    setBusy(true)
+    const { error } = await setInquiryStatus(lead.id, next)
+    setBusy(false)
+    if (error) { setNotice(error); return }
+    patchRow(lead.id, {
+      status: next,
+      contacted_at: next === "new" ? null : lead.contacted_at ?? new Date().toISOString(),
+    })
+    setNotice(message)
+  }
+
+  const toggleArchive = async (lead: Inquiry) => {
+    const archiving = !lead.deleted_at
+    setBusy(true)
+    const { error } = await setInquiryDeleted(lead.id, archiving)
+    setBusy(false)
+    if (error) { setNotice(error); return }
+    setNotice(archiving ? "Conversation archived." : "Conversation restored.")
+    setRows((rs) => rs.filter((r) => r.id !== lead.id))
+    setParams({ open: null })
+    void load()
+  }
+
+  // ── bulk selection ──────────────────────────────────────────────────────
+  const pageIds = folder === "sent" ? sentRows.map((r) => r.id) : rows.map((r) => r.id)
+  const allSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id))
+
+  const toggleSelect = (id: string) => {
+    setSelected((s) => {
+      const next = new Set(s)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    setSelected(allSelected ? new Set() : new Set(pageIds))
+  }
+
+  /** Archive (deleted=true) or restore (false) every checked conversation. */
+  const bulkSetDeleted = async (deleted: boolean) => {
+    const ids = [...selected]
+    if (ids.length === 0) return
+    setBusy(true)
+    const results = await Promise.all(ids.map((id) => setInquiryDeleted(id, deleted)))
+    setBusy(false)
+    const failed = results.filter((r) => r.error).length
+    const done = ids.length - failed
+    setNotice(
+      failed
+        ? `${done} ${deleted ? "archived" : "restored"}, ${failed} failed — try again.`
+        : `${done} conversation${done === 1 ? "" : "s"} ${deleted ? "archived" : "restored"}.`,
+    )
+    if (openId && ids.includes(openId)) setParams({ open: null })
+    void load()
+  }
+
+  /** Sent folder: permanently delete the checked records (confirmed first). */
+  const bulkDeleteSent = async () => {
+    const ids = [...selected]
+    if (ids.length === 0) return
+    const label = ids.length === 1 ? "this sent email" : `${ids.length} sent emails`
+    if (!window.confirm(`Delete ${label}? This can't be undone.`)) return
+    setBusy(true)
+    const results = await Promise.all(ids.map((id) => deleteSentEmail(id)))
+    setBusy(false)
+    const failed = results.filter((r) => r.error).length
+    const done = ids.length - failed
+    setNotice(
+      failed
+        ? `${done} deleted, ${failed} failed — try again.`
+        : `${done} sent email${done === 1 ? "" : "s"} deleted.`,
+    )
+    setSummary((s) => (s ? { ...s, sent: Math.max(0, (s.sent ?? 0) - done) } : s))
+    if (openId && ids.includes(openId)) setParams({ open: null })
+    void load()
+  }
+
+  const selectedSent = useMemo(
+    () => (folder === "sent" ? sentRows.find((r) => r.id === openId) ?? null : null),
+    [folder, sentRows, openId],
+  )
+
+  const paneOpen = folder === "sent" ? Boolean(selectedSent) : Boolean(openId)
+
+  // ── render ──────────────────────────────────────────────────────────────
+  const tabs: Array<{ key: Folder; label: string; icon: typeof Inbox; count?: number }> = [
+    { key: "inbox", label: "Inbox", icon: Inbox, count: unread },
+    { key: "sent", label: "Sent", icon: Send, count: summary?.sent ?? 0 },
+    { key: "archived", label: "Archived", icon: Archive },
+  ]
 
   return (
-    <div className="space-y-6">
-      <div className="max-w-12xl space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shadow-lg">
-            <UserSearch className="w-6 h-6 text-white" />
+    <div className="space-y-4">
+      {notice && (
+        <div className="border border-[#e5e8ec] bg-white px-4 py-2.5 text-sm text-[#374151] shadow-sm">{notice}</div>
+      )}
+
+      {/* Mail client */}
+      <div className="bg-white border border-[#e5e8ec] overflow-hidden flex flex-col h-[calc(100vh-170px)] min-h-[560px]">
+        {/* Toolbar */}
+        <div className="flex items-center gap-2 flex-wrap px-4 py-3 border-b border-[#f0f0f0]">
+          <button
+            type="button"
+            onClick={() => setComposeOpen(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#d6b357] text-[#1a1408] text-sm font-bold hover:brightness-95 transition-all shadow-sm"
+          >
+            <PenSquare className="w-4 h-4" /> Compose
+          </button>
+
+          <div className="flex items-center border border-[#e5e8ec] bg-white p-1">
+            {tabs.map((t) => {
+              const active = folder === t.key
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => openFolder(t.key)}
+                  className={`inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition-all ${
+                    active ? "bg-[#001f3f] text-white" : "text-[#5f6368] hover:text-[#001f3f]"
+                  }`}
+                >
+                  <t.icon className="w-3.5 h-3.5" /> {t.label}
+                  {(t.count ?? 0) > 0 && (
+                    <span className={`min-w-[18px] h-[18px] px-1 text-[10px] font-bold flex items-center justify-center ${
+                      t.key === "inbox"
+                        ? "bg-[#d6b357] text-[#1a1408]"
+                        : active
+                          ? "bg-white/20 text-white"
+                          : "bg-[#e8eaed] text-[#5f6368]"
+                    }`}>
+                      {t.count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
           </div>
-          <div>
-            <h1 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">Leads Inquiries</h1>
-            <p className="text-sm text-[#6b7280]">
-              {summary ? `${summary.new} new · ${summary.total} total leads` : "Property inquiries from project pages"}
-            </p>
+
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+            <input
+              className="w-full pl-11 pr-4 py-2.5 border border-[#e5e8ec] bg-white text-sm focus:outline-none focus:border-[#001f3f] transition-all"
+              placeholder={folder === "sent" ? "Search sent emails…" : "Search by name, email, phone, or project…"}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
           </div>
+
+          {folder !== "sent" && (
+            <>
+              <select
+                value={status}
+                onChange={(e) => { setStatus(e.target.value); setPage(1) }}
+                className="px-3.5 py-2.5 border border-[#e5e8ec] bg-white text-xs font-semibold text-[#374151] focus:outline-none focus:border-[#001f3f]"
+              >
+                <option value="">All status</option>
+                <option value="new">New</option>
+                <option value="contacted">Contacted</option>
+                <option value="closed">Closed</option>
+              </select>
+              <select
+                value={category}
+                onChange={(e) => { setCategory(e.target.value); setPage(1) }}
+                className="px-3.5 py-2.5 border border-[#e5e8ec] bg-white text-xs font-semibold text-[#374151] focus:outline-none focus:border-[#001f3f]"
+              >
+                <option value="">All categories</option>
+                <option value="off_plan">Off Plan</option>
+                <option value="ready">Ready</option>
+                <option value="rent">Rent</option>
+              </select>
+            </>
+          )}
+
+          <IconBtn title="Refresh" onClick={() => void load()}>
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </IconBtn>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white/60 backdrop-blur-2xl rounded-[24px] border border-white/60 shadow-xl shadow-black/5 p-4">
-          <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-            <div className="relative flex-1 min-w-[220px]">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
-              <input
-                className="w-full pl-11 pr-4 py-3 rounded-2xl border border-[#e5e5e5] bg-white text-sm focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 transition-all"
-                placeholder="Search by name, email, phone, or project…"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-              />
-            </div>
-
-            <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1) }} className={selectCls}>
-              <option value="">All Status</option>
-              <option value="new">New</option>
-              <option value="contacted">Contacted</option>
-              <option value="closed">Closed</option>
-            </select>
-
-            <select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1) }} className={selectCls}>
-              <option value="">All Categories</option>
-              <option value="off_plan">Off Plan</option>
-              <option value="ready">Ready</option>
-              <option value="rent">Rent</option>
-            </select>
-
-            <label className="flex items-center gap-2 px-4 py-3 rounded-2xl border border-[#e5e5e5] bg-white text-sm text-[#374151] cursor-pointer select-none">
-              <input type="checkbox" checked={showDeleted} onChange={(e) => { setShowDeleted(e.target.checked); setPage(1) }}
-                className="w-4 h-4 rounded border-[#e5e5e5] accent-[#001f3f]" />
-              Show archived
-            </label>
-
-            <button type="button" onClick={() => void load()}
-              className="flex items-center gap-2 px-4 py-3 rounded-2xl border border-[#e5e5e5] bg-white text-sm text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] transition-all">
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            </button>
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="bg-white/60 backdrop-blur-2xl rounded-[24px] border border-white/60 shadow-xl shadow-black/5 overflow-hidden">
-          <div className="overflow-x-auto">
-            <div className="hidden lg:grid grid-cols-[1.4fr_150px_1.2fr_1.3fr_110px_140px_32px] lg:min-w-[1020px] gap-4 px-6 py-3 border-b border-[#f0f0f0]">
-              {["Lead", "Phone", "Interest", "Project", "Status", "Submitted", ""].map((h, i) => (
-                <span key={i} className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">{h}</span>
-              ))}
-            </div>
-
-            {loading ? (
-              <div className="p-6 space-y-3">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="h-14 rounded-2xl bg-white/70 animate-pulse border border-[#f0f0f0]" />
-                ))}
+        {/* Panes */}
+        <div className="flex flex-1 min-h-0">
+          {/* Message list */}
+          <div className={`${paneOpen ? "hidden lg:flex" : "flex"} flex-col w-full lg:w-[400px] xl:w-[440px] lg:border-r border-[#f0f0f0] min-h-0`}>
+            {/* Select-all bar — bulk archive/restore/delete for checked rows */}
+            {!loading && pageIds.length > 0 && (
+              <div className="flex items-center gap-3 px-4 py-2 border-b border-[#f0f0f0] bg-[#fafbfc]">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => { if (el) el.indeterminate = selected.size > 0 && !allSelected }}
+                  onChange={toggleSelectAll}
+                  aria-label="Select all on this page"
+                  className="w-4 h-4 accent-[#001f3f] cursor-pointer shrink-0"
+                />
+                {selected.size > 0 ? (
+                  <>
+                    <span className="text-xs font-semibold text-[#374151]">{selected.size} selected</span>
+                    {folder === "inbox" ? (
+                      <button
+                        type="button"
+                        onClick={() => void bulkSetDeleted(true)}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#e5e8ec] text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Archive
+                      </button>
+                    ) : folder === "archived" ? (
+                      <button
+                        type="button"
+                        onClick={() => void bulkSetDeleted(false)}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#e5e8ec] text-xs font-semibold text-emerald-600 hover:bg-emerald-50 disabled:opacity-50 transition-colors"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Restore
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void bulkDeleteSent()}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#e5e8ec] text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-xs text-[#9ca3af]">Select</span>
+                )}
               </div>
-            ) : rows.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-                <div className="w-16 h-16 rounded-2xl bg-[#f3f4f6] flex items-center justify-center mb-4">
-                  <UserSearch className="w-8 h-8 text-[#d1d5db]" />
+            )}
+            <div className="flex-1 overflow-y-auto">
+              {loading ? (
+                <div className="p-4 space-y-2">
+                  {Array.from({ length: 9 }).map((_, i) => (
+                    <div key={i} className="h-16 bg-[#f8f9fa] animate-pulse" />
+                  ))}
                 </div>
-                <p className="text-base font-semibold text-[#374151]">No leads found</p>
-                <p className="text-sm text-[#9ca3af] mt-1">Inquiries from the Inquire Now form on project pages will appear here.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-[#f0f0f0]">
-                {/* Desktop rows */}
-                {rows.map((row) => (
-                  <button
-                    key={row.id}
-                    type="button"
-                    onClick={() => router.push(`${base}/leads/${row.id}`)}
-                    className={`hidden lg:grid grid-cols-[1.4fr_150px_1.2fr_1.3fr_110px_140px_32px] lg:min-w-[1020px] gap-4 items-center px-6 py-4 w-full text-left hover:bg-[#f8fafc] transition-colors ${row.deleted_at ? "opacity-60" : ""}`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <UserAvatar name={row.name} size={34} />
-                      <div className="min-w-0">
-                        <p className={`text-sm truncate ${row.status === "new" && !row.deleted_at ? "font-bold text-[#0d1117]" : "font-semibold text-[#374151]"}`}>{row.name}</p>
-                        <p className="text-xs text-[#9ca3af] truncate">{row.email}</p>
+              ) : listError ? (
+                <div className="p-8 text-center text-sm text-rose-600">{listError}</div>
+              ) : folder === "sent" ? (
+                sentRows.length === 0 ? (
+                  <EmptyList icon={Send} title="Nothing sent yet" hint="Replies and composed emails will appear here." />
+                ) : (
+                  sentRows.map((m) => {
+                    const active = openId === m.id
+                    return (
+                      <div
+                        key={m.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setParams({ open: m.id })}
+                        onKeyDown={(e) => { if (e.key === "Enter") setParams({ open: m.id }) }}
+                        className={`w-full text-left px-4 py-3 border-b border-[#f5f5f5] cursor-pointer transition-colors ${
+                          active ? "bg-[#001f3f]/[0.05]" : "hover:bg-[#f8f9fa]"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(m.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={() => toggleSelect(m.id)}
+                            aria-label={`Select email to ${m.to_name || m.to_email}`}
+                            className="w-4 h-4 mt-0.5 accent-[#001f3f] cursor-pointer shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="flex-1 min-w-0 text-sm font-semibold text-[#374151] truncate">
+                                To: {m.to_name || m.to_email}
+                              </p>
+                              {m.status === "failed" && (
+                                <span className="px-2 py-0.5 text-[10px] font-semibold bg-rose-50 text-rose-600">Failed</span>
+                              )}
+                              <span className="text-[11px] text-[#9ca3af] shrink-0">{mailTime(m.created_at)}</span>
+                            </div>
+                            <p className="text-[13px] text-[#0d1117] font-medium truncate mt-0.5">{m.subject}</p>
+                            <p className="text-xs text-[#9ca3af] truncate mt-0.5">{m.body_text}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )
+              ) : rows.length === 0 ? (
+                <EmptyList
+                  icon={folder === "archived" ? Archive : Inbox}
+                  title={folder === "archived" ? "No archived conversations" : "Inbox zero"}
+                  hint={folder === "archived" ? "Archived leads will appear here." : "Inquiries from the Inquire Now form on project pages will appear here."}
+                />
+              ) : (
+                rows.map((row) => {
+                  const isUnread = !row.read_at && !row.deleted_at
+                  const active = openId === row.id
+                  // div + role, not <button>: the row holds a checkbox, and
+                  // interactive elements can't nest inside a button.
+                  return (
+                    <div
+                      key={row.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setParams({ open: row.id })}
+                      onKeyDown={(e) => { if (e.key === "Enter") setParams({ open: row.id }) }}
+                      className={`w-full text-left px-4 py-3 border-b border-[#f5f5f5] cursor-pointer transition-colors ${
+                        active ? "bg-[#001f3f]/[0.05]" : isUnread ? "bg-white hover:bg-[#f8f9fa]" : "bg-[#fafbfc] hover:bg-[#f8f9fa]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggleSelect(row.id)}
+                          aria-label={`Select conversation from ${row.name}`}
+                          className="w-4 h-4 accent-[#001f3f] cursor-pointer shrink-0"
+                        />
+                        <UserAvatar name={row.name} size={38} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className={`flex-1 min-w-0 text-sm truncate ${isUnread ? "font-bold text-[#0d1117]" : "font-medium text-[#4b5563]"}`}>
+                              {row.name}
+                            </p>
+                            {isUnread && <span className="w-2 h-2 rounded-full bg-[#d6b357] shrink-0" />}
+                            <span className={`text-[11px] shrink-0 ${isUnread ? "font-bold text-[#0d1117]" : "text-[#9ca3af]"}`}>
+                              {mailTime(row.created_at)}
+                            </span>
+                          </div>
+                          <p className={`text-[13px] truncate mt-0.5 ${isUnread ? "font-semibold text-[#1f2937]" : "text-[#6b7280]"}`}>
+                            {row.project_name ? `Inquiry — ${row.project_name}` : `${CATEGORY_LABELS[row.property_category] ?? row.property_category} inquiry`}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="px-2 py-0.5 text-[10px] font-semibold bg-[#f3f4f6] text-[#374151]">
+                              {CATEGORY_LABELS[row.property_category] ?? row.property_category}
+                            </span>
+                            <StatusChip row={row} />
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <span className="text-xs text-[#6b7280] truncate">{row.phone_country_code} {row.phone}</span>
-                    <div className="min-w-0 flex flex-col gap-1">
-                      <span className="text-xs text-[#6b7280] truncate">{LOOKING_FOR_LABELS[row.looking_for] ?? row.looking_for}</span>
-                      <CategoryChip category={row.property_category} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs text-[#374151] truncate">{row.project_name ?? "—"}</p>
-                      {row.developer_name && <p className="text-[11px] text-[#9ca3af] truncate">{row.developer_name}</p>}
-                    </div>
-                    <StatusBadge row={row} />
-                    <div className="min-w-0">
-                      <p className="text-xs text-[#374151] truncate" title={formatDateTime(row.created_at)}>{formatDate(row.created_at)}</p>
-                      <p className="text-[11px] text-[#9ca3af] truncate">{relativeTime(row.created_at)}</p>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-[#c4c4c4]" />
-                  </button>
-                ))}
+                  )
+                })
+              )}
+            </div>
 
-                {/* Mobile cards */}
-                {rows.map((row) => (
-                  <button
-                    key={`m-${row.id}`}
-                    type="button"
-                    onClick={() => router.push(`${base}/leads/${row.id}`)}
-                    className={`lg:hidden w-full text-left p-4 hover:bg-[#f8fafc] transition-colors ${row.deleted_at ? "opacity-60" : ""}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <UserAvatar name={row.name} size={36} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className={`text-sm truncate ${row.status === "new" && !row.deleted_at ? "font-bold text-[#0d1117]" : "font-semibold text-[#374151]"}`}>{row.name}</p>
-                          <StatusBadge row={row} />
-                        </div>
-                        <p className="text-xs text-[#9ca3af] truncate">{row.email} · {row.phone_country_code} {row.phone}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <CategoryChip category={row.property_category} />
-                          <span className="text-[11px] text-[#9ca3af] truncate">{LOOKING_FOR_LABELS[row.looking_for] ?? row.looking_for}</span>
-                        </div>
-                        <p className="text-[11px] text-[#9ca3af] mt-1">{row.project_name ?? "No project"} · {relativeTime(row.created_at)}</p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
+            {/* List pagination */}
+            <div className="flex items-center justify-between px-4 py-2 border-t border-[#f0f0f0]">
+              <p className="text-[11px] text-[#9ca3af]">
+                {total > 0 ? `${Math.min((page - 1) * PER_PAGE + 1, total)}–${Math.min(page * PER_PAGE, total)} of ${total}` : "No results"}
+              </p>
+              <div className="flex items-center gap-1">
+                <IconBtn title="Previous page" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
+                  <ChevronLeft className="w-4 h-4" />
+                </IconBtn>
+                <IconBtn title="Next page" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
+                  <ChevronRight className="w-4 h-4" />
+                </IconBtn>
               </div>
+            </div>
+          </div>
+
+          {/* Reading pane */}
+          <div className={`${paneOpen ? "flex" : "hidden lg:flex"} flex-col flex-1 min-w-0 min-h-0`}>
+            {folder === "sent" ? (
+              selectedSent ? (
+                <SentReader
+                  email={selectedSent}
+                  onBack={() => setParams({ open: null })}
+                  onOpenLead={(inquiryId) => setParams({ folder: null, open: inquiryId })}
+                />
+              ) : (
+                <EmptyPane />
+              )
+            ) : openId ? (
+              threadLoading || !thread ? (
+                <div className="flex-1 flex items-center justify-center gap-2 text-sm text-[#9ca3af]">
+                  <Loader2 className="w-5 h-5 animate-spin" /> Opening conversation…
+                </div>
+              ) : (
+                <ThreadReader
+                  thread={thread}
+                  busy={busy}
+                  onBack={() => setParams({ open: null })}
+                  onMarkUnread={() => void markUnread(thread.inquiry)}
+                  onStatus={(s, msg) => void changeStatus(thread.inquiry, s, msg)}
+                  onArchive={() => void toggleArchive(thread.inquiry)}
+                  onReplied={(email) => {
+                    setThread((t) => (t ? { ...t, emails: [...t.emails, email] } : t))
+                    patchRow(thread.inquiry.id, {
+                      status: thread.inquiry.status === "new" ? "contacted" : thread.inquiry.status,
+                      contacted_at: thread.inquiry.contacted_at ?? new Date().toISOString(),
+                    })
+                    setSummary((s) => (s ? { ...s, sent: (s.sent ?? 0) + 1 } : s))
+                    setNotice(`Reply sent to ${thread.inquiry.email}.`)
+                  }}
+                  onNotice={setNotice}
+                />
+              )
+            ) : (
+              <EmptyPane />
             )}
           </div>
         </div>
+      </div>
 
-        {/* Pagination */}
-        <div className="flex items-center justify-between gap-4">
-          <p className="text-sm text-[#6b7280]">
-            {total > 0 ? `Showing ${Math.min((page - 1) * PER_PAGE + 1, total)}–${Math.min(page * PER_PAGE, total)} of ${total}` : "No results"}
-          </p>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-              className="w-9 h-9 flex items-center justify-center rounded-full border border-[#e5e5e5] text-[#6b7280] hover:border-[#001f3f] hover:text-[#001f3f] disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-xs font-semibold text-[#374151] px-2">{page} / {totalPages}</span>
-            <button type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-              className="w-9 h-9 flex items-center justify-center rounded-full border border-[#e5e5e5] text-[#6b7280] hover:border-[#001f3f] hover:text-[#001f3f] disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-              <ChevronRight className="w-4 h-4" />
-            </button>
+      {composeOpen && (
+        <ComposeWindow
+          onClose={() => setComposeOpen(false)}
+          onSent={(email) => {
+            setComposeOpen(false)
+            setNotice(`Email sent to ${email.to_email}.`)
+            setSummary((s) => (s ? { ...s, sent: (s.sent ?? 0) + 1 } : s))
+            if (folder === "sent") setSentRows((rs) => [email, ...rs])
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function EmptyList({ icon: Icon, title, hint }: { icon: typeof Inbox; title: string; hint: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+      <div className="w-14 h-14 bg-[#f3f4f6] flex items-center justify-center mb-3">
+        <Icon className="w-7 h-7 text-[#d1d5db]" />
+      </div>
+      <p className="text-sm font-semibold text-[#374151]">{title}</p>
+      <p className="text-xs text-[#9ca3af] mt-1">{hint}</p>
+    </div>
+  )
+}
+
+function EmptyPane() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+      <div className="w-16 h-16 bg-[#f3f4f6] flex items-center justify-center mb-4">
+        <MailOpen className="w-8 h-8 text-[#d1d5db]" />
+      </div>
+      <p className="text-sm font-semibold text-[#374151]">Select a conversation to read</p>
+      <p className="text-xs text-[#9ca3af] mt-1">Click an email on the left — reply without leaving the page.</p>
+    </div>
+  )
+}
+
+// ─── Reading pane: a lead conversation ────────────────────────────────────────
+
+function ThreadReader({
+  thread, busy, onBack, onMarkUnread, onStatus, onArchive, onReplied, onNotice,
+}: {
+  thread: { inquiry: Inquiry; emails: SentEmail[] }
+  busy: boolean
+  onBack: () => void
+  onMarkUnread: () => void
+  onStatus: (s: InquiryStatus, message: string) => void
+  onArchive: () => void
+  onReplied: (email: SentEmail) => void
+  onNotice: (n: string) => void
+}) {
+  const l = thread.inquiry
+  const isArchived = Boolean(l.deleted_at)
+  const fullPhone = `${l.phone_country_code} ${l.phone}`
+  const waNumber = `${l.phone_country_code}${l.phone}`.replace(/[^0-9]/g, "")
+  const subjectLine = l.project_name ? `Inquiry — ${l.project_name}` : "New property inquiry"
+
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  return (
+    <>
+      {/* Pane toolbar */}
+      <div className="flex items-center gap-1 px-3 py-2 border-b border-[#f0f0f0]">
+        <IconBtn title="Back to list" onClick={onBack}>
+          <ArrowLeft className="w-4 h-4" />
+        </IconBtn>
+        <div className="flex-1 min-w-0 px-1">
+          <p className="text-sm font-bold text-[#0d1117] truncate">{subjectLine}</p>
+        </div>
+        <IconBtn title="Mark as unread" onClick={onMarkUnread} disabled={busy}>
+          <Mail className="w-4 h-4" />
+        </IconBtn>
+        {!isArchived && l.status !== "contacted" && (
+          <IconBtn title="Mark contacted" onClick={() => onStatus("contacted", "Marked as contacted.")} disabled={busy}>
+            <PhoneCall className="w-4 h-4" />
+          </IconBtn>
+        )}
+        {!isArchived && l.status !== "closed" && (
+          <IconBtn title="Mark closed" tone="success" onClick={() => onStatus("closed", "Marked as closed.")} disabled={busy}>
+            <CheckCircle2 className="w-4 h-4" />
+          </IconBtn>
+        )}
+        {!isArchived && l.status !== "new" && (
+          <IconBtn title="Reopen as new" onClick={() => onStatus("new", "Reopened as new.")} disabled={busy}>
+            <Undo2 className="w-4 h-4" />
+          </IconBtn>
+        )}
+        <IconBtn title={isArchived ? "Restore" : "Archive"} tone={isArchived ? "success" : "danger"} onClick={onArchive} disabled={busy}>
+          {isArchived ? <RotateCcw className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+        </IconBtn>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-4">
+          {/* Subject + chips */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{subjectLine}</h2>
+            <span className="px-2 py-0.5 text-[10px] font-semibold bg-[#f3f4f6] text-[#374151]">
+              {CATEGORY_LABELS[l.property_category] ?? l.property_category}
+            </span>
+            <StatusChip row={l} />
+            {!l.deleted_at && l.status === "new" && (
+              <span className="px-2 py-0.5 text-[10px] font-semibold bg-[#d6b357]/15 text-[#8a6d1f]">New</span>
+            )}
+          </div>
+
+          {/* The lead's message */}
+          <div className="border border-[#e5e8ec] bg-white">
+            <div className="flex items-start gap-3 px-5 pt-4">
+              <UserAvatar name={l.name} size={40} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <p className="text-sm font-bold text-[#0d1117]">{l.name}</p>
+                  <a href={`mailto:${l.email}`} className="text-xs text-[#6b7280] hover:text-[#001f3f] truncate">&lt;{l.email}&gt;</a>
+                </div>
+                <p className="text-[11px] text-[#9ca3af]">to FHI Global</p>
+              </div>
+              <span className="text-[11px] text-[#9ca3af] shrink-0" title={formatDateTime(l.created_at)}>
+                {formatDateTime(l.created_at)} · {relativeTime(l.created_at)}
+              </span>
+            </div>
+
+            <div className="px-5 py-4 text-sm text-[#374151] leading-relaxed">
+              <p>
+                <strong>{l.name}</strong> submitted the Inquire Now form
+                {l.project_name ? <> for <strong>{l.project_name}</strong></> : null}
+                {l.developer_name ? <> by {l.developer_name}</> : null}.
+              </p>
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                <ThreadFact label="Interested in" value={CATEGORY_LABELS[l.property_category] ?? l.property_category} />
+                <ThreadFact label="Who they are" value={LOOKING_FOR_LABELS[l.looking_for] ?? l.looking_for} />
+                <ThreadFact label="Phone" value={fullPhone} />
+                <ThreadFact label="Email" value={l.email} />
+              </div>
+
+              {/* Quick contact actions */}
+              <div className="flex items-center gap-2 flex-wrap mt-5">
+                <a href={`tel:${l.phone_country_code}${l.phone.replace(/[^0-9]/g, "")}`}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#e5e8ec] text-xs font-semibold text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] transition-all">
+                  <Phone className="w-3.5 h-3.5" /> Call
+                </a>
+                <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#e5e8ec] text-xs font-semibold text-[#374151] hover:border-[#25d366] hover:text-[#128c4a] transition-all">
+                  <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                </a>
+                {l.project_name && (
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#f3f4f6] text-xs font-semibold text-[#374151]">
+                    <Building2 className="w-3.5 h-3.5" /> {l.project_name}
+                  </span>
+                )}
+              </div>
+
+              {/* Submission meta, folded away like Gmail's details */}
+              <details className="mt-4 group">
+                <summary className="inline-flex items-center gap-1 text-xs text-[#9ca3af] cursor-pointer select-none hover:text-[#374151]">
+                  <ChevronDown className="w-3.5 h-3.5 transition-transform group-open:rotate-180" /> Submission details
+                </summary>
+                <div className="mt-3 bg-[#f8f9fa] px-4 py-3 space-y-1.5 text-xs text-[#6b7280]">
+                  <p className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> {formatDateTime(l.created_at)}</p>
+                  <p className="flex items-center gap-1.5"><Globe className="w-3 h-3" /> {l.ip_address ?? "IP unavailable"} · {l.source === "project_page" ? "Project page — Inquire Now" : l.source}</p>
+                  <p className="flex items-start gap-1.5 break-all"><MonitorSmartphone className="w-3 h-3 mt-0.5 shrink-0" /> {l.user_agent ?? "Device unavailable"}</p>
+                  {l.contacted_at && <p className="flex items-center gap-1.5"><PhoneCall className="w-3 h-3" /> First contacted {formatDateTime(l.contacted_at)}</p>}
+                </div>
+              </details>
+            </div>
+          </div>
+
+          {/* Sent replies */}
+          {thread.emails.map((m) => (
+            <div key={m.id} className={`border ${m.status === "failed" ? "border-rose-200 bg-rose-50/40" : "border-[#eef0f2] bg-[#fbfcfd]"}`}>
+              <div className="flex items-start gap-3 px-5 pt-4">
+                <div className="w-10 h-10 rounded-full bg-[#001f3f] flex items-center justify-center shrink-0">
+                  <span className="text-white text-xs font-bold">FHI</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <p className="text-sm font-bold text-[#0d1117]">{m.sent_by_name ?? "FHI Global"}</p>
+                    <span className="text-xs text-[#6b7280] truncate">to {m.to_email}</span>
+                  </div>
+                  <p className="text-[13px] font-semibold text-[#374151] mt-0.5 truncate">{m.subject}</p>
+                </div>
+                <span className="text-[11px] text-[#9ca3af] shrink-0" title={formatDateTime(m.created_at)}>
+                  {formatDateTime(m.created_at)}
+                </span>
+              </div>
+              <div className="px-5 py-4">
+                {m.status === "failed" && (
+                  <p className="mb-2 text-xs font-semibold text-rose-600">
+                    Failed to send{m.error ? ` — ${m.error}` : ""}. This message was not delivered.
+                  </p>
+                )}
+                <p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">{m.body_text}</p>
+              </div>
+            </div>
+          ))}
+
+          {/* Reply composer — keyed by lead so drafts reset per conversation */}
+          <ReplyBox
+            key={l.id}
+            lead={l}
+            disabled={isArchived}
+            onReplied={(email) => { onReplied(email); bottomRef.current?.scrollIntoView({ behavior: "smooth" }) }}
+            onNotice={onNotice}
+          />
+          <div ref={bottomRef} />
+        </div>
+      </div>
+    </>
+  )
+}
+
+function ThreadFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[11px] text-[#9ca3af]">{label}</p>
+      <p className="text-sm font-semibold text-[#111827] break-all">{value}</p>
+    </div>
+  )
+}
+
+// ─── Reply box ────────────────────────────────────────────────────────────────
+
+function ReplyBox({
+  lead, disabled, onReplied, onNotice,
+}: {
+  lead: Inquiry
+  disabled: boolean
+  onReplied: (email: SentEmail) => void
+  onNotice: (n: string) => void
+}) {
+  const defaultSubject = lead.project_name
+    ? `Re: Your inquiry about ${lead.project_name}`
+    : "Re: Your inquiry — FHI Global"
+
+  const [open, setOpen] = useState(false)
+  const [subject, setSubject] = useState(defaultSubject)
+  const [message, setMessage] = useState("")
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  if (disabled) {
+    return (
+      <p className="text-xs text-[#9ca3af] text-center py-2">
+        This conversation is archived — restore it to reply.
+      </p>
+    )
+  }
+
+  if (!open) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-2 px-6 py-2.5 border border-[#e5e8ec] text-sm font-bold text-[#001f3f] hover:bg-[#001f3f] hover:text-white transition-all"
+        >
+          <Send className="w-4 h-4" /> Reply
+        </button>
+      </div>
+    )
+  }
+
+  const send = async () => {
+    if (!subject.trim() || !message.trim()) { setError("Write a subject and a message first."); return }
+    setSending(true)
+    setError(null)
+    const { email, error: err } = await sendInquiryReply(lead.id, subject.trim(), message.trim())
+    setSending(false)
+    if (err) { setError(err); if (email) onReplied(email); return }
+    if (email) onReplied(email)
+    setOpen(false)
+    setMessage("")
+    onNotice(`Reply sent to ${lead.email}.`)
+  }
+
+  return (
+    <div className="border border-[#e5e8ec] bg-white overflow-hidden">
+      <div className="px-5 pt-4 pb-1">
+        <p className="text-xs text-[#6b7280]">
+          Replying to <span className="font-semibold text-[#374151]">{lead.name}</span> &lt;{lead.email}&gt;
+        </p>
+      </div>
+      <div className="px-5 py-2">
+        <input
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          maxLength={200}
+          placeholder="Subject"
+          className="w-full py-2 text-sm font-semibold text-[#0d1117] border-b border-[#f0f0f0] focus:outline-none focus:border-[#001f3f]/40"
+        />
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          maxLength={10_000}
+          rows={6}
+          autoFocus
+          placeholder={`Hi ${lead.name.split(/\s+/)[0]},`}
+          className="w-full py-3 text-sm text-[#374151] leading-relaxed resize-y focus:outline-none"
+        />
+      </div>
+      {error && <p className="px-5 pb-1 text-xs font-semibold text-rose-600">{error}</p>}
+      <div className="flex items-center gap-2 px-5 py-3 border-t border-[#f0f0f0]">
+        <button
+          type="button"
+          onClick={() => void send()}
+          disabled={sending}
+          className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#0a3d6b] disabled:opacity-60 transition-all"
+        >
+          {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          {sending ? "Sending…" : "Send"}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setError(null) }}
+          disabled={sending}
+          className="px-4 py-2.5 text-sm font-semibold text-[#6b7280] hover:bg-[#f1f3f4] transition-all"
+        >
+          Discard
+        </button>
+        <span className="ml-auto text-[11px] text-[#c4c4c4]">Sent from your FHI Global email</span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Reading pane: a sent email ───────────────────────────────────────────────
+
+function SentReader({
+  email, onBack, onOpenLead,
+}: {
+  email: SentEmail
+  onBack: () => void
+  onOpenLead: (inquiryId: string) => void
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-1 px-3 py-2 border-b border-[#f0f0f0]">
+        <IconBtn title="Back to list" onClick={onBack}>
+          <ArrowLeft className="w-4 h-4" />
+        </IconBtn>
+        <div className="flex-1 min-w-0 px-1">
+          <p className="text-sm font-bold text-[#0d1117] truncate">{email.subject}</p>
+        </div>
+        {email.inquiry_id && (
+          <button
+            type="button"
+            onClick={() => onOpenLead(email.inquiry_id!)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#e5e8ec] text-xs font-semibold text-[#001f3f] hover:bg-[#001f3f] hover:text-white transition-all"
+          >
+            <Inbox className="w-3.5 h-3.5" /> Open conversation
+          </button>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5">
+          <div className="border border-[#e5e8ec] bg-white">
+            <div className="flex items-start gap-3 px-5 pt-4">
+              <div className="w-10 h-10 rounded-full bg-[#001f3f] flex items-center justify-center shrink-0">
+                <span className="text-white text-xs font-bold">FHI</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-[#0d1117]">{email.sent_by_name ?? "FHI Global"}</p>
+                <p className="text-xs text-[#6b7280] truncate">to {email.to_name ? `${email.to_name} <${email.to_email}>` : email.to_email}</p>
+              </div>
+              <span className="text-[11px] text-[#9ca3af] shrink-0" title={formatDateTime(email.created_at)}>
+                {formatDateTime(email.created_at)}
+              </span>
+            </div>
+            <div className="px-5 py-4">
+              {email.status === "failed" && (
+                <p className="mb-3 text-xs font-semibold text-rose-600">
+                  Failed to send{email.error ? ` — ${email.error}` : ""}. This message was not delivered.
+                </p>
+              )}
+              <h2 className="font-['Outfit'] text-base font-bold text-[#0d1117] mb-3">{email.subject}</h2>
+              <p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">{email.body_text}</p>
+            </div>
           </div>
         </div>
+      </div>
+    </>
+  )
+}
+
+// ─── Compose window (Gmail-style, bottom-right) ───────────────────────────────
+
+function ComposeWindow({
+  onClose, onSent,
+}: {
+  onClose: () => void
+  onSent: (email: SentEmail) => void
+}) {
+  const [to, setTo] = useState("")
+  const [toName, setToName] = useState("")
+  const [subject, setSubject] = useState("")
+  const [message, setMessage] = useState("")
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const send = async () => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to.trim())) { setError("Enter a valid email address."); return }
+    if (!subject.trim() || !message.trim()) { setError("Write a subject and a message first."); return }
+    setSending(true)
+    setError(null)
+    const { email, error: err } = await sendComposedEmail({
+      to: to.trim(),
+      toName: toName.trim() || undefined,
+      subject: subject.trim(),
+      message: message.trim(),
+    })
+    setSending(false)
+    if (err) { setError(err); return }
+    if (email) onSent(email)
+  }
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50 w-[min(520px,calc(100vw-2rem))] bg-white shadow-2xl shadow-black/25 border border-[#e5e5e5] overflow-hidden flex flex-col max-h-[min(640px,calc(100vh-4rem))]">
+      <div className="flex items-center justify-between gap-3 px-5 py-3 bg-[#001f3f]">
+        <p className="text-sm font-bold text-white">New message</p>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={sending}
+          aria-label="Close compose"
+          className="w-7 h-7 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="px-5 flex-1 overflow-y-auto">
+        <div className="flex items-center gap-2 border-b border-[#f0f0f0]">
+          <span className="text-xs text-[#9ca3af] shrink-0 w-14">To</span>
+          <input
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            type="email"
+            placeholder="recipient@email.com"
+            className="flex-1 py-2.5 text-sm text-[#0d1117] focus:outline-none"
+            autoFocus
+          />
+        </div>
+        <div className="flex items-center gap-2 border-b border-[#f0f0f0]">
+          <span className="text-xs text-[#9ca3af] shrink-0 w-14">Name</span>
+          <input
+            value={toName}
+            onChange={(e) => setToName(e.target.value)}
+            placeholder="Optional — recipient's name"
+            className="flex-1 py-2.5 text-sm text-[#0d1117] focus:outline-none"
+          />
+        </div>
+        <div className="flex items-center gap-2 border-b border-[#f0f0f0]">
+          <span className="text-xs text-[#9ca3af] shrink-0 w-14">Subject</span>
+          <input
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            maxLength={200}
+            placeholder="Subject"
+            className="flex-1 py-2.5 text-sm font-semibold text-[#0d1117] focus:outline-none"
+          />
+        </div>
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          maxLength={10_000}
+          rows={9}
+          placeholder="Write your message…"
+          className="w-full py-3 text-sm text-[#374151] leading-relaxed resize-none focus:outline-none"
+        />
+      </div>
+
+      {error && <p className="px-5 pb-2 text-xs font-semibold text-rose-600">{error}</p>}
+      <div className="flex items-center gap-2 px-5 py-3 border-t border-[#f0f0f0]">
+        <button
+          type="button"
+          onClick={() => void send()}
+          disabled={sending}
+          className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#d6b357] text-[#1a1408] text-sm font-bold hover:brightness-95 disabled:opacity-60 transition-all"
+        >
+          {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          {sending ? "Sending…" : "Send"}
+        </button>
+        <span className="ml-auto text-[11px] text-[#c4c4c4]">Delivered with the FHI Global template</span>
       </div>
     </div>
   )

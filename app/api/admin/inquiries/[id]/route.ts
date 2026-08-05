@@ -12,7 +12,9 @@ import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 export const runtime = "nodejs"
 
 const FULL_COLUMNS =
-  "id, name, email, phone_country_code, phone, looking_for, property_category, project_id, project_name, developer_name, status, source, ip_address, user_agent, created_at, contacted_at, updated_at, deleted_at"
+  "id, name, email, phone_country_code, phone, looking_for, property_category, project_id, project_name, developer_name, status, source, ip_address, user_agent, created_at, contacted_at, read_at, updated_at, deleted_at"
+const EMAIL_COLUMNS =
+  "id, inquiry_id, to_email, to_name, subject, body_text, sent_by, sent_by_name, status, error, created_at"
 const STATUSES = new Set(["new", "contacted", "closed"])
 
 function actorFrom(ctx: { userId: string; email: string | null; profile: { role: string | null; fullname: string | null } }) {
@@ -25,16 +27,29 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
   const { id } = await context.params
 
   const admin = createAdminSupabase()
-  const { data, error } = await admin
-    .from("inquiries")
-    .select(FULL_COLUMNS)
-    .eq("id", id)
-    .maybeSingle()
+  let result = await admin.from("inquiries").select(FULL_COLUMNS).eq("id", id).maybeSingle()
+  // 42703 = read_at doesn't exist yet (migration 031 not applied).
+  if (result.error?.code === "42703") {
+    result = await admin
+      .from("inquiries")
+      .select(FULL_COLUMNS.replace(", read_at", ""))
+      .eq("id", id)
+      .maybeSingle()
+  }
+  const { data, error } = result
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: "Lead not found." }, { status: 404 })
 
-  return NextResponse.json({ inquiry: data })
+  // The Emails page shows the lead as a conversation — include every email
+  // sent from the dashboard on this thread, oldest first.
+  const { data: emails } = await admin
+    .from("inquiry_emails")
+    .select(EMAIL_COLUMNS)
+    .eq("inquiry_id", id)
+    .order("created_at", { ascending: true })
+
+  return NextResponse.json({ inquiry: data, emails: emails ?? [] })
 }
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -42,16 +57,31 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   if (!guard.ok) return guard.response
   const { id } = await context.params
 
-  let body: { status?: string }
+  let body: { status?: string; read?: boolean }
   try {
-    body = (await req.json()) as { status?: string }
+    body = (await req.json()) as { status?: string; read?: boolean }
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
   }
-  const status = String(body.status ?? "")
-  if (!STATUSES.has(status)) return NextResponse.json({ error: "Invalid status." }, { status: 400 })
 
   const admin = createAdminSupabase()
+
+  // Read/unread is inbox state, not a business event — no status change, no
+  // audit row. Opening an email fires this on every click.
+  if (typeof body.read === "boolean" && body.status === undefined) {
+    const { error } = await admin
+      .from("inquiries")
+      .update({ read_at: body.read ? new Date().toISOString() : null })
+      .eq("id", id)
+    // 42703: migration 031 not applied — read state is a no-op until then.
+    if (error && error.code !== "42703") {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    return NextResponse.json({ ok: true })
+  }
+
+  const status = String(body.status ?? "")
+  if (!STATUSES.has(status)) return NextResponse.json({ error: "Invalid status." }, { status: 400 })
   const { data: existing } = await admin
     .from("inquiries")
     .select("id, name, status, contacted_at")

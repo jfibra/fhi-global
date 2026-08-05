@@ -121,8 +121,8 @@ function SidebarNav({
 }) {
   const pathname = usePathname()
 
-  // Unread-leads badge — only fetched when this role's list actually has the
-  // Leads Inquiries row (admin + superadmin).
+  // Unread-emails badge — only fetched when this role's list actually has the
+  // Emails row (admin + superadmin).
   const leadsHref = `${dashboardBase}/leads`
   const newLeads = useNewLeadsCount(items.some((i) => i.href === leadsHref), pathname)
 
