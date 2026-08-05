@@ -21,7 +21,7 @@ const LogoTile = memo(function LogoTile({ dev }: { dev: DeveloperLogoItem }) {
   return (
     <Link
       href={`/${dev.slug}`}
-      className="group relative flex aspect-square w-[calc((100%-20px)/2)] shrink-0 items-center justify-center bg-white p-6 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform hover:-translate-y-2 sm:w-[calc((100%-40px)/3)] lg:w-[calc((100%-80px)/5)] after:pointer-events-none after:absolute after:inset-0 after:opacity-0 after:shadow-[0_14px_30px_-10px_rgba(0,31,63,0.35)] after:transition-opacity after:duration-300 hover:after:opacity-100"
+      className="group relative flex h-[188px] w-[calc((100%-20px)/2)] shrink-0 items-center justify-center bg-white p-8 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform hover:-translate-y-2 sm:w-[calc((100%-40px)/3)] lg:w-[calc((100%-80px)/5)] after:pointer-events-none after:absolute after:inset-0 after:opacity-0 after:shadow-[0_14px_30px_-10px_rgba(0,31,63,0.35)] after:transition-opacity after:duration-300 hover:after:opacity-100"
     >
       {dev.logo_url ? (
         <Image
@@ -29,7 +29,7 @@ const LogoTile = memo(function LogoTile({ dev }: { dev: DeveloperLogoItem }) {
           alt={dev.name}
           width={160}
           height={160}
-          className="h-full w-full object-contain grayscale-[15%] transition-[filter] duration-300 group-hover:grayscale-0"
+          className="max-h-[110px] w-full object-contain grayscale-[15%] transition-[filter] duration-300 group-hover:grayscale-0"
         />
       ) : (
         <span className="text-center text-sm font-semibold uppercase tracking-widest text-[#4b5563]">

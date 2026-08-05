@@ -191,7 +191,7 @@ export default async function HomePage() {
       {/* FEATURED DEVELOPERS                             */}
       {/* ----------------------------------------------- */}
       {developers && developers.length > 0 && (
-        <section className="relative pt-24 pb-36 overflow-hidden">
+        <section className="relative py-16 overflow-hidden">
           {/* Background photo with soft white wash (approved mockup) */}
           <div className="absolute inset-0">
             <Image
@@ -208,19 +208,17 @@ export default async function HomePage() {
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Section header */}
             <Reveal>
-            <div className="text-center mb-14">
-              <div className="inline-flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-[#0d1117] mb-5"><span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true"></span>
-                Our Partners
-              </div>
-              <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight">
-                <span className="text-[#0d1117]">Trusted</span>{" "}
-                <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
-                  Partners
-                </span>
+            <div className="mb-10 max-w-2xl">
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f]">Our Partners</p>
+              <h2 className="font-['Outfit'] text-3xl md:text-[42px] font-bold tracking-tight leading-[1.12] mt-3">
+                <span className="text-[#0d1117]">Trusted Developers,</span>
+                <br />
+                <span className="text-[#0d1117]">Building </span>
+                <span className="text-[#b8913f]">Dubai&rsquo;s Future</span>
               </h2>
-              <p className="text-[#4b5563] text-base leading-relaxed mt-4 max-w-xl mx-auto">
-                We collaborate with the most trusted and innovative real estate developers in Dubai
-                to bring you exceptional properties and investment opportunities.
+              <p className="text-[15.5px] leading-relaxed text-[#4b5563] mt-4">
+                We collaborate with the UAE&rsquo;s most trusted and innovative real estate
+                developers to bring you exceptional properties and investment opportunities.
               </p>
             </div>
             </Reveal>
