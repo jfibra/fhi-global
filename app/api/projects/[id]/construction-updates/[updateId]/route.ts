@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { guardProjectManage } from "@/lib/project-access"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
@@ -7,17 +8,40 @@ export const runtime = "nodejs"
 
 const STORAGE_BUCKET = "construction-updates"
 
-// Pull the in-bucket object path out of a public storage URL, e.g.
-// ".../object/public/construction-updates/dev/proj/123-abc.pdf" → "dev/proj/123-abc.pdf".
-function storagePathFromUrl(url: string | null | undefined): string | null {
-  if (!url) return null
+const s3 = new S3Client({
+  region: process.env.S3_REGION!,
+  credentials: {
+    accessKeyId: process.env.S3_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+  },
+})
+
+// The S3 object key from a public S3 URL (`${S3_PUBLIC_URL}/FHI_GLOBAL/...`).
+function s3KeyFromUrl(url: string): string | null {
+  const base = (process.env.S3_PUBLIC_URL ?? "").replace(/\/+$/, "")
+  if (!base || !url.startsWith(base + "/")) return null
+  try { return decodeURIComponent(url.slice(base.length + 1)) } catch { return url.slice(base.length + 1) }
+}
+
+// The in-bucket path from a Supabase Storage public URL (legacy/fallback files).
+function supabasePathFromUrl(url: string): string | null {
   const marker = `/${STORAGE_BUCKET}/`
   const i = url.indexOf(marker)
   if (i === -1) return null
-  try {
-    return decodeURIComponent(url.slice(i + marker.length))
-  } catch {
-    return url.slice(i + marker.length)
+  try { return decodeURIComponent(url.slice(i + marker.length)) } catch { return url.slice(i + marker.length) }
+}
+
+// Best-effort: remove the stored file from wherever it lives (S3 for current
+// uploads, Supabase for legacy/fallback ones). Never throws.
+async function removeStoredFile(admin: ReturnType<typeof createAdminSupabase>, fileUrl: string): Promise<void> {
+  const s3Key = s3KeyFromUrl(fileUrl)
+  if (s3Key) {
+    try { await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET_NAME!, Key: s3Key })) } catch { /* ignore */ }
+    return
+  }
+  const supaPath = supabasePathFromUrl(fileUrl)
+  if (supaPath) {
+    try { await admin.storage.from(STORAGE_BUCKET).remove([supaPath]) } catch { /* ignore */ }
   }
 }
 
@@ -42,16 +66,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { error } = await admin.from("construction_updates").delete().eq("id", updateId).eq("project_id", projectId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Best-effort: also remove the stored file so the bucket doesn't accumulate
-  // orphans. Never fail the delete on a storage hiccup (the row is already gone).
-  const path = storagePathFromUrl(existing.file_url)
-  if (path) {
-    try {
-      await admin.storage.from(STORAGE_BUCKET).remove([path])
-    } catch {
-      /* orphaned file is harmless; ignore */
-    }
-  }
+  // Best-effort: also remove the stored file (S3 or legacy Supabase) so storage
+  // doesn't accumulate orphans. Never fail the delete on a storage hiccup.
+  await removeStoredFile(admin, existing.file_url)
 
   await logAuditEvent({
     category: "projects",
