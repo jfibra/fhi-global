@@ -12,6 +12,7 @@ const STATIC_PATHS = [
   "/rent",
   "/projects",
   "/developers",
+  "/agents",
   "/events",
   "/news",
   "/about",
