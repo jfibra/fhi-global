@@ -220,8 +220,8 @@ export function InviteClient({
 
   const exportExcel = () => {
     const rows = [
-      ["Name", "Email", "Role", "Status", "Date Joined"],
-      ...filtered.map((r) => [r.fullname, r.email ?? "", roleToLabel(r.role), r.status, joinedLabel(r.joinedAt)]),
+      ["Name", "Email", "Role", "Contact Number", "WhatsApp Number", "Status", "Date Joined"],
+      ...filtered.map((r) => [r.fullname, r.email ?? "", roleToLabel(r.role), r.phone ?? "", r.whatsapp ?? "", r.status, joinedLabel(r.joinedAt)]),
     ]
     // BOM so Excel opens UTF-8 names (ñ, Arabic, …) correctly.
     const csv = "﻿" + rows.map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n")
@@ -245,6 +245,8 @@ export function InviteClient({
           <td><strong>${esc(r.fullname)}</strong></td>
           <td>${esc(r.email ?? "—")}</td>
           <td>${esc(roleToLabel(r.role))}</td>
+          <td>${esc(r.phone ?? "—")}</td>
+          <td>${esc(r.whatsapp ?? "—")}</td>
           <td><span class="pill ${r.status === "active" ? "ok" : "wait"}">${r.status === "active" ? "Active" : "Pending"}</span></td>
           <td>${esc(joinedLabel(r.joinedAt))}</td>
         </tr>`,
@@ -279,7 +281,7 @@ export function InviteClient({
     ${query.trim() ? `<span>Filter: <strong>“${esc(query.trim())}”</strong></span>` : ""}
   </div>
   <table>
-    <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Date Joined</th></tr></thead>
+    <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Contact Number</th><th>WhatsApp</th><th>Status</th><th>Date Joined</th></tr></thead>
     <tbody>${body}</tbody>
   </table>
   <p class="foot">Generated from the FHI Global dashboard · <b>fhiglobal.ae</b></p>
