@@ -204,7 +204,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           right. The old version stacked pills, title, and a loud navy CTA card
           in the same space — seven fat share buttons ended up shouting louder
           than the project name. */}
-      <section className="relative min-h-[560px] flex items-center overflow-hidden">
+      <section className="relative min-h-[420px] flex items-center overflow-hidden">
         {project.main_image ? (
           <Image
             src={project.main_image}
@@ -221,10 +221,10 @@ export default async function ProjectDetailPage({ params }: Props) {
             visible on the right, where the building usually is. */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/75 via-[#001428]/35 to-[#001428]/5" />
 
-        <div className="relative w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="relative w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12">
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-10 lg:gap-14 items-end">
             <div className="max-w-2xl">
-              <div className="flex items-center gap-3 mb-5">
+              <div className="flex items-center gap-3 mb-4">
                 <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
                   {status.label}
                 </span>
@@ -235,12 +235,12 @@ export default async function ProjectDetailPage({ params }: Props) {
               </div>
 
               <h1
-                className="font-['Outfit'] text-5xl md:text-6xl font-bold text-white leading-[1.04]"
+                className="font-['Outfit'] text-4xl md:text-5xl font-bold text-white leading-[1.06]"
                 style={{ textShadow: "0 2px 30px rgba(0,10,30,0.6)" }}
               >
                 {project.name}
               </h1>
-              <span className="block w-14 h-1 rounded-full bg-[#d6b357] mt-5 mb-6" aria-hidden="true" />
+              <span className="block w-14 h-1 bg-[#d6b357] mt-4 mb-5" aria-hidden="true" />
 
               {(project.description || project.about_project) && (
                 <p
@@ -253,7 +253,7 @@ export default async function ProjectDetailPage({ params }: Props) {
 
               {/* Fact row — the mockup's Developer / Location / Type / Status
                   strip. Empty fields drop out rather than printing a dash. */}
-              <dl className="mt-9 flex flex-wrap gap-x-12 gap-y-6">
+              <dl className="mt-7 flex flex-wrap gap-x-10 gap-y-5">
                 {[
                   {
                     label: "Developer",
