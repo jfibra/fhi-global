@@ -1,12 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   Users, ChevronDown, Eye, Phone, RotateCcw, Search, X,
   Calendar, Clock, User, Linkedin, Facebook, Mail,
   Building2, Briefcase, Loader2, BadgeCheck, Pencil,
   LayoutGrid, Table as TableIcon,
 } from "lucide-react"
+import { setBreadcrumbExtra } from "@/lib/dashboard-breadcrumb-extra"
 import { UserAvatar } from "@/components/user-avatar"
 import { DeveloperCombobox } from "@/components/developers/developer-combobox"
 import { DeveloperLogo } from "@/components/developers/developer-logo"
@@ -172,6 +174,42 @@ type AdminUsersClientProps = {
   roleColor?: string
 }
 
+// ── URL ⇄ state ──────────────────────────────────────────────────────────────
+// The directory mirrors its view into the query string (page / perPage / fname /
+// lname / email / sort / dir / view / account) so a refresh, a shared link, or
+// the browser Back button restores the exact same screen instead of snapping to
+// page one with cleared filters. Only non-default values are written, so a fresh
+// directory keeps a clean URL.
+type UrlState = {
+  page: number
+  perPage: number
+  fname: string
+  lname: string
+  email: string
+  sortKey: string
+  sortDir: "asc" | "desc"
+  account: string | null
+}
+
+function readUrlState(sp: { get(name: string): string | null }): UrlState {
+  const posInt = (v: string | null, fallback: number) => {
+    const n = Number(v)
+    return Number.isInteger(n) && n > 0 ? n : fallback
+  }
+  const perPage = posInt(sp.get("perPage"), DEFAULT_PER_PAGE)
+  const dir = sp.get("dir")
+  return {
+    page: posInt(sp.get("page"), 1),
+    perPage: PER_PAGE_OPTIONS.includes(perPage) ? perPage : DEFAULT_PER_PAGE,
+    fname: sp.get("fname") ?? "",
+    lname: sp.get("lname") ?? "",
+    email: sp.get("email") ?? "",
+    sortKey: sp.get("sort") || DEFAULT_SORT.key,
+    sortDir: dir === "asc" ? "asc" : dir === "desc" ? "desc" : DEFAULT_SORT.dir,
+    account: sp.get("account"),
+  }
+}
+
 // ─── View mode (cards ⇄ table), remembered per browser ────────────────────────
 // Backed by localStorage through useSyncExternalStore: reading storage during
 // render would make the server ("cards") and client disagree and break
@@ -282,26 +320,42 @@ function AssignDeveloperDialog({
 
 export function AdminUsersClient(props: AdminUsersClientProps) {
   const { currentRole, roleLabel, roleColor } = props
+
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // Snapshot the URL once (lazy init, so it reads the query exactly once) so a
+  // refresh / shared link opens on the same page, filters, sort and account
+  // rather than resetting.
+  const [init] = useState<UrlState>(() => readUrlState(searchParams))
+
   const [users,       setUsers]       = useState<UserRecord[]>([])
   const [total,       setTotal]       = useState(0)
-  const [page,        setPage]        = useState(1)
-  const [perPage,     setPerPage]     = useState(DEFAULT_PER_PAGE)
+  const [page,        setPage]        = useState(init.page)
+  const [perPage,     setPerPage]     = useState(init.perPage)
   /** Request signature whose results are currently in `users`. */
   const [loadedKey,   setLoadedKey]   = useState("")
   // Structured search inputs (first / last / email) + the committed query that
   // drives a fetch. A blank query is allowed — it fetches ALL users (paginated).
-  const [fnameInput,  setFnameInput]  = useState("")
-  const [lnameInput,  setLnameInput]  = useState("")
-  const [emailInput,  setEmailInput]  = useState("")
-  // Starts as a blank query so the directory lists everyone on arrival, then
-  // narrows as you type (debounced) — no need to press Search.
-  const [query,       setQuery]       = useState<{ fname: string; lname: string; email: string }>({ fname: "", lname: "", email: "" })
+  const [fnameInput,  setFnameInput]  = useState(init.fname)
+  const [lnameInput,  setLnameInput]  = useState(init.lname)
+  const [emailInput,  setEmailInput]  = useState(init.email)
+  // Seeded from the URL so the committed query matches the inputs on arrival,
+  // then narrows as you type (debounced) — no need to press Search.
+  const [query,       setQuery]       = useState<{ fname: string; lname: string; email: string }>({ fname: init.fname, lname: init.lname, email: init.email })
   // Column sort (table header clicks) — server-side, so it spans all pages.
-  const [sort,        setSort]        = useState<SortState>(DEFAULT_SORT)
+  const [sort,        setSort]        = useState<SortState>({ key: init.sortKey, dir: init.sortDir })
   const view = useSyncExternalStore(subscribeView, getViewSnapshot, getViewServerSnapshot)
   // Clicking a card drills into the Account 360 view; "Edit profile" in there
-  // opens the existing profile modal on top.
-  const [detailUser,  setDetailUser]  = useState<UserRecord | null>(null)
+  // opens the existing profile modal on top. The open account is mirrored to
+  // ?account= (source of truth) so it survives a refresh and the breadcrumb can
+  // link back. The view itself is DERIVED from ?account= + the loaded records
+  // map below — no separate state to keep in sync — so a card click, a refresh,
+  // Back, or the breadcrumb all open/close it the same way.
+  const [records,     setRecords]     = useState<Map<string, UserRecord>>(new Map())
+  // Account ids whose fetch failed (bad/deleted), so we don't refetch-loop them.
+  const [failedAccounts, setFailedAccounts] = useState<Set<string>>(new Set())
   const [viewUser,    setViewUser]    = useState<UserRecord | null>(null)
   const [referrers,   setReferrers]   = useState<ReferrerOption[]>([])
   // Developer companies (for the developer badge + assign picker).
@@ -313,6 +367,12 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   // Bumped after a profile save so the 360 view refetches the same account.
   const [detailRefresh, setDetailRefresh] = useState(0)
   const drillReqRef = useRef(0)
+
+  // The open Account 360 view, derived from ?account= + the records we've loaded.
+  // `restoring` is the loading gap before an ?account= from a refresh/link lands.
+  const account = searchParams.get("account")
+  const detailUser = account ? records.get(account) ?? null : null
+  const restoring = account !== null && !detailUser && !failedAccounts.has(account)
 
   const totalPages = Math.ceil(total / perPage)
 
@@ -465,9 +525,22 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     }
   }
 
-  // Card click: open the Account 360 detail view.
+  // ?account= is the source of truth for the open Account 360 view (so a refresh
+  // keeps it open and the breadcrumb can link back). This writes it, merging with
+  // the existing query so the list's page/filters ride along.
+  const setAccountParam = useCallback((id: string | null) => {
+    const qs = new URLSearchParams(searchParams.toString())
+    if (id) qs.set("account", id)
+    else qs.delete("account")
+    const next = qs.toString()
+    router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+  }, [searchParams, pathname, router])
+
+  // Card click: open the Account 360 view. Seed the record so the derived detail
+  // opens instantly (no refetch), then drive ?account=.
   const openView = (user: UserRecord) => {
-    setDetailUser(user)
+    setRecords((prev) => new Map(prev).set(user.id, user))
+    setAccountParam(user.id)
   }
 
   // Role changes gate access, so confirm before applying (the chip stays on its
@@ -498,23 +571,101 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
     })
   }, [applyPatch])
 
-  // Drill from a teammate/recruit row into that person's own 360 view — the
-  // row only carries an id, so pull the full record first. Sequence-guarded so
-  // rapid clicks can't land on an earlier account's response.
-  const openUserById = useCallback(async (id: string) => {
+  // Fetch a full account record for an ?account= id (a card/row only carries an
+  // id) into the records map. Sequence-guarded so rapid changes can't land on an
+  // earlier response. The setState is post-await, so it never cascades a render.
+  const fetchAccount = useCallback(async (id: string) => {
     const reqId = ++drillReqRef.current
     try {
       const res = await fetch(`/api/admin/users/${id}`, { cache: "no-store" })
       if (!res.ok) throw new Error()
       const record = (await res.json()) as UserRecord
       if (reqId !== drillReqRef.current) return
-      setDetailUser(record)
+      setRecords((prev) => new Map(prev).set(id, record))
     } catch {
-      if (reqId === drillReqRef.current) toast.error("Couldn't open that account.")
+      if (reqId !== drillReqRef.current) return
+      toast.error("Couldn't open that account.")
+      setFailedAccounts((prev) => new Set(prev).add(id))
+      setAccountParam(null) // bad / deleted id — drop it from the URL
     }
+  }, [setAccountParam])
+
+  // On load, adopt an explicit ?view= into the remembered view store (URL wins
+  // over the stored preference). Later toggles flow the other way (store → URL).
+  useEffect(() => {
+    const v = searchParams.get("view")
+    if (v === "table" || v === "cards") storeView(v)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // state → URL: mirror the current screen into the query string (non-defaults
+  // only), MERGING into the existing params so ?account= (owned by the detail
+  // sync) is preserved. replace() keeps it out of history so Back leaves the page.
+  useEffect(() => {
+    const qs = new URLSearchParams(searchParams.toString())
+    const put = (key: string, value: string, keep: boolean) => (keep ? qs.set(key, value) : qs.delete(key))
+    put("page",    String(page),    page !== 1)
+    put("perPage", String(perPage), perPage !== DEFAULT_PER_PAGE)
+    put("fname",   query.fname,      Boolean(query.fname))
+    put("lname",   query.lname,      Boolean(query.lname))
+    put("email",   query.email,      Boolean(query.email))
+    const sorted = sort.key !== DEFAULT_SORT.key || sort.dir !== DEFAULT_SORT.dir
+    put("sort", sort.key, sorted)
+    put("dir",  sort.dir, sorted)
+    put("view", "table", view === "table")
+    const next = qs.toString()
+    if (next !== searchParams.toString()) {
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }
+  }, [page, perPage, query, sort, view, pathname, router, searchParams])
+
+  // When ?account= names an account we haven't loaded yet (a refresh or a shared
+  // link), fetch it once. Cards preload their record on click, so this only runs
+  // for a cold restore. detailUser stays derived — nothing to sync here. The
+  // setState lands post-await (inside the IIFE) so it never cascades a render.
+  useEffect(() => {
+    if (!account || records.has(account) || failedAccounts.has(account)) return
+    const id = account
+    const reqId = ++drillReqRef.current
+    let alive = true
+    void (async () => {
+      try {
+        const res = await fetch(`/api/admin/users/${id}`, { cache: "no-store" })
+        if (!res.ok) throw new Error()
+        const record = (await res.json()) as UserRecord
+        if (!alive || reqId !== drillReqRef.current) return
+        setRecords((prev) => new Map(prev).set(id, record))
+      } catch {
+        if (!alive || reqId !== drillReqRef.current) return
+        toast.error("Couldn't open that account.")
+        setFailedAccounts((prev) => new Set(prev).add(id))
+        setAccountParam(null) // bad / deleted id — drop it from the URL
+      }
+    })()
+    return () => { alive = false }
+  }, [account, records, failedAccounts, setAccountParam])
+
+  // Publish the open account as a trailing breadcrumb crumb so "Account
+  // Directory" becomes a link back; cleared when the view closes / unmounts.
+  useEffect(() => {
+    setBreadcrumbExtra(
+      detailUser
+        ? { label: toTitleCase(getUserDisplayName(detailUser)) || detailUser.email || "Account", path: pathname }
+        : null,
+    )
+  }, [detailUser, pathname])
+  useEffect(() => () => setBreadcrumbExtra(null), [])
+
   // ── render ─────────────────────────────────────────────────────────────────
+  // Restoring an ?account= from the URL: hold a spinner rather than flash the list.
+  if (restoring && !detailUser) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-24 text-sm text-[#6b7280]">
+        <Loader2 className="w-5 h-5 animate-spin" /> Opening account…
+      </div>
+    )
+  }
+
   if (detailUser) {
     return (
       <>
@@ -523,9 +674,9 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
           // drill-through into another person's 360 view.
           key={`${detailUser.id}:${detailRefresh}`}
           user={detailUser}
-          onBack={() => setDetailUser(null)}
+          onBack={() => setAccountParam(null)}
           onEdit={() => setViewUser(detailUser)}
-          onOpenUser={(id) => void openUserById(id)}
+          onOpenUser={(id) => setAccountParam(id)}
           refreshToken={detailRefresh}
         />
         {viewUser && (
@@ -535,7 +686,7 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
             onClose={() => setViewUser(null)}
             onSaved={() => {
               void refresh()
-              void openUserById(detailUser.id)
+              void fetchAccount(detailUser.id)
               setDetailRefresh((n) => n + 1)
             }}
             onBanner={(type: "success" | "error", msg: string) => (type === "success" ? toast.success(msg) : toast.error(msg))}

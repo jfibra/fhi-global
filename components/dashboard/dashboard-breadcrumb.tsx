@@ -1,11 +1,17 @@
 "use client"
 
+import { useSyncExternalStore } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronRight } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { getNavTrail } from "@/components/dashboard/sidebar-config"
 import { ROLE_DASHBOARD_MAP, resolveAppRoleOrMember } from "@/lib/app-roles"
+import {
+  getBreadcrumbExtra,
+  getBreadcrumbExtraServer,
+  subscribeBreadcrumbExtra,
+} from "@/lib/dashboard-breadcrumb-extra"
 
 /**
  * Route-driven breadcrumb, rendered once in the shell above the page.
@@ -64,6 +70,8 @@ const labelFor = (seg: string) =>
 export function DashboardBreadcrumb() {
   const pathname = usePathname()
   const { profile } = useAuth()
+  // A client-state detail view (no route of its own) can publish a trailing crumb.
+  const extra = useSyncExternalStore(subscribeBreadcrumbExtra, getBreadcrumbExtra, getBreadcrumbExtraServer)
 
   const roleId = resolveAppRoleOrMember(profile?.role)
   const base = ROLE_DASHBOARD_MAP[roleId] ?? ROLE_DASHBOARD_MAP.member
@@ -106,6 +114,14 @@ export function DashboardBreadcrumb() {
 
   for (let i = tailFrom; i < segs.length; i++) {
     crumbs.push({ label: labelFor(segs[i]), href: "/" + segs.slice(0, i + 1).join("/") })
+  }
+
+  // Append a page-published detail crumb (e.g. the open account's name), scoped
+  // to the route that set it. This makes the prior crumb ("Account Directory") a
+  // link back — its href is the plain path, so the page's own URL sync restores
+  // the list's page/filters when it reopens.
+  if (extra && extra.path === pathname && crumbs.length > 1) {
+    crumbs.push({ label: extra.label, href: pathname })
   }
 
   // The dashboard root needs no trail of its own.
