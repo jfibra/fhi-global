@@ -9,12 +9,13 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { SocialShare } from "@/components/social-share"
 import { ProjectGallery } from "@/components/public/project-gallery"
+import { PdfPagePreviews } from "@/components/public/pdf-page-previews"
 import { AmenitiesGrid, NearbyPlaces } from "@/components/public/amenities-grid"
 import { ProjectInquireForm } from "@/components/public/project-inquire-form"
 import {
   MapPin, Building2, Calendar, Home, Layers, Phone, Mail, ArrowLeft,
   CheckCircle2, Play, Globe, BedDouble, Bath, Maximize2, DollarSign,
-  TrendingUp, Star, FileText
+  TrendingUp, Star
 } from "lucide-react"
 
 export const revalidate = 120
@@ -466,33 +467,35 @@ export default async function ProjectDetailPage({ params }: Props) {
             </section>
           )}
 
-          {/* Construction Updates */}
+          {/* Construction Updates — PDFs show their first four pages so a
+              visitor sees the progress without opening the file; images keep
+              the simple tile. Every item still links to the original. */}
           {constructionUpdates.length > 0 && (
             <section>
               <SectionHeading title="Construction Updates" />
-              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {constructionUpdates.map((u) => (
-                  <a
-                    key={u.id}
-                    href={u.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex items-center gap-4 p-4 border border-[#e5e8ec] hover:border-[#001f3f]/40 transition-colors"
-                  >
-                    <div className="w-12 h-12 bg-[#f3f4f6] flex items-center justify-center shrink-0 overflow-hidden">
-                      {u.file_type === "image" ? (
-                        // eslint-disable-next-line @next/next/no-img-element
+              <div className="mt-5 space-y-5">
+                {constructionUpdates.map((u) =>
+                  u.file_type === "image" ? (
+                    <a
+                      key={u.id}
+                      href={u.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex items-center gap-4 p-4 border border-[#e5e8ec] hover:border-[#001f3f]/40 transition-colors"
+                    >
+                      <div className="w-12 h-12 bg-[#f3f4f6] flex items-center justify-center shrink-0 overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={u.file_url} alt={u.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <FileText className="w-5 h-5 text-[#001f3f]" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[#0d1117] truncate">{u.title}</p>
-                      <p className="text-xs text-[#9ca3af] uppercase tracking-wide">{u.file_type === "image" ? "Image" : "PDF"} · View</p>
-                    </div>
-                  </a>
-                ))}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[#0d1117] truncate">{u.title}</p>
+                        <p className="text-xs text-[#9ca3af] uppercase tracking-wide">Image · View</p>
+                      </div>
+                    </a>
+                  ) : (
+                    <PdfPagePreviews key={u.id} url={u.file_url} title={u.title} />
+                  ),
+                )}
               </div>
             </section>
           )}
