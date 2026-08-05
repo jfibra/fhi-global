@@ -13,11 +13,25 @@ import { getDashboardRouteByRole } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/client"
 import { AuthModal } from "@/components/auth/auth-modal"
 
-const NAV_LINKS = [
+type NavChild = { label: string; href: string; desc: string }
+type NavItem = { label: string; href: string; children?: NavChild[] }
+
+// Six top-level items. The four browse destinations collapse into Properties
+// so the bar stays short; Off-Plan is promoted because it is the search people
+// actually type, and it points at the landing page built for that query.
+const NAV_LINKS: NavItem[] = [
   { label: "Home", href: "/" },
-  { label: "Buy", href: "/buy" },
-  { label: "Rent", href: "/rent" },
-  { label: "Developers", href: "/developers" },
+  { label: "Off-Plan", href: "/off-plan-projects-in-dubai" },
+  {
+    label: "Properties",
+    href: "/projects",
+    children: [
+      { label: "Buy",        href: "/buy",        desc: "Homes and investments for sale" },
+      { label: "Rent",       href: "/rent",       desc: "Available rentals across Dubai" },
+      { label: "Projects",   href: "/projects",   desc: "Every development we cover" },
+      { label: "Developers", href: "/developers", desc: "Verified developers and portfolios" },
+    ],
+  },
   { label: "Events", href: "/events" },
   { label: "News", href: "/news" },
   { label: "Contact", href: "/contact" },
@@ -79,12 +93,30 @@ function initialsFrom(displayName: string, email: string | null) {
 export function Header() {
   const [scrolled, setScrolled]     = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  // Which desktop dropdown is open, by label. Also drives the mobile accordion.
+  const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const [mobileSection, setMobileSection] = useState<string | null>(null)
+  const navRef = useRef<HTMLElement | null>(null)
   const [authReady, setAuthReady]   = useState(false)
   const [session, setSession]       = useState<HeaderSession | null>(null)
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const accountRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
+
+  useEffect(() => {
+    if (!openMenu) return
+    const onDown = (e: MouseEvent) => {
+      if (!navRef.current?.contains(e.target as Node)) setOpenMenu(null)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpenMenu(null) }
+    document.addEventListener("mousedown", onDown)
+    document.addEventListener("keydown", onKey)
+    return () => {
+      document.removeEventListener("mousedown", onDown)
+      document.removeEventListener("keydown", onKey)
+    }
+  }, [openMenu])
   const router = useRouter()
 
   const loadSession = useCallback(async () => {
@@ -218,24 +250,82 @@ export function Header() {
           </Link>
 
           {/* Desktop Nav */}
-          <nav className="hidden lg:flex items-center gap-0.5">
-            {NAV_LINKS.map(({ label, href }) => {
-              const isActive = pathname === href || (href !== "/" && pathname.startsWith(href))
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`relative px-5 py-2.5 text-sm font-medium tracking-wide transition-colors duration-200 rounded-full group ${
-                    isActive ? "text-[#d6b357]" : "text-white/75 hover:text-white"
+          <nav ref={navRef} className="hidden lg:flex items-center gap-0.5">
+            {NAV_LINKS.map((item) => {
+              const { label, href, children } = item
+              // A parent counts as active when any of its children is.
+              const isActive = children
+                ? children.some((c) => pathname === c.href || pathname.startsWith(`${c.href}/`))
+                : pathname === href || (href !== "/" && pathname.startsWith(href))
+              const underline = (
+                <span
+                  className={`absolute bottom-1 left-1/2 -translate-x-1/2 h-[2px] rounded-full bg-[#d6b357] transition-all duration-300 ${
+                    isActive ? "w-5" : "w-0 group-hover:w-5"
                   }`}
+                />
+              )
+              const tone = isActive ? "text-[#d6b357]" : "text-white/75 hover:text-white"
+
+              if (!children) {
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setOpenMenu(null)}
+                    className={`relative px-5 py-2.5 text-sm font-medium tracking-wide transition-colors duration-200 group ${tone}`}
+                  >
+                    {label}
+                    {underline}
+                  </Link>
+                )
+              }
+
+              const open = openMenu === label
+              return (
+                <div
+                  key={label}
+                  className="relative"
+                  // Hover opens it like a normal menu bar; the button keeps it
+                  // usable by keyboard and touch, where hover does not exist.
+                  onMouseEnter={() => setOpenMenu(label)}
+                  onMouseLeave={() => setOpenMenu((cur) => (cur === label ? null : cur))}
                 >
-                  {label}
-                  <span
-                    className={`absolute bottom-1 left-1/2 -translate-x-1/2 h-[2px] rounded-full bg-[#d6b357] transition-all duration-300 ${
-                      isActive ? "w-5" : "w-0 group-hover:w-5"
-                    }`}
-                  />
-                </Link>
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    aria-haspopup="true"
+                    onClick={() => setOpenMenu(open ? null : label)}
+                    className={`relative inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium tracking-wide transition-colors duration-200 group ${tone}`}
+                  >
+                    {label}
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+                    {underline}
+                  </button>
+
+                  {open && (
+                    <div className="absolute left-0 top-full z-50 w-[300px] border border-white/10 bg-[#07182c] shadow-[0_24px_60px_-18px_rgba(0,8,20,0.85)]">
+                      <span className="block h-[3px] bg-[#d6b357]" aria-hidden="true" />
+                      {children.map((c) => {
+                        const childActive = pathname === c.href || pathname.startsWith(`${c.href}/`)
+                        return (
+                          <Link
+                            key={c.href}
+                            href={c.href}
+                            onClick={() => setOpenMenu(null)}
+                            className={`block px-5 py-3.5 border-b border-white/[0.06] last:border-b-0 transition-colors ${
+                              childActive ? "bg-white/[0.06]" : "hover:bg-white/[0.06]"
+                            }`}
+                          >
+                            <span className={`block text-sm font-semibold ${childActive ? "text-[#d6b357]" : "text-white"}`}>
+                              {c.label}
+                            </span>
+                            <span className="block text-xs text-white/50 mt-0.5">{c.desc}</span>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
               )
             })}
           </nav>
@@ -369,8 +459,53 @@ export function Header() {
 
           {/* Nav Links */}
           <nav className="flex flex-col gap-1 px-4 py-5 flex-1 overflow-y-auto">
-            {NAV_LINKS.map(({ label, href }) => {
-              const isActive = pathname === href || (href !== "/" && pathname.startsWith(href))
+            {NAV_LINKS.map((item) => {
+              const { label, href, children } = item
+              const isActive = children
+                ? children.some((c) => pathname === c.href || pathname.startsWith(`${c.href}/`))
+                : pathname === href || (href !== "/" && pathname.startsWith(href))
+
+              if (children) {
+                const expanded = mobileSection === label
+                return (
+                  <div key={label}>
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      onClick={() => setMobileSection(expanded ? null : label)}
+                      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                        isActive
+                          ? "bg-white/10 text-[#d6b357] border border-white/10"
+                          : "text-white/70 hover:text-white hover:bg-white/8"
+                      }`}
+                    >
+                      {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357] shrink-0" />}
+                      {label}
+                      <ChevronDown className={`w-4 h-4 ml-auto transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+                    </button>
+                    {expanded && (
+                      <div className="mt-1 ml-3 border-l border-white/10 pl-3 flex flex-col gap-1">
+                        {children.map((c) => {
+                          const childActive = pathname === c.href || pathname.startsWith(`${c.href}/`)
+                          return (
+                            <Link
+                              key={c.href}
+                              href={c.href}
+                              onClick={() => setMobileOpen(false)}
+                              className={`px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                                childActive ? "text-[#d6b357] bg-white/[0.06]" : "text-white/65 hover:text-white hover:bg-white/8"
+                              }`}
+                            >
+                              {c.label}
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+
               return (
                 <Link
                   key={href}
