@@ -13,7 +13,7 @@ import { getDashboardRouteByRole } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/client"
 import { AuthModal } from "@/components/auth/auth-modal"
 
-type NavChild = { label: string; href: string; desc: string }
+type NavChild = { label: string; href: string }
 type NavItem = { label: string; href: string; children?: NavChild[] }
 
 // Six top-level items. The four browse destinations collapse into Properties
@@ -26,10 +26,10 @@ const NAV_LINKS: NavItem[] = [
     label: "Properties",
     href: "/projects",
     children: [
-      { label: "Buy",        href: "/buy",        desc: "Homes and investments for sale" },
-      { label: "Rent",       href: "/rent",       desc: "Available rentals across Dubai" },
-      { label: "Projects",   href: "/projects",   desc: "Every development we cover" },
-      { label: "Developers", href: "/developers", desc: "Verified developers and portfolios" },
+      { label: "Buy",        href: "/buy" },
+      { label: "Rent",       href: "/rent" },
+      { label: "Projects",   href: "/projects" },
+      { label: "Developers", href: "/developers" },
     ],
   },
   { label: "Events", href: "/events" },
@@ -272,7 +272,7 @@ export function Header() {
                     key={href}
                     href={href}
                     onClick={() => setOpenMenu(null)}
-                    className={`relative px-5 py-2.5 text-sm font-medium tracking-wide transition-colors duration-200 group ${tone}`}
+                    className={`relative px-5 py-2.5 text-[15px] font-semibold tracking-[0.01em] transition-colors duration-200 group ${tone}`}
                   >
                     {label}
                     {underline}
@@ -295,7 +295,7 @@ export function Header() {
                     aria-expanded={open}
                     aria-haspopup="true"
                     onClick={() => setOpenMenu(open ? null : label)}
-                    className={`relative inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium tracking-wide transition-colors duration-200 group ${tone}`}
+                    className={`relative inline-flex items-center gap-1.5 px-5 py-2.5 text-[15px] font-semibold tracking-[0.01em] transition-colors duration-200 group ${tone}`}
                   >
                     {label}
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
@@ -303,8 +303,8 @@ export function Header() {
                   </button>
 
                   {open && (
-                    <div className="absolute left-0 top-full z-50 w-[300px] border border-white/10 bg-[#07182c] shadow-[0_24px_60px_-18px_rgba(0,8,20,0.85)]">
-                      <span className="block h-[3px] bg-[#d6b357]" aria-hidden="true" />
+                    <div className="absolute left-0 top-full z-50 w-[210px] border border-white/10 bg-[#07182c] py-1.5 shadow-[0_24px_60px_-18px_rgba(0,8,20,0.85)]">
+                      <span className="absolute inset-x-0 top-0 h-[3px] bg-[#d6b357]" aria-hidden="true" />
                       {children.map((c) => {
                         const childActive = pathname === c.href || pathname.startsWith(`${c.href}/`)
                         return (
@@ -312,14 +312,11 @@ export function Header() {
                             key={c.href}
                             href={c.href}
                             onClick={() => setOpenMenu(null)}
-                            className={`block px-5 py-3.5 border-b border-white/[0.06] last:border-b-0 transition-colors ${
-                              childActive ? "bg-white/[0.06]" : "hover:bg-white/[0.06]"
+                            className={`block px-5 py-2.5 text-[15px] font-medium transition-colors ${
+                              childActive ? "text-[#d6b357] bg-white/[0.06]" : "text-white/80 hover:text-white hover:bg-white/[0.06]"
                             }`}
                           >
-                            <span className={`block text-sm font-semibold ${childActive ? "text-[#d6b357]" : "text-white"}`}>
-                              {c.label}
-                            </span>
-                            <span className="block text-xs text-white/50 mt-0.5">{c.desc}</span>
+                            {c.label}
                           </Link>
                         )
                       })}
@@ -473,7 +470,7 @@ export function Header() {
                       type="button"
                       aria-expanded={expanded}
                       onClick={() => setMobileSection(expanded ? null : label)}
-                      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-[15px] font-semibold transition-all duration-200 ${
                         isActive
                           ? "bg-white/10 text-[#d6b357] border border-white/10"
                           : "text-white/70 hover:text-white hover:bg-white/8"
@@ -511,7 +508,7 @@ export function Header() {
                   key={href}
                   href={href}
                   onClick={() => setMobileOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-[15px] font-semibold transition-all duration-200 ${
                     isActive
                       ? "bg-white/10 text-[#d6b357] border border-white/10"
                       : "text-white/70 hover:text-white hover:bg-white/8"
