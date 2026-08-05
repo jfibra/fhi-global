@@ -854,7 +854,7 @@ export function SaleFormDialog({
                 </div>
 
                 <div>
-                  <FieldLabel text="Price per SQM" />
+                  <FieldLabel text="Price per SQFT" />
                   <div className="relative">
                     <DollarSign className={iconCls} />
                     <input
@@ -870,7 +870,7 @@ export function SaleFormDialog({
                 </div>
 
                 <div>
-                  <FieldLabel text="Total Area (SQM)" />
+                  <FieldLabel text="Total Area (SQFT)" />
                   <input
                     type="number"
                     min={0}

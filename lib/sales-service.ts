@@ -94,6 +94,10 @@ export type SaleRecord = {
   reservation_date: string | null
   payment_plan: string | null
   payment_terms: string | null
+  // NB: these are captured and shown in SQUARE FEET (Dubai SPAs are stated in
+  // sqft). The columns keep their historical `_sqm` names but hold sqft values;
+  // all UI labels read "sqft". Rename the columns to `_sqft` if the data model
+  // is ever tidied.
   price_per_sqm: number | null
   total_area_sqm: number | null
   commission_status: CommissionStatus

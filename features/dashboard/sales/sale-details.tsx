@@ -182,8 +182,8 @@ export function SaleDetails({
             <SectionCard icon={DollarSign} title="Contract Details">
               <DetailRow label="Contract Price" value={formatCurrency(sale.contract_price)} />
               <DetailRow label="Reservation Date" value={formatDate(sale.reservation_date)} />
-              <DetailRow label="Price / SQM" value={sale.price_per_sqm ? formatCurrency(sale.price_per_sqm) : null} />
-              <DetailRow label="Total Area (SQM)" value={sale.total_area_sqm ? `${sale.total_area_sqm} sqm` : null} />
+              <DetailRow label="Price / SQFT" value={sale.price_per_sqm ? formatCurrency(sale.price_per_sqm) : null} />
+              <DetailRow label="Total Area (SQFT)" value={sale.total_area_sqm ? `${sale.total_area_sqm} sqft` : null} />
               <DetailRow label="Payment Plan" value={sale.payment_plan} />
               <div className="col-span-2 md:col-span-3">
                 <DetailRow label="Payment Terms" value={sale.payment_terms} />

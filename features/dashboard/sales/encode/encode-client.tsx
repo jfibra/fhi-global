@@ -563,10 +563,10 @@ export function EncodeSaleClient({
             </div>
             {isProject && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Price per sqm (AED)">
+                <Field label="Price per sqft (AED)">
                   <input className={inputCls} inputMode="decimal" value={form.price_per_sqm} onChange={(e) => setField("price_per_sqm", e.target.value.replace(/[^0-9.]/g, ""))} />
                 </Field>
-                <Field label="Total area (sqm)">
+                <Field label="Total area (sqft)">
                   <input className={inputCls} inputMode="decimal" value={form.total_area_sqm} onChange={(e) => setField("total_area_sqm", e.target.value.replace(/[^0-9.]/g, ""))} />
                 </Field>
               </div>
