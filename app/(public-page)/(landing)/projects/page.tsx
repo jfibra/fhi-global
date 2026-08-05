@@ -90,15 +90,13 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
           style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }}
         />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 border border-white/20 rounded-full text-xs font-medium text-white/80 mb-5 backdrop-blur-sm">
+          <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#0a2647]/80 border border-white/20 text-[11px] font-bold uppercase tracking-[0.14em] text-white mb-6 backdrop-blur-sm">
             <Building2 className="w-3.5 h-3.5 text-[#d6b357]" />
             {featured === "true" ? "Featured Projects" : "All Projects"}
           </div>
           <h1 className="font-['Outfit'] text-4xl md:text-5xl font-bold text-white leading-tight mb-3" style={{ textShadow: "0 2px 20px rgba(0,0,0,0.4)" }}>
             Discover Premium<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d6b357] to-[#f0d890]">
-              Property Projects
-            </span>
+            <span className="text-[#d6b357]">Property Projects</span>
           </h1>
           <p className="text-white/55 text-lg max-w-xl">
             Browse off-plan and ready properties from Dubai&apos;s most trusted developers.
@@ -118,11 +116,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
 
         {/* Count */}
         <div className="flex items-center gap-3 mt-6 mb-6">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#e8eaed] rounded-full shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-[#d6b357]" />
-            <span className="text-sm font-semibold text-[#0d1117]">{projects?.length ?? 0}</span>
-            <span className="text-sm text-[#6b7280]">project{(projects?.length ?? 0) !== 1 ? "s" : ""} found</span>
-          </div>
+          <span className="w-2 h-2 rounded-full bg-[#d6b357]" aria-hidden="true" />
+          <span className="text-[15px] font-bold text-[#0d1117]">{projects?.length ?? 0}</span>
+          <span className="text-[15px] text-[#6b7280]">project{(projects?.length ?? 0) !== 1 ? "s" : ""} found</span>
         </div>
 
         {projects && projects.length > 0 ? (
@@ -133,7 +129,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-28 text-center">
-            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#001f3f]/6 to-[#d6b357]/6 border border-[#e8eaed] flex items-center justify-center mb-5 shadow-sm">
+            <div className="w-20 h-20 bg-[#001f3f]/5 border border-[#e5e8ec] flex items-center justify-center mb-5">
               <Building2 className="w-9 h-9 text-[#001f3f]/30" />
             </div>
             <h3 className="font-['Outfit'] font-bold text-[#0d1117] text-xl mb-2">No projects found</h3>

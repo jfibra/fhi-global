@@ -44,13 +44,13 @@ export function ProjectFilters({ developers, cities }: Omit<ProjectFiltersProps,
   const city = searchParams.get("city") ?? ""
 
   return (
-    <div className="relative bg-white border border-[#e8eaed] rounded-[28px] p-6 shadow-sm overflow-hidden">
+    <div className="relative bg-white border border-[#e5e8ec] p-6 overflow-hidden">
       <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#001f3f] via-[#d6b357] to-transparent" />
       <div className="flex items-center gap-2 mb-5">
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#001f3f]/8 to-[#d6b357]/8 flex items-center justify-center">
+        <div className="w-7 h-7 bg-[#f0f2f5] flex items-center justify-center">
           <SlidersHorizontal className="w-3.5 h-3.5 text-[#001f3f]" />
         </div>
-        <span className="text-sm font-bold text-[#0d1117]">Filter Projects</span>
+        <span className="text-[13px] font-bold uppercase tracking-[0.14em] text-[#0d1117]">Filter Projects</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Search */}
@@ -61,7 +61,7 @@ export function ProjectFilters({ developers, cities }: Omit<ProjectFiltersProps,
             placeholder="Search projects..."
             defaultValue={q}
             onChange={(e) => updateParams("q", e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#e5e5e5] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all"
+            className="w-full pl-10 pr-4 py-3 border border-[#e5e5e5] bg-white text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all"
           />
         </div>
 
@@ -69,7 +69,7 @@ export function ProjectFilters({ developers, cities }: Omit<ProjectFiltersProps,
         <select
           value={developer}
           onChange={(e) => updateParams("developer", e.target.value)}
-          className="w-full px-4 py-2.5 rounded-xl border border-[#e5e5e5] bg-[#f9fafb] text-sm text-[#111827] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all appearance-none cursor-pointer"
+          className="w-full px-4 py-3 border border-[#e5e5e5] bg-white text-sm text-[#111827] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all appearance-none cursor-pointer"
         >
           <option value="">All Developers</option>
           {developers.map((d) => (
@@ -81,7 +81,7 @@ export function ProjectFilters({ developers, cities }: Omit<ProjectFiltersProps,
         <select
           value={status}
           onChange={(e) => updateParams("status", e.target.value)}
-          className="w-full px-4 py-2.5 rounded-xl border border-[#e5e5e5] bg-[#f9fafb] text-sm text-[#111827] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all appearance-none cursor-pointer"
+          className="w-full px-4 py-3 border border-[#e5e5e5] bg-white text-sm text-[#111827] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all appearance-none cursor-pointer"
         >
           <option value="">All Statuses</option>
           {STATUS_OPTIONS.map((s) => (
@@ -93,7 +93,7 @@ export function ProjectFilters({ developers, cities }: Omit<ProjectFiltersProps,
         <select
           value={city}
           onChange={(e) => updateParams("city", e.target.value)}
-          className="w-full px-4 py-2.5 rounded-xl border border-[#e5e5e5] bg-[#f9fafb] text-sm text-[#111827] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all appearance-none cursor-pointer"
+          className="w-full px-4 py-3 border border-[#e5e5e5] bg-white text-sm text-[#111827] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all appearance-none cursor-pointer"
         >
           <option value="">All Cities</option>
           {cities.map((c) => (
