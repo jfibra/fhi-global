@@ -23,7 +23,6 @@ import {
   Globe,
   Zap,
   BadgeCheck,
-  Sparkles,
   MessageCircle,
 } from "lucide-react";
 
@@ -304,8 +303,15 @@ export default async function HomePage() {
       {/* ----------------------------------------------- */}
       {/* WHY CHOOSE US                                   */}
       {/* ----------------------------------------------- */}
+      {/* Rebuilt to the approved mockup. Gone: the "Why FHI Global" eyebrow and
+          the "Your Trusted Real Estate Partner" headline (the sub-line says it
+          better and one heading beats two), the gold-rimmed navy ellipse behind
+          the cards, the navy icon blocks, the gold top trims and the big rotated
+          watermarks. What's left is the point: an ornament, one statement, and
+          six facts. */}
       <section className="relative pt-24 pb-24 overflow-hidden">
-        {/* Background — bright skyline photo with a navy curve rising behind the cards */}
+        {/* Background — skyline photo, fading to the page before the cards so
+            the lower row sits on plain white like the mockup. */}
         <div className="absolute inset-0">
           <Image
             src="/background/developers.webp"
@@ -315,58 +321,43 @@ export default async function HomePage() {
             className="object-cover object-center"
             aria-hidden="true"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-white/85 via-white/45 to-transparent" />
-          {/* Gold-rimmed navy ellipse (approved mockup's curved base) */}
-          <div
-            className="absolute -bottom-[380px] left-1/2 -translate-x-1/2 w-[190%] h-[760px] rounded-[50%] border-4 border-[#d6b357]/70 bg-gradient-to-b from-[#00203f] to-[#000d1c] shadow-[0_-20px_60px_rgba(0,13,28,0.4)]"
-            aria-hidden="true"
-          />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/80 via-white/60 to-[#f7f8fa]" />
         </div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
+
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header — the mockup's building ornament, then the statement. */}
           <Reveal>
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <div className="inline-flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-[#0d1117] mb-5"><span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true"></span>
-              Why FHI Global
+          <div className="text-center max-w-3xl mx-auto mb-14">
+            <div className="flex items-center justify-center gap-3 mb-6" aria-hidden="true">
+              <span className="h-px w-20 bg-[#d6b357]/70" />
+              <Building2 className="w-6 h-6 text-[#b8913f]" />
+              <span className="h-px w-20 bg-[#d6b357]/70" />
             </div>
-            <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight mb-4">
-              <span className="text-[#0d1117]">Your Trusted</span>{" "}
-              <span className="bg-gradient-to-r from-[#001f3f] to-[#d6b357] bg-clip-text text-transparent">
-                Real Estate Partner
-              </span>
+            <h2 className="font-['Outfit'] text-3xl md:text-[42px] font-bold tracking-tight text-[#0d1117] leading-[1.15]">
+              We connect serious investors with
+              <br className="hidden sm:block" /> the right developers and projects
             </h2>
-            {/* Gold ornamental divider (mockup) */}
-            <div className="flex items-center justify-center gap-2 mb-5" aria-hidden="true">
-              <span className="h-px w-20 bg-gradient-to-r from-transparent to-[#d6b357]/80" />
-              <Building2 className="w-4 h-4 text-[#d6b357]" />
-              <span className="h-px w-20 bg-gradient-to-l from-transparent to-[#d6b357]/80" />
-            </div>
-            <p className="text-[#374151] text-lg leading-relaxed">
-              We connect serious investors with the right developers and
-              projects — backed by expertise, transparency, and a proven track
-              record.
+            <span className="block w-14 h-[3px] bg-[#d6b357] mx-auto mt-6 mb-5" aria-hidden="true" />
+            <p className="text-[#6b7280] text-lg leading-relaxed">
+              Backed by expertise, transparency,
+              <br className="hidden sm:block" /> and a proven track record.
             </p>
           </div>
           </Reveal>
 
+          {/* Six facts — icon beside the text, hairline between them, as drawn. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {WHY_US.map(({ icon: Icon, title, desc }, i) => (
               <Reveal key={title} delay={(i % 3) * 120} className="h-full">
-              <div
-                className="group relative h-full bg-white border border-[#e5e8ec] p-8 overflow-hidden transition-shadow duration-300 hover:shadow-[0_14px_40px_-16px_rgba(0,20,40,0.25)]"
-              >
-                {/* Gold top trim */}
-                <span className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-[#d6b357]/30" aria-hidden="true" />
-                {/* Faint gold watermark */}
-                <Icon className="absolute -bottom-7 -right-7 w-36 h-36 text-[#d6b357]/10 -rotate-6" aria-hidden="true" />
-                <div className="w-14 h-14 bg-[#001f3f] flex items-center justify-center mb-5">
-                  <Icon className="w-6 h-6 text-[#d6b357]" />
+              <div className="group h-full bg-white border border-[#e8eaed] p-6 flex items-start gap-5 transition-shadow duration-300 hover:shadow-[0_14px_40px_-18px_rgba(0,20,40,0.22)]">
+                <Icon className="w-9 h-9 shrink-0 text-[#b8913f]" strokeWidth={1.25} aria-hidden="true" />
+                <div className="min-w-0 border-l border-[#eef0f3] pl-5">
+                  <h3 className="font-['Outfit'] text-[17px] font-bold text-[#0d1117]">
+                    {title}
+                  </h3>
+                  <span className="block w-8 h-[3px] bg-[#d6b357] mt-2 mb-3" aria-hidden="true" />
+                  <p className="text-sm text-[#6b7280] leading-relaxed">{desc}</p>
                 </div>
-                <h3 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mb-2">
-                  {title}
-                </h3>
-                <span className="block w-9 h-[3px] bg-[#d6b357] mb-3" aria-hidden="true" />
-                <p className="relative text-sm text-[#555] leading-relaxed">{desc}</p>
               </div>
               </Reveal>
             ))}
@@ -377,8 +368,12 @@ export default async function HomePage() {
       {/* ----------------------------------------------- */}
       {/* CALL TO ACTION                                  */}
       {/* ----------------------------------------------- */}
+      {/* Rebuilt to the approved mockup: a split banner. The photo is the
+          section, and a light panel occupies the left with a diagonal seam
+          cutting across it — so the pool and skyline stay fully visible on the
+          right instead of being covered by a centred navy card. */}
       <section className="relative overflow-hidden">
-        {/* Background — dusk marina photo, kept bright around the navy card */}
+        {/* Photo — the whole section */}
         <div className="absolute inset-0">
           <Image
             src="/background/dubai.webp"
@@ -388,60 +383,63 @@ export default async function HomePage() {
             className="object-cover object-center"
             aria-hidden="true"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#001428]/40 via-[#001428]/20 to-[#001428]/50" />
         </div>
 
-        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
-          {/* Solid navy card with gold border (approved mockup) */}
-          <Reveal direction="zoom">
-          <div className="relative overflow-hidden bg-[#04101f] border border-[#d6b357]/60 px-8 md:px-16 py-14">
-            {/* Subtle dot texture inside the card */}
-            <div
-              className="absolute inset-0 opacity-[0.05]"
-              style={{
-                backgroundImage:
-                  "radial-gradient(circle, #fff 1px, transparent 1px)",
-                backgroundSize: "26px 26px",
-              }}
-              aria-hidden="true"
-            />
-            <div className="relative">
-              <div className="inline-flex items-center gap-2 px-5 py-2 border border-[#d6b357]/60 text-xs font-bold uppercase tracking-[0.15em] text-[#d6b357] mb-8">
-                <Sparkles className="w-3.5 h-3.5" />
+        {/* Light panel with the mockup's diagonal seam. Two layers: an opaque
+            wedge for the copy to sit on, and a softer wedge just past it so the
+            transition into the photo is a gradient rather than a hard line. On
+            mobile the wedge becomes a plain vertical scrim — a diagonal across a
+            narrow screen would cut through the text. */}
+        <div
+          className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-[#f7f8fa] via-[#f7f8fa]/95 to-[#f7f8fa]/0 md:w-[62%] md:bg-[#f7f8fa]/95"
+          style={{ clipPath: "polygon(0 0, 100% 0, 78% 100%, 0 100%)" }}
+          aria-hidden="true"
+        />
+        <div
+          className="hidden md:block absolute inset-y-0 left-0 w-[72%] bg-gradient-to-r from-transparent via-transparent to-[#f7f8fa]/0"
+          style={{ clipPath: "polygon(60% 0, 100% 0, 82% 100%, 42% 100%)", background: "linear-gradient(90deg, rgba(247,248,250,0.85), rgba(247,248,250,0))" }}
+          aria-hidden="true"
+        />
+
+        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-24">
+          <Reveal>
+          <div className="max-w-xl">
+            {/* Badge — solid navy block with the gold label, as drawn. */}
+            <div className="inline-flex items-center gap-2 bg-[#0a2647] px-3.5 py-2 mb-7">
+              <TrendingUp className="w-3.5 h-3.5 text-[#d6b357]" />
+              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#d6b357]">
                 Ready to Invest?
-              </div>
-              <h2 className="font-['Outfit'] text-4xl md:text-6xl font-bold text-white leading-[1.1] mb-6 tracking-tight">
-                Start Exploring
-                <br />
-                <span className="bg-gradient-to-r from-[#d6b357] to-[#f0d890] bg-clip-text text-transparent">
-                  Luxury Properties.
-                </span>
-              </h2>
-              {/* Gold ornamental divider */}
-              <div className="flex items-center justify-center gap-2 mb-6" aria-hidden="true">
-                <span className="h-px w-28 bg-gradient-to-r from-transparent to-[#d6b357]/70" />
-                <Building2 className="w-4 h-4 text-[#d6b357]" />
-                <span className="h-px w-28 bg-gradient-to-l from-transparent to-[#d6b357]/70" />
-              </div>
-              <p className="text-white/70 text-lg max-w-xl mx-auto mb-10 leading-relaxed">
-                Browse hundreds of premium developments — from off-plan launches
-                to ready-to-move investments in Dubai&apos;s finest communities.
-              </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link
-                  href="/projects"
-                  className="bg-[#d6b357] hover:bg-[#c8a544] text-[#001f3f] px-9 py-[18px] font-bold text-base transition-colors duration-300 flex items-center gap-2"
-                >
-                  <Building2 className="w-5 h-5" />
-                  Browse Projects <ArrowRight className="w-5 h-5" />
-                </Link>
-                <Link
-                  href="/contact"
-                  className="px-9 py-[18px] font-semibold text-base border border-[#d6b357]/60 text-white transition-all hover:bg-[#d6b357]/10 hover:border-[#d6b357] flex items-center gap-2"
-                >
-                  Contact Us <MessageCircle className="w-5 h-5 text-[#d6b357]" />
-                </Link>
-              </div>
+              </span>
+            </div>
+
+            <h2 className="font-['Outfit'] text-4xl md:text-[52px] font-bold leading-[1.08] tracking-tight">
+              <span className="block text-[#0d1117]">Start Exploring</span>
+              <span className="block text-[#b8913f]">Luxury Properties.</span>
+            </h2>
+
+            <span className="block w-14 h-[3px] bg-[#d6b357] mt-6 mb-6" aria-hidden="true" />
+
+            <p className="text-[#4b5563] text-[16.5px] leading-[1.7] max-w-md">
+              Browse hundreds of premium developments — from off-plan launches
+              to ready-to-move investments in Dubai&apos;s finest communities.
+            </p>
+
+            <div className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <Link
+                href="/projects"
+                className="inline-flex items-center justify-center gap-2.5 bg-[#d6b357] hover:bg-[#c8a544] text-[#001f3f] px-7 py-4 font-bold text-[15px] transition-colors duration-300"
+              >
+                <Building2 className="w-[18px] h-[18px]" />
+                Browse Projects
+                <ArrowRight className="w-[18px] h-[18px]" />
+              </Link>
+              <Link
+                href="/contact"
+                className="inline-flex items-center justify-center gap-2.5 bg-white hover:bg-[#f0f2f5] border border-[#0a2647]/25 text-[#0d1117] px-7 py-4 font-bold text-[15px] transition-colors duration-300"
+              >
+                <MessageCircle className="w-[18px] h-[18px] text-[#b8913f]" />
+                Contact Us
+              </Link>
             </div>
           </div>
           </Reveal>
