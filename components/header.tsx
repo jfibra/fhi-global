@@ -32,6 +32,7 @@ const NAV_LINKS: NavItem[] = [
       { label: "Developers", href: "/developers" },
     ],
   },
+  { label: "Agents", href: "/agents" },
   { label: "Events", href: "/events" },
   { label: "News", href: "/news" },
   { label: "Contact", href: "/contact" },
