@@ -99,14 +99,6 @@ export function ProjectDataTab({ project, onJump, showToast }: Props) {
       targetTab: "nearby",
     },
     {
-      key: "keywords",
-      label: "SEO / Keywords",
-      ok: Boolean(project.meta_title && project.meta_description) && (stats?.keywords ?? 0) > 0,
-      detail: stats ? `${stats.keywords} keywords` : "",
-      count: stats?.keywords,
-      targetTab: "seo",
-    },
-    {
       key: "settings",
       label: "Status",
       ok: project.is_active && project.is_published,

@@ -14,7 +14,7 @@ import { ProjectInquireForm } from "@/components/public/project-inquire-form"
 import {
   MapPin, Building2, Calendar, Home, Layers, Phone, Mail, ArrowLeft,
   CheckCircle2, Play, Globe, BedDouble, Bath, Maximize2, DollarSign,
-  TrendingUp, Star
+  TrendingUp, Star, FileText
 } from "lucide-react"
 
 export const revalidate = 120
@@ -126,6 +126,14 @@ export default async function ProjectDetailPage({ params }: Props) {
   const units = (project.project_units ?? []) as { id:number; unit_type:string|null; bedrooms:number|null; bathrooms:number|null; size_sqft:number|null; price_from:number|null; price_to:number|null; available_units:number|null; is_available:boolean|null }[]
   const features = (project.project_features ?? []) as { id:number; description:string }[]
   const media = (project.project_media ?? []) as { id:number; media_type:string|null; url:string }[]
+  // Fetched separately (not embedded) so a missing table in older environments
+  // never breaks the page; the anon RLS policy gates rows to published projects.
+  const { data: cuRows } = await supabase
+    .from("construction_updates")
+    .select("id, title, file_url, file_type, created_at")
+    .eq("project_id", project.id as number)
+    .order("created_at", { ascending: false })
+  const constructionUpdates = (cuRows ?? []) as { id:string; title:string; file_url:string; file_type:string; created_at:string|null }[]
   const propertyTypes = ((project.project_property_types ?? []) as { property_types: { name: string } | null }[])
     .map((pt) => pt.property_types?.name).filter(Boolean) as string[]
   const quickFacts = [
@@ -454,6 +462,37 @@ export default async function ProjectDetailPage({ params }: Props) {
                   points={(project.project_points as any[])?.map((p) => ({ ...p, place_type: p.category }))}
                   neighbors={(project.project_neighbors as any[])?.map((p) => ({ ...p, place_type: p.category }))}
                 />
+              </div>
+            </section>
+          )}
+
+          {/* Construction Updates */}
+          {constructionUpdates.length > 0 && (
+            <section>
+              <SectionHeading title="Construction Updates" />
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {constructionUpdates.map((u) => (
+                  <a
+                    key={u.id}
+                    href={u.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex items-center gap-4 p-4 border border-[#e5e8ec] hover:border-[#001f3f]/40 transition-colors"
+                  >
+                    <div className="w-12 h-12 bg-[#f3f4f6] flex items-center justify-center shrink-0 overflow-hidden">
+                      {u.file_type === "image" ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={u.file_url} alt={u.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <FileText className="w-5 h-5 text-[#001f3f]" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[#0d1117] truncate">{u.title}</p>
+                      <p className="text-xs text-[#9ca3af] uppercase tracking-wide">{u.file_type === "image" ? "Image" : "PDF"} · View</p>
+                    </div>
+                  </a>
+                ))}
               </div>
             </section>
           )}

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { MoreHorizontal, Globe, EyeOff, Copy, Trash2, Star, Gem, LayoutTemplate, Clapperboard, X } from "lucide-react"
+import { MoreHorizontal, Globe, EyeOff, Copy, Trash2, Star, Gem, LayoutTemplate, Clapperboard, X, ExternalLink } from "lucide-react"
 import Image from "next/image"
 import type { Project } from "@/lib/project-service"
 import { ProjectPosterTab } from "./project-poster-tab"
@@ -191,6 +191,17 @@ export function ProjectHeader({ project, onPublishToggle, onDuplicate, onDelete,
           >
             <Clapperboard className="w-3.5 h-3.5" /> Reels
           </button>
+
+          {project.developers?.slug && (
+            <a
+              href={`/${project.developers.slug}/${project.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold bg-white text-[#001f3f] border border-[#e5e5e5] hover:border-[#001f3f]/40 transition-all"
+            >
+              <ExternalLink className="w-3.5 h-3.5" /> View Project
+            </a>
+          )}
 
           {!readOnly && (
           <>

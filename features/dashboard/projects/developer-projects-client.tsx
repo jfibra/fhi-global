@@ -26,7 +26,7 @@ import { ProjectPropertyTypesTab } from "./project-property-types-tab"
 import { ProjectMediaTab }         from "./project-media-tab"
 import { ProjectFeaturesTab }      from "./project-features-tab"
 import { ProjectNearbyTab }        from "./project-nearby-tab"
-import { ProjectSeoTab }           from "./project-seo-tab"
+import { ProjectConstructionUpdateTab } from "./project-construction-update-tab"
 import { ProjectSettingsTab }      from "./project-settings-tab"
 import { ProjectHeader }           from "./project-header"
 import { DeveloperPortalPageHeader } from "@/components/developer/developer-portal-page-header"
@@ -77,7 +77,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onCo
 }
 
 // ─── Tab types ─────────────────────────────────────────────────────────────────
-type TabId = "data" | "overview" | "units" | "images" | "amenities" | "property_types" | "media" | "features" | "nearby" | "seo" | "settings"
+type TabId = "data" | "overview" | "units" | "images" | "amenities" | "property_types" | "media" | "features" | "nearby" | "construction_update" | "settings"
 const TABS: { id: TabId; label: string }[] = [
   { id: "data",            label: "Data Health" },
   { id: "overview",        label: "Overview" },
@@ -88,7 +88,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "media",           label: "Media" },
   { id: "features",        label: "Features" },
   { id: "nearby",          label: "Nearby" },
-  { id: "seo",             label: "SEO" },
+  { id: "construction_update", label: "Construction Update" },
   { id: "settings",        label: "Settings" },
 ]
 
@@ -337,8 +337,8 @@ export function DeveloperProjectsClient({
           title="My projects"
           description={
             developerName
-              ? `Create and maintain projects for ${developerName}. Pick a project in the list to edit overview, units, gallery, amenities, SEO, and publishing.`
-              : "Create and maintain your projects. Pick a project in the list to edit overview, units, gallery, amenities, SEO, and publishing."
+              ? `Create and maintain projects for ${developerName}. Pick a project in the list to edit overview, units, gallery, amenities, and publishing.`
+              : "Create and maintain your projects. Pick a project in the list to edit overview, units, gallery, amenities, and publishing."
           }
         />
       </div>
@@ -525,7 +525,7 @@ export function DeveloperProjectsClient({
                 {activeTab === "media"          && <ProjectMediaTab          projectId={selected.id} showToast={showToast} />}
                 {activeTab === "features"       && <ProjectFeaturesTab       projectId={selected.id} showToast={showToast} />}
                 {activeTab === "nearby"         && <ProjectNearbyTab         projectId={selected.id} showToast={showToast} />}
-                {activeTab === "seo"            && <ProjectSeoTab            project={selected} onSave={handleUpdateProject} showToast={showToast} />}
+                {activeTab === "construction_update" && <ProjectConstructionUpdateTab projectId={selected.id} projectSlug={selected.slug} developerSlug={selected.developers?.slug ?? "unknown"} showToast={showToast} />}
                 {activeTab === "settings"       && (
                   <ProjectSettingsTab
                     project={selected}

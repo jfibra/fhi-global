@@ -41,7 +41,7 @@ import { ProjectPropertyTypesTab } from "./project-property-types-tab"
 import { ProjectMediaTab } from "./project-media-tab"
 import { ProjectFeaturesTab } from "./project-features-tab"
 import { ProjectNearbyTab } from "./project-nearby-tab"
-import { ProjectSeoTab } from "./project-seo-tab"
+import { ProjectConstructionUpdateTab } from "./project-construction-update-tab"
 import { ProjectSettingsTab } from "./project-settings-tab"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 import { sampleLogoBgFromUrl } from "@/lib/logo-bg"
@@ -155,7 +155,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onCo
 }
 
 // ─── Tabs ──────────────────────────────────────────────────────────────────────
-export type TabId = "data" | "overview" | "units" | "images" | "amenities" | "property_types" | "media" | "features" | "nearby" | "seo" | "settings"
+export type TabId = "data" | "overview" | "units" | "images" | "amenities" | "property_types" | "media" | "features" | "nearby" | "construction_update" | "settings"
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "data",            label: "Data Health" },
@@ -167,13 +167,13 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "media",           label: "Media" },
   { id: "features",        label: "Features" },
   { id: "nearby",          label: "Nearby" },
-  { id: "seo",             label: "SEO" },
+  { id: "construction_update", label: "Construction Update" },
   { id: "settings",        label: "Settings" },
 ]
 
-// Tabs agents/members may browse read-only — content only, no Data Health / SEO / Settings.
+// Tabs agents/members may browse read-only — content only, no Data Health / Settings.
 const READONLY_TAB_IDS = new Set<TabId>([
-  "overview", "units", "images", "amenities", "property_types", "media", "features", "nearby",
+  "overview", "units", "images", "amenities", "property_types", "media", "features", "nearby", "construction_update",
 ])
 
 // ─── New Project Modal ─────────────────────────────────────────────────────────
@@ -1023,7 +1023,7 @@ export function ProjectsClient({
             {activeTab === "media"          && <ProjectMediaTab          projectId={selected.id} showToast={showToast} readOnly={readOnly} />}
             {activeTab === "features"       && <ProjectFeaturesTab       projectId={selected.id} showToast={showToast} readOnly={readOnly} />}
             {activeTab === "nearby"         && <ProjectNearbyTab         projectId={selected.id} showToast={showToast} readOnly={readOnly} />}
-            {activeTab === "seo"            && !readOnly && <ProjectSeoTab            project={selected} onSave={handleUpdateProject} showToast={showToast} />}
+            {activeTab === "construction_update" && <ProjectConstructionUpdateTab projectId={selected.id} projectSlug={selected.slug} developerSlug={selected.developers?.slug ?? "unknown"} showToast={showToast} readOnly={readOnly} />}
             {activeTab === "settings"       && !readOnly && <ProjectSettingsTab       project={selected} onSave={handleUpdateProject} onPublishToggle={() => void handlePublishToggle()} showToast={showToast} />}
           </div>
         </div>
