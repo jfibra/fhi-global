@@ -28,6 +28,7 @@ export function ProjectConstructionUpdateTab({ projectId, projectSlug, developer
   const [title, setTitle] = useState("")
   const [file, setFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
+  const [progress, setProgress] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
@@ -52,11 +53,14 @@ export function ProjectConstructionUpdateTab({ projectId, projectSlug, developer
     if (!file) { showToast("error", "Choose a PDF or image to upload."); return }
 
     setSaving(true)
-    const { url, error: uploadError } = await uploadConstructionFile(file, developerSlug, projectSlug)
-    if (uploadError || !url) { setSaving(false); showToast("error", uploadError ?? "Upload failed."); return }
+    setProgress(0)
+    const { url, error: uploadError } = await uploadConstructionFile(file, developerSlug, projectSlug, (pct) => setProgress(pct))
+    if (uploadError || !url) { setSaving(false); setProgress(null); showToast("error", uploadError ?? "Upload failed."); return }
 
+    setProgress(100) // uploaded — the server now relocates it to S3
     const { error } = await createConstructionUpdate(projectId, { title: t, file_url: url, file_type: fileTypeOf(file) })
     setSaving(false)
+    setProgress(null)
     if (error) { showToast("error", error); return }
 
     showToast("success", "Construction update added")
@@ -111,10 +115,26 @@ export function ProjectConstructionUpdateTab({ projectId, projectSlug, developer
               className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#001f3f]/90 transition-all disabled:opacity-50"
             >
               {saving
-                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploading…</>
+                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {progress !== null && progress >= 100 ? "Finalizing…" : "Uploading…"}</>
                 : <><Plus className="w-3.5 h-3.5" /> Add update</>}
             </button>
           </div>
+
+          {saving && progress !== null && (
+            <div className="pt-0.5">
+              <div className="flex items-center justify-between text-[11px] font-medium mb-1">
+                <span className="text-[#374151]">{progress < 100 ? "Uploading…" : "Finalizing…"}</span>
+                <span className="tabular-nums font-bold text-[#001f3f]">{progress}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-[#e5e7eb] overflow-hidden">
+                <div
+                  className={`h-full rounded-full bg-[#001f3f] transition-all duration-200 ${progress >= 100 ? "animate-pulse" : ""}`}
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           <p className="text-[11px] text-[#9ca3af]">PDF or image · up to 30 MB.</p>
         </div>
       )}
