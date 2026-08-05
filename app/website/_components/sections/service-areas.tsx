@@ -1,0 +1,44 @@
+// Service Areas — hover-to-expand accordion strip over a background photo
+// with a soft white wash (same treatment as the homepage's Trusted Partners).
+
+import { AREAS, GOLD, IMG, NAVY } from "../../_data"
+import { Eyebrow } from "../ui"
+
+export function ServiceAreasSection() {
+  return (
+    <section id="areas" className="relative scroll-mt-[72px] overflow-hidden">
+      {/* Background photo + white wash */}
+      <div className="absolute inset-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={IMG.houseC} alt="" aria-hidden className="h-full w-full object-cover object-center" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/75" />
+      </div>
+      <div className="relative mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
+        <Eyebrow center>Service Areas</Eyebrow>
+        <h2 className="mt-3 text-center font-serif text-3xl font-bold tracking-tight sm:text-4xl" style={{ color: NAVY }}>
+          Areas I Specialize In
+        </h2>
+        <div className="mx-auto mt-4 flex items-center justify-center gap-2">
+          <span className="h-px w-10" style={{ backgroundColor: GOLD }} />
+          <span className="h-1.5 w-1.5 rotate-45" style={{ backgroundColor: GOLD }} />
+          <span className="h-px w-10" style={{ backgroundColor: GOLD }} />
+        </div>
+        <div className="mt-10 flex h-[420px] gap-3">
+          {AREAS.map((a) => (
+            <div
+              key={a.label}
+              className="group relative min-w-0 flex-1 cursor-pointer overflow-hidden rounded-2xl transition-all duration-500 ease-out hover:flex-[3.5]"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={a.image} alt={a.label} className="absolute inset-0 h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-black/25" />
+              <div className="absolute bottom-4 left-5 right-5 text-center">
+                <p className="truncate text-[17px] font-semibold text-white">{a.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
