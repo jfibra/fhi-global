@@ -237,23 +237,48 @@ export function LeadsClient() {
     return () => clearTimeout(t)
   }, [searchInput])
 
-  // Pull lead replies from the company mailbox once per visit. Silent when
-  // nothing is new (or IMAP isn't configured); on fresh replies the list and
-  // any open thread refetch so the conversation shows both sides.
-  const syncedRef = useRef(false)
-  useEffect(() => {
-    if (syncedRef.current) return
-    syncedRef.current = true
-    const t = setTimeout(async () => {
+  // Pull lead replies from the company mailbox automatically: on page visit,
+  // then every 60 seconds while the tab is visible, and again the moment the
+  // tab regains focus — replies drift in on their own, Gmail-style. Silent
+  // when nothing is new (or IMAP isn't configured); on fresh replies the list
+  // and any open thread refetch so conversations show both sides.
+  const loadRef = useRef(load)
+  useEffect(() => { loadRef.current = load }, [load])
+  const syncBusyRef = useRef(false)
+  const lastSyncRef = useRef(0)
+  const runAutoSync = useCallback(async () => {
+    // One sync at a time, and never more than one per 30s — tab-switching
+    // back and forth shouldn't hammer the mailbox with IMAP logins.
+    if (syncBusyRef.current || Date.now() - lastSyncRef.current < 30_000) return
+    syncBusyRef.current = true
+    lastSyncRef.current = Date.now()
+    try {
       const { ingested } = await syncInbox()
       if (ingested > 0) {
         setNotice(`${ingested} new ${ingested === 1 ? "reply" : "replies"} from your mailbox.`)
         setThreadVersion((v) => v + 1)
-        void load()
+        void loadRef.current()
       }
-    }, 100)
-    return () => clearTimeout(t)
-  }, [load])
+    } finally {
+      syncBusyRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const initial = setTimeout(() => { void runAutoSync() }, 100)
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void runAutoSync()
+    }, 60_000)
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void runAutoSync()
+    }
+    document.addEventListener("visibilitychange", onVisible)
+    return () => {
+      clearTimeout(initial)
+      clearInterval(timer)
+      document.removeEventListener("visibilitychange", onVisible)
+    }
+  }, [runAutoSync])
 
   /** Manual refresh = check the mailbox first, then reload the list. */
   const handleRefresh = async () => {
