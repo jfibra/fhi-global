@@ -4,10 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import {
   Users, ChevronDown, Eye, Phone, RotateCcw, Search, X,
   Calendar, Clock, User, Linkedin, Facebook, Mail,
-  Building2, Briefcase, Loader2, BadgeCheck,
+  Building2, Briefcase, Loader2, BadgeCheck, Pencil,
   LayoutGrid, Table as TableIcon,
 } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
+import { DeveloperCombobox } from "@/components/developers/developer-combobox"
+import { DeveloperLogo } from "@/components/developers/developer-logo"
 import { TOOLBAR_GRADIENT } from "@/components/common/header-toolbar"
 import { DataTable, TablePagination } from "@/components/common/data-table"
 import { toast } from "sonner"
@@ -15,6 +17,8 @@ import { UserProfileModal } from "./user-profile-modal"
 import { UserDetailView } from "./user-detail-view"
 import type { UserRecord, UsersListResponse } from "@/lib/user-service"
 import { ROLE_OPTIONS, STATUS_OPTIONS, ROLE_COLORS, STATUS_COLORS, TIMEZONES, getUserDisplayName } from "@/lib/user-service"
+import { isDeveloperRole, roleToLabel } from "@/lib/app-roles"
+import type { DeveloperOption } from "@/lib/sales-service"
 import { formatDateAtTimeInZone, formatDateInZone, formatTimeInZone } from "@/lib/utils"
 
 type ReferrerOption = { id: string; fullname: string; role: string }
@@ -209,6 +213,73 @@ function storeView(next: ViewMode) {
 const SEARCH_DEBOUNCE = 350
 
 
+// The developer company a user is linked to (developer role → metadata.developer_id).
+function developerIdOf(user: UserRecord): string {
+  const v = user.metadata?.developer_id
+  return typeof v === "string" ? v : ""
+}
+
+// Generic confirmation modal — used before persisting a role change so an admin
+// can't flip someone's access with a stray click.
+function ConfirmDialog({
+  title, message, confirmLabel, busy, onConfirm, onCancel,
+}: {
+  title: string
+  message: ReactNode
+  confirmLabel: string
+  busy?: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} aria-hidden />
+      <div className="relative bg-white rounded-[24px] p-6 max-w-md w-full shadow-2xl border border-white/60">
+        <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117] mb-1.5">{title}</h3>
+        <div className="text-sm text-[#4b5563] leading-relaxed mb-6">{message}</div>
+        <div className="flex gap-3 justify-end">
+          <button type="button" onClick={onCancel} disabled={busy}
+            className="px-5 py-2.5 rounded-full border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-all disabled:opacity-50">Cancel</button>
+          <button type="button" onClick={onConfirm} disabled={busy}
+            className="px-5 py-2.5 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#002b57] transition-all disabled:opacity-50">{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Assign / change the developer company a developer account belongs to. The
+// searchable combobox (logo + name) is the picker; the Assign button confirms.
+function AssignDeveloperDialog({
+  user, developers, onAssign, onClose,
+}: {
+  user: UserRecord
+  developers: DeveloperOption[]
+  onAssign: (developerId: string) => void
+  onClose: () => void
+}) {
+  const currentId = developerIdOf(user)
+  const [selected, setSelected] = useState(currentId)
+  const changed = selected !== currentId
+  const name = toTitleCase(getUserDisplayName(user))
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
+      <div className="relative bg-white rounded-[24px] p-6 max-w-md w-full shadow-2xl border border-white/60">
+        <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117] mb-1">Assign developer company</h3>
+        <p className="text-sm text-[#6b7280] mb-4">Choose the developer <strong className="text-[#374151]">{name}</strong> belongs to.</p>
+        <DeveloperCombobox developers={developers} value={selected} onChange={setSelected} placeholder="Search developer…" />
+        <div className="flex gap-3 justify-end mt-6">
+          <button type="button" onClick={onClose}
+            className="px-5 py-2.5 rounded-full border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-all">Cancel</button>
+          <button type="button" disabled={!changed} onClick={() => onAssign(selected)}
+            className="px-5 py-2.5 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#002b57] transition-all disabled:opacity-50">Assign</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function AdminUsersClient(props: AdminUsersClientProps) {
   const { currentRole, roleLabel, roleColor } = props
   const [users,       setUsers]       = useState<UserRecord[]>([])
@@ -233,6 +304,12 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const [detailUser,  setDetailUser]  = useState<UserRecord | null>(null)
   const [viewUser,    setViewUser]    = useState<UserRecord | null>(null)
   const [referrers,   setReferrers]   = useState<ReferrerOption[]>([])
+  // Developer companies (for the developer badge + assign picker).
+  const [developers,  setDevelopers]  = useState<DeveloperOption[]>([])
+  // Pending role change awaiting confirmation, and the account whose developer
+  // is being (re)assigned.
+  const [confirmState, setConfirmState] = useState<{ title: string; message: ReactNode; confirmLabel: string; onConfirm: () => void } | null>(null)
+  const [assignUser,  setAssignUser]  = useState<UserRecord | null>(null)
   // Bumped after a profile save so the 360 view refetches the same account.
   const [detailRefresh, setDetailRefresh] = useState(0)
   const drillReqRef = useRef(0)
@@ -312,6 +389,18 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
 
   const referrerName = useMemo(() => new Map(referrers.map((r) => [r.id, r.fullname])), [referrers])
 
+  // Developer companies for the developer badge + assign picker.
+  useEffect(() => {
+    let alive = true
+    void fetch("/api/admin/developers")
+      .then((res) => (res.ok ? res.json() : { developers: [] }))
+      .then((data: { developers?: DeveloperOption[] }) => { if (alive) setDevelopers(data.developers ?? []) })
+      .catch(() => { /* non-fatal */ })
+    return () => { alive = false }
+  }, [])
+
+  const developerById = useMemo(() => new Map(developers.map((d) => [d.id, d])), [developers])
+
   // Inline edit (role / status / referrer) — optimistic, reverts on failure.
   const applyPatch = useCallback(async (id: string, patch: Record<string, unknown>) => {
     setUsers((list) => list.map((u) => {
@@ -321,6 +410,9 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
       if (patch.status !== undefined) next.status = patch.status as string
       if (patch.invited_by !== undefined) {
         next.metadata = { ...(u.metadata ?? {}), invited_by: patch.invited_by }
+      }
+      if (patch.developer_id !== undefined) {
+        next.metadata = { ...(next.metadata ?? u.metadata ?? {}), developer_id: patch.developer_id }
       }
       return next
     }))
@@ -377,6 +469,34 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
   const openView = (user: UserRecord) => {
     setDetailUser(user)
   }
+
+  // Role changes gate access, so confirm before applying (the chip stays on its
+  // old value until confirmed, since it's controlled by user.role).
+  const requestRoleChange = useCallback((user: UserRecord, newRole: string) => {
+    if (newRole.toLowerCase() === (user.role ?? "member").toLowerCase()) return
+    const name = toTitleCase(getUserDisplayName(user))
+    setConfirmState({
+      title: "Change role?",
+      message: (
+        <>
+          Change <strong className="text-[#111827]">{name}</strong>&apos;s role from{" "}
+          <strong className="text-[#111827]">{roleToLabel(user.role)}</strong> to{" "}
+          <strong className="text-[#111827]">{roleToLabel(newRole)}</strong>?
+          {isDeveloperRole(newRole) && " You can assign their developer company afterwards."}
+        </>
+      ),
+      confirmLabel: "Change role",
+      onConfirm: () => { void applyPatch(user.id, { role: newRole }); setConfirmState(null) },
+    })
+  }, [applyPatch])
+
+  // Confirmed from the AssignDeveloperDialog (its Assign button is the confirm).
+  const handleAssignDeveloper = useCallback((developerId: string) => {
+    setAssignUser((current) => {
+      if (current) void applyPatch(current.id, { developer_id: developerId })
+      return null
+    })
+  }, [applyPatch])
 
   // Drill from a teammate/recruit row into that person's own 360 view — the
   // row only carries an id, so pull the full record first. Sequence-guarded so
@@ -527,7 +647,10 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
         <UsersTable
           users={users}
           referrerName={referrerName}
+          developerById={developerById}
           onPatch={applyPatch}
+          onRequestRoleChange={requestRoleChange}
+          onAssignDeveloper={setAssignUser}
           onOpen={openView}
           onRestore={handleRestore}
           sort={sort}
@@ -547,7 +670,10 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
                 key={user.id}
                 user={user}
                 referrerName={referrerName}
+                developerById={developerById}
                 onPatch={applyPatch}
+                onRequestRoleChange={requestRoleChange}
+                onAssignDeveloper={setAssignUser}
                 onOpen={openView}
                 onRestore={handleRestore}
               />
@@ -579,6 +705,25 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
           onBanner={(type: "success" | "error", msg: string) => (type === "success" ? toast.success(msg) : toast.error(msg))}
         />
       )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          onConfirm={confirmState.onConfirm}
+          onCancel={() => setConfirmState(null)}
+        />
+      )}
+
+      {assignUser && (
+        <AssignDeveloperDialog
+          user={assignUser}
+          developers={developers}
+          onAssign={handleAssignDeveloper}
+          onClose={() => setAssignUser(null)}
+        />
+      )}
     </>
   )
 }
@@ -589,7 +734,10 @@ export function AdminUsersClient(props: AdminUsersClientProps) {
 function UsersTable({
   users,
   referrerName,
+  developerById,
   onPatch,
+  onRequestRoleChange,
+  onAssignDeveloper,
   onOpen,
   onRestore,
   sort,
@@ -603,7 +751,10 @@ function UsersTable({
 }: {
   users: UserRecord[]
   referrerName: Map<string, string>
+  developerById: Map<string, DeveloperOption>
   onPatch: (id: string, patch: Record<string, unknown>) => void | Promise<void>
+  onRequestRoleChange: (u: UserRecord, newRole: string) => void
+  onAssignDeveloper: (u: UserRecord) => void
   onOpen: (u: UserRecord) => void
   onRestore: (id: string) => void
   sort: SortState
@@ -645,6 +796,7 @@ function UsersTable({
         const invitedBy = typeof user.metadata?.invited_by === "string" ? user.metadata.invited_by : ""
         const phone = contactFrom(user.metadata, "phone")
         const status = (user.status ?? "pending").toLowerCase()
+        const dev = isDeveloperRole(user.role) ? developerById.get(developerIdOf(user)) ?? null : null
 
         return (
           <tr
@@ -673,7 +825,17 @@ function UsersTable({
               </div>
             </td>
             <td className="px-3 py-3" onClick={stop}>
-              <ChipSelect size="sm" value={(user.role ?? "member").toLowerCase()} onChange={(v) => onPatch(user.id, { role: v })} options={ROLE_OPTIONS} colorClass={roleChipCls(user.role)} />
+              <div className="flex flex-col items-start gap-1">
+                <ChipSelect size="sm" value={(user.role ?? "member").toLowerCase()} onChange={(v) => onRequestRoleChange(user, v)} options={ROLE_OPTIONS} colorClass={roleChipCls(user.role)} />
+                {isDeveloperRole(user.role) && (
+                  <button type="button" onClick={() => onAssignDeveloper(user)} title={dev ? `Developer: ${dev.name} — click to reassign` : "Assign developer company"}
+                    className="inline-flex items-center gap-1 max-w-[160px] text-[10px] font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors">
+                    <DeveloperLogo url={dev?.logo_url ?? null} name={dev?.name ?? "?"} size={16} />
+                    <span className="truncate">{dev?.name ?? "Assign developer"}</span>
+                    <Pencil className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                  </button>
+                )}
+              </div>
             </td>
             <td className="px-3 py-3 text-[13px] text-[#374151] whitespace-nowrap">{phone || cardDash}</td>
             <td className="px-3 py-3 text-[13px] text-[#374151] capitalize truncate max-w-[160px]">
@@ -731,18 +893,25 @@ const cardDash = <span className="text-[#c0c6cf]">—</span>
 function UserCard({
   user,
   referrerName,
+  developerById,
   onPatch,
+  onRequestRoleChange,
+  onAssignDeveloper,
   onOpen,
   onRestore,
 }: {
   user: UserRecord
   referrerName: Map<string, string>
+  developerById: Map<string, DeveloperOption>
   onPatch: (id: string, patch: Record<string, unknown>) => void | Promise<void>
+  onRequestRoleChange: (u: UserRecord, newRole: string) => void
+  onAssignDeveloper: (u: UserRecord) => void
   onOpen: (u: UserRecord) => void
   onRestore: (id: string) => void
 }) {
   const displayName = toTitleCase(getUserDisplayName(user))
   const isDeleted   = user.is_deleted === true
+  const developer   = isDeveloperRole(user.role) ? developerById.get(developerIdOf(user)) ?? null : null
   const invitedBy   = typeof user.metadata?.invited_by === "string" ? user.metadata.invited_by : ""
   const phone       = contactFrom(user.metadata, "phone")
   const whatsapp    = contactFrom(user.metadata, "whatsapp")
@@ -801,7 +970,7 @@ function UserCard({
           <ChipSelect
             size="sm"
             value={(user.role ?? "member").toLowerCase()}
-            onChange={(v) => onPatch(user.id, { role: v })}
+            onChange={(v) => onRequestRoleChange(user, v)}
             options={ROLE_OPTIONS}
             colorClass={roleChipCls(user.role)}
           />
@@ -809,6 +978,18 @@ function UserCard({
             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-200 font-bold uppercase tracking-wide">
               Deleted
             </span>
+          )}
+          {isDeveloperRole(user.role) && (
+            <button
+              type="button"
+              onClick={() => onAssignDeveloper(user)}
+              title={developer ? `Developer: ${developer.name} — click to reassign` : "Assign developer company"}
+              className="inline-flex items-center gap-1.5 max-w-[220px] px-2 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-[11px] font-semibold text-white/90 transition-colors"
+            >
+              <DeveloperLogo url={developer?.logo_url ?? null} name={developer?.name ?? "?"} size={18} />
+              <span className="truncate">{developer?.name ?? "Assign developer"}</span>
+              <Pencil className="w-2.5 h-2.5 opacity-70 shrink-0" />
+            </button>
           )}
         </div>
 
