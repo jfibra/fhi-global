@@ -70,6 +70,14 @@ async function fetchAgents(): Promise<Agent[]> {
     })
     // An unnamed card helps nobody find anyone.
     .filter((a) => a.name.length > 0)
+    // Agents with a photo lead. A visitor's first screen decides whether the
+    // team looks real, and a grid opening on logo placeholders undersells it.
+    // Alphabetical within each group, so the ordering is still predictable and
+    // the whole thing self-corrects as agents upload portraits.
+    .sort((a, b) => {
+      if (Boolean(a.photo) !== Boolean(b.photo)) return a.photo ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
 }
 
 const PROMISES = [
