@@ -4,6 +4,7 @@
 // placeholder data throughout. Every image is a local asset or the already-
 // allowlisted S3 bucket, so nothing trips the CSP.
 
+import { useEffect, useState } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import {
   ArrowRight, Award, Bath, BedDouble, Building2, CalendarCheck, Check, Facebook, Globe2,
@@ -106,6 +107,7 @@ const TESTIMONIALS = [
   { quote: "Raphael was exceptional from start to finish. His market knowledge and dedication made the entire process seamless.", name: "John D.", where: "Dubai Marina" },
   { quote: "Professional, responsive, and always had our best interests at heart. We highly recommend his services.", name: "Fatima Al Zaabi", where: "Abu Dhabi, UAE" },
   { quote: "Thanks to Raphael, we found our dream home in Dubai. Truly a partner you can trust.", name: "James & Sarah W.", where: "Sydney, Australia" },
+  { quote: "From viewing to handover, everything was smooth and transparent. He made our Dubai investment effortless.", name: "Michael T.", where: "London, UK" },
 ]
 
 const script = { fontFamily: "'Snell Roundhand', 'Segoe Script', 'Brush Script MT', cursive" }
@@ -140,6 +142,15 @@ function Stars() {
 }
 
 export function SampleSite() {
+  // Testimonials carousel: 3 visible, auto-advancing one card at a time and
+  // sliding back to the start after the last position.
+  const positions = Math.max(1, TESTIMONIALS.length - 2)
+  const [reviewIdx, setReviewIdx] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setReviewIdx((i) => (i + 1) % positions), 3500)
+    return () => clearInterval(id)
+  }, [positions])
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: IVORY }}>
       {/* ══ NAVBAR ══════════════════════════════════════════════════════════ */}
@@ -528,22 +539,50 @@ export function SampleSite() {
       </section>
 
       {/* ══ TESTIMONIALS ════════════════════════════════════════════════════ */}
-      <section className="mx-auto max-w-[1400px] px-5 pb-16 sm:px-8">
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-          {TESTIMONIALS.map((t) => (
-            <div key={t.name} className="border border-[#e8e5dc] bg-white p-6">
-              <Stars />
-              <p className="mt-4 text-[13px] leading-relaxed text-[#3d4451]">&ldquo;{t.quote}&rdquo;</p>
-              <div className="mt-5 flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full text-[12px] font-bold text-white" style={{ backgroundColor: NAVY }}>
-                  {t.name.charAt(0)}
-                </span>
-                <span>
-                  <span className="block text-[13px] font-bold" style={{ color: NAVY }}>{t.name}</span>
-                  <span className="block text-[11px] text-[#9aa0aa]">{t.where}</span>
-                </span>
+      <section className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
+        <Eyebrow center>Client Testimonials</Eyebrow>
+        <h2 className="mt-3 text-center font-serif text-3xl font-bold tracking-tight sm:text-4xl" style={{ color: NAVY }}>
+          What My Clients Say
+        </h2>
+        <div className="mx-auto mt-4 flex items-center justify-center gap-2">
+          <span className="h-px w-10" style={{ backgroundColor: GOLD }} />
+          <span className="h-1.5 w-1.5 rotate-45" style={{ backgroundColor: GOLD }} />
+          <span className="h-px w-10" style={{ backgroundColor: GOLD }} />
+        </div>
+        <div className="mt-10 overflow-hidden">
+          <div
+            className="flex transition-transform duration-700 ease-out"
+            style={{ transform: `translateX(-${reviewIdx * (100 / 3)}%)` }}
+          >
+            {TESTIMONIALS.map((t) => (
+              <div key={t.name} className="w-full shrink-0 px-2.5 sm:w-1/3">
+                <div className="h-full border border-[#e8e5dc] bg-white p-6">
+                  <Stars />
+                  <p className="mt-4 text-[13px] leading-relaxed text-[#3d4451]">&ldquo;{t.quote}&rdquo;</p>
+                  <div className="mt-5 flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full text-[12px] font-bold text-white" style={{ backgroundColor: NAVY }}>
+                      {t.name.charAt(0)}
+                    </span>
+                    <span>
+                      <span className="block text-[13px] font-bold" style={{ color: NAVY }}>{t.name}</span>
+                      <span className="block text-[11px] text-[#9aa0aa]">{t.where}</span>
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-6 flex items-center justify-center gap-2">
+          {Array.from({ length: positions }).map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={`Show reviews from position ${i + 1}`}
+              onClick={() => setReviewIdx(i)}
+              className="h-2 w-2 rounded-full transition-colors"
+              style={{ backgroundColor: i === reviewIdx ? GOLD : "#ded8c8" }}
+            />
           ))}
         </div>
       </section>
