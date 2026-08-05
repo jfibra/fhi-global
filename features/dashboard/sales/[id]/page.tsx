@@ -251,8 +251,8 @@ export default function SaleDetailPage() {
         <SectionCard icon={DollarSign} title="Contract Details">
           <DetailRow label="Contract Price" value={formatCurrency(sale.contract_price)} />
           <DetailRow label="Reservation Date" value={formatDate(sale.reservation_date)} />
-          <DetailRow label="Price / SQFT" value={sale.price_per_sqm ? formatCurrency(sale.price_per_sqm) : null} />
-          <DetailRow label="Total Area (SQFT)" value={sale.total_area_sqm ? `${sale.total_area_sqm} sqft` : null} />
+          <DetailRow label="Price / SQFT" value={sale.price_per_sqft ? formatCurrency(sale.price_per_sqft) : null} />
+          <DetailRow label="Total Area (SQFT)" value={sale.total_area_sqft ? `${sale.total_area_sqft} sqft` : null} />
           <DetailRow label="Payment Plan" value={sale.payment_plan} />
           {sale.payment_terms && (
             <div className="col-span-2 md:col-span-3">

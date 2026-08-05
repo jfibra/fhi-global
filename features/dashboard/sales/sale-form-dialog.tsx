@@ -111,7 +111,7 @@ const EMPTY_FORM: SaleFormData = {
   client: EMPTY_CLIENT,
   contract_price: "", reservation_date: "",
   payment_plan: "", payment_terms: "",
-  price_per_sqm: "", total_area_sqm: "",
+  price_per_sqft: "", total_area_sqft: "",
   remarks: "",
   commission_status: "pending",
   validation_status: "pending",
@@ -231,8 +231,8 @@ export function SaleFormDialog({
         reservation_date:   editSale.reservation_date ?? "",
         payment_plan:       editSale.payment_plan ?? "",
         payment_terms:      editSale.payment_terms ?? "",
-        price_per_sqm:      editSale.price_per_sqm != null ? String(editSale.price_per_sqm) : "",
-        total_area_sqm:     editSale.total_area_sqm != null ? String(editSale.total_area_sqm) : "",
+        price_per_sqft:      editSale.price_per_sqft != null ? String(editSale.price_per_sqft) : "",
+        total_area_sqft:     editSale.total_area_sqft != null ? String(editSale.total_area_sqft) : "",
         remarks:            editSale.remarks ?? "",
         commission_status:  editSale.commission_status,
         validation_status:  editSale.validation_status,
@@ -860,11 +860,11 @@ export function SaleFormDialog({
                     <input
                       type="number"
                       min={0}
-                      value={form.price_per_sqm}
-                      onChange={(e) => set("price_per_sqm", e.target.value)}
+                      value={form.price_per_sqft}
+                      onChange={(e) => set("price_per_sqft", e.target.value)}
                       disabled={disabled}
                       placeholder="e.g. 15000"
-                      className={inp("price_per_sqm")}
+                      className={inp("price_per_sqft")}
                     />
                   </div>
                 </div>
@@ -874,11 +874,11 @@ export function SaleFormDialog({
                   <input
                     type="number"
                     min={0}
-                    value={form.total_area_sqm}
-                    onChange={(e) => set("total_area_sqm", e.target.value)}
+                    value={form.total_area_sqft}
+                    onChange={(e) => set("total_area_sqft", e.target.value)}
                     disabled={disabled}
                     placeholder="e.g. 120"
-                    className={inpNoIcon("total_area_sqm")}
+                    className={inpNoIcon("total_area_sqft")}
                   />
                 </div>
 

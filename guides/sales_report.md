@@ -53,8 +53,8 @@ create table public.sales_reports (
   payment_terms text null,
 
   -- project pricing snapshot
-  price_per_sqm numeric(14,2) null,
-  total_area_sqm numeric(14,2) null,
+  price_per_sqft numeric(14,2) null,
+  total_area_sqft numeric(14,2) null,
 
   -- sales workflow
   commission_status text default 'pending',

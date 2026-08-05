@@ -51,7 +51,7 @@ function emptyForm(saleType: SaleType): SaleFormData {
     client: { ...EMPTY_CLIENT },
     contract_price: "", reservation_date: "",
     payment_plan: "", payment_terms: "",
-    price_per_sqm: "", total_area_sqm: "",
+    price_per_sqft: "", total_area_sqft: "",
     remarks: "",
     commission_status: "pending",
     validation_status: "pending",
@@ -564,10 +564,10 @@ export function EncodeSaleClient({
             {isProject && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Price per sqft (AED)">
-                  <input className={inputCls} inputMode="decimal" value={form.price_per_sqm} onChange={(e) => setField("price_per_sqm", e.target.value.replace(/[^0-9.]/g, ""))} />
+                  <input className={inputCls} inputMode="decimal" value={form.price_per_sqft} onChange={(e) => setField("price_per_sqft", e.target.value.replace(/[^0-9.]/g, ""))} />
                 </Field>
                 <Field label="Total area (sqft)">
-                  <input className={inputCls} inputMode="decimal" value={form.total_area_sqm} onChange={(e) => setField("total_area_sqm", e.target.value.replace(/[^0-9.]/g, ""))} />
+                  <input className={inputCls} inputMode="decimal" value={form.total_area_sqft} onChange={(e) => setField("total_area_sqft", e.target.value.replace(/[^0-9.]/g, ""))} />
                 </Field>
               </div>
             )}

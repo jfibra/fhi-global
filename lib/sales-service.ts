@@ -94,12 +94,9 @@ export type SaleRecord = {
   reservation_date: string | null
   payment_plan: string | null
   payment_terms: string | null
-  // NB: these are captured and shown in SQUARE FEET (Dubai SPAs are stated in
-  // sqft). The columns keep their historical `_sqm` names but hold sqft values;
-  // all UI labels read "sqft". Rename the columns to `_sqft` if the data model
-  // is ever tidied.
-  price_per_sqm: number | null
-  total_area_sqm: number | null
+  // Area / price-per-area are in SQUARE FEET (Dubai SPAs are stated in sqft).
+  price_per_sqft: number | null
+  total_area_sqft: number | null
   commission_status: CommissionStatus
   validation_status: ValidationStatus
   // Who last changed the validation status (migration 024). The name is a
@@ -199,8 +196,8 @@ export type SaleFormData = {
   reservation_date: string
   payment_plan: string
   payment_terms: string
-  price_per_sqm: string
-  total_area_sqm: string
+  price_per_sqft: string
+  total_area_sqft: string
   remarks: string
   // workflow
   commission_status: CommissionStatus
@@ -357,8 +354,8 @@ function normalizeSale(row: unknown): SaleRecord {
     reservation_date: typeof raw.reservation_date === "string" ? raw.reservation_date : null,
     payment_plan: typeof raw.payment_plan === "string" ? raw.payment_plan : null,
     payment_terms: typeof raw.payment_terms === "string" ? raw.payment_terms : null,
-    price_per_sqm: raw.price_per_sqm != null ? Number(raw.price_per_sqm) : null,
-    total_area_sqm: raw.total_area_sqm != null ? Number(raw.total_area_sqm) : null,
+    price_per_sqft: raw.price_per_sqft != null ? Number(raw.price_per_sqft) : null,
+    total_area_sqft: raw.total_area_sqft != null ? Number(raw.total_area_sqft) : null,
     commission_status: (raw.commission_status as CommissionStatus) ?? "pending",
     validation_status: (raw.validation_status as ValidationStatus) ?? "pending",
     validation_changed_by: typeof raw.validation_changed_by === "string" ? raw.validation_changed_by : null,
@@ -946,8 +943,8 @@ export async function createSale(
     reservation_date: form.reservation_date || null,
     payment_plan: form.payment_plan.trim() || null,
     payment_terms: form.payment_terms.trim() || null,
-    price_per_sqm: form.price_per_sqm ? Number(form.price_per_sqm) : null,
-    total_area_sqm: form.total_area_sqm ? Number(form.total_area_sqm) : null,
+    price_per_sqft: form.price_per_sqft ? Number(form.price_per_sqft) : null,
+    total_area_sqft: form.total_area_sqft ? Number(form.total_area_sqft) : null,
     commission_status: isAdminRole(currentRole) ? form.commission_status : "pending",
     validation_status: isAdminRole(currentRole) ? form.validation_status : "pending",
     remarks: form.remarks.trim() || null,
@@ -1077,8 +1074,8 @@ export async function updateSale(
     reservation_date: form.reservation_date || null,
     payment_plan: form.payment_plan.trim() || null,
     payment_terms: form.payment_terms.trim() || null,
-    price_per_sqm: form.price_per_sqm ? Number(form.price_per_sqm) : null,
-    total_area_sqm: form.total_area_sqm ? Number(form.total_area_sqm) : null,
+    price_per_sqft: form.price_per_sqft ? Number(form.price_per_sqft) : null,
+    total_area_sqft: form.total_area_sqft ? Number(form.total_area_sqft) : null,
     commission_status: nextCommissionStatus,
     validation_status: nextValidationStatus,
     remarks: form.remarks.trim() || null,
@@ -1130,8 +1127,8 @@ export async function updateSale(
     reservation_date: existingSale.reservation_date,
     payment_plan: existingSale.payment_plan,
     payment_terms: existingSale.payment_terms,
-    price_per_sqm: existingSale.price_per_sqm,
-    total_area_sqm: existingSale.total_area_sqm,
+    price_per_sqft: existingSale.price_per_sqft,
+    total_area_sqft: existingSale.total_area_sqft,
     commission_status: existingSale.commission_status,
     validation_status: existingSale.validation_status,
     remarks: existingSale.remarks,
