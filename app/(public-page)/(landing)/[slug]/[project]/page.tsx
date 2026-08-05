@@ -526,7 +526,9 @@ export default async function ProjectDetailPage({ params }: Props) {
           )}
         </div>
 
-        {/* ── Right sidebar — headings sit on the page, panels are square. ── */}
+        {/* ── Right sidebar — headings sit on the page, panels are square.
+               Sticky so the developer and enquiry panels stay with the reader
+               through a long gallery instead of leaving the column blank. ── */}
         <div className="space-y-10">
           {/* Developer */}
           {developer && (
@@ -626,7 +628,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           )}
 
           {/* Inquire Now — lead capture, with direct contact as secondary links */}
-          <SidePanel title="Inquire Now">
+          <SidePanel title="Inquire Now" className="lg:sticky lg:top-24">
             <p className="text-sm text-[#6b7280] leading-relaxed">
               Leave your details and our team will reach out with availability, payment plans and exclusive offers.
             </p>
@@ -675,9 +677,9 @@ function SectionHeading({ title, action }: { title: string; action?: React.React
   )
 }
 
-function SidePanel({ title, children }: { title: string; children: React.ReactNode }) {
+function SidePanel({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <div>
+    <div className={className}>
       <p className="font-['Outfit'] text-[13px] font-bold uppercase tracking-[0.16em] text-[#0d1117] mb-3">
         {title}
       </p>
