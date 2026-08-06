@@ -6,7 +6,9 @@ import { GoldRing } from "../ui"
 export function StatsBandSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   return (
     <section style={{ backgroundColor: INK }}>
-      <div className="mx-auto grid max-w-[1400px] grid-cols-2 gap-6 px-5 py-9 sm:grid-cols-3 sm:px-8 lg:grid-cols-5">
+      {/* Flex + justify-center: the GROUP of stats stays centered whatever the
+          count (2 stats don't stick left); each stat stays left-aligned inside. */}
+      <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-center gap-x-16 gap-y-6 px-5 py-9 sm:px-8">
         {data.bandStats.map(({ icon, value, label }, i) => (
           <div key={`${label}-${i}`} className="flex items-center gap-3">
             <GoldRing icon={STAT_ICONS[icon ?? BAND_STAT_ICON_FALLBACK[i % BAND_STAT_ICON_FALLBACK.length]]} dark />

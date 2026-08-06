@@ -1,13 +1,16 @@
 "use client"
 
-// About — portrait, bio with a measured clamp (fills the space above the
-// pinned credentials/stats group; "Show more" swaps to a scrollable full bio
-// that never exceeds the portrait height), and the QR + socials rail.
+// About — three columns: the framed portrait card (name plate at the bottom),
+// the bio with a measured clamp + credential tiles + the dark stats bar, and
+// the "Let's Connect" card (message/contact buttons + QR) with socials below.
 
 import { useEffect, useState } from "react"
 import { QRCodeSVG } from "qrcode.react"
-import { Check, Eye, Facebook, HomeIcon, Instagram, Linkedin, Star, Youtube } from "lucide-react"
-import { GOLD, INK, NAVY, SAMPLE_DATA, script, type WebsiteData } from "../../_data"
+import {
+  ArrowRight, Building2, Eye, Facebook, FileText, HomeIcon, Instagram,
+  Linkedin, MessageCircle, ShieldCheck, Star, Youtube,
+} from "lucide-react"
+import { GOLD, GOLD_SOFT, IMG, INK, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
 import { Eyebrow } from "../ui"
 
 export function AboutSection({
@@ -20,21 +23,50 @@ export function AboutSection({
 }) {
   const { agent, about } = data
   const [aboutExpanded, setAboutExpanded] = useState(false)
-  // The clamp is measured, not fixed: the bio fills whatever space remains
-  // above the pinned credentials/stats group, clamped to whole lines.
+  // The truncation is measured, not fixed: the bio fills whatever space
+  // remains above the pinned credentials/stats group. Instead of a clamp +
+  // overlay, the string itself is CUT (binary search against a hidden
+  // measurer) so it ends in "…" with an inline "Show more" after it — plain
+  // text flow, nothing painted over the photo background. The measurer
+  // includes a small buffer so the button never crowds the last line.
   const BIO_LINE_H = 23.5 // 14.5px × leading-relaxed (1.625)
+  // Non-breaking spaces: HTML collapses normal ones, these measure for real.
+  const BIO_GAP = "\u00A0\u00A0" // gap between the "…" and the button
+  const BIO_SUFFIX = `…${BIO_GAP}Show more${"\u00A0".repeat(5)}` // ~5-char safety buffer
   const [bioEl, setBioEl] = useState<HTMLDivElement | null>(null)
-  const [bioLines, setBioLines] = useState(3)
+  const [measureEl, setMeasureEl] = useState<HTMLParagraphElement | null>(null)
+  // null = the whole bio fits, no truncation needed.
+  const [bioCut, setBioCut] = useState<number | null>(null)
+  const bio = about.bio
   useEffect(() => {
-    if (!bioEl) return
-    const ro = new ResizeObserver(() => {
+    if (!bioEl || !measureEl) return
+    const compute = () => {
+      if (bioEl.clientHeight <= 0) return
       // +6px tolerance: a line that ALMOST fits still counts, so the slack
       // under the last line stays smaller than a full row.
-      if (bioEl.clientHeight > 0) setBioLines(Math.max(2, Math.floor((bioEl.clientHeight + 6) / BIO_LINE_H)))
-    })
+      const lines = Math.max(2, Math.floor((bioEl.clientHeight + 6) / BIO_LINE_H))
+      const maxH = lines * BIO_LINE_H + 2
+      measureEl.textContent = bio
+      if (measureEl.scrollHeight <= maxH) {
+        setBioCut(null)
+        return
+      }
+      let lo = 0
+      let hi = bio.length
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2)
+        measureEl.textContent = bio.slice(0, mid).trimEnd() + BIO_SUFFIX
+        if (measureEl.scrollHeight <= maxH) lo = mid
+        else hi = mid - 1
+      }
+      setBioCut(lo)
+    }
+    const ro = new ResizeObserver(compute)
     ro.observe(bioEl)
     return () => ro.disconnect()
-  }, [bioEl])
+    // BIO_SUFFIX is a render-constant string.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bioEl, measureEl, bio])
 
   const socials = [
     { icon: Facebook, label: "Facebook", href: about.socials.facebook },
@@ -43,37 +75,63 @@ export function AboutSection({
     { icon: Youtube, label: "YouTube", href: about.socials.youtube },
   ]
 
+  const credentials = [
+    { icon: ShieldCheck, label: "RERA Licensed Broker", value: `BRN: ${agent.brn}` },
+    { icon: Building2, label: "Brokerage", value: agent.brokerage },
+    { icon: FileText, label: "Office Registration", value: `ORN: ${agent.orn}` },
+  ]
+
   return (
-    <section id="about" className="scroll-mt-[72px] bg-white">
-      <div className="mx-auto grid max-w-[1400px] items-center gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[380px_1fr_190px]">
-        {/* Portrait */}
-        <div className="relative h-[420px] overflow-hidden" style={{ backgroundColor: INK }}>
+    <section id="about" className="relative scroll-mt-[72px] overflow-hidden">
+      {/* Background — the homepage "We connect serious investors" skyline photo
+          under a soft white wash. */}
+      <div className="absolute inset-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={IMG.skylineB} alt="" aria-hidden className="h-full w-full object-cover object-top" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/75" />
+      </div>
+      {/* Right column = the socials row width (4 × 44px + 3 × 12px = 212px) plus its 4rem gap margin */}
+      <div className="relative mx-auto grid max-w-[1400px] items-stretch gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[380px_1fr_276px]">
+        {/* Portrait card — gold-framed, name plate over a bottom fade */}
+        <div
+          className="relative min-h-[420px] overflow-hidden border shadow-[0_24px_60px_-24px_rgba(13,27,46,0.45)] lg:min-h-[540px]"
+          style={{ backgroundColor: INK, borderColor: `${GOLD}99` }}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={about.portrait}
             alt={agent.name}
             className="absolute inset-0 h-full w-full object-cover object-top"
           />
-          <p className="absolute bottom-5 left-5 text-2xl" style={{ ...script, color: GOLD }}>
-            {agent.name}
-          </p>
+          <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 px-7 pb-6 pt-4">
+            <p className="mt-1.5 text-[13px] font-bold uppercase tracking-[0.24em] text-white/85">{agent.name}</p>
+          </div>
         </div>
 
-        {/* Copy + credentials — capped at the portrait's height (420px).
-            Collapsed: clamped bio + the credentials/stats group.
+        {/* Copy + credentials + stats — capped at the portrait's height.
+            Collapsed: clamped bio + the pinned credentials/stats group.
             Expanded: the group hides and the full bio scrolls instead. */}
-        <div className="flex flex-col lg:h-[420px] lg:overflow-hidden">
-          <Eyebrow>About me</Eyebrow>
-          <h2 className="mt-2 whitespace-pre-line font-serif text-3xl font-bold tracking-tight" style={{ color: NAVY }}>
+        <div className="flex flex-col lg:h-[540px] lg:overflow-hidden">
+          <div className="flex items-center gap-4">
+            <Eyebrow>About Me</Eyebrow>
+            <span className="h-px w-14" style={{ backgroundColor: GOLD }} />
+          </div>
+          <h2 className="mt-3 whitespace-pre-line font-serif text-3xl font-bold tracking-tight sm:text-4xl" style={{ color: NAVY }}>
             {about.heading}
           </h2>
+          <div className="mt-4 flex items-center gap-2">
+            <span className="h-px w-10" style={{ backgroundColor: GOLD }} />
+            <span className="h-1.5 w-1.5 rotate-45" style={{ backgroundColor: GOLD }} />
+            <span className="h-px w-10" style={{ backgroundColor: GOLD }} />
+          </div>
 
           {aboutExpanded ? (
             <>
-              <div className="mt-4 min-h-0 max-w-lg flex-1 overflow-y-auto pr-2">
+              <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-2">
                 <p className="whitespace-pre-line text-justify text-[14.5px] leading-relaxed text-[#3d4451]">{about.bio}</p>
               </div>
-              <div className="mt-2 flex max-w-lg justify-end">
+              <div className="mt-2 flex justify-end">
                 <button
                   type="button"
                   onClick={() => setAboutExpanded(false)}
@@ -86,67 +144,79 @@ export function AboutSection({
             </>
           ) : (
             <>
-              {/* Fills the space above the pinned group; the clamp is
-                  measured from the container height. "Show more" overlays
-                  the end of the last visible line. */}
-              <div ref={setBioEl} className="relative mt-3 min-h-0 max-w-lg flex-1 overflow-hidden">
+              {/* Fills the space above the pinned group; the text itself is
+                  cut so "Show more" flows inline after the "…" — no overlay. */}
+              <div ref={setBioEl} className="relative mt-4 min-h-0 flex-1 overflow-hidden">
+                {/* Hidden measurer — same width/typography as the real text */}
                 <p
-                  className="text-justify text-[14.5px] leading-relaxed text-[#3d4451]"
-                  style={{
-                    display: "-webkit-box",
-                    WebkitBoxOrient: "vertical",
-                    WebkitLineClamp: bioLines,
-                    overflow: "hidden",
-                  }}
-                >
-                  {about.bio}
+                  ref={setMeasureEl}
+                  aria-hidden
+                  className="pointer-events-none invisible absolute inset-x-0 top-0 text-justify text-[14.5px] leading-relaxed"
+                />
+                <p className="text-justify text-[14.5px] leading-relaxed text-[#3d4451]">
+                  {bioCut === null ? (
+                    bio
+                  ) : (
+                    <>
+                      {bio.slice(0, bioCut).trimEnd()}…{BIO_GAP}
+                      <button
+                        type="button"
+                        onClick={() => setAboutExpanded(true)}
+                        className="text-[13px] font-bold hover:underline"
+                        style={{ color: GOLD }}
+                      >
+                        Show more
+                      </button>
+                    </>
+                  )}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setAboutExpanded(true)}
-                  className="absolute right-0 pl-10 text-[13px] font-bold hover:underline"
-                  style={{
-                    top: `${(bioLines - 1) * BIO_LINE_H}px`,
-                    lineHeight: `${BIO_LINE_H}px`,
-                    color: GOLD,
-                    background: "linear-gradient(90deg, rgba(255,255,255,0), #ffffff 32%)",
-                  }}
-                >
-                  Show more
-                </button>
               </div>
 
-              {/* Credentials + stats — one group pinned to the photo's bottom edge; hidden while expanded */}
-              <div className="mt-auto pt-2">
-                <div className="grid max-w-lg grid-cols-1 gap-x-10 gap-y-3 sm:grid-cols-2">
-                  {[
-                    { label: "RERA Licensed Broker", value: `BRN: ${agent.brn}` },
-                    { label: "Brokerage", value: agent.brokerage },
-                    { label: "Office Registration", value: `ORN: ${agent.orn}` },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="flex items-start gap-3">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: GOLD }} />
-                      <span>
-                        <span className="block text-[12px] font-bold" style={{ color: NAVY }}>{label}</span>
-                        <span className="block text-[12px] leading-relaxed text-[#6b7280]">{value}</span>
+              {/* Credential tiles + the dark stats bar — pinned to the bottom */}
+              <div className="mt-auto pt-4">
+                <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+                  {credentials.map(({ icon: Icon, label, value }) => (
+                    <div key={label} className="flex items-center gap-3.5">
+                      <span
+                        className="flex h-11 w-11 shrink-0 items-center justify-center border bg-white"
+                        style={{ borderColor: `${GOLD}66`, color: GOLD }}
+                      >
+                        <Icon className="h-5 w-5" strokeWidth={1.7} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[12.5px] font-bold uppercase tracking-[0.06em]" style={{ color: NAVY }}>{label}</span>
+                        <span className="block truncate text-[13px] text-[#6b7280]">{value}</span>
                       </span>
                     </div>
                   ))}
+                  <div className="flex items-center">
+                    <span
+                      className="group inline-flex cursor-pointer items-center gap-2 border bg-white px-6 py-3 text-[12px] font-bold uppercase tracking-[0.12em]"
+                      style={{ borderColor: `${GOLD}99`, color: GOLD_SOFT }}
+                    >
+                      View Agent Profile
+                      <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:-rotate-45" />
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-4 max-w-lg border-t border-[#eceadf]" />
-                <div className="mt-3 flex flex-wrap items-center gap-x-10 gap-y-4">
+
+                {/* Stats bar */}
+                <div
+                  className="mt-6 flex flex-wrap items-left justify-start gap-x-6 gap-y-4 border px-8 py-5"
+                  style={{ backgroundColor: INK, borderColor: `${GOLD}80` }}
+                >
                   {[
                     { icon: Eye, value: about.views, label: "Views" },
                     { icon: HomeIcon, value: about.listings, label: "Listings" },
                     { icon: Star, value: about.rating, label: "Rating" },
-                  ].map(({ icon: Icon, value, label }) => (
-                    <div key={label} className="flex items-center gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: "#faf5e8", color: GOLD }}>
-                        <Icon className="h-4 w-4" strokeWidth={1.8} />
+                  ].map(({ icon: Icon, value, label }, i, arr) => (
+                    <div key={label} className="flex flex-1 items-center justify-start gap-3.5" style={i < arr.length - 1 ? { borderRight: "1px solid rgba(255,255,255,0.12)" } : undefined}>
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border" style={{ borderColor: `${GOLD}99`, color: GOLD }}>
+                        <Icon className="h-4.5 w-4.5" strokeWidth={1.7} />
                       </span>
                       <span>
-                        <span className="block text-[18px] font-bold leading-tight" style={{ color: NAVY }}>{value}</span>
-                        <span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-[#9aa0aa]">{label}</span>
+                        <span className="block text-[22px] font-bold leading-tight text-white">{value}</span>
+                        <span className="block text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: `${GOLD_SOFT}cc` }}>{label}</span>
                       </span>
                     </div>
                   ))}
@@ -156,26 +226,60 @@ export function AboutSection({
           )}
         </div>
 
-        {/* QR + socials */}
-        <div className="hidden flex-col gap-4 lg:flex">
-          <div className="flex flex-col items-center gap-3 border border-[#eceadf] bg-[#fbfaf7] p-5">
-            <QRCodeSVG value={qrValue} size={130} fgColor={NAVY} bgColor="transparent" />
-            <p className="text-[11px] font-semibold text-[#6b7280]">Scan to Connect</p>
-          </div>
-          <div className="flex items-center justify-center gap-2.5">
-            {socials.map(({ icon: Icon, label, href }) => {
-              const cls =
-                "flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[#e3ddcd] bg-white transition-colors hover:bg-[#faf5e8]"
-              return href ? (
-                <a key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label} className={cls} style={{ color: NAVY }}>
-                  <Icon className="h-4 w-4" strokeWidth={1.8} />
-                </a>
-              ) : (
-                <span key={label} aria-label={label} className={cls} style={{ color: NAVY }}>
-                  <Icon className="h-4 w-4" strokeWidth={1.8} />
-                </span>
-              )
-            })}
+        {/* Let's Connect — no card chrome, content sits on the section bg.
+            Extra left margin keeps it clear of the About column. */}
+        <div className="hidden lg:ml-16 lg:flex">
+          <div className="flex flex-1 flex-col text-center">
+            <div className="flex flex-1 flex-col items-center pt-2">
+
+              <p className="mt-4 font-serif text-[26px] font-bold tracking-tight" style={{ color: NAVY }}>
+                Let&apos;s Connect
+              </p>
+              <div className="mt-2.5 flex w-full items-center justify-center gap-2">
+                <span className="h-px w-12" style={{ backgroundColor: `${GOLD}80` }} />
+                <span className="h-1.5 w-1.5 rotate-45" style={{ backgroundColor: GOLD }} />
+                <span className="h-px w-12" style={{ backgroundColor: `${GOLD}80` }} />
+              </div>
+              <p className="mt-3 text-[13.5px] leading-relaxed text-[#5b6472]">
+                I&apos;m here to help you find the perfect property in Dubai.
+              </p>
+              <a
+                href={`https://wa.me/${agent.whatsapp.replace(/\D/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6 flex w-full items-center justify-center px-5 py-4 text-[13px] font-bold uppercase tracking-[0.16em] text-white transition-opacity hover:opacity-90"
+                style={{ background: `linear-gradient(180deg, ${GOLD_SOFT}, ${GOLD})` }}
+              >
+                <MessageCircle className="h-4.5 w-4.5" />
+                <span className="pl-2">Message Me</span>
+              </a>
+              <div className="mt-6 flex w-full items-center gap-3">
+                <span className="h-px flex-1" style={{ backgroundColor: `${GOLD}66` }} />
+                <span className="text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: GOLD }}>Scan to Connect</span>
+                <span className="h-px flex-1" style={{ backgroundColor: `${GOLD}66` }} />
+              </div>
+              <div className="mt-4 border bg-white p-3" style={{ borderColor: `${GOLD}99` }}>
+                <QRCodeSVG value={qrValue} size={128} fgColor={NAVY} bgColor="transparent" />
+              </div>
+
+              {/* Socials — white circles directly below the QR */}
+              <div className="mt-5 flex items-center justify-center gap-3">
+                {socials.map(({ icon: Icon, label, href }) => {
+                  const cls =
+                    "flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-white shadow-[0_10px_24px_-10px_rgba(13,27,46,0.35)] transition-colors hover:bg-[#faf5e8]"
+                  const inner = <Icon className="h-4.5 w-4.5" strokeWidth={1.8} />
+                  return href ? (
+                    <a key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label} className={cls} style={{ color: NAVY }}>
+                      {inner}
+                    </a>
+                  ) : (
+                    <span key={label} aria-label={label} className={cls} style={{ color: NAVY }}>
+                      {inner}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </div>
