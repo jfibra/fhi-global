@@ -399,11 +399,27 @@ function FeaturedPicker({
 
 // ─── Live preview ─────────────────────────────────────────────────────────────
 
-function LivePreview({ data }: { data: WebsiteData }) {
+/** A scroll request: the template anchor id plus a counter so re-clicking the
+ *  same section still scrolls. */
+export type PreviewTarget = { id: string; n: number }
+
+function LivePreview({ data, target }: { data: WebsiteData; target: PreviewTarget | null }) {
   const [outerEl, setOuterEl] = useState<HTMLDivElement | null>(null)
   const [innerEl, setInnerEl] = useState<HTMLDivElement | null>(null)
   const [scale, setScale] = useState(0.4)
   const [innerH, setInnerH] = useState(5000)
+
+  // Scroll the preview to the section that's being edited. Rect math is in
+  // post-transform (scaled) coordinates, so no manual scale factor needed.
+  useEffect(() => {
+    if (!target || !outerEl || !innerEl) return
+    const el = innerEl.querySelector(`#${target.id}`)
+    if (!el) return
+    const top = el.getBoundingClientRect().top - outerEl.getBoundingClientRect().top + outerEl.scrollTop
+    outerEl.scrollTo({ top: Math.max(0, top), behavior: "smooth" })
+    // outerEl/innerEl are stable refs; only a new click should re-scroll.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target])
 
   useEffect(() => {
     if (!outerEl) return
@@ -460,6 +476,20 @@ const FORM_SECTIONS = [
 
 type FormSectionId = (typeof FORM_SECTIONS)[number]["id"]
 
+/** Which template anchor each form section corresponds to in the preview. */
+const SECTION_ANCHORS: Record<FormSectionId, string> = {
+  agent: "home",
+  hero: "home",
+  about: "about",
+  projects: "projects",
+  listings: "properties",
+  stats: "stats",
+  areas: "areas",
+  gallery: "gallery",
+  reviews: "reviews",
+  cta: "contact",
+}
+
 // ─── Editor ───────────────────────────────────────────────────────────────────
 
 export function WebsiteBuilderClient() {
@@ -498,6 +528,12 @@ export function WebsiteBuilderClient() {
   })
   const [activeSection, setActiveSection] = useState<FormSectionId>("agent")
   const [activeGalleryCat, setActiveGalleryCat] = useState<GalleryCategory>("Event Photos")
+  const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null)
+
+  const openSection = (id: FormSectionId) => {
+    setActiveSection(id)
+    setPreviewTarget((t) => ({ id: SECTION_ANCHORS[id], n: (t?.n ?? 0) + 1 }))
+  }
 
   // Published-site state (migration 035): the slug is minted on first save.
   const [siteSlug, setSiteSlug] = useState<string | null>(null)
@@ -656,7 +692,7 @@ export function WebsiteBuilderClient() {
               <button
                 key={s.id}
                 type="button"
-                onClick={() => setActiveSection(s.id)}
+                onClick={() => openSection(s.id)}
                 className={` px-3 py-1.5 text-[11.5px] font-bold transition-colors ${
                   active
                     ? "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white"
@@ -1042,7 +1078,7 @@ export function WebsiteBuilderClient() {
 
       {/* ── Live preview ── */}
       <div className="min-w-0 flex-1">
-        <LivePreview data={data} />
+        <LivePreview data={data} target={previewTarget} />
       </div>
     </div>
   )

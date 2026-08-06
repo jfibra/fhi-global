@@ -5,7 +5,7 @@ import { GoldRing } from "../ui"
 
 export function StatsBandSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   return (
-    <section style={{ backgroundColor: INK }}>
+    <section id="stats" style={{ backgroundColor: INK }}>
       {/* Flex + justify-center: the GROUP of stats stays centered whatever the
           count (2 stats don't stick left); each stat stays left-aligned inside. */}
       <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-center gap-x-16 gap-y-6 px-5 py-9 sm:px-8">
