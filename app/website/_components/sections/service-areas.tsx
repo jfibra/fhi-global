@@ -10,7 +10,7 @@ export function ServiceAreasSection({ data = SAMPLE_DATA }: { data?: WebsiteData
       {/* Background photo + white wash */}
       <div className="absolute inset-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={IMG.houseC} alt="" aria-hidden className="h-full w-full object-cover object-center" />
+        <img src={IMG.featuredBg} alt="" aria-hidden className="h-full w-full object-cover object-center" />
         <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/75" />
       </div>
       <div className="relative mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
@@ -27,7 +27,7 @@ export function ServiceAreasSection({ data = SAMPLE_DATA }: { data?: WebsiteData
           {data.areas.map((a, i) => (
             <div
               key={`${a.label}-${i}`}
-              className="group relative min-w-0 flex-1 cursor-pointer overflow-hidden rounded-2xl transition-all duration-500 ease-out hover:flex-[3.5]"
+              className="group relative min-w-0 flex-1 cursor-pointer overflow-hidden transition-all duration-500 ease-out hover:flex-[3.5]"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={a.image} alt={a.label} className="absolute inset-0 h-full w-full object-cover" />

@@ -27,6 +27,8 @@ export const IMG = {
   skylineC: "/background/dubai.webp",
   skylineA: "/background/home.webp",
   skylineB: "/background/developers.webp",
+  galleryBg: "/background/gallery-dubai.jpg",
+  featuredBg: "/background/featured-marina.jpg",
   houseA: "/images/house.jpg",
   houseB: "/images/house 2.jpg",
   houseC: "/images/properties.jpg",
@@ -177,14 +179,14 @@ const ABOUT_TEXT =
 
 export const SAMPLE_DATA: WebsiteData = {
   agent: {
-    name: "Raphael Tempest",
+    name: "Veldora Tempest",
     title: "International Property Endorser",
     brn: "123456",
     orn: "98765",
     brokerage: "Filipino Homes Inc. Dubai",
     phone: "+971 50 123 4567",
     whatsapp: "+971 50 123 4567",
-    email: "raphael.tempest@fhiglobal.ae",
+    email: "sample@fhiglobal.ae",
     office: "Business Bay, Dubai, UAE",
   },
   hero: {
@@ -241,9 +243,9 @@ export const SAMPLE_DATA: WebsiteData = {
     "Awards & Recognition": [IMG.houseB, IMG.skylineC, IMG.aptB, IMG.houseA],
   },
   testimonials: [
-    { quote: "Raphael was exceptional from start to finish. His market knowledge and dedication made the entire process seamless.", name: "John D.", where: "Dubai Marina" },
+    { quote: "Veldora was exceptional from start to finish. His market knowledge and dedication made the entire process seamless.", name: "John D.", where: "Dubai Marina" },
     { quote: "Professional, responsive, and always had our best interests at heart. We highly recommend his services.", name: "Fatima Al Zaabi", where: "Abu Dhabi, UAE" },
-    { quote: "Thanks to Raphael, we found our dream home in Dubai. Truly a partner you can trust.", name: "James & Sarah W.", where: "Sydney, Australia" },
+    { quote: "Thanks to Veldora, we found our dream home in Dubai. Truly a partner you can trust.", name: "James & Sarah W.", where: "Sydney, Australia" },
     { quote: "From viewing to handover, everything was smooth and transparent. He made our Dubai investment effortless.", name: "Michael T.", where: "London, UK" },
   ],
   cta: {

@@ -8,7 +8,7 @@ import { Stars } from "./ui"
 export function ProjectCard({ project: p }: { project: Project }) {
   return (
     <div className="group border border-[#e8e5dc] bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_44px_-14px_rgba(13,27,46,0.3)]">
-      <div className="p-3 pb-0">
+      <div>
         <div className="relative h-40 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={p.image} alt={p.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -49,7 +49,7 @@ export function ProjectCard({ project: p }: { project: Project }) {
 export function PropertyCard({ property: p }: { property: Property }) {
   return (
     <div className="group border border-[#e8e5dc] bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_44px_-14px_rgba(13,27,46,0.3)]">
-      <div className="p-3 pb-0">
+      <div>
         <div className="relative h-40 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={p.image} alt={p.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />

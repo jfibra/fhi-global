@@ -17,7 +17,7 @@ export function FeaturedSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) 
       {/* Background photo + white wash */}
       <div className="absolute inset-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={IMG.skylineA} alt="" aria-hidden className="h-full w-full object-cover object-center" />
+        <img src={IMG.houseC} alt="" aria-hidden className="h-full w-full object-cover object-center" />
         <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/75" />
       </div>
 
