@@ -283,6 +283,9 @@ export const ROLES_REELS_MAKER: readonly AppRoleId[] = ["super_admin", "admin", 
  */
 export const ROLES_PROJECT_STUDIO_VIEWERS: readonly AppRoleId[] = ["agent", "team_leader", "unit_manager", "member"]
 
+/** Who may use the Website Builder (personal agent-site editor): admin staff + the sales pipeline. */
+export const ROLES_WEBSITE_BUILDER: readonly AppRoleId[] = ["super_admin", "admin", "agent", "team_leader", "unit_manager"]
+
 export function isAdminStaffRole(role: string | null | undefined): boolean {
   return roleInList(role, ROLES_ADMIN_STAFF)
 }
@@ -329,6 +332,10 @@ export function canUseReelsMaker(role: string | null | undefined): boolean {
 
 export function canBrowseProjectStudios(role: string | null | undefined): boolean {
   return roleInList(role, ROLES_PROJECT_STUDIO_VIEWERS)
+}
+
+export function canUseWebsiteBuilder(role: string | null | undefined): boolean {
+  return roleInList(role, ROLES_WEBSITE_BUILDER)
 }
 
 /**

@@ -12,6 +12,7 @@ import {
   ROLES_REELS_MAKER,
   ROLES_PROJECT_STUDIO_VIEWERS,
   ROLES_INTERNAL_RESOURCES,
+  ROLES_WEBSITE_BUILDER,
 } from "@/lib/app-roles"
 
 export type AppUser = {
@@ -60,6 +61,7 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   media: ["developer"],
   sales: [...ROLES_SALES_REPORTS_ACCESS],
   "reels-maker": [...ROLES_REELS_MAKER],
+  "website-builder": [...ROLES_WEBSITE_BUILDER],
   "team-sales": ["team_leader", "unit_manager"],
   // Internal only — external developer partners don't get our marketing
   // artwork or training library.

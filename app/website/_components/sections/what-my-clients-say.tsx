@@ -4,12 +4,13 @@
 // sliding back to the start after the last position; dot indicators below.
 
 import { useEffect, useState } from "react"
-import { GOLD, NAVY, TESTIMONIALS } from "../../_data"
+import { GOLD, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
 import { TestimonialCard } from "../cards"
 import { Eyebrow } from "../ui"
 
-export function TestimonialsSection() {
-  const positions = Math.max(1, TESTIMONIALS.length - 2)
+export function TestimonialsSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
+  const testimonials = data.testimonials
+  const positions = Math.max(1, testimonials.length - 2)
   const [reviewIdx, setReviewIdx] = useState(0)
   useEffect(() => {
     const id = setInterval(() => setReviewIdx((i) => (i + 1) % positions), 3500)
@@ -31,10 +32,10 @@ export function TestimonialsSection() {
       <div className="mt-10 overflow-hidden">
         <div
           className="flex transition-transform duration-700 ease-out"
-          style={{ transform: `translateX(-${reviewIdx * (100 / 3)}%)` }}
+          style={{ transform: `translateX(-${Math.min(reviewIdx, positions - 1) * (100 / 3)}%)` }}
         >
-          {TESTIMONIALS.map((t) => (
-            <div key={t.name} className="w-full shrink-0 px-2.5 sm:w-1/3">
+          {testimonials.map((t, i) => (
+            <div key={`${t.name}-${i}`} className="w-full shrink-0 px-2.5 sm:w-1/3">
               <TestimonialCard testimonial={t} />
             </div>
           ))}

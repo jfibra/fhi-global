@@ -1,10 +1,10 @@
 // Service Areas — hover-to-expand accordion strip over a background photo
 // with a soft white wash (same treatment as the homepage's Trusted Partners).
 
-import { AREAS, GOLD, IMG, NAVY } from "../../_data"
+import { GOLD, IMG, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
 import { Eyebrow } from "../ui"
 
-export function ServiceAreasSection() {
+export function ServiceAreasSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   return (
     <section id="areas" className="relative scroll-mt-[72px] overflow-hidden">
       {/* Background photo + white wash */}
@@ -24,9 +24,9 @@ export function ServiceAreasSection() {
           <span className="h-px w-10" style={{ backgroundColor: GOLD }} />
         </div>
         <div className="mt-10 flex h-[420px] gap-3">
-          {AREAS.map((a) => (
+          {data.areas.map((a, i) => (
             <div
-              key={a.label}
+              key={`${a.label}-${i}`}
               className="group relative min-w-0 flex-1 cursor-pointer overflow-hidden rounded-2xl transition-all duration-500 ease-out hover:flex-[3.5]"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}

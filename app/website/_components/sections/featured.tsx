@@ -2,10 +2,10 @@
 // photo (the same image as the site homepage's hero) under a soft white wash.
 
 import { ArrowRight } from "lucide-react"
-import { GOLD, IMG, NAVY, PROJECTS, PROPERTIES } from "../../_data"
+import { GOLD, IMG, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
 import { ProjectCard, PropertyCard } from "../cards"
 
-export function FeaturedSection() {
+export function FeaturedSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   return (
     <section className="relative overflow-hidden">
       {/* Background photo + white wash */}
@@ -25,8 +25,8 @@ export function FeaturedSection() {
           </span>
         </div>
         <div className="mt-7 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {PROJECTS.map((p) => (
-            <ProjectCard key={p.title} project={p} />
+          {data.projects.map((p, i) => (
+            <ProjectCard key={`${p.title}-${i}`} project={p} />
           ))}
         </div>
       </div>
@@ -41,8 +41,8 @@ export function FeaturedSection() {
           </span>
         </div>
         <div className="mt-7 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {PROPERTIES.map((p) => (
-            <PropertyCard key={p.title} property={p} />
+          {data.properties.map((p, i) => (
+            <PropertyCard key={`${p.title}-${i}`} property={p} />
           ))}
         </div>
       </div>

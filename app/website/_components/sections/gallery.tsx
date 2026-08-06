@@ -1,11 +1,11 @@
 "use client"
 
-// Gallery — categorized by tabs at the top (Photos / Certificates / Awards);
-// the grid shows the active category's images.
+// Gallery — categorized by tabs at the top (Event Photos / Certificates /
+// Awards & Recognition); the grid shows the active category's images.
 
 import { useState } from "react"
 import { Award, BadgeCheck, Camera } from "lucide-react"
-import { GALLERY, GALLERY_CATEGORIES, GOLD, NAVY, type GalleryCategory } from "../../_data"
+import { GALLERY_CATEGORIES, GOLD, NAVY, SAMPLE_DATA, type GalleryCategory, type WebsiteData } from "../../_data"
 import { Eyebrow } from "../ui"
 
 const CATEGORY_ICONS: Record<GalleryCategory, typeof Camera> = {
@@ -14,9 +14,9 @@ const CATEGORY_ICONS: Record<GalleryCategory, typeof Camera> = {
   "Awards & Recognition": Award,
 }
 
-export function GallerySection() {
+export function GallerySection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   const [category, setCategory] = useState<GalleryCategory>("Event Photos")
-  const images = GALLERY[category]
+  const images = data.gallery[category] ?? []
 
   return (
     <section id="gallery" className="scroll-mt-[72px]">

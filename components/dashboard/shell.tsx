@@ -403,7 +403,11 @@ export function DashboardShell({
   const resolvedItems: NavItem[] = navItems ?? getSidebarNavItems(effectiveRole)
 
   return (
-    <div className="flex h-screen bg-[#f4f6f9] font-sans overflow-hidden">
+    // The :has() classes are the full-bleed editor gate: when the page below
+    // renders an element with data-wb-full-bleed (the Website Builder), the
+    // sidebar hides and <main> drops its padding/scroll — pure CSS, so the
+    // shell's render-once contract (no usePathname here) stays intact.
+    <div className="flex h-screen bg-[#f4f6f9] font-sans overflow-hidden [&:has([data-wb-full-bleed])>aside]:hidden [&:has([data-wb-full-bleed])_main]:p-0 [&:has([data-wb-full-bleed])_main]:overflow-hidden">
 
       {/* ── Sidebar ───────────────────────────────────────────────────── */}
       {/* Mobile overlay — backdrop blur */}

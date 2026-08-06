@@ -1,33 +1,47 @@
 // Hero — headline over the banner photo (no overlay), the frosted broker
 // card at the lower right, and the glass stat strip along the bottom.
 
-import { Landmark, Mail, MessageCircle, Phone, Play } from "lucide-react"
-import { AGENT, GOLD, HERO_STATS, IMG, INK, NAVY } from "../../_data"
-import { Eyebrow } from "../ui"
+import { Building2, Landmark, Mail, MessageCircle, Phone, Play } from "lucide-react"
+import { GOLD, HERO_STAT_ICON_FALLBACK, INK, NAVY, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
 
-export function HeroSection() {
+export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
+  const { agent, hero } = data
+  // Left-side dark wash (0–100) so the headline stays readable on bright
+  // photos; at 0 the banner renders with no overlay at all.
+  const overlay = Math.min(100, Math.max(0, hero.overlay ?? 0)) / 100
   return (
     <section id="home" className="relative overflow-hidden" style={{ backgroundColor: INK }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={IMG.hero} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-center" />
+      <img src={hero.image} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-center" />
+      {overlay > 0 && (
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(90deg, rgba(0,0,0,${overlay}) 0%, rgba(0,0,0,${overlay * 0.55}) 38%, rgba(0,0,0,0) 68%)`,
+          }}
+        />
+      )}
       <div className="relative mx-auto max-w-[1400px] px-5 sm:px-8">
         <div className="flex min-h-[520px] items-center gap-8 py-16">
           {/* Left: headline */}
           <div className="max-w-xl">
-            <Eyebrow>Your trusted real estate partner in Dubai</Eyebrow>
-            <h1 className="mt-4 font-serif text-4xl leading-[1.14] font-bold tracking-tight sm:text-[54px] sm:leading-[1.1]" style={{ color: NAVY }}>
-              Guiding You to
-              <br />
-              the <span style={{ color: GOLD }}>Right Move.</span>
+            <h1 className="font-serif text-4xl leading-[1.14] font-bold tracking-tight sm:text-[54px] sm:leading-[1.1]" style={{ color: hero.headlineColor || NAVY }}>
+              <span className="whitespace-pre-line">{hero.headline}</span>{" "}
+              <span style={{ color: hero.headlineAccentColor || GOLD }}>{hero.headlineAccent}</span>
             </h1>
-            <p className="mt-5 max-w-sm text-[14.5px] leading-relaxed text-[#3d4451]">
-              Personalized real estate solutions with integrity, market expertise, and a commitment to your success.
+            <p className="mt-5 max-w-sm text-[14.5px] leading-relaxed" style={{ color: hero.descriptionColor || "#3d4451" }}>
+              {hero.description}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <a href="#projects" className="inline-flex items-center px-6 py-3 text-[13px] font-bold text-white" style={{ backgroundColor: NAVY }}>
-                Explore Projects
+              <a href="#projects" className="inline-flex items-center gap-2 px-6 py-3 text-[13px] font-bold text-white" style={{ backgroundColor: NAVY }}>
+                <Building2 className="h-3.5 w-3.5" />Explore Projects
               </a>
-              <a href="#about" className="inline-flex items-center gap-2 border px-6 py-3 text-[13px] font-bold" style={{ borderColor: NAVY, color: NAVY }}>
+              <a
+                href="#about"
+                className="inline-flex items-center gap-2 border border-white/25 px-6 py-3 text-[13px] font-bold text-white backdrop-blur-md transition-colors hover:bg-white/10"
+                style={{ backgroundColor: "rgba(6,12,22,0.3)" }}
+              >
                 <Play className="h-3.5 w-3.5" />Featured Video
               </a>
             </div>
@@ -41,31 +55,31 @@ export function HeroSection() {
           className="rounded-xl border border-white/15 p-6 shadow-2xl backdrop-blur-md"
           style={{ backgroundColor: "rgba(10,22,40,0.72)" }}
         >
-          <p className="mt-3 text-sm font-bold uppercase tracking-[0.16em] text-white">{AGENT.name}</p>
-          <p className="mt-1 text-xs text-white/70">International Property Endorser</p>
+          <p className="mt-3 text-sm font-bold uppercase tracking-[0.16em] text-white">{agent.name}</p>
+          <p className="mt-1 text-xs text-white/70">{agent.title}</p>
           <div className="mt-3.5 space-y-2">
             <a
-              href={`https://wa.me/${AGENT.phone.replace(/\D/g, "")}`}
+              href={`https://wa.me/${agent.whatsapp.replace(/\D/g, "")}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white"
             >
-              <MessageCircle className="h-3.5 w-3.5" style={{ color: GOLD }} /> {AGENT.phone}
+              <MessageCircle className="h-3.5 w-3.5" style={{ color: GOLD }} /> {agent.whatsapp}
             </a>
-            <a href={`tel:${AGENT.phone}`} className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white">
-              <Phone className="h-3.5 w-3.5" style={{ color: GOLD }} /> {AGENT.phone}
+            <a href={`tel:${agent.phone}`} className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white">
+              <Phone className="h-3.5 w-3.5" style={{ color: GOLD }} /> {agent.phone}
             </a>
-            <a href={`mailto:${AGENT.email}`} className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white">
+            <a href={`mailto:${agent.email}`} className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white">
               <Mail className="h-3.5 w-3.5" style={{ color: GOLD }} />
-              <span className="truncate">{AGENT.email}</span>
+              <span className="truncate">{agent.email}</span>
             </a>
           </div>
           <div className="mt-4 h-px w-full bg-white/15" />
           <p className="mt-3.5 flex items-center gap-2 text-[11.5px] font-bold tracking-[0.1em]" style={{ color: GOLD }}>
-            <Landmark className="h-4 w-4" /> RERA BRN: {AGENT.brn}
+            <Landmark className="h-4 w-4" /> RERA BRN: {agent.brn}
           </p>
           <p className="mt-3.5 flex items-center gap-2 text-[11.5px] font-bold tracking-[0.1em]" style={{ color: GOLD }}>
-            <Landmark className="h-4 w-4" /> RERA ORN: {AGENT.orn}
+            <Landmark className="h-4 w-4" /> RERA ORN: {agent.orn}
           </p>
         </div>
       </div>
@@ -78,19 +92,22 @@ export function HeroSection() {
           className="inline-flex max-w-full flex-wrap items-center gap-x-10 gap-y-4 border-y border-white/10 py-4 pl-5 pr-10 backdrop-blur-md"
           style={{ backgroundColor: "rgba(6,12,22,0.3)" }}
         >
-          {HERO_STATS.map(({ icon: Icon, value, label }) => (
-            <div key={label} className="flex items-center gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border" style={{ borderColor: GOLD }}>
-                <span className="flex h-8 w-8 items-center justify-center rounded-full border" style={{ borderColor: `${GOLD}80`, color: GOLD }}>
-                  <Icon className="h-4 w-4" strokeWidth={1.6} />
+          {hero.stats.map(({ icon, value, label }, i) => {
+            const Icon = STAT_ICONS[icon ?? HERO_STAT_ICON_FALLBACK[i % HERO_STAT_ICON_FALLBACK.length]]
+            return (
+              <div key={`${label}-${i}`} className="flex items-center gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border" style={{ borderColor: GOLD }}>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full border" style={{ borderColor: `${GOLD}80`, color: GOLD }}>
+                    <Icon className="h-4 w-4" strokeWidth={1.6} />
+                  </span>
                 </span>
-              </span>
-              <span>
-                <span className="block whitespace-nowrap text-[19px] font-bold leading-tight text-white">{value}</span>
-                <span className="block whitespace-nowrap text-[9.5px] font-bold uppercase tracking-[0.16em] text-white/60">{label}</span>
-              </span>
-            </div>
-          ))}
+                <span>
+                  <span className="block whitespace-nowrap text-[19px] font-bold leading-tight text-white">{value}</span>
+                  <span className="block whitespace-nowrap text-[9.5px] font-bold uppercase tracking-[0.16em] text-white/60">{label}</span>
+                </span>
+              </div>
+            )
+          })}
         </div>
       </div>
     </section>

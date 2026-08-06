@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library,
-  Mail,
+  Mail, PanelsTopLeft,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -119,6 +119,7 @@ const INVITE: NavEntry = { icon: QrCode, label: "Invite", to: "invite" }
 const REELS_MAKER: NavEntry = { icon: Clapperboard, label: "Reels Maker", to: "reels-maker" }
 const POSTER_MAKER: NavEntry = { icon: LayoutTemplate, label: "Poster Maker", to: "poster-maker" }
 const BUSINESS_CARD: NavEntry = { icon: CreditCard, label: "Business Card", to: "business-card" }
+const WEBSITE_BUILDER: NavEntry = { icon: PanelsTopLeft, label: "Website Builder", to: "website-builder" }
 const DIGITAL_CARD: NavEntry = { icon: Globe, label: "Digital Business Card", to: "digital-business-card" }
 const SALES_REPORTS: NavEntry = { icon: TrendingUp, label: "Sales Reports", to: "sales" }
 const SUPPORT_TICKETS: NavEntry = { icon: LifeBuoy, label: "Support Tickets", to: "support" }
@@ -181,6 +182,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { ...DIGITAL_CARD, description: "The one link you share — contacts, socials and QR." },
       { ...REELS_MAKER,   description: "Turn a listing or project into a shareable reel." },
       { ...POSTER_MAKER,  description: "Flyers and posters from any listing or project." },
+      { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website." },
     ],
   },
   {
@@ -247,6 +249,7 @@ const salesPipelineNav = ({ projects = false, events = false, teamSales = false 
   SUPPORT_TICKETS,
   BUSINESS_CARD,
   DIGITAL_CARD,
+  WEBSITE_BUILDER,
   MATERIALS,
   EBOOKS,
 ]

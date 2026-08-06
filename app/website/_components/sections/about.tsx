@@ -7,10 +7,11 @@
 import { useEffect, useState } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { Check, Eye, Facebook, HomeIcon, Instagram, Linkedin, Star, Youtube } from "lucide-react"
-import { ABOUT_TEXT, AGENT, GOLD, IMG, INK, NAVY, script } from "../../_data"
+import { GOLD, INK, NAVY, SAMPLE_DATA, script, type WebsiteData } from "../../_data"
 import { Eyebrow } from "../ui"
 
-export function AboutSection() {
+export function AboutSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
+  const { agent, about } = data
   const [aboutExpanded, setAboutExpanded] = useState(false)
   // The clamp is measured, not fixed: the bio fills whatever space remains
   // above the pinned credentials/stats group, clamped to whole lines.
@@ -28,6 +29,13 @@ export function AboutSection() {
     return () => ro.disconnect()
   }, [bioEl])
 
+  const socials = [
+    { icon: Facebook, label: "Facebook", href: about.socials.facebook },
+    { icon: Instagram, label: "Instagram", href: about.socials.instagram },
+    { icon: Linkedin, label: "LinkedIn", href: about.socials.linkedin },
+    { icon: Youtube, label: "YouTube", href: about.socials.youtube },
+  ]
+
   return (
     <section id="about" className="scroll-mt-[72px] bg-white">
       <div className="mx-auto grid max-w-[1400px] items-center gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[380px_1fr_190px]">
@@ -35,12 +43,12 @@ export function AboutSection() {
         <div className="relative h-[420px] overflow-hidden" style={{ backgroundColor: INK }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={IMG.portrait}
-            alt={AGENT.name}
+            src={about.portrait}
+            alt={agent.name}
             className="absolute inset-0 h-full w-full object-cover object-top"
           />
           <p className="absolute bottom-5 left-5 text-2xl" style={{ ...script, color: GOLD }}>
-            {AGENT.name}
+            {agent.name}
           </p>
         </div>
 
@@ -49,16 +57,14 @@ export function AboutSection() {
             Expanded: the group hides and the full bio scrolls instead. */}
         <div className="flex flex-col lg:h-[420px] lg:overflow-hidden">
           <Eyebrow>About me</Eyebrow>
-          <h2 className="mt-2 font-serif text-3xl font-bold tracking-tight" style={{ color: NAVY }}>
-            Dedicated to Delivering
-            <br />
-            Exceptional Results
+          <h2 className="mt-2 whitespace-pre-line font-serif text-3xl font-bold tracking-tight" style={{ color: NAVY }}>
+            {about.heading}
           </h2>
 
           {aboutExpanded ? (
             <>
               <div className="mt-4 min-h-0 max-w-lg flex-1 overflow-y-auto pr-2">
-                <p className="whitespace-pre-line text-justify text-[14.5px] leading-relaxed text-[#3d4451]">{ABOUT_TEXT}</p>
+                <p className="whitespace-pre-line text-justify text-[14.5px] leading-relaxed text-[#3d4451]">{about.bio}</p>
               </div>
               <div className="mt-2 flex max-w-lg justify-end">
                 <button
@@ -86,7 +92,7 @@ export function AboutSection() {
                     overflow: "hidden",
                   }}
                 >
-                  {ABOUT_TEXT}
+                  {about.bio}
                 </p>
                 <button
                   type="button"
@@ -107,12 +113,12 @@ export function AboutSection() {
               <div className="mt-auto pt-2">
                 <div className="grid max-w-lg grid-cols-1 gap-x-10 gap-y-3 sm:grid-cols-2">
                   {[
-                    { icon: Check, label: "RERA Licensed Broker", value: `BRN: ${AGENT.brn}` },
-                    { icon: Check, label: "Brokerage", value: "Filipino Homes Inc. Dubai" },
-                    { icon: Check, label: "Office Registration", value: "ORN: 98765" },
-                  ].map(({ icon: Icon, label, value }) => (
+                    { label: "RERA Licensed Broker", value: `BRN: ${agent.brn}` },
+                    { label: "Brokerage", value: agent.brokerage },
+                    { label: "Office Registration", value: `ORN: ${agent.orn}` },
+                  ].map(({ label, value }) => (
                     <div key={label} className="flex items-start gap-3">
-                      <Icon className="mt-0.5 h-4 w-4 shrink-0" style={{ color: GOLD }} />
+                      <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: GOLD }} />
                       <span>
                         <span className="block text-[12px] font-bold" style={{ color: NAVY }}>{label}</span>
                         <span className="block text-[12px] leading-relaxed text-[#6b7280]">{value}</span>
@@ -123,9 +129,9 @@ export function AboutSection() {
                 <div className="mt-4 max-w-lg border-t border-[#eceadf]" />
                 <div className="mt-3 flex flex-wrap items-center gap-x-10 gap-y-4">
                   {[
-                    { icon: Eye, value: "12.5K", label: "Views" },
-                    { icon: HomeIcon, value: "24", label: "Listings" },
-                    { icon: Star, value: "4.9/5", label: "Rating" },
+                    { icon: Eye, value: about.views, label: "Views" },
+                    { icon: HomeIcon, value: about.listings, label: "Listings" },
+                    { icon: Star, value: about.rating, label: "Rating" },
                   ].map(({ icon: Icon, value, label }) => (
                     <div key={label} className="flex items-center gap-3">
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: "#faf5e8", color: GOLD }}>
@@ -150,21 +156,19 @@ export function AboutSection() {
             <p className="text-[11px] font-semibold text-[#6b7280]">Scan to Connect</p>
           </div>
           <div className="flex items-center justify-center gap-2.5">
-            {[
-              { icon: Facebook, label: "Facebook" },
-              { icon: Instagram, label: "Instagram" },
-              { icon: Linkedin, label: "LinkedIn" },
-              { icon: Youtube, label: "YouTube" },
-            ].map(({ icon: Icon, label }) => (
-              <span
-                key={label}
-                aria-label={label}
-                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[#e3ddcd] bg-white transition-colors hover:bg-[#faf5e8]"
-                style={{ color: NAVY }}
-              >
-                <Icon className="h-4 w-4" strokeWidth={1.8} />
-              </span>
-            ))}
+            {socials.map(({ icon: Icon, label, href }) => {
+              const cls =
+                "flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[#e3ddcd] bg-white transition-colors hover:bg-[#faf5e8]"
+              return href ? (
+                <a key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label} className={cls} style={{ color: NAVY }}>
+                  <Icon className="h-4 w-4" strokeWidth={1.8} />
+                </a>
+              ) : (
+                <span key={label} aria-label={label} className={cls} style={{ color: NAVY }}>
+                  <Icon className="h-4 w-4" strokeWidth={1.8} />
+                </span>
+              )
+            })}
           </div>
         </div>
       </div>

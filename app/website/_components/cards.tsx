@@ -13,12 +13,14 @@ export function ProjectCard({ project: p }: { project: Project }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={p.image} alt={p.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
           <span className="absolute left-3 top-3 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ backgroundColor: GOLD_SOFT, color: INK }}>
-            Off Plan
+            {p.badge}
           </span>
-          <span className="absolute right-3 top-3 flex h-9 w-14 items-center justify-center bg-white/95 p-1">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={p.developer.url} alt={p.developer.name} className="max-h-full max-w-full object-contain" />
-          </span>
+          {p.developerLogo && (
+            <span className="absolute right-3 top-3 flex h-9 w-14 items-center justify-center bg-white/95 p-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.developerLogo} alt={p.developerName} className="max-h-full max-w-full object-contain" />
+            </span>
+          )}
         </div>
       </div>
       <div className="p-4">

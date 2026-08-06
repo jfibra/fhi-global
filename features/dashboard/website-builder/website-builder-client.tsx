@@ -1,0 +1,883 @@
+"use client"
+
+// Website Builder — every section of the /website/sample template is editable
+// through the form on the left while the right side shows the real template
+// (the same section components) live-updating at a scaled 1440px virtual
+// viewport. The form shows ONE section at a time (chip navigation at the top),
+// Featured Projects/Listings are picked from real published data, and the
+// agent's contact fields seed from their profile. The draft autosaves to
+// localStorage; DB persistence comes later.
+
+import { useEffect, useRef, useState, useSyncExternalStore } from "react"
+import {
+  Check, ExternalLink, ImagePlus, Loader2, Palette, Plus, RotateCcw, Search, Trash2,
+} from "lucide-react"
+import { useAuth } from "@/context/auth-context"
+import { compressImageForUpload } from "@/lib/upload/compress-image"
+import { normalizeSocialUrl, readSocialLinks } from "@/lib/public-profile"
+import {
+  BAND_STAT_ICON_FALLBACK, GALLERY_CATEGORIES, HERO_STAT_ICON_FALLBACK, SAMPLE_DATA, STAT_ICONS,
+  type GalleryCategory, type Project, type Property, type StatIconKey, type WebsiteData,
+} from "@/app/website/_data"
+import { SiteHeader } from "@/app/website/_components/header"
+import { SiteFooter } from "@/app/website/_components/footer"
+import { HeroSection } from "@/app/website/_components/sections/hero"
+import { AboutSection } from "@/app/website/_components/sections/about"
+import { FeaturedSection } from "@/app/website/_components/sections/featured"
+import { StatsBandSection } from "@/app/website/_components/sections/stats"
+import { ServiceAreasSection } from "@/app/website/_components/sections/service-areas"
+import { GallerySection } from "@/app/website/_components/sections/gallery"
+import { TestimonialsSection } from "@/app/website/_components/sections/what-my-clients-say"
+import { ClosingCtaSection } from "@/app/website/_components/sections/closing-cta"
+
+const DRAFT_KEY = "fhi:website-builder:draft:v1"
+const VIRTUAL_WIDTH = 1440
+const MAX_FEATURED = 8
+
+// ─── Draft persistence + profile seeding ─────────────────────────────────────
+
+function loadDraft(): WebsiteData | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as WebsiteData
+    // Newly added fields fall back to the sample so old drafts never render holes.
+    return {
+      ...structuredClone(SAMPLE_DATA),
+      ...parsed,
+      agent: { ...SAMPLE_DATA.agent, ...parsed.agent },
+      hero: { ...structuredClone(SAMPLE_DATA.hero), ...parsed.hero },
+      about: { ...structuredClone(SAMPLE_DATA.about), ...parsed.about },
+      cta: { ...SAMPLE_DATA.cta, ...parsed.cta },
+      gallery: { ...structuredClone(SAMPLE_DATA.gallery), ...parsed.gallery },
+    }
+  } catch {
+    return null
+  }
+}
+
+type ProfileSeed = {
+  name: string
+  phone: string
+  whatsapp: string
+  email: string
+  facebook: string
+  instagram: string
+  linkedin: string
+  youtube: string
+}
+
+/** Sample data with the agent's own contact details + socials dropped in. */
+function seededSample(seed: ProfileSeed): WebsiteData {
+  const d = structuredClone(SAMPLE_DATA)
+  if (seed.name) d.agent.name = seed.name
+  if (seed.phone) d.agent.phone = seed.phone
+  if (seed.whatsapp) d.agent.whatsapp = seed.whatsapp
+  if (seed.email) d.agent.email = seed.email
+  d.about.socials = {
+    facebook: seed.facebook,
+    instagram: seed.instagram,
+    linkedin: seed.linkedin,
+    youtube: seed.youtube,
+  }
+  return d
+}
+
+/** Profile values fill in any EMPTY social field of an existing draft — a
+ *  draft saved before seeding existed shouldn't pin the socials to "". */
+function seedEmptySocials(d: WebsiteData, seed: ProfileSeed): WebsiteData {
+  const s = d.about.socials
+  if (!s.facebook && seed.facebook) s.facebook = seed.facebook
+  if (!s.instagram && seed.instagram) s.instagram = seed.instagram
+  if (!s.linkedin && seed.linkedin) s.linkedin = seed.linkedin
+  if (!s.youtube && seed.youtube) s.youtube = seed.youtube
+  return d
+}
+
+// Mounted flag without a set-state-in-effect: server snapshot is false, the
+// client snapshot is true, so the editor body only renders after hydration
+// (the draft comes from localStorage, which the server can't see).
+const subscribeNoop = () => () => {}
+function useMounted() {
+  return useSyncExternalStore(subscribeNoop, () => true, () => false)
+}
+
+// ─── Small form primitives ────────────────────────────────────────────────────
+
+function Field({ label, action, children }: { label: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-wide text-[#6b7280]">{label}</span>
+        {action}
+      </span>
+      {children}
+    </label>
+  )
+}
+
+/** Labeled swatch that opens the native color picker. */
+function ColorButton({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <span
+      className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 border border-[#e2e6ea] bg-white px-1.5 py-0.5"
+      title="Pick a text color"
+    >
+      <Palette className="h-3 w-3 text-[#6b7280]" />
+      <span className="text-[10px] font-bold uppercase tracking-wide text-[#6b7280]">Color</span>
+      <input
+        type="color"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label="Text color"
+        className="h-4 w-6 cursor-pointer appearance-none border border-[#e2e6ea] bg-white p-0"
+      />
+    </span>
+  )
+}
+
+const INPUT_CLS =
+  "w-full border border-[#e2e6ea] bg-white px-3 py-2 text-[13px] text-[#0d1117] outline-none transition-colors focus:border-[#001f3f]"
+
+function TInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return <input type="text" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={INPUT_CLS} />
+}
+
+function TArea({ value, onChange, rows = 3 }: { value: string; onChange: (v: string) => void; rows?: number }) {
+  return <textarea value={value} rows={rows} onChange={(e) => onChange(e.target.value)} className={`${INPUT_CLS} resize-y`} />
+}
+
+/** Image field: thumbnail + URL input + S3 upload button. */
+function ImageInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const upload = async (file: File) => {
+    setBusy(true)
+    setError(null)
+    try {
+      const { file: toUpload } = await compressImageForUpload(file)
+      const fd = new FormData()
+      fd.append("file", toUpload)
+      const res = await fetch("/api/upload/website-builder", { method: "POST", body: fd })
+      const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string }
+      if (!res.ok || !json.url) throw new Error(json.error || "Upload failed")
+      onChange(json.url)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed")
+    } finally {
+      setBusy(false)
+      if (fileRef.current) fileRef.current.value = ""
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="flex h-10 w-14 shrink-0 items-center justify-center overflow-hidden border border-[#e2e6ea] bg-[#f4f6f9]">
+          {value ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={value} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <ImagePlus className="h-4 w-4 text-[#9aa0aa]" />
+          )}
+        </span>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Image URL"
+          className={INPUT_CLS}
+        />
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => fileRef.current?.click()}
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 border border-[#e2e6ea] bg-white px-3 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9] disabled:opacity-60"
+        >
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
+          Upload
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) void upload(f)
+          }}
+        />
+      </div>
+      {error && <p className="mt-1 text-[11px] font-semibold text-red-600">{error}</p>}
+    </div>
+  )
+}
+
+/** Numbered card wrapper for one item of a list, with a remove button. */
+function ItemCard({ index, onRemove, children }: { index: number; onRemove: () => void; children: React.ReactNode }) {
+  return (
+    <div className=" border border-[#e8eaed] bg-[#fafbfc] p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[11px] font-bold text-[#9aa0aa]">#{index + 1}</span>
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="Remove"
+          className="flex h-6 w-6 items-center justify-center text-[#9aa0aa] transition-colors hover:bg-red-50 hover:text-red-600"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="space-y-2.5">{children}</div>
+    </div>
+  )
+}
+
+/** Flat grid of the STAT_ICONS registry — the selected key is navy. */
+function IconPicker({ value, onChange }: { value: StatIconKey; onChange: (k: StatIconKey) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {(Object.keys(STAT_ICONS) as StatIconKey[]).map((k) => {
+        const Icon = STAT_ICONS[k]
+        const selected = value === k
+        return (
+          <button
+            key={k}
+            type="button"
+            title={k}
+            aria-label={k}
+            onClick={() => onChange(k)}
+            className={`flex h-8 w-8 items-center justify-center border transition-colors ${
+              selected
+                ? "border-[#001f3f] bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white"
+                : "border-[#e2e6ea] bg-white text-[#5b6472] hover:border-[#9aa0aa]"
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-3 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+    >
+      <Plus className="h-3.5 w-3.5" /> {label}
+    </button>
+  )
+}
+
+// ─── Featured picker (projects + listings share the shape) ───────────────────
+
+type PickerItem = { sourceId: string; image: string; title: string; sub: string }
+
+function FeaturedPicker({
+  items,
+  loading,
+  loadError,
+  selectedIds,
+  onToggle,
+  emptyText,
+}: {
+  items: PickerItem[]
+  loading: boolean
+  loadError: string | null
+  selectedIds: Set<string>
+  onToggle: (id: string) => void
+  emptyText: string
+}) {
+  const [q, setQ] = useState("")
+  const needle = q.trim().toLowerCase()
+  const filtered = needle ? items.filter((i) => `${i.title} ${i.sub}`.toLowerCase().includes(needle)) : items
+
+  return (
+    <div className="space-y-2.5">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9aa0aa]" />
+        <input
+          type="text"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search…"
+          className={`${INPUT_CLS} pl-8`}
+        />
+      </div>
+      <div className="max-h-72 space-y-1.5 overflow-y-auto border border-[#e8eaed] bg-[#fafbfc] p-1.5">
+        {loading ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-4 w-4 animate-spin text-[#9aa0aa]" />
+          </div>
+        ) : loadError ? (
+          <p className="px-2 py-4 text-center text-[12px] font-semibold text-red-600">{loadError}</p>
+        ) : filtered.length === 0 ? (
+          <p className="px-2 py-4 text-center text-[12px] text-[#9aa0aa]">{emptyText}</p>
+        ) : (
+          filtered.map((item) => {
+            const selected = selectedIds.has(item.sourceId)
+            return (
+              <button
+                key={item.sourceId}
+                type="button"
+                onClick={() => onToggle(item.sourceId)}
+                className={`flex w-full items-center gap-2.5 border p-2 text-left transition-colors ${
+                  selected ? "border-[#001f3f] bg-[#eef3f9]" : "border-transparent bg-white hover:border-[#d8dde3]"
+                }`}
+              >
+                <span className="flex h-9 w-12 shrink-0 items-center justify-center overflow-hidden bg-[#eceff3]">
+                  {item.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.image} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <ImagePlus className="h-3.5 w-3.5 text-[#9aa0aa]" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[12.5px] font-bold text-[#0d1117]">{item.title}</span>
+                  <span className="block truncate text-[11px] text-[#9aa0aa]">{item.sub}</span>
+                </span>
+                <span
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center border ${
+                    selected ? "border-[#001f3f] bg-[#001f3f] text-white" : "border-[#c8ccd2] text-transparent"
+                  }`}
+                >
+                  <Check className="h-3 w-3" />
+                </span>
+              </button>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Live preview ─────────────────────────────────────────────────────────────
+
+function LivePreview({ data }: { data: WebsiteData }) {
+  const [outerEl, setOuterEl] = useState<HTMLDivElement | null>(null)
+  const [innerEl, setInnerEl] = useState<HTMLDivElement | null>(null)
+  const [scale, setScale] = useState(0.4)
+  const [innerH, setInnerH] = useState(5000)
+
+  useEffect(() => {
+    if (!outerEl) return
+    const ro = new ResizeObserver(() => {
+      if (outerEl.clientWidth > 0) setScale(outerEl.clientWidth / VIRTUAL_WIDTH)
+    })
+    ro.observe(outerEl)
+    return () => ro.disconnect()
+  }, [outerEl])
+
+  useEffect(() => {
+    if (!innerEl) return
+    const ro = new ResizeObserver(() => {
+      if (innerEl.offsetHeight > 0) setInnerH(innerEl.offsetHeight)
+    })
+    ro.observe(innerEl)
+    return () => ro.disconnect()
+  }, [innerEl])
+
+  return (
+    <div ref={setOuterEl} className="h-full overflow-y-auto overflow-x-hidden bg-[#dfe4ea]">
+      <div style={{ height: innerH * scale }} className="relative">
+        <div ref={setInnerEl} style={{ width: VIRTUAL_WIDTH, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+          <SiteHeader />
+          <HeroSection data={data} />
+          <AboutSection data={data} />
+          <FeaturedSection data={data} />
+          <StatsBandSection data={data} />
+          <ServiceAreasSection data={data} />
+          <GallerySection data={data} />
+          <TestimonialsSection data={data} />
+          <ClosingCtaSection data={data} />
+          <SiteFooter data={data} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Section navigation ───────────────────────────────────────────────────────
+
+const FORM_SECTIONS = [
+  { id: "agent", label: "Agent" },
+  { id: "hero", label: "Hero" },
+  { id: "about", label: "About" },
+  { id: "projects", label: "Projects" },
+  { id: "listings", label: "Listings" },
+  { id: "stats", label: "Stats" },
+  { id: "areas", label: "Service Areas" },
+  { id: "gallery", label: "Gallery" },
+  { id: "reviews", label: "Reviews" },
+  { id: "cta", label: "CTA" },
+] as const
+
+type FormSectionId = (typeof FORM_SECTIONS)[number]["id"]
+
+// ─── Editor ───────────────────────────────────────────────────────────────────
+
+export function WebsiteBuilderClient() {
+  const mounted = useMounted()
+  const { user, profile } = useAuth()
+
+  // Contact fields + socials seed from the logged-in profile (still fully
+  // editable). Socials come from the digital-business-card links
+  // (metadata.socials), falling back to the profile tab's facebook/linkedin
+  // fields; bare handles are normalized to full https URLs.
+  const meta = (profile?.metadata ?? {}) as Record<string, unknown>
+  const socials = readSocialLinks(profile?.metadata ?? null)
+  const socialUrl = (platform: "facebook" | "instagram" | "linkedin" | "tiktok", fallback?: unknown) => {
+    const raw = socials[platform] ?? (typeof fallback === "string" ? fallback : "")
+    return raw ? normalizeSocialUrl(platform, raw) ?? "" : ""
+  }
+  const seed: ProfileSeed = {
+    name: profile?.fullname ?? "",
+    phone: typeof meta.phone_number === "string" ? meta.phone_number : "",
+    whatsapp: typeof meta.whatsapp_number === "string" ? meta.whatsapp_number : "",
+    email: user?.email ?? "",
+    facebook: socialUrl("facebook", meta.facebook),
+    instagram: socialUrl("instagram"),
+    linkedin: socialUrl("linkedin", meta.linkedin),
+    // No YouTube field exists on the profile yet — stays manual.
+    youtube: "",
+  }
+
+  const [data, setData] = useState<WebsiteData>(() => {
+    if (typeof window === "undefined") return SAMPLE_DATA
+    const draft = loadDraft()
+    return draft ? seedEmptySocials(draft, seed) : seededSample(seed)
+  })
+  const [activeSection, setActiveSection] = useState<FormSectionId>("agent")
+  const [activeGalleryCat, setActiveGalleryCat] = useState<GalleryCategory>("Event Photos")
+
+  // Picker data — real published projects + the agent's own published listings.
+  const [projectOptions, setProjectOptions] = useState<Project[] | null>(null)
+  const [projectsError, setProjectsError] = useState<string | null>(null)
+  const [listingOptions, setListingOptions] = useState<Property[] | null>(null)
+  const [listingsError, setListingsError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!mounted) return
+    let alive = true
+    fetch("/api/website-builder/projects")
+      .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (!alive) return
+        if (!ok) throw new Error((j as { error?: string }).error || "Failed to load projects")
+        setProjectOptions(((j as { projects?: Project[] }).projects ?? []))
+      })
+      .catch((e) => {
+        if (alive) setProjectsError(e instanceof Error ? e.message : "Failed to load projects")
+      })
+    fetch("/api/website-builder/listings")
+      .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (!alive) return
+        if (!ok) throw new Error((j as { error?: string }).error || "Failed to load listings")
+        setListingOptions(((j as { listings?: Property[] }).listings ?? []))
+      })
+      .catch((e) => {
+        if (alive) setListingsError(e instanceof Error ? e.message : "Failed to load listings")
+      })
+    return () => {
+      alive = false
+    }
+  }, [mounted])
+
+  // Debounced localStorage autosave.
+  useEffect(() => {
+    if (!mounted) return
+    const id = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(data))
+      } catch {
+        // storage full/blocked — the draft just won't persist
+      }
+    }, 400)
+    return () => clearTimeout(id)
+  }, [data, mounted])
+
+  /** Clone-and-mutate updater: keeps every field handler a one-liner. */
+  const update = (fn: (d: WebsiteData) => void) =>
+    setData((prev) => {
+      const next = structuredClone(prev)
+      fn(next)
+      return next
+    })
+
+  const reset = () => {
+    if (!window.confirm("Reset everything back to the sample content? Your draft will be lost.")) return
+    localStorage.removeItem(DRAFT_KEY)
+    setData(seededSample(seed))
+  }
+
+  const selectedProjectIds = new Set(data.projects.map((p) => p.sourceId).filter(Boolean) as string[])
+  const selectedListingIds = new Set(data.properties.map((p) => p.sourceId).filter(Boolean) as string[])
+
+  const toggleProject = (id: string) => {
+    const option = projectOptions?.find((o) => o.sourceId === id)
+    update((d) => {
+      const at = d.projects.findIndex((p) => p.sourceId === id)
+      if (at >= 0) d.projects.splice(at, 1)
+      else if (option && d.projects.length < MAX_FEATURED) d.projects.push(structuredClone(option))
+    })
+  }
+
+  const toggleListing = (id: string) => {
+    const option = listingOptions?.find((o) => o.sourceId === id)
+    update((d) => {
+      const at = d.properties.findIndex((p) => p.sourceId === id)
+      if (at >= 0) d.properties.splice(at, 1)
+      else if (option && d.properties.length < MAX_FEATURED) d.properties.push(structuredClone(option))
+    })
+  }
+
+  if (!mounted) {
+    return (
+      <div data-wb-full-bleed className="flex h-full items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-[#9aa0aa]" />
+      </div>
+    )
+  }
+
+  return (
+    <div data-wb-full-bleed className="flex h-full min-h-0">
+      {/* ── Form ── */}
+      <div className="flex w-[400px] shrink-0 flex-col border-r border-[#e8eaed] bg-white xl:w-[440px]">
+        {/* Section navigation — one section's fields at a time */}
+        <div className="flex flex-wrap gap-1.5 border-b border-[#eef0f3] px-5 py-3">
+          {FORM_SECTIONS.map((s) => {
+            const active = activeSection === s.id
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setActiveSection(s.id)}
+                className={` px-3 py-1.5 text-[11.5px] font-bold transition-colors ${
+                  active
+                    ? "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white"
+                    : "border border-[#e2e6ea] text-[#5b6472] hover:border-[#9aa0aa]"
+                }`}
+              >
+                {s.label}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
+          {activeSection === "agent" && (
+            <>
+              <Field label="Full name"><TInput value={data.agent.name} onChange={(v) => update((d) => { d.agent.name = v })} /></Field>
+              <Field label="Professional Title"><TInput value={data.agent.title} onChange={(v) => update((d) => { d.agent.title = v })} /></Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="RERA BRN"><TInput value={data.agent.brn} onChange={(v) => update((d) => { d.agent.brn = v })} /></Field>
+                <Field label="RERA ORN"><TInput value={data.agent.orn} onChange={(v) => update((d) => { d.agent.orn = v })} /></Field>
+              </div>
+              <Field label="Brokerage"><TInput value={data.agent.brokerage} onChange={(v) => update((d) => { d.agent.brokerage = v })} /></Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Phone"><TInput value={data.agent.phone} onChange={(v) => update((d) => { d.agent.phone = v })} /></Field>
+                <Field label="WhatsApp"><TInput value={data.agent.whatsapp} onChange={(v) => update((d) => { d.agent.whatsapp = v })} /></Field>
+              </div>
+              <Field label="Email"><TInput value={data.agent.email} onChange={(v) => update((d) => { d.agent.email = v })} /></Field>
+              <Field label="Office address"><TInput value={data.agent.office} onChange={(v) => update((d) => { d.agent.office = v })} /></Field>
+            </>
+          )}
+
+          {activeSection === "hero" && (
+            <>
+              <Field
+                label="Headline (line breaks kept)"
+                action={<ColorButton value={data.hero.headlineColor ?? "#0d1b2e"} onChange={(v) => update((d) => { d.hero.headlineColor = v })} />}
+              >
+                <TArea rows={2} value={data.hero.headline} onChange={(v) => update((d) => { d.hero.headline = v })} />
+              </Field>
+              <Field
+                label="Headline accent"
+                action={<ColorButton value={data.hero.headlineAccentColor ?? "#c9a24b"} onChange={(v) => update((d) => { d.hero.headlineAccentColor = v })} />}
+              >
+                <TInput value={data.hero.headlineAccent} onChange={(v) => update((d) => { d.hero.headlineAccent = v })} />
+              </Field>
+              <Field
+                label="Description"
+                action={<ColorButton value={data.hero.descriptionColor ?? "#3d4451"} onChange={(v) => update((d) => { d.hero.descriptionColor = v })} />}
+              >
+                <TArea value={data.hero.description} onChange={(v) => update((d) => { d.hero.description = v })} />
+              </Field>
+              <Field label="Banner photo"><ImageInput value={data.hero.image} onChange={(v) => update((d) => { d.hero.image = v })} /></Field>
+              <Field
+                label="Left dark overlay"
+                action={<span className="text-[10px] font-bold text-[#6b7280]">{data.hero.overlay ?? 0}%</span>}
+              >
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={data.hero.overlay ?? 0}
+                  onChange={(e) => update((d) => { d.hero.overlay = Number(e.target.value) })}
+                  className="w-full cursor-pointer accent-[#001f3f]"
+                  aria-label="Left dark overlay strength"
+                />
+                <p className="mt-1 text-[11px] text-[#9aa0aa]">
+                  Darkens the left side behind the headline so it stays readable on bright photos. 0% = no overlay.
+                </p>
+              </Field>
+              <Field label="Hero stats">
+                <div className="space-y-2.5">
+                  {data.hero.stats.map((s, i) => (
+                    <ItemCard key={i} index={i} onRemove={() => update((d) => { d.hero.stats.splice(i, 1) })}>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <TInput value={s.value} placeholder="Value" onChange={(v) => update((d) => { d.hero.stats[i].value = v })} />
+                        <TInput value={s.label} placeholder="Label" onChange={(v) => update((d) => { d.hero.stats[i].label = v })} />
+                      </div>
+                      <IconPicker
+                        value={s.icon ?? HERO_STAT_ICON_FALLBACK[i % HERO_STAT_ICON_FALLBACK.length]}
+                        onChange={(k) => update((d) => { d.hero.stats[i].icon = k })}
+                      />
+                    </ItemCard>
+                  ))}
+                  <AddButton label="Add stat" onClick={() => update((d) => { d.hero.stats.push({ value: "", label: "" }) })} />
+                </div>
+              </Field>
+            </>
+          )}
+
+          {activeSection === "about" && (
+            <>
+              <Field label="Heading (line breaks kept)"><TArea rows={2} value={data.about.heading} onChange={(v) => update((d) => { d.about.heading = v })} /></Field>
+              <Field label="Bio"><TArea rows={7} value={data.about.bio} onChange={(v) => update((d) => { d.about.bio = v })} /></Field>
+              <Field label="Portrait photo"><ImageInput value={data.about.portrait} onChange={(v) => update((d) => { d.about.portrait = v })} /></Field>
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Views"><TInput value={data.about.views} onChange={(v) => update((d) => { d.about.views = v })} /></Field>
+                <Field label="Listings"><TInput value={data.about.listings} onChange={(v) => update((d) => { d.about.listings = v })} /></Field>
+                <Field label="Rating"><TInput value={data.about.rating} onChange={(v) => update((d) => { d.about.rating = v })} /></Field>
+              </div>
+              <Field label="Facebook URL"><TInput value={data.about.socials.facebook} onChange={(v) => update((d) => { d.about.socials.facebook = v })} /></Field>
+              <Field label="Instagram URL"><TInput value={data.about.socials.instagram} onChange={(v) => update((d) => { d.about.socials.instagram = v })} /></Field>
+              <Field label="LinkedIn URL"><TInput value={data.about.socials.linkedin} onChange={(v) => update((d) => { d.about.socials.linkedin = v })} /></Field>
+              <Field label="YouTube URL"><TInput value={data.about.socials.youtube} onChange={(v) => update((d) => { d.about.socials.youtube = v })} /></Field>
+            </>
+          )}
+
+          {activeSection === "projects" && (
+            <>
+              <p className="text-[12px] leading-relaxed text-[#6b7280]">
+                Pick up to {MAX_FEATURED} published projects — the card fills in from the real project.
+                <span className="ml-1 font-bold text-[#0d1117]">{data.projects.length}/{MAX_FEATURED} selected</span>
+              </p>
+              <FeaturedPicker
+                items={(projectOptions ?? []).map((p) => ({
+                  sourceId: p.sourceId!,
+                  image: p.image,
+                  title: p.title,
+                  sub: [p.developerName, p.location].filter(Boolean).join(" · "),
+                }))}
+                loading={projectOptions === null && !projectsError}
+                loadError={projectsError}
+                selectedIds={selectedProjectIds}
+                onToggle={toggleProject}
+                emptyText="No published projects found."
+              />
+              {data.projects.length > 0 && (
+                <Field label="Selected (shown in this order)">
+                  <div className="space-y-1.5">
+                    {data.projects.map((p, i) => (
+                      <div key={`${p.sourceId ?? p.title}-${i}`} className="flex items-center gap-2 border border-[#e8eaed] bg-[#fafbfc] px-2.5 py-1.5">
+                        <span className="text-[11px] font-bold text-[#9aa0aa]">#{i + 1}</span>
+                        <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-[#0d1117]">{p.title || "Untitled"}</span>
+                        <button
+                          type="button"
+                          aria-label="Remove"
+                          onClick={() => update((d) => { d.projects.splice(i, 1) })}
+                          className="flex h-6 w-6 items-center justify-center text-[#9aa0aa] transition-colors hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </Field>
+              )}
+            </>
+          )}
+
+          {activeSection === "listings" && (
+            <>
+              <p className="text-[12px] leading-relaxed text-[#6b7280]">
+                Pick up to {MAX_FEATURED} of your published listings — the card fills in from the real listing.
+                <span className="ml-1 font-bold text-[#0d1117]">{data.properties.length}/{MAX_FEATURED} selected</span>
+              </p>
+              <FeaturedPicker
+                items={(listingOptions ?? []).map((p) => ({
+                  sourceId: p.sourceId!,
+                  image: p.image,
+                  title: p.title,
+                  sub: [p.badge, p.location, p.price].filter(Boolean).join(" · "),
+                }))}
+                loading={listingOptions === null && !listingsError}
+                loadError={listingsError}
+                selectedIds={selectedListingIds}
+                onToggle={toggleListing}
+                emptyText="No published listings found — publish a listing first."
+              />
+              {data.properties.length > 0 && (
+                <Field label="Selected (shown in this order)">
+                  <div className="space-y-1.5">
+                    {data.properties.map((p, i) => (
+                      <div key={`${p.sourceId ?? p.title}-${i}`} className="flex items-center gap-2 border border-[#e8eaed] bg-[#fafbfc] px-2.5 py-1.5">
+                        <span className="text-[11px] font-bold text-[#9aa0aa]">#{i + 1}</span>
+                        <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-[#0d1117]">{p.title || "Untitled"}</span>
+                        <button
+                          type="button"
+                          aria-label="Remove"
+                          onClick={() => update((d) => { d.properties.splice(i, 1) })}
+                          className="flex h-6 w-6 items-center justify-center text-[#9aa0aa] transition-colors hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </Field>
+              )}
+            </>
+          )}
+
+          {activeSection === "stats" && (
+            <>
+              {data.bandStats.map((s, i) => (
+                <ItemCard key={i} index={i} onRemove={() => update((d) => { d.bandStats.splice(i, 1) })}>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <TInput value={s.value} placeholder="Value" onChange={(v) => update((d) => { d.bandStats[i].value = v })} />
+                    <TInput value={s.label} placeholder="Label" onChange={(v) => update((d) => { d.bandStats[i].label = v })} />
+                  </div>
+                  <IconPicker
+                    value={s.icon ?? BAND_STAT_ICON_FALLBACK[i % BAND_STAT_ICON_FALLBACK.length]}
+                    onChange={(k) => update((d) => { d.bandStats[i].icon = k })}
+                  />
+                </ItemCard>
+              ))}
+              <AddButton label="Add stat" onClick={() => update((d) => { d.bandStats.push({ value: "", label: "" }) })} />
+            </>
+          )}
+
+          {activeSection === "areas" && (
+            <>
+              {data.areas.map((a, i) => (
+                <ItemCard key={i} index={i} onRemove={() => update((d) => { d.areas.splice(i, 1) })}>
+                  <ImageInput value={a.image} onChange={(v) => update((d) => { d.areas[i].image = v })} />
+                  <TInput value={a.label} placeholder="Area name" onChange={(v) => update((d) => { d.areas[i].label = v })} />
+                </ItemCard>
+              ))}
+              <AddButton label="Add area" onClick={() => update((d) => { d.areas.push({ image: "", label: "" }) })} />
+            </>
+          )}
+
+          {activeSection === "gallery" && (
+            <>
+              {/* Category navbar — only the active category's images below */}
+              <div className="flex flex-wrap gap-1.5">
+                {GALLERY_CATEGORIES.map((cat) => {
+                  const active = activeGalleryCat === cat
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setActiveGalleryCat(cat)}
+                      className={` px-3 py-1.5 text-[11.5px] font-bold transition-colors ${
+                        active
+                          ? "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white"
+                          : "border border-[#e2e6ea] text-[#5b6472] hover:border-[#9aa0aa]"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="space-y-2.5">
+                {data.gallery[activeGalleryCat].map((src, i) => (
+                  <div key={`${activeGalleryCat}-${i}`} className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <ImageInput value={src} onChange={(v) => update((d) => { d.gallery[activeGalleryCat][i] = v })} />
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="Remove image"
+                      onClick={() => update((d) => { d.gallery[activeGalleryCat].splice(i, 1) })}
+                      className="mt-2 flex h-6 w-6 shrink-0 items-center justify-center text-[#9aa0aa] transition-colors hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+                <AddButton label="Add image" onClick={() => update((d) => { d.gallery[activeGalleryCat].push("") })} />
+              </div>
+            </>
+          )}
+
+          {activeSection === "reviews" && (
+            <>
+              {data.testimonials.map((t, i) => (
+                <ItemCard key={i} index={i} onRemove={() => update((d) => { d.testimonials.splice(i, 1) })}>
+                  <TArea rows={3} value={t.quote} onChange={(v) => update((d) => { d.testimonials[i].quote = v })} />
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <TInput value={t.name} placeholder="Client name" onChange={(v) => update((d) => { d.testimonials[i].name = v })} />
+                    <TInput value={t.where} placeholder="Location" onChange={(v) => update((d) => { d.testimonials[i].where = v })} />
+                  </div>
+                </ItemCard>
+              ))}
+              <AddButton label="Add testimonial" onClick={() => update((d) => { d.testimonials.push({ quote: "", name: "", where: "" }) })} />
+            </>
+          )}
+
+          {activeSection === "cta" && (
+            <>
+              <Field label="Heading"><TInput value={data.cta.heading} onChange={(v) => update((d) => { d.cta.heading = v })} /></Field>
+              <Field label="Subtext"><TInput value={data.cta.sub} onChange={(v) => update((d) => { d.cta.sub = v })} /></Field>
+            </>
+          )}
+        </div>
+
+        {/* Footer — title, autosave note and the Sample/Reset actions */}
+        <div className="flex shrink-0 items-center justify-between border-t border-[#eef0f3] px-5 py-4">
+          <div>
+            <h1 className="font-['Outfit'] text-[16px] font-bold text-[#0d1117]">Website Builder</h1>
+            <p className="text-[11px] text-[#9aa0aa]">Draft autosaves in this browser</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href="/website/sample"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-8 items-center gap-1.5 border border-[#e2e6ea] px-2.5 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> Sample
+            </a>
+            <button
+              type="button"
+              onClick={reset}
+              className="inline-flex h-8 items-center gap-1.5 border border-[#e2e6ea] px-2.5 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Reset
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Live preview ── */}
+      <div className="min-w-0 flex-1">
+        <LivePreview data={data} />
+      </div>
+    </div>
+  )
+}
