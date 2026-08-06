@@ -2,11 +2,10 @@ import { NextResponse } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { canUseWebsiteBuilder } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { fetchProjectCards } from "@/lib/website-builder-service"
 
-// Published projects for the Website Builder "Featured Projects" picker,
-// already mapped to the template's ProjectCard shape (shared with the save/
-// load service so picked cards and rendered cards always agree).
+// The shared service-area catalog (migration 036) for the editor's
+// choose-or-create area field: picking an existing name reuses its catalog
+// row (and photo); a new name inserts one on save.
 
 export const runtime = "nodejs"
 
@@ -17,10 +16,12 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  try {
-    const projects = await fetchProjectCards(createAdminSupabase())
-    return NextResponse.json({ projects })
-  } catch {
-    return NextResponse.json({ error: "Failed to load projects" }, { status: 500 })
+  const { data, error } = await createAdminSupabase()
+    .from("service_areas")
+    .select("name, photo")
+    .order("name")
+  if (error) {
+    return NextResponse.json({ error: "Failed to load areas" }, { status: 500 })
   }
+  return NextResponse.json({ areas: data ?? [] })
 }

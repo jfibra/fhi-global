@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 import {
-  Check, ExternalLink, ImagePlus, Loader2, Palette, Plus, RotateCcw, Search, Trash2,
+  ArrowDown, ArrowUp, Check, ExternalLink, ImagePlus, Loader2, Palette, Plus, RotateCcw, Save, Search, Trash2,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
@@ -215,24 +215,62 @@ function ImageInput({ value, onChange }: { value: string; onChange: (v: string) 
   )
 }
 
-/** Numbered card wrapper for one item of a list, with a remove button. */
-function ItemCard({ index, onRemove, children }: { index: number; onRemove: () => void; children: React.ReactNode }) {
+/** Up/down arrows for reordering a list item (the saved rank is the array
+ *  position). Each arrow disables at its end of the list. */
+function MoveButtons({ index, count, onMove }: { index: number; count: number; onMove: (dir: -1 | 1) => void }) {
+  const btn = "flex h-6 w-6 items-center justify-center text-[#9aa0aa] transition-colors hover:bg-[#eef0f3] hover:text-[#0d1117] disabled:pointer-events-none disabled:opacity-30"
+  return (
+    <>
+      <button type="button" aria-label="Move up" disabled={index === 0} onClick={() => onMove(-1)} className={btn}>
+        <ArrowUp className="h-3.5 w-3.5" />
+      </button>
+      <button type="button" aria-label="Move down" disabled={index === count - 1} onClick={() => onMove(1)} className={btn}>
+        <ArrowDown className="h-3.5 w-3.5" />
+      </button>
+    </>
+  )
+}
+
+/** Numbered card wrapper for one item of a list, with move + remove buttons. */
+function ItemCard({
+  index,
+  count,
+  onMove,
+  onRemove,
+  children,
+}: {
+  index: number
+  count: number
+  onMove: (dir: -1 | 1) => void
+  onRemove: () => void
+  children: React.ReactNode
+}) {
   return (
     <div className=" border border-[#e8eaed] bg-[#fafbfc] p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-[11px] font-bold text-[#9aa0aa]">#{index + 1}</span>
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label="Remove"
-          className="flex h-6 w-6 items-center justify-center text-[#9aa0aa] transition-colors hover:bg-red-50 hover:text-red-600"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <MoveButtons index={index} count={count} onMove={onMove} />
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label="Remove"
+            className="flex h-6 w-6 items-center justify-center text-[#9aa0aa] transition-colors hover:bg-red-50 hover:text-red-600"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
       <div className="space-y-2.5">{children}</div>
     </div>
   )
+}
+
+/** Swap arr[i] with its neighbor in place — the update() clone makes it safe. */
+function swap<T>(arr: T[], i: number, dir: -1 | 1) {
+  const j = i + dir
+  if (j < 0 || j >= arr.length) return
+  ;[arr[i], arr[j]] = [arr[j], arr[i]]
 }
 
 /** Flat grid of the STAT_ICONS registry — the selected key is navy. */
@@ -450,6 +488,9 @@ export function WebsiteBuilderClient() {
     youtube: "",
   }
 
+  // Whether a local draft existed at mount — when it didn't, the saved site
+  // from the DB (if any) becomes the initial state instead.
+  const [hadDraft] = useState(() => typeof window !== "undefined" && !!localStorage.getItem(DRAFT_KEY))
   const [data, setData] = useState<WebsiteData>(() => {
     if (typeof window === "undefined") return SAMPLE_DATA
     const draft = loadDraft()
@@ -458,11 +499,58 @@ export function WebsiteBuilderClient() {
   const [activeSection, setActiveSection] = useState<FormSectionId>("agent")
   const [activeGalleryCat, setActiveGalleryCat] = useState<GalleryCategory>("Event Photos")
 
+  // Published-site state (migration 035): the slug is minted on first save.
+  const [siteSlug, setSiteSlug] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!mounted) return
+    let alive = true
+    fetch("/api/website-builder/site")
+      .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (!alive || !ok) return
+        const site = j as { exists?: boolean; slug?: string; data?: WebsiteData }
+        if (!site.exists || !site.slug || !site.data) return
+        setSiteSlug(site.slug)
+        // A local draft is newer than the DB copy on this browser — keep it.
+        if (!hadDraft) setData(site.data)
+      })
+      .catch(() => {
+        // No saved site / table not migrated yet — the editor stays local-only.
+      })
+    return () => {
+      alive = false
+    }
+  }, [mounted, hadDraft])
+
+  const save = async () => {
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const res = await fetch("/api/website-builder/site", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
+      const json = (await res.json().catch(() => ({}))) as { slug?: string; error?: string }
+      if (!res.ok || !json.slug) throw new Error(json.error || "Failed to save")
+      setSiteSlug(json.slug)
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Failed to save")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // Picker data — real published projects + the agent's own published listings.
   const [projectOptions, setProjectOptions] = useState<Project[] | null>(null)
   const [projectsError, setProjectsError] = useState<string | null>(null)
   const [listingOptions, setListingOptions] = useState<Property[] | null>(null)
   const [listingsError, setListingsError] = useState<string | null>(null)
+  // Shared service-area catalog — typing an existing name reuses its row/photo.
+  const [areaOptions, setAreaOptions] = useState<{ name: string; photo: string }[]>([])
 
   useEffect(() => {
     if (!mounted) return
@@ -476,6 +564,14 @@ export function WebsiteBuilderClient() {
       })
       .catch((e) => {
         if (alive) setProjectsError(e instanceof Error ? e.message : "Failed to load projects")
+      })
+    fetch("/api/website-builder/areas")
+      .then((r) => (r.ok ? r.json() : { areas: [] }))
+      .then((j) => {
+        if (alive) setAreaOptions(((j as { areas?: { name: string; photo: string }[] }).areas ?? []))
+      })
+      .catch(() => {
+        // Catalog unavailable — the field still works as free text.
       })
     fetch("/api/website-builder/listings")
       .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
@@ -634,7 +730,13 @@ export function WebsiteBuilderClient() {
               <Field label="Hero stats">
                 <div className="space-y-2.5">
                   {data.hero.stats.map((s, i) => (
-                    <ItemCard key={i} index={i} onRemove={() => update((d) => { d.hero.stats.splice(i, 1) })}>
+                    <ItemCard
+                      key={i}
+                      index={i}
+                      count={data.hero.stats.length}
+                      onMove={(dir) => update((d) => swap(d.hero.stats, i, dir))}
+                      onRemove={() => update((d) => { d.hero.stats.splice(i, 1) })}
+                    >
                       <div className="grid grid-cols-2 gap-2.5">
                         <TInput value={s.value} placeholder="Value" onChange={(v) => update((d) => { d.hero.stats[i].value = v })} />
                         <TInput value={s.label} placeholder="Label" onChange={(v) => update((d) => { d.hero.stats[i].label = v })} />
@@ -694,6 +796,7 @@ export function WebsiteBuilderClient() {
                       <div key={`${p.sourceId ?? p.title}-${i}`} className="flex items-center gap-2 border border-[#e8eaed] bg-[#fafbfc] px-2.5 py-1.5">
                         <span className="text-[11px] font-bold text-[#9aa0aa]">#{i + 1}</span>
                         <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-[#0d1117]">{p.title || "Untitled"}</span>
+                        <MoveButtons index={i} count={data.projects.length} onMove={(dir) => update((d) => swap(d.projects, i, dir))} />
                         <button
                           type="button"
                           aria-label="Remove"
@@ -736,6 +839,7 @@ export function WebsiteBuilderClient() {
                       <div key={`${p.sourceId ?? p.title}-${i}`} className="flex items-center gap-2 border border-[#e8eaed] bg-[#fafbfc] px-2.5 py-1.5">
                         <span className="text-[11px] font-bold text-[#9aa0aa]">#{i + 1}</span>
                         <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-[#0d1117]">{p.title || "Untitled"}</span>
+                        <MoveButtons index={i} count={data.properties.length} onMove={(dir) => update((d) => swap(d.properties, i, dir))} />
                         <button
                           type="button"
                           aria-label="Remove"
@@ -755,7 +859,13 @@ export function WebsiteBuilderClient() {
           {activeSection === "stats" && (
             <>
               {data.bandStats.map((s, i) => (
-                <ItemCard key={i} index={i} onRemove={() => update((d) => { d.bandStats.splice(i, 1) })}>
+                <ItemCard
+                  key={i}
+                  index={i}
+                  count={data.bandStats.length}
+                  onMove={(dir) => update((d) => swap(d.bandStats, i, dir))}
+                  onRemove={() => update((d) => { d.bandStats.splice(i, 1) })}
+                >
                   <div className="grid grid-cols-2 gap-2.5">
                     <TInput value={s.value} placeholder="Value" onChange={(v) => update((d) => { d.bandStats[i].value = v })} />
                     <TInput value={s.label} placeholder="Label" onChange={(v) => update((d) => { d.bandStats[i].label = v })} />
@@ -772,10 +882,39 @@ export function WebsiteBuilderClient() {
 
           {activeSection === "areas" && (
             <>
+              <p className="text-[12px] leading-relaxed text-[#6b7280]">
+                Areas are shared across all agent sites — typing an existing name reuses it (and its photo); a new name is added to the catalog when you save.
+              </p>
+              <datalist id="wb-area-catalog">
+                {areaOptions.map((a) => (
+                  <option key={a.name} value={a.name} />
+                ))}
+              </datalist>
               {data.areas.map((a, i) => (
-                <ItemCard key={i} index={i} onRemove={() => update((d) => { d.areas.splice(i, 1) })}>
+                <ItemCard
+                  key={i}
+                  index={i}
+                  count={data.areas.length}
+                  onMove={(dir) => update((d) => swap(d.areas, i, dir))}
+                  onRemove={() => update((d) => { d.areas.splice(i, 1) })}
+                >
+                  <input
+                    type="text"
+                    value={a.label}
+                    placeholder="Area name"
+                    list="wb-area-catalog"
+                    onChange={(e) => {
+                      const v = e.target.value
+                      const match = areaOptions.find((o) => o.name.toLowerCase() === v.trim().toLowerCase())
+                      update((d) => {
+                        d.areas[i].label = v
+                        // Choosing an existing area adopts its shared photo.
+                        if (match?.photo) d.areas[i].image = match.photo
+                      })
+                    }}
+                    className={INPUT_CLS}
+                  />
                   <ImageInput value={a.image} onChange={(v) => update((d) => { d.areas[i].image = v })} />
-                  <TInput value={a.label} placeholder="Area name" onChange={(v) => update((d) => { d.areas[i].label = v })} />
                 </ItemCard>
               ))}
               <AddButton label="Add area" onClick={() => update((d) => { d.areas.push({ image: "", label: "" }) })} />
@@ -806,18 +945,25 @@ export function WebsiteBuilderClient() {
               </div>
               <div className="space-y-2.5">
                 {data.gallery[activeGalleryCat].map((src, i) => (
-                  <div key={`${activeGalleryCat}-${i}`} className="flex items-start gap-2">
+                  <div key={`${activeGalleryCat}-${i}`} className="flex items-start gap-1">
                     <div className="min-w-0 flex-1">
                       <ImageInput value={src} onChange={(v) => update((d) => { d.gallery[activeGalleryCat][i] = v })} />
                     </div>
-                    <button
-                      type="button"
-                      aria-label="Remove image"
-                      onClick={() => update((d) => { d.gallery[activeGalleryCat].splice(i, 1) })}
-                      className="mt-2 flex h-6 w-6 shrink-0 items-center justify-center text-[#9aa0aa] transition-colors hover:bg-red-50 hover:text-red-600"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="mt-2 flex shrink-0 items-center gap-0.5">
+                      <MoveButtons
+                        index={i}
+                        count={data.gallery[activeGalleryCat].length}
+                        onMove={(dir) => update((d) => swap(d.gallery[activeGalleryCat], i, dir))}
+                      />
+                      <button
+                        type="button"
+                        aria-label="Remove image"
+                        onClick={() => update((d) => { d.gallery[activeGalleryCat].splice(i, 1) })}
+                        className="flex h-6 w-6 items-center justify-center text-[#9aa0aa] transition-colors hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
                 <AddButton label="Add image" onClick={() => update((d) => { d.gallery[activeGalleryCat].push("") })} />
@@ -828,7 +974,13 @@ export function WebsiteBuilderClient() {
           {activeSection === "reviews" && (
             <>
               {data.testimonials.map((t, i) => (
-                <ItemCard key={i} index={i} onRemove={() => update((d) => { d.testimonials.splice(i, 1) })}>
+                <ItemCard
+                  key={i}
+                  index={i}
+                  count={data.testimonials.length}
+                  onMove={(dir) => update((d) => swap(d.testimonials, i, dir))}
+                  onRemove={() => update((d) => { d.testimonials.splice(i, 1) })}
+                >
                   <TArea rows={3} value={t.quote} onChange={(v) => update((d) => { d.testimonials[i].quote = v })} />
                   <div className="grid grid-cols-2 gap-2.5">
                     <TInput value={t.name} placeholder="Client name" onChange={(v) => update((d) => { d.testimonials[i].name = v })} />
@@ -848,29 +1000,43 @@ export function WebsiteBuilderClient() {
           )}
         </div>
 
-        {/* Footer — title, autosave note and the Sample/Reset actions */}
-        <div className="flex shrink-0 items-center justify-between border-t border-[#eef0f3] px-5 py-4">
-          <div>
-            <h1 className="font-['Outfit'] text-[16px] font-bold text-[#0d1117]">Website Builder</h1>
-            <p className="text-[11px] text-[#9aa0aa]">Draft autosaves in this browser</p>
+        {/* Footer — title, publish state and the View/Reset/Save actions */}
+        <div className="shrink-0 border-t border-[#eef0f3] px-5 py-4">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <h1 className="font-['Outfit'] text-[16px] font-bold text-[#0d1117]">Website Builder</h1>
+              <p className="truncate text-[11px] text-[#9aa0aa]">
+                {siteSlug ? `Published at /website/${siteSlug}` : "Draft autosaves in this browser"}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <a
+                href={siteSlug ? `/website/${siteSlug}` : "/website/sample"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-8 items-center gap-1.5 border border-[#e2e6ea] px-2.5 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> {siteSlug ? "View Site" : "Sample"}
+              </a>
+              <button
+                type="button"
+                onClick={reset}
+                className="inline-flex h-8 items-center gap-1.5 border border-[#e2e6ea] px-2.5 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => void save()}
+                disabled={saving}
+                className="inline-flex h-8 items-center gap-1.5 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-3 text-[12px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                {siteSlug ? "Save" : "Save & Publish"}
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <a
-              href="/website/sample"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-8 items-center gap-1.5 border border-[#e2e6ea] px-2.5 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
-            >
-              <ExternalLink className="h-3.5 w-3.5" /> Sample
-            </a>
-            <button
-              type="button"
-              onClick={reset}
-              className="inline-flex h-8 items-center gap-1.5 border border-[#e2e6ea] px-2.5 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
-            >
-              <RotateCcw className="h-3.5 w-3.5" /> Reset
-            </button>
-          </div>
+          {saveError && <p className="mt-2 text-[11px] font-semibold text-red-600">{saveError}</p>}
         </div>
       </div>
 

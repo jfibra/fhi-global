@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { SiteFooter } from "../_components/footer"
 import { HeroSection } from "../_components/sections/hero"
 import { AboutSection } from "../_components/sections/about"
 import { FeaturedSection } from "../_components/sections/featured"
@@ -30,6 +31,7 @@ export default function WebsiteSamplePage() {
       <GallerySection />
       <TestimonialsSection />
       <ClosingCtaSection />
+      <SiteFooter />
     </>
   )
 }

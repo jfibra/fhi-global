@@ -10,7 +10,14 @@ import { Check, Eye, Facebook, HomeIcon, Instagram, Linkedin, Star, Youtube } fr
 import { GOLD, INK, NAVY, SAMPLE_DATA, script, type WebsiteData } from "../../_data"
 import { Eyebrow } from "../ui"
 
-export function AboutSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
+export function AboutSection({
+  data = SAMPLE_DATA,
+  qrValue = "https://fhiglobal.ae/website/sample",
+}: {
+  data?: WebsiteData
+  /** What the "Scan to Connect" QR encodes — the site's own public URL. */
+  qrValue?: string
+}) {
   const { agent, about } = data
   const [aboutExpanded, setAboutExpanded] = useState(false)
   // The clamp is measured, not fixed: the bio fills whatever space remains
@@ -152,7 +159,7 @@ export function AboutSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
         {/* QR + socials */}
         <div className="hidden flex-col gap-4 lg:flex">
           <div className="flex flex-col items-center gap-3 border border-[#eceadf] bg-[#fbfaf7] p-5">
-            <QRCodeSVG value="https://fhiglobal.ae/website/sample" size={130} fgColor={NAVY} bgColor="transparent" />
+            <QRCodeSVG value={qrValue} size={130} fgColor={NAVY} bgColor="transparent" />
             <p className="text-[11px] font-semibold text-[#6b7280]">Scan to Connect</p>
           </div>
           <div className="flex items-center justify-center gap-2.5">
