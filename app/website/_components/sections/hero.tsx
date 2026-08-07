@@ -3,7 +3,7 @@
 // stat strip along the bottom.
 
 import { Building2, FileText, Mail, Phone, Play, ShieldCheck } from "lucide-react"
-import { BRAND_GLASS_GRADIENT, BRAND_GLASS_SOFT, BRAND_GRADIENT, BRAND_TO, BRAND_TO_A0, BRAND_TO_A90, GOLD, GOLD_A50, HERO_STAT_ICON_FALLBACK, INK, NAVY, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
+import { BRAND_GLASS_GRADIENT, BRAND_GLASS_SOFT, BRAND_GRADIENT, BRAND_TO, BRAND_TO_A0, BRAND_TO_A90, DEFAULT_WA_MESSAGE, GOLD, GOLD_A50, HERO_STAT_ICON_FALLBACK, INK, NAVY, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
 
 /** WhatsApp brand glyph — lucide has no brand icon for it. */
 function WhatsAppIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -29,7 +29,7 @@ function BrokerCard({ agent }: { agent: WebsiteData["agent"] }) {
       <div className="mt-3.5 grid grid-cols-2 items-start gap-x-4 lg:block">
         <div className="min-w-0 space-y-2">
           <a
-            href={`https://wa.me/${agent.whatsapp.replace(/\D/g, "")}`}
+            href={`https://wa.me/${agent.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(DEFAULT_WA_MESSAGE)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white"

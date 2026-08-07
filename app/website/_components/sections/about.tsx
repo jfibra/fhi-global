@@ -10,7 +10,7 @@ import {
   ArrowRight, Building2, Eye, Facebook, FileText, HomeIcon, Instagram,
   Linkedin, MessageCircle, ShieldCheck, Star, Youtube,
 } from "lucide-react"
-import { BRAND_GRADIENT, GOLD, GOLD_A40, GOLD_A50, GOLD_A60, GOLD_SOFT, GOLD_SOFT_A80, IMG, INK, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
+import { BRAND_GRADIENT, DEFAULT_WA_MESSAGE, GOLD, GOLD_A40, GOLD_A50, GOLD_A60, GOLD_SOFT, GOLD_SOFT_A80, IMG, INK, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
 import { Eyebrow } from "../ui"
 
 export function AboutSection({
@@ -256,7 +256,7 @@ export function AboutSection({
                 I&apos;m here to help you find the perfect property in Dubai.
               </p>
               <a
-                href={`https://wa.me/${agent.whatsapp.replace(/\D/g, "")}`}
+                href={`https://wa.me/${agent.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(DEFAULT_WA_MESSAGE)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-6 flex w-full items-center justify-center px-5 py-4 text-[13px] font-bold uppercase tracking-[0.16em] text-white transition-transform hover:-translate-y-0.5"

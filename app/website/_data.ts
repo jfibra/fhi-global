@@ -17,6 +17,9 @@ import {
 // and every surface below syncs. The exported names read exactly as before —
 // components keep using GOLD / BRAND_GRADIENT / etc.
 
+/** Default prefilled WhatsApp text when the agent hasn't written their own. */
+export const DEFAULT_WA_MESSAGE = "Hi! I found your website and I'd like to know more about your services."
+
 /** The agent's palette: accent (gold family) + primary (navy family).
  *  Everything else — soft/tint/alpha/gradient variants — is derived. */
 export type WebsiteTheme = { gold?: string; brand?: string }
