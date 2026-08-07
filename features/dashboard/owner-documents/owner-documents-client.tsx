@@ -1,12 +1,14 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { toast } from "sonner"
 import {
   ScrollText, Plus, Link2, Eye, XCircle, Loader2, X, FileText, Image as ImageIcon,
-  ExternalLink, Clock, CheckCircle2, Ban, Trash2,
+  ExternalLink, Clock, CheckCircle2, Ban, Trash2, Search,
 } from "lucide-react"
+import { DataTable, type DataTableColumn } from "@/components/common/data-table"
+import { roleToLabel } from "@/lib/app-roles"
 import {
   fetchMyOwnerDocumentRequests,
   fetchAllOwnerDocumentRequestsAdmin,
@@ -46,7 +48,7 @@ const STATUS_STYLE: Record<OwnerDocRequestStatus, { label: string; cls: string; 
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"
 
-export function OwnerDocumentsClient({ isAdmin }: { isAdmin: boolean }) {
+export function OwnerDocumentsClient({ isAdmin, currentUserId }: { isAdmin: boolean; currentUserId: string }) {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
@@ -55,6 +57,17 @@ export function OwnerDocumentsClient({ isAdmin }: { isAdmin: boolean }) {
   const [confirm, setConfirm] = useState<{ kind: "delete" | "cancel"; row: Row } | null>(null)
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [viewing, setViewing] = useState<{ request: Row; files: OwnerDocumentFile[] } | null>(null)
+
+  // ── Filters (admin only) + table state ──────────────────────────────────────
+  // Admins default to "everyone" (the whole team's requests, as before); the
+  // toggle narrows to just their own. Role + person filters compose on top.
+  const [scope, setScope] = useState<"mine" | "everyone">("everyone")
+  const [roleFilter, setRoleFilter] = useState<string>("all")
+  const [agentFilter, setAgentFilter] = useState<string>("all")
+  const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
+  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" })
 
   const openView = useCallback(async (row: Row) => {
     const { data: files, error } = await fetchOwnerDocumentFiles(row.id)
@@ -144,8 +157,81 @@ export function OwnerDocumentsClient({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
+  // ── Derived: filter → sort → paginate (all client-side; the list is small) ──
+  // Distinct people who have requests, for the person dropdown (admins only).
+  const people = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; role: string | null }>()
+    for (const r of rows) {
+      if (r.agent_id && !map.has(r.agent_id)) {
+        map.set(r.agent_id, { id: r.agent_id, name: r.agent_name?.trim() || "Unknown", role: r.agent_role ?? null })
+      }
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [rows])
+
+  // Roles present in the data, for the role dropdown.
+  const roleOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of rows) if (r.agent_role) set.add(r.agent_role)
+    return [...set].sort()
+  }, [rows])
+
+  const filtered = useMemo(() => {
+    let list = rows
+    if (isAdmin && scope === "mine") {
+      list = list.filter((r) => r.agent_id === currentUserId)
+    } else if (isAdmin) {
+      if (roleFilter !== "all") list = list.filter((r) => r.agent_role === roleFilter)
+      if (agentFilter !== "all") list = list.filter((r) => r.agent_id === agentFilter)
+    }
+    const q = search.trim().toLowerCase()
+    if (q) {
+      list = list.filter(
+        (r) =>
+          (r.label ?? "").toLowerCase().includes(q) ||
+          (r.owner_name ?? "").toLowerCase().includes(q) ||
+          (r.agent_name ?? "").toLowerCase().includes(q),
+      )
+    }
+    const dir = sort.dir === "asc" ? 1 : -1
+    const keyOf = (r: Row) =>
+      sort.key === "label"
+        ? (r.label ?? r.owner_name ?? "").toLowerCase()
+        : sort.key === "status"
+          ? r.status
+          : r.created_at
+    return [...list].sort((a, b) => {
+      const av = keyOf(a)
+      const bv = keyOf(b)
+      return av < bv ? -dir : av > bv ? dir : 0
+    })
+  }, [rows, isAdmin, scope, currentUserId, roleFilter, agentFilter, search, sort])
+
+  const total = filtered.length
+  const totalPages = Math.max(1, Math.ceil(total / perPage))
+  const safePage = Math.min(page, totalPages)
+  const pageRows = filtered.slice((safePage - 1) * perPage, safePage * perPage)
+
+  const toggleSort = (key: string) =>
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "created_at" ? "desc" : "asc" },
+    )
+
+  const columns: DataTableColumn[] = [
+    { label: "Request", sortKey: "label" },
+    { label: "Status", sortKey: "status" },
+    ...(isAdmin ? [{ label: "Agent" }] : []),
+    { label: "Created", sortKey: "created_at" },
+    { label: "", className: "text-right" },
+  ]
+
+  const selectCls =
+    "h-9 rounded-xl border border-[#e5e7eb] bg-white pl-3 pr-8 text-sm text-[#374151] outline-none focus:border-[#001f3f] cursor-pointer"
+
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -197,45 +283,125 @@ export function OwnerDocumentsClient({ isAdmin }: { isAdmin: boolean }) {
         </div>
       )}
 
-      {/* List */}
-      <div className="mt-5">
-        {loading ? (
-          <div className="flex items-center justify-center py-16 text-[#9ca3af]">
-            <Loader2 className="h-6 w-6 animate-spin" />
+      {/* Filters */}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {isAdmin && (
+          <div className="inline-flex rounded-full border border-[#e5e7eb] bg-white p-0.5">
+            {(["mine", "everyone"] as const).map((sVal) => (
+              <button
+                key={sVal}
+                type="button"
+                onClick={() => { setScope(sVal); setPage(1) }}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                  scope === sVal ? "bg-[#001f3f] text-white" : "text-[#6b7280] hover:text-[#001f3f]"
+                }`}
+              >
+                {sVal === "mine" ? "My requests" : "Everyone"}
+              </button>
+            ))}
           </div>
-        ) : rows.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#d1d5db] py-16 text-center">
-            <ScrollText className="mx-auto h-8 w-8 text-[#c4c4c4]" />
-            <p className="mt-3 text-sm font-medium text-[#6b7280]">No requests yet</p>
-            <p className="mt-1 text-[13px] text-[#9ca3af]">Create a request to get a link you can send to a property owner.</p>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {rows.map((row) => {
-              const s = STATUS_STYLE[row.status]
-              const StatusIcon = s.icon
-              return (
-                <div
-                  key={row.id}
-                  className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#eef0f2] bg-white px-4 py-3.5 shadow-sm"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate font-['Outfit'] text-[15px] font-bold text-[#0d1117]">
-                        {row.label?.trim() || row.owner_name?.trim() || "Untitled request"}
-                      </p>
-                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${s.cls}`}>
-                        <StatusIcon className="h-3 w-3" /> {s.label}
-                      </span>
-                      {isAdmin && row.agent_name && <AgentChip name={row.agent_name} avatar={row.agent_avatar ?? null} />}
-                    </div>
-                    <p className="mt-0.5 text-[12px] text-[#9ca3af]">
-                      Created {fmtDate(row.created_at)}
-                      {row.status === "submitted" && row.owner_name ? ` · from ${row.owner_name}` : ""}
-                      {row.status === "pending" ? ` · expires ${fmtDate(row.expires_at)}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
+        )}
+        {isAdmin && scope === "everyone" && (
+          <>
+            <select
+              value={roleFilter}
+              onChange={(e) => { setRoleFilter(e.target.value); setAgentFilter("all"); setPage(1) }}
+              className={selectCls}
+              aria-label="Filter by role"
+            >
+              <option value="all">All roles</option>
+              {roleOptions.map((r) => <option key={r} value={r}>{roleToLabel(r)}</option>)}
+            </select>
+            <select
+              value={agentFilter}
+              onChange={(e) => { setAgentFilter(e.target.value); setPage(1) }}
+              className={selectCls}
+              aria-label="Filter by person"
+            >
+              <option value="all">All people</option>
+              {people
+                .filter((p) => roleFilter === "all" || p.role === roleFilter)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}{p.role ? ` · ${roleToLabel(p.role)}` : ""}
+                  </option>
+                ))}
+            </select>
+          </>
+        )}
+        <div className="relative min-w-[180px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9ca3af]" />
+          <input
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            placeholder="Search request, owner, agent…"
+            className="h-9 w-full rounded-xl border border-[#e5e7eb] bg-white pl-9 pr-3 text-sm outline-none focus:border-[#001f3f]"
+          />
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="mt-4">
+        <DataTable
+          columns={columns}
+          loading={loading}
+          empty={total === 0}
+          emptyState={
+            <div>
+              <ScrollText className="mx-auto h-8 w-8 text-[#c4c4c4]" />
+              <p className="mt-3 text-sm font-medium text-[#6b7280]">
+                {rows.length === 0 ? "No requests yet" : "No requests match your filters"}
+              </p>
+              <p className="mt-1 text-[13px] text-[#9ca3af]">
+                {rows.length === 0
+                  ? "Create a request to get a link you can send to a property owner."
+                  : "Try a different scope, role, person, or search."}
+              </p>
+            </div>
+          }
+          page={safePage}
+          perPage={perPage}
+          total={total}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          onPerPageChange={(n) => { setPerPage(n); setPage(1) }}
+          sort={sort}
+          onSort={toggleSort}
+        >
+          {pageRows.map((row) => {
+            const s = STATUS_STYLE[row.status]
+            const StatusIcon = s.icon
+            return (
+              <tr key={row.id} className="transition-colors hover:bg-[#fcfdff]">
+                <td className="px-3 py-3 align-middle first:pl-6">
+                  <p className="max-w-[260px] truncate font-['Outfit'] text-sm font-bold text-[#0d1117]">
+                    {row.label?.trim() || row.owner_name?.trim() || "Untitled request"}
+                  </p>
+                  {(row.status === "submitted" && row.owner_name) ? (
+                    <p className="text-[11px] text-[#9ca3af]">from {row.owner_name}</p>
+                  ) : row.status === "pending" ? (
+                    <p className="text-[11px] text-[#9ca3af]">expires {fmtDate(row.expires_at)}</p>
+                  ) : null}
+                </td>
+                <td className="px-3 py-3 align-middle">
+                  <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${s.cls}`}>
+                    <StatusIcon className="h-3 w-3" /> {s.label}
+                  </span>
+                </td>
+                {isAdmin && (
+                  <td className="px-3 py-3 align-middle">
+                    {row.agent_name ? (
+                      <AgentChip name={row.agent_name} avatar={row.agent_avatar ?? null} />
+                    ) : (
+                      <span className="text-[#c4c4c4]">—</span>
+                    )}
+                  </td>
+                )}
+                <td className="whitespace-nowrap px-3 py-3 align-middle text-[13px] text-[#6b7280]">
+                  {fmtDate(row.created_at)}
+                </td>
+                <td className="px-3 py-3 align-middle last:pr-6">
+                  <div className="flex items-center justify-end gap-1.5">
                     {(isAdmin || row.status === "submitted") && (
                       <button
                         type="button"
@@ -275,11 +441,11 @@ export function OwnerDocumentsClient({ isAdmin }: { isAdmin: boolean }) {
                       </button>
                     )}
                   </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
+                </td>
+              </tr>
+            )
+          })}
+        </DataTable>
       </div>
 
       {viewing && (

@@ -11,11 +11,12 @@ import { OwnerDocumentsClient } from "./owner-documents-client"
  * requests (RLS); admins see all (staff read policy in migration 039).
  */
 export function OwnerDocuments() {
-  const { role } = useAuth()
+  const { role, profile } = useAuth()
   const allowed = useRequireAllowed(isSalesPipelineRole(role) || isAdminStaffRole(role))
   if (!allowed) return null
 
   // Admins see every agent's requests (with attribution) and can delete; sales
-  // roles see and manage only their own.
-  return <OwnerDocumentsClient isAdmin={isAdminStaffRole(role)} />
+  // roles see and manage only their own. currentUserId drives the admin
+  // "My requests" toggle.
+  return <OwnerDocumentsClient isAdmin={isAdminStaffRole(role)} currentUserId={profile?.id ?? ""} />
 }
