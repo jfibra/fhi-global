@@ -112,7 +112,7 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
           only as wide as the stats; photo stays visible below. */}
       <div className="relative mx-auto mb-12 max-w-[1400px] px-5 sm:px-8">
         <div
-          className="inline-flex max-w-full flex-wrap items-center gap-x-6 gap-y-4 border-y border-white/10 px-4 py-4 backdrop-blur-md sm:gap-x-10 sm:pl-5 sm:pr-10"
+          className="grid max-w-full grid-cols-2 gap-x-6 gap-y-4 border-y border-white/10 px-4 py-4 backdrop-blur-md sm:inline-flex sm:flex-wrap sm:items-center sm:gap-x-10 sm:pl-5 sm:pr-10"
           style={{ backgroundColor: "rgba(6,12,22,0.3)" }}
         >
           {hero.stats.map(({ icon, value, label }, i) => {
@@ -124,9 +124,9 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
                     <Icon className="h-4 w-4" strokeWidth={1.6} />
                   </span>
                 </span>
-                <span>
-                  <span className="block whitespace-nowrap text-[19px] font-bold leading-tight text-white">{value}</span>
-                  <span className="block whitespace-nowrap text-[9.5px] font-bold uppercase tracking-[0.16em] text-white/60">{label}</span>
+                <span className="min-w-0">
+                  <span className="block text-[19px] font-bold leading-tight text-white sm:whitespace-nowrap">{value}</span>
+                  <span className="block text-[9.5px] font-bold uppercase tracking-[0.16em] text-white/60 sm:whitespace-nowrap">{label}</span>
                 </span>
               </div>
             )
