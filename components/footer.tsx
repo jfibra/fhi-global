@@ -289,7 +289,7 @@ export function Footer() {
       <div className="relative z-10 border-t border-white/[0.06]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-white/25">
-            © {year} FHI Global Real Estate LLC. All rights reserved. RERA Licensed.
+            © {year} FHI Global Property. All rights reserved. RERA Licensed.
           </p>
           <div className="flex items-center gap-5">
             {[

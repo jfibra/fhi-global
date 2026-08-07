@@ -55,7 +55,7 @@ export default async function OwnerDocumentsPage({ params }: { params: Promise<{
         token={token}
         agentName={agentName}
         agentAvatarUrl={agent?.profile_url ?? null}
-        agencyName={`FHI Global Real Estate — ${agentName}`}
+        agencyName={`FHI Global Property — ${agentName}`}
       />
     )
   }
