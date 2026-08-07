@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { SiteHeader } from "../_components/header"
 import { SiteFooter } from "../_components/footer"
 import { HeroSection } from "../_components/sections/hero"
 import { AboutSection } from "../_components/sections/about"
@@ -23,6 +24,7 @@ export const metadata: Metadata = {
 export default function WebsiteSamplePage() {
   return (
     <>
+      <SiteHeader />
       <HeroSection />
       <AboutSection />
       <FeaturedSection />

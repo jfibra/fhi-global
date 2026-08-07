@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { loadSiteBySlug } from "@/lib/website-builder-service"
 import { SITE_URL } from "@/lib/seo"
+import { SiteHeader } from "../_components/header"
 import { SiteFooter } from "../_components/footer"
 import { HeroSection } from "../_components/sections/hero"
 import { AboutSection } from "../_components/sections/about"
@@ -44,6 +45,7 @@ export default async function AgentWebsitePage({ params }: Props) {
 
   return (
     <>
+      <SiteHeader />
       <HeroSection data={data} />
       <AboutSection data={data} qrValue={`${SITE_URL}/website/${site.slug}`} />
       <FeaturedSection data={data} />

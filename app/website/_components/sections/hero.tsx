@@ -66,7 +66,7 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   // photos; at 0 the banner renders with no overlay at all.
   const overlay = Math.min(100, Math.max(0, hero.overlay ?? 0)) / 100
   return (
-    <section id="home" className="relative overflow-hidden" style={{ backgroundColor: INK }}>
+    <section id="home" className="relative scroll-mt-[72px] overflow-hidden" style={{ backgroundColor: INK }}>
       {/* Banner photo — full-bleed. On mobile the stacked content is far
           taller than the photo's aspect, so its lower half is scrimmed to
           SOLID ink: only the top of the photo shows (like a banner) and the
