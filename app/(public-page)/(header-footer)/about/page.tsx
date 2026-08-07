@@ -64,17 +64,19 @@ export default function AboutPage() {
       {/* ── Hero ── */}
       <section className="relative bg-[#001428] overflow-hidden">
         <div className="absolute inset-0" aria-hidden="true">
+          {/* The bright golden-hour skyline, not the dusk shot — no scrim
+              setting can lighten a photo that is itself dark. */}
           <Image
-            src="/background/home.webp"
+            src="/background/dubai.webp"
             alt=""
             fill
             priority
             sizes="100vw"
             className="object-cover object-center animate-kenburns"
           />
-          {/* One gradient across the whole section - solid under the type on
-              the left, opening to the skyline on the right. No seam. */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#001428] via-[#001428]/85 to-[#001428]/20" />
+          {/* Strong only under the type on the left, then opening fast so the
+              skyline reads as a bright photo rather than a dark wash. */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/85 via-[#001428]/35 to-transparent" />
         </div>
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-28 md:pt-20 md:pb-32">
@@ -186,7 +188,7 @@ export default function AboutPage() {
           <div>
             <div className="relative aspect-[4/3] w-full">
               <Image
-                src="/background/dubai.webp"
+                src="/background/home.webp"
                 alt="Dubai skyline"
                 fill
                 sizes="(max-width: 1024px) 100vw, 50vw"

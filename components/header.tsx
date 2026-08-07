@@ -116,6 +116,21 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false)
   // Which desktop dropdown is open, by label. Also drives the mobile accordion.
   const [openMenu, setOpenMenu] = useState<string | null>(null)
+  // Grace period before a hover-opened menu closes: crossing the boundary
+  // between the trigger and the panel (or briefly overshooting) must not
+  // slam the menu shut. Entering either one cancels the pending close.
+  const menuCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const openMenuNow = useCallback((label: string) => {
+    clearTimeout(menuCloseTimer.current)
+    setOpenMenu(label)
+  }, [])
+  const closeMenuSoon = useCallback((label: string) => {
+    clearTimeout(menuCloseTimer.current)
+    menuCloseTimer.current = setTimeout(() => {
+      setOpenMenu((cur) => (cur === label ? null : cur))
+    }, 160)
+  }, [])
+  useEffect(() => () => clearTimeout(menuCloseTimer.current), [])
   const [mobileSection, setMobileSection] = useState<string | null>(null)
   const navRef = useRef<HTMLElement | null>(null)
   const [authReady, setAuthReady]   = useState(false)
@@ -308,8 +323,8 @@ export function Header() {
                   className="relative"
                   // Hover opens it like a normal menu bar; the button keeps it
                   // usable by keyboard and touch, where hover does not exist.
-                  onMouseEnter={() => setOpenMenu(label)}
-                  onMouseLeave={() => setOpenMenu((cur) => (cur === label ? null : cur))}
+                  onMouseEnter={() => openMenuNow(label)}
+                  onMouseLeave={() => closeMenuSoon(label)}
                 >
                   <button
                     type="button"
@@ -327,7 +342,11 @@ export function Header() {
                       surface of the page rather than more chrome. Each row is
                       an icon tile + name + what you'll find there. */}
                   {open && (
-                    <div className="absolute left-0 top-full z-50 mt-1 w-[290px] bg-white border border-[#e5e8ec] shadow-[0_24px_60px_-18px_rgba(0,12,26,0.45)]">
+                    // Outer wrapper carries transparent padding instead of a
+                    // margin: the visual gap stays, but the pointer never
+                    // leaves a hoverable element on the way to the panel.
+                    <div className="absolute left-0 top-full z-50 pt-1.5 w-[290px]">
+                    <div className="bg-white border border-[#e5e8ec] shadow-[0_24px_60px_-18px_rgba(0,12,26,0.45)]">
                       <span className="block h-[3px] bg-[#d6b357]" aria-hidden="true" />
                       <div className="py-1.5">
                         {children.map((c) => {
@@ -374,6 +393,7 @@ export function Header() {
                           )
                         })}
                       </div>
+                    </div>
                     </div>
                   )}
                 </div>
