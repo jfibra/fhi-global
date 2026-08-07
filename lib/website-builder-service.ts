@@ -564,3 +564,33 @@ async function loadSite(
 
 export const loadSiteByAgent = (admin: SupabaseClient, agentId: string) => loadSite(admin, { agentId })
 export const loadSiteBySlug = (admin: SupabaseClient, slug: string) => loadSite(admin, { slug })
+
+// ─── Public directory ─────────────────────────────────────────────────────────
+
+export type PublishedSiteCard = {
+  slug: string
+  name: string
+  banner: string
+}
+
+/** Every published agent site, newest first — for the public directory page.
+ *  Card = the site's hero banner photo + the agent's name. */
+export async function listPublishedSites(admin: SupabaseClient): Promise<PublishedSiteCard[]> {
+  const { data, error } = await admin
+    .from("website_builder")
+    .select("slug, contact, hero:hero_id ( banner )")
+    .eq("is_published", true)
+    .order("updated_at", { ascending: false })
+    .limit(200)
+  if (error) throw new Error("Failed to load agent websites")
+
+  return (data ?? []).map((row) => {
+    const contact = (row.contact ?? {}) as { name?: unknown }
+    const hero = (Array.isArray(row.hero) ? row.hero[0] : row.hero) as { banner: string | null } | null
+    return {
+      slug: row.slug as string,
+      name: typeof contact.name === "string" ? contact.name : "",
+      banner: hero?.banner ?? "",
+    }
+  })
+}

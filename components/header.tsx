@@ -6,7 +6,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Menu, X, Phone, Mail, Facebook, Instagram, ChevronDown, LayoutDashboard,
-  LogOut, Building2, CalendarDays, Camera, KeyRound, Landmark, Newspaper,
+  LogOut, Building2, CalendarDays, Camera, Globe, KeyRound, Landmark, Newspaper,
   Tag, Users, type LucideIcon,
 } from "lucide-react"
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
@@ -44,6 +44,7 @@ const NAV_LINKS: NavItem[] = [
     children: [
       { label: "Our Company", href: "/about",   desc: "Who we are and how we work",     icon: Landmark },
       { label: "Agents",      href: "/agents",  desc: "Meet the team behind FHI Global", icon: Users },
+      { label: "Agent Websites", href: "/agent-websites", desc: "Personal sites of our agents", icon: Globe },
       { label: "Gallery",     href: "/gallery", desc: "Photos from our events",          icon: Camera },
     ],
   },
