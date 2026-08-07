@@ -7,11 +7,11 @@
 import { useEffect, useState } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import {
-  ArrowRight, Building2, Eye, Facebook, FileText, HomeIcon, Instagram,
-  Linkedin, MessageCircle, ShieldCheck, Star, Youtube,
+  ArrowRight, Building2, ChevronDown, Eye, Facebook, FileText, HomeIcon, Instagram,
+  Linkedin, Mail, MessageCircle, ShieldCheck, Star, Youtube,
 } from "lucide-react"
 import { BRAND_GRADIENT, DEFAULT_WA_MESSAGE, GOLD, GOLD_A40, GOLD_A50, GOLD_A60, GOLD_SOFT, GOLD_SOFT_A80, IMG, INK, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
-import { Eyebrow } from "../ui"
+import { Eyebrow, MessengerIcon, WhatsAppIcon } from "../ui"
 
 export function AboutSection({
   data = SAMPLE_DATA,
@@ -73,6 +73,37 @@ export function AboutSection({
     { icon: Instagram, label: "Instagram", href: about.socials.instagram },
     { icon: Linkedin, label: "LinkedIn", href: about.socials.linkedin },
     { icon: Youtube, label: "YouTube", href: about.socials.youtube },
+  ]
+
+  // Contact Me dropdown — WhatsApp/Email always; Messenger + Instagram DM only
+  // when the profile URLs are set (their handle becomes an m.me / ig.me chat
+  // link — the socials row itself stays plain profile links).
+  const [contactOpen, setContactOpen] = useState(false)
+  const handleFrom = (url: string): string | null => {
+    try {
+      const u = new URL(url)
+      const seg = u.pathname.split("/").filter(Boolean)
+      if (seg[0] === "profile.php") return u.searchParams.get("id")
+      return seg[0] || null
+    } catch {
+      return null
+    }
+  }
+  const fbHandle = about.socials.facebook ? handleFrom(about.socials.facebook) : null
+  const igHandle = about.socials.instagram ? handleFrom(about.socials.instagram) : null
+  const contactChannels = [
+    {
+      icon: WhatsAppIcon,
+      label: "WhatsApp",
+      href: `https://wa.me/${agent.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(DEFAULT_WA_MESSAGE)}`,
+    },
+    { icon: Mail, label: "Email", href: `mailto:${agent.email}` },
+    // m.me: on MOBILE (most visitors) it opens the Messenger app straight
+    // into the chat. Desktop web hits Meta's E2EE "Continue" flow, which
+    // drops the recipient for personal profiles with no prior thread — a
+    // Meta-side quirk no URL form avoids; only Pages get the clean web flow.
+    ...(fbHandle ? [{ icon: MessengerIcon, label: "Messenger", href: `https://m.me/${fbHandle}` }] : []),
+    ...(igHandle ? [{ icon: Instagram, label: "Instagram", href: `https://ig.me/m/${igHandle}` }] : []),
   ]
 
   const credentials = [
@@ -255,16 +286,40 @@ export function AboutSection({
               <p className="mt-3 text-[13.5px] leading-relaxed text-[#5b6472]">
                 I&apos;m here to help you find the perfect property in Dubai.
               </p>
-              <a
-                href={`https://wa.me/${agent.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(DEFAULT_WA_MESSAGE)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-6 flex w-full items-center justify-center px-5 py-4 text-[13px] font-bold uppercase tracking-[0.16em] text-white transition-transform hover:-translate-y-0.5"
-                style={{ background: BRAND_GRADIENT }}
-              >
-                <MessageCircle className="h-4.5 w-4.5" />
-                <span className="pl-2">Message Me</span>
-              </a>
+              {/* Contact Me — dropdown of chat channels. Facebook/Instagram
+                  open a DIRECT CHAT (m.me / ig.me, derived from the profile
+                  URLs) — no prefill there, the platforms don't allow it. */}
+              <div className="relative mt-6 w-full">
+                <button
+                  type="button"
+                  onClick={() => setContactOpen((o) => !o)}
+                  aria-expanded={contactOpen}
+                  className="flex w-full items-center justify-center px-5 py-4 text-[13px] font-bold uppercase tracking-[0.16em] text-white"
+                  style={{ background: BRAND_GRADIENT }}
+                >
+                  <MessageCircle className="h-4.5 w-4.5" />
+                  <span className="pl-2">Contact Me</span>
+                  <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${contactOpen ? "rotate-180" : ""}`} />
+                </button>
+                {contactOpen && (
+                  <div className="absolute inset-x-0 top-full z-10 border border-[#e8e2d4] bg-white shadow-[0_18px_40px_-18px_rgba(13,27,46,0.4)]">
+                    {contactChannels.map(({ icon: Icon, label, href }) => (
+                      <a
+                        key={label}
+                        href={href}
+                        target={href.startsWith("mailto:") ? undefined : "_blank"}
+                        rel="noopener noreferrer"
+                        onClick={() => setContactOpen(false)}
+                        className="flex items-center gap-3 border-b border-[#f0ede4] px-4 py-3 text-left text-[13px] font-semibold last:border-b-0 hover:bg-[#faf8f4]"
+                        style={{ color: NAVY }}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" style={{ color: GOLD }} />
+                        {label}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Scan to Connect — QR + socials */}
