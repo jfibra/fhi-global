@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { toast } from "sonner"
 import {
@@ -56,6 +56,15 @@ export function OwnerDocumentsClient({ isAdmin }: { isAdmin: boolean }) {
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [viewing, setViewing] = useState<{ request: Row; files: OwnerDocumentFile[] } | null>(null)
 
+  const openView = useCallback(async (row: Row) => {
+    const { data: files, error } = await fetchOwnerDocumentFiles(row.id)
+    if (error) {
+      toast.error(error)
+      return
+    }
+    setViewing({ request: row, files })
+  }, [])
+
   useEffect(() => {
     let active = true
     ;(async () => {
@@ -66,11 +75,17 @@ export function OwnerDocumentsClient({ isAdmin }: { isAdmin: boolean }) {
       if (error) toast.error(error)
       setRows(data)
       setLoading(false)
+      // Deep-link from the notification email (/owner-documents?view=<id>) opens it.
+      const viewId = new URLSearchParams(window.location.search).get("view")
+      if (viewId) {
+        const row = data.find((r) => r.id === viewId)
+        if (row) void openView(row)
+      }
     })()
     return () => {
       active = false
     }
-  }, [isAdmin])
+  }, [isAdmin, openView])
 
   async function refresh() {
     const { data, error } = isAdmin
@@ -104,15 +119,6 @@ export function OwnerDocumentsClient({ isAdmin }: { isAdmin: boolean }) {
     if (isAdmin) await refresh()
     else setRows((prev) => [data, ...prev])
     await copyLink(data.token)
-  }
-
-  async function openView(row: Row) {
-    const { data: files, error } = await fetchOwnerDocumentFiles(row.id)
-    if (error) {
-      toast.error(error)
-      return
-    }
-    setViewing({ request: row, files })
   }
 
   async function runConfirm() {

@@ -189,7 +189,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
           ownerName: data.ownerName,
           propertyLabel,
           fileCount: fileRows.length,
-          dashboardUrl: `${SITE_URL}${getDashboardRouteByRole(agent?.role ?? "agent")}/owner-documents`,
+          dashboardUrl: `${SITE_URL}${getDashboardRouteByRole(agent?.role ?? "agent")}/owner-documents?view=${request.id}`,
         }).catch(() => {})
       }
     } catch (e) {

@@ -16,7 +16,7 @@ export type NocPdfInput = {
   unitNumber: string
   community: string
   titleDeedNumber: string
-  /** Who the owner authorizes — e.g. "FHI Global Real Estate (Agent: Jane Doe)". */
+  /** Who the owner authorizes — e.g. "FHI Global Property (Agent: Jane Doe)". */
   agencyName: string
   /** Pre-formatted "valid until" date, or "" for the blank line. */
   validUntil: string
@@ -230,8 +230,13 @@ export async function buildNocPdfBlob(input: NocPdfInput): Promise<Blob> {
     }
   }
   page.drawLine({ start: { x: sigX, y: sigLabelY - 3 }, end: { x: sigX + 230, y: sigLabelY - 3 }, thickness: 0.75, color: ink })
-  y -= 16
-  page.drawText("Signature over printed name", { x: sigX, y, size: 8.5, font, color: gray })
+  // Printed name under the line — the "printed name" the signature sits over.
+  y = sigLabelY - 18
+  if (input.ownerName.trim()) {
+    page.drawText(safe(input.ownerName.trim()), { x: sigX, y, size: 10.5, font: bold, color: ink })
+    y -= 12
+  }
+  page.drawText("Signature over printed name", { x: sigX, y, size: 8, font, color: gray })
 
   // ── Footer ──────────────────────────────────────────────────────────────────
   const footY = 44
