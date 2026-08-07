@@ -227,6 +227,11 @@ export type WebsiteData = {
     /** 0–100 strength of a left-side dark gradient behind the headline, so
      *  the copy stays readable on bright photos. 0/undefined = no overlay. */
     overlay?: number
+    /** Banner focal point, 0–100 (object-position). 50/50 = centered. */
+    posX?: number
+    posY?: number
+    /** Banner zoom, percent — 100 = fit (no zoom), up to 300. */
+    zoom?: number
     stats: EditableStat[]
   }
   about: {

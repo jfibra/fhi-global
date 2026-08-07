@@ -65,6 +65,12 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   // Left-side dark wash (0–100) so the headline stays readable on bright
   // photos; at 0 the banner renders with no overlay at all.
   const overlay = Math.min(100, Math.max(0, hero.overlay ?? 0)) / 100
+  // Banner focal point + zoom — which part of an oversized photo the crop
+  // shows, and how far in. Zoom scales around the focal point so the two
+  // controls cooperate.
+  const posX = Math.min(100, Math.max(0, hero.posX ?? 50))
+  const posY = Math.min(100, Math.max(0, hero.posY ?? 50))
+  const zoom = Math.min(300, Math.max(100, hero.zoom ?? 100)) / 100
   return (
     <section id="home" className="relative scroll-mt-[72px] overflow-hidden" style={{ backgroundColor: INK }}>
       {/* Banner photo — full-bleed. On mobile the stacked content is far
@@ -72,8 +78,20 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
           SOLID ink: only the top of the photo shows (like a banner) and the
           broker card sits on clean ink, with no seams or leftover bands. */}
       <div className="absolute inset-0">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {hero.image && <img src={hero.image} alt="" aria-hidden className="h-full w-full object-cover object-center" />}
+        {hero.image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={hero.image}
+            alt=""
+            aria-hidden
+            className="h-full w-full object-cover"
+            style={{
+              objectPosition: `${posX}% ${posY}%`,
+              transform: zoom > 1 ? `scale(${zoom})` : undefined,
+              transformOrigin: `${posX}% ${posY}%`,
+            }}
+          />
+        )}
         {overlay > 0 && (
           <div
             aria-hidden

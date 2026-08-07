@@ -251,6 +251,9 @@ export async function saveSite(
     headline_color: data.hero.headlineColor ?? null,
     accent_color: data.hero.headlineAccentColor ?? null,
     description_color: data.hero.descriptionColor ?? null,
+    banner_pos_x: data.hero.posX ?? null,
+    banner_pos_y: data.hero.posY ?? null,
+    banner_zoom: data.hero.zoom ?? null,
   }
   const socialsJson = {
     twitter: null,
@@ -501,6 +504,9 @@ async function loadSite(
     if (typeof h.headline_color === "string") data.hero.headlineColor = h.headline_color
     if (typeof h.accent_color === "string") data.hero.headlineAccentColor = h.accent_color
     if (typeof h.description_color === "string") data.hero.descriptionColor = h.description_color
+    if (typeof h.banner_pos_x === "number") data.hero.posX = h.banner_pos_x
+    if (typeof h.banner_pos_y === "number") data.hero.posY = h.banner_pos_y
+    if (typeof h.banner_zoom === "number") data.hero.zoom = h.banner_zoom
     data.hero.description = (hero.description as string) ?? ""
     data.hero.image = (hero.banner as string) || data.hero.image
     data.hero.overlay = (hero.overlay as number) ?? 0

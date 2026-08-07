@@ -976,6 +976,57 @@ export function WebsiteBuilderClient() {
                   Darkens the left side behind the headline so it stays readable on bright photos. 0% = no overlay.
                 </p>
               </Field>
+              <Field
+                label="Photo position — horizontal"
+                action={<span className="text-[10px] font-bold text-[#6b7280]">{(data.hero.posX ?? 50).toFixed(1)}%</span>}
+              >
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  value={data.hero.posX ?? 50}
+                  onChange={(e) => update((d) => { d.hero.posX = Number(e.target.value) })}
+                  className="w-full cursor-pointer accent-[#001f3f]"
+                  aria-label="Banner photo horizontal position"
+                />
+              </Field>
+              <Field
+                label="Photo position — vertical"
+                action={<span className="text-[10px] font-bold text-[#6b7280]">{(data.hero.posY ?? 50).toFixed(1)}%</span>}
+              >
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  value={data.hero.posY ?? 50}
+                  onChange={(e) => update((d) => { d.hero.posY = Number(e.target.value) })}
+                  className="w-full cursor-pointer accent-[#001f3f]"
+                  aria-label="Banner photo vertical position"
+                />
+                <p className="mt-1 text-[11px] text-[#9aa0aa]">
+                  Picks which part of an oversized photo shows in the banner crop: 0% = left/top edge, 100% = right/bottom edge.
+                </p>
+              </Field>
+              <Field
+                label="Photo zoom"
+                action={<span className="text-[10px] font-bold text-[#6b7280]">{(data.hero.zoom ?? 100).toFixed(1)}%</span>}
+              >
+                <input
+                  type="range"
+                  min={100}
+                  max={300}
+                  step={0.1}
+                  value={data.hero.zoom ?? 100}
+                  onChange={(e) => update((d) => { d.hero.zoom = Number(e.target.value) })}
+                  className="w-full cursor-pointer accent-[#001f3f]"
+                  aria-label="Banner photo zoom"
+                />
+                <p className="mt-1 text-[11px] text-[#9aa0aa]">
+                  100% = no zoom. Zooming magnifies around the position you set above.
+                </p>
+              </Field>
               <Field label="Hero stats">
                 <div className="space-y-2.5">
                   {data.hero.stats.map((s, i) => (
