@@ -12,12 +12,23 @@
 //   * disableAutoFetch keeps pdf.js on ranged requests, so it pulls only the
 //     bytes the first pages need instead of the whole document.
 // The file host must allow cross-origin reads. Supabase storage sends
-// `access-control-allow-origin: *` and the CSP already lists it in connect-src;
-// the uploads S3 bucket sends no CORS header at all, so a PDF stored there
-// would fail here and fall back to the plain link.
+// `access-control-allow-origin: *` and the CSP already lists it in connect-src,
+// so its files load directly; the uploads S3 bucket sends no CORS header and
+// isn't in connect-src, so its files fetch through our same-origin
+// /api/pdf-proxy instead. Click-to-view links always keep the original URL —
+// navigation isn't subject to CORS or connect-src.
 
 import { useEffect, useRef, useState } from "react"
 import { ExternalLink, FileText } from "lucide-react"
+
+function fetchUrlFor(url: string): string {
+  try {
+    if (new URL(url).hostname.endsWith(".supabase.co")) return url
+  } catch {
+    return url // relative or malformed — let pdf.js try it as-is
+  }
+  return `/api/pdf-proxy?url=${encodeURIComponent(url)}`
+}
 
 const PAGE_COUNT = 4
 const LOAD_TIMEOUT_MS = 45_000
@@ -55,7 +66,7 @@ export function PdfPagePreviews({ url, title }: { url: string; title: string }) 
         // failure mode is a worker that silently never starts.
         pdfjs.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs"
 
-        const task = pdfjs.getDocument({ url, disableAutoFetch: true, disableStream: false })
+        const task = pdfjs.getDocument({ url: fetchUrlFor(url), disableAutoFetch: true, disableStream: false })
         const pdf = await Promise.race([
           task.promise,
           new Promise<never>((_, reject) => {
