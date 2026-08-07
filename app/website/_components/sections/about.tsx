@@ -8,7 +8,7 @@ import { useEffect, useState } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import {
   ArrowRight, Building2, ChevronDown, Eye, Facebook, FileText, HomeIcon, Instagram,
-  Linkedin, Mail, MessageCircle, ShieldCheck, Star, Youtube,
+  Linkedin, Mail, MessageCircle, Phone, ShieldCheck, Star, Youtube,
 } from "lucide-react"
 import { BRAND_GRADIENT, DEFAULT_WA_MESSAGE, GOLD, GOLD_A40, GOLD_A50, GOLD_A60, GOLD_SOFT, GOLD_SOFT_A80, IMG, INK, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
 import { Eyebrow, MessengerIcon, WhatsAppIcon } from "../ui"
@@ -97,13 +97,14 @@ export function AboutSection({
       label: "WhatsApp",
       href: `https://wa.me/${agent.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(DEFAULT_WA_MESSAGE)}`,
     },
+    ...(igHandle ? [{ icon: Instagram, label: "Instagram", href: `https://ig.me/m/${igHandle}` }] : []),
     { icon: Mail, label: "Email", href: `mailto:${agent.email}` },
     // m.me: on MOBILE (most visitors) it opens the Messenger app straight
     // into the chat. Desktop web hits Meta's E2EE "Continue" flow, which
     // drops the recipient for personal profiles with no prior thread — a
     // Meta-side quirk no URL form avoids; only Pages get the clean web flow.
     ...(fbHandle ? [{ icon: MessengerIcon, label: "Messenger", href: `https://m.me/${fbHandle}` }] : []),
-    ...(igHandle ? [{ icon: Instagram, label: "Instagram", href: `https://ig.me/m/${igHandle}` }] : []),
+    { icon: Phone, label: "Call", href: `tel:${agent.phone}` },
   ]
 
   const credentials = [
@@ -142,6 +143,9 @@ export function AboutSection({
           <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 px-7 pb-6 pt-4">
             <p className="mt-1.5 text-[13px] font-bold uppercase tracking-[0.24em] text-white/85">{agent.name}</p>
+            {agent.title && (
+              <p className="mt-1 text-[11px] tracking-[0.08em] text-white/65">{agent.title}</p>
+            )}
           </div>
         </div>
 
@@ -223,7 +227,7 @@ export function AboutSection({
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-[12.5px] font-bold uppercase tracking-[0.06em]" style={{ color: NAVY }}>{label}</span>
-                        <span className="block truncate text-[13px] text-[#6b7280]">{value}</span>
+                        <span className="block truncate text-[13px] text-black">{value}</span>
                       </span>
                     </div>
                   ))}
@@ -307,7 +311,7 @@ export function AboutSection({
                       <a
                         key={label}
                         href={href}
-                        target={href.startsWith("mailto:") ? undefined : "_blank"}
+                        target={href.startsWith("mailto:") || href.startsWith("tel:") ? undefined : "_blank"}
                         rel="noopener noreferrer"
                         onClick={() => setContactOpen(false)}
                         className="flex items-center gap-3 border-b border-[#f0ede4] px-4 py-3 text-left text-[13px] font-semibold last:border-b-0 hover:bg-[#faf8f4]"

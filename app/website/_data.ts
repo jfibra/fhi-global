@@ -69,14 +69,21 @@ function mixHex(a: string, b: string, w: number): string {
   return `#${((r << 16) | (g << 8) | bl).toString(16).padStart(6, "0")}`
 }
 
-/** The CSS variables for a palette. Defaults reproduce the original design
- *  exactly; custom colors derive their soft/dark partners automatically. */
-export function themeVars(theme?: WebsiteTheme | null): React.CSSProperties {
+/** The palette as RAW HEX values — for consumers that can't resolve CSS
+ *  variables (the OG-image renderer). Same derivations as themeVars. */
+export function resolveThemeColors(theme?: WebsiteTheme | null) {
   const gold = theme?.gold || DEFAULT_THEME.gold
   const brand = theme?.brand || DEFAULT_THEME.brand
   // Hand-tuned partners for the defaults; derived for custom picks.
   const goldSoft = theme?.gold ? mixHex(gold, "#ffffff", 0.18) : "#d6b357"
   const brandTo = theme?.brand ? mixHex(brand, "#000000", 0.5) : "#0a1628"
+  return { gold, goldSoft, brandFrom: brand, brandTo }
+}
+
+/** The CSS variables for a palette. Defaults reproduce the original design
+ *  exactly; custom colors derive their soft/dark partners automatically. */
+export function themeVars(theme?: WebsiteTheme | null): React.CSSProperties {
+  const { gold, goldSoft, brandFrom: brand, brandTo } = resolveThemeColors(theme)
   return {
     "--wb-gold": gold,
     "--wb-gold-soft": goldSoft,
