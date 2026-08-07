@@ -435,14 +435,16 @@ export async function saveSite(
     if (error) throw new Error("Failed to save service areas")
   }
 
+  // One row per category; the photos array's order is the display order.
   await admin.from("gallery_section").delete().eq("website_id", websiteId)
-  const galleryRows = (Object.keys(GALLERY_DB_CATEGORY) as GalleryCategory[]).flatMap((cat) =>
-    (data.gallery[cat] ?? [])
-      .filter((photo) => photo.trim())
-      .map((photo, i) => ({
-        website_id: websiteId, agent_id: agentId, photo, category: GALLERY_DB_CATEGORY[cat], rank: i,
-      })),
-  )
+  const galleryRows = (Object.keys(GALLERY_DB_CATEGORY) as GalleryCategory[])
+    .map((cat) => ({
+      website_id: websiteId,
+      agent_id: agentId,
+      category: GALLERY_DB_CATEGORY[cat],
+      photos: (data.gallery[cat] ?? []).map((p) => p.trim()).filter(Boolean),
+    }))
+    .filter((row) => row.photos.length > 0)
   if (galleryRows.length) {
     const { error } = await admin.from("gallery_section").insert(galleryRows)
     if (error) throw new Error("Failed to save gallery")
@@ -480,7 +482,7 @@ async function loadSite(
     admin.from("about_section").select("*").eq("id", site.about_id as string).maybeSingle(),
     admin.from("featured_section").select("project_id, listing_id, rank").eq("website_id", websiteId).order("rank"),
     admin.from("service_areas_section").select("rank, service_areas ( name, photo )").eq("website_id", websiteId).order("rank"),
-    admin.from("gallery_section").select("photo, category, rank").eq("website_id", websiteId).order("rank"),
+    admin.from("gallery_section").select("photos, category").eq("website_id", websiteId),
   ])
 
   if (hero) {
@@ -537,7 +539,9 @@ async function loadSite(
   data.gallery = { "Event Photos": [], Certificates: [], "Awards & Recognition": [] }
   for (const g of gallery ?? []) {
     const cat = GALLERY_UI_CATEGORY[(g.category as string) ?? ""]
-    if (cat) data.gallery[cat].push((g.photo as string) ?? "")
+    if (!cat) continue
+    const photos = Array.isArray(g.photos) ? (g.photos as unknown[]) : []
+    data.gallery[cat] = photos.filter((p): p is string => typeof p === "string" && !!p)
   }
 
   return { websiteId, slug: site.slug as string, title: site.title as string, data }

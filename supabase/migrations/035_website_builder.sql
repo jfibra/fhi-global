@@ -112,14 +112,16 @@ CREATE TABLE IF NOT EXISTS public.service_areas_section (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- One row per (website, category); photos is a jsonb array of URLs whose
+-- array order IS the display order (see 037 for the per-photo → array move).
 CREATE TABLE IF NOT EXISTS public.gallery_section (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   website_id UUID NOT NULL REFERENCES public.website_builder(id) ON DELETE CASCADE,
   agent_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  photo TEXT NOT NULL DEFAULT '',
+  photos JSONB NOT NULL DEFAULT '[]'::jsonb,
   category TEXT NOT NULL DEFAULT 'events',
-  rank INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (website_id, category)
 );
 
 ALTER TABLE public.gallery_section DROP CONSTRAINT IF EXISTS gallery_section_category_check;
@@ -130,7 +132,6 @@ ALTER TABLE public.gallery_section ADD CONSTRAINT gallery_section_category_check
 
 CREATE INDEX IF NOT EXISTS idx_featured_section_website ON public.featured_section (website_id, rank);
 CREATE INDEX IF NOT EXISTS idx_service_areas_section_website ON public.service_areas_section (website_id, rank);
-CREATE INDEX IF NOT EXISTS idx_gallery_section_website ON public.gallery_section (website_id, category, rank);
 
 -- ── RLS: owner CRUD + public read ────────────────────────────────────────────
 
