@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { Building2, Star, BadgeCheck, ArrowUpRight, Layers, Check } from "lucide-react"
+import { Building2, BadgeCheck, ArrowUpRight, Layers, Check } from "lucide-react"
 import { sampleLogoBg } from "@/lib/logo-bg"
 
 export interface DeveloperCardData {
@@ -24,8 +24,9 @@ interface DeveloperCardProps {
 }
 
 export function DeveloperCard({ developer, variant = "default" }: DeveloperCardProps) {
-  const { name, slug, description, logo_url, rating, is_verified, project_count } = developer
-  const stars = rating != null ? Math.round(rating) : 0
+  // Ratings are deliberately not shown: there is no review system behind the
+  // number, so a star score would be an unearned claim about a third party.
+  const { name, slug, description, logo_url, is_verified, project_count } = developer
   // Logo panel background sampled from the logo image itself, so baked-in
   // logo backgrounds (e.g. white) fill the panel instead of floating in it.
   const [logoBg, setLogoBg] = useState<string | null>(null)
@@ -65,23 +66,6 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
               >
                 <Check className="h-3 w-3 stroke-[3]" aria-hidden />
               </span>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5 text-sm text-[#374151]">
-            <span className="font-medium text-[#4b5563]">Rating:</span>
-            {rating != null ? (
-              <div className="flex items-center gap-0.5">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`h-3.5 w-3.5 ${
-                      i < stars ? "fill-[#d6b357] text-[#d6b357]" : "fill-[#e5e7eb] text-[#e5e7eb]"
-                    }`}
-                  />
-                ))}
-              </div>
-            ) : (
-              <span className="text-xs italic text-[#9ca3af]">Not yet rated</span>
             )}
           </div>
           {description ? (
@@ -148,28 +132,7 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
           )}
         </div>
 
-        {/* Row 2: Stars */}
-        <div className="flex items-center gap-1">
-          {rating != null ? (
-            <>
-              <div className="flex items-center gap-0.5">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`w-3.5 h-3.5 ${i < stars ? "text-[#d6b357] fill-[#d6b357]" : "text-[#e5e7eb] fill-[#e5e7eb]"
-                      }`}
-                  />
-                ))}
-              </div>
-              <span className="text-xs font-bold text-[#374151] ml-1">{rating.toFixed(1)}</span>
-              <span className="text-xs text-[#9ca3af] ml-0.5">/ 5.0</span>
-            </>
-          ) : (
-            <span className="text-xs text-[#d1d5db] italic">Not yet rated</span>
-          )}
-        </div>
-
-        {/* Row 3: Description */}
+        {/* Row 2: Description */}
         {description && (
           <p className="text-[13px] text-[#6b7280] leading-relaxed line-clamp-2 flex-1">
             {description}
