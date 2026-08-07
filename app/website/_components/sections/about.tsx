@@ -10,7 +10,7 @@ import {
   ArrowRight, Building2, Eye, Facebook, FileText, HomeIcon, Instagram,
   Linkedin, MessageCircle, ShieldCheck, Star, Youtube,
 } from "lucide-react"
-import { GOLD, GOLD_SOFT, IMG, INK, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
+import { BRAND_GRADIENT, GOLD, GOLD_SOFT, IMG, INK, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
 import { Eyebrow } from "../ui"
 
 export function AboutSection({
@@ -207,8 +207,8 @@ export function AboutSection({
 
                 {/* Stats bar */}
                 <div
-                  className="mt-6 flex flex-wrap items-left justify-start gap-x-6 gap-y-4 border px-8 py-5"
-                  style={{ backgroundColor: INK, borderColor: `${GOLD}80` }}
+                  className="mt-6 flex flex-wrap items-center justify-start gap-x-6 gap-y-4 border px-8 py-5"
+                  style={{ background: BRAND_GRADIENT, borderColor: `${GOLD}80` }}
                 >
                   {[
                     { icon: Eye, value: about.views, label: "Views" },
@@ -255,8 +255,8 @@ export function AboutSection({
                 href={`https://wa.me/${agent.whatsapp.replace(/\D/g, "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-6 flex w-full items-center justify-center px-5 py-4 text-[13px] font-bold uppercase tracking-[0.16em] text-white transition-opacity hover:opacity-90"
-                style={{ background: `linear-gradient(180deg, ${GOLD_SOFT}, ${GOLD})` }}
+                className="mt-6 flex w-full items-center justify-center px-5 py-4 text-[13px] font-bold uppercase tracking-[0.16em] text-white transition-transform hover:-translate-y-0.5"
+                style={{ background: BRAND_GRADIENT }}
               >
                 <MessageCircle className="h-4.5 w-4.5" />
                 <span className="pl-2">Message Me</span>

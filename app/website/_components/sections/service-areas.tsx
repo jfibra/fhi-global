@@ -1,8 +1,8 @@
 // Service Areas — hover-to-expand accordion strip over a background photo
 // with a soft white wash (same treatment as the homepage's Trusted Partners).
 
-import { GOLD, IMG, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
-import { Eyebrow } from "../ui"
+import { IMG, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
+import { FancyEyebrow } from "../ui"
 
 export function ServiceAreasSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   return (
@@ -14,15 +14,10 @@ export function ServiceAreasSection({ data = SAMPLE_DATA }: { data?: WebsiteData
         <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/75" />
       </div>
       <div className="relative mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
-        <Eyebrow center>Service Areas</Eyebrow>
-        <h2 className="mt-3 text-center font-serif text-3xl font-bold tracking-tight sm:text-4xl" style={{ color: NAVY }}>
+        <FancyEyebrow>Service Areas</FancyEyebrow>
+        <h2 className="mt-4 text-center font-serif text-3xl font-bold tracking-tight sm:text-4xl" style={{ color: NAVY }}>
           Areas I Specialize In
         </h2>
-        <div className="mx-auto mt-4 flex items-center justify-center gap-2">
-          <span className="h-px w-10" style={{ backgroundColor: GOLD }} />
-          <span className="h-1.5 w-1.5 rotate-45" style={{ backgroundColor: GOLD }} />
-          <span className="h-px w-10" style={{ backgroundColor: GOLD }} />
-        </div>
         {/* Mobile: a simple photo grid. Desktop: the hover-expand accordion. */}
         <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:flex lg:h-[420px]">
           {data.areas.map((a, i) => (

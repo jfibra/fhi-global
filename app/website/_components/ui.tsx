@@ -12,6 +12,22 @@ export function Eyebrow({ children, center }: { children: React.ReactNode; cente
   )
 }
 
+/** Centered section eyebrow flanked by long gold rules with diamond tips:
+ *  ◆——— LABEL ———◆ */
+export function FancyEyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-center gap-4">
+      <span className="h-1.5 w-1.5 shrink-0 rotate-45" style={{ backgroundColor: GOLD }} />
+      <span className="h-px max-w-[180px] flex-1" style={{ backgroundColor: `${GOLD}99` }} />
+      <span className="shrink-0 text-center text-[13px] font-bold uppercase tracking-[0.35em]" style={{ color: GOLD }}>
+        {children}
+      </span>
+      <span className="h-px max-w-[180px] flex-1" style={{ backgroundColor: `${GOLD}99` }} />
+      <span className="h-1.5 w-1.5 shrink-0 rotate-45" style={{ backgroundColor: GOLD }} />
+    </div>
+  )
+}
+
 export function GoldRing({ icon: Icon, dark }: { icon: typeof Award; dark?: boolean }) {
   return (
     <span

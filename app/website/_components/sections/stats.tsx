@@ -1,11 +1,11 @@
 // Navy market-stats band.
 
-import { BAND_STAT_ICON_FALLBACK, INK, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
+import { BAND_STAT_ICON_FALLBACK, BRAND_GRADIENT, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
 import { GoldRing } from "../ui"
 
 export function StatsBandSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   return (
-    <section id="stats" style={{ backgroundColor: INK }}>
+    <section id="stats" style={{ background: BRAND_GRADIENT }}>
       {/* Small screens: a shrink-wrapped grid centered as a block, so wrapped
           rows share the same column edges (uniform left alignment) instead of
           each row centering itself. Desktop: the centered flex row. */}

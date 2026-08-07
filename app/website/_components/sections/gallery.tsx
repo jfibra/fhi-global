@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from "react"
 import { ArrowRight, Award, BadgeCheck, Camera } from "lucide-react"
 import { GALLERY_CATEGORIES, GOLD, NAVY, SAMPLE_DATA, type GalleryCategory, type WebsiteData } from "../../_data"
-import { Eyebrow } from "../ui"
+import { FancyEyebrow } from "../ui"
 
 const CATEGORY_ICONS: Record<GalleryCategory, typeof Camera> = {
   "Event Photos": Camera,
@@ -111,15 +111,10 @@ export function GallerySection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   return (
     <section id="gallery" className="scroll-mt-[72px] bg-white">
       <div className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
-        <Eyebrow center>Gallery</Eyebrow>
-        <h2 className="mt-3 text-center font-serif text-3xl font-bold tracking-tight sm:text-4xl" style={{ color: NAVY }}>
+        <FancyEyebrow>Gallery</FancyEyebrow>
+        <h2 className="mt-4 text-center font-serif text-3xl font-bold tracking-tight sm:text-4xl" style={{ color: NAVY }}>
           Professional Highlights
         </h2>
-        <div className="mx-auto mt-4 flex items-center justify-center gap-2">
-          <span className="h-px w-10" style={{ backgroundColor: GOLD }} />
-          <span className="h-1.5 w-1.5 rotate-45" style={{ backgroundColor: GOLD }} />
-          <span className="h-px w-10" style={{ backgroundColor: GOLD }} />
-        </div>
 
         {/* Category tabs — only once a category is focused (switch or click
             the active one again to return to the overview) */}

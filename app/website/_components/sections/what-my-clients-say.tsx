@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react"
 import { GOLD, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
 import { TestimonialCard } from "../cards"
-import { Eyebrow } from "../ui"
+import { FancyEyebrow } from "../ui"
 
 export function TestimonialsSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   const testimonials = data.testimonials
@@ -32,15 +32,10 @@ export function TestimonialsSection({ data = SAMPLE_DATA }: { data?: WebsiteData
   return (
     <section id="reviews" className="scroll-mt-[72px] bg-white">
       <div className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
-      <Eyebrow center>Client Testimonials</Eyebrow>
-      <h2 className="mt-3 text-center font-serif text-3xl font-bold tracking-tight sm:text-4xl" style={{ color: NAVY }}>
+      <FancyEyebrow>Client Testimonials</FancyEyebrow>
+      <h2 className="mt-4 text-center font-serif text-3xl font-bold tracking-tight sm:text-4xl" style={{ color: NAVY }}>
         What My Clients Say
       </h2>
-      <div className="mx-auto mt-4 flex items-center justify-center gap-2">
-        <span className="h-px w-10" style={{ backgroundColor: GOLD }} />
-        <span className="h-1.5 w-1.5 rotate-45" style={{ backgroundColor: GOLD }} />
-        <span className="h-px w-10" style={{ backgroundColor: GOLD }} />
-      </div>
       <div className="mt-10 overflow-hidden">
         <div
           className="flex transition-transform duration-700 ease-out"

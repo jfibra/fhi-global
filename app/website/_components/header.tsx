@@ -7,13 +7,16 @@
 import { useState } from "react"
 import Link from "next/link"
 import { Mail, Menu, X } from "lucide-react"
-import { GOLD, GOLD_SOFT, INK, NAV_LINKS } from "../_data"
+import { BRAND_GRADIENT, BRAND_TO, GOLD, GOLD_SOFT, INK, NAV_LINKS } from "../_data"
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false)
 
   return (
-    <header className="sticky top-0 z-50" style={{ backgroundColor: "#001f3f" }}>
+    // Same gradient treatment as the dashboard listings buttons (180deg, navy
+    // → darker): top is the FHI header navy, bottom is the ink used by the
+    // About stats bar, so the two blend.
+    <header className="sticky top-0 z-50" style={{ background: BRAND_GRADIENT }}>
       <div className="mx-auto flex max-w-[1400px] items-center gap-4 px-5 py-4 sm:px-8 lg:gap-8">
         <Link href="/" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -66,7 +69,7 @@ export function SiteHeader() {
 
       {/* Mobile menu panel */}
       {open && (
-        <nav className="border-t border-white/10 px-5 pb-6 pt-2 lg:hidden" style={{ backgroundColor: "#001f3f" }}>
+        <nav className="border-t border-white/10 px-5 pb-6 pt-2 lg:hidden" style={{ backgroundColor: BRAND_TO }}>
           {NAV_LINKS.map(({ label, href }, i) => (
             <a
               key={label}

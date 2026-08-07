@@ -3,7 +3,7 @@
 // stat strip along the bottom.
 
 import { Building2, FileText, Mail, Phone, Play, ShieldCheck } from "lucide-react"
-import { GOLD, HERO_STAT_ICON_FALLBACK, INK, NAVY, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
+import { BRAND_GLASS_GRADIENT, BRAND_GRADIENT, GOLD, HERO_STAT_ICON_FALLBACK, INK, NAVY, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
 
 /** WhatsApp brand glyph — lucide has no brand icon for it. */
 function WhatsAppIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -20,7 +20,7 @@ function BrokerCard({ agent }: { agent: WebsiteData["agent"] }) {
   return (
     <div
       className="border border-white/15 p-6 shadow-2xl backdrop-blur-md"
-      style={{ backgroundColor: "rgba(10,22,40,0.72)" }}
+      style={{ background: BRAND_GLASS_GRADIENT }}
     >
       <p className="mt-3 text-sm font-bold uppercase tracking-[0.16em] text-white">{agent.name}</p>
       <p className="mt-1 text-xs text-white/70">{agent.title}</p>
@@ -104,7 +104,7 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
               <a
                 href="#projects"
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 text-[12px] font-bold text-white sm:gap-2 sm:px-6 sm:py-3 sm:text-[13px]"
-                style={{ backgroundColor: NAVY }}
+                style={{ background: BRAND_GRADIENT }}
               >
                 <Building2 className="h-3.5 w-3.5" />Explore Projects
               </a>

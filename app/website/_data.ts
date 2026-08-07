@@ -17,6 +17,27 @@ export const NAVY = "#0d1b2e"
 export const INK = "#0a1628"
 export const IVORY = "#faf8f4"
 
+// ─── Brand gradient ───────────────────────────────────────────────────────────
+// ONE place to change the site's navy gradient (header, primary buttons, stat
+// bands, and — via hexToRgba — the hero's glass cards).
+
+export const BRAND_FROM = "#001f3f"
+export const BRAND_TO = INK
+
+/** The 180° brand gradient as a CSS value. */
+export const BRAND_GRADIENT = `linear-gradient(180deg, ${BRAND_FROM}, ${BRAND_TO})`
+
+/** #rrggbb → rgba(r,g,b,alpha) — for translucent (glass) brand surfaces. */
+export function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace("#", "")
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h
+  const n = parseInt(full, 16)
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`
+}
+
+/** Translucent version of the brand gradient for glass cards. */
+export const BRAND_GLASS_GRADIENT = `linear-gradient(180deg, ${hexToRgba(BRAND_FROM, 0.72)}, ${hexToRgba(BRAND_TO, 0.72)})`
+
 export const script = { fontFamily: "'Snell Roundhand', 'Segoe Script', 'Brush Script MT', cursive" }
 
 const S3 = "https://filipinohomes123.s3.ap-southeast-1.amazonaws.com"
