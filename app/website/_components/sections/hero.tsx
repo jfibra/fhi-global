@@ -24,30 +24,38 @@ function BrokerCard({ agent }: { agent: WebsiteData["agent"] }) {
     >
       <p className="mt-3 text-sm font-bold uppercase tracking-[0.16em] text-white">{agent.name}</p>
       <p className="mt-1 text-xs text-white/70">{agent.title}</p>
-      <div className="mt-3.5 space-y-2">
-        <a
-          href={`https://wa.me/${agent.whatsapp.replace(/\D/g, "")}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white"
-        >
-          <WhatsAppIcon className="h-3.5 w-3.5 shrink-0" style={{ color: GOLD }} /> {agent.whatsapp}
-        </a>
-        <a href={`tel:${agent.phone}`} className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white">
-          <Phone className="h-3.5 w-3.5" style={{ color: GOLD }} /> {agent.phone}
-        </a>
-        <a href={`mailto:${agent.email}`} className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white">
-          <Mail className="h-3.5 w-3.5" style={{ color: GOLD }} />
-          <span className="truncate">{agent.email}</span>
-        </a>
+      {/* Mobile (the wider inline card): contacts and RERA side by side.
+          Desktop (the narrow floating card): stacked with a divider. */}
+      <div className="mt-3.5 grid grid-cols-2 items-start gap-x-4 lg:block">
+        <div className="min-w-0 space-y-2">
+          <a
+            href={`https://wa.me/${agent.whatsapp.replace(/\D/g, "")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white"
+          >
+            <WhatsAppIcon className="h-3.5 w-3.5 shrink-0" style={{ color: GOLD }} />
+            <span className="truncate">{agent.whatsapp}</span>
+          </a>
+          <a href={`tel:${agent.phone}`} className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white">
+            <Phone className="h-3.5 w-3.5 shrink-0" style={{ color: GOLD }} />
+            <span className="truncate">{agent.phone}</span>
+          </a>
+          <a href={`mailto:${agent.email}`} className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white">
+            <Mail className="h-3.5 w-3.5 shrink-0" style={{ color: GOLD }} />
+            <span className="truncate">{agent.email}</span>
+          </a>
+        </div>
+        <div className="min-w-0 border-l border-white/15 pl-4 lg:border-0 lg:pl-0">
+          <div className="hidden lg:mt-4 lg:block lg:h-px lg:w-full lg:bg-white/15" />
+          <p className="flex items-center gap-2 text-[11.5px] font-bold tracking-[0.1em] lg:mt-3.5" style={{ color: GOLD }}>
+            <ShieldCheck className="h-4 w-4 shrink-0" /> RERA BRN: {agent.brn}
+          </p>
+          <p className="mt-3.5 flex items-center gap-2 text-[11.5px] font-bold tracking-[0.1em]" style={{ color: GOLD }}>
+            <FileText className="h-4 w-4 shrink-0" /> RERA ORN: {agent.orn}
+          </p>
+        </div>
       </div>
-      <div className="mt-4 h-px w-full bg-white/15" />
-      <p className="mt-3.5 flex items-center gap-2 text-[11.5px] font-bold tracking-[0.1em]" style={{ color: GOLD }}>
-        <ShieldCheck className="h-4 w-4" /> RERA BRN: {agent.brn}
-      </p>
-      <p className="mt-3.5 flex items-center gap-2 text-[11.5px] font-bold tracking-[0.1em]" style={{ color: GOLD }}>
-        <FileText className="h-4 w-4" /> RERA ORN: {agent.orn}
-      </p>
     </div>
   )
 }
@@ -59,17 +67,28 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   const overlay = Math.min(100, Math.max(0, hero.overlay ?? 0)) / 100
   return (
     <section id="home" className="relative overflow-hidden" style={{ backgroundColor: INK }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={hero.image} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-center" />
-      {overlay > 0 && (
+      {/* Banner photo — full-bleed. On mobile the stacked content is far
+          taller than the photo's aspect, so its lower half is scrimmed to
+          SOLID ink: only the top of the photo shows (like a banner) and the
+          broker card sits on clean ink, with no seams or leftover bands. */}
+      <div className="absolute inset-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={hero.image} alt="" aria-hidden className="h-full w-full object-cover object-center" />
+        {overlay > 0 && (
+          <div
+            aria-hidden
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(90deg, rgba(0,0,0,${overlay}) 0%, rgba(0,0,0,${overlay * 0.55}) 38%, rgba(0,0,0,0) 68%)`,
+            }}
+          />
+        )}
         <div
+          className="absolute inset-0 lg:hidden"
+          style={{ background: "linear-gradient(180deg, rgba(10,22,40,0) 300px, rgba(10,22,40,0.9) 520px, #0a1628 620px)" }}
           aria-hidden
-          className="absolute inset-0"
-          style={{
-            background: `linear-gradient(90deg, rgba(0,0,0,${overlay}) 0%, rgba(0,0,0,${overlay * 0.55}) 38%, rgba(0,0,0,0) 68%)`,
-          }}
         />
-      )}
+      </div>
       <div className="relative mx-auto max-w-[1400px] px-5 sm:px-8">
         <div className="flex min-h-[420px] items-center gap-8 py-12 lg:min-h-[520px] lg:py-16">
           {/* Left: headline */}
@@ -81,13 +100,17 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
             <p className="mt-5 max-w-sm text-[14.5px] leading-relaxed" style={{ color: hero.descriptionColor || "#3d4451" }}>
               {hero.description}
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <a href="#projects" className="inline-flex items-center gap-2 px-6 py-3 text-[13px] font-bold text-white" style={{ backgroundColor: NAVY }}>
+            <div className="mt-8 flex flex-wrap gap-2.5 sm:gap-3">
+              <a
+                href="#projects"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 text-[12px] font-bold text-white sm:gap-2 sm:px-6 sm:py-3 sm:text-[13px]"
+                style={{ backgroundColor: NAVY }}
+              >
                 <Building2 className="h-3.5 w-3.5" />Explore Projects
               </a>
               <a
                 href="#about"
-                className="inline-flex items-center gap-2 border border-white/25 px-6 py-3 text-[13px] font-bold text-white backdrop-blur-md transition-colors hover:bg-white/10"
+                className="inline-flex items-center gap-1.5 border border-white/25 px-4 py-2.5 text-[12px] font-bold text-white backdrop-blur-md transition-colors hover:bg-white/10 sm:gap-2 sm:px-6 sm:py-3 sm:text-[13px]"
                 style={{ backgroundColor: "rgba(6,12,22,0.3)" }}
               >
                 <Play className="h-3.5 w-3.5" />Featured Video
@@ -109,10 +132,11 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
 
       {/* Stat strip — ONE dark-glass band that RESPECTS the page's left
           padding (its left edge lines up with the headline/buttons) and is
-          only as wide as the stats; photo stays visible below. */}
-      <div className="relative mx-auto mb-12 max-w-[1400px] px-5 sm:px-8">
+          only as wide as the stats; photo stays visible below. Hidden on
+          mobile — the hero is already tall with the inline broker card. */}
+      <div className="relative mx-auto mb-12 hidden max-w-[1400px] px-5 sm:px-8 lg:block">
         <div
-          className="grid max-w-full grid-cols-2 gap-x-6 gap-y-4 border-y border-white/10 px-4 py-4 backdrop-blur-md sm:inline-flex sm:flex-wrap sm:items-center sm:gap-x-10 sm:pl-5 sm:pr-10"
+          className="grid max-w-full grid-cols-2 gap-x-6 gap-y-4 border-y border-white/10 px-4 py-4 backdrop-blur-md sm:inline-flex sm:flex-wrap sm:items-center sm:gap-x-10 sm:pl-5 sm:pr-10 lg:max-w-[calc(100%-21rem)]"
           style={{ backgroundColor: "rgba(6,12,22,0.3)" }}
         >
           {hero.stats.map(({ icon, value, label }, i) => {
