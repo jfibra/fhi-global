@@ -11,23 +11,43 @@ import {
   KeyRound, Landmark, Medal, Star, Trophy, TrendingUp, Users,
 } from "lucide-react"
 
-export const GOLD = "#c9a24b"
-export const GOLD_SOFT = "#d6b357"
+// ─── Theme ────────────────────────────────────────────────────────────────────
+// Every brand color is a CSS VARIABLE so each agent site can carry its own
+// palette: pages/preview inject themeVars(data.theme) once on a wrapper div
+// and every surface below syncs. The exported names read exactly as before —
+// components keep using GOLD / BRAND_GRADIENT / etc.
+
+/** The agent's palette: accent (gold family) + primary (navy family).
+ *  Everything else — soft/tint/alpha/gradient variants — is derived. */
+export type WebsiteTheme = { gold?: string; brand?: string }
+
+export const DEFAULT_THEME: Required<WebsiteTheme> = { gold: "#c9a24b", brand: "#001f3f" }
+
+export const GOLD = "var(--wb-gold)"
+export const GOLD_SOFT = "var(--wb-gold-soft)"
+export const GOLD_GRADIENT = "var(--wb-gold-grad)"
+export const GOLD_TINT = "var(--wb-gold-tint)"
+// Alpha steps of the accent, for borders/rules (hex+suffix no longer works on a var()).
+export const GOLD_A40 = "var(--wb-gold-a40)"
+export const GOLD_A50 = "var(--wb-gold-a50)"
+export const GOLD_A60 = "var(--wb-gold-a60)"
+export const GOLD_SOFT_A80 = "var(--wb-gold-soft-a80)"
+
+export const BRAND_FROM = "var(--wb-brand-from)"
+export const BRAND_TO = "var(--wb-brand-to)"
+export const BRAND_GRADIENT = "var(--wb-brand-grad)"
+export const BRAND_GLASS_GRADIENT = "var(--wb-brand-glass-grad)"
+export const BRAND_GLASS_SOFT = "var(--wb-brand-glass-soft)"
+export const BRAND_TO_A0 = "var(--wb-brand-to-a0)"
+export const BRAND_TO_A90 = "var(--wb-brand-to-a90)"
+
+/** Dark section background — the brand gradient's bottom color. */
+export const INK = BRAND_TO
+/** Heading/text navy — deliberately NOT part of the palette (stays readable). */
 export const NAVY = "#0d1b2e"
-export const INK = "#0a1628"
 export const IVORY = "#faf8f4"
 
-// ─── Brand gradient ───────────────────────────────────────────────────────────
-// ONE place to change the site's navy gradient (header, primary buttons, stat
-// bands, and — via hexToRgba — the hero's glass cards).
-
-export const BRAND_FROM = "#001f3f"
-export const BRAND_TO = INK
-
-/** The 180° brand gradient as a CSS value. */
-export const BRAND_GRADIENT = `linear-gradient(180deg, ${BRAND_FROM}, ${BRAND_TO})`
-
-/** #rrggbb → rgba(r,g,b,alpha) — for translucent (glass) brand surfaces. */
+/** #rrggbb → rgba(r,g,b,alpha). Only for REAL hex values (themeVars inputs). */
 export function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace("#", "")
   const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h
@@ -35,18 +55,43 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`
 }
 
-/** Translucent version of the brand gradient for glass cards. */
-export const BRAND_GLASS_GRADIENT = `linear-gradient(180deg, ${hexToRgba(BRAND_FROM, 0.72)}, ${hexToRgba(BRAND_TO, 0.72)})`
+/** Lerp two hex colors (w = weight of `b`). */
+function mixHex(a: string, b: string, w: number): string {
+  const pa = parseInt(a.replace("#", ""), 16)
+  const pb = parseInt(b.replace("#", ""), 16)
+  const ch = (sa: number, sb: number) => Math.round(sa + (sb - sa) * w)
+  const r = ch((pa >> 16) & 255, (pb >> 16) & 255)
+  const g = ch((pa >> 8) & 255, (pb >> 8) & 255)
+  const bl = ch(pa & 255, pb & 255)
+  return `#${((r << 16) | (g << 8) | bl).toString(16).padStart(6, "0")}`
+}
 
-/** Gold CTA gradient (Get in Touch, Book a Consultation) — same 180° style. */
-export const GOLD_GRADIENT = `linear-gradient(180deg, ${GOLD_SOFT}, ${GOLD})`
-
-/** Soft dark glass for translucent strips/buttons over photos (hero stat
- *  strip, Featured Video) — derived from the brand ink. */
-export const BRAND_GLASS_SOFT = hexToRgba(BRAND_TO, 0.35)
-
-/** Pale gold tint behind gold icons on light surfaces — derived from GOLD. */
-export const GOLD_TINT = hexToRgba(GOLD, 0.13)
+/** The CSS variables for a palette. Defaults reproduce the original design
+ *  exactly; custom colors derive their soft/dark partners automatically. */
+export function themeVars(theme?: WebsiteTheme | null): React.CSSProperties {
+  const gold = theme?.gold || DEFAULT_THEME.gold
+  const brand = theme?.brand || DEFAULT_THEME.brand
+  // Hand-tuned partners for the defaults; derived for custom picks.
+  const goldSoft = theme?.gold ? mixHex(gold, "#ffffff", 0.18) : "#d6b357"
+  const brandTo = theme?.brand ? mixHex(brand, "#000000", 0.5) : "#0a1628"
+  return {
+    "--wb-gold": gold,
+    "--wb-gold-soft": goldSoft,
+    "--wb-gold-grad": `linear-gradient(180deg, ${goldSoft}, ${gold})`,
+    "--wb-gold-tint": hexToRgba(gold, 0.13),
+    "--wb-gold-a40": hexToRgba(gold, 0.4),
+    "--wb-gold-a50": hexToRgba(gold, 0.5),
+    "--wb-gold-a60": hexToRgba(gold, 0.6),
+    "--wb-gold-soft-a80": hexToRgba(goldSoft, 0.8),
+    "--wb-brand-from": brand,
+    "--wb-brand-to": brandTo,
+    "--wb-brand-grad": `linear-gradient(180deg, ${brand}, ${brandTo})`,
+    "--wb-brand-glass-grad": `linear-gradient(180deg, ${hexToRgba(brand, 0.72)}, ${hexToRgba(brandTo, 0.72)})`,
+    "--wb-brand-glass-soft": hexToRgba(brandTo, 0.35),
+    "--wb-brand-to-a0": hexToRgba(brandTo, 0),
+    "--wb-brand-to-a90": hexToRgba(brandTo, 0.9),
+  } as React.CSSProperties
+}
 
 export const script = { fontFamily: "'Snell Roundhand', 'Segoe Script', 'Brush Script MT', cursive" }
 
@@ -201,6 +246,8 @@ export type WebsiteData = {
   gallery: Record<GalleryCategory, string[]>
   testimonials: Testimonial[]
   cta: { heading: string; sub: string }
+  /** The agent's palette; absent = the default gold/navy design. */
+  theme?: WebsiteTheme
 }
 
 // ─── Sample content ───────────────────────────────────────────────────────────

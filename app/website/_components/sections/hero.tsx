@@ -3,7 +3,7 @@
 // stat strip along the bottom.
 
 import { Building2, FileText, Mail, Phone, Play, ShieldCheck } from "lucide-react"
-import { BRAND_GLASS_GRADIENT, BRAND_GLASS_SOFT, BRAND_GRADIENT, BRAND_TO, GOLD, HERO_STAT_ICON_FALLBACK, hexToRgba, INK, NAVY, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
+import { BRAND_GLASS_GRADIENT, BRAND_GLASS_SOFT, BRAND_GRADIENT, BRAND_TO, BRAND_TO_A0, BRAND_TO_A90, GOLD, GOLD_A50, HERO_STAT_ICON_FALLBACK, INK, NAVY, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
 
 /** WhatsApp brand glyph — lucide has no brand icon for it. */
 function WhatsAppIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -73,7 +73,7 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
           broker card sits on clean ink, with no seams or leftover bands. */}
       <div className="absolute inset-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={hero.image} alt="" aria-hidden className="h-full w-full object-cover object-center" />
+        {hero.image && <img src={hero.image} alt="" aria-hidden className="h-full w-full object-cover object-center" />}
         {overlay > 0 && (
           <div
             aria-hidden
@@ -85,7 +85,7 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
         )}
         <div
           className="absolute inset-0 lg:hidden"
-          style={{ background: `linear-gradient(180deg, ${hexToRgba(BRAND_TO, 0)} 300px, ${hexToRgba(BRAND_TO, 0.9)} 520px, ${BRAND_TO} 620px)` }}
+          style={{ background: `linear-gradient(180deg, ${BRAND_TO_A0} 300px, ${BRAND_TO_A90} 520px, ${BRAND_TO} 620px)` }}
           aria-hidden
         />
       </div>
@@ -134,6 +134,7 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
           padding (its left edge lines up with the headline/buttons) and is
           only as wide as the stats; photo stays visible below. Hidden on
           mobile — the hero is already tall with the inline broker card. */}
+      {hero.stats.length > 0 && (
       <div className="relative mx-auto mb-12 hidden max-w-[1400px] px-5 sm:px-8 lg:block">
         <div
           className="grid max-w-full grid-cols-2 gap-x-6 gap-y-4 border-y border-white/10 px-4 py-4 backdrop-blur-md sm:inline-flex sm:flex-wrap sm:items-center sm:gap-x-10 sm:pl-5 sm:pr-10 lg:max-w-[calc(100%-21rem)]"
@@ -144,7 +145,7 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
             return (
               <div key={`${label}-${i}`} className="flex items-center gap-3">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border" style={{ borderColor: GOLD }}>
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full border" style={{ borderColor: `${GOLD}80`, color: GOLD }}>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full border" style={{ borderColor: GOLD_A50, color: GOLD }}>
                     <Icon className="h-4 w-4" strokeWidth={1.6} />
                   </span>
                 </span>
@@ -157,6 +158,7 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
           })}
         </div>
       </div>
+      )}
     </section>
   )
 }

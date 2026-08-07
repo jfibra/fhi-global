@@ -317,6 +317,7 @@ export async function saveSite(
         title_description: data.hero.description,
         contact: data.agent,
         cta: data.cta,
+        theme: data.theme ?? {},
         is_published: true,
         updated_at: now,
       })
@@ -370,6 +371,7 @@ export async function saveSite(
         title_description: data.hero.description,
         contact: data.agent,
         cta: data.cta,
+        theme: data.theme ?? {},
         hero_id: heroRow.id,
         about_id: aboutRow.id,
         is_published: true,
@@ -476,6 +478,13 @@ async function loadSite(
   data.agent = { ...data.agent, ...contact }
   const cta = (site.cta ?? {}) as Partial<WebsiteData["cta"]>
   data.cta = { ...data.cta, ...cta }
+  const theme = (site.theme ?? {}) as { gold?: unknown; brand?: unknown }
+  if (typeof theme.gold === "string" || typeof theme.brand === "string") {
+    data.theme = {
+      ...(typeof theme.gold === "string" ? { gold: theme.gold } : {}),
+      ...(typeof theme.brand === "string" ? { brand: theme.brand } : {}),
+    }
+  }
 
   const [{ data: hero }, { data: about }, { data: featured }, { data: areas }, { data: gallery }] = await Promise.all([
     admin.from("hero_section").select("*, website_stats ( hero_stats, stats_section )").eq("id", site.hero_id as string).maybeSingle(),

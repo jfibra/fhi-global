@@ -4,6 +4,7 @@ import { BAND_STAT_ICON_FALLBACK, BRAND_GRADIENT, SAMPLE_DATA, STAT_ICONS, type 
 import { GoldRing } from "../ui"
 
 export function StatsBandSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
+  if (data.bandStats.length === 0) return null
   return (
     <section id="stats" style={{ background: BRAND_GRADIENT }}>
       {/* Small screens: a shrink-wrapped grid centered as a block, so wrapped

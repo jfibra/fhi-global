@@ -5,6 +5,7 @@ import { IMG, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
 import { FancyEyebrow } from "../ui"
 
 export function ServiceAreasSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
+  if (data.areas.length === 0) return null
   return (
     <section id="areas" className="relative scroll-mt-[72px] overflow-hidden">
       {/* Background photo + white wash */}

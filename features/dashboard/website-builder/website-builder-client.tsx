@@ -8,15 +8,15 @@
 // agent's contact fields seed from their profile. The draft autosaves to
 // localStorage; DB persistence comes later.
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import {
-  ArrowDown, ArrowUp, Check, ExternalLink, ImagePlus, Loader2, Palette, Plus, RotateCcw, Save, Search, Trash2,
+  ArrowDown, ArrowUp, Check, Eraser, ExternalLink, ImagePlus, Loader2, Palette, Plus, RotateCcw, Save, Search, Trash2,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 import { normalizeSocialUrl, readSocialLinks } from "@/lib/public-profile"
 import {
-  BAND_STAT_ICON_FALLBACK, GALLERY_CATEGORIES, HERO_STAT_ICON_FALLBACK, SAMPLE_DATA, STAT_ICONS,
+  BAND_STAT_ICON_FALLBACK, DEFAULT_THEME, GALLERY_CATEGORIES, HERO_STAT_ICON_FALLBACK, SAMPLE_DATA, STAT_ICONS, themeVars,
   type GalleryCategory, type Project, type Property, type StatIconKey, type WebsiteData,
 } from "@/app/website/_data"
 import { SiteHeader } from "@/app/website/_components/header"
@@ -403,7 +403,19 @@ function FeaturedPicker({
  *  same section still scrolls. */
 export type PreviewTarget = { id: string; n: number }
 
-function LivePreview({ data, target }: { data: WebsiteData; target: PreviewTarget | null }) {
+/** Template anchors in page order — used by the scroll spy. */
+const SPY_ANCHORS = ["home", "about", "projects", "properties", "stats", "areas", "gallery", "reviews", "contact"] as const
+
+function LivePreview({
+  data,
+  target,
+  onSectionInView,
+}: {
+  data: WebsiteData
+  target: PreviewTarget | null
+  /** Fires with the anchor id of the section currently at the top of the preview. */
+  onSectionInView?: (anchor: string) => void
+}) {
   const [outerEl, setOuterEl] = useState<HTMLDivElement | null>(null)
   const [innerEl, setInnerEl] = useState<HTMLDivElement | null>(null)
   const [scale, setScale] = useState(0.4)
@@ -439,10 +451,34 @@ function LivePreview({ data, target }: { data: WebsiteData; target: PreviewTarge
     return () => ro.disconnect()
   }, [innerEl])
 
+  // Scroll spy — report which section is at the top of the preview so the
+  // form can follow along. Rect math is post-transform, so scale-safe.
+  useEffect(() => {
+    if (!outerEl || !innerEl || !onSectionInView) return
+    let raf = 0
+    const onScroll = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        const outerTop = outerEl.getBoundingClientRect().top
+        let current: string = SPY_ANCHORS[0]
+        for (const id of SPY_ANCHORS) {
+          const el = innerEl.querySelector(`#${id}`)
+          if (el && el.getBoundingClientRect().top - outerTop <= 140) current = id
+        }
+        onSectionInView(current)
+      })
+    }
+    outerEl.addEventListener("scroll", onScroll, { passive: true })
+    return () => {
+      outerEl.removeEventListener("scroll", onScroll)
+      cancelAnimationFrame(raf)
+    }
+  }, [outerEl, innerEl, onSectionInView])
+
   return (
     <div ref={setOuterEl} className="h-full overflow-y-auto overflow-x-hidden bg-[#dfe4ea]">
       <div style={{ height: innerH * scale }} className="relative">
-        <div ref={setInnerEl} style={{ width: VIRTUAL_WIDTH, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+        <div ref={setInnerEl} style={{ width: VIRTUAL_WIDTH, transform: `scale(${scale})`, transformOrigin: "top left", ...themeVars(data.theme) }}>
           <SiteHeader />
           <HeroSection data={data} />
           <AboutSection data={data} />
@@ -462,6 +498,7 @@ function LivePreview({ data, target }: { data: WebsiteData; target: PreviewTarge
 // ─── Section navigation ───────────────────────────────────────────────────────
 
 const FORM_SECTIONS = [
+  { id: "palette", label: "Palette" },
   { id: "agent", label: "Agent" },
   { id: "hero", label: "Hero" },
   { id: "about", label: "About" },
@@ -478,6 +515,7 @@ type FormSectionId = (typeof FORM_SECTIONS)[number]["id"]
 
 /** Which template anchor each form section corresponds to in the preview. */
 const SECTION_ANCHORS: Record<FormSectionId, string> = {
+  palette: "home",
   agent: "home",
   hero: "home",
   about: "about",
@@ -488,6 +526,45 @@ const SECTION_ANCHORS: Record<FormSectionId, string> = {
   gallery: "gallery",
   reviews: "reviews",
   cta: "contact",
+}
+
+/** Curated palette suggestions — accent (gold family) + primary (dark family).
+ *  The first is the default design; picking it clears the stored theme. */
+const PALETTE_PRESETS: { name: string; gold: string; brand: string; isDefault?: boolean }[] = [
+  { name: "Classic Gold", gold: DEFAULT_THEME.gold, brand: DEFAULT_THEME.brand, isDefault: true },
+  { name: "Royal Emerald", gold: "#3fae8a", brand: "#0b3d2e" },
+  { name: "Burgundy Luxe", gold: "#d9a441", brand: "#3d0c11" },
+  { name: "Ocean Sapphire", gold: "#6fb7e9", brand: "#0a2540" },
+  { name: "Copper Slate", gold: "#c47f4a", brand: "#232b36" },
+  { name: "Onyx Silver", gold: "#b9c2cf", brand: "#101418" },
+  { name: "Violet Night", gold: "#b79bd6", brand: "#241a3d" },
+  { name: "Desert Rose", gold: "#d98c8c", brand: "#402a32" },
+  { name: "Champagne Noir", gold: "#e2c992", brand: "#171512" },
+  { name: "Forest Brass", gold: "#c9b458", brand: "#1e2d24" },
+  { name: "Crimson Steel", gold: "#e07a5f", brand: "#1d2430" },
+  { name: "Teal Sand", gold: "#e0c9a6", brand: "#0f3a3f" },
+  { name: "Midnight Mint", gold: "#8fd6bd", brand: "#101f33" },
+  { name: "Espresso Cream", gold: "#d6b98c", brand: "#2b1d16" },
+  { name: "Arctic Ice", gold: "#a8d3e6", brand: "#12232e" },
+  { name: "Imperial Purple", gold: "#d4af37", brand: "#301934" },
+  { name: "Graphite Lime", gold: "#b6c649", brand: "#1c1f1a" },
+  { name: "Terracotta Dusk", gold: "#cc7a52", brand: "#33272b" },
+  { name: "Deep Sea Coral", gold: "#f0937b", brand: "#082a3a" },
+  { name: "Platinum Navy", gold: "#cfd8e3", brand: "#001a33" },
+]
+
+/** Scroll-spy inverse: which form section a preview anchor selects ("home"
+ *  picks Hero — Agent shares the hero and stays reachable by tab). */
+const ANCHOR_TO_SECTION: Record<string, FormSectionId> = {
+  home: "hero",
+  about: "about",
+  projects: "projects",
+  properties: "listings",
+  stats: "stats",
+  areas: "areas",
+  gallery: "gallery",
+  reviews: "reviews",
+  contact: "cta",
 }
 
 // ─── Editor ───────────────────────────────────────────────────────────────────
@@ -529,11 +606,37 @@ export function WebsiteBuilderClient() {
   const [activeSection, setActiveSection] = useState<FormSectionId>("agent")
   const [activeGalleryCat, setActiveGalleryCat] = useState<GalleryCategory>("Event Photos")
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null)
+  // While a tab click smooth-scrolls the preview, the scroll spy would fire on
+  // every intermediate section — suppress it until the animation settles.
+  const spySuppressed = useRef(false)
 
   const openSection = (id: FormSectionId) => {
     setActiveSection(id)
+    spySuppressed.current = true
     setPreviewTarget((t) => ({ id: SECTION_ANCHORS[id], n: (t?.n ?? 0) + 1 }))
   }
+
+  useEffect(() => {
+    if (!previewTarget) return
+    const t = setTimeout(() => {
+      spySuppressed.current = false
+    }, 1200)
+    return () => clearTimeout(t)
+  }, [previewTarget])
+
+  // Scroll spy: scrolling the preview follows along in the form. The agent tab
+  // shares the hero anchor, so don't fight the user while they're on it.
+  const handleSectionInView = useCallback((anchor: string) => {
+    if (spySuppressed.current) return
+    const formId = ANCHOR_TO_SECTION[anchor]
+    if (!formId) return
+    setActiveSection((prev) => {
+      if (prev === formId) return prev
+      // Palette + Agent share the hero anchor — don't kick the user off them.
+      if (formId === "hero" && (prev === "agent" || prev === "palette")) return prev
+      return formId
+    })
+  }, [])
 
   // Published-site state (migration 035): the slug is minted on first save.
   const [siteSlug, setSiteSlug] = useState<string | null>(null)
@@ -651,6 +754,27 @@ export function WebsiteBuilderClient() {
     setData(seededSample(seed))
   }
 
+  /** Blank slate: wipe every placeholder (texts, photos, cards, reviews) so
+   *  nothing fake can end up published; keeps the profile-seeded contacts,
+   *  socials and the chosen palette. */
+  const clearSample = () => {
+    if (!window.confirm("Clear all sample/placeholder content? Your contacts, socials and palette are kept.")) return
+    setData((prev) => {
+      const d = structuredClone(prev)
+      d.agent = { ...d.agent, title: "", brn: "", orn: "", brokerage: "" }
+      d.hero = { headline: "", headlineAccent: "", description: "", image: "", overlay: 0, stats: [] }
+      d.about = { ...d.about, heading: "", bio: "", portrait: "", views: "", listings: "", rating: "" }
+      d.projects = []
+      d.properties = []
+      d.bandStats = []
+      d.areas = []
+      d.gallery = { "Event Photos": [], Certificates: [], "Awards & Recognition": [] }
+      d.testimonials = []
+      d.cta = { heading: "", sub: "" }
+      return d
+    })
+  }
+
   const selectedProjectIds = new Set(data.projects.map((p) => p.sourceId).filter(Boolean) as string[])
   const selectedListingIds = new Set(data.properties.map((p) => p.sourceId).filter(Boolean) as string[])
 
@@ -706,6 +830,78 @@ export function WebsiteBuilderClient() {
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
+          {activeSection === "palette" && (
+            <>
+              <p className="text-[12px] leading-relaxed text-[#6b7280]">
+                Your site&apos;s two brand colors. Everything derives from them — the navbar, buttons,
+                stat bands, glass cards, icons, dividers and gradients all update together.
+              </p>
+
+              {/* Suggested palettes */}
+              <Field label="Suggestions">
+                <div className="grid grid-cols-2 gap-2">
+                  {PALETTE_PRESETS.map((p) => {
+                    const activeGold = data.theme?.gold ?? DEFAULT_THEME.gold
+                    const activeBrand = data.theme?.brand ?? DEFAULT_THEME.brand
+                    const selected = activeGold.toLowerCase() === p.gold.toLowerCase() && activeBrand.toLowerCase() === p.brand.toLowerCase()
+                    return (
+                      <button
+                        key={p.name}
+                        type="button"
+                        onClick={() => update((d) => {
+                          if (p.isDefault) delete d.theme
+                          else d.theme = { gold: p.gold, brand: p.brand }
+                        })}
+                        className={`flex items-center gap-2.5 border p-2 text-left transition-colors ${
+                          selected ? "border-[#001f3f] bg-[#eef3f9]" : "border-[#e8eaed] bg-white hover:border-[#9aa0aa]"
+                        }`}
+                      >
+                        <span className="flex h-8 w-8 shrink-0 overflow-hidden border border-black/10">
+                          <span className="h-full w-1/2" style={{ backgroundColor: p.brand }} />
+                          <span className="h-full w-1/2" style={{ backgroundColor: p.gold }} />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-[12px] font-bold text-[#0d1117]">{p.name}</span>
+                          {p.isDefault && <span className="block text-[10px] text-[#9aa0aa]">Default</span>}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </Field>
+
+              {(
+                [
+                  { key: "gold", label: "Accent (gold)", hint: "Icons, dividers, eyebrows, Get in Touch / Book a Consultation" },
+                  { key: "brand", label: "Primary (navy)", hint: "Navbar, primary buttons, stat bands, dark sections" },
+                ] as const
+              ).map(({ key, label, hint }) => (
+                <div key={key} className="border border-[#e8eaed] bg-[#fafbfc] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[12.5px] font-bold text-[#0d1117]">{label}</p>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-[#9aa0aa]">{hint}</p>
+                    </div>
+                    <input
+                      type="color"
+                      value={data.theme?.[key] ?? DEFAULT_THEME[key]}
+                      onChange={(e) => update((d) => { d.theme = { ...(d.theme ?? {}), [key]: e.target.value } })}
+                      aria-label={label}
+                      className="h-10 w-14 shrink-0 cursor-pointer appearance-none border border-[#e2e6ea] bg-white p-1"
+                    />
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => update((d) => { delete d.theme })}
+                className="inline-flex items-center gap-1.5 border border-[#e2e6ea] bg-white px-3 py-2 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Reset to default palette
+              </button>
+            </>
+          )}
+
           {activeSection === "agent" && (
             <>
               <Field label="Full name"><TInput value={data.agent.name} onChange={(v) => update((d) => { d.agent.name = v })} /></Field>
@@ -1039,12 +1235,6 @@ export function WebsiteBuilderClient() {
         {/* Footer — title, publish state and the View/Reset/Save actions */}
         <div className="shrink-0 border-t border-[#eef0f3] px-5 py-4">
           <div className="flex items-center justify-between">
-            <div className="min-w-0">
-              <h1 className="font-['Outfit'] text-[16px] font-bold text-[#0d1117]">Website Builder</h1>
-              <p className="truncate text-[11px] text-[#9aa0aa]">
-                {siteSlug ? `Published at /website/${siteSlug}` : "Draft autosaves in this browser"}
-              </p>
-            </div>
             <div className="flex shrink-0 items-center gap-2">
               <a
                 href={siteSlug ? `/website/${siteSlug}` : "/website/sample"}
@@ -1054,6 +1244,14 @@ export function WebsiteBuilderClient() {
               >
                 <ExternalLink className="h-3.5 w-3.5" /> {siteSlug ? "View Site" : "Sample"}
               </a>
+              <button
+                type="button"
+                onClick={clearSample}
+                title="Remove all placeholder content (keeps contacts, socials and palette)"
+                className="inline-flex h-8 items-center gap-1.5 border border-[#e2e6ea] px-2.5 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
+              >
+                <Eraser className="h-3.5 w-3.5" /> Clear Sample
+              </button>
               <button
                 type="button"
                 onClick={reset}
@@ -1078,7 +1276,7 @@ export function WebsiteBuilderClient() {
 
       {/* ── Live preview ── */}
       <div className="min-w-0 flex-1">
-        <LivePreview data={data} target={previewTarget} />
+        <LivePreview data={data} target={previewTarget} onSectionInView={handleSectionInView} />
       </div>
     </div>
   )

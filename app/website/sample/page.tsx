@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { themeVars } from "../_data"
 import { SiteHeader } from "../_components/header"
 import { SiteFooter } from "../_components/footer"
 import { HeroSection } from "../_components/sections/hero"
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
 
 export default function WebsiteSamplePage() {
   return (
-    <>
+    <div style={themeVars()}>
       <SiteHeader />
       <HeroSection />
       <AboutSection />
@@ -34,6 +35,6 @@ export default function WebsiteSamplePage() {
       <TestimonialsSection />
       <ClosingCtaSection />
       <SiteFooter />
-    </>
+    </div>
   )
 }

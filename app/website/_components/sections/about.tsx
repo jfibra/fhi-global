@@ -10,7 +10,7 @@ import {
   ArrowRight, Building2, Eye, Facebook, FileText, HomeIcon, Instagram,
   Linkedin, MessageCircle, ShieldCheck, Star, Youtube,
 } from "lucide-react"
-import { BRAND_GRADIENT, GOLD, GOLD_SOFT, IMG, INK, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
+import { BRAND_GRADIENT, GOLD, GOLD_A40, GOLD_A50, GOLD_A60, GOLD_SOFT, GOLD_SOFT_A80, IMG, INK, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
 import { Eyebrow } from "../ui"
 
 export function AboutSection({
@@ -98,14 +98,16 @@ export function AboutSection({
         {/* Portrait card — gold-framed, name plate over a bottom fade */}
         <div
           className="relative min-h-[420px] overflow-hidden border shadow-[0_24px_60px_-24px_rgba(13,27,46,0.45)] min-[900px]:min-h-[540px]"
-          style={{ backgroundColor: INK, borderColor: `${GOLD}99` }}
+          style={{ backgroundColor: INK, borderColor: GOLD_A60 }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={about.portrait}
-            alt={agent.name}
-            className="absolute inset-0 h-full w-full object-cover object-top"
-          />
+          {about.portrait && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={about.portrait}
+              alt={agent.name}
+              className="absolute inset-0 h-full w-full object-cover object-top"
+            />
+          )}
           <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 px-7 pb-6 pt-4">
             <p className="mt-1.5 text-[13px] font-bold uppercase tracking-[0.24em] text-white/85">{agent.name}</p>
@@ -184,7 +186,7 @@ export function AboutSection({
                     <div key={label} className="flex items-center gap-3.5">
                       <span
                         className="flex h-11 w-11 shrink-0 items-center justify-center border bg-white"
-                        style={{ borderColor: `${GOLD}66`, color: GOLD }}
+                        style={{ borderColor: GOLD_A40, color: GOLD }}
                       >
                         <Icon className="h-5 w-5" strokeWidth={1.7} />
                       </span>
@@ -197,7 +199,7 @@ export function AboutSection({
                   <div className="flex items-center">
                     <span
                       className="group inline-flex cursor-pointer items-center gap-2 border bg-white px-6 py-3 text-[12px] font-bold uppercase tracking-[0.12em]"
-                      style={{ borderColor: `${GOLD}99`, color: GOLD_SOFT }}
+                      style={{ borderColor: GOLD_A60, color: GOLD_SOFT }}
                     >
                       View Agent Profile
                       <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:-rotate-45" />
@@ -208,7 +210,7 @@ export function AboutSection({
                 {/* Stats bar */}
                 <div
                   className="mt-6 flex flex-wrap items-center justify-start gap-x-6 gap-y-4 border px-8 py-5"
-                  style={{ background: BRAND_GRADIENT, borderColor: `${GOLD}80` }}
+                  style={{ background: BRAND_GRADIENT, borderColor: GOLD_A50 }}
                 >
                   {[
                     { icon: Eye, value: about.views, label: "Views" },
@@ -216,12 +218,12 @@ export function AboutSection({
                     { icon: Star, value: about.rating, label: "Rating" },
                   ].map(({ icon: Icon, value, label }, i, arr) => (
                     <div key={label} className="flex flex-1 items-center justify-start gap-3.5" style={i < arr.length - 1 ? { borderRight: "1px solid rgba(255,255,255,0.12)" } : undefined}>
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border" style={{ borderColor: `${GOLD}99`, color: GOLD }}>
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border" style={{ borderColor: GOLD_A60, color: GOLD }}>
                         <Icon className="h-4.5 w-4.5" strokeWidth={1.7} />
                       </span>
                       <span>
                         <span className="block text-[22px] font-bold leading-tight text-white">{value}</span>
-                        <span className="block text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: `${GOLD_SOFT}cc` }}>{label}</span>
+                        <span className="block text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: GOLD_SOFT_A80 }}>{label}</span>
                       </span>
                     </div>
                   ))}
@@ -244,9 +246,9 @@ export function AboutSection({
                 Let&apos;s Connect
               </p>
               <div className="mt-2.5 flex w-full items-center justify-center gap-2">
-                <span className="h-px w-12" style={{ backgroundColor: `${GOLD}80` }} />
+                <span className="h-px w-12" style={{ backgroundColor: GOLD_A50 }} />
                 <span className="h-1.5 w-1.5 rotate-45" style={{ backgroundColor: GOLD }} />
-                <span className="h-px w-12" style={{ backgroundColor: `${GOLD}80` }} />
+                <span className="h-px w-12" style={{ backgroundColor: GOLD_A50 }} />
               </div>
               <p className="mt-3 text-[13.5px] leading-relaxed text-[#5b6472]">
                 I&apos;m here to help you find the perfect property in Dubai.
@@ -266,11 +268,11 @@ export function AboutSection({
             {/* Scan to Connect — QR + socials */}
             <div className="flex flex-col items-center">
               <div className="flex w-full items-center gap-3">
-                <span className="h-px flex-1" style={{ backgroundColor: `${GOLD}66` }} />
+                <span className="h-px flex-1" style={{ backgroundColor: GOLD_A40 }} />
                 <span className="text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: GOLD }}>Scan to Connect</span>
-                <span className="h-px flex-1" style={{ backgroundColor: `${GOLD}66` }} />
+                <span className="h-px flex-1" style={{ backgroundColor: GOLD_A40 }} />
               </div>
-              <div className="mt-4 border bg-white p-3" style={{ borderColor: `${GOLD}99` }}>
+              <div className="mt-4 border bg-white p-3" style={{ borderColor: GOLD_A60 }}>
                 <QRCodeSVG value={qrValue} size={128} fgColor={NAVY} bgColor="transparent" />
               </div>
 

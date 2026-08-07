@@ -29,6 +29,8 @@ export function TestimonialsSection({ data = SAMPLE_DATA }: { data?: WebsiteData
     return () => clearInterval(id)
   }, [positions])
 
+  if (testimonials.length === 0) return null
+
   return (
     <section id="reviews" className="scroll-mt-[72px] bg-white">
       <div className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
