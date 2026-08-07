@@ -1,18 +1,25 @@
-// Site navbar — matches the FHI Global homepage header color (#001f3f). The
-// logo links back to the platform homepage, not the personal site.
+"use client"
 
+// Site navbar — matches the FHI Global homepage header color (#001f3f). The
+// logo links back to the platform homepage, not the personal site. Below lg
+// the links collapse into a burger menu panel.
+
+import { useState } from "react"
 import Link from "next/link"
-import { Mail } from "lucide-react"
+import { Mail, Menu, X } from "lucide-react"
 import { GOLD, GOLD_SOFT, INK, NAV_LINKS } from "../_data"
 
 export function SiteHeader() {
+  const [open, setOpen] = useState(false)
+
   return (
     <header className="sticky top-0 z-50" style={{ backgroundColor: "#001f3f" }}>
-      <div className="mx-auto flex max-w-[1400px] items-center gap-8 px-5 py-4 sm:px-8">
+      <div className="mx-auto flex max-w-[1400px] items-center gap-4 px-5 py-4 sm:px-8 lg:gap-8">
         <Link href="/" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/FHI_Branding_White.png" alt="FHI Global" className="h-10 w-auto" />
+          <img src="/FHI_Branding_White.png" alt="FHI Global" className="h-9 w-auto sm:h-10" />
         </Link>
+
         <nav className="ml-auto hidden items-center gap-7 lg:flex">
           {NAV_LINKS.map(({ label, href }, i) => (
             <a
@@ -36,14 +43,53 @@ export function SiteHeader() {
             </a>
           ))}
         </nav>
+
         <a
           href="#contact"
-          className="hidden items-center gap-2 px-5 py-2.5 text-[13px] font-bold sm:inline-flex"
+          className="hidden items-center gap-2 px-5 py-2.5 text-[13px] font-bold sm:inline-flex lg:ml-0"
           style={{ backgroundColor: GOLD_SOFT, color: INK }}
         >
           <Mail className="h-4 w-4" /> Get in Touch
         </a>
+
+        {/* Burger — mobile/tablet only */}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-label={open ? "Close menu" : "Open menu"}
+          aria-expanded={open}
+          className="ml-auto flex h-10 w-10 items-center justify-center text-white sm:ml-0 lg:hidden"
+        >
+          {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </button>
       </div>
+
+      {/* Mobile menu panel */}
+      {open && (
+        <nav className="border-t border-white/10 px-5 pb-6 pt-2 lg:hidden" style={{ backgroundColor: "#001f3f" }}>
+          {NAV_LINKS.map(({ label, href }, i) => (
+            <a
+              key={label}
+              href={href}
+              onClick={() => setOpen(false)}
+              className={`block border-b border-white/5 py-3 text-[14px] font-semibold ${
+                i === 0 ? "" : "text-white/80"
+              }`}
+              style={i === 0 ? { color: GOLD } : undefined}
+            >
+              {label}
+            </a>
+          ))}
+          <a
+            href="#contact"
+            onClick={() => setOpen(false)}
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 px-5 py-3 text-[13px] font-bold"
+            style={{ backgroundColor: GOLD_SOFT, color: INK }}
+          >
+            <Mail className="h-4 w-4" /> Get in Touch
+          </a>
+        </nav>
+      )}
     </header>
   )
 }

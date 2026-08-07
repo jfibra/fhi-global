@@ -23,11 +23,12 @@ export function ServiceAreasSection({ data = SAMPLE_DATA }: { data?: WebsiteData
           <span className="h-1.5 w-1.5 rotate-45" style={{ backgroundColor: GOLD }} />
           <span className="h-px w-10" style={{ backgroundColor: GOLD }} />
         </div>
-        <div className="mt-10 flex h-[420px] gap-3">
+        {/* Mobile: a simple photo grid. Desktop: the hover-expand accordion. */}
+        <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:flex lg:h-[420px]">
           {data.areas.map((a, i) => (
             <div
               key={`${a.label}-${i}`}
-              className="group relative min-w-0 flex-1 cursor-pointer overflow-hidden transition-all duration-500 ease-out hover:flex-[3.5]"
+              className="group relative h-44 min-w-0 cursor-pointer overflow-hidden transition-all duration-500 ease-out sm:h-52 lg:h-auto lg:flex-1 lg:hover:flex-[3.5]"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={a.image} alt={a.label} className="absolute inset-0 h-full w-full object-cover" />

@@ -6,9 +6,10 @@ import { GoldRing } from "../ui"
 export function StatsBandSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   return (
     <section id="stats" style={{ backgroundColor: INK }}>
-      {/* Flex + justify-center: the GROUP of stats stays centered whatever the
-          count (2 stats don't stick left); each stat stays left-aligned inside. */}
-      <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-center gap-x-16 gap-y-6 px-5 py-9 sm:px-8">
+      {/* Small screens: a shrink-wrapped grid centered as a block, so wrapped
+          rows share the same column edges (uniform left alignment) instead of
+          each row centering itself. Desktop: the centered flex row. */}
+      <div className="mx-auto grid w-fit max-w-[1400px] grid-cols-2 gap-x-10 gap-y-6 px-5 py-9 sm:grid-cols-3 sm:px-8 lg:flex lg:w-auto lg:flex-wrap lg:items-center lg:justify-center lg:gap-x-16">
         {data.bandStats.map(({ icon, value, label }, i) => (
           <div key={`${label}-${i}`} className="flex items-center gap-3">
             <GoldRing icon={STAT_ICONS[icon ?? BAND_STAT_ICON_FALLBACK[i % BAND_STAT_ICON_FALLBACK.length]]} dark />

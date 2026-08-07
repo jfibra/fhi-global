@@ -128,7 +128,7 @@ export function AboutSection({
 
           {aboutExpanded ? (
             <>
-              <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-2">
+              <div className="mt-4 max-h-[320px] min-h-0 flex-1 overflow-y-auto pr-2 lg:max-h-none">
                 <p className="whitespace-pre-line text-justify text-[14.5px] leading-relaxed text-[#3d4451]">{about.bio}</p>
               </div>
               <div className="mt-2 flex justify-end">
@@ -146,7 +146,9 @@ export function AboutSection({
             <>
               {/* Fills the space above the pinned group; the text itself is
                   cut so "Show more" flows inline after the "…" — no overlay. */}
-              <div ref={setBioEl} className="relative mt-4 min-h-0 flex-1 overflow-hidden">
+              {/* On mobile the column has no fixed height, so the bio gets an
+                  explicit cap (~8 lines) for the truncation to measure against. */}
+              <div ref={setBioEl} className="relative mt-4 max-h-[188px] min-h-0 flex-1 overflow-hidden lg:max-h-none">
                 {/* Hidden measurer — same width/typography as the real text */}
                 <p
                   ref={setMeasureEl}
@@ -227,9 +229,10 @@ export function AboutSection({
         </div>
 
         {/* Let's Connect — no card chrome, content sits on the section bg.
-            Extra left margin keeps it clear of the About column. */}
-        <div className="hidden lg:ml-16 lg:flex">
-          <div className="flex flex-1 flex-col text-center">
+            Extra left margin keeps it clear of the About column on desktop;
+            on mobile it stacks below, centered at the socials-row width. */}
+        <div className="flex lg:ml-16">
+          <div className="mx-auto flex w-full max-w-[280px] flex-1 flex-col text-center lg:mx-0 lg:max-w-none">
             <div className="flex flex-1 flex-col items-center pt-2">
 
               <p className="mt-4 font-serif text-[26px] font-bold tracking-tight" style={{ color: NAVY }}>

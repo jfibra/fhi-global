@@ -10,7 +10,19 @@ import { Eyebrow } from "../ui"
 
 export function TestimonialsSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   const testimonials = data.testimonials
-  const positions = Math.max(1, testimonials.length - 2)
+  // 3 cards per view on sm+ screens, 1 on phones — the slide step and dot
+  // count both depend on it, so it's tracked from the same breakpoint the
+  // card widths use (sm:w-1/3).
+  const [perView, setPerView] = useState(3)
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 640px)")
+    const update = () => setPerView(mq.matches ? 3 : 1)
+    update()
+    mq.addEventListener("change", update)
+    return () => mq.removeEventListener("change", update)
+  }, [])
+
+  const positions = Math.max(1, testimonials.length - perView + 1)
   const [reviewIdx, setReviewIdx] = useState(0)
   useEffect(() => {
     const id = setInterval(() => setReviewIdx((i) => (i + 1) % positions), 3500)
@@ -32,7 +44,7 @@ export function TestimonialsSection({ data = SAMPLE_DATA }: { data?: WebsiteData
       <div className="mt-10 overflow-hidden">
         <div
           className="flex transition-transform duration-700 ease-out"
-          style={{ transform: `translateX(-${Math.min(reviewIdx, positions - 1) * (100 / 3)}%)` }}
+          style={{ transform: `translateX(-${Math.min(reviewIdx, positions - 1) * (100 / perView)}%)` }}
         >
           {testimonials.map((t, i) => (
             <div key={`${t.name}-${i}`} className="w-full shrink-0 px-2.5 sm:w-1/3">
