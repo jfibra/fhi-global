@@ -190,7 +190,9 @@ export function OwnerDocumentsClient({ isAdmin, currentUserId }: { isAdmin: bool
         (r) =>
           (r.label ?? "").toLowerCase().includes(q) ||
           (r.owner_name ?? "").toLowerCase().includes(q) ||
-          (r.agent_name ?? "").toLowerCase().includes(q),
+          // Agent is only a dimension in the admin view — sales roles see only
+          // their own requests, so matching agent name there is meaningless.
+          (isAdmin && (r.agent_name ?? "").toLowerCase().includes(q)),
       )
     }
     const dir = sort.dir === "asc" ? 1 : -1
@@ -334,7 +336,7 @@ export function OwnerDocumentsClient({ isAdmin, currentUserId }: { isAdmin: bool
           <input
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-            placeholder="Search request, owner, agent…"
+            placeholder={isAdmin ? "Search request, owner, agent…" : "Search request or owner…"}
             className="h-9 w-full rounded-xl border border-[#e5e7eb] bg-white pl-9 pr-3 text-sm outline-none focus:border-[#001f3f]"
           />
         </div>
