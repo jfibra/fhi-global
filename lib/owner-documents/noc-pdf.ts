@@ -20,6 +20,8 @@ export type NocPdfInput = {
   agencyName: string
   /** Pre-formatted "valid until" date, or "" for the blank line. */
   validUntil: string
+  /** Optional PNG data URL of the owner's drawn signature, embedded on the line. */
+  signatureDataUrl?: string
 }
 
 const A4: [number, number] = [595.28, 841.89]
@@ -44,6 +46,20 @@ function safe(s: string): string {
     .replace(/[^\x20-\x7E\xA0-\xFF•]/g, "")
 }
 
+/** Decode a `data:image/png;base64,...` URL to bytes for pdf-lib embedding. */
+function dataUrlToBytes(dataUrl: string): Uint8Array | null {
+  const comma = dataUrl.indexOf(",")
+  if (comma < 0) return null
+  try {
+    const bin = atob(dataUrl.slice(comma + 1))
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    return bytes
+  } catch {
+    return null
+  }
+}
+
 /** Build the NOC authorization letter as a branded PDF Blob. */
 export async function buildNocPdfBlob(input: NocPdfInput): Promise<Blob> {
   const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib")
@@ -54,7 +70,7 @@ export async function buildNocPdfBlob(input: NocPdfInput): Promise<Blob> {
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
 
-  const navy = rgb(0, 0.122, 0.247)
+  const navy = rgb(0.043, 0.137, 0.259)
   const gold = rgb(0.839, 0.702, 0.341)
   const ink = rgb(0.05, 0.07, 0.09)
   const gray = rgb(0.42, 0.45, 0.5)
@@ -64,14 +80,14 @@ export async function buildNocPdfBlob(input: NocPdfInput): Promise<Blob> {
   const bulletX = MARGIN + 16
 
   // ── Header band + logo + gold rule ─────────────────────────────────────────
-  const bandH = 118
+  const bandH = 108
   page.drawRectangle({ x: 0, y: H - bandH, width: W, height: bandH, color: navy })
   page.drawRectangle({ x: 0, y: H - bandH - 3, width: W, height: 3, color: gold })
   try {
-    const res = await fetch("/FHI_Branding.png")
+    const res = await fetch("/fhi-branding-navy.png")
     if (res.ok) {
       const logo = await doc.embedPng(await res.arrayBuffer())
-      const logoH = 74
+      const logoH = 62
       const logoW = (logo.width / logo.height) * logoH
       page.drawImage(logo, {
         x: (W - logoW) / 2,
@@ -196,9 +212,26 @@ export async function buildNocPdfBlob(input: NocPdfInput): Promise<Blob> {
     { gap: 46 },
   )
 
-  // ── Signature block ─────────────────────────────────────────────────────────
-  draw("Owner Signature: ______________________________", { gap: 2 })
-  draw("Signature over printed name", { size: 8.5, color: gray })
+  // ── Signature block (embeds the owner's drawn signature if provided) ─────────
+  const sigLabelY = y
+  page.drawText("Owner Signature:", { x: MARGIN, y: sigLabelY, size: BODY_SIZE, font, color: ink })
+  const sigX = MARGIN + 112
+  if (input.signatureDataUrl) {
+    const bytes = dataUrlToBytes(input.signatureDataUrl)
+    if (bytes) {
+      try {
+        const sig = await doc.embedPng(bytes)
+        const sigH = 42
+        const sigW = Math.min(210, (sig.width / sig.height) * sigH)
+        page.drawImage(sig, { x: sigX, y: sigLabelY, width: sigW, height: sigH })
+      } catch {
+        // signature is best-effort; the ruled line below still stands
+      }
+    }
+  }
+  page.drawLine({ start: { x: sigX, y: sigLabelY - 3 }, end: { x: sigX + 230, y: sigLabelY - 3 }, thickness: 0.75, color: ink })
+  y -= 16
+  page.drawText("Signature over printed name", { x: sigX, y, size: 8.5, font, color: gray })
 
   // ── Footer ──────────────────────────────────────────────────────────────────
   const footY = 44

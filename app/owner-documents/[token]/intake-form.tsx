@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { FileText, UploadCloud, CheckCircle2, Loader2, X, Download } from "lucide-react"
+import { UploadCloud, CheckCircle2, Loader2, X, Download, PenLine, Eraser } from "lucide-react"
 import { uploadOwnerDoc, type UploadedDoc } from "@/lib/owner-documents/upload-client"
-import { downloadNocPdf } from "@/lib/owner-documents/noc-pdf"
+import { buildNocPdfBlob, downloadNocPdf, type NocPdfInput } from "@/lib/owner-documents/noc-pdf"
 
 const MAX_MB = 25
 const ACCEPT = ".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
@@ -47,25 +47,34 @@ export function IntakeForm({
   const [community, setCommunity] = useState("")
   const [titleDeedNumber, setTitleDeedNumber] = useState("")
   const [validUntil, setValidUntil] = useState("")
+  const [signature, setSignature] = useState<string | null>(null)
 
-  // Document slots
+  // Document slots (owner's own docs — the signed NOC is generated from the signature)
   const [titleDeed, setTitleDeed] = useState<Slot | null>(null)
   const [idType, setIdType] = useState<"emirates_id" | "passport">("emirates_id")
   const [idDoc, setIdDoc] = useState<Slot | null>(null)
-  const [signedNoc, setSignedNoc] = useState<Slot | null>(null)
   const [others, setOthers] = useState<Slot[]>([])
 
   const today = fmtDate(new Date())
-  const requiredDone =
-    titleDeed?.status === "done" && idDoc?.status === "done" && signedNoc?.status === "done"
+  const uploadsDone = titleDeed?.status === "done" && idDoc?.status === "done"
   const anyUploading =
-    titleDeed?.status === "uploading" ||
-    idDoc?.status === "uploading" ||
-    signedNoc?.status === "uploading" ||
-    others.some((o) => o.status === "uploading")
+    titleDeed?.status === "uploading" || idDoc?.status === "uploading" || others.some((o) => o.status === "uploading")
   const detailsDone =
     !!ownerName.trim() && !!ownerIdNumber.trim() && EMAIL_RE.test(ownerEmail.trim()) && ownerMobile.trim().length >= 4
-  const canSubmit = detailsDone && requiredDone && !anyUploading && !submitting
+  const canSubmit = detailsDone && !!signature && uploadsDone && !anyUploading && !submitting
+
+  const nocInput = (): NocPdfInput => ({
+    date: today,
+    ownerName,
+    ownerIdNumber,
+    building,
+    unitNumber,
+    community,
+    titleDeedNumber,
+    agencyName,
+    validUntil: validUntil ? fmtDate(new Date(validUntil)) : "",
+    signatureDataUrl: signature ?? undefined,
+  })
 
   function validateFile(file: File): string | null {
     if (!ALLOWED.has(file.type)) return "Only JPG, PNG, or PDF files are allowed."
@@ -103,49 +112,40 @@ export function IntakeForm({
     patch({ file, status: "done", progress: 100, uploaded: data })
   }
 
-  function handleDownloadNoc() {
-    if (!ownerName.trim() || !ownerIdNumber.trim()) {
-      toast.error("Fill in your name and ID number first.")
-      return
-    }
+  function handleDownloadCopy() {
     void downloadNocPdf(
-      {
-        date: today,
-        ownerName,
-        ownerIdNumber,
-        building,
-        unitNumber,
-        community,
-        titleDeedNumber,
-        agencyName,
-        validUntil: validUntil ? fmtDate(new Date(validUntil)) : "",
-      },
+      nocInput(),
       `NOC-${(building || "property").replace(/[^a-z0-9]+/gi, "-")}-${unitNumber || ""}.pdf`.replace(/-+\.pdf$/, ".pdf"),
     )
   }
 
   async function handleSubmit() {
     if (!detailsDone) return toast.error("Please complete your details (name, ID, email, mobile).")
-    if (!requiredDone) return toast.error("Please upload the Title Deed, your ID, and the signed NOC.")
-    setSubmitting(true)
-    const files: Array<{ path: string; docType: string; fileName: string; fileType: string; fileSize: number }> = []
-    const push = (slot: Slot | null, docType: string) => {
-      if (slot?.uploaded) {
-        files.push({
-          path: slot.uploaded.path,
-          docType,
-          fileName: slot.uploaded.fileName,
-          fileType: slot.uploaded.fileType,
-          fileSize: slot.uploaded.fileSize,
-        })
-      }
-    }
-    push(titleDeed, "title_deed")
-    push(idDoc, idType)
-    push(signedNoc, "signed_noc")
-    others.forEach((o) => push(o, "other"))
+    if (!signature) return toast.error("Please sign in the signature box.")
+    if (!uploadsDone) return toast.error("Please upload your Title Deed and ID.")
 
+    setSubmitting(true)
     try {
+      // Generate the signed NOC (with the drawn signature embedded) and upload it
+      // as the signed_noc document — no print/scan needed.
+      const nocBlob = await buildNocPdfBlob(nocInput())
+      const nocFile = new File([nocBlob], "Signed-NOC.pdf", { type: "application/pdf" })
+      const { data: noc, error: nocErr } = await uploadOwnerDoc(token, "signed_noc", nocFile)
+      if (nocErr || !noc) {
+        toast.error(nocErr ?? "Could not prepare your signed NOC. Please try again.")
+        setSubmitting(false)
+        return
+      }
+
+      const files: Array<{ path: string; docType: string; fileName: string; fileType: string; fileSize: number }> = []
+      const push = (u: UploadedDoc | undefined, docType: string) => {
+        if (u) files.push({ path: u.path, docType, fileName: u.fileName, fileType: u.fileType, fileSize: u.fileSize })
+      }
+      push(titleDeed?.uploaded, "title_deed")
+      push(idDoc?.uploaded, idType)
+      push(noc, "signed_noc")
+      others.forEach((o) => push(o.uploaded, "other"))
+
       const res = await fetch(`/api/owner-documents/${token}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -171,11 +171,9 @@ export function IntakeForm({
   return (
     <div className="min-h-screen bg-[#eef1f5]">
       {/* FHI letterhead */}
-      <div className="bg-gradient-to-b from-[#001228] to-[#012a53]">
-        <div className="mx-auto flex max-w-3xl flex-col items-center px-4 py-7">
-          {/* eslint-disable-next-line @next/next/no-img-element -- local public brand asset */}
-          <img src="/FHI_Branding.png" alt="FHI Global Property" className="h-16 w-auto" />
-        </div>
+      <div className="flex w-full justify-center bg-[#0a2342] px-4 py-6">
+        {/* eslint-disable-next-line @next/next/no-img-element -- local public brand asset */}
+        <img src="/fhi-branding-navy.png" alt="FHI Global Property" className="h-16 w-auto sm:h-20" />
       </div>
       <div className="h-[3px] bg-[#d6b357]" />
 
@@ -242,7 +240,7 @@ export function IntakeForm({
                 </p>
               </div>
 
-              {/* Contact details (not part of the letter, but needed) */}
+              {/* Contact details */}
               <div className="mt-8 rounded-xl border border-[#eef0f2] bg-[#f9fafb] p-4">
                 <p className="text-[13px] font-semibold text-[#374151]">Your contact details</p>
                 <p className="text-[12px] text-[#9ca3af]">So your agent can reach you about this authorization.</p>
@@ -252,22 +250,25 @@ export function IntakeForm({
                 </div>
               </div>
 
-              {/* Download + sign */}
-              <div className="mt-6 flex items-start gap-3 rounded-2xl border border-[#e7d9a8] bg-[#fdf9ee] p-4">
-                <FileText className="mt-0.5 h-5 w-5 shrink-0 text-[#a8842a]" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-[#1f2937]">Download &amp; sign your NOC</p>
-                  <p className="mt-0.5 text-[13px] leading-relaxed text-[#6b7280]">
-                    We&apos;ve filled the certificate above from your details. Download it, sign it, then upload the signed copy below.
-                  </p>
+              {/* Signature */}
+              <div className="mt-8">
+                <p className="text-sm font-bold text-[#0d1117]">Owner signature <span className="text-rose-500">*</span></p>
+                <p className="mt-0.5 text-[13px] text-[#6b7280]">
+                  Sign in the box below. On a phone or tablet, sign with your finger. We&apos;ll add your signature to the
+                  certificate automatically — no printing or scanning needed.
+                </p>
+                <div className="mt-3">
+                  <SignaturePad onChange={setSignature} />
+                </div>
+                {signature && (
                   <button
                     type="button"
-                    onClick={handleDownloadNoc}
-                    className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#001f3f] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#002b57]"
+                    onClick={handleDownloadCopy}
+                    className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-[#001f3f] hover:underline"
                   >
-                    <Download className="h-3.5 w-3.5" /> Download NOC letter
+                    <Download className="h-3.5 w-3.5" /> Download a copy of your signed NOC
                   </button>
-                </div>
+                )}
               </div>
 
               {/* Uploads */}
@@ -288,7 +289,6 @@ export function IntakeForm({
                   </div>
                   <UploadField label="ID" hideLabel slot={idDoc} onPick={(f) => runUpload(f, idType, setIdDoc)} onClear={() => setIdDoc(null)} />
                 </div>
-                <UploadField label="Signed NOC" required slot={signedNoc} onPick={(f) => runUpload(f, "signed_noc", setSignedNoc)} onClear={() => setSignedNoc(null)} />
                 {others.map((o, i) => (
                   <UploadField key={i} label={`Additional document ${i + 1}`} slot={o} onPick={() => {}} onClear={() => setOthers((prev) => prev.filter((_, idx) => idx !== i))} locked />
                 ))}
@@ -302,7 +302,7 @@ export function IntakeForm({
               <div className="mt-8 border-t border-[#eef0f2] pt-6">
                 {!canSubmit && (
                   <p className="mb-3 text-center text-[12px] text-[#9ca3af]">
-                    Complete your details and upload the Title Deed, your ID, and the signed NOC to submit.
+                    Complete your details, sign above, and upload your Title Deed and ID to submit.
                   </p>
                 )}
                 <button
@@ -330,6 +330,101 @@ export function IntakeForm({
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
+
+function SignaturePad({ onChange }: { onChange: (dataUrl: string | null) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const drawing = useRef(false)
+  const last = useRef<{ x: number; y: number } | null>(null)
+  const dirty = useRef(false)
+  const [empty, setEmpty] = useState(true)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ratio = window.devicePixelRatio || 1
+    const rect = canvas.getBoundingClientRect()
+    canvas.width = Math.max(1, Math.round(rect.width * ratio))
+    canvas.height = Math.max(1, Math.round(rect.height * ratio))
+    const ctx = canvas.getContext("2d")
+    if (ctx) {
+      ctx.scale(ratio, ratio)
+      ctx.lineWidth = 2.2
+      ctx.lineCap = "round"
+      ctx.lineJoin = "round"
+      ctx.strokeStyle = "#0d1117"
+    }
+  }, [])
+
+  const point = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current!.getBoundingClientRect()
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
+  const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.preventDefault()
+    drawing.current = true
+    last.current = point(e)
+    canvasRef.current?.setPointerCapture(e.pointerId)
+  }
+  const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawing.current) return
+    const ctx = canvasRef.current?.getContext("2d")
+    if (!ctx || !last.current) return
+    const p = point(e)
+    ctx.beginPath()
+    ctx.moveTo(last.current.x, last.current.y)
+    ctx.lineTo(p.x, p.y)
+    ctx.stroke()
+    last.current = p
+    if (!dirty.current) {
+      dirty.current = true
+      setEmpty(false)
+    }
+  }
+  const end = () => {
+    if (!drawing.current) return
+    drawing.current = false
+    last.current = null
+    if (dirty.current) onChange(canvasRef.current?.toDataURL("image/png") ?? null)
+  }
+  const clear = () => {
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext("2d")
+    if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
+    dirty.current = false
+    setEmpty(true)
+    onChange(null)
+  }
+
+  return (
+    <div>
+      <div className="relative rounded-2xl border-2 border-dashed border-[#d1d5db] bg-white">
+        <canvas
+          ref={canvasRef}
+          onPointerDown={start}
+          onPointerMove={move}
+          onPointerUp={end}
+          onPointerLeave={end}
+          onPointerCancel={end}
+          className="h-40 w-full touch-none rounded-2xl"
+        />
+        <div className="pointer-events-none absolute inset-x-8 bottom-9 border-b border-[#e5e7eb]" />
+        {empty && (
+          <span className="pointer-events-none absolute bottom-2.5 left-1/2 flex -translate-x-1/2 items-center gap-1.5 text-[12px] text-[#c4c4c4]">
+            <PenLine className="h-3.5 w-3.5" /> Sign here
+          </span>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={clear}
+        disabled={empty}
+        className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-[#6b7280] hover:text-rose-500 disabled:opacity-40"
+      >
+        <Eraser className="h-3.5 w-3.5" /> Clear signature
+      </button>
+    </div>
+  )
+}
 
 function DocValue({ children }: { children: React.ReactNode }) {
   return <span className="font-semibold text-[#0d1117] underline decoration-[#c9ccd1] decoration-1 underline-offset-4">{children}</span>
@@ -447,7 +542,7 @@ function SuccessPanel({ agentName }: { agentName: string }) {
       </div>
       <h2 className="mt-5 font-['Outfit'] text-xl font-bold text-[#0d1117]">Documents submitted</h2>
       <p className="mt-2 max-w-sm text-sm text-[#6b7280]">
-        Thank you! Your details and documents have been securely sent to <strong>{agentName}</strong>. They&apos;ll
+        Thank you! Your signed certificate and documents have been securely sent to <strong>{agentName}</strong>. They&apos;ll
         proceed with your property&apos;s NOC / Trakheesi advertising permit. You can close this page.
       </p>
     </div>
