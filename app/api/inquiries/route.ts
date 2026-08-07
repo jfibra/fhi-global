@@ -153,7 +153,9 @@ export async function POST(req: NextRequest) {
             to,
             adminName: typeof a.fullname === "string" ? a.fullname : null,
             lead,
-            dashboardUrl: `${SITE_URL}${getDashboardRouteByRole(a.role as string)}/leads`,
+            // Deep-link to this specific lead: the /leads/[id] route forwards to
+            // the inbox with the conversation open (see LeadDetailClient).
+            dashboardUrl: `${SITE_URL}${getDashboardRouteByRole(a.role as string)}/leads/${inserted.id}`,
           }).catch(() => {})
         }),
       )
