@@ -3,7 +3,7 @@
 import { useState } from "react"
 import {
   Mail, Phone, CheckCircle2, User, MessageSquare,
-  Building2, ArrowRight, Loader2
+  Building2, Loader2
 } from "lucide-react"
 
 const SUBJECTS = [
@@ -55,7 +55,7 @@ export function ContactForm() {
   if (status === "success") {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-16 h-16 rounded-full bg-[#d6b357]/15 border-2 border-[#d6b357]/30 flex items-center justify-center mb-6">
+        <div className="w-16 h-16 bg-[#faf7ee] border border-[#e7d9a8] flex items-center justify-center mb-6">
           <CheckCircle2 className="w-8 h-8 text-[#d6b357]" />
         </div>
         <h3 className="font-['Outfit'] text-2xl font-bold text-white lg:text-[#0d1117] mb-2">Message Sent!</h3>
@@ -64,9 +64,9 @@ export function ContactForm() {
         </p>
         <button
           onClick={() => setStatus("idle")}
-          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#002a52] transition-colors"
+          className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors"
         >
-          Send Another Message <ArrowRight className="w-4 h-4" />
+          Send Another Message
         </button>
       </div>
     )
@@ -85,7 +85,7 @@ export function ContactForm() {
       {/* Name + Email row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Full Name *</label>
+          <label className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#6b7280]">Full Name *</label>
           <div className="relative">
             <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
             <input
@@ -93,12 +93,12 @@ export function ContactForm() {
               type="text"
               placeholder="Ahmed Al Rashidi"
               required
-              className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/8 transition-all"
+              className="w-full pl-11 pr-4 py-3.5 border border-[#e5e8ec] bg-white text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#d6b357] transition-colors"
             />
           </div>
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Email Address *</label>
+          <label className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#6b7280]">Email Address *</label>
           <div className="relative">
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
             <input
@@ -106,7 +106,7 @@ export function ContactForm() {
               type="email"
               placeholder="you@example.com"
               required
-              className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/8 transition-all"
+              className="w-full pl-11 pr-4 py-3.5 border border-[#e5e8ec] bg-white text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#d6b357] transition-colors"
             />
           </div>
         </div>
@@ -115,26 +115,26 @@ export function ContactForm() {
       {/* Phone + Company row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Phone</label>
+          <label className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#6b7280]">Phone</label>
           <div className="relative">
             <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
             <input
               name="phone"
               type="tel"
               placeholder="+971 50 000 0000"
-              className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/8 transition-all"
+              className="w-full pl-11 pr-4 py-3.5 border border-[#e5e8ec] bg-white text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#d6b357] transition-colors"
             />
           </div>
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Company</label>
+          <label className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#6b7280]">Company</label>
           <div className="relative">
             <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
             <input
               name="company"
               type="text"
               placeholder="Your Company"
-              className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/8 transition-all"
+              className="w-full pl-11 pr-4 py-3.5 border border-[#e5e8ec] bg-white text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#d6b357] transition-colors"
             />
           </div>
         </div>
@@ -142,12 +142,12 @@ export function ContactForm() {
 
       {/* Subject */}
       <div className="space-y-1.5">
-        <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Subject</label>
+        <label className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#6b7280]">Subject</label>
         <div className="relative">
           <MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
           <select
             name="subject"
-            className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/8 transition-all appearance-none"
+            className="w-full pl-11 pr-4 py-3.5 border border-[#e5e8ec] bg-white text-sm text-[#111827] focus:outline-none focus:border-[#d6b357] transition-colors appearance-none"
           >
             {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
@@ -156,33 +156,30 @@ export function ContactForm() {
 
       {/* Message */}
       <div className="space-y-1.5">
-        <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Message *</label>
+        <label className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#6b7280]">Message *</label>
         <textarea
           name="message"
           rows={5}
           required
           placeholder="Tell us how we can help..."
-          className="w-full px-4 py-3.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/8 transition-all resize-none"
+          className="w-full px-4 py-3.5 border border-[#e5e8ec] bg-white text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#d6b357] transition-colors resize-none"
         />
       </div>
 
       {error && (
-        <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
+        <p className="border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
       )}
 
       <button
         type="submit"
         disabled={status === "sending"}
-        className="group relative w-full sm:w-auto py-4 px-10 bg-gradient-to-r from-[#d6b357] to-[#c9a449] hover:from-[#c9a449] hover:to-[#b8913f] text-[#001f3f] text-sm font-bold rounded-xl transition-all duration-300 disabled:opacity-60 shadow-[0_6px_20px_-4px_rgba(214,179,87,0.6)] hover:shadow-[0_8px_26px_-4px_rgba(214,179,87,0.75)] hover:-translate-y-0.5 overflow-hidden"
+        className="inline-flex items-center justify-center gap-2 w-full sm:w-auto py-3.5 px-10 bg-[#001f3f] text-white text-[13px] font-bold uppercase tracking-[0.12em] hover:bg-[#00356b] disabled:opacity-60 transition-colors"
       >
-        <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-        <span className="relative flex items-center justify-center gap-2">
-          {status === "sending" ? (
-            <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
-          ) : (
-            <>Send Message <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" /></>
-          )}
-        </span>
+        {status === "sending" ? (
+          <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
+        ) : (
+          "Send Message"
+        )}
       </button>
     </form>
   )
