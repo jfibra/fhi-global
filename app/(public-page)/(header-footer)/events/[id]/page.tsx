@@ -95,21 +95,21 @@ export default async function EventDetailPage({ params }: Props) {
               />
             </>
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-[#001f3f] to-[#002a52]" />
+            <div className="absolute inset-0 bg-[#001f3f]" />
           )}
           <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#001428]/70 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#d6b357]/70 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#d6b357]" />
         </div>
         <Link
           href="/events"
-          className="absolute top-4 left-4 z-10 inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-sm font-bold text-[#0f2940] shadow-md hover:bg-white transition-colors"
+          className="absolute top-4 left-4 z-10 inline-flex items-center gap-2 bg-white/95 px-4 py-2 text-sm font-bold text-[#0f2940] hover:bg-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           All Events
         </Link>
         {/* Presented-by plaque — big, gold-ringed, unmistakable */}
         <span
-          className="absolute bottom-5 left-4 sm:left-8 z-10 flex items-center gap-3 rounded-2xl px-4 py-3 shadow-[0_16px_44px_-12px_rgba(0,10,25,0.6)] ring-2 ring-[#d6b357]"
+          className="absolute bottom-5 left-4 sm:left-8 z-10 flex items-center gap-3 px-4 py-3 border-2 border-[#d6b357]"
           style={{ backgroundColor: brand.logoIsWhite ? "rgba(0,31,63,0.96)" : "rgba(255,255,255,0.97)" }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -143,24 +143,24 @@ export default async function EventDetailPage({ params }: Props) {
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] gap-6 items-start">
           {/* ── Event details ── */}
-          <div className="bg-white rounded-2xl border border-[#e8eaed] shadow-sm p-6 sm:p-8 min-w-0">
-            <h1 className="font-['Outfit'] text-3xl sm:text-4xl font-bold text-[#0f2940] leading-tight mb-3">
+          <div className="bg-white border border-[#e5e8ec] p-6 sm:p-8 min-w-0">
+            <h1 className="font-['Outfit'] text-3xl sm:text-4xl font-bold uppercase tracking-tight text-[#001f3f] leading-tight mb-3">
               {event.title}
             </h1>
-            <span className="block w-14 h-1 rounded-full bg-[#d6b357] mb-6" aria-hidden="true" />
+            <span className="block w-16 h-[3px] bg-[#d6b357] mb-6" aria-hidden="true" />
 
             {/* Date / time / venue chips */}
             <div className="flex flex-wrap gap-3 mb-7">
-              <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#001f3f] text-white text-sm font-semibold">
+              <span className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#001f3f] text-white text-sm font-semibold">
                 <CalendarDays className="w-4 h-4 text-[#d6b357]" /> {dateLabel}
               </span>
               {timeLabel && (
-                <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#001f3f]/5 border border-[#001f3f]/10 text-[#0f2940] text-sm font-semibold">
+                <span className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#e5e8ec] text-[#0f2940] text-sm font-semibold">
                   <Clock className="w-4 h-4 text-[#d6b357]" /> {timeLabel}
                 </span>
               )}
               {event.venue && (
-                <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#001f3f]/5 border border-[#001f3f]/10 text-[#0f2940] text-sm font-semibold">
+                <span className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#e5e8ec] text-[#0f2940] text-sm font-semibold">
                   <MapPin className="w-4 h-4 text-[#d6b357]" /> {event.venue}
                 </span>
               )}
@@ -178,10 +178,10 @@ export default async function EventDetailPage({ params }: Props) {
           {/* ── Registration card (sticky) — #register is the QR landing anchor ── */}
           <aside
             id="register"
-            className="scroll-mt-24 lg:sticky lg:top-24 bg-white rounded-2xl border border-[#e8eaed] shadow-[0_16px_44px_-16px_rgba(0,20,40,0.18)] overflow-hidden"
+            className="scroll-mt-24 lg:sticky lg:top-24 bg-white border border-[#e5e8ec] overflow-hidden"
           >
-            <div className="bg-gradient-to-r from-[#001f3f] to-[#002a52] px-5 py-4 flex items-center gap-3">
-              <span className="w-10 h-10 rounded-full bg-[#d6b357]/20 border border-[#d6b357]/40 flex items-center justify-center shrink-0">
+            <div className="bg-[#001f3f] px-5 py-4 flex items-center gap-3">
+              <span className="w-10 h-10 bg-[#d6b357]/20 border border-[#d6b357]/40 flex items-center justify-center shrink-0">
                 <Ticket className="w-5 h-5 text-[#d6b357]" />
               </span>
               <div>
@@ -195,7 +195,7 @@ export default async function EventDetailPage({ params }: Props) {
               </div>
             ) : (
               <div className="p-6 text-center">
-                <span className="mx-auto w-14 h-14 rounded-full bg-[#001f3f]/5 border border-[#001f3f]/10 flex items-center justify-center mb-4">
+                <span className="mx-auto w-14 h-14 bg-[#faf7ee] border border-[#e7d9a8] flex items-center justify-center mb-4">
                   <Ticket className="w-6 h-6 text-[#9ca3af]" />
                 </span>
                 <p className="font-['Outfit'] text-lg font-bold text-[#0f2940] mb-1.5">Registration closed</p>
@@ -205,7 +205,7 @@ export default async function EventDetailPage({ params }: Props) {
                 </p>
                 <Link
                   href="/events"
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors"
                 >
                   See upcoming events
                 </Link>
