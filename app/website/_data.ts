@@ -132,6 +132,7 @@ const LOGO = {
 
 /** Fixed template chrome — the navbar is not per-agent editable. */
 export const NAV_LINKS: { label: string; href: string }[] = [
+  { label: "FHI Global Homepage", href: "/" },
   { label: "Home", href: "#home" },
   { label: "Projects", href: "#projects" },
   { label: "Buy", href: "#properties" },

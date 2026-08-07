@@ -25,27 +25,32 @@ export function SiteHeader({ sticky = true }: { sticky?: boolean }) {
         </Link>
 
         <nav className="ml-auto hidden items-center gap-7 lg:flex">
-          {NAV_LINKS.map(({ label, href }, i) => (
-            <a
-              key={label}
-              href={href}
-              className={`relative cursor-pointer text-[13.5px] font-semibold transition-colors ${
-                i === 0 ? "" : "text-white/75 hover:text-white"
-              }`}
-              style={i === 0 ? { color: GOLD } : undefined}
-            >
-              {label}
-              {/* Absolute underline: the active label keeps the exact same
-                  baseline as its siblings instead of lifting. */}
-              {i === 0 && (
-                <span
-                  className="absolute -bottom-1.5 left-0 right-0 h-[2px]"
-                  style={{ backgroundColor: GOLD }}
-                  aria-hidden
-                />
-              )}
-            </a>
-          ))}
+          {NAV_LINKS.map(({ label, href }) => {
+            // "Home" (#home) is the active link — not whatever sits first in
+            // the list (e.g. the FHI Global Homepage link).
+            const active = href === "#home"
+            return (
+              <a
+                key={label}
+                href={href}
+                className={`relative cursor-pointer text-[13.5px] font-semibold transition-colors ${
+                  active ? "" : "text-white/75 hover:text-white"
+                }`}
+                style={active ? { color: GOLD } : undefined}
+              >
+                {label}
+                {/* Absolute underline: the active label keeps the exact same
+                    baseline as its siblings instead of lifting. */}
+                {active && (
+                  <span
+                    className="absolute -bottom-1.5 left-0 right-0 h-[2px]"
+                    style={{ backgroundColor: GOLD }}
+                    aria-hidden
+                  />
+                )}
+              </a>
+            )
+          })}
         </nav>
 
         <a
@@ -71,19 +76,22 @@ export function SiteHeader({ sticky = true }: { sticky?: boolean }) {
       {/* Mobile menu panel */}
       {open && (
         <nav className="border-t border-white/10 px-5 pb-6 pt-2 lg:hidden" style={{ backgroundColor: BRAND_TO }}>
-          {NAV_LINKS.map(({ label, href }, i) => (
-            <a
-              key={label}
-              href={href}
-              onClick={() => setOpen(false)}
-              className={`block border-b border-white/5 py-3 text-[14px] font-semibold ${
-                i === 0 ? "" : "text-white/80"
-              }`}
-              style={i === 0 ? { color: GOLD } : undefined}
-            >
-              {label}
-            </a>
-          ))}
+          {NAV_LINKS.map(({ label, href }) => {
+            const active = href === "#home"
+            return (
+              <a
+                key={label}
+                href={href}
+                onClick={() => setOpen(false)}
+                className={`block border-b border-white/5 py-3 text-[14px] font-semibold ${
+                  active ? "" : "text-white/80"
+                }`}
+                style={active ? { color: GOLD } : undefined}
+              >
+                {label}
+              </a>
+            )
+          })}
           <a
             href="#contact"
             onClick={() => setOpen(false)}
