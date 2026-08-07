@@ -27,7 +27,7 @@ function ViewAsPicker({ onClose }: { onClose: () => void }) {
               <Eye className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Switch point of view</h3>
+              <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Change Role</h3>
               <p className="text-xs text-[#6b7280]">Preview another role&apos;s dashboard</p>
             </div>
           </div>
@@ -62,9 +62,9 @@ function ViewAsPicker({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * "Switch point of view" entry for the sidebar account dropdown. Self-gates to
- * real admin-staff accounts (returns null otherwise), so it stays hidden while
- * an admin is already previewing a non-admin role.
+ * "Change Role" entry for the sidebar account dropdown. Self-gates to real
+ * admin-staff accounts (returns null otherwise), so it stays hidden while an
+ * admin is already previewing a non-admin role.
  */
 export function ViewAsMenuItem({ onNavigate }: { onNavigate?: () => void }) {
   const { realRole } = useAuth()
@@ -81,7 +81,7 @@ export function ViewAsMenuItem({ onNavigate }: { onNavigate?: () => void }) {
         <span className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-white/15 flex items-center justify-center shrink-0 transition-all">
           <Eye className="w-[18px] h-[18px] text-white/80 group-hover:text-white" />
         </span>
-        <span className="font-['Outfit'] font-semibold text-[15px]">Switch point of view</span>
+        <span className="font-['Outfit'] font-semibold text-[15px]">Change Role</span>
       </button>
       {open && <ViewAsPicker onClose={() => setOpen(false)} />}
     </>

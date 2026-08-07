@@ -10,7 +10,7 @@ type AuthContextValue = {
    *  previewing a role, otherwise the real role. Most consumers should use this. */
   role: string | null
   /** The account's actual role (never the view-as override). Use for real
-   *  authority checks like showing the "Switch point of view" control. */
+   *  authority checks like showing the "Change Role" control. */
   realRole: string | null
   /** True while an admin is previewing another role. */
   isViewingAs: boolean

@@ -234,7 +234,7 @@ function SidebarAccount({
         <ChevronDown className={`w-4 h-4 text-white/50 shrink-0 transition-transform duration-200 ${profileMenuOpen ? "rotate-180" : ""}`} />
       </button>
 
-      {/* Account dropdown — Profile Settings / (Switch point of view) / Sign Out.
+      {/* Account dropdown — Profile Settings / (Change Role) / Sign Out.
           Home lives in the top bar, so it isn't repeated here. */}
       <div
         className="overflow-hidden transition-all duration-200 ease-in-out"
