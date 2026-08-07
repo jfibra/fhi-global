@@ -2,7 +2,7 @@
 // contact card (phone / email / office).
 
 import { CalendarCheck, Landmark, Mail, Phone } from "lucide-react"
-import { GOLD, GOLD_SOFT, IMG, INK, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
+import { GOLD, GOLD_GRADIENT, GOLD_TINT, IMG, INK, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
 
 export function ClosingCtaSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   const { agent, cta } = data
@@ -17,7 +17,11 @@ export function ClosingCtaSection({ data = SAMPLE_DATA }: { data?: WebsiteData }
           </h2>
           <p className="mt-3 text-[14px] text-white/70">{cta.sub}</p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <a href={`mailto:${agent.email}`} className="inline-flex items-center gap-2 px-6 py-3 text-[13px] font-bold" style={{ backgroundColor: GOLD_SOFT, color: INK }}>
+            <a
+              href={`mailto:${agent.email}`}
+              className="inline-flex items-center gap-2 px-6 py-3 text-[13px] font-bold"
+              style={{ background: GOLD_GRADIENT, color: INK }}
+            >
               <CalendarCheck className="h-4 w-4" /> Book a Consultation
             </a>
             <a href={`tel:${agent.phone}`} className="inline-flex items-center gap-2 border border-white/30 px-6 py-3 text-[13px] font-bold text-white hover:bg-white/10">
@@ -33,7 +37,7 @@ export function ClosingCtaSection({ data = SAMPLE_DATA }: { data?: WebsiteData }
               { icon: Landmark, label: "Office", value: agent.office },
             ].map(({ icon: Icon, label, value, href }) => (
               <div key={label} className="flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: "#faf5e8", color: GOLD }}>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: GOLD_TINT, color: GOLD }}>
                   <Icon className="h-4 w-4" />
                 </span>
                 <span className="min-w-0">

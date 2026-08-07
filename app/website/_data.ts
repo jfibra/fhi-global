@@ -38,6 +38,16 @@ export function hexToRgba(hex: string, alpha: number): string {
 /** Translucent version of the brand gradient for glass cards. */
 export const BRAND_GLASS_GRADIENT = `linear-gradient(180deg, ${hexToRgba(BRAND_FROM, 0.72)}, ${hexToRgba(BRAND_TO, 0.72)})`
 
+/** Gold CTA gradient (Get in Touch, Book a Consultation) — same 180° style. */
+export const GOLD_GRADIENT = `linear-gradient(180deg, ${GOLD_SOFT}, ${GOLD})`
+
+/** Soft dark glass for translucent strips/buttons over photos (hero stat
+ *  strip, Featured Video) — derived from the brand ink. */
+export const BRAND_GLASS_SOFT = hexToRgba(BRAND_TO, 0.35)
+
+/** Pale gold tint behind gold icons on light surfaces — derived from GOLD. */
+export const GOLD_TINT = hexToRgba(GOLD, 0.13)
+
 export const script = { fontFamily: "'Snell Roundhand', 'Segoe Script', 'Brush Script MT', cursive" }
 
 const S3 = "https://filipinohomes123.s3.ap-southeast-1.amazonaws.com"

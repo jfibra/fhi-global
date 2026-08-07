@@ -7,7 +7,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { Mail, Menu, X } from "lucide-react"
-import { BRAND_GRADIENT, BRAND_TO, GOLD, GOLD_SOFT, INK, NAV_LINKS } from "../_data"
+import { BRAND_GRADIENT, BRAND_TO, GOLD, GOLD_GRADIENT, NAV_LINKS } from "../_data"
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false)
@@ -50,7 +50,7 @@ export function SiteHeader() {
         <a
           href="#contact"
           className="hidden items-center gap-2 px-5 py-2.5 text-[13px] font-bold sm:inline-flex lg:ml-0"
-          style={{ backgroundColor: GOLD_SOFT, color: INK }}
+          style={{ background: GOLD_GRADIENT, color: BRAND_TO }}
         >
           <Mail className="h-4 w-4" /> Get in Touch
         </a>
@@ -87,7 +87,7 @@ export function SiteHeader() {
             href="#contact"
             onClick={() => setOpen(false)}
             className="mt-4 inline-flex w-full items-center justify-center gap-2 px-5 py-3 text-[13px] font-bold"
-            style={{ backgroundColor: GOLD_SOFT, color: INK }}
+            style={{ background: GOLD_GRADIENT, color: BRAND_TO }}
           >
             <Mail className="h-4 w-4" /> Get in Touch
           </a>

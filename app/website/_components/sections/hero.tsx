@@ -3,7 +3,7 @@
 // stat strip along the bottom.
 
 import { Building2, FileText, Mail, Phone, Play, ShieldCheck } from "lucide-react"
-import { BRAND_GLASS_GRADIENT, BRAND_GRADIENT, GOLD, HERO_STAT_ICON_FALLBACK, INK, NAVY, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
+import { BRAND_GLASS_GRADIENT, BRAND_GLASS_SOFT, BRAND_GRADIENT, BRAND_TO, GOLD, HERO_STAT_ICON_FALLBACK, hexToRgba, INK, NAVY, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
 
 /** WhatsApp brand glyph — lucide has no brand icon for it. */
 function WhatsAppIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -85,7 +85,7 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
         )}
         <div
           className="absolute inset-0 lg:hidden"
-          style={{ background: "linear-gradient(180deg, rgba(10,22,40,0) 300px, rgba(10,22,40,0.9) 520px, #0a1628 620px)" }}
+          style={{ background: `linear-gradient(180deg, ${hexToRgba(BRAND_TO, 0)} 300px, ${hexToRgba(BRAND_TO, 0.9)} 520px, ${BRAND_TO} 620px)` }}
           aria-hidden
         />
       </div>
@@ -111,7 +111,7 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
               <a
                 href="#about"
                 className="inline-flex items-center gap-1.5 border border-white/25 px-4 py-2.5 text-[12px] font-bold text-white backdrop-blur-md transition-colors hover:bg-white/10 sm:gap-2 sm:px-6 sm:py-3 sm:text-[13px]"
-                style={{ backgroundColor: "rgba(6,12,22,0.3)" }}
+                style={{ backgroundColor: BRAND_GLASS_SOFT }}
               >
                 <Play className="h-3.5 w-3.5" />Featured Video
               </a>
@@ -137,7 +137,7 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
       <div className="relative mx-auto mb-12 hidden max-w-[1400px] px-5 sm:px-8 lg:block">
         <div
           className="grid max-w-full grid-cols-2 gap-x-6 gap-y-4 border-y border-white/10 px-4 py-4 backdrop-blur-md sm:inline-flex sm:flex-wrap sm:items-center sm:gap-x-10 sm:pl-5 sm:pr-10 lg:max-w-[calc(100%-21rem)]"
-          style={{ backgroundColor: "rgba(6,12,22,0.3)" }}
+          style={{ backgroundColor: BRAND_GLASS_SOFT }}
         >
           {hero.stats.map(({ icon, value, label }, i) => {
             const Icon = STAT_ICONS[icon ?? HERO_STAT_ICON_FALLBACK[i % HERO_STAT_ICON_FALLBACK.length]]
