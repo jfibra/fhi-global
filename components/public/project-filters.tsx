@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
-import { useCallback } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import { Search, SlidersHorizontal } from "lucide-react"
 
 type FilterOption = { value: string; label: string }
@@ -25,7 +25,7 @@ export function ProjectFilters({ developers, cities }: Omit<ProjectFiltersProps,
   const searchParams = useSearchParams()
 
   const updateParams = useCallback(
-    (key: string, value: string) => {
+    (key: string, value: string, mode: "push" | "replace" = "push") => {
       const params = new URLSearchParams(searchParams.toString())
       if (value) {
         params.set(key, value)
@@ -33,10 +33,26 @@ export function ProjectFilters({ developers, cities }: Omit<ProjectFiltersProps,
         params.delete(key)
       }
       params.delete("page") // reset pagination on filter
-      router.push(`${pathname}?${params.toString()}`)
+      const qs = params.toString()
+      // scroll: false — the results refresh in place; without it every filter
+      // change yanks the viewport back to the top of the page.
+      router[mode](qs ? `${pathname}?${qs}` : pathname, { scroll: false })
     },
     [router, pathname, searchParams]
   )
+
+  // Typing shouldn't navigate on every keystroke — that's a server round trip
+  // per character. Wait for a pause, then replace (rather than push) so one
+  // search doesn't bury the previous page under a dozen history entries.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const onSearchChange = useCallback(
+    (value: string) => {
+      clearTimeout(debounceRef.current)
+      debounceRef.current = setTimeout(() => updateParams("q", value, "replace"), 350)
+    },
+    [updateParams],
+  )
+  useEffect(() => () => clearTimeout(debounceRef.current), [])
 
   const q = searchParams.get("q") ?? ""
   const developer = searchParams.get("developer") ?? ""
@@ -59,7 +75,7 @@ export function ProjectFilters({ developers, cities }: Omit<ProjectFiltersProps,
             type="text"
             placeholder="Search projects..."
             defaultValue={q}
-            onChange={(e) => updateParams("q", e.target.value)}
+            onChange={(e) => onSearchChange(e.target.value)}
             className="w-full pl-10 pr-4 py-3 border border-[#e5e5e5] bg-white text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all"
           />
         </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Search, X } from "lucide-react"
 
 export function DeveloperSearch({ initialQ }: { initialQ: string }) {
@@ -14,14 +14,23 @@ export function DeveloperSearch({ initialQ }: { initialQ: string }) {
     setValue(initialQ)
   }, [initialQ])
 
+  // The input stays instant (local state); only the navigation waits for a
+  // pause in typing. scroll: false keeps the viewport steady, and replace
+  // avoids one history entry per character.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(debounceRef.current), [])
+
   const handleChange = useCallback(
     (val: string) => {
       setValue(val)
-      const params = new URLSearchParams(searchParams.toString())
-      if (val.trim()) params.set("q", val.trim())
-      else params.delete("q")
-      const qs = params.toString()
-      router.push(qs ? `${pathname}?${qs}` : pathname)
+      clearTimeout(debounceRef.current)
+      debounceRef.current = setTimeout(() => {
+        const params = new URLSearchParams(searchParams.toString())
+        if (val.trim()) params.set("q", val.trim())
+        else params.delete("q")
+        const qs = params.toString()
+        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+      }, 350)
     },
     [router, pathname, searchParams],
   )

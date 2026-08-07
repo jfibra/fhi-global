@@ -28,7 +28,9 @@ export function BuyListToolbar({
       else p.set(key, value)
       const qs = p.toString()
       const base = listingBasePath
-      startTransition(() => router.push(qs ? `${base}?${qs}` : base))
+      // scroll: false — sorting or switching view refreshes the results in
+      // place; jumping to the top loses the reader's position.
+      startTransition(() => router.push(qs ? `${base}?${qs}` : base, { scroll: false }))
     },
     [router, searchParams, listingBasePath]
   )

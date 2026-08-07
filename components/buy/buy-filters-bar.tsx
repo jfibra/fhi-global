@@ -106,7 +106,9 @@ export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTyp
       mutate(p)
       const qs = p.toString()
       const base = listBase
-      startTransition(() => router.push(qs ? `${base}?${qs}` : base))
+      // scroll: false — results refresh in place instead of yanking the
+      // viewport back to the top of the page on every filter change.
+      startTransition(() => router.push(qs ? `${base}?${qs}` : base, { scroll: false }))
     },
     [router, searchParams, listBase]
   )
