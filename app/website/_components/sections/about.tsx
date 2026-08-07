@@ -91,10 +91,13 @@ export function AboutSection({
         <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/75" />
       </div>
       {/* Right column = the socials row width (4 × 44px + 3 × 12px = 212px) plus its 4rem gap margin */}
-      <div className="relative mx-auto grid max-w-[1400px] items-stretch gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[380px_1fr_276px]">
+      {/* Breakpoints: <900px one column; 900–1200px portrait+copy side by side
+          with Let's Connect below (its own two columns); ≥1200px three columns
+          with the About↔Connect gap growing with the viewport. */}
+      <div className="relative mx-auto grid max-w-[1400px] grid-cols-1 items-stretch gap-10 px-5 py-16 sm:px-8 min-[900px]:grid-cols-[minmax(0,380px)_1fr] min-[1200px]:grid-cols-[380px_1fr_276px]">
         {/* Portrait card — gold-framed, name plate over a bottom fade */}
         <div
-          className="relative min-h-[420px] overflow-hidden border shadow-[0_24px_60px_-24px_rgba(13,27,46,0.45)] lg:min-h-[540px]"
+          className="relative min-h-[420px] overflow-hidden border shadow-[0_24px_60px_-24px_rgba(13,27,46,0.45)] min-[900px]:min-h-[540px]"
           style={{ backgroundColor: INK, borderColor: `${GOLD}99` }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -112,7 +115,7 @@ export function AboutSection({
         {/* Copy + credentials + stats — capped at the portrait's height.
             Collapsed: clamped bio + the pinned credentials/stats group.
             Expanded: the group hides and the full bio scrolls instead. */}
-        <div className="flex flex-col lg:h-[540px] lg:overflow-hidden">
+        <div className="flex flex-col min-[900px]:h-[540px] min-[900px]:overflow-hidden">
           <div className="flex items-center gap-4">
             <Eyebrow>About Me</Eyebrow>
             <span className="h-px w-14" style={{ backgroundColor: GOLD }} />
@@ -128,7 +131,7 @@ export function AboutSection({
 
           {aboutExpanded ? (
             <>
-              <div className="mt-4 max-h-[320px] min-h-0 flex-1 overflow-y-auto pr-2 lg:max-h-none">
+              <div className="mt-4 max-h-[320px] min-h-0 flex-1 overflow-y-auto pr-2 min-[900px]:max-h-none">
                 <p className="whitespace-pre-line text-justify text-[14.5px] leading-relaxed text-[#3d4451]">{about.bio}</p>
               </div>
               <div className="mt-2 flex justify-end">
@@ -148,7 +151,7 @@ export function AboutSection({
                   cut so "Show more" flows inline after the "…" — no overlay. */}
               {/* On mobile the column has no fixed height, so the bio gets an
                   explicit cap (~8 lines) for the truncation to measure against. */}
-              <div ref={setBioEl} className="relative mt-4 max-h-[188px] min-h-0 flex-1 overflow-hidden lg:max-h-none">
+              <div ref={setBioEl} className="relative mt-4 max-h-[188px] min-h-0 flex-1 overflow-hidden min-[900px]:max-h-none">
                 {/* Hidden measurer — same width/typography as the real text */}
                 <p
                   ref={setMeasureEl}
@@ -229,12 +232,14 @@ export function AboutSection({
         </div>
 
         {/* Let's Connect — no card chrome, content sits on the section bg.
-            Extra left margin keeps it clear of the About column on desktop;
-            on mobile it stacks below, centered at the socials-row width. */}
-        <div className="flex lg:ml-16">
-          <div className="mx-auto flex w-full max-w-[280px] flex-1 flex-col text-center lg:mx-0 lg:max-w-none">
-            <div className="flex flex-1 flex-col items-center pt-2">
-
+            <900px: stacked below everything, centered at the socials width.
+            900–1200px: spans the full row below portrait+copy, split into two
+            columns — Let's Connect | Scan to Connect.
+            ≥1200px: its own third column; the left gap grows with viewport. */}
+        <div className="flex min-[900px]:col-span-2 min-[1200px]:col-span-1 min-[1200px]:ml-4 min-[1300px]:ml-10 min-[1400px]:ml-16">
+          <div className="mx-auto grid w-full max-w-[280px] flex-1 grid-cols-1 gap-6 pt-2 text-center min-[900px]:max-w-[680px] min-[900px]:grid-cols-2 min-[900px]:items-start min-[900px]:gap-12 min-[1200px]:mx-0 min-[1200px]:max-w-none min-[1200px]:grid-cols-1 min-[1200px]:gap-6">
+            {/* Let's Connect — heading, blurb, Message Me */}
+            <div className="flex flex-col items-center">
               <p className="mt-4 font-serif text-[26px] font-bold tracking-tight" style={{ color: NAVY }}>
                 Let&apos;s Connect
               </p>
@@ -256,7 +261,11 @@ export function AboutSection({
                 <MessageCircle className="h-4.5 w-4.5" />
                 <span className="pl-2">Message Me</span>
               </a>
-              <div className="mt-6 flex w-full items-center gap-3">
+            </div>
+
+            {/* Scan to Connect — QR + socials */}
+            <div className="flex flex-col items-center">
+              <div className="flex w-full items-center gap-3">
                 <span className="h-px flex-1" style={{ backgroundColor: `${GOLD}66` }} />
                 <span className="text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: GOLD }}>Scan to Connect</span>
                 <span className="h-px flex-1" style={{ backgroundColor: `${GOLD}66` }} />
