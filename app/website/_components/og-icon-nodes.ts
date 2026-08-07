@@ -2,7 +2,7 @@
 // Satori can't run lucide's components (react-dom/server is unavailable in
 // this context and stroke inheritance from <svg> is unreliable), so the raw
 // nodes are drawn manually with explicit per-element stroke attributes.
-// Keys mirror STAT_ICONS in ../_data plus the broker-card icons.
+// Keys mirror STAT_ICONS in ../_data plus the broker-card/button icons.
 
 export type OgIconNode = [string, Record<string, string | number>][]
 
@@ -427,6 +427,14 @@ export const OG_ICON_NODES: Record<string, OgIconNode> = {
       "path",
       {
         "d": "M16 17H8"
+      }
+    ]
+  ],
+  "play": [
+    [
+      "path",
+      {
+        "d": "M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"
       }
     ]
   ]

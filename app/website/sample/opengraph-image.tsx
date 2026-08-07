@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og"
 import { headers } from "next/headers"
 import { SITE_URL } from "@/lib/seo"
 import { SAMPLE_DATA } from "../_data"
-import { OG_SIZE, OgHero } from "../_components/og-hero"
+import { loadOgFonts, OG_SIZE, OgHero } from "../_components/og-hero"
 
 // Link-share thumbnail for the design sample — the hero with the broker
 // contact/RERA card (which the live page no longer renders).
@@ -21,5 +21,5 @@ export default async function Image() {
   } catch {
     // build-time render — SITE_URL fallback
   }
-  return new ImageResponse(<OgHero data={SAMPLE_DATA} base={base} />, { ...OG_SIZE })
+  return new ImageResponse(<OgHero data={SAMPLE_DATA} base={base} />, { ...OG_SIZE, fonts: await loadOgFonts() })
 }

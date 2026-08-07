@@ -4,7 +4,7 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import { loadSiteBySlug } from "@/lib/website-builder-service"
 import { SITE_URL } from "@/lib/seo"
 import { SAMPLE_DATA } from "../_data"
-import { OG_SIZE, OgHero } from "../_components/og-hero"
+import { loadOgFonts, OG_SIZE, OgHero } from "../_components/og-hero"
 
 // Link-share thumbnail for a published agent site — the hero exactly as the
 // site renders it (banner, headline, description, stats, palette) plus the
@@ -27,5 +27,5 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   } catch {
     // build-time render — SITE_URL fallback
   }
-  return new ImageResponse(<OgHero data={data} base={base} />, { ...OG_SIZE })
+  return new ImageResponse(<OgHero data={data} base={base} />, { ...OG_SIZE, fonts: await loadOgFonts() })
 }

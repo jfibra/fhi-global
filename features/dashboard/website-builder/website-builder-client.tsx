@@ -509,6 +509,7 @@ const FORM_SECTIONS = [
   { id: "gallery", label: "Gallery" },
   { id: "reviews", label: "Reviews" },
   { id: "cta", label: "CTA" },
+  { id: "link", label: "Link Preview" },
 ] as const
 
 type FormSectionId = (typeof FORM_SECTIONS)[number]["id"]
@@ -526,6 +527,7 @@ const SECTION_ANCHORS: Record<FormSectionId, string> = {
   gallery: "gallery",
   reviews: "reviews",
   cta: "contact",
+  link: "contact",
 }
 
 /** Curated palette suggestions — accent (gold family) + primary (dark family).
@@ -605,6 +607,8 @@ export function WebsiteBuilderClient() {
   })
   const [activeSection, setActiveSection] = useState<FormSectionId>("agent")
   const [activeGalleryCat, setActiveGalleryCat] = useState<GalleryCategory>("Event Photos")
+  // Cache-buster for the link-share (OG) preview image.
+  const [ogBust, setOgBust] = useState(0)
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null)
   // While a tab click smooth-scrolls the preview, the scroll spy would fire on
   // every intermediate section — suppress it until the animation settles.
@@ -1294,6 +1298,42 @@ export function WebsiteBuilderClient() {
             <>
               <Field label="Heading"><TInput value={data.cta.heading} onChange={(v) => update((d) => { d.cta.heading = v })} /></Field>
               <Field label="Subtext"><TInput value={data.cta.sub} onChange={(v) => update((d) => { d.cta.sub = v })} /></Field>
+            </>
+          )}
+
+          {activeSection === "link" && (
+            <>
+              <p className="text-[12px] leading-relaxed text-[#6b7280]">
+                This is the thumbnail shown when your website link is shared (WhatsApp, Facebook,
+                iMessage…) — your hero exactly as the page renders it, plus your contact &amp; RERA
+                card at the lower right. It regenerates from your <span className="font-bold">saved</span> site,
+                so hit Save first, then Refresh.
+              </p>
+              <div className="border border-[#e8eaed] bg-[#fafbfc] p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  key={ogBust}
+                  src={`${siteSlug ? `/website/${siteSlug}` : "/website/sample"}/opengraph-image?r=${ogBust}`}
+                  alt="Link share preview"
+                  className="w-full border border-[#e2e6ea]"
+                />
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="truncate text-[11px] text-[#9aa0aa]">
+                    {siteSlug ? `fhiglobal.ae/website/${siteSlug}` : "Sample preview — save to generate yours"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setOgBust((n) => n + 1)}
+                    className="inline-flex shrink-0 items-center gap-1.5 border border-[#e2e6ea] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
+                  >
+                    <RotateCcw className="h-3 w-3" /> Refresh
+                  </button>
+                </div>
+              </div>
+              <p className="text-[11px] leading-relaxed text-[#9aa0aa]">
+                Note: messaging apps cache thumbnails — after changing your hero, use e.g. Facebook&apos;s
+                Sharing Debugger to force platforms to re-scrape an already-shared link.
+              </p>
             </>
           )}
         </div>
