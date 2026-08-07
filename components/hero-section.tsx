@@ -49,12 +49,12 @@ const SLIDE_MS = 7000
 const ROTATING_WORDS = ["Investment", "Opportunities", "Living"]
 const WORD_MS = 3600
 
-const HIGHLIGHTS = [
-  { icon: ShieldCheck, title: "Trusted Developers",  desc: "Partnered with top UAE developers" },
-  { icon: Gem,         title: "Premium Properties",  desc: "Handpicked luxury developments" },
-  { icon: TrendingUp,  title: "High ROI Potential",  desc: "Invest in high-growth opportunities" },
-  { icon: Headphones,  title: "Expert Support",      desc: "Dedicated support for your investment journey" },
-]
+// const HIGHLIGHTS = [
+//   { icon: ShieldCheck, title: "Trusted Developers",  desc: "Partnered with top UAE developers" },
+//   { icon: Gem,         title: "Premium Properties",  desc: "Handpicked luxury developments" },
+//   { icon: TrendingUp,  title: "High ROI Potential",  desc: "Invest in high-growth opportunities" },
+//   { icon: Headphones,  title: "Expert Support",      desc: "Dedicated support for your investment journey" },
+// ]
 
 export function HeroSection({ developers, cities, spotlight = [] }: HeroSectionProps) {
   const router = useRouter()
@@ -261,7 +261,7 @@ export function HeroSection({ developers, cities, spotlight = [] }: HeroSectionP
         </div>
 
         {/* ═══ Highlight band (mockup's bottom strip) ═══ */}
-        <div
+        {/* <div
           className="animate-hero-item mt-12 lg:mt-14 bg-[#06182e]/65 backdrop-blur-xl border border-white/10 shadow-[0_16px_50px_rgba(0,0,0,0.35)] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 lg:divide-x divide-white/10"
           style={{ animationDelay: "0.62s" }}
         >
@@ -276,7 +276,7 @@ export function HeroSection({ developers, cities, spotlight = [] }: HeroSectionP
               </div>
             </div>
           ))}
-        </div>
+        </div> */}
         {/* ═══ Rotating featured-project spotlight (wide screens) ═══ */}
         {spotlight.length > 0 && spotlight[spot] && (
           <Link
