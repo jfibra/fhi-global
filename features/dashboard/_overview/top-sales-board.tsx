@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ChevronRight, Crown, Medal, TrendingUp, Trophy } from "lucide-react"
+import { BarChart3, ChevronRight, Crown, Medal, TrendingUp, Trophy } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
 import { roleToLabel } from "@/lib/app-roles"
 
@@ -179,9 +179,13 @@ export function TopSalesBoard({
             </button>
           </div>
         ) : leaders.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[#e5e5e5] px-4 py-8 text-center text-sm text-[#9ca3af]">
-            No validated sales for {periodLabel} yet.
-          </p>
+          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#e5e5e5] px-4 py-10 text-center">
+            <BarChart3 className="w-8 h-8 text-[#d5d9df]" aria-hidden="true" />
+            <div>
+              <p className="text-sm text-[#9ca3af]">No validated sales for {periodLabel} yet.</p>
+              <p className="text-sm text-[#c3c8d0] mt-0.5">Record a sale to see your performance here.</p>
+            </div>
+          </div>
         ) : (
           <ol className="space-y-2">
             {leaders.map((l) => {

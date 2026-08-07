@@ -3,7 +3,10 @@
 import Link from "next/link"
 import { ReactNode, useEffect, useState } from "react"
 import type { LucideIcon } from "lucide-react"
-import { Building2, FileText, LifeBuoy, ShoppingCart, Users } from "lucide-react"
+import {
+  ArrowUp, BadgeCheck, Building2, FileText, Headphones, Info, LayoutGrid,
+  LifeBuoy, RefreshCw, ShoppingCart, Users, UsersRound, Wallet,
+} from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { fetchSales } from "@/lib/sales-service"
 import { getDashboardRouteByRole } from "@/lib/auth"
@@ -149,6 +152,15 @@ async function loadAdminDashboard(roleValue: string, userId: string) {
   monthlyWindowStart.setUTCHours(0, 0, 0, 0)
   const monthlyStartISO = monthlyWindowStart.toISOString().split("T")[0]
 
+  // Start of the current month. Movement is reported as a plain count of what
+  // was added since this instant — NOT a percentage: at these volumes one
+  // extra sale would read as "+100%", which flatters the numbers rather than
+  // informing anyone. A count stays honest at 17 records and at 17,000.
+  const monthStart = new Date()
+  monthStart.setUTCDate(1)
+  monthStart.setUTCHours(0, 0, 0, 0)
+  const monthStartISO = monthStart.toISOString()
+
   const [
     profilesCountRes,
     developersCountRes,
@@ -170,6 +182,9 @@ async function loadAdminDashboard(roleValue: string, userId: string) {
     purchasesTableRes,
     activityLogsRes,
     recentSalesRes,
+    salesThisMonthRes,
+    salesValueThisMonthRes,
+    clientsThisMonthRes,
   ] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_deleted", false),
     supabase.from("developers").select("id", { count: "exact", head: true }).eq("is_active", true).is("deleted_at", null),
@@ -230,6 +245,14 @@ async function loadAdminDashboard(roleValue: string, userId: string) {
       sortField: "created_at", sortDir: "desc",
       currentRole: roleValue, currentUserId: userId,
     }),
+    // Movement since the 1st. created_at (not reservation_date) because these
+    // explain how the totals above them grew, and a total grows when a record
+    // is written.
+    supabase.from("sales_reports").select("id", { count: "exact", head: true }).gte("created_at", monthStartISO),
+    // Summed in JS: PostgREST aggregates are disabled on this project, and
+    // sales_summary takes no date argument.
+    supabase.from("sales_reports").select("contract_price").gte("created_at", monthStartISO),
+    supabase.from("clients").select("id", { count: "exact", head: true }).gte("created_at", monthStartISO),
   ])
 
   // ── KPI counts ──────────────────────────────────────────────────────────────
@@ -254,6 +277,13 @@ async function loadAdminDashboard(roleValue: string, userId: string) {
     },
     0,
   )
+
+  // ── Movement this month ─────────────────────────────────────────────────────
+  const salesThisMonth = safeCount(salesThisMonthRes)
+  const clientsThisMonth = safeCount(clientsThisMonthRes)
+  const salesValueThisMonth = (
+    safeRows(salesValueThisMonthRes) as { contract_price: string | number | null }[]
+  ).reduce((sum, r) => sum + Number(r.contract_price ?? 0), 0)
 
   // ── Chart data ───────────────────────────────────────────────────────────────
   const monthlyRows = safeRows(monthlySalesRes) as { reservation_date: string | null; contract_price: string | null }[]
@@ -338,16 +368,19 @@ async function loadAdminDashboard(roleValue: string, userId: string) {
 
   // ── Summary cards ──────────────────────────────────────────────────────────
   const kpiCards = [
-    { label: "Active Users",          value: fmtNumber(totalUsers),       detail: "Active Profiles"       },
-    { label: "Active Developers",     value: fmtNumber(totalDevelopers),   detail: "Verified Partners"     },
-    { label: "Total Projects",        value: fmtNumber(totalProjects),     detail: "Published"             },
+    { label: "Active Users",          value: fmtNumber(totalUsers),       detail: "Active Profiles",     icon: Users        },
+    { label: "Active Developers",     value: fmtNumber(totalDevelopers),   detail: "Verified Partners",   icon: Building2    },
+    { label: "Total Projects",        value: fmtNumber(totalProjects),     detail: "Published",           icon: LayoutGrid   },
     // Only switch to "K" once there are thousands — dividing by 1000 first
     // rendered a single sale as "0K".
-    { label: "Total Sales",           value: totalSalesCount >= 1000 ? `${Math.round(totalSalesCount / 1000)}K` : fmtNumber(totalSalesCount), detail: "All Sales Records" },
-    { label: "Sales Value",           value: `AED ${fmtNumber(Math.round(totalSalesValue))}`, detail: "Sum of Contract Prices" },
-    { label: "Total Clients",         value: fmtNumber(totalClients),      detail: "Registered Leads"      },
-    { label: "Total Purchases",       value: fmtNumber(totalPurchases),    detail: "Procurement Records"   },
-    { label: "Open Support Tickets",  value: fmtNumber(openTickets),       detail: "Awaiting Triage"       },
+    { label: "Total Sales",           value: totalSalesCount >= 1000 ? `${Math.round(totalSalesCount / 1000)}K` : fmtNumber(totalSalesCount), detail: "All Sales Records", icon: BadgeCheck,
+      movement: salesThisMonth > 0 ? `+${fmtNumber(salesThisMonth)} this month` : null },
+    { label: "Sales Value",           value: `AED ${fmtNumber(Math.round(totalSalesValue))}`, detail: "Sum of Contract Prices", icon: Wallet,
+      movement: salesValueThisMonth > 0 ? `+AED ${fmtNumber(Math.round(salesValueThisMonth))} this month` : null },
+    { label: "Total Clients",         value: fmtNumber(totalClients),      detail: "Registered Leads",    icon: UsersRound,
+      movement: clientsThisMonth > 0 ? `+${fmtNumber(clientsThisMonth)} this month` : null },
+    { label: "Total Purchases",       value: fmtNumber(totalPurchases),    detail: "Procurement Records", icon: ShoppingCart },
+    { label: "Open Support Tickets",  value: fmtNumber(openTickets),       detail: "Awaiting Triage",     icon: Headphones   },
   ]
 
   const opsCards = [
@@ -360,6 +393,7 @@ async function loadAdminDashboard(roleValue: string, userId: string) {
     kpiCards, opsCards, monthlySeries, developerChartData,
     projectStatusSeries, validationStatusSeries,
     supportTickets, purchaseList, activityFeed, recentSales,
+    generatedAt: new Date().toISOString(),
   }
 }
 
@@ -406,6 +440,7 @@ export function AdminDashboardContent({
     kpiCards, opsCards, monthlySeries, developerChartData,
     projectStatusSeries, validationStatusSeries,
     supportTickets, purchaseList, activityFeed, recentSales,
+    generatedAt,
   } = data
 
   return (
@@ -589,30 +624,85 @@ export function AdminDashboardContent({
           )}
         </section>
 
+        {/* Footer bar — when the figures were read, and a reload for a fresh
+            pass. generatedAt is stamped by the loader, so no clock is read
+            during render. */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-[#e8eaed] bg-white px-5 py-3.5">
+          <p className="flex items-center gap-2 text-xs text-[#6b7280]">
+            <Info className="w-4 h-4 text-[#9ca3af] shrink-0" />
+            <span>
+              <span className="font-semibold text-[#374151]">Tip:</span> Keep your data updated to
+              get accurate insights and reports.
+            </span>
+          </p>
+          <p className="flex items-center gap-2 text-xs text-[#9ca3af] shrink-0">
+            Data as of {fmtGeneratedAt(generatedAt)}
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              aria-label="Refresh dashboard data"
+              className="p-1 hover:text-[#001f3f] transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          </p>
+        </div>
+
       </div>
     </>
   )
+}
+
+/** "August 7, 2026" from the loader's ISO stamp. */
+function fmtGeneratedAt(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return "—"
+  return d.toLocaleDateString("en-AE", { year: "numeric", month: "long", day: "numeric" })
 }
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
 function SectionLabel({ index, title }: { index: number; title: string }) {
   return (
-    <div className="mb-4">
+    <div className="mb-4 flex items-center gap-3">
+      <span className="w-1 h-6 bg-[#d6b357] shrink-0" aria-hidden="true" />
       <h2 className="text-[20px] font-bold text-[#0d1117] font-['Outfit']">{title}</h2>
     </div>
   )
 }
 
-function KpiCard({ label, value, detail, accent }: { label: string; value: string; detail?: string; accent?: string }) {
+function KpiCard({
+  label, value, detail, icon: Icon, movement,
+}: {
+  label: string
+  value: string
+  detail?: string
+  icon?: LucideIcon
+  /** Growth since the 1st, already formatted; null when nothing moved. */
+  movement?: string | null
+}) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-white border border-[#e8eaed] p-5 hover:shadow-[0_4px_20px_-2px_rgba(0,31,63,0.06)] transition-all duration-300">
-      <div className="absolute top-4 bottom-4 left-0 w-1.5 rounded-r bg-[#001f3f]" />
-      <div className="pl-3">
-        <p className="text-[10px] font-bold uppercase tracking-[0.05em] text-[#374151]">{label}</p>
-        <p className="font-['Outfit'] text-[40px] leading-tight font-bold text-[#001f3f] mt-1 tracking-tight">{value}</p>
-        {detail && <p className="text-[13px] text-[#6b7280]">{detail}</p>}
+    <div className="rounded-2xl bg-white border border-[#e8eaed] p-5 hover:shadow-[0_4px_20px_-2px_rgba(0,31,63,0.08)] transition-shadow duration-300">
+      <div className="flex items-center gap-3 mb-4">
+        {Icon && (
+          <span className="w-10 h-10 rounded-full bg-[#001f3f] flex items-center justify-center shrink-0">
+            <Icon className="w-[18px] h-[18px] text-[#d6b357]" />
+          </span>
+        )}
+        <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#6b7280] leading-tight">
+          {label}
+        </p>
       </div>
+      <p className="font-['Outfit'] text-[34px] leading-[1.1] font-bold text-[#001f3f] tracking-tight">
+        {value}
+      </p>
+      {detail && <p className="text-[13px] text-[#6b7280] mt-1">{detail}</p>}
+      {movement && (
+        <p className="mt-3 pt-3 border-t border-[#f0f2f5] flex items-center gap-1.5 text-[12px] font-semibold text-[#b8913f]">
+          <ArrowUp className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          {movement}
+        </p>
+      )}
     </div>
   )
 }
