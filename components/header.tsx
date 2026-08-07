@@ -5,20 +5,26 @@ import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
-  Menu, X, Phone, Mail, Facebook, Instagram,
-  ChevronDown, LayoutDashboard, LogOut,
+  Menu, X, Phone, Mail, Facebook, Instagram, ChevronDown, LayoutDashboard,
+  LogOut, Building2, CalendarDays, Camera, KeyRound, Landmark, Newspaper,
+  Tag, Users, type LucideIcon,
 } from "lucide-react"
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
 import { getDashboardRouteByRole } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/client"
 import { AuthModal } from "@/components/auth/auth-modal"
 
-type NavChild = { label: string; href: string }
+type NavChild = { label: string; href: string; desc: string; icon: LucideIcon }
 type NavItem = { label: string; href: string; children?: NavChild[] }
 
-// Six top-level items. The four browse destinations collapse into Properties
-// so the bar stays short; Off-Plan is promoted because it is the search people
-// actually type, and it points at the landing page built for that query.
+// Six top-level items, three of them dropdowns, so the bar stays short as
+// sections are added: the four browse destinations collapse into Properties,
+// the two "who we are" pages into About Us, and the two timely ones into News
+// & Events. Off-Plan stays top-level because it is the search people actually
+// type, and it points at the landing page built for that query.
+//
+// A parent's href is never navigated to (the button only opens the menu) — it
+// exists so every item has one; keep it pointing at the primary child.
 const NAV_LINKS: NavItem[] = [
   { label: "Home", href: "/" },
   { label: "Off-Plan", href: "/off-plan-projects-in-dubai" },
@@ -26,16 +32,29 @@ const NAV_LINKS: NavItem[] = [
     label: "Properties",
     href: "/projects",
     children: [
-      { label: "Buy",        href: "/buy" },
-      { label: "Rent",       href: "/rent" },
-      { label: "Projects",   href: "/projects" },
-      { label: "Developers", href: "/developers" },
+      { label: "Buy",        href: "/buy",        desc: "Homes and investments for sale", icon: Tag },
+      { label: "Rent",       href: "/rent",       desc: "Available rentals across Dubai",  icon: KeyRound },
+      { label: "Projects",   href: "/projects",   desc: "Every development we cover",      icon: Building2 },
+      { label: "Developers", href: "/developers", desc: "Verified developers and portfolios", icon: Landmark },
     ],
   },
-  { label: "Agents", href: "/agents" },
-  { label: "Events", href: "/events" },
-  { label: "Gallery", href: "/gallery" },
-  { label: "News", href: "/news" },
+  {
+    label: "About Us",
+    href: "/about",
+    children: [
+      { label: "Our Company", href: "/about",   desc: "Who we are and how we work",     icon: Landmark },
+      { label: "Agents",      href: "/agents",  desc: "Meet the team behind FHI Global", icon: Users },
+      { label: "Gallery",     href: "/gallery", desc: "Photos from our events",          icon: Camera },
+    ],
+  },
+  {
+    label: "News & Events",
+    href: "/events",
+    children: [
+      { label: "Events", href: "/events", desc: "Showcases and investor nights", icon: CalendarDays },
+      { label: "News",   href: "/news",   desc: "Dubai market updates",           icon: Newspaper },
+    ],
+  },
   { label: "Contact", href: "/contact" },
 ]
 
@@ -304,24 +323,57 @@ export function Header() {
                     {underline}
                   </button>
 
+                  {/* White panel against the navy bar, so the menu reads as a
+                      surface of the page rather than more chrome. Each row is
+                      an icon tile + name + what you'll find there. */}
                   {open && (
-                    <div className="absolute left-0 top-full z-50 w-[210px] border border-white/10 bg-[#07182c] py-1.5 shadow-[0_24px_60px_-18px_rgba(0,8,20,0.85)]">
-                      <span className="absolute inset-x-0 top-0 h-[3px] bg-[#d6b357]" aria-hidden="true" />
-                      {children.map((c) => {
-                        const childActive = pathname === c.href || pathname.startsWith(`${c.href}/`)
-                        return (
-                          <Link
-                            key={c.href}
-                            href={c.href}
-                            onClick={() => setOpenMenu(null)}
-                            className={`block px-5 py-2.5 text-[15px] font-medium transition-colors ${
-                              childActive ? "text-[#d6b357] bg-white/[0.06]" : "text-white/80 hover:text-white hover:bg-white/[0.06]"
-                            }`}
-                          >
-                            {c.label}
-                          </Link>
-                        )
-                      })}
+                    <div className="absolute left-0 top-full z-50 mt-1 w-[290px] bg-white border border-[#e5e8ec] shadow-[0_24px_60px_-18px_rgba(0,12,26,0.45)]">
+                      <span className="block h-[3px] bg-[#d6b357]" aria-hidden="true" />
+                      <div className="py-1.5">
+                        {children.map((c) => {
+                          const childActive = pathname === c.href || pathname.startsWith(`${c.href}/`)
+                          return (
+                            <Link
+                              key={c.href}
+                              href={c.href}
+                              onClick={() => setOpenMenu(null)}
+                              className={`group/item relative flex items-start gap-3 px-4 py-2.5 transition-colors ${
+                                childActive ? "bg-[#faf7ee]" : "hover:bg-[#f6f7f9]"
+                              }`}
+                            >
+                              {/* Gold rail marks the current page, and slides
+                                  in on hover. */}
+                              <span
+                                className={`absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-[#d6b357] transition-opacity ${
+                                  childActive ? "opacity-100" : "opacity-0 group-hover/item:opacity-100"
+                                }`}
+                                aria-hidden="true"
+                              />
+                              <span
+                                className={`w-9 h-9 flex items-center justify-center shrink-0 transition-colors ${
+                                  childActive ? "bg-[#001f3f]" : "bg-[#f0f2f5] group-hover/item:bg-[#001f3f]"
+                                }`}
+                              >
+                                <c.icon
+                                  className={`w-[18px] h-[18px] transition-colors ${
+                                    childActive ? "text-[#d6b357]" : "text-[#5f6368] group-hover/item:text-[#d6b357]"
+                                  }`}
+                                />
+                              </span>
+                              <span className="min-w-0">
+                                <span className={`block font-['Outfit'] text-[14px] font-bold leading-tight ${
+                                  childActive ? "text-[#b8913f]" : "text-[#001f3f]"
+                                }`}>
+                                  {c.label}
+                                </span>
+                                <span className="block text-[11.5px] text-[#6b7280] leading-snug mt-0.5">
+                                  {c.desc}
+                                </span>
+                              </span>
+                            </Link>
+                          )
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -491,11 +543,15 @@ export function Header() {
                               key={c.href}
                               href={c.href}
                               onClick={() => setMobileOpen(false)}
-                              className={`px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                                 childActive ? "text-[#d6b357] bg-white/[0.06]" : "text-white/65 hover:text-white hover:bg-white/8"
                               }`}
                             >
-                              {c.label}
+                              <c.icon className={`w-4 h-4 shrink-0 ${childActive ? "text-[#d6b357]" : "text-white/40"}`} />
+                              <span className="min-w-0">
+                                <span className="block text-sm font-semibold leading-tight">{c.label}</span>
+                                <span className="block text-[11px] text-white/40 leading-snug mt-0.5">{c.desc}</span>
+                              </span>
                             </Link>
                           )
                         })}
