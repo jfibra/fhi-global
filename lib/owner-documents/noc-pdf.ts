@@ -1,11 +1,11 @@
 // Client-side generator for the owner's NOC ("No Objection Certificate" /
 // Authorization-to-Advertise letter). Built from the details the owner enters on
-// the public intake page, downloaded for them to sign and re-upload. pdf-lib is
-// dynamically imported so it never ships in the initial bundle — only pulled in
-// when the owner clicks "Download NOC letter".
+// the public intake page, downloaded for them to sign and re-upload.
 //
-// Filled-in values are drawn UNDERLINED (a line under the answer text), matching
-// the paper template where each blank is an underline in the sentence.
+// Designed as a branded FHI letterhead document: navy header band with the FHI
+// logo + gold rule, centered title, the letter body with filled-in answers
+// drawn UNDERLINED, a signature block, and a footer. pdf-lib is dynamically
+// imported so it never ships in the initial bundle.
 
 export type NocPdfInput = {
   /** Pre-formatted date string (e.g. "7 August 2026"). */
@@ -23,7 +23,7 @@ export type NocPdfInput = {
 }
 
 const A4: [number, number] = [595.28, 841.89]
-const MARGIN = 56
+const MARGIN = 54
 const BODY_SIZE = 11
 const LINE_HEIGHT = 16
 const BLANK = "________________________"
@@ -32,51 +32,85 @@ const BLANK = "________________________"
 type Run = { text: string; underline?: boolean }
 
 /**
- * Keep only characters the built-in Helvetica (WinAnsi) can encode, so an owner
- * entering exotic glyphs (e.g. Arabic) can never crash PDF generation. Common
- * smart punctuation is folded to ASCII; anything else outside printable Latin-1
- * is dropped.
+ * Keep only characters the built-in Helvetica (WinAnsi) can encode — plus the
+ * bullet (U+2022, which WinAnsi renders at 0x95) — so an owner entering exotic
+ * glyphs (e.g. Arabic) can never crash PDF generation.
  */
 function safe(s: string): string {
   return s
     .replace(/[—–]/g, "-")
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
-    // Keep printable Latin-1 plus the bullet (U+2022, which WinAnsi/Helvetica
-    // renders at 0x95); drop anything else (e.g. Arabic) so it can't crash.
     .replace(/[^\x20-\x7E\xA0-\xFF•]/g, "")
 }
 
-/** Build the NOC authorization letter as a PDF Blob. */
+/** Build the NOC authorization letter as a branded PDF Blob. */
 export async function buildNocPdfBlob(input: NocPdfInput): Promise<Blob> {
   const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib")
 
   const doc = await PDFDocument.create()
+  const [W, H] = A4
   const page = doc.addPage(A4)
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
 
-  const maxWidth = A4[0] - MARGIN * 2
+  const navy = rgb(0, 0.122, 0.247)
+  const gold = rgb(0.839, 0.702, 0.341)
   const ink = rgb(0.05, 0.07, 0.09)
-  const bulletX = MARGIN + 16
-  let y = A4[1] - MARGIN
+  const gray = rgb(0.42, 0.45, 0.5)
+  const hair = rgb(0.9, 0.91, 0.93)
 
-  // A filled value → underlined text; an empty one → a blank underline.
+  const maxWidth = W - MARGIN * 2
+  const bulletX = MARGIN + 16
+
+  // ── Header band + logo + gold rule ─────────────────────────────────────────
+  const bandH = 118
+  page.drawRectangle({ x: 0, y: H - bandH, width: W, height: bandH, color: navy })
+  page.drawRectangle({ x: 0, y: H - bandH - 3, width: W, height: 3, color: gold })
+  try {
+    const res = await fetch("/FHI_Branding.png")
+    if (res.ok) {
+      const logo = await doc.embedPng(await res.arrayBuffer())
+      const logoH = 74
+      const logoW = (logo.width / logo.height) * logoH
+      page.drawImage(logo, {
+        x: (W - logoW) / 2,
+        y: H - bandH + (bandH - logoH) / 2,
+        width: logoW,
+        height: logoH,
+      })
+    }
+  } catch {
+    // Logo is decorative — a fetch/embed failure must not break the document.
+  }
+
+  let y = H - bandH - 46
+
+  const center = (text: string, size: number, f: typeof font, color: typeof ink) => {
+    const t = safe(text)
+    const w = f.widthOfTextAtSize(t, size)
+    page.drawText(t, { x: (W - w) / 2, y, size, font: f, color })
+  }
+  center("NO OBJECTION CERTIFICATE", 18, bold, navy)
+  y -= 17
+  center("Owner's Authorization to Advertise", 10.5, font, gray)
+  y -= 30
+
+  // ── Body: word-wrapped runs, filled answers underlined ──────────────────────
   const val = (s: string): Run => (s.trim() ? { text: s.trim(), underline: true } : { text: BLANK })
 
-  // Lay out a sequence of runs with word-wrap, drawing an underline beneath any
-  // run marked as an answer (including the spaces inside a multi-word answer).
   function drawRuns(
     runs: Run[],
-    opts: { size?: number; x?: number; gap?: number; font?: typeof font } = {},
+    opts: { size?: number; x?: number; gap?: number; font?: typeof font; color?: typeof ink } = {},
   ) {
     const size = opts.size ?? BODY_SIZE
     const startX = opts.x ?? MARGIN
     const f = opts.font ?? font
+    const color = opts.color ?? ink
     const spaceW = f.widthOfTextAtSize(" ", size)
 
-    type W = { text: string; underline: boolean; runId: number; w: number }
-    const words: W[] = []
+    type Word = { text: string; underline: boolean; runId: number; w: number }
+    const words: Word[] = []
     runs.forEach((run, runId) => {
       for (const part of safe(run.text).split(" ")) {
         if (!part) continue
@@ -84,22 +118,21 @@ export async function buildNocPdfBlob(input: NocPdfInput): Promise<Blob> {
       }
     })
 
-    let line: W[] = []
+    let line: Word[] = []
     let lineW = 0
     const flush = () => {
       let x = startX
       for (let i = 0; i < line.length; i++) {
         const wd = line[i]
-        page.drawText(wd.text, { x, y, size, font: f, color: ink })
+        page.drawText(wd.text, { x, y, size, font: f, color })
         if (wd.underline) {
-          page.drawLine({ start: { x, y: y - 2 }, end: { x: x + wd.w, y: y - 2 }, thickness: 0.75, color: ink })
+          page.drawLine({ start: { x, y: y - 2 }, end: { x: x + wd.w, y: y - 2 }, thickness: 0.75, color })
         }
         const next = line[i + 1]
         if (next) {
           const gapStart = x + wd.w
-          // Continue the underline across the space inside a multi-word answer.
           if (wd.underline && next.underline && wd.runId === next.runId) {
-            page.drawLine({ start: { x: gapStart, y: y - 2 }, end: { x: gapStart + spaceW, y: y - 2 }, thickness: 0.75, color: ink })
+            page.drawLine({ start: { x: gapStart, y: y - 2 }, end: { x: gapStart + spaceW, y: y - 2 }, thickness: 0.75, color })
           }
           x = gapStart + spaceW
         }
@@ -119,12 +152,8 @@ export async function buildNocPdfBlob(input: NocPdfInput): Promise<Blob> {
     if (opts.gap) y -= opts.gap
   }
 
-  const draw = (text: string, opts: { size?: number; x?: number; gap?: number; font?: typeof font } = {}) =>
+  const draw = (text: string, opts: { size?: number; x?: number; gap?: number; font?: typeof font; color?: typeof ink } = {}) =>
     drawRuns([{ text }], opts)
-
-  // Heading
-  draw("NO OBJECTION CERTIFICATE", { font: bold, size: 15, gap: 2 })
-  draw("(Owner's Authorization to Advertise)", { font: bold, size: 10, gap: 12 })
 
   drawRuns([{ text: "Date: " }, val(input.date)], { gap: 10 })
   draw("To Whom It May Concern,", { gap: 10 })
@@ -164,11 +193,18 @@ export async function buildNocPdfBlob(input: NocPdfInput): Promise<Blob> {
       val(input.validUntil),
       { text: " or until revoked by me in writing." },
     ],
-    { gap: 40 },
+    { gap: 46 },
   )
 
-  // Signature line (owner's name + date already appear above).
-  draw("Owner Signature: ______________________________")
+  // ── Signature block ─────────────────────────────────────────────────────────
+  draw("Owner Signature: ______________________________", { gap: 2 })
+  draw("Signature over printed name", { size: 8.5, color: gray })
+
+  // ── Footer ──────────────────────────────────────────────────────────────────
+  const footY = 44
+  page.drawRectangle({ x: MARGIN, y: footY + 16, width: W - MARGIN * 2, height: 0.8, color: hair })
+  const foot = safe("FHI Global Property  ·  Dubai, UAE  ·  fhiglobal.ae")
+  page.drawText(foot, { x: (W - font.widthOfTextAtSize(foot, 8.5)) / 2, y: footY, size: 8.5, font, color: gray })
 
   const bytes = await doc.save()
   // Copy into a plain ArrayBuffer — pdf-lib returns Uint8Array<ArrayBufferLike>,
