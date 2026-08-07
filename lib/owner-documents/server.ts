@@ -1,5 +1,5 @@
 import "server-only"
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 // Server-only shared helpers for the public owner-document intake flow: the
@@ -88,6 +88,25 @@ export async function moveOwnerDocToS3(admin: SupabaseClient, path: string): Pro
     return `${process.env.S3_PUBLIC_URL}/${key}`
   } catch {
     return null
+  }
+}
+
+/**
+ * Best-effort delete of owner-document files from S3 by their public URL (used
+ * when an admin deletes a request). Only touches objects under our S3_PUBLIC_URL
+ * — signed Supabase fallback URLs are left alone.
+ */
+export async function deleteOwnerDocFilesFromS3(urls: string[]): Promise<void> {
+  const base = process.env.S3_PUBLIC_URL
+  if (!base) return
+  for (const url of urls) {
+    if (typeof url !== "string" || !url.startsWith(`${base}/`)) continue
+    const key = url.slice(base.length + 1)
+    try {
+      await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET_NAME!, Key: key }))
+    } catch {
+      /* best-effort — orphaned object is harmless */
+    }
   }
 }
 

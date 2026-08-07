@@ -15,5 +15,7 @@ export function OwnerDocuments() {
   const allowed = useRequireAllowed(isSalesPipelineRole(role) || isAdminStaffRole(role))
   if (!allowed) return null
 
-  return <OwnerDocumentsClient />
+  // Admins see every agent's requests (with attribution) and can delete; sales
+  // roles see and manage only their own.
+  return <OwnerDocumentsClient isAdmin={isAdminStaffRole(role)} />
 }

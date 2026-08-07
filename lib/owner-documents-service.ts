@@ -44,6 +44,13 @@ export type OwnerDocumentFile = {
   uploaded_at: string
 }
 
+/** Admin list row — a request plus the creating agent's public card. */
+export type AdminOwnerDocumentRequest = OwnerDocumentRequest & {
+  agent_name: string | null
+  agent_avatar: string | null
+  agent_role: string | null
+}
+
 const REQUEST_SELECT =
   "id, token, agent_id, label, status, owner_name, owner_id_number, owner_email, owner_mobile, property_building, unit_number, community_area, title_deed_number, noc_valid_until, submitted_at, expires_at, created_at, updated_at, deleted_at"
 const FILE_SELECT = "id, request_id, doc_type, file_name, file_url, file_type, file_size, uploaded_at"
@@ -98,34 +105,50 @@ export async function createOwnerDocumentRequest(
   }
 }
 
-export async function fetchOwnerDocumentRequest(id: string): Promise<{
-  request: OwnerDocumentRequest | null
-  files: OwnerDocumentFile[]
+/** Files for one request (RLS lets the owning agent or an admin read them). */
+export async function fetchOwnerDocumentFiles(
+  requestId: string,
+): Promise<{ data: OwnerDocumentFile[]; error: string | null }> {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("owner_document_files")
+      .select(FILE_SELECT)
+      .eq("request_id", requestId)
+      .order("uploaded_at", { ascending: true })
+    if (error) return { data: [], error: error.message }
+    return { data: (data ?? []) as OwnerDocumentFile[], error: null }
+  } catch {
+    return { data: [], error: "Failed to load the documents." }
+  }
+}
+
+/** Admin: every request with the creating agent's name/avatar (service-role API). */
+export async function fetchAllOwnerDocumentRequestsAdmin(): Promise<{
+  data: AdminOwnerDocumentRequest[]
   error: string | null
 }> {
   try {
-    const supabase = createClient()
-    const { data: request, error } = await supabase
-      .from("owner_document_requests")
-      .select(REQUEST_SELECT)
-      .eq("id", id)
-      .is("deleted_at", null)
-      .maybeSingle()
-    if (error) return { request: null, files: [], error: error.message }
-    if (!request) return { request: null, files: [], error: null }
-
-    const { data: files } = await supabase
-      .from("owner_document_files")
-      .select(FILE_SELECT)
-      .eq("request_id", id)
-      .order("uploaded_at", { ascending: true })
-    return {
-      request: request as OwnerDocumentRequest,
-      files: (files ?? []) as OwnerDocumentFile[],
-      error: null,
-    }
+    const res = await fetch("/api/admin/owner-documents")
+    const json = (await res.json()) as { requests?: AdminOwnerDocumentRequest[]; error?: string }
+    if (!res.ok) return { data: [], error: json.error ?? "Failed to load requests." }
+    return { data: json.requests ?? [], error: null }
   } catch {
-    return { request: null, files: [], error: "Failed to load the request." }
+    return { data: [], error: "Failed to load requests." }
+  }
+}
+
+/** Admin: hard-delete a request + its files (and S3 objects). For test cleanup. */
+export async function deleteOwnerDocumentRequestAdmin(id: string): Promise<{ error: string | null }> {
+  try {
+    const res = await fetch(`/api/admin/owner-documents/${id}`, { method: "DELETE" })
+    if (!res.ok) {
+      const json = (await res.json().catch(() => ({}))) as { error?: string }
+      return { error: json.error ?? "Failed to delete the request." }
+    }
+    return { error: null }
+  } catch {
+    return { error: "Failed to delete the request." }
   }
 }
 

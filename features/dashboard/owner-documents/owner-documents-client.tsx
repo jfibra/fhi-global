@@ -5,19 +5,28 @@ import { createPortal } from "react-dom"
 import { toast } from "sonner"
 import {
   ScrollText, Plus, Link2, Eye, XCircle, Loader2, X, FileText, Image as ImageIcon,
-  ExternalLink, Clock, CheckCircle2, Ban,
+  ExternalLink, Clock, CheckCircle2, Ban, Trash2,
 } from "lucide-react"
 import {
   fetchMyOwnerDocumentRequests,
+  fetchAllOwnerDocumentRequestsAdmin,
   createOwnerDocumentRequest,
-  fetchOwnerDocumentRequest,
+  fetchOwnerDocumentFiles,
   cancelOwnerDocumentRequest,
+  deleteOwnerDocumentRequestAdmin,
   ownerDocumentSharePath,
   type OwnerDocumentRequest,
   type OwnerDocumentFile,
   type OwnerDocRequestStatus,
   type OwnerDocType,
 } from "@/lib/owner-documents-service"
+
+// A list row: a request, plus (admin only) the creating agent's card.
+type Row = OwnerDocumentRequest & {
+  agent_name?: string | null
+  agent_avatar?: string | null
+  agent_role?: string | null
+}
 
 const DOC_LABELS: Record<OwnerDocType, string> = {
   title_deed: "Title Deed",
@@ -36,18 +45,21 @@ const STATUS_STYLE: Record<OwnerDocRequestStatus, { label: string; cls: string; 
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"
 
-export function OwnerDocumentsClient() {
-  const [rows, setRows] = useState<OwnerDocumentRequest[]>([])
+export function OwnerDocumentsClient({ isAdmin }: { isAdmin: boolean }) {
+  const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
   const [label, setLabel] = useState("")
   const [creating, setCreating] = useState(false)
-  const [viewing, setViewing] = useState<{ request: OwnerDocumentRequest; files: OwnerDocumentFile[] } | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [viewing, setViewing] = useState<{ request: Row; files: OwnerDocumentFile[] } | null>(null)
 
   useEffect(() => {
     let active = true
     ;(async () => {
-      const { data, error } = await fetchMyOwnerDocumentRequests()
+      const { data, error } = isAdmin
+        ? await fetchAllOwnerDocumentRequestsAdmin()
+        : await fetchMyOwnerDocumentRequests()
       if (!active) return
       if (error) toast.error(error)
       setRows(data)
@@ -56,10 +68,12 @@ export function OwnerDocumentsClient() {
     return () => {
       active = false
     }
-  }, [])
+  }, [isAdmin])
 
   async function refresh() {
-    const { data, error } = await fetchMyOwnerDocumentRequests()
+    const { data, error } = isAdmin
+      ? await fetchAllOwnerDocumentRequestsAdmin()
+      : await fetchMyOwnerDocumentRequests()
     if (error) toast.error(error)
     setRows(data)
   }
@@ -85,20 +99,21 @@ export function OwnerDocumentsClient() {
     }
     setLabel("")
     setShowNew(false)
-    setRows((prev) => [data, ...prev])
+    if (isAdmin) await refresh()
+    else setRows((prev) => [data, ...prev])
     await copyLink(data.token)
   }
 
-  async function openView(id: string) {
-    const { request, files, error } = await fetchOwnerDocumentRequest(id)
-    if (error || !request) {
-      toast.error(error ?? "Could not open the request.")
+  async function openView(row: Row) {
+    const { data: files, error } = await fetchOwnerDocumentFiles(row.id)
+    if (error) {
+      toast.error(error)
       return
     }
-    setViewing({ request, files })
+    setViewing({ request: row, files })
   }
 
-  async function handleCancel(row: OwnerDocumentRequest) {
+  async function handleCancel(row: Row) {
     if (!window.confirm("Cancel this request? The owner's link will stop working.")) return
     const { error } = await cancelOwnerDocumentRequest(row.id)
     if (error) {
@@ -107,6 +122,19 @@ export function OwnerDocumentsClient() {
     }
     toast.success("Request cancelled.")
     await refresh()
+  }
+
+  async function handleDelete(row: Row) {
+    if (!window.confirm("Delete this request permanently? This removes its uploaded files too and cannot be undone.")) return
+    setDeletingId(row.id)
+    const { error } = await deleteOwnerDocumentRequestAdmin(row.id)
+    setDeletingId(null)
+    if (error) {
+      toast.error(error)
+      return
+    }
+    toast.success("Request deleted.")
+    setRows((prev) => prev.filter((r) => r.id !== row.id))
   }
 
   return (
@@ -119,7 +147,11 @@ export function OwnerDocumentsClient() {
           </div>
           <div>
             <h1 className="font-['Outfit'] text-xl font-bold text-[#0d1117]">Owner Documents</h1>
-            <p className="text-sm text-[#6b7280]">Collect NOC / Trakheesi documents from property owners via a link.</p>
+            <p className="text-sm text-[#6b7280]">
+              {isAdmin
+                ? "Every agent's NOC / Trakheesi document requests."
+                : "Collect NOC / Trakheesi documents from property owners via a link."}
+            </p>
           </div>
         </div>
         <button
@@ -181,13 +213,14 @@ export function OwnerDocumentsClient() {
                   className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#eef0f2] bg-white px-4 py-3.5 shadow-sm"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate font-['Outfit'] text-[15px] font-bold text-[#0d1117]">
                         {row.label?.trim() || row.owner_name?.trim() || "Untitled request"}
                       </p>
                       <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${s.cls}`}>
                         <StatusIcon className="h-3 w-3" /> {s.label}
                       </span>
+                      {isAdmin && row.agent_name && <AgentChip name={row.agent_name} avatar={row.agent_avatar ?? null} />}
                     </div>
                     <p className="mt-0.5 text-[12px] text-[#9ca3af]">
                       Created {fmtDate(row.created_at)}
@@ -196,33 +229,45 @@ export function OwnerDocumentsClient() {
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    {row.status === "submitted" ? (
+                    {(isAdmin || row.status === "submitted") && (
                       <button
                         type="button"
-                        onClick={() => void openView(row.id)}
+                        onClick={() => void openView(row)}
                         className="inline-flex items-center gap-1.5 rounded-full bg-[#001f3f] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#002b57]"
                       >
                         <Eye className="h-3.5 w-3.5" /> View
                       </button>
-                    ) : row.status === "pending" ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => void copyLink(row.token)}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-[#e5e7eb] px-3.5 py-1.5 text-xs font-semibold text-[#374151] hover:border-[#001f3f]"
-                        >
-                          <Link2 className="h-3.5 w-3.5" /> Copy link
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleCancel(row)}
-                          title="Cancel request"
-                          className="inline-flex items-center rounded-full border border-[#e5e7eb] p-1.5 text-[#9ca3af] hover:border-rose-300 hover:text-rose-500"
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </button>
-                      </>
-                    ) : null}
+                    )}
+                    {row.status === "pending" && (
+                      <button
+                        type="button"
+                        onClick={() => void copyLink(row.token)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-[#e5e7eb] px-3.5 py-1.5 text-xs font-semibold text-[#374151] hover:border-[#001f3f]"
+                      >
+                        <Link2 className="h-3.5 w-3.5" /> Copy link
+                      </button>
+                    )}
+                    {!isAdmin && row.status === "pending" && (
+                      <button
+                        type="button"
+                        onClick={() => void handleCancel(row)}
+                        title="Cancel request"
+                        className="inline-flex items-center rounded-full border border-[#e5e7eb] p-1.5 text-[#9ca3af] hover:border-rose-300 hover:text-rose-500"
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(row)}
+                        disabled={deletingId === row.id}
+                        title="Delete request"
+                        className="inline-flex items-center rounded-full border border-[#e5e7eb] p-1.5 text-[#9ca3af] hover:border-rose-300 hover:text-rose-500 disabled:opacity-50"
+                      >
+                        {deletingId === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      </button>
+                    )}
                   </div>
                 </div>
               )
@@ -231,16 +276,38 @@ export function OwnerDocumentsClient() {
         )}
       </div>
 
-      {viewing && <SubmissionModal data={viewing} onClose={() => setViewing(null)} />}
+      {viewing && (
+        <RequestModal data={viewing} isAdmin={isAdmin} onCopyLink={copyLink} onClose={() => setViewing(null)} />
+      )}
     </div>
   )
 }
 
-function SubmissionModal({
+function AgentChip({ name, avatar }: { name: string; avatar: string | null }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f3f4f6] py-0.5 pl-0.5 pr-2.5 text-[11px] font-medium text-[#4b5563]">
+      {avatar ? (
+        // eslint-disable-next-line @next/next/no-img-element -- avatar host varies (Google/S3/legacy)
+        <img src={avatar} alt={name} className="h-4 w-4 rounded-full object-cover" />
+      ) : (
+        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#001f3f] text-[8px] font-bold text-white">
+          {name.slice(0, 1).toUpperCase()}
+        </span>
+      )}
+      {name}
+    </span>
+  )
+}
+
+function RequestModal({
   data,
+  isAdmin,
+  onCopyLink,
   onClose,
 }: {
-  data: { request: OwnerDocumentRequest; files: OwnerDocumentFile[] }
+  data: { request: Row; files: OwnerDocumentFile[] }
+  isAdmin: boolean
+  onCopyLink: (token: string) => void
   onClose: () => void
 }) {
   useEffect(() => {
@@ -263,9 +330,14 @@ function SubmissionModal({
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div className="relative flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl">
         <div className="flex items-start justify-between border-b border-[#f0f0f0] px-6 py-4">
-          <div>
-            <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{r.owner_name || "Owner submission"}</h3>
-            <p className="text-xs text-[#6b7280]">Submitted {fmtDate(r.submitted_at)}</p>
+          <div className="min-w-0">
+            <h3 className="truncate font-['Outfit'] text-lg font-bold text-[#0d1117]">
+              {r.owner_name || r.label || "Owner document request"}
+            </h3>
+            <p className="text-xs text-[#6b7280]">
+              {r.status === "submitted" ? `Submitted ${fmtDate(r.submitted_at)}` : `Created ${fmtDate(r.created_at)}`}
+              {isAdmin && r.agent_name ? ` · by ${r.agent_name}` : ""}
+            </p>
           </div>
           <button type="button" onClick={onClose} className="rounded-full border border-[#e5e5e5] p-2 text-[#6b7280] hover:text-[#0d1117]">
             <X className="h-4 w-4" />
@@ -273,43 +345,75 @@ function SubmissionModal({
         </div>
 
         <div className="overflow-y-auto px-6 py-5">
-          <dl className="grid grid-cols-2 gap-4">
-            {detail("Emirates ID / Passport", r.owner_id_number)}
-            {detail("Email", r.owner_email)}
-            {detail("Mobile", r.owner_mobile)}
-            {detail("Property / Building", r.property_building)}
-            {detail("Unit", r.unit_number)}
-            {detail("Community / Area", r.community_area)}
-            {detail("Title Deed No.", r.title_deed_number)}
-            {detail("Valid until", r.noc_valid_until)}
-          </dl>
+          {r.status === "pending" && (
+            <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-[13px] font-semibold text-amber-800">Awaiting the owner&apos;s submission</p>
+              <p className="mt-0.5 text-[12px] text-amber-700">Share this link with the property owner:</p>
+              <div className="mt-2 flex gap-2">
+                <input
+                  readOnly
+                  value={`${typeof window !== "undefined" ? window.location.origin : ""}${ownerDocumentSharePath(r.token)}`}
+                  className="min-w-0 flex-1 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-[12px] text-[#374151]"
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                <button
+                  type="button"
+                  onClick={() => onCopyLink(r.token)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#001f3f] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[#002b57]"
+                >
+                  <Link2 className="h-3.5 w-3.5" /> Copy
+                </button>
+              </div>
+            </div>
+          )}
 
-          <p className="mt-6 mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#9ca3af]">
-            Documents ({files.length})
-          </p>
-          <div className="space-y-2">
-            {files.map((f) => (
-              <a
-                key={f.id}
-                href={f.file_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 rounded-xl border border-[#eef0f2] px-3 py-2.5 transition-colors hover:border-[#001f3f]/40 hover:bg-[#f9fafb]"
-              >
-                {f.file_type === "image" ? (
-                  <ImageIcon className="h-5 w-5 shrink-0 text-[#6b7280]" />
-                ) : (
-                  <FileText className="h-5 w-5 shrink-0 text-[#6b7280]" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium text-[#111827]">{DOC_LABELS[f.doc_type]}</p>
-                  <p className="truncate text-[11px] text-[#9ca3af]">{f.file_name}</p>
-                </div>
-                <ExternalLink className="h-4 w-4 shrink-0 text-[#c4c4c4]" />
-              </a>
-            ))}
-            {files.length === 0 && <p className="text-sm text-[#9ca3af]">No files were attached.</p>}
-          </div>
+          {r.status === "submitted" && (
+            <dl className="grid grid-cols-2 gap-4">
+              {detail("Emirates ID / Passport", r.owner_id_number)}
+              {detail("Email", r.owner_email)}
+              {detail("Mobile", r.owner_mobile)}
+              {detail("Property / Building", r.property_building)}
+              {detail("Unit", r.unit_number)}
+              {detail("Community / Area", r.community_area)}
+              {detail("Title Deed No.", r.title_deed_number)}
+              {detail("Valid until", r.noc_valid_until)}
+            </dl>
+          )}
+
+          {r.status === "submitted" && (
+            <>
+              <p className="mt-6 mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#9ca3af]">
+                Documents ({files.length})
+              </p>
+              <div className="space-y-2">
+                {files.map((f) => (
+                  <a
+                    key={f.id}
+                    href={f.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 rounded-xl border border-[#eef0f2] px-3 py-2.5 transition-colors hover:border-[#001f3f]/40 hover:bg-[#f9fafb]"
+                  >
+                    {f.file_type === "image" ? (
+                      <ImageIcon className="h-5 w-5 shrink-0 text-[#6b7280]" />
+                    ) : (
+                      <FileText className="h-5 w-5 shrink-0 text-[#6b7280]" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-medium text-[#111827]">{DOC_LABELS[f.doc_type]}</p>
+                      <p className="truncate text-[11px] text-[#9ca3af]">{f.file_name}</p>
+                    </div>
+                    <ExternalLink className="h-4 w-4 shrink-0 text-[#c4c4c4]" />
+                  </a>
+                ))}
+                {files.length === 0 && <p className="text-sm text-[#9ca3af]">No files were attached.</p>}
+              </div>
+            </>
+          )}
+
+          {r.status === "cancelled" && (
+            <p className="text-sm text-[#6b7280]">This request was cancelled — its link no longer works.</p>
+          )}
         </div>
       </div>
     </div>,
