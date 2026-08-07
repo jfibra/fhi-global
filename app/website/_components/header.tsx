@@ -9,14 +9,15 @@ import Link from "next/link"
 import { Mail, Menu, X } from "lucide-react"
 import { BRAND_GRADIENT, BRAND_TO, GOLD, GOLD_GRADIENT, NAV_LINKS } from "../_data"
 
-export function SiteHeader() {
+export function SiteHeader({ sticky = true }: { sticky?: boolean }) {
   const [open, setOpen] = useState(false)
 
   return (
     // Same gradient treatment as the dashboard listings buttons (180deg, navy
     // → darker): top is the FHI header navy, bottom is the ink used by the
-    // About stats bar, so the two blend.
-    <header className="sticky top-0 z-50" style={{ background: BRAND_GRADIENT }}>
+    // About stats bar, so the two blend. `sticky` is off in the builder's
+    // live preview — there it should scroll with the page like plain content.
+    <header className={sticky ? "sticky top-0 z-50" : "relative"} style={{ background: BRAND_GRADIENT }}>
       <div className="mx-auto flex max-w-[1400px] items-center gap-4 px-5 py-4 sm:px-8 lg:gap-8">
         <Link href="/" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -159,7 +159,7 @@ export function OgHero({ data, base }: { data: WebsiteData; base: string }) {
       <div
         style={{
           position: "absolute",
-          top: u(96),
+          top: u(122),
           left: LEFT,
           width: u(640),
           display: "flex",
