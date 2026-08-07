@@ -20,6 +20,7 @@ import {
   type OwnerDocRequestStatus,
   type OwnerDocType,
 } from "@/lib/owner-documents-service"
+import { SaleConfirmDialog } from "@/features/dashboard/sales/sale-confirm-dialog"
 
 // A list row: a request, plus (admin only) the creating agent's card.
 type Row = OwnerDocumentRequest & {
@@ -51,7 +52,8 @@ export function OwnerDocumentsClient({ isAdmin }: { isAdmin: boolean }) {
   const [showNew, setShowNew] = useState(false)
   const [label, setLabel] = useState("")
   const [creating, setCreating] = useState(false)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirm, setConfirm] = useState<{ kind: "delete" | "cancel"; row: Row } | null>(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
   const [viewing, setViewing] = useState<{ request: Row; files: OwnerDocumentFile[] } | null>(null)
 
   useEffect(() => {
@@ -113,28 +115,27 @@ export function OwnerDocumentsClient({ isAdmin }: { isAdmin: boolean }) {
     setViewing({ request: row, files })
   }
 
-  async function handleCancel(row: Row) {
-    if (!window.confirm("Cancel this request? The owner's link will stop working.")) return
-    const { error } = await cancelOwnerDocumentRequest(row.id)
+  async function runConfirm() {
+    if (!confirm) return
+    const { kind, row } = confirm
+    setConfirmBusy(true)
+    const { error } =
+      kind === "delete"
+        ? await deleteOwnerDocumentRequestAdmin(row.id)
+        : await cancelOwnerDocumentRequest(row.id)
+    setConfirmBusy(false)
+    setConfirm(null)
     if (error) {
       toast.error(error)
       return
     }
-    toast.success("Request cancelled.")
-    await refresh()
-  }
-
-  async function handleDelete(row: Row) {
-    if (!window.confirm("Delete this request permanently? This removes its uploaded files too and cannot be undone.")) return
-    setDeletingId(row.id)
-    const { error } = await deleteOwnerDocumentRequestAdmin(row.id)
-    setDeletingId(null)
-    if (error) {
-      toast.error(error)
-      return
+    if (kind === "delete") {
+      toast.success("Request deleted.")
+      setRows((prev) => prev.filter((r) => r.id !== row.id))
+    } else {
+      toast.success("Request cancelled.")
+      await refresh()
     }
-    toast.success("Request deleted.")
-    setRows((prev) => prev.filter((r) => r.id !== row.id))
   }
 
   return (
@@ -250,7 +251,7 @@ export function OwnerDocumentsClient({ isAdmin }: { isAdmin: boolean }) {
                     {!isAdmin && row.status === "pending" && (
                       <button
                         type="button"
-                        onClick={() => void handleCancel(row)}
+                        onClick={() => setConfirm({ kind: "cancel", row })}
                         title="Cancel request"
                         className="inline-flex items-center rounded-full border border-[#e5e7eb] p-1.5 text-[#9ca3af] hover:border-rose-300 hover:text-rose-500"
                       >
@@ -260,12 +261,11 @@ export function OwnerDocumentsClient({ isAdmin }: { isAdmin: boolean }) {
                     {isAdmin && (
                       <button
                         type="button"
-                        onClick={() => void handleDelete(row)}
-                        disabled={deletingId === row.id}
+                        onClick={() => setConfirm({ kind: "delete", row })}
                         title="Delete request"
-                        className="inline-flex items-center rounded-full border border-[#e5e7eb] p-1.5 text-[#9ca3af] hover:border-rose-300 hover:text-rose-500 disabled:opacity-50"
+                        className="inline-flex items-center rounded-full border border-[#e5e7eb] p-1.5 text-[#9ca3af] hover:border-rose-300 hover:text-rose-500"
                       >
-                        {deletingId === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     )}
                   </div>
@@ -278,6 +278,23 @@ export function OwnerDocumentsClient({ isAdmin }: { isAdmin: boolean }) {
 
       {viewing && (
         <RequestModal data={viewing} isAdmin={isAdmin} onCopyLink={copyLink} onClose={() => setViewing(null)} />
+      )}
+
+      {confirm && (
+        <SaleConfirmDialog
+          title={confirm.kind === "delete" ? "Delete request" : "Cancel request"}
+          message={
+            confirm.kind === "delete"
+              ? "This permanently removes the request and its uploaded files. This cannot be undone."
+              : "The owner's link will stop working. You can always create a new request."
+          }
+          confirmLabel={confirm.kind === "delete" ? "Hold to delete" : "Cancel request"}
+          tone="danger"
+          hold={confirm.kind === "delete"}
+          busy={confirmBusy}
+          onConfirm={() => void runConfirm()}
+          onCancel={() => setConfirm(null)}
+        />
       )}
     </div>
   )

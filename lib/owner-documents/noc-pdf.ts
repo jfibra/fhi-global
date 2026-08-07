@@ -42,7 +42,9 @@ function safe(s: string): string {
     .replace(/[—–]/g, "-")
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
-    .replace(/[^\x20-\x7E\xA0-\xFF]/g, "")
+    // Keep printable Latin-1 plus the bullet (U+2022, which WinAnsi/Helvetica
+    // renders at 0x95); drop anything else (e.g. Arabic) so it can't crash.
+    .replace(/[^\x20-\x7E\xA0-\xFF•]/g, "")
 }
 
 /** Build the NOC authorization letter as a PDF Blob. */
@@ -165,10 +167,8 @@ export async function buildNocPdfBlob(input: NocPdfInput): Promise<Blob> {
     { gap: 40 },
   )
 
-  // Signature block
-  draw("Owner Signature: ______________________________", { gap: 12 })
-  drawRuns([{ text: "Name: " }, val(input.ownerName)], { gap: 4 })
-  drawRuns([{ text: "Date: " }, val(input.date)])
+  // Signature line (owner's name + date already appear above).
+  draw("Owner Signature: ______________________________")
 
   const bytes = await doc.save()
   // Copy into a plain ArrayBuffer — pdf-lib returns Uint8Array<ArrayBufferLike>,
