@@ -855,3 +855,67 @@ export async function sendAdminDirectEmail(input: {
     }),
   })
 }
+
+/**
+ * Sent to the requesting agent when a property owner submits their documents
+ * through an owner-document (NOC / Trakheesi) intake link. Best-effort — a mail
+ * failure must never lose the submission.
+ */
+export async function sendOwnerDocumentsSubmittedEmail(input: {
+  to: string
+  agentName: string | null
+  ownerName: string
+  propertyLabel: string | null
+  fileCount: number
+  dashboardUrl: string
+}): Promise<void> {
+  const name = greetingName(input.agentName)
+  const subject = `Owner documents received — ${input.ownerName}`
+
+  const detailsHtml = [
+    detailRow("Owner", input.ownerName),
+    input.propertyLabel ? detailRow("Property", input.propertyLabel) : "",
+    detailRow("Documents", `${input.fileCount} file${input.fileCount === 1 ? "" : "s"} uploaded`),
+  ].join("")
+
+  const bodyHtml = `
+        <tr>
+          <td style="padding:36px 40px 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">Owner documents received</p>
+            <h1 style="margin:0 0 12px;font-size:23px;line-height:1.3;font-weight:700;color:#0d1117;">You've got what you need, ${esc(name)} 📄</h1>
+            <p style="margin:0;font-size:15px;line-height:1.65;color:#4b5563;">
+              <strong>${esc(input.ownerName)}</strong> submitted their documents and details through your intake link.
+              You can now review everything and proceed with the NOC / Trakheesi filing.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px 6px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafd;border:1px solid #e2e8f2;border-radius:14px;">
+              <tr><td style="padding:16px 20px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${detailsHtml}</table>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:22px 40px 34px;">
+            <a href="${esc(input.dashboardUrl)}"
+               style="display:inline-block;background:${NAVY};color:#ffffff;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;text-decoration:none;padding:13px 34px;border-radius:12px;border-bottom:3px solid ${GOLD};">
+              View submission
+            </a>
+          </td>
+        </tr>`
+
+  await deliver("OwnerDocumentsSubmittedMailer", {
+    from: fromAddress(),
+    to: input.to,
+    subject,
+    text: `Owner documents received from ${input.ownerName}.\n\nOwner: ${input.ownerName}\n${input.propertyLabel ? `Property: ${input.propertyLabel}\n` : ""}Documents: ${input.fileCount} file${input.fileCount === 1 ? "" : "s"} uploaded\n\nReview the submission: ${input.dashboardUrl}`,
+    html: eventEmailShell({
+      subject,
+      preheader: `${input.ownerName} submitted their documents through your intake link.`,
+      bodyHtml,
+    }),
+  })
+}

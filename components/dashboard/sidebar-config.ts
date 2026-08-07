@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library,
-  Mail, PanelsTopLeft,
+  Mail, PanelsTopLeft, FileSignature,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -128,6 +128,9 @@ const SUPPORT_TICKETS: NavEntry = { icon: LifeBuoy, label: "Support Tickets", to
 const MATERIALS: NavEntry = { icon: FolderDown, label: "Materials", to: "materials" }
 // Training PDFs, also open to every role — likewise absent from SUB_PATH_ROLES.
 const EBOOKS: NavEntry = { icon: Library, label: "Ebooks", to: "ebooks" }
+// Owner document intake (NOC / Trakheesi) — sales pipeline + admin. Access is
+// gated by SUB_PATH_ROLES["owner-documents"] in lib/auth.ts.
+const OWNER_DOCUMENTS: NavEntry = { icon: FileSignature, label: "Owner Documents", to: "owner-documents" }
 
 // ─── Per-role lists ───────────────────────────────────────────────────────────
 
@@ -158,6 +161,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { icon: ClipboardList, label: "Listings",   to: "listings",   description: "Every listing across all agents." },
     ],
   },
+  OWNER_DOCUMENTS,
   {
     group: "Finance",
     to: "finance",
@@ -235,6 +239,7 @@ const DEVELOPER_NAV: RoleNavEntry[] = [
 const salesPipelineNav = ({ projects = false, events = false, teamSales = false } = {}): RoleNavEntry[] => [
   OVERVIEW,
   { icon: ClipboardList, label: "My listings", to: "listings" },
+  OWNER_DOCUMENTS,
   // The read-only projects browser for the Poster/Reels studios — the whole
   // sales ladder has it (see ROLES_PROJECT_STUDIO_VIEWERS).
   ...(projects ? [PROJECTS] : []),

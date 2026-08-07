@@ -323,6 +323,11 @@ const nextConfig = {
         source: "/internal/:path*",
         headers: PRIVATE_NOINDEX_HEADERS,
       },
+      {
+        // Public owner-document intake links must not be indexed.
+        source: "/owner-documents/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
     ]
   },
 }
