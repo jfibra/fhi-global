@@ -5,6 +5,9 @@ import { getCachedHomePageData } from "@/lib/data/home";
 import { createPageMetadata } from "@/lib/seo";
 import { HeroSection } from "@/components/hero-section";
 import { Reveal } from "@/components/public/reveal";
+import { HomeFaq } from "@/components/public/home-faq";
+import { faqPageSchema } from "@/lib/faqs";
+import { jsonLdScript } from "@/lib/seo";
 import {
   DeveloperLogoCarousel,
   type DeveloperLogoItem,
@@ -155,6 +158,12 @@ export default async function HomePage() {
     <script
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+    />
+    {/* Pairs with the FAQ section below — this is what lets Google expand the
+        answers underneath our search result. */}
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: jsonLdScript(faqPageSchema()) }}
     />
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
       {/* Ambient blobs */}
@@ -360,6 +369,11 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ----------------------------------------------- */}
+      {/* FAQ                                             */}
+      {/* ----------------------------------------------- */}
+      <HomeFaq />
 
       {/* ----------------------------------------------- */}
       {/* CALL TO ACTION                                  */}
