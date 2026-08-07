@@ -32,9 +32,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const site = await getSite(slug)
   if (!site) notFound()
+  const { agent, hero } = site.data
+  const title = [agent.name, agent.title].filter(Boolean).join(" — ") || site.title
+  const description = hero.description || site.title
+  // Explicit OpenGraph/Twitter text so share cards show the AGENT, not the
+  // root site's defaults (the og image itself comes from opengraph-image.tsx).
   return {
-    title: site.data.agent.name || site.title,
-    description: site.data.hero.description || site.title,
+    title: agent.name || site.title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `${SITE_URL}/website/${site.slug}`,
+      type: "profile",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
   }
 }
 

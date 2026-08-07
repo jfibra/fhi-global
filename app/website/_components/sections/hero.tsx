@@ -1,59 +1,12 @@
-// Hero — headline over the banner photo (no overlay), the frosted broker
-// card at the lower right (inline below the copy on mobile), and the glass
-// stat strip along the bottom.
+// Hero — headline over the banner photo and the glass stat strip along the
+// bottom. The broker contact/RERA card lives ONLY in the link-share
+// thumbnail now (see ../og-hero.tsx), not on the page.
 
-import { Building2, FileText, Mail, Phone, Play, ShieldCheck } from "lucide-react"
-import { BRAND_GLASS_GRADIENT, BRAND_GLASS_SOFT, BRAND_GRADIENT, BRAND_TO, BRAND_TO_A0, BRAND_TO_A90, DEFAULT_WA_MESSAGE, GOLD, GOLD_A50, HERO_STAT_ICON_FALLBACK, INK, NAVY, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
-import { WhatsAppIcon } from "../ui"
-
-/** The frosted broker contact card — rendered absolutely on desktop and
- *  inline under the headline on mobile. */
-function BrokerCard({ agent }: { agent: WebsiteData["agent"] }) {
-  return (
-    <div
-      className="border border-white/15 p-6 shadow-2xl backdrop-blur-md"
-      style={{ background: BRAND_GLASS_GRADIENT }}
-    >
-      <p className="mt-3 text-sm font-bold uppercase tracking-[0.16em] text-white">{agent.name}</p>
-      <p className="mt-1 text-xs text-white/70">{agent.title}</p>
-      {/* Mobile (the wider inline card): contacts and RERA side by side.
-          Desktop (the narrow floating card): stacked with a divider. */}
-      <div className="mt-3.5 grid grid-cols-2 items-start gap-x-4 lg:block">
-        <div className="min-w-0 space-y-2">
-          <a
-            href={`https://wa.me/${agent.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(DEFAULT_WA_MESSAGE)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white"
-          >
-            <WhatsAppIcon className="h-3.5 w-3.5 shrink-0" style={{ color: GOLD }} />
-            <span className="truncate">{agent.whatsapp}</span>
-          </a>
-          <a href={`tel:${agent.phone}`} className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white">
-            <Phone className="h-3.5 w-3.5 shrink-0" style={{ color: GOLD }} />
-            <span className="truncate">{agent.phone}</span>
-          </a>
-          <a href={`mailto:${agent.email}`} className="flex items-center gap-2 text-[12px] text-white/85 hover:text-white">
-            <Mail className="h-3.5 w-3.5 shrink-0" style={{ color: GOLD }} />
-            <span className="truncate">{agent.email}</span>
-          </a>
-        </div>
-        <div className="min-w-0 border-l border-white/15 pl-4 lg:border-0 lg:pl-0">
-          <div className="hidden lg:mt-4 lg:block lg:h-px lg:w-full lg:bg-white/15" />
-          <p className="flex items-center gap-2 text-[11.5px] font-bold tracking-[0.1em] lg:mt-3.5" style={{ color: GOLD }}>
-            <ShieldCheck className="h-4 w-4 shrink-0" /> RERA BRN: {agent.brn}
-          </p>
-          <p className="mt-3.5 flex items-center gap-2 text-[11.5px] font-bold tracking-[0.1em]" style={{ color: GOLD }}>
-            <FileText className="h-4 w-4 shrink-0" /> RERA ORN: {agent.orn}
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
+import { Building2, Play } from "lucide-react"
+import { BRAND_GLASS_SOFT, BRAND_GRADIENT, BRAND_TO, BRAND_TO_A0, BRAND_TO_A90, GOLD, GOLD_A50, HERO_STAT_ICON_FALLBACK, INK, NAVY, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
 
 export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
-  const { agent, hero } = data
+  const { hero } = data
   // Left-side dark wash (0–100) so the headline stays readable on bright
   // photos; at 0 the banner renders with no overlay at all.
   const overlay = Math.min(100, Math.max(0, hero.overlay ?? 0)) / 100
@@ -127,18 +80,10 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
               </a>
             </div>
 
-            {/* Broker card — inline on mobile/tablet, absolute on desktop */}
-            <div className="mt-8 w-full max-w-sm lg:hidden">
-              <BrokerCard agent={agent} />
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Broker card — frosted glass, floating at the hero's lower right */}
-      <div className="absolute bottom-14 right-[max(2.5rem,calc((100vw-1400px)/2+2rem))] hidden w-72 lg:block">
-        <BrokerCard agent={agent} />
-      </div>
 
       {/* Stat strip — ONE dark-glass band that RESPECTS the page's left
           padding (its left edge lines up with the headline/buttons) and is
@@ -147,7 +92,7 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
       {hero.stats.length > 0 && (
       <div className="relative mx-auto mb-12 hidden max-w-[1400px] px-5 sm:px-8 lg:block">
         <div
-          className="grid max-w-full grid-cols-2 gap-x-6 gap-y-4 border-y border-white/10 px-4 py-4 backdrop-blur-md sm:inline-flex sm:flex-wrap sm:items-center sm:gap-x-10 sm:pl-5 sm:pr-10 lg:max-w-[calc(100%-21rem)]"
+          className="grid max-w-full grid-cols-2 gap-x-6 gap-y-4 border-y border-white/10 px-4 py-4 backdrop-blur-md sm:inline-flex sm:flex-wrap sm:items-center sm:gap-x-10 sm:pl-5 sm:pr-10"
           style={{ backgroundColor: BRAND_GLASS_SOFT }}
         >
           {hero.stats.map(({ icon, value, label }, i) => {
