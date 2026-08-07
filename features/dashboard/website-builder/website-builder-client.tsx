@@ -748,10 +748,27 @@ export function WebsiteBuilderClient() {
       return next
     })
 
-  const reset = () => {
-    if (!window.confirm("Reset everything back to the sample content? Your draft will be lost.")) return
-    localStorage.removeItem(DRAFT_KEY)
-    setData(seededSample(seed))
+  /** Discard unsaved edits: reload the SAVED site from the DB. Only when
+   *  nothing has ever been saved does it fall back to the seeded sample. */
+  const [resetting, setResetting] = useState(false)
+  const reset = async () => {
+    if (!window.confirm("Discard unsaved edits and reload your saved site?")) return
+    setResetting(true)
+    try {
+      localStorage.removeItem(DRAFT_KEY)
+      const res = await fetch("/api/website-builder/site")
+      const json = (await res.json().catch(() => ({}))) as { exists?: boolean; slug?: string; data?: WebsiteData }
+      if (res.ok && json.exists && json.data) {
+        setData(json.data)
+        if (json.slug) setSiteSlug(json.slug)
+      } else {
+        setData(seededSample(seed))
+      }
+    } catch {
+      setData(seededSample(seed))
+    } finally {
+      setResetting(false)
+    }
   }
 
   /** Blank slate: wipe every placeholder (texts, photos, cards, reviews) so
@@ -990,11 +1007,9 @@ export function WebsiteBuilderClient() {
               <Field label="Heading (line breaks kept)"><TArea rows={2} value={data.about.heading} onChange={(v) => update((d) => { d.about.heading = v })} /></Field>
               <Field label="Bio"><TArea rows={7} value={data.about.bio} onChange={(v) => update((d) => { d.about.bio = v })} /></Field>
               <Field label="Portrait photo"><ImageInput value={data.about.portrait} onChange={(v) => update((d) => { d.about.portrait = v })} /></Field>
-              <div className="grid grid-cols-3 gap-3">
-                <Field label="Views"><TInput value={data.about.views} onChange={(v) => update((d) => { d.about.views = v })} /></Field>
-                <Field label="Listings"><TInput value={data.about.listings} onChange={(v) => update((d) => { d.about.listings = v })} /></Field>
-                <Field label="Rating"><TInput value={data.about.rating} onChange={(v) => update((d) => { d.about.rating = v })} /></Field>
-              </div>
+              <p className="text-[11px] leading-relaxed text-[#9aa0aa]">
+                Views, Listings and Rating aren&apos;t editable — they show &ldquo;-&rdquo; for now and will be automated from real data.
+              </p>
               <Field label="Facebook URL"><TInput value={data.about.socials.facebook} onChange={(v) => update((d) => { d.about.socials.facebook = v })} /></Field>
               <Field label="Instagram URL"><TInput value={data.about.socials.instagram} onChange={(v) => update((d) => { d.about.socials.instagram = v })} /></Field>
               <Field label="LinkedIn URL"><TInput value={data.about.socials.linkedin} onChange={(v) => update((d) => { d.about.socials.linkedin = v })} /></Field>
@@ -1254,10 +1269,12 @@ export function WebsiteBuilderClient() {
               </button>
               <button
                 type="button"
-                onClick={reset}
-                className="inline-flex h-8 items-center gap-1.5 border border-[#e2e6ea] px-2.5 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
+                onClick={() => void reset()}
+                disabled={resetting}
+                title="Discard unsaved edits and reload your saved site"
+                className="inline-flex h-8 items-center gap-1.5 border border-[#e2e6ea] px-2.5 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9] disabled:opacity-60"
               >
-                <RotateCcw className="h-3.5 w-3.5" /> Reset
+                {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />} Reset
               </button>
               <button
                 type="button"

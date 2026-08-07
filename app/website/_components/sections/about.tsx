@@ -212,10 +212,12 @@ export function AboutSection({
                   className="mt-6 flex flex-wrap items-center justify-start gap-x-6 gap-y-4 border px-8 py-5"
                   style={{ background: BRAND_GRADIENT, borderColor: GOLD_A50 }}
                 >
+                  {/* Placeholder "-" for now — these will be automated from
+                      real data (view tracking, listing counts, ratings). */}
                   {[
-                    { icon: Eye, value: about.views, label: "Views" },
-                    { icon: HomeIcon, value: about.listings, label: "Listings" },
-                    { icon: Star, value: about.rating, label: "Rating" },
+                    { icon: Eye, value: "-", label: "Views" },
+                    { icon: HomeIcon, value: "-", label: "Listings" },
+                    { icon: Star, value: "-", label: "Rating" },
                   ].map(({ icon: Icon, value, label }, i, arr) => (
                     <div key={label} className="flex flex-1 items-center justify-start gap-3.5" style={i < arr.length - 1 ? { borderRight: "1px solid rgba(255,255,255,0.12)" } : undefined}>
                       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border" style={{ borderColor: GOLD_A60, color: GOLD }}>
