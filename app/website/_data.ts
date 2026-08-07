@@ -323,12 +323,12 @@ export const SAMPLE_DATA: WebsiteData = {
     { value: "4.9/5", label: "Client Rating" },
   ],
   areas: [
-    { image: IMG.houseA, label: "Dubai Marina" },
-    { image: IMG.skylineC, label: "Downtown Dubai" },
-    { image: IMG.houseB, label: "Palm Jumeirah" },
-    { image: IMG.skylineA, label: "Business Bay" },
-    { image: IMG.houseC, label: "Dubai Hills Estate" },
-    { image: IMG.skylineB, label: "JVC" },
+    { image: IMG.houseA, label: "sample 1" },
+    { image: IMG.skylineC, label: "sample 2" },
+    { image: IMG.houseB, label: "sample 3" },
+    { image: IMG.skylineA, label: "sample 4" },
+    { image: IMG.houseC, label: "sample 5" },
+    { image: IMG.skylineB, label: "sample 6" },
   ],
   gallery: {
     "Event Photos": [IMG.houseA, IMG.skylineC, IMG.houseB, IMG.aptA, IMG.houseC, IMG.aptB, IMG.skylineA, IMG.aptC],
