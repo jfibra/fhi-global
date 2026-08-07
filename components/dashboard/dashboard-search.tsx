@@ -15,7 +15,9 @@ import { getSearchTargets, type NavSearchTarget } from "@/components/dashboard/s
  */
 export function DashboardSearch() {
   const router = useRouter()
-  const { profile } = useAuth()
+  // Effective role (follows an admin's view-as preview) so search targets match
+  // the sidebar the user is currently looking at.
+  const { role } = useAuth()
 
   const [query, setQuery] = useState("")
   const [open, setOpen] = useState(false)
@@ -23,7 +25,7 @@ export function DashboardSearch() {
   const boxRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const targets = useMemo(() => getSearchTargets(profile?.role), [profile?.role])
+  const targets = useMemo(() => getSearchTargets(role), [role])
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase()

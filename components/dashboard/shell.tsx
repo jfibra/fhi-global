@@ -15,6 +15,7 @@ import { DashboardBreadcrumb } from "@/components/dashboard/dashboard-breadcrumb
 import { DashboardSearch } from "@/components/dashboard/dashboard-search"
 import { useNewLeadsCount } from "@/components/dashboard/use-new-leads-count"
 import { RequiredSaleProofGate } from "@/components/dashboard/required-sale-proof-gate"
+import { ViewAsMenuItem, ViewAsBanner } from "@/components/dashboard/view-as"
 import { ROLE_SHELL_BADGE, normalizeAppRole, isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
 
 // ─── Render-once contract ────────────────────────────────────────────────────
@@ -171,6 +172,7 @@ function SidebarAccount({
   accentColor,
   dashboardBase,
   showEncodeSale,
+  canSwitchPov,
   onNavigate,
 }: {
   displayName: string
@@ -180,6 +182,7 @@ function SidebarAccount({
   accentColor: string
   dashboardBase: string
   showEncodeSale: boolean
+  canSwitchPov: boolean
   onNavigate: () => void
 }) {
   const router = useRouter()
@@ -231,11 +234,11 @@ function SidebarAccount({
         <ChevronDown className={`w-4 h-4 text-white/50 shrink-0 transition-transform duration-200 ${profileMenuOpen ? "rotate-180" : ""}`} />
       </button>
 
-      {/* Account dropdown — Profile Settings / Sign Out. Home lives in the top
-          bar, so it isn't repeated here. */}
+      {/* Account dropdown — Profile Settings / (Switch point of view) / Sign Out.
+          Home lives in the top bar, so it isn't repeated here. */}
       <div
         className="overflow-hidden transition-all duration-200 ease-in-out"
-        style={{ maxHeight: profileMenuOpen ? "160px" : "0px" }}
+        style={{ maxHeight: profileMenuOpen ? (canSwitchPov ? "224px" : "160px") : "0px" }}
       >
         <div className="pt-2 space-y-0.5">
           <Link
@@ -248,6 +251,7 @@ function SidebarAccount({
             </span>
             <span className="font-['Outfit'] font-semibold text-[15px]">Profile Settings</span>
           </Link>
+          {canSwitchPov && <ViewAsMenuItem onNavigate={closeAll} />}
           <button
             type="button"
             onClick={handleSignOut}
@@ -383,14 +387,16 @@ export function DashboardShell({
 }: DashboardShellProps) {
   // Shared state only — the mobile drawer, its backdrop and the burger button.
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { user, profile } = useAuth()
+  const { user, profile, role: contextRole, realRole } = useAuth()
 
   const closeSidebar = () => setSidebarOpen(false)
 
-  const effectiveRole = profile?.role ?? role ?? "member"
+  // Effective role drives the entire shell. Context wins so an admin previewing
+  // another role (view-as) gets that role's sidebar, header, badge and accent;
+  // otherwise it's the real role from the profile.
+  const effectiveRole = contextRole ?? profile?.role ?? role ?? "member"
   const dashboardBase = getDashboardRouteByRole(effectiveRole)
-  const effectiveRoleLabel =
-    (profile?.role ? roleToLabel(profile.role) : roleLabel) ?? roleToLabel(effectiveRole)
+  const effectiveRoleLabel = roleToLabel(effectiveRole) ?? roleLabel
   const displayName = profile?.fullname || userName || user?.email || "User"
   const avatarUrl = userAvatar || profile?.profile_url || null
   // Accent color: explicit prop wins, else derive from the effective role.
@@ -444,6 +450,7 @@ export function DashboardShell({
             accentColor={accentColor}
             dashboardBase={dashboardBase}
             showEncodeSale={isSalesPipelineRole(effectiveRole) || isAdminStaffRole(effectiveRole)}
+            canSwitchPov={isAdminStaffRole(realRole)}
             onNavigate={closeSidebar}
           />
         </div>
@@ -470,6 +477,9 @@ export function DashboardShell({
           roleLabel={effectiveRoleLabel}
           onOpenSidebar={() => setSidebarOpen(true)}
         />
+
+        {/* Admin role-preview strip — only renders while previewing. */}
+        <ViewAsBanner />
 
         {/* Route trail. Reads the pathname itself, so it re-renders on
             navigation without dragging the rest of the shell with it. */}

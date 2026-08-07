@@ -8,6 +8,8 @@ import { DashboardShell } from "@/components/dashboard/shell"
 import { ProfilePhotoGate } from "@/components/dashboard/profile-photo-gate"
 import { PageLoader } from "@/components/ui/PageLoader"
 import { getProfileByUserId, googleAvatarUrl, hasProfilePhoto, isInactiveProfile, type AppProfile, type AppUser } from "@/lib/auth"
+import { isAdminStaffRole, isKnownAppRoleId } from "@/lib/app-roles"
+import { readViewAsCookie } from "@/lib/view-as"
 
 /**
  * Client-side session provisioning for the dashboard.
@@ -87,8 +89,16 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
   // rule, still governs spots where headshot quality specifically matters.)
   const needsPhoto = !hasProfilePhoto(session.profile.profile_url)
 
+  // Admin "view as role": honor the view-as cookie only for a real admin-staff
+  // account (mirrors proxy.ts). Everyone else sees their real role.
+  const cookieRole = readViewAsCookie()
+  const viewAsRole =
+    isAdminStaffRole(session.profile.role) && isKnownAppRoleId(cookieRole) && cookieRole !== session.profile.role
+      ? cookieRole
+      : null
+
   return (
-    <AuthProvider user={session.user} profile={session.profile}>
+    <AuthProvider user={session.user} profile={session.profile} viewAsRole={viewAsRole}>
       <DashboardShell>{children}</DashboardShell>
       {needsPhoto && (
         <ProfilePhotoGate

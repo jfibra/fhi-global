@@ -10,8 +10,10 @@ import { getHubTiles } from "@/components/dashboard/sidebar-config"
  * `app/(users)/{role}/{hub}/page.tsx` is just `<HubPage hub="…" />`.
  */
 export function HubPage({ hub }: { hub: string }) {
-  const { profile } = useAuth()
-  const resolved = getHubTiles(profile?.role, hub)
+  // Effective role (follows an admin's view-as preview) so hub tiles match the
+  // previewed role's dashboard.
+  const { role } = useAuth()
+  const resolved = getHubTiles(role, hub)
 
   if (!resolved) {
     return (

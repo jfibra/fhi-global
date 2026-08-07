@@ -8,7 +8,8 @@ import {
   isProfileMissingMinimumFields,
   type AppProfile,
 } from "@/lib/auth"
-import { isAdminStaffRole, isKnownRoleSlug } from "@/lib/app-roles"
+import { isAdminStaffRole, isKnownAppRoleId, isKnownRoleSlug } from "@/lib/app-roles"
+import { VIEW_AS_COOKIE } from "@/lib/view-as"
 import { updateSession } from "@/lib/supabase/middleware"
 import { readCachedProfile, writeCachedProfile } from "@/lib/profile-cache"
 import { IDENTITY_HEADERS } from "@/lib/identity-headers"
@@ -163,6 +164,14 @@ export async function proxy(request: NextRequest) {
 
   const isPrivilegedRole = isAdminStaffRole(profile.role)
 
+  // Admin "view as role": when an admin/super_admin has a view-as cookie set,
+  // gate navigation as that role so they can browse its dashboard subtree. Only
+  // honored for a real admin-staff role — a forged cookie from anyone else is
+  // ignored here, and it never touches API authorization or RLS.
+  const viewAs = request.cookies.get(VIEW_AS_COOKIE)?.value
+  const effectiveRole =
+    isPrivilegedRole && viewAs && isKnownAppRoleId(viewAs) ? viewAs : profile.role
+
   if (
     isDashboardRoute &&
     !isPrivilegedRole &&
@@ -174,15 +183,15 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (isDashboardRoute && !canAccessDashboardPath(pathname, profile.role)) {
+  if (isDashboardRoute && !canAccessDashboardPath(pathname, effectiveRole)) {
     const url = request.nextUrl.clone()
-    url.pathname = getDashboardRouteByRole(profile.role)
+    url.pathname = getDashboardRouteByRole(effectiveRole)
     return NextResponse.redirect(url)
   }
 
   if (isLoginRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = getDashboardRouteByRole(profile.role)
+    url.pathname = getDashboardRouteByRole(effectiveRole)
     return NextResponse.redirect(url)
   }
 

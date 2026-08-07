@@ -69,11 +69,13 @@ const labelFor = (seg: string) =>
 
 export function DashboardBreadcrumb() {
   const pathname = usePathname()
-  const { profile } = useAuth()
+  // Effective role (follows an admin's view-as preview) so the trail resolves
+  // against the same nav as the sidebar currently shown.
+  const { role } = useAuth()
   // A client-state detail view (no route of its own) can publish a trailing crumb.
   const extra = useSyncExternalStore(subscribeBreadcrumbExtra, getBreadcrumbExtra, getBreadcrumbExtraServer)
 
-  const roleId = resolveAppRoleOrMember(profile?.role)
+  const roleId = resolveAppRoleOrMember(role)
   const base = ROLE_DASHBOARD_MAP[roleId] ?? ROLE_DASHBOARD_MAP.member
 
   if (!pathname || !pathname.startsWith(base)) return null
@@ -96,7 +98,7 @@ export function DashboardBreadcrumb() {
 
   for (let end = segs.length; end > 1; end--) {
     const candidate = "/" + segs.slice(0, end).join("/")
-    const trail = getNavTrail(profile?.role, candidate)
+    const trail = getNavTrail(role, candidate)
     if (trail.length) {
       matched = trail
       tailFrom = end
