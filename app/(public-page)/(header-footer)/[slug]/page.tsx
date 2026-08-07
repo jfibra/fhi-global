@@ -5,6 +5,7 @@ import Link from "next/link"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
 import { ProjectCard, type ProjectCardData } from "@/components/project-card"
+import { Reveal } from "@/components/public/reveal"
 import { SOCIAL_URLS } from "@/lib/social"
 import { getSeoPage, NON_UAE_CITIES, type SeoPage } from "@/lib/seo-pages"
 import { Building2, Facebook, Mail, MapPin, Star, CheckCircle2, ArrowLeft } from "lucide-react"
@@ -519,39 +520,42 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
               fill
               sizes="100vw"
               priority
-              className="absolute inset-0 object-cover"
+              // Slow cinematic drift, so the masthead isn't a still slab.
+              className="absolute inset-0 object-cover animate-kenburns"
               aria-hidden="true"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/95 via-[#001428]/80 to-[#001428]/45" />
+            {/* Scrim only where the type sits — heavy enough on the left to
+                keep the headline legible, clear on the right so the building
+                reads as a photo rather than a flat blue panel. */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/88 via-[#001428]/45 to-transparent" />
           </>
         )}
 
-        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-12">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
+        {/* Deliberately short: the visitor came to see projects, so the header
+            states what this page is and gets out of the way. The explanatory
+            copy — which is what actually ranks — sits under the grid. */}
+        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-9">
+          <p
+            className="animate-hero-item text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]"
+            style={{ animationDelay: "60ms" }}
+          >
             FHI Global · Popular Searches
           </p>
           <h1
-            className="font-['Outfit'] text-4xl md:text-[46px] font-bold text-white mt-2.5 leading-[1.1] tracking-tight"
-            style={{ textShadow: "0 2px 22px rgba(0,10,30,0.55)" }}
+            className="animate-hero-item font-['Outfit'] text-4xl md:text-[46px] font-bold text-white mt-2.5 leading-[1.1] tracking-tight"
+            style={{ textShadow: "0 2px 22px rgba(0,10,30,0.55)", animationDelay: "150ms" }}
           >
             {seo.h1}
           </h1>
-          <span className="block w-14 h-[3px] bg-[#d6b357] mt-5" aria-hidden="true" />
-          <div className="mt-6 max-w-3xl space-y-3">
-            {seo.intro.map((paragraph) => (
-              <p
-                key={paragraph.slice(0, 32)}
-                className="text-[15px] leading-relaxed text-[#c9d4e2]"
-                style={{ textShadow: "0 1px 10px rgba(0,10,30,0.5)" }}
-              >
-                {paragraph}
-              </p>
-            ))}
-          </div>
+          <span
+            className="animate-hero-item block w-14 h-[3px] bg-[#d6b357] mt-5"
+            style={{ animationDelay: "240ms" }}
+            aria-hidden="true"
+          />
 
           {/* Facts strip — the count plus what the filter actually means, so the
               header carries information instead of one lonely pill. */}
-          <dl className="mt-8 flex flex-wrap gap-x-12 gap-y-5">
+          <dl className="animate-hero-item mt-7 flex flex-wrap gap-x-12 gap-y-5" style={{ animationDelay: "330ms" }}>
             {[
               { label: "Projects available", value: String(visible.length) },
               { label: "Developers", value: String(developerCount) },
@@ -577,8 +581,12 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
         {shown.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {shown.map((p) => (
-              <ProjectCard key={p.id} project={p as unknown as ProjectCardData} />
+            {shown.map((p, i) => (
+              // Stagger across the row only, so later rows don't inherit an
+              // ever-growing delay and arrive late.
+              <Reveal key={p.id} delay={(i % 3) * 90}>
+                <ProjectCard project={p as unknown as ProjectCardData} />
+              </Reveal>
             ))}
           </div>
         ) : (
@@ -598,6 +606,25 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
               Browse all {visible.length} projects <ArrowLeft className="w-4 h-4 rotate-180" />
             </Link>
           </div>
+        )}
+
+        {/* The page's explanatory copy. It sits below the results rather than
+            above them: buyers want the projects first, but this prose is what
+            makes the page rank, so it stays on the page. */}
+        {seo.intro.length > 0 && (
+          <Reveal>
+          <section className="bg-white border border-[#e8eaed] p-6 sm:p-8">
+            <h2 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">About {seo.label}</h2>
+            <span className="block w-10 h-[2px] bg-[#d6b357] mt-2.5 mb-4" aria-hidden="true" />
+            <div className="max-w-3xl space-y-3.5">
+              {seo.intro.map((paragraph) => (
+                <p key={paragraph.slice(0, 32)} className="text-[15px] leading-relaxed text-[#4b5563]">
+                  {paragraph}
+                </p>
+              ))}
+            </div>
+          </section>
+          </Reveal>
         )}
 
         {/* Related searches — the interlinking is half the SEO value. */}
