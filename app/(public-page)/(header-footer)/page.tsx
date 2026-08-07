@@ -131,6 +131,33 @@ export default async function HomePage() {
     name: d.name,
   }));
 
+  // Rotating spotlight in the hero — real featured projects, compact price.
+  const heroStatusLabels: Record<string, string> = {
+    pre_launch: "Pre-Launch",
+    launch: "Launching Now",
+    under_construction: "Under Construction",
+    completed: "Completed",
+  };
+  const heroPrice = (from: number | string | null, currency: string | null): string | null => {
+    const n = Number(from);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    const code = (currency ?? "AED").toUpperCase();
+    if (n >= 1_000_000) return `From ${code} ${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+    if (n >= 1_000) return `From ${code} ${Math.round(n / 1_000)}K`;
+    return `From ${code} ${n.toLocaleString("en-AE")}`;
+  };
+  const heroSpotlight = (featuredProjects ?? [])
+    .filter((p) => p.main_image?.trim())
+    .slice(0, 4)
+    .map((p) => ({
+      name: p.name,
+      slug: p.slug ?? null,
+      image: p.main_image as string,
+      location: p.location || p.city || null,
+      priceLabel: heroPrice(p.launch_price_from, p.currency),
+      statusLabel: heroStatusLabels[p.status ?? ""] ?? null,
+    }));
+
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae";
   const organizationSchema = {
     "@context": "https://schema.org",
@@ -170,7 +197,7 @@ export default async function HomePage() {
       <div className="fixed top-[-10%] left-[-10%] w-[700px] h-[700px] rounded-full opacity-30 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />
       <div className="fixed bottom-0 right-[-5%] w-[600px] h-[600px] rounded-full opacity-25 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(250,240,210)_0%,rgba(255,255,255,0)_70%)]" />
 
-      <HeroSection developers={devOptions} cities={uniqueCities} />
+      <HeroSection developers={devOptions} cities={uniqueCities} spotlight={heroSpotlight} />
 
       {/* ----------------------------------------------- */}
       {/* STATS BANNER                                    */}

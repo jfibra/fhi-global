@@ -1,16 +1,28 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import {
   Search, MapPin, Building2, DollarSign, ChevronDown,
-  ShieldCheck, Gem, TrendingUp, Headphones,
+  ShieldCheck, Gem, TrendingUp, Headphones, ArrowRight,
 } from "lucide-react"
+
+export interface HeroSpotlight {
+  name: string
+  slug: string | null
+  image: string
+  location: string | null
+  priceLabel: string | null
+  statusLabel: string | null
+}
 
 interface HeroSectionProps {
   developers: { id: string; name: string }[]
   cities: string[]
+  /** Featured projects for the rotating spotlight card (xl screens). */
+  spotlight?: HeroSpotlight[]
 }
 
 const PRICE_RANGES = [
@@ -23,8 +35,19 @@ const PRICE_RANGES = [
   { label: "Above AED 10M",  value: "10000000-" },
 ]
 
-// Full-bleed Dubai skyline photo (approved homepage mockup), served locally.
-const BG_IMAGE = "/background/home.webp"
+// The hero rotates through these on a slow crossfade — one frozen photo was
+// the single biggest reason the section read as static. All served locally.
+const HERO_SLIDES = [
+  "/background/home.webp",
+  "/background/developers.webp",
+  "/background/featured-marina.jpg",
+  "/background/dubai.webp",
+]
+const SLIDE_MS = 7000
+
+// The last headline word cycles — motion at the exact spot every visitor reads.
+const ROTATING_WORDS = ["Investment", "Opportunities", "Living"]
+const WORD_MS = 3600
 
 const HIGHLIGHTS = [
   { icon: ShieldCheck, title: "Trusted Developers",  desc: "Partnered with top UAE developers" },
@@ -33,12 +56,31 @@ const HIGHLIGHTS = [
   { icon: Headphones,  title: "Expert Support",      desc: "Dedicated support for your investment journey" },
 ]
 
-export function HeroSection({ developers, cities }: HeroSectionProps) {
+export function HeroSection({ developers, cities, spotlight = [] }: HeroSectionProps) {
   const router = useRouter()
   const [query,      setQuery]      = useState("")
   const [developer,  setDeveloper]  = useState("")
   const [city,       setCity]       = useState("")
   const [priceRange, setPriceRange] = useState("")
+
+  // Rotation state for the background, the headline word and the spotlight
+  // card. One interval each, all skipped for reduced-motion users.
+  const [slide, setSlide] = useState(0)
+  const [word, setWord] = useState(0)
+  const [spot, setSpot] = useState(0)
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+    const slides = setInterval(() => setSlide((i) => (i + 1) % HERO_SLIDES.length), SLIDE_MS)
+    const words = setInterval(() => setWord((i) => (i + 1) % ROTATING_WORDS.length), WORD_MS)
+    const spots = spotlight.length > 1
+      ? setInterval(() => setSpot((i) => (i + 1) % spotlight.length), 6000)
+      : undefined
+    return () => {
+      clearInterval(slides)
+      clearInterval(words)
+      clearInterval(spots)
+    }
+  }, [spotlight.length])
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -58,15 +100,20 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
     <section className="relative min-h-[88vh] flex overflow-hidden">
       {/* ── Background photo + legibility washes ── */}
       <div className="absolute inset-0">
-        <Image
-          src={BG_IMAGE}
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          quality={80}
-          className="object-cover object-center animate-kenburns"
-        />
+        {HERO_SLIDES.map((src, i) => (
+          <Image
+            key={src}
+            src={src}
+            alt=""
+            fill
+            priority={i === 0}
+            sizes="100vw"
+            quality={80}
+            className={`object-cover object-center animate-kenburns transition-opacity duration-[1800ms] ease-linear ${
+              i === slide ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        ))}
         {/* Light navy wash on the left where the copy sits; skyline stays bright */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/70 via-[#001428]/30 to-transparent" />
         {/* Bottom fade so the highlight band and next section blend in */}
@@ -94,7 +141,10 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
             <span className="text-white">Discover Premium</span>
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-b from-[#f3dd89] to-[#daa843]">
-              Real Estate Investment
+              Real Estate{" "}
+              <span key={ROTATING_WORDS[word]} className="animate-hero-item inline-block">
+                {ROTATING_WORDS[word]}
+              </span>
             </span>
           </h1>
 
@@ -227,6 +277,56 @@ export function HeroSection({ developers, cities }: HeroSectionProps) {
             </div>
           ))}
         </div>
+        {/* ═══ Rotating featured-project spotlight (wide screens) ═══ */}
+        {spotlight.length > 0 && spotlight[spot] && (
+          <Link
+            key={spotlight[spot].slug ?? spot}
+            href={spotlight[spot].slug ? `/projects/${spotlight[spot].slug}` : "/projects"}
+            className="animate-hero-item hidden xl:block absolute right-8 top-24 w-[300px] bg-[#06182e]/75 backdrop-blur-xl border border-white/15 shadow-[0_20px_60px_rgba(0,0,0,0.45)] hover:border-[#d6b357]/70 transition-colors group"
+          >
+            <div className="relative h-40 overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={spotlight[spot].image}
+                alt={spotlight[spot].name}
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
+              />
+              {spotlight[spot].statusLabel && (
+                <span className="absolute top-0 left-0 bg-[#0a2647] text-white text-[10px] font-bold uppercase tracking-[0.12em] px-2.5 py-1.5">
+                  {spotlight[spot].statusLabel}
+                </span>
+              )}
+            </div>
+            <div className="p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#d6b357] mb-1.5">
+                Featured Project
+              </p>
+              <p className="font-['Outfit'] text-base font-bold text-white leading-snug line-clamp-1">
+                {spotlight[spot].name}
+              </p>
+              {spotlight[spot].location && (
+                <p className="text-xs text-white/60 mt-1 inline-flex items-center gap-1.5 max-w-full">
+                  <MapPin className="w-3 h-3 text-[#d6b357] shrink-0" />
+                  <span className="truncate">{spotlight[spot].location}</span>
+                </p>
+              )}
+              <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between gap-3">
+                <span className="text-sm font-bold text-[#d6b357]">
+                  {spotlight[spot].priceLabel ?? "Price on request"}
+                </span>
+                <ArrowRight className="w-4 h-4 text-white/60 group-hover:text-[#d6b357] group-hover:translate-x-0.5 transition-all" />
+              </div>
+            </div>
+          </Link>
+        )}
+
+        {/* Scroll cue */}
+        <span
+          className="hidden md:flex absolute bottom-3 left-1/2 -translate-x-1/2 text-white/45 animate-bounce"
+          aria-hidden="true"
+        >
+          <ChevronDown className="w-5 h-5" />
+        </span>
       </div>
     </section>
   )
