@@ -63,6 +63,7 @@ export const CATEGORY_META: Record<string, { label: string; bg: string; text: st
   support: { label: "Support", bg: "bg-orange-50", text: "text-orange-700" },
   contact: { label: "Contact", bg: "bg-cyan-50", text: "text-cyan-700" },
   inquiry: { label: "Inquiries", bg: "bg-emerald-50", text: "text-emerald-700" },
+  feedback: { label: "Customer Feedback", bg: "bg-amber-50", text: "text-amber-700" },
   auth: { label: "Auth", bg: "bg-rose-50", text: "text-rose-700" },
   security: { label: "Security", bg: "bg-red-50", text: "text-red-700" },
   mailer: { label: "Mailer", bg: "bg-blue-50", text: "text-blue-700" },

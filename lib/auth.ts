@@ -9,6 +9,7 @@ import {
   isSuperAdminRole,
   isDeveloperRole,
   ROLES_SALES_REPORTS_ACCESS,
+  ROLES_SALES_PIPELINE,
   ROLES_REELS_MAKER,
   ROLES_PROJECT_STUDIO_VIEWERS,
   ROLES_INTERNAL_RESOURCES,
@@ -64,6 +65,8 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   "reels-maker": [...ROLES_REELS_MAKER],
   "website-builder": [...ROLES_WEBSITE_BUILDER],
   "team-sales": ["team_leader", "unit_manager"],
+  // Customer feedback — the sales ladder collects reviews on themselves.
+  feedback: [...ROLES_SALES_PIPELINE],
   // Internal only — external developer partners don't get our marketing
   // artwork or training library.
   materials: [...ROLES_INTERNAL_RESOURCES],

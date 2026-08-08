@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library,
-  Mail, PanelsTopLeft, FileSignature,
+  Mail, PanelsTopLeft, FileSignature, Star,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -123,6 +123,7 @@ const WEBSITE_BUILDER: NavEntry = { icon: PanelsTopLeft, label: "Website Builder
 const DIGITAL_CARD: NavEntry = { icon: Globe, label: "Digital Business Card", to: "digital-business-card" }
 const SALES_REPORTS: NavEntry = { icon: TrendingUp, label: "Sales Reports", to: "sales" }
 const SUPPORT_TICKETS: NavEntry = { icon: LifeBuoy, label: "Support Tickets", to: "support" }
+const FEEDBACK: NavEntry = { icon: Star, label: "Customer Feedback", to: "feedback" }
 // Shared marketing artwork. Open to every role, so it appears in all lists and
 // is deliberately absent from SUB_PATH_ROLES in lib/auth.ts (unlisted = shared).
 const MATERIALS: NavEntry = { icon: FolderDown, label: "Materials", to: "materials" }
@@ -251,6 +252,7 @@ const salesPipelineNav = ({ projects = false, events = false, teamSales = false 
   // Team leaders / unit managers see their whole team's production
   // (keep in sync with "team-sales" in SUB_PATH_ROLES, lib/auth.ts).
   ...(teamSales ? [{ icon: Users, label: "Team Sales", to: "team-sales" } satisfies NavEntry] : []),
+  FEEDBACK,
   SUPPORT_TICKETS,
   BUSINESS_CARD,
   DIGITAL_CARD,
