@@ -243,11 +243,9 @@ const salesPipelineNav = ({ projects = false, events = false, teamSales = false 
   OVERVIEW,
   { icon: ClipboardList, label: "My listings", to: "listings" },
   OWNER_DOCUMENTS,
-  A2A_AGREEMENT,
   // The read-only projects browser for the Poster/Reels studios — the whole
   // sales ladder has it (see ROLES_PROJECT_STUDIO_VIEWERS).
   ...(projects ? [PROJECTS] : []),
-  REELS_MAKER,
   INVITE,
   // Team leaders manage events too (see ROLES_EVENT_MANAGERS).
   ...(events ? [EVENTS] : []),
@@ -257,11 +255,32 @@ const salesPipelineNav = ({ projects = false, events = false, teamSales = false 
   ...(teamSales ? [{ icon: Users, label: "Team Sales", to: "team-sales" } satisfies NavEntry] : []),
   FEEDBACK,
   SUPPORT_TICKETS,
-  BUSINESS_CARD,
-  DIGITAL_CARD,
-  WEBSITE_BUILDER,
-  MATERIALS,
-  EBOOKS,
+  // The agent toolkit, consolidated into one hub row (mirrors admin's Agent
+  // Resource). Each tile lives at agent-resource/{item} — see the matching
+  // route folders under app/(users)/{agent,teamleader,unitmanager}/agent-resource.
+  {
+    group: "Agent Resource",
+    to: "agent-resource",
+    icon: FileText,
+    items: [
+      { ...BUSINESS_CARD,   description: "Your shareable digital business card." },
+      { ...DIGITAL_CARD,    description: "The one link you share — contacts, socials and QR." },
+      { ...REELS_MAKER,     description: "Turn a listing or project into a shareable reel." },
+      { ...POSTER_MAKER,    description: "Flyers and posters from any listing or project." },
+      { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website." },
+      { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement." },
+    ],
+  },
+  // Marketing artwork + training PDFs, grouped under one hub.
+  {
+    group: "Library",
+    to: "library",
+    icon: Library,
+    items: [
+      { ...MATERIALS, description: "Branded marketing artwork to download and share." },
+      { ...EBOOKS,    description: "Training guides and reference PDFs." },
+    ],
+  },
 ]
 
 /** secretary + team_secretary — paperwork support, no listings of their own. */
