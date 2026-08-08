@@ -83,6 +83,24 @@ function seededSample(seed: ProfileSeed): WebsiteData {
   return d
 }
 
+/** A blank site for first-time builders: no placeholder content anywhere, so
+ *  nothing fake needs clearing — only the profile-seeded contacts, socials
+ *  survive. (The sample content stays viewable at /website/sample.) */
+function emptySite(seed: ProfileSeed): WebsiteData {
+  const d = seededSample(seed)
+  d.agent = { ...d.agent, title: "", brn: "", orn: "", brokerage: "" }
+  d.hero = { headline: "", headlineAccent: "", description: "", image: "", overlay: 0, stats: [] }
+  d.about = { ...d.about, heading: "", bio: "", portrait: "", views: "", listings: "", rating: "" }
+  d.projects = []
+  d.properties = []
+  d.bandStats = []
+  d.areas = []
+  d.gallery = { "Event Photos": [], Certificates: [], "Awards & Recognition": [] }
+  d.testimonials = []
+  d.cta = { heading: "", sub: "" }
+  return d
+}
+
 /** Profile values fill in any EMPTY social field of an existing draft — a
  *  draft saved before seeding existed shouldn't pin the socials to "". */
 function seedEmptySocials(d: WebsiteData, seed: ProfileSeed): WebsiteData {
@@ -603,7 +621,7 @@ export function WebsiteBuilderClient() {
   const [data, setData] = useState<WebsiteData>(() => {
     if (typeof window === "undefined") return SAMPLE_DATA
     const draft = loadDraft()
-    return draft ? seedEmptySocials(draft, seed) : seededSample(seed)
+    return draft ? seedEmptySocials(draft, seed) : emptySite(seed)
   })
   const [activeSection, setActiveSection] = useState<FormSectionId>("agent")
   const [activeGalleryCat, setActiveGalleryCat] = useState<GalleryCategory>("Event Photos")
@@ -766,10 +784,10 @@ export function WebsiteBuilderClient() {
         setData(json.data)
         if (json.slug) setSiteSlug(json.slug)
       } else {
-        setData(seededSample(seed))
+        setData(emptySite(seed))
       }
     } catch {
-      setData(seededSample(seed))
+      setData(emptySite(seed))
     } finally {
       setResetting(false)
     }
