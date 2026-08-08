@@ -201,8 +201,16 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { ...SUPPORT_TICKETS,                                        description: "Tickets raised by agents and clients." },
     ],
   },
-  MATERIALS,
-  EBOOKS,
+  // Marketing artwork + training PDFs, grouped under one hub (same as the sales roles).
+  {
+    group: "Library",
+    to: "library",
+    icon: Library,
+    items: [
+      { ...MATERIALS, description: "Branded marketing artwork to download and share." },
+      { ...EBOOKS,    description: "Training guides and reference PDFs." },
+    ],
+  },
   { icon: ScrollText, label: "Activity Logs", to: "system-logs" },
   // Dev-only test bench for the upload-compression pipeline
   // (lib/upload/compress-image.ts) — not a real business feature, just a way
