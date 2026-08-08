@@ -7,9 +7,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import QRCode from "qrcode"
 import {
-  Check, Copy, Download, ExternalLink, Loader2, MessageSquareQuote,
-  QrCode, Star, ThumbsUp, Users,
+  Check, Copy, Download, ExternalLink, Eye, Loader2, MessageSquareQuote,
+  QrCode, Star, ThumbsUp, Users, X,
 } from "lucide-react"
+import { buildFeedbackPoster } from "./feedback-poster"
 import {
   type AgentFeedback,
   RECOMMEND_LABELS,
@@ -28,6 +29,13 @@ export function FeedbackBoard({ agentId, agentName }: { agentId: string; agentNa
   const [qr, setQr] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  // The printable poster is generated on demand (canvas work is wasted if
+  // nobody opens it) and cached for the session.
+  const [poster, setPoster] = useState<string | null>(null)
+  const [posterOpen, setPosterOpen] = useState(false)
+  const [posterBusy, setPosterBusy] = useState(false)
+  const [posterError, setPosterError] = useState<string | null>(null)
 
   useEffect(() => {
     const url = `${window.location.origin}/feedback/${agentId}`
@@ -59,6 +67,46 @@ export function FeedbackBoard({ agentId, agentName }: { agentId: string; agentNa
       // Clipboard blocked — the input below is selectable by hand.
     }
   }, [link])
+
+  const ensurePoster = useCallback(async (): Promise<string | null> => {
+    if (poster) return poster
+    if (!qr) return null
+    setPosterBusy(true)
+    setPosterError(null)
+    try {
+      const url = await buildFeedbackPoster({
+        qrDataUrl: qr,
+        agentName,
+        siteLabel: window.location.host.replace(/^www\./, ""),
+      })
+      setPoster(url)
+      return url
+    } catch (err) {
+      setPosterError((err as Error).message)
+      return null
+    } finally {
+      setPosterBusy(false)
+    }
+  }, [poster, qr, agentName])
+
+  const posterFileName = `fhi-feedback-poster-${agentName.replace(/\s+/g, "-").toLowerCase()}.png`
+
+  const downloadPoster = useCallback(async () => {
+    const url = await ensurePoster()
+    if (!url) return
+    const a = document.createElement("a")
+    a.href = url
+    a.download = posterFileName
+    a.click()
+  }, [ensurePoster, posterFileName])
+
+  // Escape closes the preview, matching every other overlay in the dashboard.
+  useEffect(() => {
+    if (!posterOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPosterOpen(false) }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [posterOpen])
 
   const stats = useMemo(() => {
     if (!rows || rows.length === 0) return null
@@ -124,20 +172,32 @@ export function FeedbackBoard({ agentId, agentName }: { agentId: string; agentNa
         <div className="shrink-0 text-center">
           {qr ? (
             <>
-              <div className="inline-block bg-white p-3">
+              <div className="inline-block bg-white p-4">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={qr} alt="QR code for your feedback link" className="w-40 h-40" />
+                <img src={qr} alt="QR code for your feedback link" className="w-56 h-56" />
               </div>
-              <a
-                href={qr}
-                download={`feedback-qr-${agentName.replace(/\s+/g, "-").toLowerCase()}.png`}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#d6b357] hover:text-white transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" /> Download QR (print-ready)
-              </a>
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setPosterOpen(true); void ensurePoster() }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 border border-white/25 text-xs font-semibold text-white hover:bg-white/10 transition-colors"
+                >
+                  <Eye className="w-3.5 h-3.5" /> Preview poster
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void downloadPoster()}
+                  disabled={posterBusy}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#d6b357] text-[#1a1408] text-xs font-bold hover:brightness-95 disabled:opacity-60 transition-all"
+                >
+                  {posterBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                  Download
+                </button>
+              </div>
+              {posterError && <p className="mt-2 text-xs text-rose-300">{posterError}</p>}
             </>
           ) : (
-            <div className="w-40 h-40 bg-white/10 border border-white/20 flex items-center justify-center">
+            <div className="w-56 h-56 bg-white/10 border border-white/20 flex items-center justify-center">
               <QrCode className="w-8 h-8 text-white/40" />
             </div>
           )}
@@ -299,6 +359,57 @@ export function FeedbackBoard({ agentId, agentName }: { agentId: string; agentNa
           ))}
         </div>
       </div>
+
+      {/* ── Poster preview ── */}
+      {posterOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setPosterOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Feedback poster preview"
+        >
+          <div
+            className="bg-white max-w-[440px] w-full max-h-full overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[#eef0f3]">
+              <p className="text-sm font-bold text-[#0d1117]">Printable poster</p>
+              <button
+                type="button"
+                onClick={() => setPosterOpen(false)}
+                aria-label="Close preview"
+                className="p-1.5 text-[#6b7280] hover:text-[#0d1117] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 bg-[#f5f6f8]">
+              {poster ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={poster} alt="Feedback poster preview" className="w-full border border-[#e5e8ec]" />
+              ) : (
+                <div className="flex items-center justify-center py-24">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#9ca3af]" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 px-4 py-3 border-t border-[#eef0f3]">
+              <button
+                type="button"
+                onClick={() => void downloadPoster()}
+                disabled={!poster}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#0a3d6b] disabled:opacity-60 transition-colors"
+              >
+                <Download className="w-4 h-4" /> Download PNG
+              </button>
+              <span className="text-xs text-[#9ca3af]">Prints cleanly at A5 or A4.</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -10,6 +10,7 @@ import {
   isDeveloperRole,
   ROLES_SALES_REPORTS_ACCESS,
   ROLES_SALES_PIPELINE,
+  ROLES_ADMIN_STAFF,
   ROLES_REELS_MAKER,
   ROLES_PROJECT_STUDIO_VIEWERS,
   ROLES_INTERNAL_RESOURCES,
@@ -67,6 +68,8 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   "team-sales": ["team_leader", "unit_manager"],
   // Customer feedback — the sales ladder collects reviews on themselves.
   feedback: [...ROLES_SALES_PIPELINE],
+  // A2A agreement — the ladder plus admin staff, who prepare one on request.
+  "a2a-agreement": [...ROLES_SALES_PIPELINE, ...ROLES_ADMIN_STAFF],
   // Internal only — external developer partners don't get our marketing
   // artwork or training library.
   materials: [...ROLES_INTERNAL_RESOURCES],

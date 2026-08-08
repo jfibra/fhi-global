@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library,
-  Mail, PanelsTopLeft, FileSignature, Star,
+  Mail, PanelsTopLeft, FileSignature, Star, Handshake,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -124,6 +124,7 @@ const DIGITAL_CARD: NavEntry = { icon: Globe, label: "Digital Business Card", to
 const SALES_REPORTS: NavEntry = { icon: TrendingUp, label: "Sales Reports", to: "sales" }
 const SUPPORT_TICKETS: NavEntry = { icon: LifeBuoy, label: "Support Tickets", to: "support" }
 const FEEDBACK: NavEntry = { icon: Star, label: "Customer Feedback", to: "feedback" }
+const A2A_AGREEMENT: NavEntry = { icon: Handshake, label: "A2A Agreement", to: "a2a-agreement" }
 // Shared marketing artwork. Open to every role, so it appears in all lists and
 // is deliberately absent from SUB_PATH_ROLES in lib/auth.ts (unlisted = shared).
 const MATERIALS: NavEntry = { icon: FolderDown, label: "Materials", to: "materials" }
@@ -188,6 +189,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { ...REELS_MAKER,   description: "Turn a listing or project into a shareable reel." },
       { ...POSTER_MAKER,  description: "Flyers and posters from any listing or project." },
       { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website." },
+      { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement." },
     ],
   },
   {
@@ -241,6 +243,7 @@ const salesPipelineNav = ({ projects = false, events = false, teamSales = false 
   OVERVIEW,
   { icon: ClipboardList, label: "My listings", to: "listings" },
   OWNER_DOCUMENTS,
+  A2A_AGREEMENT,
   // The read-only projects browser for the Poster/Reels studios — the whole
   // sales ladder has it (see ROLES_PROJECT_STUDIO_VIEWERS).
   ...(projects ? [PROJECTS] : []),
