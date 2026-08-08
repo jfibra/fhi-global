@@ -2,7 +2,7 @@
 //
 // The editor works with the template's WebsiteData shape (app/website/_data);
 // this module translates that to/from the normalized tables — website_builder
-// (title mirrors the hero headline, slug generated from it once and immutable,
+// (title mirrors the hero headline, slug re-minted from the title on save,
 // contact + cta jsonb), hero_section / website_stats / about_section (1:1),
 // and featured_section / service_areas_section / gallery_section (1:N).
 // Featured items are stored as IDs only and re-resolved to card data on every
@@ -190,13 +190,16 @@ export function slugify(input: string): string {
     .slice(0, 80)
 }
 
-/** base, base-2, base-3, … — the first slug not already taken. */
-async function ensureUniqueSlug(admin: SupabaseClient, base: string): Promise<string> {
+/** base, base-2, base-3, … — the first slug not already taken. Pass the own
+ *  row's id when re-minting so a site's current slug doesn't count as taken. */
+async function ensureUniqueSlug(admin: SupabaseClient, base: string, excludeId?: string): Promise<string> {
   const clean = slugify(base) || "agent-site"
-  const { data } = await admin
+  let query = admin
     .from("website_builder")
     .select("slug")
     .or(`slug.eq.${clean},slug.like.${clean}-%`)
+  if (excludeId) query = query.neq("id", excludeId)
+  const { data } = await query
   const taken = new Set((data ?? []).map((r) => r.slug as string))
   if (!taken.has(clean)) return clean
   for (let n = 2; ; n++) {
@@ -275,7 +278,14 @@ export async function saveSite(
 
   if (existing) {
     websiteId = existing.id as string
-    slug = existing.slug as string // immutable after first save
+    // The slug follows the title: when the headline changes, a new slug is
+    // minted from it (unique against everyone else's; re-saving the same
+    // title keeps the current slug, including its -2/-3 suffix).
+    slug = existing.slug as string
+    const base = slugify(title) || "agent-site"
+    if (slug !== base && !new RegExp(`^${base}-\\d+$`).test(slug)) {
+      slug = await ensureUniqueSlug(admin, title, websiteId)
+    }
 
     const { data: heroRow } = await admin
       .from("hero_section")
@@ -317,6 +327,7 @@ export async function saveSite(
       .from("website_builder")
       .update({
         title,
+        slug,
         title_description: data.hero.description,
         contact: data.agent,
         cta: data.cta,

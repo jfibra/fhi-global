@@ -7,8 +7,8 @@ import type { WebsiteData } from "@/app/website/_data"
 
 // The agent's own Website Builder site: GET loads it (WebsiteData shape,
 // featured items re-resolved from live projects/listings), PUT saves the whole
-// draft across the website_builder tables. The slug is generated from the hero
-// headline on the FIRST save and never changes afterwards.
+// draft across the website_builder tables. The slug follows the hero headline:
+// changing the title re-mints the slug on save (old links stop resolving).
 
 export const runtime = "nodejs"
 
