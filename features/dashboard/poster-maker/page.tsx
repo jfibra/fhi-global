@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import { ArrowLeft, ArrowRight, FileImage, LayoutTemplate } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { canUsePosterMaker } from "@/lib/app-roles"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { PosterMakerClient } from "./poster-maker-client"
 
@@ -65,7 +65,7 @@ function PosterMakerPageInner() {
   const { role } = useAuth()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const allowed = useRequireAllowed(isAdminStaffRole(role))
+  const allowed = useRequireAllowed(canUsePosterMaker(role))
   if (!allowed) return null
 
   const type = searchParams.get("type")

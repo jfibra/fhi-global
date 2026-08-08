@@ -276,6 +276,10 @@ export const ROLES_EVENT_MANAGERS: readonly AppRoleId[] = ["super_admin", "admin
 /** Who may use the standalone Reels Maker: admin staff, the sales pipeline, and members. */
 export const ROLES_REELS_MAKER: readonly AppRoleId[] = ["super_admin", "admin", "agent", "team_leader", "unit_manager", "member"]
 
+/** Who may use Poster Maker — admin staff + the sales pipeline (it lives in
+ *  their Agent Resource hub). Keep in sync with the Agent Resource tiles. */
+export const ROLES_POSTER_MAKER: readonly AppRoleId[] = ["super_admin", "admin", "agent", "team_leader", "unit_manager"]
+
 /**
  * Who gets the read-only Projects browser (no create/edit/publish) purely to
  * open a project's Poster & Reels marketing studios. Content managers and
@@ -328,6 +332,10 @@ export function canManageEvents(role: string | null | undefined): boolean {
 
 export function canUseReelsMaker(role: string | null | undefined): boolean {
   return roleInList(role, ROLES_REELS_MAKER)
+}
+
+export function canUsePosterMaker(role: string | null | undefined): boolean {
+  return roleInList(role, ROLES_POSTER_MAKER)
 }
 
 export function canBrowseProjectStudios(role: string | null | undefined): boolean {
