@@ -3,11 +3,12 @@
 import { Suspense } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { ArrowLeft, ArrowRight, FileImage, LayoutTemplate } from "lucide-react"
+import { ArrowLeft, ArrowRight, Cake, FileImage, LayoutTemplate } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { canUsePosterMaker } from "@/lib/app-roles"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { PosterMakerClient } from "./poster-maker-client"
+import { BirthdayStudio } from "./birthday-studio"
 
 const STUDIOS = [
   {
@@ -21,6 +22,12 @@ const STUDIOS = [
     icon: LayoutTemplate,
     title: "Project Posters",
     desc: "Open a published project's Poster Studio — three designs across story, square, and print formats.",
+  },
+  {
+    type: "birthday",
+    icon: Cake,
+    title: "Birthday Poster",
+    desc: "Greet a teammate or client — drop in a photo, position it in the frame, and add their name.",
   },
 ] as const
 
@@ -69,7 +76,7 @@ function PosterMakerPageInner() {
   if (!allowed) return null
 
   const type = searchParams.get("type")
-  if (type !== "listings" && type !== "projects") {
+  if (type !== "listings" && type !== "projects" && type !== "birthday") {
     return <StudioBento pathname={pathname} />
   }
 
@@ -82,7 +89,11 @@ function PosterMakerPageInner() {
         <ArrowLeft className="w-4 h-4" />
         All studios
       </Link>
-      <PosterMakerClient key={type} source={type} />
+      {type === "birthday" ? (
+        <BirthdayStudio />
+      ) : (
+        <PosterMakerClient key={type} source={type} />
+      )}
     </div>
   )
 }
