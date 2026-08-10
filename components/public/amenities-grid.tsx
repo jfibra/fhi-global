@@ -1,6 +1,6 @@
 import {
   Waves, Dumbbell, Trees, Car, Shield, Wifi, Wind, Sun, Coffee, ShoppingBag,
-  School, Hospital, Train, Utensils, MapPin, Star, Building2, Home
+  School, Hospital, Train, Utensils, MapPin, Star, Plane
 } from "lucide-react"
 
 const AMENITY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -86,6 +86,7 @@ const PLACE_ICONS: Record<string, React.ComponentType<{ className?: string }>> =
   transport: Train,
   shopping: ShoppingBag,
   restaurant: Utensils,
+  airport: Plane,
   default: MapPin,
 }
 

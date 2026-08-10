@@ -128,7 +128,7 @@ export type ProjectKeyword = {
 export type ProjectNeighbor = {
   id: number
   project_id: number | null
-  category: "school" | "hospital" | "shopping" | null
+  category: "school" | "hospital" | "shopping" | "airport" | null
   description: string
 }
 

@@ -11,7 +11,15 @@ interface Props {
 }
 
 type Category = ProjectNeighbor["category"]
-const CATEGORIES: Category[] = ["school", "hospital", "shopping", null]
+
+// Single source of truth for the dropdown. "" is stored as null ("Other").
+const CATEGORY_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "Other" },
+  { value: "school", label: "School" },
+  { value: "hospital", label: "Hospital" },
+  { value: "shopping", label: "Shopping" },
+  { value: "airport", label: "Airport" },
+]
 
 const EMPTY: Partial<ProjectNeighbor> = { category: null, description: "" }
 
@@ -54,6 +62,7 @@ export function ProjectNearbyTab({ projectId, showToast, readOnly = false }: Pro
       school: "bg-blue-100 text-blue-600",
       hospital: "bg-red-100 text-red-600",
       shopping: "bg-yellow-100 text-yellow-600",
+      airport: "bg-sky-100 text-sky-600",
     }
     return (
       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${c ? colors[c] ?? "bg-gray-100 text-gray-500" : "bg-gray-100 text-gray-500"}`}>
@@ -82,10 +91,9 @@ export function ProjectNearbyTab({ projectId, showToast, readOnly = false }: Pro
               <select value={editing.category ?? ""}
                 onChange={(e) => setEditing((prev) => ({ ...prev, category: (e.target.value as Category) || null }))}
                 className="w-full border border-[#e5e5e5] rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#001f3f]/20 focus:border-[#001f3f]">
-                <option value="">Other</option>
-                <option value="school">School</option>
-                <option value="hospital">Hospital</option>
-                <option value="shopping">Shopping</option>
+                {CATEGORY_OPTIONS.map((o) => (
+                  <option key={o.value || "other"} value={o.value}>{o.label}</option>
+                ))}
               </select>
             </div>
             <div>
