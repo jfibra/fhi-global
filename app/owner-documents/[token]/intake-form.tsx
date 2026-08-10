@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { type Ref, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { UploadCloud, CheckCircle2, Loader2, X, Download, PenLine, Eraser } from "lucide-react"
 import { uploadOwnerDoc, type UploadedDoc } from "@/lib/owner-documents/upload-client"
@@ -21,6 +21,23 @@ type Slot = {
 
 const fmtDate = (d: Date) =>
   Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+
+/** Everything that must be filled before the NOC can be submitted, top-to-bottom. */
+type FieldKey = "ownerName" | "ownerIdNumber" | "ownerEmail" | "ownerMobile" | "signature" | "titleDeed" | "idDoc"
+
+const REQUIRED_ORDER: FieldKey[] = [
+  "ownerName", "ownerIdNumber", "ownerEmail", "ownerMobile", "signature", "titleDeed", "idDoc",
+]
+
+const FIELD_LABELS: Record<FieldKey, string> = {
+  ownerName: "your full name",
+  ownerIdNumber: "your Emirates ID / Passport number",
+  ownerEmail: "a valid email",
+  ownerMobile: "your mobile number",
+  signature: "your signature",
+  titleDeed: "your Oqood Certificate / Title Deed",
+  idDoc: "your ID document",
+}
 
 export function IntakeForm({
   token,
@@ -55,6 +72,25 @@ export function IntakeForm({
   const [idDoc, setIdDoc] = useState<Slot | null>(null)
   const [others, setOthers] = useState<Slot[]>([])
 
+  // Which required fields to flag — populated when the owner taps Submit with
+  // something missing, cleared per-field as they fill each one in.
+  const [fieldErrors, setFieldErrors] = useState<Set<FieldKey>>(() => new Set())
+  const ownerNameRef = useRef<HTMLInputElement>(null)
+  const ownerIdRef = useRef<HTMLInputElement>(null)
+  const ownerEmailRef = useRef<HTMLInputElement>(null)
+  const ownerMobileRef = useRef<HTMLInputElement>(null)
+  const signatureRef = useRef<HTMLDivElement>(null)
+  const titleDeedRef = useRef<HTMLDivElement>(null)
+  const idDocRef = useRef<HTMLDivElement>(null)
+
+  const clearError = (key: FieldKey) =>
+    setFieldErrors((prev) => {
+      if (!prev.has(key)) return prev
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
+
   const today = fmtDate(new Date())
   const uploadsDone = titleDeed?.status === "done" && idDoc?.status === "done"
   const anyUploading =
@@ -82,7 +118,7 @@ export function IntakeForm({
     return null
   }
 
-  async function runUpload(file: File, docType: string, set: (s: Slot | null) => void) {
+  async function runUpload(file: File, docType: string, set: (s: Slot | null) => void, errorKey?: FieldKey) {
     const err = validateFile(file)
     if (err) return toast.error(err)
     set({ file, status: "uploading", progress: 0 })
@@ -94,6 +130,7 @@ export function IntakeForm({
       return toast.error(error ?? "Upload failed.")
     }
     set({ file, status: "done", progress: 100, uploaded: data })
+    if (errorKey) clearError(errorKey)
   }
 
   async function addOther(file: File) {
@@ -120,10 +157,46 @@ export function IntakeForm({
   }
 
   async function handleSubmit() {
-    if (!detailsDone) return toast.error("Please complete your details (name, ID, email, mobile).")
-    if (!signature) return toast.error("Please sign in the signature box.")
-    if (!uploadsDone) return toast.error("Please upload your Title Deed and ID.")
+    // Validate every required field at once, flag the missing ones, and jump to
+    // the first — the owner sees exactly what's blocking the submit.
+    const invalid = new Set<FieldKey>()
+    if (!ownerName.trim()) invalid.add("ownerName")
+    if (!ownerIdNumber.trim()) invalid.add("ownerIdNumber")
+    if (!EMAIL_RE.test(ownerEmail.trim())) invalid.add("ownerEmail")
+    if (ownerMobile.trim().length < 4) invalid.add("ownerMobile")
+    if (!signature) invalid.add("signature")
+    if (titleDeed?.status !== "done") invalid.add("titleDeed")
+    if (idDoc?.status !== "done") invalid.add("idDoc")
 
+    if (invalid.size > 0) {
+      setFieldErrors(invalid)
+      const missing = REQUIRED_ORDER.filter((k) => invalid.has(k)).map((k) => FIELD_LABELS[k])
+      toast.error(
+        missing.length === 1
+          ? `Please add ${missing[0]} to submit.`
+          : `Please add ${missing.slice(0, -1).join(", ")} and ${missing[missing.length - 1]} to submit.`,
+      )
+
+      const firstKey = REQUIRED_ORDER.find((k) => invalid.has(k))
+      const el =
+        firstKey === "ownerName" ? ownerNameRef.current
+        : firstKey === "ownerIdNumber" ? ownerIdRef.current
+        : firstKey === "ownerEmail" ? ownerEmailRef.current
+        : firstKey === "ownerMobile" ? ownerMobileRef.current
+        : firstKey === "signature" ? signatureRef.current
+        : firstKey === "titleDeed" ? titleDeedRef.current
+        : firstKey === "idDoc" ? idDocRef.current
+        : null
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" })
+        if (el instanceof HTMLInputElement) el.focus({ preventScroll: true })
+      }
+      return
+    }
+
+    if (anyUploading) return toast.error("Please wait for your uploads to finish, then submit.")
+
+    setFieldErrors(new Set())
     setSubmitting(true)
     try {
       // Generate the signed NOC (with the drawn signature embedded) and upload it
@@ -211,7 +284,7 @@ export function IntakeForm({
                 <p>Date: <DocValue>{today}</DocValue></p>
                 <p>To Whom It May Concern,</p>
                 <p>
-                  I, <InlineInput value={ownerName} onChange={setOwnerName} placeholder="Full name (as on title deed)" width="17rem" />, holder of Emirates ID/Passport No. <InlineInput value={ownerIdNumber} onChange={setOwnerIdNumber} placeholder="ID / Passport no." width="14rem" />, being the legal owner of the property described below:
+                  I, <InlineInput value={ownerName} onChange={(v) => { setOwnerName(v); clearError("ownerName") }} placeholder="Full name (as on ID)" width="17rem" invalid={fieldErrors.has("ownerName")} inputRef={ownerNameRef} />, holder of Emirates ID/Passport No. <InlineInput value={ownerIdNumber} onChange={(v) => { setOwnerIdNumber(v); clearError("ownerIdNumber") }} placeholder="ID / Passport no." width="14rem" invalid={fieldErrors.has("ownerIdNumber")} inputRef={ownerIdRef} />, being the legal owner of the property described below:
                 </p>
                 <div>
                   <p className="font-bold text-[#0d1117]">Property Details:</p>
@@ -219,7 +292,7 @@ export function IntakeForm({
                     <Bullet label="Property Name/Building:"><InlineInput value={building} onChange={setBuilding} placeholder="e.g. Azizi Venice" width="16rem" /></Bullet>
                     <Bullet label="Unit Number:"><InlineInput value={unitNumber} onChange={setUnitNumber} placeholder="e.g. 1203" width="9rem" /></Bullet>
                     <Bullet label="Community/Area:"><InlineInput value={community} onChange={setCommunity} placeholder="e.g. Dubai South" width="13rem" /></Bullet>
-                    <Bullet label="Title Deed Number:"><InlineInput value={titleDeedNumber} onChange={setTitleDeedNumber} placeholder="e.g. 1234/2027" width="12rem" /></Bullet>
+                    <Bullet label="Title Deed / Oqood No.:"><InlineInput value={titleDeedNumber} onChange={setTitleDeedNumber} placeholder="e.g. 1234/2027" width="12rem" /></Bullet>
                   </ul>
                 </div>
                 <p>
@@ -245,8 +318,8 @@ export function IntakeForm({
                 <p className="text-[13px] font-semibold text-[#374151]">Your contact details</p>
                 <p className="text-[12px] text-[#9ca3af]">So your agent can reach you about this authorization.</p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <Field label="Email" type="email" value={ownerEmail} onChange={setOwnerEmail} placeholder="you@example.com" />
-                  <Field label="Mobile" value={ownerMobile} onChange={setOwnerMobile} placeholder="+971 5X XXX XXXX" />
+                  <Field label="Email" type="email" value={ownerEmail} onChange={(v) => { setOwnerEmail(v); clearError("ownerEmail") }} placeholder="you@example.com" invalid={fieldErrors.has("ownerEmail")} inputRef={ownerEmailRef} />
+                  <Field label="Mobile" value={ownerMobile} onChange={(v) => { setOwnerMobile(v); clearError("ownerMobile") }} placeholder="+971 5X XXX XXXX" invalid={fieldErrors.has("ownerMobile")} inputRef={ownerMobileRef} />
                 </div>
               </div>
 
@@ -257,8 +330,11 @@ export function IntakeForm({
                   Sign in the box below. On a phone or tablet, sign with your finger. We&apos;ll add your signature to the
                   certificate automatically — no printing or scanning needed.
                 </p>
-                <div className="mt-3">
-                  <SignaturePad onChange={setSignature} />
+                <div className="mt-3" ref={signatureRef}>
+                  <SignaturePad
+                    invalid={fieldErrors.has("signature")}
+                    onChange={(v) => { setSignature(v); if (v) clearError("signature") }}
+                  />
                 </div>
                 {signature && (
                   <button
@@ -274,8 +350,8 @@ export function IntakeForm({
               {/* Uploads */}
               <p className="mt-8 text-sm font-bold text-[#0d1117]">Upload your documents</p>
               <div className="mt-3 space-y-4">
-                <UploadField label="Title Deed" required slot={titleDeed} onPick={(f) => runUpload(f, "title_deed", setTitleDeed)} onClear={() => setTitleDeed(null)} />
-                <div>
+                <UploadField label="Oqood Certificate / Title Deed" required slot={titleDeed} onPick={(f) => runUpload(f, "title_deed", setTitleDeed, "titleDeed")} onClear={() => setTitleDeed(null)} invalid={fieldErrors.has("titleDeed")} rootRef={titleDeedRef} />
+                <div ref={idDocRef}>
                   <div className="mb-2 flex items-center gap-2">
                     <span className="text-[13px] font-semibold text-[#374151]">Identification <span className="text-rose-500">*</span></span>
                     <div className="inline-flex overflow-hidden rounded-full border border-[#e5e7eb] text-[11px] font-semibold">
@@ -287,7 +363,7 @@ export function IntakeForm({
                       ))}
                     </div>
                   </div>
-                  <UploadField label="ID" hideLabel slot={idDoc} onPick={(f) => runUpload(f, idType, setIdDoc)} onClear={() => setIdDoc(null)} />
+                  <UploadField label="ID" hideLabel slot={idDoc} onPick={(f) => runUpload(f, idType, setIdDoc, "idDoc")} onClear={() => setIdDoc(null)} invalid={fieldErrors.has("idDoc")} />
                 </div>
                 {others.map((o, i) => (
                   <UploadField key={i} label={`Additional document ${i + 1}`} slot={o} onPick={() => {}} onClear={() => setOthers((prev) => prev.filter((_, idx) => idx !== i))} locked />
@@ -302,13 +378,13 @@ export function IntakeForm({
               <div className="mt-8 border-t border-[#eef0f2] pt-6">
                 {!canSubmit && (
                   <p className="mb-3 text-center text-[12px] text-[#9ca3af]">
-                    Complete your details, sign above, and upload your Title Deed and ID to submit.
+                    Complete your details, sign above, and upload your Oqood Certificate / Title Deed and ID to submit.
                   </p>
                 )}
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={!canSubmit}
+                  disabled={submitting}
                   className="flex w-full items-center justify-center gap-2 rounded-full bg-[#001f3f] px-6 py-3.5 text-sm font-bold text-white transition-all hover:bg-[#002b57] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {submitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Submitting…</> : "Submit documents"}
@@ -331,7 +407,7 @@ export function IntakeForm({
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function SignaturePad({ onChange }: { onChange: (dataUrl: string | null) => void }) {
+function SignaturePad({ onChange, invalid }: { onChange: (dataUrl: string | null) => void; invalid?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawing = useRef(false)
   const last = useRef<{ x: number; y: number } | null>(null)
@@ -397,7 +473,7 @@ function SignaturePad({ onChange }: { onChange: (dataUrl: string | null) => void
 
   return (
     <div>
-      <div className="relative rounded-2xl border-2 border-dashed border-[#d1d5db] bg-white">
+      <div className={`relative rounded-2xl border-2 border-dashed bg-white ${invalid ? "border-rose-400" : "border-[#d1d5db]"}`}>
         <canvas
           ref={canvasRef}
           onPointerDown={start}
@@ -441,49 +517,59 @@ function Bullet({ label, children }: { label: string; children: React.ReactNode 
 }
 
 function InlineInput({
-  value, onChange, placeholder, width,
+  value, onChange, placeholder, width, invalid, inputRef,
 }: {
   value: string
   onChange: (v: string) => void
   placeholder?: string
   width?: string
+  invalid?: boolean
+  inputRef?: Ref<HTMLInputElement>
 }) {
   return (
     <input
+      ref={inputRef}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       style={{ width: width ?? "12rem", maxWidth: "100%" }}
-      className="inline-block border-b border-[#c9ccd1] bg-transparent px-1 align-baseline text-[15px] font-semibold text-[#0d1117] outline-none transition-colors placeholder:font-normal placeholder:text-[#b6bcc4] focus:border-[#001f3f]"
+      className={`inline-block border-b bg-transparent px-1 align-baseline text-[15px] font-semibold text-[#0d1117] outline-none transition-colors placeholder:font-normal focus:border-[#001f3f] ${
+        invalid ? "border-rose-400 placeholder:text-rose-400" : "border-[#c9ccd1] placeholder:text-[#b6bcc4]"
+      }`}
     />
   )
 }
 
 function Field({
-  label, value, onChange, placeholder, type = "text",
+  label, value, onChange, placeholder, type = "text", invalid, inputRef,
 }: {
   label: string
   value: string
   onChange: (v: string) => void
   placeholder?: string
   type?: string
+  invalid?: boolean
+  inputRef?: Ref<HTMLInputElement>
 }) {
   return (
     <div>
       <label className="mb-1 block text-[12px] font-semibold text-[#374151]">{label}</label>
       <input
+        ref={inputRef}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-[#e5e7eb] bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none transition-colors placeholder:text-[#b6bcc4] focus:border-[#001f3f]"
+        className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none transition-colors placeholder:text-[#b6bcc4] focus:border-[#001f3f] ${
+          invalid ? "border-rose-400" : "border-[#e5e7eb]"
+        }`}
       />
     </div>
   )
 }
 
 function UploadField({
-  label, slot, onPick, onClear, required, hideLabel, locked,
+  label, slot, onPick, onClear, required, hideLabel, locked, invalid, rootRef,
 }: {
   label: string
   slot: Slot | null
@@ -492,9 +578,11 @@ function UploadField({
   required?: boolean
   hideLabel?: boolean
   locked?: boolean
+  invalid?: boolean
+  rootRef?: Ref<HTMLDivElement>
 }) {
   return (
-    <div>
+    <div ref={rootRef}>
       {!hideLabel && (
         <label className="mb-1.5 block text-[13px] font-semibold text-[#374151]">
           {label} {required && <span className="text-rose-500">*</span>}
@@ -524,7 +612,7 @@ function UploadField({
           </button>
         </div>
       ) : locked ? null : (
-        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-[#d1d5db] px-4 py-3 transition-colors hover:border-[#001f3f]">
+        <label className={`flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed px-4 py-3 transition-colors hover:border-[#001f3f] ${invalid ? "border-rose-400" : "border-[#d1d5db]"}`}>
           <UploadCloud className="h-5 w-5 text-[#9ca3af]" />
           <span className="text-[13px] text-[#6b7280]">Tap to upload — JPG, PNG or PDF (max {MAX_MB} MB)</span>
           <input type="file" accept={ACCEPT} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); e.target.value = "" }} />

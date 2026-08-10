@@ -189,7 +189,7 @@ export async function buildNocPdfBlob(input: NocPdfInput): Promise<Blob> {
   drawRuns([{ text: "•  Property Name/Building: " }, val(input.building)], { x: bulletX })
   drawRuns([{ text: "•  Unit Number: " }, val(input.unitNumber)], { x: bulletX })
   drawRuns([{ text: "•  Community/Area: " }, val(input.community)], { x: bulletX })
-  drawRuns([{ text: "•  Title Deed Number: " }, val(input.titleDeedNumber)], { x: bulletX, gap: 12 })
+  drawRuns([{ text: "•  Title Deed / Oqood No.: " }, val(input.titleDeedNumber)], { x: bulletX, gap: 12 })
 
   drawRuns(
     [

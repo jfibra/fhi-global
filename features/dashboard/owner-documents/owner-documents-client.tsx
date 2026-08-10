@@ -32,7 +32,7 @@ type Row = OwnerDocumentRequest & {
 }
 
 const DOC_LABELS: Record<OwnerDocType, string> = {
-  title_deed: "Title Deed",
+  title_deed: "Oqood Certificate / Title Deed",
   emirates_id: "Emirates ID",
   passport: "Passport",
   signed_noc: "Signed NOC",
@@ -566,7 +566,7 @@ function RequestModal({
               {detail("Property / Building", r.property_building)}
               {detail("Unit", r.unit_number)}
               {detail("Community / Area", r.community_area)}
-              {detail("Title Deed No.", r.title_deed_number)}
+              {detail("Title Deed / Oqood No.", r.title_deed_number)}
               {detail("Valid until", r.noc_valid_until)}
             </dl>
           )}
