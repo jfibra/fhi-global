@@ -4,7 +4,9 @@ import { useEffect, useState } from "react"
 import {
   Building2,
   CalendarDays,
+  Crosshair,
   DollarSign,
+  Loader2,
   MapPin,
   Phone,
   Save,
@@ -61,6 +63,11 @@ interface Props {
 
 export function ProjectOverviewTab({ project, developers, onSave, showToast, readOnly = false }: Props) {
   const [form, setForm]         = useState<Partial<ProjectFormData>>({})
+  // Coordinate lookup: geocodes whatever address parts are already typed.
+  // Storing the result is what spares the public project page a per-visitor
+  // geocode, and it pins the map exactly rather than approximately.
+  const [geoBusy, setGeoBusy]   = useState(false)
+  const [geoNote, setGeoNote]   = useState<{ ok: boolean; text: string } | null>(null)
   const [saving, setSaving]     = useState(false)
   const [active, setActive]     = useState<InnerTab>("basic")
   const [aiLoading, setAiLoading] = useState<"description" | "about_project" | null>(null)
@@ -128,6 +135,72 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
   }
 
   // ─── Shared field helpers ─────────────────────────────────────────────────
+
+  /**
+   * Geocode whatever address parts are filled in. This runs in the browser on
+   * purpose: the Maps key is HTTP-referrer restricted, and Google rejects such
+   * keys on the server-side REST API — the same reason the public project map
+   * geocodes client-side.
+   */
+  const findCoordinates = async () => {
+    const parts = [form.location, form.sub_community, form.community, form.city, form.country]
+      .map((v) => String(v ?? "").trim())
+      .filter(Boolean)
+    // Deduplicate: "Dubai, Dubai" geocodes worse than "Dubai".
+    const query = [...new Set(parts)].join(", ")
+    if (query.length < 3) {
+      setGeoNote({ ok: false, text: "Fill in the address or city first." })
+      return
+    }
+
+    setGeoBusy(true)
+    setGeoNote(null)
+    try {
+      // Load the Maps script once per dashboard session.
+      if (!window.google?.maps?.Geocoder) {
+        const res = await fetch("/api/admin/maps-key", { cache: "no-store" })
+        const json = (await res.json()) as { key?: string; error?: string }
+        if (!res.ok || !json.key) throw new Error(json.error ?? "Maps is not configured.")
+        await new Promise<void>((resolve, reject) => {
+          const existing = document.querySelector<HTMLScriptElement>("script[data-fhi-maps]")
+          if (existing) {
+            existing.addEventListener("load", () => resolve(), { once: true })
+            existing.addEventListener("error", () => reject(new Error("Maps failed to load.")), { once: true })
+            return
+          }
+          const el = document.createElement("script")
+          el.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(json.key!)}`
+          el.async = true
+          el.dataset.fhiMaps = "1"
+          el.onload = () => resolve()
+          el.onerror = () => reject(new Error("Maps failed to load."))
+          document.head.appendChild(el)
+        })
+      }
+
+      const geocoder = new window.google.maps.Geocoder()
+      const { results } = await geocoder.geocode({
+        address: query,
+        componentRestrictions: { country: "AE" },
+      })
+      const hit = results?.[0]
+      const loc = hit?.geometry?.location
+      if (!loc) {
+        setGeoNote({ ok: false, text: "No match — try adding the community or city." })
+        return
+      }
+      setForm((f) => ({
+        ...f,
+        latitude: loc.lat().toFixed(6),
+        longitude: loc.lng().toFixed(6),
+      }))
+      setGeoNote({ ok: true, text: `Matched: ${hit?.formatted_address ?? query}` })
+    } catch (err) {
+      setGeoNote({ ok: false, text: (err as Error).message || "Lookup failed." })
+    } finally {
+      setGeoBusy(false)
+    }
+  }
 
   const field = (label: string, content: React.ReactNode, action?: React.ReactNode) => (
     <div>
@@ -325,7 +398,39 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
         {field("Community",     inp("community",     "e.g. Business Bay"))}
         {field("Sub-Community", inp("sub_community", ""))}
         <div className="col-span-3 border-t border-[#f0f0f0] pt-4">
-          <p className="text-xs font-semibold text-[#6b7280] mb-3">Coordinates (optional)</p>
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <p className="text-xs font-semibold text-[#6b7280]">Coordinates</p>
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={() => void findCoordinates()}
+                disabled={geoBusy}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#d6b357]/40 bg-[#fff8e1] px-2.5 py-1 text-[11px] font-semibold text-[#0f2940] hover:bg-[#fff3cc] disabled:opacity-50"
+              >
+                {geoBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Crosshair className="h-3 w-3 text-[#d6b357]" />}
+                {geoBusy ? "Finding…" : "Find from address"}
+              </button>
+            )}
+            {form.latitude && form.longitude && (
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${form.latitude},${form.longitude}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] font-semibold text-[#0f2940] underline hover:text-[#d6b357]"
+              >
+                Check this pin on Google Maps
+              </a>
+            )}
+          </div>
+          <p className="text-[11px] text-[#9ca3af] mb-3">
+            Filling these pins the project map exactly and skips an address lookup for every
+            visitor. Leave them blank and the public page falls back to searching the address.
+          </p>
+          {geoNote && (
+            <p className={`mb-3 text-[11px] font-semibold ${geoNote.ok ? "text-emerald-600" : "text-rose-600"}`}>
+              {geoNote.text}
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-4">
             {field("Latitude",  inp("latitude",  "e.g. 25.2048"))}
             {field("Longitude", inp("longitude", "e.g. 55.2708"))}
