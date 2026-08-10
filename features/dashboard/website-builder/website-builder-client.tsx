@@ -10,13 +10,13 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import {
-  ArrowDown, ArrowUp, Check, Eraser, ExternalLink, ImagePlus, Loader2, Palette, Plus, RotateCcw, Save, Search, Trash2,
+  ArrowDown, ArrowUp, Check, ExternalLink, ImagePlus, Loader2, Palette, Plus, RotateCcw, Save, Search, Trash2,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 import { normalizeSocialUrl, readSocialLinks } from "@/lib/public-profile"
 import {
-  BAND_STAT_ICON_FALLBACK, DEFAULT_THEME, GALLERY_CATEGORIES, HERO_STAT_ICON_FALLBACK, SAMPLE_DATA, STAT_ICONS, themeVars,
+  BAND_STAT_ICON_FALLBACK, DEFAULT_THEME, GALLERY_CATEGORIES, HERO_STAT_ICON_FALLBACK, SAMPLE_DATA, STAT_ICONS, TEST_AREAS, TEST_GALLERY_AWARDS, TEST_GALLERY_CERTIFICATES, TEST_GALLERY_EVENTS, TEST_REVIEWS, themeVars,
   type GalleryCategory, type Project, type Property, type StatIconKey, type WebsiteData,
 } from "@/app/website/_data"
 import { SiteHeader } from "@/app/website/_components/header"
@@ -504,7 +504,7 @@ function LivePreview({
           <StatsBandSection data={data} />
           <ServiceAreasSection data={data} />
           <GallerySection data={data} />
-          <TestimonialsSection data={data} />
+          <TestimonialsSection />
           <ClosingCtaSection data={data} />
           <SiteFooter data={data} />
         </div>
@@ -793,26 +793,6 @@ export function WebsiteBuilderClient() {
     }
   }
 
-  /** Blank slate: wipe every placeholder (texts, photos, cards, reviews) so
-   *  nothing fake can end up published; keeps the profile-seeded contacts,
-   *  socials and the chosen palette. */
-  const clearSample = () => {
-    if (!window.confirm("Clear all sample/placeholder content? Your contacts, socials and palette are kept.")) return
-    setData((prev) => {
-      const d = structuredClone(prev)
-      d.agent = { ...d.agent, title: "", brn: "", orn: "", brokerage: "" }
-      d.hero = { headline: "", headlineAccent: "", description: "", image: "", overlay: 0, stats: [] }
-      d.about = { ...d.about, heading: "", bio: "", portrait: "", views: "", listings: "", rating: "" }
-      d.projects = []
-      d.properties = []
-      d.bandStats = []
-      d.areas = []
-      d.gallery = { "Event Photos": [], Certificates: [], "Awards & Recognition": [] }
-      d.testimonials = []
-      d.cta = { heading: "", sub: "" }
-      return d
-    })
-  }
 
   const selectedProjectIds = new Set(data.projects.map((p) => p.sourceId).filter(Boolean) as string[])
   const selectedListingIds = new Set(data.properties.map((p) => p.sourceId).filter(Boolean) as string[])
@@ -1203,7 +1183,7 @@ export function WebsiteBuilderClient() {
           {activeSection === "areas" && (
             <>
               <p className="text-[12px] leading-relaxed text-[#6b7280]">
-                Areas are shared across all agent sites — typing an existing name reuses it (and its photo); a new name is added to the catalog when you save.
+                Until you add your own, the site shows Sample 1–6 as placeholders — they disappear as soon as you add an area. Areas are shared across all agent sites: typing an existing name reuses it (and its photo); a new name is added to the catalog when you save.
               </p>
               <datalist id="wb-area-catalog">
                 {areaOptions.map((a) => (
@@ -1238,6 +1218,18 @@ export function WebsiteBuilderClient() {
                 </ItemCard>
               ))}
               <AddButton label="Add area" onClick={() => update((d) => { d.areas.push({ image: "", label: "" }) })} />
+              {data.areas.every((a) => a.label.trim() === "" && a.image.trim() === "") && (
+                <div className="space-y-2.5">
+                  {TEST_AREAS.map((a, i) => (
+                    <div key={i} className="flex items-center gap-3 border border-[#e2e6ea] bg-[#fafbfc] p-2.5 opacity-70">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={a.image} alt="" className="h-10 w-14 shrink-0 object-cover" />
+                      <span className="text-[12.5px] font-bold text-[#0d1117]">{a.label}</span>
+                      <span className="ml-auto text-[10.5px] font-semibold uppercase tracking-wide text-[#9aa0aa]">Sample</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
 
@@ -1287,28 +1279,40 @@ export function WebsiteBuilderClient() {
                   </div>
                 ))}
                 <AddButton label="Add image" onClick={() => update((d) => { d.gallery[activeGalleryCat].push("") })} />
+                {GALLERY_CATEGORIES.every((c) => data.gallery[c].every((src) => src.trim() === "")) && (
+                    <div className="space-y-2.5">
+                      {(activeGalleryCat === "Event Photos"
+                        ? TEST_GALLERY_EVENTS
+                        : activeGalleryCat === "Certificates"
+                          ? TEST_GALLERY_CERTIFICATES
+                          : TEST_GALLERY_AWARDS
+                      ).map((src, i) => (
+                        <div key={i} className="flex items-center gap-3 border border-[#e2e6ea] bg-[#fafbfc] p-2.5 opacity-70">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={src} alt="" className="h-10 w-14 shrink-0 object-cover" />
+                          <span className="truncate text-[11.5px] text-[#5b6472]">{src}</span>
+                          <span className="ml-auto shrink-0 text-[10.5px] font-semibold uppercase tracking-wide text-[#9aa0aa]">Sample</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
               </div>
             </>
           )}
 
           {activeSection === "reviews" && (
             <>
-              {data.testimonials.map((t, i) => (
-                <ItemCard
-                  key={i}
-                  index={i}
-                  count={data.testimonials.length}
-                  onMove={(dir) => update((d) => swap(d.testimonials, i, dir))}
-                  onRemove={() => update((d) => { d.testimonials.splice(i, 1) })}
-                >
-                  <TArea rows={3} value={t.quote} onChange={(v) => update((d) => { d.testimonials[i].quote = v })} />
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <TInput value={t.name} placeholder="Client name" onChange={(v) => update((d) => { d.testimonials[i].name = v })} />
-                    <TInput value={t.where} placeholder="Location" onChange={(v) => update((d) => { d.testimonials[i].where = v })} />
+              <p className="text-[12px] leading-relaxed text-[#6b7280]">
+                Reviews are fixed test samples for now and are displayed on every site — real client reviews will be automated later. They can&apos;t be edited.
+              </p>
+              <div className="space-y-2.5">
+                {TEST_REVIEWS.map((t, i) => (
+                  <div key={i} className="border border-[#e2e6ea] bg-[#fafbfc] p-3">
+                    <p className="text-[12.5px] leading-relaxed text-[#374151]">&ldquo;{t.quote}&rdquo;</p>
+                    <p className="mt-1.5 text-[11.5px] font-bold text-[#0d1117]">{t.name} <span className="font-medium text-[#9aa0aa]">— {t.where}</span></p>
                   </div>
-                </ItemCard>
-              ))}
-              <AddButton label="Add testimonial" onClick={() => update((d) => { d.testimonials.push({ quote: "", name: "", where: "" }) })} />
+                ))}
+              </div>
             </>
           )}
 
@@ -1368,14 +1372,6 @@ export function WebsiteBuilderClient() {
               >
                 <ExternalLink className="h-3.5 w-3.5" /> {siteSlug ? "View Site" : "Sample"}
               </a>
-              <button
-                type="button"
-                onClick={clearSample}
-                title="Remove all placeholder content (keeps contacts, socials and palette)"
-                className="inline-flex h-8 items-center gap-1.5 border border-[#e2e6ea] px-2.5 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
-              >
-                <Eraser className="h-3.5 w-3.5" /> Clear Sample
-              </button>
               <button
                 type="button"
                 onClick={() => void reset()}

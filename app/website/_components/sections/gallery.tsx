@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { ArrowRight, Award, BadgeCheck, Camera } from "lucide-react"
-import { GALLERY_CATEGORIES, GOLD, NAVY, SAMPLE_DATA, type GalleryCategory, type WebsiteData } from "../../_data"
+import { GALLERY_CATEGORIES, GOLD, NAVY, SAMPLE_DATA, TEST_GALLERY_AWARDS, TEST_GALLERY_CERTIFICATES, TEST_GALLERY_EVENTS, type GalleryCategory, type WebsiteData } from "../../_data"
 import { FancyEyebrow } from "../ui"
 
 const CATEGORY_ICONS: Record<GalleryCategory, typeof Camera> = {
@@ -102,9 +102,12 @@ function PhotoCarousel({ category, images, interval = 2500 }: { category: Galler
   )
 }
 
-export function GallerySection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
+export function GallerySection({ data: incoming = SAMPLE_DATA }: { data?: WebsiteData }) {
   // null = overview (an auto-sliding labeled row per category).
   const [category, setCategory] = useState<GalleryCategory | null>(null)
+  // Sample event photos fill the gallery until the agent adds their own.
+  const blank = GALLERY_CATEGORIES.every((c) => (incoming.gallery[c] ?? []).filter((src) => src.trim() !== "").length === 0)
+  const data = blank ? { ...incoming, gallery: { "Event Photos": TEST_GALLERY_EVENTS, Certificates: TEST_GALLERY_CERTIFICATES, "Awards & Recognition": TEST_GALLERY_AWARDS } } : incoming
   const withPhotos = GALLERY_CATEGORIES.filter((c) => (data.gallery[c] ?? []).length > 0)
   if (withPhotos.length === 0) return null
 

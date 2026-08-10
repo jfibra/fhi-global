@@ -1,11 +1,14 @@
 // Service Areas — hover-to-expand accordion strip over a background photo
 // with a soft white wash (same treatment as the homepage's Trusted Partners).
 
-import { IMG, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
+import { IMG, NAVY, SAMPLE_DATA, TEST_AREAS, type WebsiteData } from "../../_data"
 import { FancyEyebrow } from "../ui"
 
 export function ServiceAreasSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
-  if (data.areas.length === 0) return null
+  // Agent-added areas take over; until then the fixed samples fill the section.
+  // Rows with no name and no photo (a freshly added blank) don't count.
+  const real = data.areas.filter((a) => a.label.trim() !== "" || a.image.trim() !== "")
+  const areas = real.length > 0 ? real : TEST_AREAS
   return (
     <section id="areas" className="relative scroll-mt-[72px] overflow-hidden">
       {/* Background photo + white wash */}
@@ -21,7 +24,7 @@ export function ServiceAreasSection({ data = SAMPLE_DATA }: { data?: WebsiteData
         </h2>
         {/* Mobile: a simple photo grid. Desktop: the hover-expand accordion. */}
         <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:flex lg:h-[420px]">
-          {data.areas.map((a, i) => (
+          {areas.map((a, i) => (
             <div
               key={`${a.label}-${i}`}
               className="group relative h-44 min-w-0 cursor-pointer overflow-hidden transition-all duration-500 ease-out sm:h-52 lg:h-auto lg:flex-1 lg:hover:flex-[3.5]"

@@ -69,7 +69,7 @@ export default async function AgentWebsitePage({ params }: Props) {
       <StatsBandSection data={data} />
       <ServiceAreasSection data={data} />
       <GallerySection data={data} />
-      <TestimonialsSection data={data} />
+      <TestimonialsSection />
       <ClosingCtaSection data={data} />
       <SiteFooter data={data} />
     </div>

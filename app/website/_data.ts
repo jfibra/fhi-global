@@ -204,7 +204,42 @@ export type Project = {
 
 export type Area = { image: string; label: string }
 
+// Fixed sample service areas — display-only for now, like TEST_REVIEWS.
+// Fixed sample gallery photos (Event Photos) — shown until the agent adds
+// their own images, like TEST_AREAS.
+export const TEST_GALLERY_EVENTS: string[] = [
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcThHa2knR9NMMqi29r53PuQoJjUQgrqFVm3GrdGq-tf2g&s=10",
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTPio8UD3aejPHdGm2JQSznpECNMSFJMCGrGkpaR27oUg&s=10",
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTA2yGHLYEWWJ1wtF-t-E-FVNAdPaS5By7PJMramaw51w&s=10",
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTsMXcVO4U5Xp4gmKV5ou2rCIm2jDB_tCstLhUsM8Ahqw&s=10",
+]
+
+export const TEST_GALLERY_CERTIFICATES: string[] = Array(4).fill(
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTovOdA0TF3YRa9kTLkC2P6_fpiy9kT7T-irO5pzeDntQ&s=10",
+)
+
+export const TEST_GALLERY_AWARDS: string[] = Array(4).fill(
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTJkACJuQkJkb3MHpqh3ManQJrQEAAdhC45MUGM6W01jA&s=10",
+)
+
+export const TEST_AREAS: Area[] = [
+  { image: IMG.houseA, label: "Sample 1" },
+  { image: IMG.skylineC, label: "Sample 2" },
+  { image: IMG.houseB, label: "Sample 3" },
+  { image: IMG.skylineA, label: "Sample 4" },
+  { image: IMG.houseC, label: "Sample 5" },
+  { image: IMG.skylineB, label: "Sample 6" },
+]
+
 export type Testimonial = { quote: string; name: string; where: string }
+
+// Fixed test reviews — the builder can only show or hide these (no editing);
+// real client reviews will be automated later.
+export const TEST_REVIEWS: Testimonial[] = [
+  { quote: "Exceptional service from start to finish — deep market knowledge made the entire process seamless. (Test review)", name: "Test Client 1", where: "Dubai Marina" },
+  { quote: "Professional, responsive, and always had our best interests at heart. Highly recommended. (Test review)", name: "Test Client 2", where: "Abu Dhabi, UAE" },
+  { quote: "From viewing to handover everything was smooth and transparent — our Dubai investment felt effortless. (Test review)", name: "Test Client 3", where: "London, UK" },
+]
 
 export const GALLERY_CATEGORIES = ["Event Photos", "Certificates", "Awards & Recognition"] as const
 export type GalleryCategory = (typeof GALLERY_CATEGORIES)[number]
@@ -323,14 +358,7 @@ export const SAMPLE_DATA: WebsiteData = {
     { value: "8+", label: "Years Experience" },
     { value: "4.9/5", label: "Client Rating" },
   ],
-  areas: [
-    { image: IMG.houseA, label: "sample 1" },
-    { image: IMG.skylineC, label: "sample 2" },
-    { image: IMG.houseB, label: "sample 3" },
-    { image: IMG.skylineA, label: "sample 4" },
-    { image: IMG.houseC, label: "sample 5" },
-    { image: IMG.skylineB, label: "sample 6" },
-  ],
+  areas: TEST_AREAS,
   gallery: {
     "Event Photos": [IMG.houseA, IMG.skylineC, IMG.houseB, IMG.aptA, IMG.houseC, IMG.aptB, IMG.skylineA, IMG.aptC],
     Certificates: [IMG.skylineB, IMG.aptA, IMG.houseC, IMG.skylineA],

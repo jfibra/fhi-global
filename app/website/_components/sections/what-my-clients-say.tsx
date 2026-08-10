@@ -4,12 +4,14 @@
 // sliding back to the start after the last position; dot indicators below.
 
 import { useEffect, useState } from "react"
-import { GOLD, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
+import { GOLD, NAVY, TEST_REVIEWS } from "../../_data"
 import { TestimonialCard } from "../cards"
 import { FancyEyebrow } from "../ui"
 
-export function TestimonialsSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
-  const testimonials = data.testimonials
+export function TestimonialsSection() {
+  // Fixed test reviews for every site — agents can't add or edit reviews
+  // (real ones will be automated later); this is display-only.
+  const testimonials = TEST_REVIEWS
   // 3 cards per view on sm+ screens, 1 on phones — the slide step and dot
   // count both depend on it, so it's tracked from the same breakpoint the
   // card widths use (sm:w-1/3).
