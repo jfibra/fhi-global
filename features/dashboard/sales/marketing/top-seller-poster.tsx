@@ -11,12 +11,59 @@
 import React, { forwardRef } from "react"
 import { proxied } from "@/lib/flyer/theme"
 
-export type PosterFormatId = "portrait" | "story" | "square"
+export type PosterFormatId = "certificate" | "monthly" | "portrait" | "story" | "square"
 
 export const POSTER_FORMATS: Record<PosterFormatId, { w: number; h: number; label: string; hint: string }> = {
-  portrait: { w: 1080, h: 1620, label: "Portrait", hint: "1080 × 1620 — 2:3 poster, prints beautifully" },
-  story:    { w: 1080, h: 1920, label: "Story",    hint: "1080 × 1920 — Instagram / TikTok story" },
-  square:   { w: 1080, h: 1080, label: "Square",   hint: "1080 × 1080 — feed post" },
+  certificate: { w: 1448, h: 1086, label: "Top Seller Certificate", hint: "1448 × 1086 — landscape award certificate, ready to print" },
+  monthly:     { w: 1448, h: 1086, label: "Monthly Awardee",       hint: "1448 × 1086 — monthly recognition certificate for a chosen month" },
+  portrait:    { w: 1080, h: 1620, label: "Portrait",    hint: "1080 × 1620 — 2:3 poster, prints beautifully" },
+  story:       { w: 1080, h: 1920, label: "Story",       hint: "1080 × 1920 — Instagram / TikTok story" },
+  square:      { w: 1080, h: 1080, label: "Square",      hint: "1080 × 1080 — feed post" },
+}
+
+/**
+ * The printed certificate artwork, and where its blanks sit (measured from
+ * the file, in its own 1448 × 1086 pixels).
+ *
+ * Only the blanks are drawn over: the photo medallion on the left, the
+ * recipient line above the divider, and the three ruled slots along the foot.
+ * Everything else — frame, laurels, ribbon, body copy — is the artwork itself,
+ * so the printed piece stays exactly as designed.
+ */
+type CertificateArt = {
+  src: string
+  /** Photo medallion: a true circle, so CSS can clip it — no canvas needed. */
+  photo: { cx: number; cy: number; d: number }
+  /** Recipient name, centred on the rule below it. */
+  name: { cx: number; baseline: number; maxWidth: number }
+  /** Optional month banner (the monthly certificate reserves one). */
+  month?: { cx: number; baseline: number; maxWidth: number; size: number }
+  /** The three ruled slots; values sit just above each rule. */
+  slots: Array<{ cx: number; baseline: number }>
+}
+
+const CERTIFICATES: Record<"certificate" | "monthly", CertificateArt> = {
+  certificate: {
+    src: "/images/topsellers1.png",
+    photo: { cx: 273, cy: 448, d: 330 },
+    name: { cx: 857, baseline: 570, maxWidth: 620 },
+    slots: [
+      { cx: 553, baseline: 924 },
+      { cx: 834, baseline: 924 },
+      { cx: 1114, baseline: 924 },
+    ],
+  },
+  monthly: {
+    src: "/images/monthlyawardee.png",
+    photo: { cx: 276, cy: 462, d: 316 },
+    name: { cx: 822, baseline: 532, maxWidth: 640 },
+    month: { cx: 855, baseline: 836, maxWidth: 520, size: 34 },
+    slots: [
+      { cx: 511, baseline: 987 },
+      { cx: 806, baseline: 987 },
+      { cx: 1087, baseline: 987 },
+    ],
+  },
 }
 
 export type AwardId = "top-seller" | "top-producer" | "rising-star"
@@ -365,6 +412,129 @@ export const TopSellerPoster = forwardRef<HTMLDivElement, TopSellerPosterProps>(
     { label: deals === 1 ? "DEAL CLOSED" : "DEALS CLOSED", value: String(deals), d: ICON_DEAL },
     { label: "PERIOD", value: periodLabel, d: ICON_CALENDAR },
   ]
+
+  if (format === "certificate" || format === "monthly") {
+    const c = CERTIFICATES[format]
+    // The artwork is authored at exactly this size, so its own pixels are the
+    // layout units — no scaling factor needed.
+    const nameText = name.trim().toUpperCase()
+    // Fit to the rule beneath it rather than stepping through fixed sizes: a
+    // 22-character name at a fixed 64px overran the divider and crowded the
+    // medallion. ~0.62em average advance for bold display caps.
+    const nameSizePx = Math.max(
+      26,
+      Math.min(64, Math.floor(c.name.maxWidth / (0.62 * Math.max(1, nameText.length)))),
+    )
+    const slotValues = [`${money(value)} AED`, String(deals), periodLabel]
+    return (
+      <div
+        ref={ref}
+        style={{
+          width: w,
+          height: h,
+          position: "relative",
+          overflow: "hidden",
+          background: "#ffffff",
+          fontFamily: BODY,
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={c.src}
+          alt=""
+          width={w}
+          height={h}
+          style={{ position: "absolute", inset: 0, width: w, height: h, objectFit: "cover" }}
+        />
+
+        {/* Honouree photo, clipped to the medallion. */}
+        {photoUrl ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={proxied(photoUrl)}
+            alt=""
+            style={{
+              position: "absolute",
+              left: c.photo.cx - c.photo.d / 2,
+              top: c.photo.cy - c.photo.d / 2,
+              width: c.photo.d,
+              height: c.photo.d,
+              borderRadius: "50%",
+              objectFit: "cover",
+              objectPosition: "center top",
+            }}
+          />
+        ) : null}
+
+        {/* Recipient. */}
+        <div
+          style={{
+            position: "absolute",
+            left: c.name.cx - c.name.maxWidth / 2,
+            top: c.name.baseline - nameSizePx,
+            width: c.name.maxWidth,
+            textAlign: "center",
+            fontFamily: DISPLAY,
+            fontSize: nameSizePx,
+            lineHeight: 1,
+            fontWeight: 700,
+            letterSpacing: 1,
+            color: NAVY_DEEP,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+          }}
+        >
+          {nameText}
+        </div>
+
+        {/* Month banner (monthly certificate only). */}
+        {c.month && (
+          <div
+            style={{
+              position: "absolute",
+              left: c.month.cx - c.month.maxWidth / 2,
+              top: c.month.baseline - c.month.size,
+              width: c.month.maxWidth,
+              textAlign: "center",
+              fontFamily: DISPLAY,
+              fontSize: c.month.size,
+              lineHeight: 1,
+              fontWeight: 700,
+              letterSpacing: 1,
+              color: NAVY_DEEP,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+            }}
+          >
+            {periodLabel}
+          </div>
+        )}
+
+        {/* Total sales · deals closed · period, on their rules. */}
+        {c.slots.map((slot, i) => (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              left: slot.cx - 110,
+              top: slot.baseline - 26,
+              width: 220,
+              textAlign: "center",
+              fontFamily: DISPLAY,
+              fontSize: slotValues[i].length > 14 ? 20 : 24,
+              lineHeight: "26px",
+              fontWeight: 700,
+              color: NAVY_DEEP,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+            }}
+          >
+            {slotValues[i]}
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div
