@@ -13,8 +13,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
-  Cake, Check, Download, ImagePlus, Loader2, Maximize2, RotateCcw, Trash2, ZoomIn,
+  Cake, Check, Download, ImagePlus, Loader2, Maximize2, RotateCcw, Search,
+  Trash2, UserRound, X, ZoomIn,
 } from "lucide-react"
+import { proxiedMarkerImageSrc } from "@/lib/map/proxied-marker-image-src"
 import {
   BIRTHDAY_DESIGNS,
   NAME_FILL,
@@ -28,6 +30,7 @@ type Placement = { scale: number; dx: number; dy: number }
 const DEFAULT_PLACEMENT: Placement = { scale: 1, dx: 0, dy: 0 }
 
 type Loaded = { img: HTMLImageElement; mask: HTMLCanvasElement }
+type Person = { id: string; name: string; photo: string | null }
 
 export function BirthdayStudio({ defaultName }: { defaultName?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -47,6 +50,13 @@ export function BirthdayStudio({ defaultName }: { defaultName?: string }) {
   const [error, setError] = useState<string | null>(null)
 
   const drag = useRef<{ x: number; y: number; dx: number; dy: number } | null>(null)
+
+  // "Pick a teammate": search the directory, then pull their name and photo in.
+  const [query, setQuery] = useState("")
+  const [people, setPeople] = useState<Person[] | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [picked, setPicked] = useState<Person | null>(null)
+  const [photoBusy, setPhotoBusy] = useState(false)
 
   // ── Load the active design and derive its photo mask ─────────────────────
   useEffect(() => {
@@ -114,34 +124,90 @@ export function BirthdayStudio({ defaultName }: { defaultName?: string }) {
         }
       }
 
-      // Fill each row between the kept blob's own edges — the openings are
-      // convex, so this closes interior gaps (one artwork has a placeholder
-      // icon inside its frame) without ever reaching past the ring.
-      const filled = new Uint8Array(w * h)
+      // Fill the blob's convex hull. Row/column spans alone can't repair a
+      // bite taken out of the boundary — a sparkle painted ON the ring makes
+      // those pixels fail the colour test, leaving a notch in the circle. A
+      // hull closes any concavity, while still respecting a genuinely
+      // straight edge: one artwork's opening is cropped by a ribbon, and a
+      // chord is convex, so that flat bottom survives untouched.
+      const pts: Array<[number, number]> = []
       for (let row = 0; row < h; row++) {
         let first = -1
         let last = -1
         for (let col = 0; col < w; col++) {
           if (keep[row * w + col]) { if (first < 0) first = col; last = col }
         }
-        if (first >= 0) {
-          for (let col = first; col <= last; col++) filled[row * w + col] = 1
-        }
+        if (first >= 0) { pts.push([first, row]); pts.push([last, row]) }
       }
-      // Second pass down the columns: a bright sparkle ON the ring makes a
-      // few boundary pixels fail the colour test, which notches the row fill.
-      // The opening is convex, so the union of row spans and column spans is
-      // exactly the opening — the notch closes, ribbon clips stay clipped.
-      for (let col = 0; col < w; col++) {
-        let first = -1
-        let last = -1
+
+      const filled = new Uint8Array(w * h)
+
+      if (design.wellShape === "ellipse" && pts.length >= 3) {
+        // Fit to the detected extent. The widest row and tallest column carry
+        // the true axes even when a sparkle nibbles the boundary elsewhere.
+        let c0 = Infinity
+        let c1 = -Infinity
+        let r0 = Infinity
+        let r1 = -Infinity
+        for (const [px, py] of pts) {
+          if (px < c0) c0 = px
+          if (px > c1) c1 = px
+          if (py < r0) r0 = py
+          if (py > r1) r1 = py
+        }
+        const cx = (c0 + c1) / 2
+        const cy = (r0 + r1) / 2
+        const rx = Math.max(1, (c1 - c0) / 2)
+        const ry = Math.max(1, (r1 - r0) / 2)
         for (let row = 0; row < h; row++) {
-          if (filled[row * w + col]) { if (first < 0) first = row; last = row }
+          const ny = (row - cy) / ry
+          if (Math.abs(ny) > 1) continue
+          const half = rx * Math.sqrt(1 - ny * ny)
+          const from = Math.max(0, Math.ceil(cx - half))
+          const to = Math.min(w - 1, Math.floor(cx + half))
+          for (let col = from; col <= to; col++) filled[row * w + col] = 1
         }
-        if (first >= 0) {
-          for (let row = first; row <= last; row++) filled[row * w + col] = 1
+      } else if (pts.length >= 3) {
+        pts.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+        const cross = (o: [number, number], a: [number, number], b: [number, number]) =>
+          (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+        // Andrew's monotone chain.
+        const lower: Array<[number, number]> = []
+        for (const pt of pts) {
+          while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], pt) <= 0) lower.pop()
+          lower.push(pt)
+        }
+        const upper: Array<[number, number]> = []
+        for (let k = pts.length - 1; k >= 0; k--) {
+          const pt = pts[k]
+          while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], pt) <= 0) upper.pop()
+          upper.push(pt)
+        }
+        const hull = lower.slice(0, -1).concat(upper.slice(0, -1))
+
+        // Scanline-fill the hull.
+        for (let row = 0; row < h; row++) {
+          const y = row + 0.5
+          let xmin = Infinity
+          let xmax = -Infinity
+          for (let k = 0; k < hull.length; k++) {
+            const [ax, ay] = hull[k]
+            const [bx, by] = hull[(k + 1) % hull.length]
+            if ((ay <= y && by >= y) || (by <= y && ay >= y)) {
+              const x = ay === by ? Math.min(ax, bx) : ax + ((bx - ax) * (y - ay)) / (by - ay)
+              const x2 = ay === by ? Math.max(ax, bx) : x
+              if (x < xmin) xmin = x
+              if (x2 > xmax) xmax = x2
+            }
+          }
+          if (xmin <= xmax) {
+            const from = Math.max(0, Math.ceil(xmin))
+            const to = Math.min(w - 1, Math.floor(xmax))
+            for (let col = from; col <= to; col++) filled[row * w + col] = 1
+          }
         }
       }
+
       for (let k = 0; k < w * h; k++) {
         const i = k * 4
         d[i] = d[i + 1] = d[i + 2] = 255
@@ -162,6 +228,62 @@ export function BirthdayStudio({ defaultName }: { defaultName?: string }) {
     return () => { cancelled = true }
   }, [design])
 
+  // Debounced so typing a name doesn't fire a query per keystroke. All state
+  // moves happen inside the timer, never synchronously in the effect body.
+  useEffect(() => {
+    const q = query.trim()
+    let cancelled = false
+    const t = setTimeout(async () => {
+      if (q.length < 2) { setPeople(null); return }
+      setSearching(true)
+      try {
+        const res = await fetch(`/api/admin/people-search?q=${encodeURIComponent(q)}`, { cache: "no-store" })
+        const json = (await res.json()) as { people?: Person[]; error?: string }
+        if (cancelled) return
+        setPeople(res.ok ? json.people ?? [] : [])
+      } catch {
+        if (!cancelled) setPeople([])
+      } finally {
+        if (!cancelled) setSearching(false)
+      }
+    }, q.length < 2 ? 0 : 300)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [query])
+
+  /**
+   * Fill the poster from a directory entry. The photo loads through our own
+   * origin (proxiedMarkerImageSrc) — an S3 avatar dropped straight onto the
+   * canvas would taint it and make the PNG download throw.
+   */
+  const applyPerson = useCallback((person: Person) => {
+    setPicked(person)
+    setName(person.name)
+    setQuery("")
+    setPeople(null)
+    if (!person.photo) {
+      // Name still lands; they just have no avatar to place.
+      photoRef.current = null
+      setHasPhoto(false)
+      setPhotoVersion((v) => v + 1)
+      return
+    }
+    setPhotoBusy(true)
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      photoRef.current = img
+      setHasPhoto(true)
+      setPlacement({ ...DEFAULT_PLACEMENT })
+      setPhotoVersion((v) => v + 1)
+      setPhotoBusy(false)
+    }
+    img.onerror = () => {
+      setPhotoBusy(false)
+      setError("Could not load that person's photo — choose a file instead.")
+    }
+    img.src = proxiedMarkerImageSrc(person.photo)
+  }, [])
+
   // ── Paint ────────────────────────────────────────────────────────────────
   const paint = useCallback(() => {
     const canvas = canvasRef.current
@@ -172,6 +294,9 @@ export function BirthdayStudio({ defaultName }: { defaultName?: string }) {
     ctx.clearRect(0, 0, TEMPLATE_W, TEMPLATE_H)
     ctx.drawImage(loaded.img, 0, 0, TEMPLATE_W, TEMPLATE_H)
 
+    // photoVersion is not read here — it exists so swapping the image (held
+    // in a ref, invisible to React) re-runs this paint.
+    void photoVersion
     const photo = photoRef.current
     if (photo) {
       const { x0, y0, x1, y1 } = design.well
@@ -353,6 +478,76 @@ export function BirthdayStudio({ defaultName }: { defaultName?: string }) {
           </div>
 
           <div className="bg-white border border-[#e8eaed] p-5">
+            <p className={label}>Pick a teammate</p>
+            {picked ? (
+              <div className="flex items-center gap-3 border border-[#e8eaed] bg-[#f7f9fc] px-3 py-2.5">
+                {picked.photo ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={picked.photo} alt="" className="w-9 h-9 rounded-full object-cover object-top" />
+                ) : (
+                  <span className="w-9 h-9 rounded-full bg-[#001f3f] flex items-center justify-center">
+                    <UserRound className="w-4 h-4 text-[#d6b357]" />
+                  </span>
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold text-[#0d1117] truncate">{picked.name}</span>
+                  <span className="block text-[11px] text-[#6b7280]">
+                    {photoBusy ? "Loading photo…" : picked.photo ? "Photo and name filled in" : "No photo on file"}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPicked(null)}
+                  aria-label="Clear selection"
+                  className="p-1 text-[#9ca3af] hover:text-[#0d1117] transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search agents by name…"
+                  className="w-full pl-9 pr-3 py-2.5 border border-[#dfe3e8] bg-white text-sm text-[#0d1117] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f]"
+                />
+                {searching && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-[#9ca3af]" />
+                )}
+                {people !== null && (
+                  <div className="absolute z-20 left-0 right-0 top-full mt-1 max-h-64 overflow-y-auto bg-white border border-[#e8eaed] shadow-[0_16px_40px_-12px_rgba(0,20,45,0.3)]">
+                    {people.length === 0 ? (
+                      <p className="px-3 py-3 text-xs text-[#9ca3af]">No one matches that name.</p>
+                    ) : (
+                      people.map((person) => (
+                        <button
+                          key={person.id}
+                          type="button"
+                          onClick={() => applyPerson(person)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#f5f6f8] transition-colors"
+                        >
+                          {person.photo ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={person.photo} alt="" className="w-7 h-7 rounded-full object-cover object-top shrink-0" />
+                          ) : (
+                            <span className="w-7 h-7 rounded-full bg-[#eef0f3] flex items-center justify-center shrink-0">
+                              <UserRound className="w-3.5 h-3.5 text-[#9ca3af]" />
+                            </span>
+                          )}
+                          <span className="text-[13px] text-[#0d1117] truncate">{person.name}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            <p className="text-[11px] text-[#9ca3af] mt-2 mb-4">
+              Fills the name and profile photo — both stay editable below.
+            </p>
+
             <label className={label}>Celebrant&apos;s name</label>
             <input
               value={name}

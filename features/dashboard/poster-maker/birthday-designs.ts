@@ -13,6 +13,15 @@
 // clipped by a ribbon.
 
 export type WellTest = "light" | "warmGrey" | "neutralGrey"
+/**
+ * How to turn detected pixels into the final opening.
+ *  - "ellipse": fit to the detected extent. Gives a perfectly smooth curve,
+ *    which matters because a sparkle painted on the ring makes a few boundary
+ *    pixels fail the colour test and would otherwise flatten the edge.
+ *  - "hull": convex hull. For an opening genuinely cropped by artwork (a
+ *    ribbon crossing it), where a straight edge is correct.
+ */
+export type WellShape = "ellipse" | "hull"
 export type NameStyle = "gold" | "ink" | "bronze"
 
 export type BirthdayDesign = {
@@ -23,6 +32,7 @@ export type BirthdayDesign = {
   /** Photo opening in template pixels. */
   well: { x0: number; y0: number; x1: number; y1: number }
   wellTest: WellTest
+  wellShape: WellShape
   name: {
     cx: number
     /** Text baseline, in template pixels. */
@@ -46,6 +56,8 @@ export const BIRTHDAY_DESIGNS: BirthdayDesign[] = [
     src: "/images/birthday-blank.png",
     well: { x0: 259, y0: 630, x1: 761, y1: 1068 },
     wellTest: "light",
+    // Cropped by the ribbon that crosses its lower edge.
+    wellShape: "hull",
     name: { cx: 514, baseline: 1176, maxWidth: 560, size: 62, style: "gold" },
   },
   {
@@ -55,6 +67,7 @@ export const BIRTHDAY_DESIGNS: BirthdayDesign[] = [
     src: "/images/birthday1-blank.png",
     well: { x0: 109, y0: 593, x1: 598, y1: 1071 },
     wellTest: "warmGrey",
+    wellShape: "ellipse",
     name: { cx: 416, baseline: 1396, maxWidth: 470, size: 54, style: "ink" },
   },
   {
@@ -64,6 +77,7 @@ export const BIRTHDAY_DESIGNS: BirthdayDesign[] = [
     src: "/images/birthday2-blank.png",
     well: { x0: 265, y0: 548, x1: 787, y1: 1066 },
     wellTest: "light",
+    wellShape: "ellipse",
     name: { cx: 519, baseline: 1152, maxWidth: 520, size: 58, style: "gold" },
   },
   {
@@ -73,6 +87,7 @@ export const BIRTHDAY_DESIGNS: BirthdayDesign[] = [
     src: "/images/birthday3-blank.png",
     well: { x0: 237, y0: 508, x1: 786, y1: 1060 },
     wellTest: "neutralGrey",
+    wellShape: "ellipse",
     name: { cx: 512, baseline: 1186, maxWidth: 570, size: 54, style: "bronze", tracking: 6 },
   },
 ]
