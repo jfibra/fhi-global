@@ -6,7 +6,7 @@ import Image from "next/image"
 import {
   Search, Plus, RefreshCw, MoreHorizontal, Pencil, ImageIcon,
   CheckCircle2, XCircle, Archive, ArchiveRestore, Eye, ExternalLink,
-  Building2, ChevronLeft, ChevronRight, ChevronDown, Star, Globe,
+  Building2, ChevronLeft, ChevronRight, ChevronDown, Globe,
   Phone, Mail, Filter, SortAsc, Trash2, UserPlus, Clock,
   LayoutGrid, Table as TableIcon,
 } from "lucide-react"
@@ -182,19 +182,6 @@ function RowActions({ dev, onEdit, onLogo, onCreateAccount, onToggleVerified, on
           </div>
         </Portal>
       )}
-    </div>
-  )
-}
-
-// ─── Stars ──────────────────────────────────────────────────────────────────
-function StarRating({ value }: { value: number | null }) {
-  if (value === null) return <span className="text-[#d1d5db] text-xs">—</span>
-  return (
-    <div className="flex items-center gap-1">
-      {[1,2,3,4,5].map((i) => (
-        <Star key={i} className={`w-3 h-3 ${i <= Math.round(value) ? "text-[#d6b357] fill-[#d6b357]" : "text-[#e5e5e5]"}`} />
-      ))}
-      <span className="text-xs text-[#6b7280] ml-1">{value.toFixed(1)}</span>
     </div>
   )
 }
@@ -389,9 +376,9 @@ function DeveloperCard({
 
   return (
     // A plain container, not role="button": putting a widget role here would
-    // make its children presentational and hide the badges, contact details and
-    // rating from screen readers. The click target is the overlay button below,
-    // which real controls (links, kebab) sit above in z-order.
+    // make its children presentational and hide the badges and contact details
+    // from screen readers. The click target is the overlay button below, which
+    // real controls (links, kebab) sit above in z-order.
     <div
       className={`group relative h-full flex flex-col bg-white rounded-3xl border border-[#eceef2] overflow-hidden shadow-[0_2px_12px_-6px_rgba(0,31,63,0.10)] transition-all duration-200 ${
         canManage ? "hover:shadow-[0_16px_40px_-12px_rgba(0,31,63,0.28)] hover:-translate-y-1 hover:border-[#d6b357]/60 focus-within:ring-4 focus-within:ring-[#001f3f]/15" : ""
@@ -512,9 +499,8 @@ function DeveloperCard({
           {!dev.email && !dev.website_url && !dev.phone && <p className="text-[11px] text-[#c0c6cf]">No contact details</p>}
         </div>
 
-        {/* Footer: rating + added — pinned to the bottom so cards in a row line up */}
-        <div className="mt-auto pt-3 border-t border-[#f4f6f9] flex items-center justify-between gap-2">
-          <StarRating value={dev.rating} />
+        {/* Footer: added date — pinned to the bottom so cards in a row line up */}
+        <div className="mt-auto pt-3 border-t border-[#f4f6f9] flex items-center justify-end gap-2">
           <span className="text-[10px] text-[#9ca3af] truncate" title={formatDateTime(dev.created_at)}>
             {relativeTime(dev.created_at)}
           </span>
@@ -534,7 +520,7 @@ interface Props {
 // columns all divide into 12).
 const PER_PAGE_OPTIONS = [12, 24, 48] as const
 
-type SortField = "name" | "created_at" | "rating"
+type SortField = "name" | "created_at"
 type SortDir   = "asc" | "desc"
 
 export function DevelopersClient({ currentRole }: Props) {
@@ -733,7 +719,7 @@ export function DevelopersClient({ currentRole }: Props) {
           <div className="flex items-center justify-between gap-3 mt-3 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-[#9ca3af] font-semibold uppercase tracking-wider">Sort:</span>
-              {(["name", "created_at", "rating"] as SortField[]).map((f) => (
+              {(["name", "created_at"] as SortField[]).map((f) => (
                 <button key={f} type="button" onClick={() => sortToggle(f)}
                   className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
                     sortField === f
@@ -809,8 +795,8 @@ export function DevelopersClient({ currentRole }: Props) {
         <div className="bg-white/60 backdrop-blur-2xl rounded-[24px] border border-white/60 shadow-xl shadow-black/5 overflow-hidden">
           <div className="overflow-x-auto">
           {/* Table header */}
-          <div className="hidden lg:grid grid-cols-[44px_1fr_1fr_100px_90px_88px_170px_170px_40px] lg:min-w-[1200px] gap-4 px-6 py-3 border-b border-[#f0f0f0]">
-            {["", "Name", "Contact", "Rating", "Verified", "Status", "Added", "Updated", ""].map((h, i) => (
+          <div className="hidden lg:grid grid-cols-[44px_1fr_1fr_90px_88px_170px_170px_40px] lg:min-w-[1200px] gap-4 px-6 py-3 border-b border-[#f0f0f0]">
+            {["", "Name", "Contact", "Verified", "Status", "Added", "Updated", ""].map((h, i) => (
               <span key={i} className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">{h}</span>
             ))}
           </div>
@@ -831,7 +817,7 @@ export function DevelopersClient({ currentRole }: Props) {
             <div className="divide-y divide-[#f0f0f0]">
               {devs.map((dev) => (
                 <div key={dev.id}
-                  className={`hidden lg:grid grid-cols-[44px_1fr_1fr_100px_90px_88px_170px_170px_40px] lg:min-w-[1200px] gap-4 items-center px-6 py-4 hover:bg-[#f8fafc] transition-colors ${
+                  className={`hidden lg:grid grid-cols-[44px_1fr_1fr_90px_88px_170px_170px_40px] lg:min-w-[1200px] gap-4 items-center px-6 py-4 hover:bg-[#f8fafc] transition-colors ${
                     dev.deleted_at ? "opacity-50" : ""
                   }`}>
                   {/* Logo */}
@@ -862,9 +848,6 @@ export function DevelopersClient({ currentRole }: Props) {
                     {dev.website_url && <p className="text-xs text-[#6b7280] truncate flex items-center gap-1"><Globe className="w-3 h-3 flex-shrink-0" />{dev.website_url.replace(/^https?:\/\//, "")}</p>}
                     {dev.phone    && <p className="text-xs text-[#6b7280] truncate flex items-center gap-1"><Phone className="w-3 h-3 flex-shrink-0" />{dev.phone}</p>}
                   </div>
-
-                  {/* Rating */}
-                  <StarRating value={dev.rating} />
 
                   {/* Verified */}
                   <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold w-fit ${
