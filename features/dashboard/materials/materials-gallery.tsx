@@ -5,7 +5,7 @@
 // next/image: off-screen tiles are never fetched, and the ones that are come
 // down as small AVIF/WebP copies sized to the tile, not the original file.
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import Image from "next/image"
 import { ChevronLeft, ChevronRight, Download, ImageOff, X, ZoomIn } from "lucide-react"
@@ -14,6 +14,30 @@ import { ALL_CATEGORY, GENERAL_CATEGORY, formatBytes, type Material } from "@/li
 
 /** Widths the browser should pick from — mirrors the grid's breakpoints. */
 const TILE_SIZES = "(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+
+/**
+ * A CSS transparency checkerboard. Only images flagged `transparent` (logo
+ * PNGs) sit on one — no single flat colour can show both a white and a dark
+ * mark, so cells give every logo a set of squares it contrasts against. Cells
+ * are the same slate on both surfaces; only the base shifts to match the
+ * surrounding chrome (light card vs. dark viewer). Opaque posters never use it.
+ */
+function checkerboard(base: string, cell = "#64748b", cellPx = 16): CSSProperties {
+  const tile = cellPx * 2
+  return {
+    backgroundColor: base,
+    backgroundImage: [
+      `linear-gradient(45deg, ${cell} 25%, transparent 25%)`,
+      `linear-gradient(-45deg, ${cell} 25%, transparent 25%)`,
+      `linear-gradient(45deg, transparent 75%, ${cell} 75%)`,
+      `linear-gradient(-45deg, transparent 75%, ${cell} 75%)`,
+    ].join(", "),
+    backgroundSize: `${tile}px ${tile}px`,
+    backgroundPosition: `0 0, 0 ${cellPx}px, ${cellPx}px -${cellPx}px, -${cellPx}px 0`,
+  }
+}
+const CHECKER_LIGHT = checkerboard("#eef1f5") // grid tiles (light cards)
+const CHECKER_DARK = checkerboard("#00112a") // full-screen viewer (dark)
 
 export function MaterialsGallery({ materials }: { materials: Material[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
@@ -152,7 +176,10 @@ export function MaterialsGallery({ materials }: { materials: Material[] }) {
               type="button"
               onClick={() => setOpenIndex(i)}
               aria-label={`View ${m.title}`}
-              className="relative block aspect-square w-full overflow-hidden rounded-t-lg bg-[#eef1f5] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#001f3f]/20"
+              style={m.transparent ? CHECKER_LIGHT : undefined}
+              className={`relative block aspect-square w-full overflow-hidden rounded-t-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-[#001f3f]/20 ${
+                m.transparent ? "" : "bg-[#eef1f5]"
+              }`}
             >
               <Image
                 src={m.src}
@@ -223,7 +250,11 @@ export function MaterialsGallery({ materials }: { materials: Material[] }) {
             </div>
           </div>
 
-          <div className="relative mt-4 flex min-h-0 flex-1 items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <div
+            style={open.transparent ? CHECKER_DARK : undefined}
+            className={`relative mt-4 flex min-h-0 flex-1 items-center justify-center ${open.transparent ? "rounded-2xl" : ""}`}
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Sized to the viewport rather than the original: a 4000px poster
                 still arrives as a screen-sized copy. */}
             <Image

@@ -22,6 +22,11 @@ export type Material = {
   /** Display label of the folder the file sits in — "Motivation",
    *  "Inspiration"… Files at the root of public/materials get GENERAL. */
   category: string
+  /** True when the image has genuinely transparent pixels (e.g. a logo PNG).
+   *  The gallery puts these on a transparency checkerboard so a white or a
+   *  dark mark stays visible on tiles/viewer of any single colour. Opaque
+   *  posters (every JPG, flattened PNG) are false and render unchanged. */
+  transparent: boolean
 }
 
 /** Bucket for files sitting directly in public/materials, uncategorised. */
