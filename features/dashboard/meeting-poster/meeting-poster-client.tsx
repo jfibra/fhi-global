@@ -1,11 +1,5 @@
 "use client"
 
-// Meeting Poster — Agent Resource studio. Compose a branded event /
-// business-presentation poster: FOUR DESIGNS (Business Meeting, Golden Invite
-// dark/light, Photo Collage), portrait-only
-// (1080 wide; Business Meeting height hugs its content). Speakers come from the live agent directory (up to six, reorderable,
-// per-speaker editable role). Exports as PNG via the shared flyer capture.
-
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowDown, ArrowUp, CalendarDays, Check, CheckCircle2, Clock, Download, Globe,
@@ -21,10 +15,6 @@ const GOLD = "#d6b357"
 const NAVY = "#001f3f"
 const INK = "#0a1628"
 
-// ─── Formats & designs ─────────────────────────────────────────────────────────
-
-// Default canvas is portrait 1080×1350 (Business Meeting height is auto);
-// designs may override with their own dimensions.
 const POSTER_W = 1080
 const POSTER_H = 1350
 const DESIGN_SIZES: Partial<Record<DesignId, { w: number; h: number }>> = {
@@ -39,34 +29,23 @@ const DESIGNS: { id: DesignId; label: string; desc: string; chip: string }[] = [
   { id: "premier", label: "Landscape Meeting", desc: "Wide navy & gold invite — skyline right, speaker cards", chip: "linear-gradient(120deg,#0a1220 55%,#1a2740)" },
 ]
 
-// ─── Logos (multi-select, like the Reels brand picker) ─────────────────────────
-
 type LogoOption = {
   id: string
   name: string
-  /** Art for dark poster backgrounds (white/gold, or colored → gets a light chip). */
   src: string
-  /** Dedicated art for light backgrounds; colored logos don't need one. */
   lightSrc?: string
-  /** White/gold art — needs a navy chip when the poster page is light. */
   whiteArt: boolean
-  /** Dark-colored art that gets a thin white halo on dark themes. */
   outlineOnDark?: boolean
-  /** Render-time size multiplier (1 = base size), set from the editor sliders. */
   scale?: number
 }
 
-// Same brand set as the Reels Maker (features/dashboard/reels-maker BRANDS).
 const LOGO_OPTIONS: LogoOption[] = [
   { id: "filipinohomes", name: "Filipino Homes", src: "/logos/Filipinohomes-logo-side-left-white.png", lightSrc: "/logos/filipinohomes-colored.png", whiteArt: true },
   { id: "fhipartners", name: "FH Global Partners", src: "/logos/global_partner.png", lightSrc: "/logos/global_partner.png", whiteArt: true, outlineOnDark: true },
   { id: "fhiglobal", name: "FHI Global Property", src: "/FHI_Branding_White.png", lightSrc: "/logos/FHI_Branding Set_PNG Copies-02.png", whiteArt: true },
-  // Transparent art works on both themes directly — whiteArt + lightSrc keep it chip-free.
   { id: "rentsouq", name: "Rentsouq AE", src: "/logos/rentsouq-transparent.png", lightSrc: "/logos/rentsouq-transparent.png", whiteArt: true },
 ]
 
-/** Renders the selected logos in a row (or stacked), picking per-background art
- *  and dropping a contrast chip behind art that would vanish otherwise. */
 function LogoRow({ logos, dark, size, stack }: { logos: LogoOption[]; dark: boolean; size: number; stack?: boolean }) {
   if (logos.length === 0) return null
   return (
@@ -103,10 +82,6 @@ function LogoRow({ logos, dark, size, stack }: { logos: LogoOption[]; dark: bool
   )
 }
 
-
-/** Remote photos go through the same-origin image proxy — profile photos
- *  (Google avatars, S3) rarely send CORS headers, and a bare remote URL would
- *  both fail to render and taint the PNG export. */
 function displayImg(url: string): string {
   return isSafeRemoteImageUrl(url) ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url
 }
@@ -121,7 +96,6 @@ type PosterData = {
   date: string
   time: string
   venue: string
-  /** Discussion topics, one per line — the Golden Invite checklist. */
   topics: string
   contactPhone: string
   contactEmail: string
@@ -146,15 +120,11 @@ type PosterProps = {
   speakers: Speaker[]
   w: number
   h: number
-  portrait: boolean
   logos: LogoOption[]
-  /** Light (ivory) theme — dark navy when false. */
   light: boolean
 }
 
-// ─── Shared poster bits ────────────────────────────────────────────────────────
-
-function DetailRow({ data, light, size = 21, align = "center" }: { data: PosterData; light?: boolean; size?: number; align?: "center" | "start" }) {
+function DetailRow({ data, light, size = 21 }: { data: PosterData; light?: boolean; size?: number }) {
   const items = [
     { icon: CalendarDays, text: data.date },
     { icon: Clock, text: data.time },
@@ -162,7 +132,7 @@ function DetailRow({ data, light, size = 21, align = "center" }: { data: PosterD
   ].filter((c) => c.text.trim())
   if (items.length === 0) return null
   return (
-    <div className={`flex flex-wrap items-center gap-x-8 gap-y-2 ${align === "start" ? "justify-start" : "justify-center"}`}>
+    <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2">
       {items.map(({ icon: Icon, text }, i) => {
         const [first, ...rest] = text.split("\n")
         return (
@@ -185,7 +155,6 @@ function DetailRow({ data, light, size = 21, align = "center" }: { data: PosterD
   )
 }
 
-/** Split speakers into balanced rows: ≤3 one row, 4 → 2+2, 5 → 3+2, 6 → 3+3. */
 function speakerRows(speakers: Speaker[]): Speaker[][] {
   const n = speakers.length
   if (n <= 3) return n > 0 ? [speakers] : []
@@ -193,7 +162,6 @@ function speakerRows(speakers: Speaker[]): Speaker[][] {
   return [speakers.slice(0, 3), speakers.slice(3)]
 }
 
-/** "Our Speaker" / "Our Speakers" — singular follows the actual count. */
 function speakersHeading(count: number): string {
   return count === 1 ? "Our Speaker" : "Our Speakers"
 }
@@ -209,20 +177,15 @@ function SpeakerPhoto({ s, className }: { s: Speaker; className?: string }) {
   )
 }
 
-// ─── Design 1: Photo Collage (hero-photo navy, portrait speaker tiles) ──────────
-
-function CollagePoster({ data, speakers, w, portrait, logos, light }: PosterProps) {
+function CollagePoster({ data, speakers, w, logos, light }: PosterProps) {
   const ink = light ? NAVY : "#ffffff"
   const subInk = light ? "#3c4451" : "rgba(255,255,255,0.85)"
   const PANEL = light ? "#ffffff" : "#0f1b2d"
   const count = Math.max(1, speakers.length)
   const perRow = count === 4 ? 2 : Math.min(count, 3)
-  const tileW = portrait
-    ? count <= 1 ? 440 : perRow === 2 ? 380 : 290
-    : count <= 3 ? 380 : count === 4 ? 330 : 285
+  const tileW = count <= 1 ? 440 : perRow === 2 ? 380 : 290
   const tileH = Math.min(Math.round(tileW * 1.2), 400)
   const titleLines = data.title.split("\n").filter(Boolean)
-  const taglineLines = data.tagline.split("\n").filter(Boolean)
   const photo = data.background || "/background/dubai.webp"
 
   return (
@@ -230,20 +193,18 @@ function CollagePoster({ data, speakers, w, portrait, logos, light }: PosterProp
       style={{ width: w, backgroundColor: light ? "#f6f4ef" : INK, fontFamily: "'Outfit', sans-serif" }}
       className="relative flex flex-col overflow-hidden"
     >
-      {/* Full-bleed hero photo under a bottom-heavy navy scrim */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={displayImg(photo)} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
       <div className="absolute inset-0" style={{ background: light ? "linear-gradient(180deg, rgba(246,244,239,0.82) 0%, rgba(246,244,239,0.62) 30%, rgba(246,244,239,0.88) 68%, rgba(246,244,239,0.97) 100%)" : `linear-gradient(180deg, ${INK}B3 0%, ${INK}8C 30%, ${INK}E6 68%, ${INK} 100%)` }} />
       <div className="absolute inset-0" style={{ background: "radial-gradient(80% 50% at 50% 0%, rgba(214,179,87,0.10), transparent 60%)" }} />
 
-
-      <div className={`relative flex flex-col ${portrait ? "px-12 pt-12" : "px-20 pt-14"}`}>
-        <div className={`flex ${portrait ? "flex-col items-center text-center" : "items-start justify-between"} gap-8`}>
-          <div className={portrait ? "flex flex-col items-center" : ""}>
-            <LogoRow logos={logos} dark={!light} size={portrait ? 84 : 72} />
+      <div className="relative flex flex-col px-12 pt-12">
+        <div className="flex flex-col items-center gap-8 text-center">
+          <div className="flex flex-col items-center">
+            <LogoRow logos={logos} dark={!light} size={84} />
             <div className="mt-5">
               {titleLines.map((line, i) => (
-                <p key={i} className={`${portrait ? "text-[76px]" : "text-[68px]"} font-black leading-[1.02] tracking-tight`} style={{ color: ink }}>
+                <p key={i} className="text-[76px] font-black leading-[1.02] tracking-tight" style={{ color: ink }}>
                   {line}
                 </p>
               ))}
@@ -256,16 +217,6 @@ function CollagePoster({ data, speakers, w, portrait, logos, light }: PosterProp
             )}
           </div>
 
-          {!portrait && taglineLines.length > 0 && (
-            <div className="pt-4 text-right">
-              {taglineLines.map((line, i) => (
-                <p key={i} className="text-[44px] font-black italic uppercase leading-[1.08]" style={{ color: ink }}>
-                  {line}
-                </p>
-              ))}
-              <div className="ml-auto mt-2 h-[6px] w-48" style={{ backgroundColor: GOLD }} />
-            </div>
-          )}
         </div>
 
         {speakers.length > 0 ? (
@@ -277,7 +228,7 @@ function CollagePoster({ data, speakers, w, portrait, logos, light }: PosterProp
               </p>
               <span className="h-[5px] w-16" style={{ backgroundColor: GOLD }} />
             </div>
-            <div className="flex w-full flex-col items-center" style={{ gap: portrait ? 34 : 26 }}>
+            <div className="flex w-full flex-col items-center" style={{ gap: 34 }}>
               {speakerRows(speakers).map((row, r) => (
                 <div key={r} className="flex flex-nowrap items-stretch justify-center" style={{ gap: 26 }}>
                   {row.map((s) => {
@@ -288,7 +239,6 @@ function CollagePoster({ data, speakers, w, portrait, logos, light }: PosterProp
                   className="relative flex flex-col border"
                   style={{ width: tileW, borderColor: `${GOLD}77`, backgroundColor: PANEL, boxShadow: light ? "0 24px 48px -28px rgba(0,31,63,0.35)" : "0 24px 48px -24px rgba(0,0,0,0.65)" }}
                 >
-                  {/* Gold corner number tag — same as Business Meeting */}
                   <span
                     className="absolute left-0 top-0 z-10 font-extrabold"
                     style={{ backgroundColor: GOLD, color: INK, fontSize: 19, padding: "6px 26px 6px 14px", clipPath: "polygon(0 0, 100% 0, 78% 100%, 0 100%)" }}
@@ -326,12 +276,8 @@ function CollagePoster({ data, speakers, w, portrait, logos, light }: PosterProp
   )
 }
 
-// ─── Design: Business Meeting (navy & gold executive invite) ───────────────────
-
 const FOOTER_DIVIDER = { paddingLeft: 26, marginLeft: 26, borderLeft: "1.5px solid #d6b35733" } as const
 
-/** Business Meeting-style footer: gold-boxed date / time / venue chips plus
- *  optional Contact Us / Email Us groups, divided by gold hairlines. */
 function GoldFooterBar({ data, marginTop = 0, light }: { data: PosterData; marginTop?: number; light?: boolean }) {
   const ink = light ? NAVY : "#ffffff"
   const subInk = light ? "#3c4451" : "rgba(255,255,255,0.8)"
@@ -387,7 +333,7 @@ function GoldFooterBar({ data, marginTop = 0, light }: { data: PosterData; margi
   )
 }
 
-function MeetingPoster({ data, speakers, w, h, portrait, logos, light }: PosterProps) {
+function MeetingPoster({ data, speakers, w, logos, light }: PosterProps) {
   const BG = light ? "#f6f4ef" : "#0d1522"
   const PANEL = light ? "#ffffff" : "#0f1b2d"
   const ink = light ? NAVY : "#ffffff"
@@ -396,38 +342,24 @@ function MeetingPoster({ data, speakers, w, h, portrait, logos, light }: PosterP
   const desc = data.subtitle.trim()
   const n = Math.max(speakers.length, 1)
 
-  // ── Fixed size budgets so nothing ever overflows the canvas ──
-  // Every zone below is measured against the poster height; the speakers zone
-  // takes whatever remains and its card photo height is derived from it.
-  const pad = portrait ? 56 : 72
+  const pad = 56
   const innerW = w - pad * 2
-  // Landscape with 1–3 speakers: title on the left, speakers on the right.
-  const split = !portrait && speakers.length > 0 && speakers.length <= 3
   const gap = 24
-  // Rows are balanced (4 → 2+2, 5 → 3+2), so cards size to the widest row.
   const perRow = n === 4 ? 2 : Math.min(n, 3)
   const cardW = Math.min(
     n === 1 ? 460 : n === 2 ? 400 : n === 4 ? 380 : 340,
-    Math.floor(((split ? Math.floor(w * 0.44) : innerW) - gap * (perRow - 1)) / perRow),
+    Math.floor((innerW - gap * (perRow - 1)) / perRow),
   )
-  // Portrait hugs its content (auto canvas height): photos size from the card
-  // width alone. Landscape keeps the fixed 16:9 canvas, so photos take what
-  // the header / heading / bottom bar leave over.
-  const speakersBudget = split ? h - 40 - 96 - 84 - 96 - 40 : h - 40 - 310 - 84 - 96 - 16
-  const panelMin = 150
-  const photoH = portrait
-    ? Math.min(Math.round(cardW * 1.2), 400)
-    : Math.max(150, Math.min(Math.round(cardW * 1.3), speakersBudget - panelMin))
+  const photoH = Math.min(Math.round(cardW * 1.2), 400)
 
   const logoArt = (
     <div className="shrink-0">
-      <LogoRow logos={logos} dark={!light} size={portrait ? 84 : 72} stack={portrait} />
+      <LogoRow logos={logos} dark={!light} size={84} stack />
     </div>
   )
 
   const speakerCards = speakers.length > 0 && (
     <div className="flex w-full flex-col items-center">
-      {/* Script heading with gold rules */}
       <div className="flex w-full items-center justify-center gap-5">
         <span className="text-[13px]" style={{ color: GOLD }}>◆</span>
         <span className="h-px flex-1" style={{ maxWidth: 170, backgroundColor: `${GOLD}88` }} />
@@ -448,7 +380,6 @@ function MeetingPoster({ data, speakers, w, h, portrait, logos, light }: PosterP
               const small = cardW < 240
           return (
             <div key={sp.id} className="relative flex flex-col border" style={{ width: cardW, borderColor: `${GOLD}77`, backgroundColor: PANEL, boxShadow: "0 24px 48px -24px rgba(0,0,0,0.65)" }}>
-              {/* Gold corner number tag */}
               <span
                 className="absolute left-0 top-0 z-10 font-extrabold"
                 style={{
@@ -485,22 +416,22 @@ function MeetingPoster({ data, speakers, w, h, portrait, logos, light }: PosterP
     </div>
   )
 
-  const titleBlock = (big: boolean) => (
+  const titleBlock = () => (
     <>
-      <h1 className="font-black uppercase tracking-tight" style={{ lineHeight: 0.98, fontSize: big ? 100 : 80 }}>
+      <h1 className="font-black uppercase tracking-tight" style={{ lineHeight: 0.98, fontSize: 100 }}>
         {titleLines.map((line, i) => (
           <span key={i} className="block" style={{ color: i % 2 === 1 ? GOLD : ink }}>{line}</span>
         ))}
       </h1>
       {data.tagline && (
-        <p className="mt-4 font-bold uppercase" style={{ color: ink, letterSpacing: "0.2em", fontSize: big ? 22 : 20 }}>
+        <p className="mt-4 font-bold uppercase" style={{ color: ink, letterSpacing: "0.2em", fontSize: 22 }}>
           {data.tagline.split("\n").join(" ")}
         </p>
       )}
       {desc && (
         <p
           className="mt-5 whitespace-pre-line leading-relaxed"
-          style={{ color: subInk, fontSize: big ? 22 : 20, maxWidth: big ? 640 : 760, borderLeft: `3px solid ${GOLD}`, paddingLeft: 20 }}
+          style={{ color: subInk, fontSize: 22, maxWidth: 640, borderLeft: `3px solid ${GOLD}`, paddingLeft: 20 }}
         >
           {desc}
         </p>
@@ -510,18 +441,16 @@ function MeetingPoster({ data, speakers, w, h, portrait, logos, light }: PosterP
 
   return (
     <div
-      style={{ width: w, height: portrait ? undefined : h, backgroundColor: BG, fontFamily: "'Outfit', sans-serif" }}
+      style={{ width: w, backgroundColor: BG, fontFamily: "'Outfit', sans-serif" }}
       className="relative flex flex-col overflow-hidden"
-      data-theme={light ? "light" : "dark"}
     >
-      {/* Ambient gold glows + arc ornaments + glowing skyline base */}
       <div className="absolute inset-x-0 top-0 h-1/2" style={{ background: "radial-gradient(90% 70% at 85% 0%, rgba(214,179,87,0.16), transparent 60%)" }} />
       <div className="absolute inset-x-0 bottom-0 h-1/2" style={{ background: "radial-gradient(80% 60% at 0% 100%, rgba(214,179,87,0.08), transparent 55%)" }} />
       <div className="absolute rounded-full" style={{ width: w * 0.5, height: w * 0.5, top: -w * 0.22, right: -w * 0.18, border: `1.5px solid ${GOLD}33` }} />
       <div className="absolute rounded-full" style={{ width: w * 0.62, height: w * 0.62, top: -w * 0.28, right: -w * 0.24, border: `1px solid ${GOLD}22` }} />
       <div className="absolute left-0 top-0 h-28 w-28" style={{ borderLeft: `2px solid ${GOLD}66`, borderTop: `2px solid ${GOLD}66`, margin: 26 }} />
       <div className="absolute bottom-0 right-0 h-28 w-28" style={{ borderRight: `2px solid ${GOLD}66`, borderBottom: `2px solid ${GOLD}66`, margin: 26 }} />
-      <div className="absolute inset-x-0 bottom-0" style={{ height: portrait ? 300 : h * 0.24 }}>
+      <div className="absolute inset-x-0 bottom-0" style={{ height: 300 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/background/dubai.webp"
@@ -532,45 +461,27 @@ function MeetingPoster({ data, speakers, w, h, portrait, logos, light }: PosterP
         <div className="absolute inset-0" style={{ background: light ? "linear-gradient(180deg, #f6f4ef 0%, rgba(246,244,239,0.05) 100%)" : `linear-gradient(180deg, ${BG} 0%, rgba(13,21,34,0.25) 70%, rgba(13,21,34,0.55) 100%)` }} />
       </div>
 
-      <div className={`relative flex flex-col ${portrait ? "" : "h-full"}`} style={{ paddingLeft: pad, paddingRight: pad, paddingTop: portrait ? 48 : 40 }}>
-        {split ? (
-          /* Landscape, 1–3 speakers: title left · logos + speakers right */
-          <div className="flex min-h-0 flex-1 items-stretch" style={{ gap: 56 }}>
-            <div className="flex min-w-0 flex-1 flex-col justify-center pb-4">{titleBlock(true)}</div>
-            <div className="flex shrink-0 flex-col" style={{ width: w * 0.44 }}>
-              <div className="flex justify-end">{logoArt}</div>
-              <div className="flex min-h-0 flex-1 flex-col justify-center" style={{ marginTop: 8 }}>{speakerCards}</div>
-            </div>
+      <div className="relative flex flex-col" style={{ paddingLeft: pad, paddingRight: pad, paddingTop: 48 }}>
+        <div className="flex items-start justify-between" style={{ gap: 48 }}>
+          <div className="min-w-0 flex-1">
+            <div className="mt-2">{titleBlock()}</div>
           </div>
-        ) : (
-          <>
-            {/* Header: title left, logos top-right */}
-            <div className="flex items-start justify-between" style={{ minHeight: portrait ? undefined : 300, gap: 48 }}>
-              <div className="min-w-0 flex-1">
-                <div className={portrait ? "mt-2" : "mt-1"}>{titleBlock(portrait)}</div>
-              </div>
-              {logoArt}
-            </div>
+          {logoArt}
+        </div>
 
-            {/* Speakers — takes the remaining height, vertically centered */}
-            <div className={`flex flex-col ${portrait ? "" : "min-h-0 flex-1 justify-center"}`} style={{ marginTop: portrait ? 28 : 4 }}>
-              {speakerCards}
-            </div>
-          </>
-        )}
+        <div className="flex flex-col" style={{ marginTop: 28 }}>
+          {speakerCards}
+        </div>
 
-        {/* Bottom bar — date / time / venue (+ contacts when provided) */}
-        <GoldFooterBar data={data} marginTop={portrait ? 30 : 0} light={light} />
+        <GoldFooterBar data={data} marginTop={30} light={light} />
       </div>
     </div>
   )
 }
 
-// ─── Design: Golden Invite (serif seminar invite, dark & light variants) ────────
-
 const INVITE_GOLD_GRAD = `linear-gradient(120deg, #f0d99b, ${GOLD} 45%, #a97e2f)`
 
-function InvitePoster({ data, speakers, w, portrait, logos, light }: PosterProps) {
+function InvitePoster({ data, speakers, w, logos, light }: PosterProps) {
   const SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif"
   const BG = light ? "#f6f4ef" : "#0a1424"
   const ink = light ? NAVY : "#ffffff"
@@ -578,7 +489,7 @@ function InvitePoster({ data, speakers, w, portrait, logos, light }: PosterProps
   const n = speakers.length
   const titleLines = data.title.split("\n").filter(Boolean)
   const topics = data.topics.split("\n").map((t) => t.trim()).filter(Boolean)
-  const pad = portrait ? 60 : 80
+  const pad = 60
 
   const goldHeading = (label: string, size = 19) => (
     <div className="flex w-full items-center justify-center gap-4">
@@ -604,11 +515,10 @@ function InvitePoster({ data, speakers, w, portrait, logos, light }: PosterProps
     </div>
   )
 
-  // 1 → hero circle + SPEAKER pill · 2 → rounded squares with & · 3+ → circle row
   const speakersBlock =
     n === 0 ? null : n === 1 ? (
       <div className="flex flex-col items-center">
-        {circle(speakers[0], portrait ? 310 : 280)}
+        {circle(speakers[0], 310)}
         <span
           className="-mt-5 px-7 py-1.5 text-[15px] font-extrabold uppercase tracking-[0.2em]"
           style={{ background: INVITE_GOLD_GRAD, color: "#0a1424", borderRadius: 999 }}
@@ -624,20 +534,19 @@ function InvitePoster({ data, speakers, w, portrait, logos, light }: PosterProps
             {i === 1 && (
               <span className="self-center font-bold" style={{ fontFamily: SERIF, color: GOLD, fontSize: 58, marginTop: -40 }}>&amp;</span>
             )}
-            <div className="flex flex-col items-center" style={{ width: portrait ? 320 : 280 }}>
-              {circle(sp, portrait ? 290 : 250)}
+            <div className="flex flex-col items-center" style={{ width: 320 }}>
+              {circle(sp, 290)}
               <div className="mt-4">{speakerName(sp)}</div>
             </div>
           </Fragment>
         ))}
       </div>
     ) : (
-      /* Balanced rows: 3 in a row · 4 → 2+2 · 5 → 3+2 · 6 → 3+3 */
       <div className="flex w-full flex-col items-center" style={{ gap: 30 }}>
         {speakerRows(speakers).map((row, r) => {
-          const d = portrait ? (n === 3 ? 250 : n === 4 ? 230 : 200) : n <= 4 ? 190 : 155
+          const d = n === 3 ? 250 : n === 4 ? 230 : 200
           return (
-            <div key={r} className="flex flex-nowrap items-start justify-center" style={{ columnGap: portrait ? 34 : 44 }}>
+            <div key={r} className="flex flex-nowrap items-start justify-center" style={{ columnGap: 34 }}>
               {row.map((sp) => (
                 <div key={sp.id} className="flex flex-col items-center" style={{ width: d + 46 }}>
                   {circle(sp, d)}
@@ -653,7 +562,7 @@ function InvitePoster({ data, speakers, w, portrait, logos, light }: PosterProps
   const topicsBlock = topics.length > 0 && (
     <div className="flex w-full flex-col items-center">
       {goldHeading("Topics We Will Discuss", 17)}
-      <div className="mt-4 grid grid-cols-2 gap-x-10 gap-y-3" style={{ maxWidth: portrait ? 860 : 780 }}>
+      <div className="mt-4 grid grid-cols-2 gap-x-10 gap-y-3" style={{ maxWidth: 860 }}>
         {topics.map((t, i) => (
           <div key={i} className="flex items-center gap-2.5">
             <CheckCircle2 className="shrink-0" style={{ color: GOLD, width: 21, height: 21 }} strokeWidth={2} />
@@ -707,7 +616,7 @@ function InvitePoster({ data, speakers, w, portrait, logos, light }: PosterProps
 
   const header = (
     <div className="flex flex-col items-center text-center">
-      <LogoRow logos={logos} dark={!light} size={portrait ? 60 : 52} />
+      <LogoRow logos={logos} dark={!light} size={60} />
       <p className="mt-11 text-[15px] font-bold uppercase" style={{ color: ink, letterSpacing: "0.34em" }}>You Are Invited to Our</p>
       <h1 style={{ fontFamily: SERIF, lineHeight: 1 }}>
         {titleLines.map((line, i) => (
@@ -715,8 +624,8 @@ function InvitePoster({ data, speakers, w, portrait, logos, light }: PosterProps
             key={i}
             className="block font-bold uppercase"
             style={i === titleLines.length - 1 && titleLines.length > 1
-              ? { color: GOLD, fontSize: portrait ? 104 : 84, letterSpacing: "0.02em", marginTop: 2 }
-              : { color: ink, fontSize: portrait ? 46 : 38, letterSpacing: "0.3em", marginTop: 10 }}
+              ? { color: GOLD, fontSize: 104, letterSpacing: "0.02em", marginTop: 2 }
+              : { color: ink, fontSize: 46, letterSpacing: "0.3em", marginTop: 10 }}
           >
             {line}
           </span>
@@ -735,7 +644,6 @@ function InvitePoster({ data, speakers, w, portrait, logos, light }: PosterProps
       style={{ width: w, backgroundColor: BG, fontFamily: "'Outfit', sans-serif" }}
       className="relative flex flex-col overflow-hidden"
     >
-      {/* Skyline + gold arc + diagonal corner accents */}
       <div className="absolute inset-x-0 bottom-0" style={{ height: light ? 620 : 540, opacity: light ? 0.28 : 0.4 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -748,13 +656,12 @@ function InvitePoster({ data, speakers, w, portrait, logos, light }: PosterProps
       </div>
       <div
         className="absolute rounded-full"
-        style={{ width: w * 1.7, height: w * 1.7, left: -w * 0.35, top: (portrait ? 320 : 250) - w * 1.7, border: `2px solid ${GOLD}55` }}
+        style={{ width: w * 1.7, height: w * 1.7, left: -w * 0.35, top: 320 - w * 1.7, border: `2px solid ${GOLD}55` }}
       />
       <span className="absolute" style={{ top: -50, right: -170, width: 430, height: 110, transform: "rotate(33deg)", borderBottom: `2.5px solid ${GOLD}99` }} />
       <span className="absolute" style={{ top: -70, right: -170, width: 430, height: 110, transform: "rotate(33deg)", borderBottom: `1px solid ${GOLD}55` }} />
       <span className="absolute" style={{ bottom: 20, left: -170, width: 430, height: 110, transform: "rotate(33deg)", borderTop: `2.5px solid ${GOLD}99` }} />
 
-      {/* Speaker-count ribbon */}
       {n > 0 && (
         <span
           className="absolute z-10 px-6 py-2 text-[16px] font-extrabold uppercase tracking-[0.12em]"
@@ -764,44 +671,25 @@ function InvitePoster({ data, speakers, w, portrait, logos, light }: PosterProps
         </span>
       )}
 
-      <div className="relative flex flex-col" style={{ paddingLeft: pad, paddingRight: pad, paddingTop: portrait ? 44 : 32 }}>
+      <div className="relative flex flex-col" style={{ paddingLeft: pad, paddingRight: pad, paddingTop: 44 }}>
         {header}
 
-        {portrait ? (
-          <>
-            <div className="mt-7 w-full">{detailsPanel}</div>
-            <div className="flex w-full flex-col items-center" style={{ paddingTop: 12 }}>
-              {n > 0 && (
-                <div className="mt-9 flex w-full flex-col items-center">
-                  {goldHeading(speakersHeading(n))}
-                  <div className="mt-6 w-full">{speakersBlock}</div>
-                </div>
-              )}
-              {topics.length > 0 && <div className="mt-10 flex w-full flex-col items-center">{topicsBlock}</div>}
+        <div className="mt-7 w-full">{detailsPanel}</div>
+        <div className="flex w-full flex-col items-center" style={{ paddingTop: 12 }}>
+          {n > 0 && (
+            <div className="mt-9 flex w-full flex-col items-center">
+              {goldHeading(speakersHeading(n))}
+              <div className="mt-6 w-full">{speakersBlock}</div>
             </div>
-          </>
-        ) : (
-          <div className="flex min-h-0 flex-1 items-center" style={{ gap: 56, paddingTop: 12, paddingBottom: 8 }}>
-            <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-7">
-              {detailsPanel}
-              {topicsBlock}
-            </div>
-            {n > 0 && (
-              <div className="flex shrink-0 flex-col items-center justify-center" style={{ width: w * 0.44 }}>
-                {goldHeading(speakersHeading(n))}
-                <div className="mt-6">{speakersBlock}</div>
-              </div>
-            )}
-          </div>
-        )}
+          )}
+          {topics.length > 0 && <div className="mt-10 flex w-full flex-col items-center">{topicsBlock}</div>}
+        </div>
 
         <div style={{ marginTop: 40 }}>{footerBar}</div>
       </div>
     </div>
   )
 }
-
-// ─── Design: Landscape Meeting (navy & gold, skyline right, speakers row) ───────
 
 function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
   const SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif"
@@ -819,7 +707,6 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
     { icon: MapPin, text: data.venue },
   ].filter((d) => d.text.trim())
 
-  // Speaker cards — balanced rows share the right column.
   const rows = speakerRows(speakers)
   const perRow = rows.length > 0 ? Math.max(...rows.map((r) => r.length)) : 1
   const cardW = perRow >= 3 ? 280 : perRow === 2 ? 330 : 400
@@ -832,7 +719,6 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
       style={{ width: w, height: h, backgroundColor: BG, fontFamily: "'Outfit', sans-serif" }}
       className="relative flex flex-col overflow-hidden"
     >
-      {/* Skyline photo blending in from the top-right */}
       <div className="absolute right-0 top-0" style={{ width: w * 0.58, height: h * 0.72 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -845,12 +731,10 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
         <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, ${light ? "rgba(246,244,239,0.55)" : "rgba(10,18,32,0.55)"} 0%, transparent 30%, ${light ? "rgba(246,244,239,0.4)" : "rgba(10,18,32,0.35)"} 75%, ${BG} 100%)` }} />
       </div>
 
-      {/* Gold corner arcs — bottom-left and right edge */}
       <div className="absolute rounded-full" style={{ width: w * 0.55, height: w * 0.55, left: -w * 0.3, bottom: -w * 0.42, border: `2px solid ${GOLD}88` }} />
       <div className="absolute rounded-full" style={{ width: w * 0.55, height: w * 0.55, left: -w * 0.32, bottom: -w * 0.44, border: `1px solid ${GOLD}55` }} />
       <div className="absolute rounded-full" style={{ width: w * 0.5, height: w * 0.5, right: -w * 0.34, bottom: -w * 0.3, border: `2px solid ${GOLD}66` }} />
 
-      {/* Speaker-count ribbon */}
       {n > 0 && (
         <span
           className="absolute z-10 px-7 py-2.5 text-[17px] font-extrabold uppercase tracking-[0.14em]"
@@ -861,12 +745,10 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
       )}
 
       <div className="relative flex h-full flex-col" style={{ paddingLeft: 90, paddingRight: 90, paddingTop: 30 }}>
-        {/* Centered logo row */}
         <div className="flex justify-center">
           <LogoRow logos={logos} dark={!light} size={64} />
         </div>
 
-        {/* Main: content left · speakers right */}
         <div className="flex min-h-0 flex-1 items-stretch" style={{ gap: 48, paddingTop: 26 }}>
           <div className="flex min-w-0 flex-col justify-center pb-10" style={{ width: w * 0.47 }}>
             <p className="text-[23px] font-bold uppercase" style={{ color: ink, letterSpacing: "0.42em" }}>You Are Invited to Our</p>
@@ -893,7 +775,6 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
               </div>
             )}
 
-            {/* Details row */}
             {details.length > 0 && (
               <div className="mt-14 flex items-center">
                 {details.map(({ icon: Icon, text }, i) => {
@@ -911,7 +792,6 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
               </div>
             )}
 
-            {/* Topics checklist */}
             {topics.length > 0 && (
               <div className="mt-14">
                 <div className="flex items-center gap-4">
@@ -934,7 +814,6 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
 
           </div>
 
-          {/* Speakers — right column, pinned to the bottom like the sample */}
           <div className="flex min-w-0 flex-1 flex-col justify-end pb-2">
             {n > 0 && (
               <>
@@ -955,7 +834,6 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
                             >
                               <SpeakerPhoto s={sp} />
                             </div>
-                            {/* Gold name plate overlapping the card bottom */}
                             <span
                               className="absolute bottom-0 left-1/2 block w-[88%] -translate-x-1/2 px-4 py-2.5 text-center text-[19px] font-extrabold uppercase leading-tight"
                               style={{ background: `linear-gradient(120deg, #f0d99b, ${GOLD} 45%, #a97e2f)`, color: "#0a1220", borderRadius: 8 }}
@@ -974,7 +852,6 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
           </div>
         </div>
 
-        {/* Footer band — centered website */}
         <div
           className="flex items-center justify-center gap-5"
           style={{ marginLeft: -90, marginRight: -90, minHeight: 84, backgroundColor: light ? NAVY : "rgba(5,9,17,0.75)", borderTop: `1px solid ${GOLD}55` }}
@@ -990,16 +867,12 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
   )
 }
 
-// ─── Dispatcher ────────────────────────────────────────────────────────────────
-
 function Poster({ design, ...props }: PosterProps & { design: DesignId }) {
   if (design === "collage") return <CollagePoster {...props} />
   if (design === "invite") return <InvitePoster {...props} />
   if (design === "premier") return <PremierPoster {...props} />
   return <MeetingPoster {...props} />
 }
-
-// ─── Small form primitives (flat, same look as the Website Builder) ───────────
 
 const INPUT_CLS =
   "w-full border border-[#e2e6ea] bg-white px-3 py-2 text-[13px] text-[#0d1117] outline-none transition-colors focus:border-[#001f3f]"
@@ -1012,8 +885,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </label>
   )
 }
-
-// ─── Editor ────────────────────────────────────────────────────────────────────
 
 export function MeetingPosterClient() {
   const [data, setData] = useState<PosterData>(DEFAULTS)
@@ -1032,7 +903,6 @@ export function MeetingPosterClient() {
   const posterRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Selection order = render order on the poster; sliders set per-logo scale.
   const selectedLogos = useMemo(
     () =>
       logoIds.flatMap((id) => {
@@ -1045,10 +915,7 @@ export function MeetingPosterClient() {
     setLogoIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
 
   const { w: posterW, h: posterH } = DESIGN_SIZES[design] ?? { w: POSTER_W, h: POSTER_H }
-  const portrait = posterH >= posterW
 
-  // Auto-height designs (Business Meeting portrait) size to content — measure
-  // the real node height so the preview frame and PNG export match it.
   const [measuredH, setMeasuredH] = useState<number | null>(null)
   useEffect(() => {
     const el = posterRef.current
@@ -1059,7 +926,6 @@ export function MeetingPosterClient() {
   }, [])
   const displayH = measuredH ?? posterH
 
-  // Preview scale — fit the poster into whatever width is available.
   const [frameEl, setFrameEl] = useState<HTMLDivElement | null>(null)
   const [scale, setScale] = useState(0.4)
   useEffect(() => {
@@ -1088,7 +954,6 @@ export function MeetingPosterClient() {
     }
   }, [])
 
-  // Warm the font-embed cache so the first Download is instant.
   useEffect(() => {
     warmFontEmbedCSS(posterRef.current)
   }, [])
@@ -1171,7 +1036,6 @@ export function MeetingPosterClient() {
         </button>
       </div>
 
-      {/* Design / theme / logo pickers — stacked rows */}
       <div className="flex flex-col gap-5 bg-white border border-[#e8eaed] p-4">
         <div>
           <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#6b7280]">Design</p>
@@ -1281,7 +1145,6 @@ export function MeetingPosterClient() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
-        {/* ── Form ── */}
         <div className="space-y-4 bg-white border border-[#e8eaed] p-5 self-start">
           <Field label="Title (line breaks kept)">
             <textarea rows={2} className={`${INPUT_CLS} resize-y`} value={data.title} onChange={(e) => set({ title: e.target.value })} />
@@ -1344,7 +1207,6 @@ export function MeetingPosterClient() {
             </div>
           </Field>
 
-          {/* Speaker picker */}
           <Field label={`Speakers — ${speakers.length}/${MAX_SPEAKERS} selected`}>
             <div className="space-y-2.5">
               <div className="relative">
@@ -1399,7 +1261,6 @@ export function MeetingPosterClient() {
                 })}
               </div>
 
-              {/* Selected — order + per-speaker role */}
               {speakers.map((s, i) => (
                 <div key={s.id} className="border border-[#e8eaed] bg-[#fafbfc] p-2">
                   <div className="flex items-center gap-2">
@@ -1433,12 +1294,11 @@ export function MeetingPosterClient() {
           </Field>
         </div>
 
-        {/* ── Live poster preview (scaled); the full-size node is what exports ── */}
         <div ref={setFrameEl} className="min-w-0">
           <div style={{ height: displayH * scale }} className="relative overflow-hidden">
             <div style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: posterW }}>
               <div ref={posterRef}>
-                <Poster design={design} data={data} speakers={speakers} w={posterW} h={posterH} portrait={portrait} logos={selectedLogos} light={theme === "light"} />
+                <Poster design={design} data={data} speakers={speakers} w={posterW} h={posterH} logos={selectedLogos} light={theme === "light"} />
               </div>
             </div>
           </div>
