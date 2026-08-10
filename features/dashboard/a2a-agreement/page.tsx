@@ -11,17 +11,9 @@ import { A2AClient } from "./a2a-client"
  * agent's behalf.
  */
 export default function A2AAgreementPage() {
-  const { user, profile, role } = useAuth()
+  const { role } = useAuth()
   const allowed = useRequireAllowed(isSalesPipelineRole(role) || isAdminStaffRole(role))
   if (!allowed) return null
 
-  return (
-    <A2AClient
-      defaultParty={{
-        fullName: profile?.fullname ?? "",
-        agency: "FHI Global Property",
-        email: user?.email ?? "",
-      }}
-    />
-  )
+  return <A2AClient />
 }

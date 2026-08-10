@@ -5,7 +5,7 @@
 // is generated in the browser and handed straight to the user, so no client
 // or commercial terms leave the device.
 
-import { useCallback, useMemo, useState } from "react"
+import { type RefObject, useCallback, useMemo, useRef, useState } from "react"
 import { Download, FileSignature, Loader2, Users } from "lucide-react"
 import { type A2AParty, type A2AScope, downloadA2APdf } from "@/lib/a2a-agreement"
 import { SignaturePad } from "./signature-pad"
@@ -28,11 +28,12 @@ function todayLocal(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-export function A2AClient({ defaultParty }: { defaultParty?: Partial<A2AParty> }) {
+/** Fields that block the download until filled in — highlighted on submit. */
+type RequiredField = "partyA.fullName" | "partyB.fullName" | "scope"
+
+export function A2AClient() {
   const [date, setDate] = useState(todayLocal)
-  // Party A pre-fills with the signed-in agent — they're normally the one
-  // introducing the listing.
-  const [partyA, setPartyA] = useState<A2AParty>(() => ({ ...emptyParty(), ...defaultParty }))
+  const [partyA, setPartyA] = useState<A2AParty>(emptyParty)
   const [partyB, setPartyB] = useState<A2AParty>(emptyParty)
   const [scope, setScope] = useState<A2AScope | "">("")
   const [propertyRef, setPropertyRef] = useState("")
@@ -43,6 +44,23 @@ export function A2AClient({ defaultParty }: { defaultParty?: Partial<A2AParty> }
   const [validUntil, setValidUntil] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Set<RequiredField>>(() => new Set())
+
+  // Scroll targets for the required fields, so a failed download jumps the user
+  // straight to the first thing that needs filling in.
+  const partyANameRef = useRef<HTMLInputElement>(null)
+  const partyBNameRef = useRef<HTMLInputElement>(null)
+  const scopeRef = useRef<HTMLDivElement>(null)
+
+  const clearFieldError = (key: RequiredField) => {
+    setFieldErrors((prev) => {
+      if (!prev.has(key)) return prev
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
+    setError(null)
+  }
 
   const splitTotal = useMemo(() => {
     const a = Number(splitA)
@@ -55,15 +73,35 @@ export function A2AClient({ defaultParty }: { defaultParty?: Partial<A2AParty> }
   const patchB = (patch: Partial<A2AParty>) => setPartyB((p) => ({ ...p, ...patch }))
 
   const generate = useCallback(async () => {
+    const invalid = new Set<RequiredField>()
+    if (!partyA.fullName.trim()) invalid.add("partyA.fullName")
+    if (!partyB.fullName.trim()) invalid.add("partyB.fullName")
+    if (!scope) invalid.add("scope")
+
+    if (invalid.size > 0) {
+      setFieldErrors(invalid)
+      const needs: string[] = []
+      if (invalid.has("partyA.fullName") || invalid.has("partyB.fullName")) needs.push("a full name for both parties")
+      if (invalid.has("scope")) needs.push("a scope of collaboration")
+      setError(`Please add ${needs.join(" and ")} before downloading.`)
+
+      // Jump to the first missing field (top-to-bottom) and focus it.
+      const first = invalid.has("partyA.fullName")
+        ? partyANameRef.current
+        : invalid.has("partyB.fullName")
+          ? partyBNameRef.current
+          : scopeRef.current
+      if (first) {
+        first.scrollIntoView({ behavior: "smooth", block: "center" })
+        const focusTarget =
+          first instanceof HTMLInputElement ? first : first.querySelector<HTMLElement>("button")
+        focusTarget?.focus({ preventScroll: true })
+      }
+      return
+    }
+
     setError(null)
-    if (!partyA.fullName.trim() || !partyB.fullName.trim()) {
-      setError("Both parties need a full name.")
-      return
-    }
-    if (!scope) {
-      setError("Pick the scope of collaboration.")
-      return
-    }
+    setFieldErrors(new Set())
     setBusy(true)
     try {
       const stamp = date || todayLocal()
@@ -89,14 +127,29 @@ export function A2AClient({ defaultParty }: { defaultParty?: Partial<A2AParty> }
     }
   }, [date, partyA, partyB, scope, propertyRef, clientName, splitA, splitB, noticePeriodDays, validUntil])
 
-  const input = "w-full px-3 py-2.5 border border-[#dfe3e8] bg-white text-sm text-[#0d1117] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f]"
+  const inputBase = "w-full px-3 py-2.5 border bg-white text-sm text-[#0d1117] placeholder:text-[#9ca3af] focus:outline-none"
+  const inputCls = (invalid?: boolean) =>
+    `${inputBase} ${invalid ? "border-rose-400 focus:border-rose-500" : "border-[#dfe3e8] focus:border-[#001f3f]"}`
+  const input = inputCls()
   const label = "block text-xs font-bold uppercase tracking-wider text-[#374151] mb-1.5"
 
-  const partyFields = (p: A2AParty, patch: (v: Partial<A2AParty>) => void) => (
+  const partyFields = (
+    p: A2AParty,
+    patch: (v: Partial<A2AParty>) => void,
+    name: { ref: RefObject<HTMLInputElement | null>; invalid: boolean; onClear: () => void },
+  ) => (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div className="sm:col-span-2">
         <label className={label}>Full Name *</label>
-        <input value={p.fullName} onChange={(e) => patch({ fullName: e.target.value })} className={input} placeholder="Agent's full name" />
+        <input
+          ref={name.ref}
+          value={p.fullName}
+          onChange={(e) => {
+            patch({ fullName: e.target.value })
+            name.onClear()
+          }}
+          className={inputCls(name.invalid)}
+        />
       </div>
       <div className="sm:col-span-2">
         <label className={label}>Agency / Brokerage</label>
@@ -151,7 +204,11 @@ export function A2AClient({ defaultParty }: { defaultParty?: Partial<A2AParty> }
           <Users className="w-4 h-4 text-[#d6b357]" /> Party A — Introducing / Listing Agent
         </h2>
         <span className="block w-full h-px bg-[#d6b357] mb-5" aria-hidden="true" />
-        {partyFields(partyA, patchA)}
+        {partyFields(partyA, patchA, {
+          ref: partyANameRef,
+          invalid: fieldErrors.has("partyA.fullName"),
+          onClear: () => clearFieldError("partyA.fullName"),
+        })}
       </section>
 
       <section className="bg-white border border-[#e8eaed] p-6">
@@ -159,23 +216,34 @@ export function A2AClient({ defaultParty }: { defaultParty?: Partial<A2AParty> }
           <Users className="w-4 h-4 text-[#d6b357]" /> Party B — Collaborating Agent
         </h2>
         <span className="block w-full h-px bg-[#d6b357] mb-5" aria-hidden="true" />
-        {partyFields(partyB, patchB)}
+        {partyFields(partyB, patchB, {
+          ref: partyBNameRef,
+          invalid: fieldErrors.has("partyB.fullName"),
+          onClear: () => clearFieldError("partyB.fullName"),
+        })}
       </section>
 
       {/* Scope */}
       <section className="bg-white border border-[#e8eaed] p-6">
         <h2 className="font-['Outfit'] text-base font-bold text-[#001f3f] mb-1">Scope of Collaboration</h2>
         <span className="block w-full h-px bg-[#d6b357] mb-5" aria-hidden="true" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div ref={scopeRef} className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {SCOPES.map((s) => {
             const active = scope === s.key
             return (
               <button
                 key={s.key}
                 type="button"
-                onClick={() => setScope(s.key)}
+                onClick={() => {
+                  setScope(s.key)
+                  clearFieldError("scope")
+                }}
                 className={`text-left p-4 border transition-colors ${
-                  active ? "border-[#001f3f] bg-[#f7f9fc]" : "border-[#dfe3e8] hover:border-[#001f3f]"
+                  active
+                    ? "border-[#001f3f] bg-[#f7f9fc]"
+                    : fieldErrors.has("scope")
+                      ? "border-rose-400 hover:border-rose-500"
+                      : "border-[#dfe3e8] hover:border-[#001f3f]"
                 }`}
               >
                 <span className="flex items-center gap-2.5">
