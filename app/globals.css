@@ -238,3 +238,37 @@
   .animate-hero-item { animation: none; opacity: 1; }
   .animate-kenburns  { animation: none; }
 }
+
+/* ─── Project location map — dive from the 3D aerial into Street View ────── */
+@keyframes map-dive {
+  from { transform: scale(1); opacity: 1; }
+  to   { transform: scale(1.45); opacity: 0; }
+}
+.animate-map-dive { animation: map-dive 0.9s cubic-bezier(0.55, 0, 0.85, 0.4) forwards; }
+@keyframes street-enter {
+  from { transform: scale(1.18); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+.animate-street-enter { animation: street-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-map-dive, .animate-street-enter { animation: none; opacity: 1; transform: none; }
+}
+@keyframes street-exit {
+  from { transform: scale(1); opacity: 1; }
+  to   { transform: scale(1.18); opacity: 0; }
+}
+.animate-street-exit { animation: street-exit 0.55s cubic-bezier(0.55, 0, 0.85, 0.4) both; }
+@keyframes map-rise {
+  from { transform: scale(1.35); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+.animate-map-rise { animation: map-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes map-soft {
+  0%   { transform: scale(1); opacity: 1; }
+  50%  { transform: scale(0.985); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-map-soft { animation: map-soft 0.6s ease-in-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-street-exit, .animate-map-rise, .animate-map-soft { animation: none; opacity: 1; transform: none; }
+}

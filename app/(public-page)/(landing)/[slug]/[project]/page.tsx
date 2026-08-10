@@ -12,6 +12,7 @@ import { ProjectGallery } from "@/components/public/project-gallery"
 import { PdfPagePreviews } from "@/components/public/pdf-page-previews"
 import { AmenitiesGrid, NearbyPlaces } from "@/components/public/amenities-grid"
 import { ProjectInquireForm } from "@/components/public/project-inquire-form"
+import { ProjectLocationMap } from "@/components/public/project-location-map"
 import {
   MapPin, Building2, Calendar, Home, Layers, Phone, Mail, ArrowLeft,
   CheckCircle2, Play, Globe, BedDouble, Bath, Maximize2, DollarSign,
@@ -114,6 +115,8 @@ export default async function ProjectDetailPage({ params }: Props) {
   const status = STATUS_STYLES[project.status] ?? { label: project.status, bg: "#f3f4f6", text: "#374151", border: "#e5e7eb" }
   const price = formatPrice(project.launch_price_from, project.launch_price_to, project.currency)
   const locationStr = [project.community, project.location, project.city].filter(Boolean).join(", ")
+  const mapsApiKey =
+    process.env.GOOGLE_MAPS_API_KEY?.trim() || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || ""
   const images = ((project.project_images ?? []) as {id:number;url:string;thumb:string|null;is_main:boolean|null;rank:number|null}[])
     .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
     .map((img) => ({ id: img.id, image_url: img.url, caption: null, rank: img.rank }))
@@ -450,6 +453,22 @@ export default async function ProjectDetailPage({ params }: Props) {
               <SectionHeading title="Amenities" />
               <div className="mt-5">
                 <AmenitiesGrid amenities={project.project_amenities as any} />
+              </div>
+            </section>
+          )}
+
+          {/* Location — 3D aerial / satellite / Street View */}
+          {mapsApiKey && locationStr && (
+            <section>
+              <SectionHeading title="Location" />
+              <div className="mt-5">
+                <ProjectLocationMap
+                  apiKey={mapsApiKey}
+                  projectName={project.name}
+                  address={locationStr}
+                  lat={project.latitude ? Number(project.latitude) : null}
+                  lng={project.longitude ? Number(project.longitude) : null}
+                />
               </div>
             </section>
           )}
