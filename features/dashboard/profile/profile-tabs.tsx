@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from "react"
 import { Phone, MessageCircle, ChevronDown } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { isDeveloperRole } from "@/lib/app-roles"
 import type { DashboardProfile } from "./profile-form"
 import { BankAccountsTab } from "./bank-accounts-tab"
+import { ChangePasswordSection } from "./change-password-section"
 import { PhoneCountrySelect } from "@/components/phone-country-select"
 import { NATIONALITIES } from "@/lib/nationalities"
 
@@ -135,6 +137,10 @@ export function ProfileTabs({
   onError: (message: string) => void
 }) {
   const userId = profile.id
+  const isDeveloper = isDeveloperRole(profile.role)
+  // Bank accounts aren't relevant to developer partner accounts — hide the tab
+  // for them (the tab is shared across every role's profile page).
+  const visibleTabs = isDeveloper ? TABS.filter((t) => t.key !== "bank_accounts") : TABS
   const [activeTab, setActiveTab] = useState<TabKey>("profile")
   const [busySection, setBusySection] = useState<"profile" | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -259,7 +265,7 @@ export function ProfileTabs({
       {/* ── Tab Bar ── */}
       <div className="border-b border-[#f0f0f0] px-6 pt-5">
         <div className="flex flex-wrap gap-2 pb-0">
-          {TABS.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
@@ -477,11 +483,18 @@ export function ProfileTabs({
                 </div>
               </div>
             </div>
+
+            {/* Change password — developer accounts sign in with a password they can rotate. */}
+            {isDeveloper && (
+              <div className="pt-8 border-t border-[#f0f0f0]">
+                <ChangePasswordSection onSuccess={onSuccess} onError={onError} />
+              </div>
+            )}
           </div>
         )}
 
-        {/* ── Bank Accounts Tab ── */}
-        {activeTab === "bank_accounts" && (
+        {/* ── Bank Accounts Tab (hidden for developer accounts) ── */}
+        {activeTab === "bank_accounts" && !isDeveloper && (
           <BankAccountsTab userId={userId} />
         )}
 

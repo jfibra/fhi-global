@@ -249,6 +249,13 @@ const nextConfig = {
         destination: "/staff-login",
         permanent: false,
       },
+      // Developer sign-in renamed from /developer-login to /developers-login.
+      // Temporary redirect keeps any existing bookmarks working; both are noindexed.
+      {
+        source: "/developer-login",
+        destination: "/developers-login",
+        permanent: false,
+      },
     ]
   },
   async headers() {
@@ -312,7 +319,7 @@ const nextConfig = {
         headers: PRIVATE_NOINDEX_HEADERS,
       },
       {
-        source: "/developer-login/:path*",
+        source: "/developers-login/:path*",
         headers: PRIVATE_NOINDEX_HEADERS,
       },
       {

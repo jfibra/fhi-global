@@ -81,7 +81,7 @@ export async function proxy(request: NextRequest) {
   // Dashboard routes are now role-prefixed (`/admin/*`, `/agent/*`, …); `/dashboard`
   // is kept only as a role-agnostic redirect stub.
   const isDashboardRoute = pathname === "/dashboard" || isKnownRoleSlug(firstSegment)
-  const isLoginRoute = pathname === "/staff-login" || pathname === "/developer-login"
+  const isLoginRoute = pathname === "/staff-login" || pathname === "/developers-login"
 
   // Anti-forgery: never trust identity headers arriving from the outside.
   for (const header of Object.values(IDENTITY_HEADERS)) {
@@ -207,7 +207,7 @@ export const config = {
   matcher: [
     "/projects/:slug",
     "/staff-login",
-    "/developer-login",
+    "/developers-login",
     "/account-inactive",
     "/dashboard",
     "/superadmin/:path*",
