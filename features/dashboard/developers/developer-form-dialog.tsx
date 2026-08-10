@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import Image from "next/image"
 import {
-  X, Check, Building2, Globe, Phone, Mail, MapPin,
-  Star, Landmark, Plus, Pencil, CalendarPlus, CalendarClock,
+  X, Check, Globe, Phone, Mail, MapPin,
+  Plus, Pencil, CalendarPlus, CalendarClock,
   ImageIcon, Upload, Trash2, Clock,
 } from "lucide-react"
 import {
@@ -94,6 +94,8 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
         phone:       editDeveloper.phone ?? "",
         email:       editDeveloper.email ?? "",
         address:     editDeveloper.address ?? "",
+        // No rating field in the form anymore — keep the stored value so saving
+        // round-trips it instead of resetting it to 0 (updateDeveloper writes rating ?? 0).
         rating:      editDeveloper.rating ?? null,
         is_verified: editDeveloper.is_verified,
         is_active:   editDeveloper.is_active,
@@ -394,19 +396,6 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
                     onChange={(e) => set("address", e.target.value)}
                     placeholder="Dubai, UAE" />
                 </div>
-              </div>
-            </div>
-
-            {/* Rating */}
-            <div className="max-w-[180px]">
-              <FieldLabel text="Rating (0–5)" />
-              <div className="relative">
-                <Star className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
-                <input className={`${inp} border-[#e5e5e5] pl-11`}
-                  type="number" min="0" max="5" step="0.1"
-                  value={form.rating ?? ""}
-                  onChange={(e) => set("rating", e.target.value === "" ? null : parseFloat(e.target.value))}
-                  placeholder="4.5" />
               </div>
             </div>
 
