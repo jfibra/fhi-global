@@ -44,7 +44,7 @@ type CertificateArt = {
 
 const CERTIFICATES: Record<"certificate" | "monthly", CertificateArt> = {
   certificate: {
-    src: "/images/topsellers1.png",
+    src: "/images/topsellers1.webp",
     photo: { cx: 273, cy: 448, d: 330 },
     name: { cx: 857, baseline: 570, maxWidth: 620 },
     slots: [
@@ -54,7 +54,7 @@ const CERTIFICATES: Record<"certificate" | "monthly", CertificateArt> = {
     ],
   },
   monthly: {
-    src: "/images/monthlyawardee.png",
+    src: "/images/monthlyawardee.webp",
     photo: { cx: 276, cy: 462, d: 316 },
     name: { cx: 822, baseline: 532, maxWidth: 640 },
     month: { cx: 855, baseline: 836, maxWidth: 520, size: 34 },
