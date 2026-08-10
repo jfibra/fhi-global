@@ -10,7 +10,7 @@ export type AgentFeedback = {
   agent_id: string
   client_name: string
   property_ref: string | null
-  transaction_type: "sale" | "rent" | "purchase" | null
+  transaction_type: "buy" | "resell" | "rent" | null
   transaction_date: string | null
   overall_rating: number
   score_communication: number

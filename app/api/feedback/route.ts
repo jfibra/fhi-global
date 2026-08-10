@@ -23,7 +23,7 @@ const FeedbackSchema = z.object({
   agentId: z.string().uuid("Invalid feedback link."),
   clientName: z.string().trim().min(1, "Please enter your name.").max(200),
   propertyRef: z.string().trim().max(300).optional().default(""),
-  transactionType: z.enum(["sale", "rent", "purchase"]).nullable().optional(),
+  transactionType: z.enum(["buy", "resell", "rent"]).nullable().optional(),
   transactionDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date.")

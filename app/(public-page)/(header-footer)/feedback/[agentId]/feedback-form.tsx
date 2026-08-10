@@ -168,9 +168,9 @@ export function FeedbackForm({ agentId, advisorName }: { agentId: string; adviso
           <label className={labelCls}>Transaction Type</label>
           <select value={transactionType} onChange={(e) => setTransactionType(e.target.value)} className={inputCls}>
             <option value="">Select…</option>
-            <option value="sale">Sale</option>
+            <option value="buy">Buy</option>
+            <option value="resell">Resell</option>
             <option value="rent">Rent</option>
-            <option value="purchase">Purchase</option>
           </select>
         </div>
         {/* Honeypot — humans never see or fill this. */}

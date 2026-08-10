@@ -18,7 +18,12 @@ import {
   fetchMyFeedback,
 } from "@/lib/feedback-service"
 
-const TYPE_LABELS: Record<string, string> = { sale: "Sale", rent: "Rent", purchase: "Purchase" }
+// Legacy sale/purchase rows were converted to "buy" by migration 040; the
+// old keys stay mapped so any stale cached row still renders a label.
+const TYPE_LABELS: Record<string, string> = {
+  buy: "Buy", resell: "Resell", rent: "Rent",
+  sale: "Buy", purchase: "Buy",
+}
 
 export function FeedbackBoard({ agentId, agentName }: { agentId: string; agentName: string }) {
   const [rows, setRows] = useState<AgentFeedback[] | null>(null)
