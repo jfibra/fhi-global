@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library,
-  Mail, PanelsTopLeft, FileSignature, Star, Handshake,
+  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -188,6 +188,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { ...DIGITAL_CARD, description: "The one link you share — contacts, socials and QR." },
       { ...REELS_MAKER,   description: "Turn a listing or project into a shareable reel." },
       { ...POSTER_MAKER,  description: "Flyers and posters from any listing or project." },
+      { icon: Presentation, label: "Meeting Poster", to: "meeting-poster", description: "Event posters with your choice of speakers." },
       { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website." },
       { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement." },
     ],
