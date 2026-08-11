@@ -1,6 +1,16 @@
 import type { Metadata } from "next"
 
-export const DEFAULT_PREVIEW_IMAGE_URL =
+/** Site-wide OG/Twitter fallback image (1200×630, lives in public/).
+ *  Relative on purpose — createPageMetadata's metadataBase resolves it. */
+export const DEFAULT_PREVIEW_IMAGE_URL = "/og-default.jpg"
+
+/**
+ * The retired default, on the legacy Supabase project that now answers HTTP
+ * 402 (storage quota exceeded). Kept ONLY as a comparison sentinel: stored
+ * data (e.g. news articles) still carries this exact URL as its "no real
+ * image" placeholder, and that rejection logic must keep working.
+ */
+export const LEGACY_PREVIEW_IMAGE_URL =
   "https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/fhi_global/fhi%20global.jpg"
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"

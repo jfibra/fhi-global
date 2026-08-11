@@ -3,14 +3,14 @@
 const isProd = process.env.NODE_ENV === "production"
 
 // ── External origins used by the app ────────────────────────────────────────
-// Supabase projects (storage + API + realtime). The env-configured project is
-// allowed alongside the legacy project, which still hosts uploaded media
-// (hero background, logos, default OG image) referenced by hardcoded URLs.
-const SUPABASE_LEGACY_HOST = "hefwmaoborpfuyhbguzv.supabase.co"
+// The env-configured Supabase project (storage + API + realtime). The legacy
+// project that used to be allowlisted alongside it is dead (HTTP 402, storage
+// quota) and its media has moved into public/ — the only remaining reference
+// is features/business-card/card-render.ts, which awaits re-uploaded artwork.
 const SUPABASE_ENV_HOST = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).host
-  : SUPABASE_LEGACY_HOST
-const SUPABASE_HOSTS = [...new Set([SUPABASE_ENV_HOST, SUPABASE_LEGACY_HOST])]
+  : ""
+const SUPABASE_HOSTS = SUPABASE_ENV_HOST ? [SUPABASE_ENV_HOST] : []
 const SUPABASE_HTTPS = SUPABASE_HOSTS.map((h) => `https://${h}`).join(" ")
 const SUPABASE_CONNECT = SUPABASE_HOSTS.map((h) => `https://${h} wss://${h}`).join(" ")
 // Vercel Analytics

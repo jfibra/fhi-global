@@ -133,7 +133,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
         {/* Background */}
         <div className="absolute inset-0">
           <Image
-            src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/5.png"
+            src="/background/dubai.webp"
             alt=""
             fill
             sizes="100vw"

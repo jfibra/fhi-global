@@ -8,11 +8,10 @@
  * Stored in `profiles.metadata.theme` alongside the rest of the profile content.
  */
 
-/** Dubai skyline images already served for the public site's hero/about pages. */
-const SKYLINE =
-  "https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/2.png"
-const SKYLINE_DUSK =
-  "https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/8.png"
+/** Dubai skyline images from the public site's own asset pool (the legacy
+ *  Supabase host that used to serve these answers HTTP 402 now). */
+const SKYLINE = "/background/dubai.webp"
+const SKYLINE_DUSK = "/background/developers.webp"
 
 export type ProfileTheme = {
   id: string
@@ -367,14 +366,8 @@ function withControls(base: ThemeBase, choice: ThemeChoice): ProfileTheme {
 export const STOCK_BACKDROPS = [
   { url: SKYLINE, name: "Skyline" },
   { url: SKYLINE_DUSK, name: "Dusk" },
-  {
-    url: "https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x1080/5.png",
-    name: "Marina",
-  },
-  {
-    url: "https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x800/7.png",
-    name: "Coast",
-  },
+  { url: "/background/featured-marina.jpg", name: "Marina" },
+  { url: "/background/home.webp", name: "Coast" },
 ]
 
 /** Custom background: a flat colour, or a photo behind a readability scrim. */

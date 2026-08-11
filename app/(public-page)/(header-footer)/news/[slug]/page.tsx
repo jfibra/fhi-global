@@ -7,7 +7,7 @@ import {
   fetchArticlesList,
   toManilaIso,
 } from "@/lib/news-service"
-import { DEFAULT_PREVIEW_IMAGE_URL, jsonLdScript, truncateDescription } from "@/lib/seo"
+import { DEFAULT_PREVIEW_IMAGE_URL, LEGACY_PREVIEW_IMAGE_URL, jsonLdScript, truncateDescription } from "@/lib/seo"
 import { ContentBlocks } from "@/components/news/content-blocks"
 import { CopyLinkButton } from "@/components/news/copy-link-button"
 import { NewsViewTracker } from "@/components/news/news-view-tracker"
@@ -48,9 +48,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const description =
     truncateDescription(article.excerpt) ||
     "Dubai real estate news and market analysis from FHI Global."
-  const image = article.featuredImage && article.featuredImage !== DEFAULT_PREVIEW_IMAGE_URL
+  // Placeholder rejection must recognize BOTH defaults: stored/upstream
+  // article data still carries the legacy URL (dead host), while the
+  // news-service stamps the current one.
+  const isPlaceholderImage = (u: string | null | undefined) =>
+    !u || u === DEFAULT_PREVIEW_IMAGE_URL || u === LEGACY_PREVIEW_IMAGE_URL
+  const image = !isPlaceholderImage(article.featuredImage)
     ? article.featuredImage
-    : article.img && article.img !== DEFAULT_PREVIEW_IMAGE_URL
+    : !isPlaceholderImage(article.img)
       ? article.img
       : undefined
   const keywords = [

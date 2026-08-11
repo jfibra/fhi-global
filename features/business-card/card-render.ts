@@ -10,6 +10,10 @@
 import { COUNTRY_CODES } from "@/lib/user-service"
 
 // ── Constants ────────────────────────────────────────────────────────────────
+// TODO(assets): these live on the RETIRED legacy Supabase project, which now
+// answers HTTP 402 (storage quota exceeded) — card export has been broken
+// since. The artwork has no copy in this repo; re-upload the front/back PNGs
+// to public/ or the live S3 bucket and point these at the new location.
 export const FRONT_URL = "https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/fhi_global/business-card-front.png"
 export const BACK_URL  = "https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/fhi_global/business-card-back.png"
 const BRAND_STACKED = "/FHI_Branding.png"        // gold shield + white wordmark (stacked)

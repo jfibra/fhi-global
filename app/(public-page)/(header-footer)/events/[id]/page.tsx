@@ -161,7 +161,7 @@ export default async function EventDetailPage({ params }: Props) {
           style={{ backgroundColor: brand.logoIsWhite ? "rgba(0,31,63,0.96)" : "rgba(255,255,255,0.97)" }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={brand.logo} alt={brand.name} className="h-10 sm:h-12 w-auto object-contain" />
+          <Image src={brand.logo} alt={brand.name} width={144} height={48} className="h-10 sm:h-12 w-auto object-contain" />
           <span className="flex flex-col leading-tight">
             <span className={`text-[10px] font-bold uppercase tracking-[0.15em] ${brand.logoIsWhite ? "text-[#d6b357]" : "text-[#8a6d2a]"}`}>
               Presented by

@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     title: "FHI Global — Dubai Real Estate",
     description: "Discover premium property projects in Dubai from verified developers.",
     type: "website",
-    images: [{ url: DEFAULT_PREVIEW_IMAGE_URL }],
+    images: [{ url: DEFAULT_PREVIEW_IMAGE_URL, width: 1200, height: 630, alt: "FHI Global — Dubai Real Estate" }],
   },
   twitter: {
     card: "summary_large_image",
@@ -69,10 +69,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="preconnect" href="https://hefwmaoborpfuyhbguzv.supabase.co" crossOrigin="anonymous" />
         {/* No raw logo preload here: every render goes through next/image's
             /_next/image URLs, so a preload of the original never matches — it
-            just downloads 156 KB at high priority on every page and drops it. */}
+            just downloads 156 KB at high priority on every page and drops it.
+            The legacy-Supabase preconnect is gone with the host (HTTP 402). */}
       </head>
       <body className={`${_geist.variable} ${_geistMono.variable} ${_outfit.variable} font-sans antialiased`}>
         <PageTransitionWrapper>{children}</PageTransitionWrapper>

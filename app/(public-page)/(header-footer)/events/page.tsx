@@ -220,7 +220,7 @@ function EventCard({ event: e, past = false }: { event: EventRow; past?: boolean
           style={{ backgroundColor: brand.logoIsWhite ? "#001f3f" : "rgba(255,255,255,0.95)" }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={brand.logo} alt={brand.name} className="h-4 w-auto object-contain" />
+          <Image src={brand.logo} alt={brand.name} width={48} height={16} className="h-4 w-auto object-contain" />
         </span>
       </div>
 

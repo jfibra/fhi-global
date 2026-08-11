@@ -125,8 +125,7 @@ export function HeroSection({ developers, cities, spotlight = [] }: HeroSectionP
         <div className="max-w-3xl">
           {/* Badge */}
           <div className="animate-hero-item inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 border border-white/25 text-xs font-medium text-white/90 mb-7 backdrop-blur-sm" style={{ animationDelay: "0.05s" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src="https://flagcdn.com/w20/ae.png"
               alt="UAE"
               width={18}
@@ -285,11 +284,12 @@ export function HeroSection({ developers, cities, spotlight = [] }: HeroSectionP
             className="animate-hero-item hidden xl:block absolute right-8 top-24 w-[300px] bg-[#06182e]/75 backdrop-blur-xl border border-white/15 shadow-[0_20px_60px_rgba(0,0,0,0.45)] hover:border-[#d6b357]/70 transition-colors group"
           >
             <div className="relative h-40 overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src={spotlight[spot].image}
                 alt={spotlight[spot].name}
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
+                fill
+                sizes="300px"
+                className="object-cover group-hover:scale-[1.04] transition-transform duration-500"
               />
               {spotlight[spot].statusLabel && (
                 <span className="absolute top-0 left-0 bg-[#0a2647] text-white text-[10px] font-bold uppercase tracking-[0.12em] px-2.5 py-1.5">

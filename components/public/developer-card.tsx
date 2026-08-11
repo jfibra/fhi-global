@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 import { ArrowRight, Star, Building2 } from "lucide-react"
 
 export type DeveloperCardData = {
@@ -20,11 +21,12 @@ export function DeveloperCard({ developer }: { developer: DeveloperCardData }) {
       {/* Logo */}
       <div className="w-full h-24 rounded-2xl bg-[#f7f8fa] border border-[#f0f0f0] flex items-center justify-center mb-5 overflow-hidden transition-colors group-hover:bg-[#001f3f]/4">
         {developer.logo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={developer.logo_url}
             alt={developer.name}
-            className="max-h-14 max-w-[80%] object-contain"
+            width={160}
+            height={56}
+            className="max-h-14 max-w-[80%] w-auto object-contain"
           />
         ) : (
           <div className="flex flex-col items-center gap-2 text-[#9ca3af]">

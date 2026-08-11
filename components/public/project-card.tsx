@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 import { MapPin, ArrowRight, Building2 } from "lucide-react"
 
 export type ProjectCardData = {
@@ -48,11 +49,13 @@ export function ProjectCard({ project }: { project: ProjectCardData }) {
       {/* Image */}
       <div className="relative h-52 overflow-hidden bg-[#f3f4f6]">
         {project.main_image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={project.main_image}
             alt={project.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            loading="lazy"
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-[#9ca3af]">
@@ -83,10 +86,11 @@ export function ProjectCard({ project }: { project: ProjectCardData }) {
         {project.developers && (
           <div className="flex items-center gap-2 mb-2">
             {project.developers.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={project.developers.logo_url}
                 alt={project.developers.name}
+                width={60}
+                height={16}
                 className="h-4 w-auto max-w-[60px] object-contain opacity-70"
               />
             ) : (

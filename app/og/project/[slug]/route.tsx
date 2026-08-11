@@ -1,7 +1,22 @@
+import { readFile } from "node:fs/promises"
+import path from "node:path"
 import { ImageResponse } from "next/og"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 
 export const runtime = "nodejs"
+
+// Fallback background when a project has no main_image. Read off disk and
+// memoized as a data URL (satori can't fetch relative URLs) — same trick as
+// app/og/business-card's logoDataUrl. Replaces the legacy Supabase JPG, whose
+// host now answers HTTP 402.
+let ogDefaultDataUrl: string | null = null
+async function defaultBackground(): Promise<string> {
+  if (!ogDefaultDataUrl) {
+    const buf = await readFile(path.join(process.cwd(), "public", "og-default.jpg"))
+    ogDefaultDataUrl = `data:image/jpeg;base64,${buf.toString("base64")}`
+  }
+  return ogDefaultDataUrl
+}
 
 // Without this header ImageResponse defaults to a YEAR of immutable caching —
 // scrapers would keep a stale card forever after the project's image or name
@@ -27,7 +42,7 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
   // [0] access made the developer name silently vanish from every card.
   const developerName = (data?.developers as unknown as { name?: string | null } | null)?.name
   const subtitle = [developerName, data?.city ?? data?.location].filter(Boolean).join(" • ")
-  const image = data?.main_image ?? "https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/fhi_global/fhi%20global.jpg"
+  const image = data?.main_image ?? (await defaultBackground())
 
   return new ImageResponse(
     (

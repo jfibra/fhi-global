@@ -523,8 +523,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                       className="group flex items-center gap-4 p-4 border border-[#e5e8ec] hover:border-[#001f3f]/40 transition-colors"
                     >
                       <div className="w-12 h-12 bg-[#f3f4f6] flex items-center justify-center shrink-0 overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={u.file_url} alt={u.title} className="w-full h-full object-cover" />
+                        <Image src={u.file_url} alt={u.title} width={48} height={48} className="w-full h-full object-cover" />
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-[#0d1117] truncate">{u.title}</p>

@@ -372,10 +372,11 @@ export default async function PublicAgentListingPage({ params }: Props) {
               {agentName ? (
                 <>
                   {agent?.profile_url ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
+                    <Image
                       src={agent.profile_url}
                       alt={agentName}
+                      width={44}
+                      height={44}
                       className="h-11 w-11 rounded-full object-cover border-2 border-[#d6b357] shrink-0"
                     />
                   ) : (
@@ -392,8 +393,7 @@ export default async function PublicAgentListingPage({ params }: Props) {
                 </>
               ) : (
                 <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/FHI_Branding_White.png" alt="FHI Global" className="h-8 w-auto object-contain" />
+                  <Image src="/FHI_Branding_White.png" alt="FHI Global" width={87} height={32} className="h-8 w-auto object-contain" />
                   <div>
                     <p className="text-white text-sm font-bold leading-tight">FHI Global</p>
                     <p className="text-[#d6b357] text-[11px] font-bold uppercase tracking-wider">Listing Team</p>

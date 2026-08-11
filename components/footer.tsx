@@ -61,12 +61,15 @@ export function Footer() {
 
   return (
     <footer className="relative bg-[#001428] text-white/70 overflow-hidden">
-      {/* Background image */}
+      {/* Background image — local asset (the legacy Supabase host is dead,
+          HTTP 402) served through next/image for AVIF/WebP. */}
       <div className="absolute inset-0 pointer-events-none select-none">
-        <img
-          src="https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/Dubai%20Image%20Ratio%201920x800/9.png"
+        <Image
+          src="/background/dubai.webp"
           alt=""
-          className="w-full h-full object-cover object-center"
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
           aria-hidden="true"
         />
         <div className="absolute inset-0 bg-[#001428]/95" />
