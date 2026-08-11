@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react"
 import {
-  AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet,
+  AlertTriangle, Cake, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet,
   FileText, Loader2, MessageCircle, Phone, QrCode, RefreshCw, Search, Users,
 } from "lucide-react"
 import { roleToLabel } from "@/lib/auth"
@@ -42,6 +42,31 @@ function joinedLabel(joinedAt: string | null): string {
   return Number.isNaN(d.getTime())
     ? "—"
     : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+}
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+]
+
+/**
+ * Month (1-12) and day for a stored birthday, or null when unusable.
+ *
+ * Read off the raw "YYYY-MM-DD" rather than through Date: a bare date string
+ * parses as UTC midnight, which in a behind-UTC timezone lands on the previous
+ * day and would file a 1 March birthday under February.
+ */
+function birthdayParts(birthday: string | null): { month: number; day: number } | null {
+  if (!birthday) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(birthday.trim())
+  if (m) {
+    const month = Number(m[2])
+    const day = Number(m[3])
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return { month, day }
+  }
+  const d = new Date(birthday)
+  if (Number.isNaN(d.getTime())) return null
+  return { month: d.getMonth() + 1, day: d.getDate() }
 }
 
 function birthdayLabel(birthday: string | null): string {
@@ -87,18 +112,42 @@ export function InviteClient({
   const PAGE_SIZE = 10
   const [query, setQuery] = useState("")
   const [page, setPage] = useState(1)
+  // Birthday filter: a month, optionally narrowed to a day range within it.
+  // "" = every month. Day bounds are day-of-month, so they work for any year.
+  const [bdayMonth, setBdayMonth] = useState("")
+  const [bdayFrom, setBdayFrom] = useState("")
+  const [bdayTo, setBdayTo] = useState("")
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return recruits
-    return recruits.filter(
-      (r) => r.fullname.toLowerCase().includes(q) || (r.email ?? "").toLowerCase().includes(q),
-    )
-  }, [recruits, query])
+    const month = Number(bdayMonth)
+    // Bounds are inclusive; a blank end means "to the end of the month".
+    const from = Number(bdayFrom) || 1
+    const to = Number(bdayTo) || 31
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+    return recruits.filter((r) => {
+      if (q && !r.fullname.toLowerCase().includes(q) && !(r.email ?? "").toLowerCase().includes(q)) {
+        return false
+      }
+      if (!month) return true
+      const b = birthdayParts(r.birthday)
+      // Someone with no birthday on file can't match a birthday filter.
+      if (!b || b.month !== month) return false
+      return b.day >= from && b.day <= to
+    })
+  }, [recruits, query, bdayMonth, bdayFrom, bdayTo])
+
+  // Sort by day when a month is chosen — a birthday list is read in date order.
+  const visible = useMemo(() => {
+    if (!bdayMonth) return filtered
+    return [...filtered].sort(
+      (a, b) => (birthdayParts(a.birthday)?.day ?? 0) - (birthdayParts(b.birthday)?.day ?? 0),
+    )
+  }, [filtered, bdayMonth])
+
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
-  const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const pageItems = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   useEffect(() => {
     setOrigin(window.location.origin)
@@ -216,12 +265,12 @@ export function InviteClient({
     }
   }
 
-  // ── Exports (always the full filtered list, not just the visible page) ──
+  // ── Exports (the whole filtered list, not just the visible page) ──
 
   const exportExcel = () => {
     const rows = [
-      ["Name", "Email", "Role", "Contact Number", "WhatsApp Number", "Status", "Date Joined"],
-      ...filtered.map((r) => [r.fullname, r.email ?? "", roleToLabel(r.role), r.phone ?? "", r.whatsapp ?? "", r.status, joinedLabel(r.joinedAt)]),
+      ["Name", "Email", "Role", "Contact Number", "WhatsApp Number", "Status", "Birthday", "Date Joined"],
+      ...visible.map((r) => [r.fullname, r.email ?? "", roleToLabel(r.role), r.phone ?? "", r.whatsapp ?? "", r.status, birthdayLabel(r.birthday), joinedLabel(r.joinedAt)]),
     ]
     // BOM so Excel opens UTF-8 names (ñ, Arabic, …) correctly.
     const csv = "﻿" + rows.map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n")
@@ -238,7 +287,7 @@ export function InviteClient({
     const w = window.open("", "_blank", "width=900,height=700")
     if (!w) return
     const generated = new Date().toLocaleDateString("en-AE", { year: "numeric", month: "long", day: "numeric" })
-    const body = filtered
+    const body = visible
       .map(
         (r, i) => `<tr>
           <td class="n">${i + 1}</td>
@@ -277,7 +326,7 @@ export function InviteClient({
   <div class="meta">
     <span>Recruiter: <strong>${esc(userName)}</strong></span>
     <span>Generated: <strong>${esc(generated)}</strong></span>
-    <span>Total recruits: <strong>${filtered.length}</strong></span>
+    <span>Total recruits: <strong>${visible.length}</strong></span>
     ${query.trim() ? `<span>Filter: <strong>“${esc(query.trim())}”</strong></span>` : ""}
   </div>
   <table>
@@ -413,9 +462,9 @@ export function InviteClient({
           </div>
 
           {/* ── My recruits ── */}
-          <div className="space-y-5">
+          <div className="space-y-5 min-w-0">
             {/* ── My recruits ── */}
-            <div className="bg-white rounded-2xl border border-[#e8eaed] p-5">
+            <div className="bg-white rounded-2xl border border-[#e8eaed] p-5 min-w-0 overflow-x-auto">
               <div className="flex items-center justify-between gap-2.5 mb-4">
                 <p className="text-xs font-bold uppercase tracking-wide text-[#6b7280] flex items-center gap-2">
                   <Users className="w-4 h-4 text-[#d6b357]" />
@@ -436,7 +485,8 @@ export function InviteClient({
 
               {/* ── Search + exports toolbar ── */}
               {!recruitsLoading && !recruitsError && recruits.length > 0 && (
-                <div className="flex flex-col sm:flex-row gap-2 mb-4">
+                <>
+                <div className="flex flex-col sm:flex-row gap-2 mb-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
                     <input
@@ -453,7 +503,7 @@ export function InviteClient({
                     <button
                       type="button"
                       onClick={exportExcel}
-                      disabled={filtered.length === 0}
+                      disabled={visible.length === 0}
                       title="Download as Excel (CSV)"
                       className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-bold hover:bg-emerald-100 transition-colors disabled:opacity-40"
                     >
@@ -463,7 +513,7 @@ export function InviteClient({
                     <button
                       type="button"
                       onClick={exportPdf}
-                      disabled={filtered.length === 0}
+                      disabled={visible.length === 0}
                       title="Download report as PDF"
                       className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f]/10 transition-colors disabled:opacity-40"
                     >
@@ -472,6 +522,79 @@ export function InviteClient({
                     </button>
                   </div>
                 </div>
+
+                {/* ── Birthday filter ── */}
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#6b7280]">
+                    <Cake className="w-3.5 h-3.5 text-[#d6b357]" />
+                    Birthdays
+                  </span>
+                  <select
+                    value={bdayMonth}
+                    onChange={(e) => {
+                      setBdayMonth(e.target.value)
+                      setPage(1)
+                    }}
+                    aria-label="Birthday month"
+                    className="rounded-xl border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#374151] focus:outline-none focus:border-[#001f3f]"
+                  >
+                    <option value="">Any month</option>
+                    {MONTHS.map((m, i) => (
+                      <option key={m} value={i + 1}>{m}</option>
+                    ))}
+                  </select>
+
+                  {/* Day bounds only make sense once a month is chosen. */}
+                  {bdayMonth && (
+                    <>
+                      <span className="text-xs text-[#9ca3af]">day</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={31}
+                        value={bdayFrom}
+                        onChange={(e) => {
+                          setBdayFrom(e.target.value)
+                          setPage(1)
+                        }}
+                        placeholder="1"
+                        aria-label="From day"
+                        className="w-16 rounded-xl border border-[#e5e5e5] px-2.5 py-2 text-xs font-semibold text-[#374151] focus:outline-none focus:border-[#001f3f]"
+                      />
+                      <span className="text-xs text-[#9ca3af]">to</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={31}
+                        value={bdayTo}
+                        onChange={(e) => {
+                          setBdayTo(e.target.value)
+                          setPage(1)
+                        }}
+                        placeholder="31"
+                        aria-label="To day"
+                        className="w-16 rounded-xl border border-[#e5e5e5] px-2.5 py-2 text-xs font-semibold text-[#374151] focus:outline-none focus:border-[#001f3f]"
+                      />
+                      <span className="text-xs font-semibold text-[#374151]">
+                        {visible.length} {visible.length === 1 ? "birthday" : "birthdays"} in{" "}
+                        {MONTHS[Number(bdayMonth) - 1]}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBdayMonth("")
+                          setBdayFrom("")
+                          setBdayTo("")
+                          setPage(1)
+                        }}
+                        className="text-xs font-semibold text-[#6b7280] hover:text-[#001f3f] underline"
+                      >
+                        Clear
+                      </button>
+                    </>
+                  )}
+                </div>
+                </>
               )}
 
               {recruitsLoading ? (
@@ -486,7 +609,7 @@ export function InviteClient({
                 <p className="text-sm text-[#9ca3af] py-4">
                   No sign-ups through your link yet — share your QR and they&apos;ll appear here.
                 </p>
-              ) : filtered.length === 0 ? (
+              ) : visible.length === 0 ? (
                 <p className="text-sm text-[#9ca3af] py-4">
                   No recruits match <span className="font-semibold text-[#374151]">&ldquo;{query.trim()}&rdquo;</span> — try another name or email.
                 </p>
@@ -497,7 +620,7 @@ export function InviteClient({
                     const showApprove = canApprove(r) && r.status !== "active"
                     const busy = approvingId === r.id
                     return (
-                    <li key={r.id} className="flex items-center gap-3 py-3">
+                    <li key={r.id} className="flex items-center gap-3 py-3 min-w-[640px] sm:min-w-0">
                       {/* Avatar — turns amber with a warning icon when the recruit's profile is incomplete */}
                       {r.incomplete ? (
                         <span
@@ -601,8 +724,8 @@ export function InviteClient({
               {!recruitsLoading && !recruitsError && totalPages > 1 && (
                 <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-[#f0f2f5]">
                   <p className="text-xs text-[#9ca3af]">
-                    Showing <span className="font-bold text-[#374151]">{(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)}</span> of{" "}
-                    <span className="font-bold text-[#374151]">{filtered.length}</span>
+                    Showing <span className="font-bold text-[#374151]">{(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, visible.length)}</span> of{" "}
+                    <span className="font-bold text-[#374151]">{visible.length}</span>
                   </p>
                   <div className="flex items-center gap-2">
                     <button
