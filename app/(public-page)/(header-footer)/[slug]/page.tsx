@@ -7,13 +7,34 @@ import { createPageMetadata } from "@/lib/seo"
 import { ProjectCard, type ProjectCardData } from "@/components/project-card"
 import { Reveal } from "@/components/public/reveal"
 import { SOCIAL_URLS } from "@/lib/social"
-import { getSeoPage, NON_UAE_CITIES, type SeoPage } from "@/lib/seo-pages"
+import { getSeoPage, NON_UAE_CITIES, SEO_PAGES, type SeoPage } from "@/lib/seo-pages"
+import { fetchSectionPage } from "@/lib/sitemap-sections"
 import { Building2, Facebook, Mail, MapPin, Star, CheckCircle2, ArrowLeft } from "lucide-react"
 
 /** The company inbox shown across the public site (contact page, footer). */
 const CONTACT_EMAIL = "info@fhiglobal.ae"
 
 export const revalidate = 120
+
+/**
+ * Prerender developer profiles + the curated SEO landing pages (production
+ * only) so they serve from the ISR cache. IMPORTANT: this route is the
+ * site-wide catch-all — `dynamicParams` must stay at its default (true) so
+ * unlisted-but-valid slugs still render on demand (and junk slugs 404).
+ * SEO_PAGES is a synchronous constant, so those slugs ship even when the
+ * Supabase enumeration fails.
+ */
+export async function generateStaticParams(): Promise<{ slug: string }[]> {
+  if (process.env.VERCEL_ENV !== "production") return []
+  const seoSlugs = SEO_PAGES.map((p) => ({ slug: p.slug }))
+  try {
+    const rows = await fetchSectionPage("developers", 1)
+    const devSlugs = (rows ?? []).flatMap((r) => (r.slug ? [{ slug: r.slug }] : []))
+    return [...devSlugs, ...seoSlugs]
+  } catch {
+    return seoSlugs
+  }
+}
 
 type Props = { params: Promise<{ slug: string }> }
 

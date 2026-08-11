@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client"
+import { pingSeoRevalidate } from "@/lib/seo-ping"
 import type { OgCardOptions } from "@/lib/flyer/og-card"
 
 export type AgentListingKind = "sale" | "rent"
@@ -299,6 +300,7 @@ export async function setAgentListingStatus(
     .eq("agent_id", agentId)
     .is("deleted_at", null)
 
+  if (!error) pingSeoRevalidate("agent-listing", listingId)
   return { error: error?.message ?? null }
 }
 

@@ -8,22 +8,23 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
       // No trailing slashes: a bare prefix covers both the exact path and its children.
-      // Dashboards are now role-prefixed (`/admin`, `/agent`, …). "/developer/" keeps a
-      // trailing slash so it does NOT block the public "/developers" pages; the exact
-      // "/developer" root is still noindexed via the X-Robots-Tag header in next.config.
-      // "/staff-login" and "/developers-login" are deliberately NOT listed — a crawler
-      // must be able to fetch the page to see its noindex signal and drop it (the old
-      // "/login" was indexed and 302-redirects to "/staff-login").
+      // Dashboards are now role-prefixed (`/admin`, `/agent`, …). "/agent/" and
+      // "/developer/" keep a trailing slash so they do NOT block the public
+      // "/agents", "/agent-websites", and "/developers" pages; the exact "/agent"
+      // and "/developer" roots are still noindexed via the X-Robots-Tag header in
+      // next.config. "/register", "/staff-login" and "/developers-login" are
+      // deliberately NOT listed — a crawler must be able to fetch the page to see
+      // its noindex signal and drop it (the old "/login" was indexed and
+      // 302-redirects to "/staff-login").
       disallow: [
         "/dashboard",
         "/api",
-        "/register",
         "/internal",
         "/superadmin",
         "/admin",
         "/teamleader",
         "/unitmanager",
-        "/agent",
+        "/agent/",
         "/developer/",
         "/secretary",
         "/teamsecretary",

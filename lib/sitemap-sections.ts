@@ -20,7 +20,7 @@ export const SUPABASE_PER_PAGE = 1000
 export const NEWS_SHARD_SIZE = 1000
 const NEWS_API_PER_PAGE = 100
 
-export type SupabaseSection = "projects" | "developers" | "listings" | "events"
+export type SupabaseSection = "projects" | "developers" | "listings" | "events" | "gallery"
 
 export type SectionRow = {
   slug: string | null
@@ -35,6 +35,7 @@ const SECTION_TABLE: Record<SupabaseSection, string> = {
   developers: "developers",
   listings: "agent_listings",
   events: "events",
+  gallery: "gallery_albums",
 }
 
 const SECTION_SELECT: Record<SupabaseSection, string> = {
@@ -42,6 +43,7 @@ const SECTION_SELECT: Record<SupabaseSection, string> = {
   developers: "slug, updated_at",
   listings: "id, slug, updated_at",
   events: "id, slug, updated_at",
+  gallery: "id, slug, updated_at",
 }
 
 /** Same published-only filters the public routes use, per section. */
@@ -54,6 +56,10 @@ function sectionFilters(section: SupabaseSection): Array<["eq" | "is", string, u
     case "listings":
     case "events":
       return [["eq", "status", "published"], ["is", "deleted_at", null]]
+    case "gallery":
+      // gallery_albums has no deleted_at or status columns (migration 038) —
+      // is_published is the whole publish state.
+      return [["eq", "is_published", true]]
   }
 }
 

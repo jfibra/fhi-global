@@ -1,10 +1,8 @@
-import { SITE_URL, buildUrlsetXml, sitemapResponse } from "@/lib/sitemap-helpers"
+import { PAGES_LASTMOD, SITE_URL, buildUrlsetXml, sitemapResponse } from "@/lib/sitemap-helpers"
 import { SEO_PAGES } from "@/lib/seo-pages"
 
 /** /sitemap-pages-1.xml — the static top-level pages. */
 export const dynamic = "force-dynamic"
-
-const PAGES_LASTMOD = "2026-08-04"
 
 const STATIC_PATHS = [
   "/",
@@ -13,8 +11,10 @@ const STATIC_PATHS = [
   "/projects",
   "/developers",
   "/agents",
+  "/agent-websites",
   "/events",
   "/news",
+  "/gallery",
   "/about",
   "/contact",
   // Popular-searches landing pages (lib/seo-pages.ts) — derived from the

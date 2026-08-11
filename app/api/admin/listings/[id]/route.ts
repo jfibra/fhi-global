@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
+import { after } from "next/server"
+import { revalidatePath } from "next/cache"
 import { requireRole } from "@/lib/auth-guard"
 import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
+import { SITE_URL } from "@/lib/seo"
+import { submitToIndexNow } from "@/lib/indexnow"
 
 // Admin edit / soft-delete / restore of any agent's listing. Service-role
 // (bypasses the owner-only RLS on agent_listings) + super_admin/admin guard.
@@ -16,6 +20,7 @@ const EDITABLE = ["title", "description", "listing_kind", "status", "unit_type",
 
 type ExistingListing = {
   id: string
+  slug: string | null
   agent_id: string
   project_id: number | null
   title: string
@@ -54,7 +59,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   const admin = createAdminSupabase()
   const { data: existing, error: fetchErr } = await admin
     .from("agent_listings")
-    .select("id, agent_id, project_id, title, description, listing_kind, status, unit_type, price, currency, is_featured, deleted_at")
+    .select("id, slug, agent_id, project_id, title, description, listing_kind, status, unit_type, price, currency, is_featured, deleted_at")
     .eq("id", id)
     .maybeSingle<ExistingListing>()
 
@@ -111,6 +116,15 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       changedKeys,
       ...requestContextFromRequest(req),
     })
+  }
+
+  // Purge the public page immediately and, when live, ping IndexNow after the
+  // response is sent (after() keeps the serverless function alive).
+  const publicPath = `/listings/${existing.slug ?? existing.id}`
+  revalidatePath(publicPath)
+  if (status === "published" && !existing.deleted_at) {
+    const loc = `${SITE_URL.replace(/\/$/, "")}${publicPath}`
+    after(() => submitToIndexNow([loc]))
   }
 
   return NextResponse.json({ ok: true })

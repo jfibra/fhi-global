@@ -1,4 +1,5 @@
 import {
+  PAGES_LASTMOD,
   SITE_URL,
   buildSitemapIndexXml,
   sitemapResponse,
@@ -18,9 +19,6 @@ import { newsConfigured } from "@/lib/news-service"
  */
 export const dynamic = "force-dynamic"
 
-// Bumped when the static pages list meaningfully changes.
-const PAGES_LASTMOD = "2026-08-03"
-
 function appendPaginated(
   sitemaps: SitemapIndexEntry[],
   prefix: string,
@@ -34,16 +32,22 @@ function appendPaginated(
 }
 
 export async function GET() {
-  const [projects, developers, listings, events, newsShards] = await Promise.all([
+  const [projects, developers, listings, events, gallery, newsShards] = await Promise.all([
     countSection("projects"),
     countSection("developers"),
     countSection("listings"),
     countSection("events"),
+    countSection("gallery"),
     countNewsShards(),
   ])
 
   const degraded =
-    projects === null || developers === null || listings === null || events === null || newsShards === null
+    projects === null ||
+    developers === null ||
+    listings === null ||
+    events === null ||
+    gallery === null ||
+    newsShards === null
 
   const shards = (count: number | null) =>
     count === null ? null : Math.ceil(count / SUPABASE_PER_PAGE)
@@ -56,6 +60,7 @@ export async function GET() {
   appendPaginated(sitemaps, "sitemap-developers", shards(developers), lastmod)
   appendPaginated(sitemaps, "sitemap-listings", shards(listings), lastmod)
   appendPaginated(sitemaps, "sitemap-events", shards(events), lastmod)
+  appendPaginated(sitemaps, "sitemap-gallery", shards(gallery), lastmod)
   appendPaginated(sitemaps, "sitemap-news", newsShards, lastmod)
   // Google News sitemap only exists meaningfully when the news feature is on.
   if (newsConfigured()) {

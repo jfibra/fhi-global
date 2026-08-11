@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
+import { after } from "next/server"
+import { revalidatePath } from "next/cache"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { canManageEvents } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { sanitizeEventInput } from "@/lib/events/validate"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
+import { SITE_URL } from "@/lib/seo"
+import { submitToIndexNow } from "@/lib/indexnow"
 
 // Event mutations run on the service-role client, so the audit_logs DB trigger
 // can't attribute an actor (auth.uid() is NULL) — routes log explicitly instead.
@@ -116,6 +120,14 @@ export async function POST(req: NextRequest) {
     newValues: { ...input, slug },
     ...requestContextFromRequest(req),
   })
+
+  // Created live → tell IndexNow after the response is sent (after() keeps
+  // the serverless function alive; see app/news-sitemap.xml/route.ts).
+  if (input.status === "published") {
+    const loc = `${SITE_URL.replace(/\/$/, "")}/events/${slug ?? result.data.id}`
+    after(() => submitToIndexNow([loc]))
+  }
+  revalidatePath(`/events/${slug ?? result.data.id}`)
 
   return NextResponse.json({ id: result.data.id })
 }

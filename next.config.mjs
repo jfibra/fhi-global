@@ -172,6 +172,16 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Bots that get BLOCKING (non-streamed) metadata. Setting this REPLACES
+  // Next's default list (node_modules/next/dist/shared/lib/router/utils/html-bots.js),
+  // so the default pattern is reproduced below and extended. The additions matter
+  // for status codes: with streaming, a notFound() thrown in generateMetadata can
+  // only swap the UI after a 200 is already on the wire — blocking metadata is what
+  // lets dead URLs answer crawlers with a real HTTP 404. Googlebot is deliberately
+  // NOT in Next's default list (it can stream); we add it so soft-404s stay fixed
+  // even if a loading boundary is ever reintroduced above the detail routes.
+  htmlLimitedBots:
+    /[\w-]+-Google|Google-[\w-]+|Googlebot|Chrome-Lighthouse|Slurp|DuckDuckBot|baiduspider|yandex|sogou|bitlybot|tumblr|vkShare|quora link preview|redditbot|ia_archiver|Bingbot|BingPreview|applebot|PetalBot|facebookexternalhit|facebookcatalog|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|Yeti|googleweblight|OAI-SearchBot|ChatGPT-User|PerplexityBot|Perplexity-User|Claude-User|Claude-SearchBot/i,
   images: {
     unoptimized: false,
     formats: ["image/avif", "image/webp"],
@@ -227,13 +237,23 @@ const nextConfig = {
     // route handlers under /api/sitemap. The sitemap INDEX must reference only
     // these rewritten URLs: robots.txt disallows /api, and Google honors
     // robots.txt when fetching sitemaps.
-    return ["pages", "projects", "developers", "listings", "events", "news"].map((section) => ({
+    return ["pages", "projects", "developers", "listings", "events", "news", "gallery"].map((section) => ({
       source: `/sitemap-${section}-:page(\\d+).xml`,
       destination: `/api/sitemap/${section}/:page`,
     }))
   },
   async redirects() {
     return [
+      // www → apex, permanent. Host canonicalization belongs at the platform
+      // layer (Vercel domain settings / Cloudflare), which currently answers
+      // with a temporary 307 — this in-repo 308 is the fallback so any request
+      // that reaches Next consolidates signals onto the apex host.
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.fhiglobal.ae" }],
+        destination: "https://fhiglobal.ae/:path*",
+        permanent: true,
+      },
       // Developer pages moved from /developers/<slug> to root-level /<slug>.
       // 301 keeps every shared link, bookmark, and indexed URL working; the
       // /developers index itself doesn't match (:slug requires a segment).
@@ -333,6 +353,11 @@ const nextConfig = {
       {
         // Public owner-document intake links must not be indexed.
         source: "/owner-documents/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      {
+        // Internal style guide — publicly reachable but not for search.
+        source: "/template/:path*",
         headers: PRIVATE_NOINDEX_HEADERS,
       },
     ]

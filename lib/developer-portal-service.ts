@@ -5,6 +5,7 @@
  */
 
 import { createClient } from "@/lib/supabase/client"
+import { pingSeoRevalidate } from "@/lib/seo-ping"
 import type { Developer } from "@/lib/developer-service"
 import type { Project, ProjectImage, ProjectMedia } from "@/lib/project-service"
 
@@ -181,6 +182,7 @@ export async function toggleProjectPublish(
     .eq("id", projectId)
     .eq("developer_id", developerId)
 
+  if (!error) pingSeoRevalidate("project", projectId)
   return { error: error?.message ?? null }
 }
 

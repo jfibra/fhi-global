@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client"
+import { pingSeoRevalidate } from "@/lib/seo-ping"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -379,6 +380,7 @@ export async function publishProject(id: number, publish: boolean): Promise<{ er
     })
     .eq("id", id)
 
+  if (!error) pingSeoRevalidate("project", id)
   return { error: error?.message ?? null }
 }
 

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
+import { fetchSectionPage } from "@/lib/sitemap-sections"
 import { eventBrand } from "@/lib/events/brands"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
 import { EventRegisterForm } from "@/components/public/event-register-form"
@@ -13,6 +14,24 @@ import { EventViewPing } from "@/components/public/event-view-ping"
 import { ArrowLeft, CalendarDays, ChevronRight, Clock, MapPin, Ticket } from "lucide-react"
 
 export const revalidate = 120
+
+/**
+ * Prerender published events (production only) so they serve from the ISR
+ * cache; params reuse the sitemap's enumeration. New events render on
+ * demand and are cached on first hit.
+ */
+export async function generateStaticParams(): Promise<{ id: string }[]> {
+  if (process.env.VERCEL_ENV !== "production") return []
+  try {
+    const rows = await fetchSectionPage("events", 1)
+    return (rows ?? []).flatMap((r) => {
+      const param = r.slug ?? (r.id != null ? String(r.id) : null)
+      return param ? [{ id: param }] : []
+    })
+  } catch {
+    return []
+  }
+}
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -37,7 +56,9 @@ async function fetchEvent(idOrSlug: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   const event = await fetchEvent(id)
-  if (!event) return { title: "Event | FHI Global" }
+  // notFound() here, not a placeholder title: aborting in metadata is what
+  // turns a dead event URL into a real HTTP 404.
+  if (!event) notFound()
   return createPageMetadata({
     title: `${event.title} | FHI Global Events`,
     description: event.description?.trim().slice(0, 155) || `Register for ${event.title} — an FHI Global event.`,

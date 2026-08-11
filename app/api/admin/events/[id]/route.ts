@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
+import { after } from "next/server"
+import { revalidatePath } from "next/cache"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { canManageEvents } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { sanitizeEventInput } from "@/lib/events/validate"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
+import { SITE_URL } from "@/lib/seo"
+import { submitToIndexNow } from "@/lib/indexnow"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -53,10 +57,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const admin = createAdminSupabase()
   const { data: existing, error: fetchErr } = await admin
     .from("events")
-    .select("id, title, description, brand, image_url, venue, status, event_date, registration_open")
+    .select("id, slug, title, description, brand, image_url, venue, status, event_date, registration_open")
     .eq("id", id)
     .is("deleted_at", null)
-    .maybeSingle<ExistingEvent>()
+    .maybeSingle<ExistingEvent & { slug: string | null }>()
 
   if (fetchErr) return NextResponse.json({ error: "Failed to update event" }, { status: 500 })
   if (!existing) return NextResponse.json({ error: "Event not found" }, { status: 404 })
@@ -99,6 +103,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       changedKeys,
       ...requestContextFromRequest(req),
     })
+  }
+
+  // Purge the public page immediately (a draft flip must not serve stale for
+  // up to `revalidate` seconds) and, when live, ping IndexNow after response.
+  const publicPath = `/events/${existing.slug ?? id}`
+  revalidatePath(publicPath)
+  if (input.status === "published") {
+    const loc = `${SITE_URL.replace(/\/$/, "")}${publicPath}`
+    after(() => submitToIndexNow([loc]))
   }
 
   return NextResponse.json({ ok: true })

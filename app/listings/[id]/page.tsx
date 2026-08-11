@@ -14,6 +14,7 @@ import {
 import { roleToLabel } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { pickUnit } from "@/lib/buy/listings-page-logic"
+import { fetchSectionPage } from "@/lib/sitemap-sections"
 import { mergedListingGalleryUrls } from "@/lib/listing-gallery-urls"
 import { ListingPhotoMosaic } from "@/components/public/listing-photo-mosaic"
 import { TopBar } from "@/components/topbar"
@@ -21,6 +22,24 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 
 export const revalidate = 120
+
+/**
+ * Prerender published listings (production only) so they serve from the ISR
+ * cache; the sitemap's enumeration provides the same slug-or-id params the
+ * route resolves. New listings render on demand and cache on first hit.
+ */
+export async function generateStaticParams(): Promise<{ id: string }[]> {
+  if (process.env.VERCEL_ENV !== "production") return []
+  try {
+    const rows = await fetchSectionPage("listings", 1)
+    return (rows ?? []).flatMap((r) => {
+      const param = r.slug ?? (r.id != null ? String(r.id) : null)
+      return param ? [{ id: param }] : []
+    })
+  } catch {
+    return []
+  }
+}
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -96,9 +115,11 @@ function formatPriceLine(
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   const { row, error } = await fetchPublicAgentListingById(id)
-  if (error || !row) {
-    return { title: "Listing | FHI Global" }
-  }
+  // Transient query failure → 5xx (crawlers retry, never deindex); a truly
+  // missing row → notFound() here, not a placeholder title, because aborting
+  // in metadata is what turns a dead listing URL into a real HTTP 404.
+  if (error) throw new Error("Failed to load listing")
+  if (!row) notFound()
   const description =
     row.description?.trim().slice(0, 155) ||
     `${row.title} — Browse this listing on FHI Global.`
@@ -119,19 +140,9 @@ export default async function PublicAgentListingPage({ params }: Props) {
   const { row, error } = await fetchPublicAgentListingById(id)
 
   if (error) {
-    return (
-      <div className="min-h-screen bg-[#faf8f4] font-sans">
-        <TopBar />
-        <Header />
-        <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-          <p className="text-[#475569]">We couldn&apos;t load this listing. Please try again later.</p>
-          <Link href="/buy" className="mt-6 inline-block text-[#d6b357] font-semibold hover:underline">
-            Back to buy
-          </Link>
-        </div>
-        <Footer />
-      </div>
-    )
+    // Thrown (not rendered) so the response is a real 5xx — crawlers retry a
+    // 500 but deindex a 404/soft-404. The friendly UI lives in ./error.tsx.
+    throw new Error("Failed to load listing")
   }
 
   if (!row) {

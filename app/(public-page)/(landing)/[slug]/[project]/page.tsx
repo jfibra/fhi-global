@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation"
 import Link from "next/link"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
+import { fetchSectionPage } from "@/lib/sitemap-sections"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -21,6 +22,24 @@ import {
 
 export const revalidate = 120
 
+/**
+ * Prerender the published catalog (only in production) so these pages serve
+ * from the ISR cache instead of cold SSR on every crawl. Reuses the sitemap's
+ * enumeration — same table, same published filters. New projects still render
+ * on demand (dynamicParams defaults to true) and are cached on first hit.
+ */
+export async function generateStaticParams(): Promise<{ slug: string; project: string }[]> {
+  if (process.env.VERCEL_ENV !== "production") return []
+  try {
+    const rows = await fetchSectionPage("projects", 1)
+    return (rows ?? []).flatMap((r) =>
+      r.slug && r.developers?.slug ? [{ slug: r.developers.slug, project: r.slug }] : [],
+    )
+  } catch {
+    return []
+  }
+}
+
 // slug = the developer's slug (the parent segment), project = the project's.
 type Props = { params: Promise<{ slug: string; project: string }> }
 
@@ -35,7 +54,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     .eq("is_published", true)
     .is("deleted_at", null)
     .maybeSingle()
-  if (!data) return { title: "Project Not Found" }
+  // notFound() here, not a placeholder title: returning metadata lets the
+  // route start streaming, after which the page body's notFound() can only
+  // swap the UI — the 200 is already on the wire. Aborting in metadata is
+  // what turns a dead project URL into a real HTTP 404.
+  if (!data) notFound()
   // Wrong developer segment: the page body issues the permanent redirect to
   // the canonical pair; metadata just needs to not claim the wrong URL.
   const devRel = data.developers as unknown as { slug: string | null } | null
@@ -103,6 +126,7 @@ export default async function ProjectDetailPage({ params }: Props) {
       project_property_types ( property_types ( name ) )
     `)
     .eq("slug", slug)
+    .eq("is_published", true)
     .is("deleted_at", null)
     .maybeSingle()
 
