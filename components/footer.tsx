@@ -35,6 +35,17 @@ const ACCOUNT_LINKS = [
   { label: "Create Account", href: "/register" },
   { label: "Dashboard", href: "/dashboard" },
 ]
+
+// The header renders these inside dropdowns; the footer column guarantees
+// every section has a plain server-rendered <a> on every page (several of
+// these had ZERO crawlable internal links before this column existed).
+const EXPLORE_LINKS = [
+  { label: "About Us", href: "/about" },
+  { label: "Our Agents", href: "/agents" },
+  { label: "Agent Websites", href: "/agent-websites" },
+  { label: "Gallery", href: "/gallery" },
+  { label: "Events", href: "/events" },
+]
 // Pretty URLs, not query strings: /projects?status=… canonicalises back to
 // /projects, so those links passed no SEO value and looked like machine URLs
 // on hover. The landing pages in lib/seo-pages.ts are the crawlable versions.
@@ -153,7 +164,7 @@ export function Footer() {
 
       {/* Main footer content */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-10">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-10 lg:gap-8">
 
           {/* ── Brand column ──────────────────────────────── */}
           <div className="lg:col-span-2 space-y-6">
@@ -230,6 +241,26 @@ export function Footer() {
             </h4>
             <ul className="space-y-3">
               {COMPANY_LINKS.map(({ label, href }) => (
+                <li key={label}>
+                  <Link
+                    href={href}
+                    className="text-sm text-white/45 hover:text-[#d6b357] transition-colors duration-200 hover:translate-x-0.5 inline-block"
+                  >
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* ── Explore ───────────────────────────────────── */}
+          <div>
+            <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white mb-5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357]" />
+              Explore
+            </h4>
+            <ul className="space-y-3">
+              {EXPLORE_LINKS.map(({ label, href }) => (
                 <li key={label}>
                   <Link
                     href={href}

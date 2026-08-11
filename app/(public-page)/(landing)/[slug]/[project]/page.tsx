@@ -406,7 +406,11 @@ export default async function ProjectDetailPage({ params }: Props) {
                 }
               />
               <div className="mt-5">
-                <ProjectGallery images={images} />
+                <ProjectGallery
+                  images={images}
+                  projectName={project.name}
+                  location={project.city ?? project.location}
+                />
               </div>
             </section>
           )}

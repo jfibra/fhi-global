@@ -16,6 +16,10 @@ import { Building2, Facebook, Mail, MapPin, Star, CheckCircle2, ArrowLeft } from
 /** The company inbox shown across the public site (contact page, footer). */
 const CONTACT_EMAIL = "info@fhiglobal.ae"
 
+/** Prices below this are placeholder rows, not real UAE property prices —
+ *  never surface them as a headline stat. (Same guard in the homepage hero.) */
+const MIN_REALISTIC_PRICE_AED = 50_000
+
 export const revalidate = 120
 
 /**
@@ -536,9 +540,11 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
   const developerCount = new Set(
     visible.map((p) => (p.developers as { name?: string } | null)?.name).filter(Boolean),
   ).size
+  // Sanity floor: a placeholder launch_price_from of 1 in a single DB row
+  // used to make the flagship landing page lead with "Starting from AED 1".
   const cheapest = visible
     .map((p) => Number(p.launch_price_from))
-    .filter((n) => Number.isFinite(n) && n > 0)
+    .filter((n) => Number.isFinite(n) && n >= MIN_REALISTIC_PRICE_AED)
     .sort((a, b) => a - b)[0]
   const priceFrom = cheapest
     ? `${(visible.find((p) => Number(p.launch_price_from) === cheapest)?.currency ?? "AED").toUpperCase()} ${

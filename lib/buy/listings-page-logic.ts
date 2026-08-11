@@ -1,5 +1,5 @@
 import { cache } from "react"
-import type { BuyRawProject, ListingMarket } from "@/lib/buy/cached-projects"
+import { getListingPageProjectsCached, type BuyRawProject, type ListingMarket } from "@/lib/buy/cached-projects"
 import { getPublicAgentListingsCached, type PublicAgentListingRow } from "@/lib/buy/agent-listings-public"
 import { mergedListingGalleryUrls } from "@/lib/listing-gallery-urls"
 import type { BuyPropertyCardData } from "@/components/buy/buy-property-card"
@@ -136,31 +136,6 @@ function agentMatchesFilters(row: PublicAgentListingRow, sp: Awaited<ListingSear
   return true
 }
 
-function sortPublicAgentRows(rows: PublicAgentListingRow[], sort: string): PublicAgentListingRow[] {
-  const out = [...rows]
-  const t = (d: string) => {
-    const x = new Date(d).getTime()
-    return Number.isFinite(x) ? x : 0
-  }
-  const dateIso = (r: PublicAgentListingRow) => r.updated_at || r.created_at
-
-  switch (sort) {
-    case "price_asc":
-      out.sort((a, b) => (agentListingEntryPrice(a) ?? 1e15) - (agentListingEntryPrice(b) ?? 1e15))
-      break
-    case "price_desc":
-      out.sort((a, b) => (agentListingEntryPrice(b) ?? 0) - (agentListingEntryPrice(a) ?? 0))
-      break
-    case "newest":
-      out.sort((a, b) => t(dateIso(b)) - t(dateIso(a)))
-      break
-    default:
-      out.sort((a, b) => t(dateIso(b)) - t(dateIso(a)))
-  }
-
-  return out
-}
-
 function agentListingToCard(row: PublicAgentListingRow): BuyPropertyCardData {
   const proj = row.projects
   const u = proj ? pickUnit(proj.project_units) : null
@@ -243,25 +218,185 @@ export type { ListingMarket }
 
 export const loadPublicAgentListings = cache((market: ListingMarket) => getPublicAgentListingsCached(market))
 
-/** Public /buy and /rent: published sales-pipeline listings only (no developer project catalog). */
+/** Developer catalog projects for the same market — blended into /buy //rent
+ *  below the curated agent listings. react.cache dedupes across the several
+ *  Suspense'd components that each call this per render. */
+export const loadListingPageProjects = cache((market: ListingMarket) => getListingPageProjectsCached(market))
+
+/** Reuses the agent-row filter logic verbatim for a catalog project: the
+ *  pseudo row carries the project as its embed, so q/type/beds/baths/price
+ *  all read the same fields they already read for project-linked listings. */
+function projectAsPseudoAgentRow(p: BuyRawProject): PublicAgentListingRow {
+  return {
+    id: `project:${p.id}`,
+    slug: null,
+    title: p.name,
+    description: p.description,
+    listing_kind: "sale",
+    price: null,
+    currency: p.currency ?? "AED",
+    unit_type: null,
+    created_at: p.created_at,
+    updated_at: p.created_at,
+    projects: p,
+    agent_listing_images: null,
+  }
+}
+
+/** Card for a catalog project. null when the /{developer}/{project} detail
+ *  route can't be addressed (missing either slug). */
+function projectToCard(p: BuyRawProject): BuyPropertyCardData | null {
+  const devSlug = p.developers?.slug
+  if (!p.slug || !devSlug) return null
+  const u = pickUnit(p.project_units)
+  const gallery = mergedListingGalleryUrls(p, null)
+  return {
+    id: `project:${p.id}`,
+    name: p.name,
+    slug: p.slug,
+    detail_path: `/${devSlug}/${p.slug}`,
+    main_image: p.main_image ?? gallery[0] ?? null,
+    gallery_urls: gallery.length > 0 ? gallery : undefined,
+    description: p.description,
+    city: p.city,
+    location: p.location,
+    launch_price_from: p.launch_price_from,
+    launch_price_to: p.launch_price_to,
+    currency: p.currency ?? "AED",
+    developers: p.developers,
+    unit_type: u?.unit_type ?? null,
+    bedrooms: u?.bedrooms ?? null,
+    bathrooms: u?.bathrooms ?? null,
+    size_sqft: u?.size_sqft ?? null,
+    size_sqm: u?.size_sqm ?? null,
+  }
+}
+
+function projectToMapMarker(p: BuyRawProject): BuyMapMarker | null {
+  const devSlug = p.developers?.slug
+  if (!p.slug || !devSlug) return null
+  const lat = parseCoord(p.latitude)
+  const lng = parseCoord(p.longitude)
+  if (lat == null || lng == null) return null
+  const u = pickUnit(p.project_units)
+  const gallery = mergedListingGalleryUrls(p, null)
+  const areaLabel =
+    u?.size_sqm != null
+      ? `${u.size_sqm.toLocaleString("en-AE")} sqm`
+      : u?.size_sqft != null
+        ? `${u.size_sqft.toLocaleString("en-AE")} sqft`
+        : null
+  return {
+    id: `project:${p.id}`,
+    lat,
+    lng,
+    title: p.name,
+    slug: p.slug,
+    detail_href: `/${devSlug}/${p.slug}`,
+    image_url: p.main_image ?? gallery[0] ?? p.developers?.logo_url ?? null,
+    price_label: formatPrice(p.launch_price_from, p.launch_price_to, p.currency ?? "AED"),
+    bedrooms: u?.bedrooms ?? null,
+    bathrooms: u?.bathrooms ?? null,
+    area_label: areaLabel,
+    location_label: [p.city, p.location].filter(Boolean).join(", ") || "United Arab Emirates",
+  }
+}
+
+type BlendedItem = {
+  card: BuyPropertyCardData
+  marker: BuyMapMarker | null
+  entry: number | null
+  dateMs: number
+  isAgent: boolean
+  featured: boolean
+}
+
+/**
+ * Public /buy and /rent: curated agent listings blended with the developer
+ * project catalog (the actual sale inventory — /buy used to show only the
+ * couple of agent listings while 180+ projects never surfaced). Projects
+ * already attached to an agent listing are deduped out; default order puts
+ * agent listings (exact prices) first, then featured projects, then newest.
+ * Explicit price/newest sorts rank the merged set globally.
+ */
 export function deriveListings(
   sp: Awaited<ListingSearchParams>,
   agentRows: PublicAgentListingRow[],
   agentError: boolean,
+  projectRows: BuyRawProject[] = [],
+  projectError: boolean = false,
 ) {
-  const filtered = agentError ? [] : agentRows.filter((a) => agentMatchesFilters(a, sp))
-  const sorted = sortPublicAgentRows(filtered, sp.sort ?? "popular")
-  const properties = sorted.map(agentListingToCard)
-  const mapMarkers = sorted.map(agentListingToMapMarker).filter((m): m is BuyMapMarker => m != null)
+  const safeAgentRows = agentError ? [] : agentRows
+  const linkedProjectIds = new Set(
+    safeAgentRows.map((r) => r.projects?.id).filter((id): id is string => id != null),
+  )
+  const dedupedProjects = projectError
+    ? []
+    : projectRows.filter((p) => !linkedProjectIds.has(p.id))
 
-  const rawTotal = agentError ? 0 : agentRows.length
-  const shown = sorted.length
+  const t = (d: string) => {
+    const x = new Date(d).getTime()
+    return Number.isFinite(x) ? x : 0
+  }
+
+  const items: BlendedItem[] = [
+    ...safeAgentRows
+      .filter((a) => agentMatchesFilters(a, sp))
+      .map((a) => ({
+        card: agentListingToCard(a),
+        marker: agentListingToMapMarker(a),
+        entry: agentListingEntryPrice(a),
+        dateMs: t(a.updated_at || a.created_at),
+        isAgent: true,
+        featured: false,
+      })),
+    ...dedupedProjects
+      .filter((p) => agentMatchesFilters(projectAsPseudoAgentRow(p), sp))
+      .flatMap((p) => {
+        const card = projectToCard(p)
+        if (!card) return []
+        return [
+          {
+            card,
+            marker: projectToMapMarker(p),
+            entry: listingEntryPrice(p),
+            dateMs: t(p.created_at),
+            isAgent: false,
+            featured: Boolean(p.is_featured),
+          },
+        ]
+      }),
+  ]
+
+  switch (sp.sort ?? "popular") {
+    case "price_asc":
+      items.sort((a, b) => (a.entry ?? 1e15) - (b.entry ?? 1e15))
+      break
+    case "price_desc":
+      items.sort((a, b) => (b.entry ?? 0) - (a.entry ?? 0))
+      break
+    case "newest":
+      items.sort((a, b) => b.dateMs - a.dateMs)
+      break
+    default:
+      items.sort((a, b) => {
+        if (a.isAgent !== b.isAgent) return a.isAgent ? -1 : 1
+        if (!a.isAgent && a.featured !== b.featured) return a.featured ? -1 : 1
+        return b.dateMs - a.dateMs
+      })
+  }
+
+  const properties = items.map((i) => i.card)
+  const mapMarkers = items.map((i) => i.marker).filter((m): m is BuyMapMarker => m != null)
+
+  const rawTotal = safeAgentRows.length + dedupedProjects.length
+  const shown = items.length
   const totalLabel =
-    agentError || rawTotal === 0
+    rawTotal === 0
       ? null
       : shown === rawTotal
-        ? `Showing all ${shown} listing${shown === 1 ? "" : "s"}`
-        : `Showing ${shown} of ${rawTotal} listing${rawTotal === 1 ? "" : "s"}`
+        ? `Showing all ${shown} propert${shown === 1 ? "y" : "ies"}`
+        : `Showing ${shown} of ${rawTotal} propert${rawTotal === 1 ? "y" : "ies"}`
 
   return { properties, mapMarkers, totalLabel }
 }

@@ -342,12 +342,17 @@ export function Header() {
 
                   {/* White panel against the navy bar, so the menu reads as a
                       surface of the page rather than more chrome. Each row is
-                      an icon tile + name + what you'll find there. */}
-                  {open && (
+                      an icon tile + name + what you'll find there.
+                      Always rendered, `hidden` when closed: the dropdown links
+                      must exist in the server HTML — conditional mounting kept
+                      /about, /agents, /gallery & friends out of the crawlable
+                      page entirely. The panel has no mount animation, so a
+                      display toggle is visually identical. */}
+                  {(
                     // Outer wrapper carries transparent padding instead of a
                     // margin: the visual gap stays, but the pointer never
                     // leaves a hoverable element on the way to the panel.
-                    <div className="absolute left-0 top-full z-50 pt-1.5 w-[290px]">
+                    <div className={`absolute left-0 top-full z-50 pt-1.5 w-[290px] ${open ? "" : "hidden"}`}>
                     <div className="bg-white border border-[#e5e8ec] shadow-[0_24px_60px_-18px_rgba(0,12,26,0.45)]">
                       <span className="block h-[3px] bg-[#d6b357]" aria-hidden="true" />
                       <div className="py-1.5">
@@ -557,8 +562,10 @@ export function Header() {
                       {label}
                       <ChevronDown className={`w-4 h-4 ml-auto transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
                     </button>
-                    {expanded && (
-                      <div className="mt-1 ml-3 border-l border-white/10 pl-3 flex flex-col gap-1">
+                    {/* Always rendered, `hidden` when collapsed — same SSR
+                        rationale as the desktop panels above. */}
+                    {(
+                      <div className={`mt-1 ml-3 border-l border-white/10 pl-3 flex flex-col gap-1 ${expanded ? "" : "hidden"}`}>
                         {children.map((c) => {
                           const childActive = pathname === c.href || pathname.startsWith(`${c.href}/`)
                           return (

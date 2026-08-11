@@ -16,14 +16,22 @@ type MosaicImage = {
 export function ListingPhotoMosaic({
   images,
   fullBleed = false,
+  title,
+  location,
 }: {
   images: MosaicImage[]
   /** Edge-to-edge hero mode: no rounded corners, taller tiles. */
   fullBleed?: boolean
+  /** Names the property in every alt — listing photos are a portal's primary
+   *  Google Images asset, and "Photo N" carries no signal. */
+  title?: string
+  location?: string
 }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   if (!images.length) return null
+
+  const subject = [title, location].filter(Boolean).join(" in ")
 
   const frame = fullBleed ? "overflow-hidden" : "rounded-2xl overflow-hidden"
   const mosaicHeights = fullBleed
@@ -51,12 +59,17 @@ export function ListingPhotoMosaic({
       type="button"
       onClick={() => setLightboxIndex(index)}
       className={`group relative overflow-hidden bg-[#f3f4f6] ${className}`}
-      aria-label={overlay ? `View all ${count} photos` : `View photo ${index + 1}`}
+      aria-label={
+        overlay
+          ? `View all ${count} photos${subject ? ` of ${subject}` : ""}`
+          : `View photo ${index + 1}${subject ? ` of ${subject}` : ""}`
+      }
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={img.image_url}
-        alt={`Photo ${index + 1}`}
+        alt={subject ? `${subject} — photo ${index + 1} of ${count}` : `Photo ${index + 1} of ${count}`}
+        loading={index > 0 ? "lazy" : undefined}
         className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-300"
       />
       {overlay ? (
@@ -151,7 +164,7 @@ export function ListingPhotoMosaic({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={images[lightboxIndex].image_url}
-            alt={`Photo ${lightboxIndex + 1} of ${count}`}
+            alt={subject ? `${subject} — photo ${lightboxIndex + 1} of ${count}` : `Photo ${lightboxIndex + 1} of ${count}`}
             className="max-h-[88vh] max-w-[92vw] object-contain rounded-lg"
             onClick={(e) => e.stopPropagation()}
           />

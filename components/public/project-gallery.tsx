@@ -10,10 +10,24 @@ type ProjectImage = {
   rank?: number | null
 }
 
-export function ProjectGallery({ images }: { images: ProjectImage[] }) {
+export function ProjectGallery({
+  images,
+  projectName,
+  location,
+}: {
+  images: ProjectImage[]
+  /** Names the property in every alt — captions are empty in practice, and
+   *  "Image N" carries zero signal for Google Images. */
+  projectName?: string
+  location?: string | null
+}) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   if (!images.length) return null
+
+  const subject = [projectName, location].filter(Boolean).join(", ")
+  const altFor = (img: ProjectImage, idx: number) =>
+    img.caption ?? (subject ? `${subject} — photo ${idx + 1} of ${images.length}` : `Photo ${idx + 1} of ${images.length}`)
 
   const prev = () => setLightboxIndex((i) => (i !== null ? Math.max(0, i - 1) : null))
   const next = () => setLightboxIndex((i) => (i !== null ? Math.min(images.length - 1, i + 1) : null))
@@ -26,12 +40,14 @@ export function ProjectGallery({ images }: { images: ProjectImage[] }) {
           <button
             key={img.id}
             onClick={() => setLightboxIndex(idx)}
+            aria-label={`View ${altFor(img, idx)}`}
             className="group relative aspect-square overflow-hidden bg-[#f3f4f6] border border-[#e8eaed] hover:border-[#001f3f]/30 transition-all"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={img.image_url}
-              alt={img.caption ?? `Image ${idx + 1}`}
+              alt={altFor(img, idx)}
+              loading={idx > 3 ? "lazy" : undefined}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
@@ -70,7 +86,7 @@ export function ProjectGallery({ images }: { images: ProjectImage[] }) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={images[lightboxIndex].image_url}
-              alt={images[lightboxIndex].caption ?? ""}
+              alt={altFor(images[lightboxIndex], lightboxIndex)}
               className="max-h-[80vh] w-auto shadow-2xl object-contain"
             />
             {images[lightboxIndex].caption && (

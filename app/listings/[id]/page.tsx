@@ -218,7 +218,7 @@ export default async function PublicAgentListingPage({ params }: Props) {
       {/* Photo mosaic — full-bleed, flush under the header (homes.com style) */}
       <div className="relative">
         {galleryItems.length > 0 ? (
-          <ListingPhotoMosaic images={galleryItems} fullBleed />
+          <ListingPhotoMosaic images={galleryItems} fullBleed title={row.title} location={loc} />
         ) : (
           <div className="relative w-full aspect-[16/9] max-h-[420px] bg-[#f3f4f6]">
             <div className="absolute inset-0 flex flex-col items-center justify-center text-[#94a3b8] gap-2">

@@ -141,9 +141,13 @@ export default async function HomePage() {
     under_construction: "Under Construction",
     completed: "Completed",
   };
+  // Prices below the floor are placeholder rows (e.g. launch_price_from = 1),
+  // not real UAE property prices — suppress rather than headline them. (Same
+  // guard on the SEO landing pages' "Starting from" stat.)
+  const MIN_REALISTIC_PRICE_AED = 50_000;
   const heroPrice = (from: number | string | null, currency: string | null): string | null => {
     const n = Number(from);
-    if (!Number.isFinite(n) || n <= 0) return null;
+    if (!Number.isFinite(n) || n < MIN_REALISTIC_PRICE_AED) return null;
     const code = (currency ?? "AED").toUpperCase();
     if (n >= 1_000_000) return `From ${code} ${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
     if (n >= 1_000) return `From ${code} ${Math.round(n / 1_000)}K`;

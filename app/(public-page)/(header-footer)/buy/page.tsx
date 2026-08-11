@@ -8,6 +8,7 @@ import {
   deriveListings,
   listViewHrefFromSp,
   loadPublicAgentListings,
+  loadListingPageProjects,
   type ListingSearchParams,
 } from "@/lib/buy/listings-page-logic"
 import { BuyFiltersLoader } from "./buy-filters-loader"
@@ -106,19 +107,25 @@ function BuyListingsSkeleton() {
 }
 
 async function BuyMapListingSubtitle({ sp }: { sp: Sp }) {
-  const { rows: agentRows, error: agentErr } = await loadBuyListings()
-  const { totalLabel } = deriveListings(sp, agentRows, agentErr)
-  if (agentErr || !totalLabel) return null
+  const [{ rows: agentRows, error: agentErr }, { rows: projectRows, error: projErr }] = await Promise.all([
+    loadBuyListings(),
+    loadListingPageProjects("buy"),
+  ])
+  const { totalLabel } = deriveListings(sp, agentRows, agentErr, projectRows, projErr)
+  if ((agentErr && projErr) || !totalLabel) return null
   return <p className="mt-1 text-sm text-[#64748b] sm:text-base">{totalLabel}</p>
 }
 
 async function BuyMapSplitList({ sp }: { sp: Sp }) {
-  const { rows: agentRows, error: agentErr } = await loadBuyListings()
-  const { properties } = deriveListings(sp, agentRows, agentErr)
+  const [{ rows: agentRows, error: agentErr }, { rows: projectRows, error: projErr }] = await Promise.all([
+    loadBuyListings(),
+    loadListingPageProjects("buy"),
+  ])
+  const { properties } = deriveListings(sp, agentRows, agentErr, projectRows, projErr)
 
   return (
     <div className="space-y-5 min-w-0 max-w-full">
-      {agentErr && (
+      {agentErr && projErr && (
         <div
           className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
           role="alert"
@@ -127,10 +134,10 @@ async function BuyMapSplitList({ sp }: { sp: Sp }) {
           the page.
         </div>
       )}
-      {!agentErr && properties.length === 0 && (
+      {!(agentErr && projErr) && properties.length === 0 && (
         <div className="rounded-2xl border border-[#e8eaed] bg-white p-12 text-center">
           <p className="mb-4 text-[#475569]">
-            No published sale listings match your filters yet. Try clearing filters or contact us for off-market
+            No properties for sale match your filters yet. Try clearing filters or contact us for off-market
             options.
           </p>
           <Link
@@ -141,7 +148,7 @@ async function BuyMapSplitList({ sp }: { sp: Sp }) {
           </Link>
         </div>
       )}
-      {!agentErr && properties.length > 0 && (
+      {!(agentErr && projErr) && properties.length > 0 && (
         <div className="flex flex-col gap-5">
           {properties.map((p) => (
             <BuyPropertyCard key={p.id} property={p} />
@@ -153,8 +160,11 @@ async function BuyMapSplitList({ sp }: { sp: Sp }) {
 }
 
 async function BuyMapSplitMap({ sp }: { sp: Sp }) {
-  const { rows: agentRows, error: agentErr } = await loadBuyListings()
-  const { mapMarkers } = deriveListings(sp, agentRows, agentErr)
+  const [{ rows: agentRows, error: agentErr }, { rows: projectRows, error: projErr }] = await Promise.all([
+    loadBuyListings(),
+    loadListingPageProjects("buy"),
+  ])
+  const { mapMarkers } = deriveListings(sp, agentRows, agentErr, projectRows, projErr)
   const apiKey =
     process.env.GOOGLE_MAPS_API_KEY?.trim() ||
     process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ||
@@ -171,12 +181,15 @@ async function BuyMapSplitMap({ sp }: { sp: Sp }) {
 }
 
 async function BuyListingsColumn({ sp }: { sp: Sp }) {
-  const { rows: agentRows, error: agentErr } = await loadBuyListings()
-  const { properties, totalLabel } = deriveListings(sp, agentRows, agentErr)
+  const [{ rows: agentRows, error: agentErr }, { rows: projectRows, error: projErr }] = await Promise.all([
+    loadBuyListings(),
+    loadListingPageProjects("buy"),
+  ])
+  const { properties, totalLabel } = deriveListings(sp, agentRows, agentErr, projectRows, projErr)
 
   return (
     <>
-      {agentErr && (
+      {agentErr && projErr && (
         <div
           className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
           role="alert"
@@ -185,11 +198,11 @@ async function BuyListingsColumn({ sp }: { sp: Sp }) {
           the page.
         </div>
       )}
-      {totalLabel && !agentErr && <p className="text-sm text-[#64748b]">{totalLabel}</p>}
-      {!agentErr && properties.length === 0 && (
+      {totalLabel && !(agentErr && projErr) && <p className="text-sm text-[#64748b]">{totalLabel}</p>}
+      {!(agentErr && projErr) && properties.length === 0 && (
         <div className="rounded-2xl border border-[#e8eaed] bg-white p-12 text-center">
           <p className="text-[#475569] mb-4">
-            No published sale listings match your filters yet. Try clearing filters or contact us for off-market
+            No properties for sale match your filters yet. Try clearing filters or contact us for off-market
             options.
           </p>
           <Link
@@ -200,7 +213,7 @@ async function BuyListingsColumn({ sp }: { sp: Sp }) {
           </Link>
         </div>
       )}
-      {!agentErr &&
+      {!(agentErr && projErr) &&
         properties.length > 0 &&
         properties.map((p) => <BuyPropertyCard key={p.id} property={p} />)}
     </>
