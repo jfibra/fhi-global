@@ -954,6 +954,16 @@ export function WebsiteBuilderClient() {
               >
                 <TArea value={data.hero.description} onChange={(v) => update((d) => { d.hero.description = v })} />
               </Field>
+              <Field label="Featured video link">
+                <TInput
+                  value={data.hero.video ?? ""}
+                  placeholder="YouTube / Vimeo / Facebook / Instagram / TikTok / direct video URL"
+                  onChange={(v) => update((d) => { d.hero.video = v })}
+                />
+                <p className="mt-1 text-[11px] text-[#9aa0aa]">
+                  Shows a &ldquo;Featured Video&rdquo; button in the hero that opens the video in a modal. Facebook, Instagram and TikTok videos must be public. Leave blank to hide the button.
+                </p>
+              </Field>
               <Field label="Banner photo"><ImageInput value={data.hero.image} onChange={(v) => update((d) => { d.hero.image = v })} /></Field>
               <Field
                 label="Left dark overlay"

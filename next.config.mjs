@@ -70,7 +70,7 @@ const CSP = [
   // reader embeds ebook PDFs (see lib/ebooks.ts) and the sale-attachments
   // viewer embeds uploaded ones, both in the browser's native viewer. Google
   // sign-in uses a full-page redirect, not a frame, so nothing else needs it.
-  `frame-src ${EBOOK_PDF_HOST}${S3_FRAME_HOST ? ` ${S3_FRAME_HOST}` : ""}`,
+  `frame-src ${EBOOK_PDF_HOST}${S3_FRAME_HOST ? ` ${S3_FRAME_HOST}` : ""} https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://www.facebook.com https://www.instagram.com https://www.tiktok.com`,
   // Prevent this app from being embedded in iframes elsewhere
   `frame-ancestors 'none'`,
 

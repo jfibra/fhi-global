@@ -269,6 +269,9 @@ export type WebsiteData = {
     description: string
     /** Description text color; defaults to the template slate. */
     descriptionColor?: string
+    /** Featured video URL (YouTube / Vimeo / direct file) — the hero's
+     *  "Featured Video" button opens it in a modal; hidden when blank. */
+    video?: string
     image: string
     /** 0–100 strength of a left-side dark gradient behind the headline, so
      *  the copy stays readable on bright photos. 0/undefined = no overlay. */
