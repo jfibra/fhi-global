@@ -9,6 +9,8 @@ import { Reveal } from "@/components/public/reveal"
 import { SOCIAL_URLS } from "@/lib/social"
 import { getSeoPage, NON_UAE_CITIES, SEO_PAGES, type SeoPage } from "@/lib/seo-pages"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
+import { breadcrumbList, developerOrganizationSchema, itemListSchema } from "@/lib/structured-data"
+import { JsonLd } from "@/components/json-ld"
 import { Building2, Facebook, Mail, MapPin, Star, CheckCircle2, ArrowLeft } from "lucide-react"
 
 /** The company inbox shown across the public site (contact page, footer). */
@@ -191,6 +193,24 @@ export default async function DeveloperDetailPage({ params }: Props) {
 
   return (
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
+      {/* Entity + trail + the portfolio actually shown below (schema mirrors
+          visible content: only projects that render make the ItemList). */}
+      <JsonLd
+        schema={[
+          developerOrganizationSchema(developer),
+          breadcrumbList([
+            { name: "Home", path: "/" },
+            { name: "Developers", path: "/developers" },
+            { name: developer.name },
+          ]),
+          itemListSchema(
+            visibleProjects.flatMap((p) =>
+              p.slug && developer.slug ? [{ name: p.name, path: `/${developer.slug}/${p.slug}` }] : [],
+            ),
+            `Projects by ${developer.name}`,
+          ),
+        ]}
+      />
       <div className="fixed top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-25 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />
       <div className="fixed bottom-0 right-[-5%] w-[500px] h-[500px] rounded-full opacity-20 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(250,240,210)_0%,rgba(255,255,255,0)_70%)]" />
 
@@ -531,6 +551,19 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
 
   return (
     <div className="bg-[#f7f8fa]">
+      {/* Trail + exactly the projects rendered in the grid below. */}
+      <JsonLd
+        schema={[
+          breadcrumbList([{ name: "Home", path: "/" }, { name: seo.h1 }]),
+          itemListSchema(
+            shown.flatMap((p) => {
+              const dev = p.developers as unknown as { slug: string | null } | null
+              return p.slug && dev?.slug ? [{ name: p.name, path: `/${dev.slug}/${p.slug}` }] : []
+            }),
+            seo.h1,
+          ),
+        ]}
+      />
       {/* Masthead — the copy sits over a real project from the very list below,
           rather than a flat navy block or stock imagery. Left-weighted scrim so
           the text stays legible while the building shows through on the right. */}
@@ -729,6 +762,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
 
   return (
     <div className="bg-white">
+      <JsonLd schema={breadcrumbList([{ name: "Home", path: "/" }, { name: seo.h1 }])} />
       {/* Editorial intro — headline and copy on the left, our project photo on
           the right, like the area pages on the major portals. */}
       <section className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-4">

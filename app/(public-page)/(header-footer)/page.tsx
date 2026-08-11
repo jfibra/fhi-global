@@ -7,7 +7,8 @@ import { HeroSection } from "@/components/hero-section";
 import { Reveal } from "@/components/public/reveal";
 import { HomeFaq } from "@/components/public/home-faq";
 import { faqPageSchema } from "@/lib/faqs";
-import { jsonLdScript } from "@/lib/seo";
+import { fhiOrganizationSchema, webSiteSchema } from "@/lib/structured-data";
+import { JsonLd } from "@/components/json-ld";
 import {
   DeveloperLogoCarousel,
   type DeveloperLogoItem,
@@ -160,40 +161,15 @@ export default async function HomePage() {
       statusLabel: heroStatusLabels[p.status ?? ""] ?? null,
     }));
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae";
-  const organizationSchema = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: "FHI Global",
-    url: siteUrl,
-    logo: `${siteUrl}/android-chrome-512x512.png`,
-    contactPoint: [
-      {
-        "@type": "ContactPoint",
-        contactType: "customer support",
-        areaServed: "AE",
-        availableLanguage: ["en", "ar"],
-      },
-    ],
-    sameAs: [
-      "https://www.linkedin.com",
-      "https://www.instagram.com",
-      "https://www.facebook.com",
-    ],
-  };
-
   return (
     <>
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
-    />
+    {/* Brand entity + site name. Organization carries only real profile URLs
+        in sameAs (bare platform domains corrupt entity reconciliation) and
+        claims English only — there is no Arabic content to back "ar". */}
+    <JsonLd schema={[fhiOrganizationSchema(), webSiteSchema()]} />
     {/* Pairs with the FAQ section below — this is what lets Google expand the
         answers underneath our search result. */}
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: jsonLdScript(faqPageSchema()) }}
-    />
+    <JsonLd schema={faqPageSchema()} />
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
       {/* Ambient blobs */}
       <div className="fixed top-[-10%] left-[-10%] w-[700px] h-[700px] rounded-full opacity-30 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />

@@ -2,6 +2,8 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
+import { breadcrumbList } from "@/lib/structured-data"
+import { JsonLd } from "@/components/json-ld"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -65,6 +67,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
 
   return (
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
+      <JsonLd schema={breadcrumbList([{ name: "Home", path: "/" }, { name: "Projects" }])} />
       <div className="fixed top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-25 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />
       <div className="fixed bottom-0 right-[-5%] w-[500px] h-[500px] rounded-full opacity-20 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(250,240,210)_0%,rgba(255,255,255,0)_70%)]" />
 

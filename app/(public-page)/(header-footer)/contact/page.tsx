@@ -2,6 +2,8 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import { ContactForm } from "./contact-form"
 import { createPageMetadata } from "@/lib/seo"
+import { breadcrumbList, realEstateAgentOfficeSchema } from "@/lib/structured-data"
+import { JsonLd } from "@/components/json-ld"
 import { MapPin, Phone, Mail, Clock, Building2, Send } from "lucide-react"
 
 export const metadata: Metadata = createPageMetadata({
@@ -64,6 +66,16 @@ const QUICK_CONTACT = [
 export default function ContactPage() {
   return (
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
+      {/* Both physical offices as RealEstateAgent entities — the addresses,
+          phones, and hours below are the same facts, made machine-readable. */}
+      <JsonLd
+        schema={[
+          ...OFFICES.map((o) =>
+            realEstateAgentOfficeSchema({ city: o.city, address: o.address, phone: o.phone, email: o.email }),
+          ),
+          breadcrumbList([{ name: "Home", path: "/" }, { name: "Contact" }]),
+        ]}
+      />
       {/* ── Hero ── */}
       <section className="relative bg-[#f7f5f1] border-b border-[#ebe7e0] overflow-hidden">
         {/* Skyline kept faint and to the right: texture behind the headline,

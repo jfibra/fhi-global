@@ -5,6 +5,8 @@ import Link from "next/link"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata, truncateDescription } from "@/lib/seo"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
+import { breadcrumbList, realEstateListingSchema } from "@/lib/structured-data"
+import { JsonLd } from "@/components/json-ld"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -183,48 +185,32 @@ export default async function ProjectDetailPage({ params }: Props) {
     project.total_units, project.number_of_buildings, project.floors,
     project.expected_roi, project.rental_yield, project.down_payment_percentage,
   ].filter(Boolean)
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
-  const listingSchema = {
-    "@context": "https://schema.org",
-    "@type": "RealEstateListing",
+  const listingSchema = realEstateListingSchema({
     name: project.name,
     description: project.meta_description || project.description || project.about_project || project.name,
-    url: `${siteUrl}/${developer.slug}/${project.slug}`,
-    image: [project.main_image, ...images.map((image) => image.image_url)].filter(Boolean),
-    offers: project.launch_price_from
-      ? {
-          "@type": "Offer",
-          priceCurrency: project.currency ?? "AED",
-          price: project.launch_price_from,
-        }
-      : undefined,
-    address: {
-      "@type": "PostalAddress",
-      addressLocality: project.city || undefined,
-      streetAddress: [project.location, project.community].filter(Boolean).join(", ") || undefined,
-      addressCountry: "AE",
-    },
-    geo: project.latitude && project.longitude
-      ? {
-          "@type": "GeoCoordinates",
-          latitude: project.latitude,
-          longitude: project.longitude,
-        }
-      : undefined,
-    seller: developer
-      ? {
-          "@type": "Organization",
-          name: developer.name,
-          url: developer.slug ? `${siteUrl}/${developer.slug}` : undefined,
-        }
-      : undefined,
-  }
+    path: `/${developer.slug}/${project.slug}`,
+    images: [project.main_image, ...images.map((image) => image.image_url)],
+    price: project.launch_price_from,
+    currency: project.currency,
+    city: project.city,
+    street: [project.location, project.community].filter(Boolean).join(", ") || null,
+    latitude: project.latitude,
+    longitude: project.longitude,
+    seller: { name: developer.name, path: developer.slug ? `/${developer.slug}` : null },
+  })
 
   return (
     <>
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(listingSchema) }}
+    <JsonLd
+      schema={[
+        listingSchema,
+        breadcrumbList([
+          { name: "Home", path: "/" },
+          { name: "Projects", path: "/projects" },
+          { name: developer.name, path: `/${developer.slug}` },
+          { name: project.name },
+        ]),
+      ]}
     />
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
       <div className="fixed top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-20 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />

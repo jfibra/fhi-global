@@ -5,6 +5,8 @@ import { AgentsGrid } from "./agents-grid"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { createPageMetadata } from "@/lib/seo"
 import { titleCaseName } from "@/lib/public-profile"
+import { breadcrumbList, personListSchema } from "@/lib/structured-data"
+import { JsonLd } from "@/components/json-ld"
 
 export const revalidate = 300
 
@@ -91,6 +93,13 @@ export default async function AgentsPage() {
 
   return (
     <div className="bg-[#f7f8fa]">
+      {/* The visible roster below, as Person entities. */}
+      <JsonLd
+        schema={[
+          personListSchema(agents.map((a) => ({ name: a.name, image: a.photo }))),
+          breadcrumbList([{ name: "Home", path: "/" }, { name: "Agents" }]),
+        ]}
+      />
       {/* ── Masthead ─────────────────────────────────────────────────── */}
       <section className="relative bg-[#001f3f] overflow-hidden">
         <Image

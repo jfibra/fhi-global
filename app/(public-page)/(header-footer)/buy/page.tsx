@@ -2,6 +2,8 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { Suspense } from "react"
 import { createPageMetadata } from "@/lib/seo"
+import { breadcrumbList } from "@/lib/structured-data"
+import { JsonLd } from "@/components/json-ld"
 import {
   deriveListings,
   listViewHrefFromSp,
@@ -253,6 +255,9 @@ export default async function BuyPage({ searchParams }: { searchParams: ListingS
     <div
       className={`relative min-h-screen font-sans ${view === "map" ? "bg-[#f6f7f9]" : "bg-[#faf8f4]"}`}
     >
+      {/* Breadcrumb only — the result list varies with searchParams inside
+          Suspense, so an ItemList here would misrepresent the page. */}
+      <JsonLd schema={breadcrumbList([{ name: "Home", path: "/" }, { name: "Buy" }])} />
       {view !== "map" && (
         <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full opacity-20 blur-[100px] -z-10 bg-[radial-gradient(circle,rgb(200,235,255)_0%,transparent_70%)]" />
       )}

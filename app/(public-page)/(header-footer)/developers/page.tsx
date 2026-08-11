@@ -4,6 +4,8 @@ import Link from "next/link"
 import { Suspense } from "react"
 import { getCachedDevelopersDirectory } from "@/lib/data/developers"
 import { createPageMetadata } from "@/lib/seo"
+import { breadcrumbList } from "@/lib/structured-data"
+import { JsonLd } from "@/components/json-ld"
 import { DeveloperCard, type DeveloperCardData } from "@/components/developer-card"
 import { DeveloperSearch } from "./developer-search"
 import { BuyFiltersLoader } from "@/app/(public-page)/(header-footer)/buy/buy-filters-loader"
@@ -175,6 +177,7 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
 
   return (
     <div className="relative min-h-screen bg-[#f6f7f9] font-sans overflow-x-hidden">
+      <JsonLd schema={breadcrumbList([{ name: "Home", path: "/" }, { name: "Developers" }])} />
       {/* Ambient blobs */}
       <div className="fixed top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-25 blur-[130px] -z-10 bg-[radial-gradient(circle,rgb(200,235,255)_0%,rgba(255,255,255,0)_70%)]" />
       <div className="fixed bottom-0 right-[-5%] w-[500px] h-[500px] rounded-full opacity-20 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(250,240,210)_0%,rgba(255,255,255,0)_70%)]" />

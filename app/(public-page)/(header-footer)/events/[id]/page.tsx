@@ -5,6 +5,8 @@ import { notFound } from "next/navigation"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata, truncateDescription } from "@/lib/seo"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
+import { breadcrumbList, eventSchema } from "@/lib/structured-data"
+import { JsonLd } from "@/components/json-ld"
 import { eventBrand } from "@/lib/events/brands"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
 import { EventRegisterForm } from "@/components/public/event-register-form"
@@ -96,6 +98,24 @@ export default async function EventDetailPage({ params }: Props) {
 
   return (
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
+      {/* Event entity (rich-result eligible) + the visible trail below. */}
+      <JsonLd
+        schema={[
+          eventSchema({
+            title: event.title,
+            description: event.description,
+            path: `/events/${event.slug ?? event.id}`,
+            imageUrl: event.image_url,
+            eventDate: event.event_date,
+            venue: event.venue,
+          }),
+          breadcrumbList([
+            { name: "Home", path: "/" },
+            { name: "Events", path: "/events" },
+            { name: event.title },
+          ]),
+        ]}
+      />
       <EventViewPing eventId={event.id} />
 
       {/* ── Hero — the WHOLE poster shown (contained) over a blurred backdrop ── */}

@@ -16,6 +16,8 @@ import { roleToLabel } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { pickUnit } from "@/lib/buy/listings-page-logic"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
+import { breadcrumbList, realEstateListingSchema } from "@/lib/structured-data"
+import { JsonLd } from "@/components/json-ld"
 import { mergedListingGalleryUrls } from "@/lib/listing-gallery-urls"
 import { ListingPhotoMosaic } from "@/components/public/listing-photo-mosaic"
 import { TopBar } from "@/components/topbar"
@@ -236,25 +238,32 @@ export default async function PublicAgentListingPage({ params }: Props) {
       </div>
 
       <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-16">
-        {/* Breadcrumbs — visible trail + BreadcrumbList structured data for SEO */}
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "BreadcrumbList",
-              itemListElement: [
-                { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
-                {
-                  "@type": "ListItem",
-                  position: 2,
-                  name: row.listing_kind === "rent" ? "Rent" : "Buy",
-                  item: `${SITE_URL.replace(/\/$/, "")}${backHref}`,
-                },
-                { "@type": "ListItem", position: 3, name: row.title },
-              ],
+        {/* Breadcrumbs — visible trail + BreadcrumbList structured data for
+            SEO, plus the listing entity itself (price/photos/location are all
+            on the page; the schema mirrors them). */}
+        <JsonLd
+          schema={[
+            breadcrumbList([
+              { name: "Home", path: "/" },
+              { name: row.listing_kind === "rent" ? "Rent" : "Buy", path: backHref },
+              { name: row.title },
+            ]),
+            realEstateListingSchema({
+              name: row.title,
+              description: row.description,
+              path: `/listings/${row.slug ?? row.id}`,
+              images: galleryUrls,
+              price: ownOk ?? proj?.launch_price_from,
+              currency: row.currency?.trim() || proj?.currency || "AED",
+              city: proj?.city,
+              street: [proj?.location].filter(Boolean).join(", ") || null,
+              latitude: proj?.latitude,
+              longitude: proj?.longitude,
+              seller: proj?.developers?.name
+                ? { name: proj.developers.name, path: proj.developers.slug ? `/${proj.developers.slug}` : null }
+                : { name: "FHI Global", path: "/" },
             }),
-          }}
+          ]}
         />
         <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1 text-sm text-[#6b7280] mb-5">
           <Link href="/" className="text-[#0f2940] hover:text-[#d6b357] transition-colors">
