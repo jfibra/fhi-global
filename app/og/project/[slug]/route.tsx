@@ -3,6 +3,12 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 
 export const runtime = "nodejs"
 
+// Without this header ImageResponse defaults to a YEAR of immutable caching —
+// scrapers would keep a stale card forever after the project's image or name
+// changes. 5 minutes matches app/og/business-card. (Being a fresh Response per
+// request, the constant is safe to share.)
+const CACHE_HEADERS = { "cache-control": "public, max-age=300, s-maxage=300" }
+
 export async function GET(_: Request, context: { params: Promise<{ slug: string }> }) {
   const { slug } = await context.params
   const supabase = createAdminSupabase()
@@ -17,7 +23,10 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
     .maybeSingle()
 
   const title = data?.name ?? "FHI Global Project"
-  const subtitle = [data?.developers?.[0]?.name, data?.city ?? data?.location].filter(Boolean).join(" • ")
+  // developers(name) is a to-one embed → an OBJECT, not an array; the old
+  // [0] access made the developer name silently vanish from every card.
+  const developerName = (data?.developers as unknown as { name?: string | null } | null)?.name
+  const subtitle = [developerName, data?.city ?? data?.location].filter(Boolean).join(" • ")
   const image = data?.main_image ?? "https://hefwmaoborpfuyhbguzv.supabase.co/storage/v1/object/public/fhi_global/fhi%20global.jpg"
 
   return new ImageResponse(
@@ -70,6 +79,6 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
         </div>
       </div>
     ),
-    { width: 1200, height: 630 },
+    { width: 1200, height: 630, headers: CACHE_HEADERS },
   )
 }

@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import type { BuyRawProject, ListingMarket } from "@/lib/buy/cached-projects"
 
@@ -146,11 +147,29 @@ async function fetchPublishedAgentListings(market: ListingMarket): Promise<{
   return { rows, error: false }
 }
 
+// Cross-request cache (see lib/buy/cached-projects.ts for the Turbopack
+// history). Failures THROW inside the cached fn so an error result is never
+// cached for 120s; the outer catch restores the { rows, error } contract.
+const getAgentListingsCachedByMarket = (market: ListingMarket) =>
+  unstable_cache(
+    async () => {
+      const result = await fetchPublishedAgentListings(market)
+      if (result.error) throw new Error(`[listings] agent-listings fetch failed (${market})`)
+      return result
+    },
+    [`public-agent-listings-${market}`],
+    { revalidate: 120, tags: ["agent-listings"] },
+  )
+
 export async function getPublicAgentListingsCached(market: ListingMarket): Promise<{
   rows: PublicAgentListingRow[]
   error: boolean
 }> {
-  return withDevTimeout(fetchPublishedAgentListings(market), { rows: [], error: true })
+  const fallback = { rows: [] as PublicAgentListingRow[], error: true }
+  return withDevTimeout(
+    getAgentListingsCachedByMarket(market)().catch(() => fallback),
+    fallback,
+  )
 }
 
 const UUID_RE =

@@ -1,5 +1,8 @@
 import type { Metadata } from "next"
 import Image from "next/image"
+import Link from "next/link"
+import { notFound } from "next/navigation"
+import { unstable_cache } from "next/cache"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
 import { breadcrumbList } from "@/lib/structured-data"
@@ -12,14 +15,12 @@ import { ProjectFilters } from "@/components/public/project-filters"
 import { Building2 } from "lucide-react"
 import { Suspense } from "react"
 
-export const metadata: Metadata = createPageMetadata({
-  title: "Real Estate Projects in Dubai",
-  description: "Browse premium off-plan and ready residential projects from top Dubai developers.",
-  pathname: "/projects",
-  keywords: ["Dubai projects", "off-plan properties Dubai", "ready properties UAE", "Dubai investment properties"],
-})
+// The full catalog rendered on one page shipped ~1.9 MB of HTML (half of it
+// RSC flight data duplicating the markup). 24 cards keeps the document a
+// crawlable, parseable size; the rest is reachable through real <a> links.
+const PAGE_SIZE = 24
 
-type SearchParams = Promise<{
+type SpValues = {
   q?: string
   developer?: string
   status?: string
@@ -27,10 +28,60 @@ type SearchParams = Promise<{
   featured?: string
   price_min?: string
   price_max?: string
-}>
+  page?: string
+}
+
+type SearchParams = Promise<SpValues>
+
+function parsePage(raw: string | undefined): number {
+  const n = Number.parseInt(raw ?? "1", 10)
+  return Number.isInteger(n) && n >= 1 ? n : 1
+}
+
+/** Pagination href that keeps every active filter and drops page=1. */
+function pageHref(sp: SpValues, page: number): string {
+  const p = new URLSearchParams()
+  for (const [k, v] of Object.entries(sp)) {
+    if (v && k !== "page") p.set(k, v)
+  }
+  if (page > 1) p.set("page", String(page))
+  const qs = p.toString()
+  return qs ? `/projects?${qs}` : "/projects"
+}
+
+export async function generateMetadata({ searchParams }: { searchParams: SearchParams }): Promise<Metadata> {
+  const { page } = await searchParams
+  const pageNum = parsePage(page)
+  // Self-canonical per page: canonicalizing everything to page 1 would orphan
+  // every project card beyond the first 24 from the crawl graph.
+  return createPageMetadata({
+    title: pageNum > 1 ? `Real Estate Projects in Dubai — Page ${pageNum}` : "Real Estate Projects in Dubai",
+    description: "Browse premium off-plan and ready residential projects from top Dubai developers.",
+    pathname: pageNum > 1 ? `/projects?page=${pageNum}` : "/projects",
+    keywords: ["Dubai projects", "off-plan properties Dubai", "ready properties UAE", "Dubai investment properties"],
+  })
+}
+
+// Filter facets change rarely; the route itself stays dynamic (searchParams),
+// so cache them at the data layer like lib/data/home.ts does.
+const getProjectFacets = unstable_cache(
+  async () => {
+    const supabase = createPublicSupabaseClient()
+    const [{ data: devOptions }, { data: cityOptions }] = await Promise.all([
+      supabase.from("developers").select("id, name").eq("is_active", true).order("name"),
+      supabase.from("projects").select("city").eq("is_active", true).not("city", "is", null),
+    ])
+    const uniqueCities = Array.from(new Set((cityOptions ?? []).map((r) => r.city).filter(Boolean))) as string[]
+    return { devOptions: devOptions ?? [], uniqueCities }
+  },
+  ["projects-facets"],
+  { revalidate: 120, tags: ["projects"] },
+)
 
 export default async function ProjectsPage({ searchParams }: { searchParams: SearchParams }) {
-  const { q, developer, status, city, featured, price_min, price_max } = await searchParams
+  const sp = await searchParams
+  const { q, developer, status, city, featured, price_min, price_max } = sp
+  const pageNum = parsePage(sp.page)
   const supabase = createPublicSupabaseClient()
 
   const priceMin = price_min ? Number(price_min) : null
@@ -38,18 +89,15 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
   const hasPriceMin = Number.isFinite(priceMin)
   const hasPriceMax = Number.isFinite(priceMax)
 
-  // Fetch filter options
-  const [{ data: devOptions }, { data: cityOptions }] = await Promise.all([
-    supabase.from("developers").select("id, name").eq("is_active", true).order("name"),
-    supabase.from("projects").select("city").eq("is_active", true).not("city", "is", null),
-  ])
+  const { devOptions, uniqueCities } = await getProjectFacets()
 
-  const uniqueCities = Array.from(new Set((cityOptions ?? []).map((r) => r.city).filter(Boolean))) as string[]
-
-  // Fetch projects
+  // Fetch one page of projects (+ the exact total for the pager).
   let query = supabase
     .from("projects")
-    .select("id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)")
+    .select(
+      "id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)",
+      { count: "exact" },
+    )
     .eq("is_active", true)
     .eq("is_published", true)
     .is("deleted_at", null)
@@ -63,7 +111,13 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
   if (hasPriceMin && priceMin !== null) query = query.gte("launch_price_from", priceMin)
   if (hasPriceMax && priceMax !== null) query = query.lte("launch_price_from", priceMax)
 
-  const { data: projects } = await query
+  const from = (pageNum - 1) * PAGE_SIZE
+  const { data: projects, count } = await query.range(from, from + PAGE_SIZE - 1)
+
+  const total = count ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  // Out-of-range pages 404 rather than serving an empty shell that indexes.
+  if (pageNum > 1 && (projects ?? []).length === 0) notFound()
 
   return (
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
@@ -120,8 +174,11 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
         {/* Count */}
         <div className="flex items-center gap-3 mt-6 mb-6">
           <span className="w-2 h-2 rounded-full bg-[#d6b357]" aria-hidden="true" />
-          <span className="text-[15px] font-bold text-[#0d1117]">{projects?.length ?? 0}</span>
-          <span className="text-[15px] text-[#6b7280]">project{(projects?.length ?? 0) !== 1 ? "s" : ""} found</span>
+          <span className="text-[15px] font-bold text-[#0d1117]">{total}</span>
+          <span className="text-[15px] text-[#6b7280]">
+            project{total !== 1 ? "s" : ""} found
+            {totalPages > 1 ? ` · page ${pageNum} of ${totalPages}` : ""}
+          </span>
         </div>
 
         {projects && projects.length > 0 ? (
@@ -138,6 +195,49 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
             <h3 className="font-['Outfit'] font-bold text-[#0d1117] text-xl mb-2">No projects found</h3>
             <p className="text-sm text-[#6b7280] max-w-xs">Try adjusting your filters or explore all available listings.</p>
           </div>
+        )}
+
+        {/* Pagination — real <a> links so every card page stays in the crawl
+            graph (this catalog used to render all ~185 cards in one 1.9 MB
+            document). Numbers are windowed around the current page. */}
+        {totalPages > 1 && (
+          <nav aria-label="Pagination" className="mt-10 flex flex-wrap items-center justify-center gap-2">
+            {pageNum > 1 && (
+              <Link
+                href={pageHref(sp, pageNum - 1)}
+                className="px-4 py-2 border border-[#e5e8ec] bg-white text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] transition-colors"
+              >
+                Previous
+              </Link>
+            )}
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((n) => n === 1 || n === totalPages || Math.abs(n - pageNum) <= 2)
+              .map((n, idx, arr) => (
+                <span key={n} className="flex items-center gap-2">
+                  {idx > 0 && arr[idx - 1] !== n - 1 && <span className="text-[#9ca3af]">…</span>}
+                  {n === pageNum ? (
+                    <span aria-current="page" className="px-4 py-2 bg-[#001f3f] text-sm font-bold text-white">
+                      {n}
+                    </span>
+                  ) : (
+                    <Link
+                      href={pageHref(sp, n)}
+                      className="px-4 py-2 border border-[#e5e8ec] bg-white text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] transition-colors"
+                    >
+                      {n}
+                    </Link>
+                  )}
+                </span>
+              ))}
+            {pageNum < totalPages && (
+              <Link
+                href={pageHref(sp, pageNum + 1)}
+                className="px-4 py-2 border border-[#e5e8ec] bg-white text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] transition-colors"
+              >
+                Next
+              </Link>
+            )}
+          </nav>
         )}
       </section>
 

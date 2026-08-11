@@ -279,8 +279,9 @@ export function Header() {
             <Image
               src="/FHI_Branding_White.png"
               alt="FHI Global"
-              width={200}
-              height={80}
+              // Intrinsic ratio is 2.72:1 (2269×835); h-15 renders ~163×60.
+              width={163}
+              height={60}
               className="object-contain h-15 w-auto"
               priority
             />
@@ -511,13 +512,14 @@ export function Header() {
           {/* Sidebar Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
             <Link href="/" onClick={() => setMobileOpen(false)}>
+              {/* No `priority`: this lives in the off-canvas drawer — an LCP
+                  preload for an invisible image competes with the real one. */}
               <Image
                 src="/FHI_Branding_White.png"
                 alt="FHI Global"
-                width={140}
-                height={42}
+                width={98}
+                height={36}
                 className="object-contain h-9 w-auto"
-                priority
               />
             </Link>
             <button

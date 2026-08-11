@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import type { ProjectListingType } from "@/lib/project-service"
 
@@ -118,13 +119,31 @@ function withDevTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
   })
 }
 
-/**
- * Loads published projects for /buy or /rent (filters run in memory on the page).
- * Avoids `unstable_cache` here — it interacted badly with Turbopack (stuck on "Compiling /buy").
- */
+// Cross-request cache, mirroring lib/data/home.ts. History: an earlier
+// unstable_cache here hung dev-mode Turbopack ("Compiling /buy" forever), so
+// it was stripped — but `next dev` has since been pinned to webpack and the
+// production Turbopack build is verified against this wrapper. Failures THROW
+// inside the cached fn so an error result is never cached for 120s; the outer
+// catch converts them back to the { rows: [], error: true } contract.
+const getBuyProjectsCachedByMarket = (market: ListingMarket) =>
+  unstable_cache(
+    async () => {
+      const result = await fetchBuyProjectsFromSupabase(market)
+      if (result.error) throw new Error(`[listings] buy-projects fetch failed (${market})`)
+      return result
+    },
+    [`buy-projects-${market}`],
+    { revalidate: 120, tags: ["buy-projects"] },
+  )
+
+/** Loads published projects for /buy or /rent (filters run in memory on the page). */
 export async function getListingPageProjectsCached(market: ListingMarket): Promise<{
   rows: BuyRawProject[]
   error: boolean
 }> {
-  return withDevTimeout(fetchBuyProjectsFromSupabase(market), { rows: [], error: true })
+  const fallback = { rows: [] as BuyRawProject[], error: true }
+  return withDevTimeout(
+    getBuyProjectsCachedByMarket(market)().catch(() => fallback),
+    fallback,
+  )
 }

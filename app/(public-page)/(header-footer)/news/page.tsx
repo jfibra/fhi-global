@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
-import { redirect } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { createPageMetadata, jsonLdScript, SITE_URL } from "@/lib/seo"
 import {
   fetchArticlesList,
@@ -14,15 +14,41 @@ import { ArrowRight, Clock, TrendingUp } from "lucide-react"
 
 export const revalidate = 300
 
-export const metadata: Metadata = createPageMetadata({
-  title: "Real Estate News & Insights",
-  description:
-    "Stay up to date with the latest real estate news, market trends, and investment insights from FHI Global.",
-  pathname: "/news",
-  keywords: ["Dubai real estate news", "UAE property updates", "FHI Global news", "property market insights"],
-})
+// 100 full article cards made this page ~940 KB of HTML for a fold that shows
+// five; 30 rows per page with real <a> pagination keeps every article
+// reachable at a fraction of the parse cost.
+const PAGE_SIZE = 30
 
-type SearchParams = Promise<{ title?: string; category?: string }>
+type SearchParams = Promise<{ title?: string; category?: string; page?: string }>
+
+function parsePage(raw: string | undefined): number {
+  const n = Number.parseInt(raw ?? "1", 10)
+  return Number.isInteger(n) && n >= 1 ? n : 1
+}
+
+/** Pagination href that keeps the category filter and drops page=1. */
+function newsPageHref(category: string | undefined, page: number): string {
+  const p = new URLSearchParams()
+  if (category) p.set("category", category)
+  if (page > 1) p.set("page", String(page))
+  const qs = p.toString()
+  return qs ? `/news?${qs}` : "/news"
+}
+
+export async function generateMetadata({ searchParams }: { searchParams: SearchParams }): Promise<Metadata> {
+  const { page } = await searchParams
+  const pageNum = parsePage(page)
+  // Self-canonical per page so the article links on deep pages stay in the
+  // crawl graph (category views canonicalize to the unfiltered list, as the
+  // static metadata always did).
+  return createPageMetadata({
+    title: pageNum > 1 ? `Real Estate News & Insights — Page ${pageNum}` : "Real Estate News & Insights",
+    description:
+      "Stay up to date with the latest real estate news, market trends, and investment insights from FHI Global.",
+    pathname: pageNum > 1 ? `/news?page=${pageNum}` : "/news",
+    keywords: ["Dubai real estate news", "UAE property updates", "FHI Global news", "property market insights"],
+  })
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function fmt(dateStr: string) {
@@ -119,17 +145,18 @@ function TrendingRow({ item, rank }: { item: NewsArticle; rank: number }) {
 }
 
 export default async function NewsPage({ searchParams }: { searchParams: SearchParams }) {
-  const { title, category } = await searchParams
+  const { title, category, page } = await searchParams
 
   if (title) {
     redirect(`/news/${slugify(title)}`)
   }
+  const pageNum = parsePage(page)
 
-  // One list call (per_page is capped at 100 upstream) + the category pairs
-  // that power the filter chips. Dedup by UUID id as a cheap guard.
+  // One paged list call + the category pairs that power the filter chips.
+  // Dedup by UUID id as a cheap guard.
   const activeCategory = typeof category === "string" && category.trim() ? category.trim() : undefined
-  const [{ articles: fetched }, categoryPairs] = await Promise.all([
-    fetchArticlesList({ page: 1, perPage: 100, categorySlug: activeCategory }),
+  const [{ articles: fetched, lastPage }, categoryPairs] = await Promise.all([
+    fetchArticlesList({ page: pageNum, perPage: PAGE_SIZE, categorySlug: activeCategory }),
     fetchCategoriesCountries(),
   ])
   const seen = new Set<string>()
@@ -137,6 +164,10 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
   for (const a of fetched) {
     if (!seen.has(a.id)) { seen.add(a.id); all.push(a) }
   }
+  // lastPage 0 is the upstream-failure sentinel; treat as a single page.
+  const totalPages = Math.max(1, lastPage || 1)
+  // Out-of-range pages 404 instead of serving an empty shell that indexes.
+  if (pageNum > 1 && all.length === 0) notFound()
 
   // Distinct categories (pairs are category × country) with summed counts.
   const categoryChips = [...categoryPairs
@@ -162,11 +193,12 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
   }
 
   // ── Slicing ──────────────────────────────────────────────────────────────
-  // One featured story, the rest as rows, and the five most recent as the
-  // sidebar's Trending list. `all` is already newest-first from upstream.
-  const latest = all[0] ?? null
-  const featured = all[0] ?? null
-  const listItems = all.slice(1)
+  // One featured story (page 1 only), the rest as rows, and the five most
+  // recent as the sidebar's Trending list. `all` is newest-first upstream.
+  const isFirstPage = pageNum === 1
+  const latest = isFirstPage ? all[0] ?? null : null
+  const featured = isFirstPage ? all[0] ?? null : null
+  const listItems = isFirstPage ? all.slice(1) : all
   const trending = all.slice(0, Math.min(5, all.length))
 
   // CollectionPage + ItemList structured data for the news hub.
@@ -359,6 +391,32 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
                   ))}
                 </div>
               </section>
+            )}
+
+            {/* Pagination — real <a> links keep the archive crawlable now that
+                the page renders 30 rows instead of the whole feed. */}
+            {totalPages > 1 && (
+              <nav aria-label="Pagination" className="flex flex-wrap items-center justify-center gap-2">
+                {pageNum > 1 && (
+                  <Link
+                    href={newsPageHref(activeCategory, pageNum - 1)}
+                    className="px-4 py-2 border border-[#e8eaed] bg-white text-sm font-semibold text-[#0d1117] hover:border-[#d6b357] transition-colors"
+                  >
+                    Newer
+                  </Link>
+                )}
+                <span className="px-2 text-sm text-[#6b7280]">
+                  Page {pageNum} of {totalPages}
+                </span>
+                {pageNum < totalPages && (
+                  <Link
+                    href={newsPageHref(activeCategory, pageNum + 1)}
+                    className="px-4 py-2 border border-[#e8eaed] bg-white text-sm font-semibold text-[#0d1117] hover:border-[#d6b357] transition-colors"
+                  >
+                    Older
+                  </Link>
+                )}
+              </nav>
             )}
 
           </main>

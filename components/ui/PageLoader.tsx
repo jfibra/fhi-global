@@ -74,9 +74,8 @@ export function PageLoader() {
           <Image
             src="/FHI_Branding_White.png"
             alt="FHI Global"
-            width={180}
+            width={163}
             height={60}
-            priority
             className="object-contain"
             style={{ width: 160, height: "auto" }}
           />

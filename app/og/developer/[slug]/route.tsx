@@ -3,6 +3,11 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 
 export const runtime = "nodejs"
 
+// Without this header ImageResponse defaults to a YEAR of immutable caching —
+// scrapers would keep a stale card forever after a rename or logo change.
+// 5 minutes matches app/og/business-card.
+const CACHE_HEADERS = { "cache-control": "public, max-age=300, s-maxage=300" }
+
 export async function GET(_: Request, context: { params: Promise<{ slug: string }> }) {
   const { slug } = await context.params
   const supabase = createAdminSupabase()
@@ -75,6 +80,6 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
         </div>
       </div>
     ),
-    { width: 1200, height: 630 },
+    { width: 1200, height: 630, headers: CACHE_HEADERS },
   )
 }

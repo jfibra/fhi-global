@@ -16,6 +16,11 @@ import ListingShareCard from "@/components/dashboard/listings/marketing/ListingS
 
 export const runtime = "nodejs"
 
+// Without this header ImageResponse defaults to a YEAR of immutable caching —
+// the page already versions this URL with ?v=updated_at, but scrapers that
+// strip params would keep a stale card forever. 5 min matches business-card.
+const CACHE_HEADERS = { "cache-control": "public, max-age=300, s-maxage=300" }
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 // The white FHI mark, memoized as a data URL — satori can't fetch relative
@@ -53,7 +58,7 @@ async function fallbackBrandCard() {
         </div>
       </div>
     ),
-    { width: OG_CARD_W, height: OG_CARD_H },
+    { width: OG_CARD_W, height: OG_CARD_H, headers: CACHE_HEADERS },
   )
 }
 
@@ -93,6 +98,6 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
 
   return new ImageResponse(
     <ListingShareCard data={card} options={options} photoSrc={photoSrc} logoSrc={await logoDataUrl()} />,
-    { width: OG_CARD_W, height: OG_CARD_H },
+    { width: OG_CARD_W, height: OG_CARD_H, headers: CACHE_HEADERS },
   )
 }

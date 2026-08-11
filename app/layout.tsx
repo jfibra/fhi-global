@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono, Outfit, Urbanist, Great_Vibes } from "next/font/google"
+import { Geist, Geist_Mono, Outfit } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { AppToaster } from "@/components/app-toaster"
 import "./globals.css"
@@ -9,12 +9,11 @@ import { PageTransitionWrapper } from "@/components/ui/PageTransitionWrapper"
 
 const _geist = Geist({ subsets: ["latin"], display: "swap", variable: "--font-geist" })
 const _geistMono = Geist_Mono({ subsets: ["latin"], display: "swap", variable: "--font-geist-mono" })
-// Outfit font for display headings (matches Figma design)
+// Outfit font for display headings (matches Figma design). Stays in the root
+// layout: public pages reference it via font-['Outfit'] literals.
+// Urbanist + Great Vibes (flyer/poster templates) are dashboard-only and load
+// from app/(users)/layout.tsx — public pages must not pay for them.
 const _outfit = Outfit({ subsets: ["latin"], display: "swap", variable: "--font-outfit" })
-// Urbanist — used by the marketing flyer / announcement templates.
-const _urbanist = Urbanist({ subsets: ["latin"], weight: ["800", "900"], display: "swap", variable: "--font-urbanist" })
-// Great Vibes — script accents on the award posters (Top Seller studio).
-const _greatVibes = Great_Vibes({ subsets: ["latin"], weight: ["400"], display: "swap", variable: "--font-script" })
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
@@ -71,9 +70,11 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <link rel="preconnect" href="https://hefwmaoborpfuyhbguzv.supabase.co" crossOrigin="anonymous" />
-        <link rel="preload" as="image" href="/FHI_Branding_White.png" />
+        {/* No raw logo preload here: every render goes through next/image's
+            /_next/image URLs, so a preload of the original never matches — it
+            just downloads 156 KB at high priority on every page and drops it. */}
       </head>
-      <body className={`${_geist.variable} ${_geistMono.variable} ${_outfit.variable} ${_urbanist.variable} ${_greatVibes.variable} font-sans antialiased`}>
+      <body className={`${_geist.variable} ${_geistMono.variable} ${_outfit.variable} font-sans antialiased`}>
         <PageTransitionWrapper>{children}</PageTransitionWrapper>
         <AppToaster />
         <Analytics />

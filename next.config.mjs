@@ -185,7 +185,10 @@ const nextConfig = {
   images: {
     unoptimized: false,
     formats: ["image/avif", "image/webp"],
-    minimumCacheTTL: 300,
+    // Optimized-image cache lifetime. Storage objects here are immutable-named
+    // (uploads get unique keys), so re-validating every 5 minutes just re-ran
+    // the optimizer constantly; 31 days is the Next default for a reason.
+    minimumCacheTTL: 2678400,
     // Next.js 16: any <Image quality={n}> must be listed here or rendering can warn/fail
     qualities: [75, 80],
     deviceSizes: [400, 640, 750, 828, 1080, 1200, 1600, 1920],
