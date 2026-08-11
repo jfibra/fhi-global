@@ -15,6 +15,22 @@ const GOLD = "#d6b357"
 const NAVY = "#001f3f"
 const INK = "#0a1628"
 
+type PosterColors = { gold: string; navy: string; bg: string }
+const DEFAULT_COLORS: PosterColors = { gold: GOLD, navy: NAVY, bg: "#0d1522" }
+const COLOR_FIELDS: { key: keyof PosterColors; label: string }[] = [
+  { key: "gold", label: "Gold accent" },
+  { key: "navy", label: "Navy" },
+  { key: "bg", label: "Background" },
+]
+
+function mixHex(a: string, b: string, t: number): string {
+  const ch = (h: string, i: number) => parseInt(h.replace("#", "").slice(i, i + 2), 16)
+  const mix = (i: number) => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * t).toString(16).padStart(2, "0")
+  return `#${mix(0)}${mix(2)}${mix(4)}`
+}
+const goldGrad = (gold: string) =>
+  `linear-gradient(120deg, ${mixHex(gold, "#ffffff", 0.45)}, ${gold} 45%, ${mixHex(gold, "#000000", 0.3)})`
+
 const POSTER_W = 1080
 const POSTER_H = 1350
 const DESIGN_SIZES: Partial<Record<DesignId, { w: number; h: number }>> = {
@@ -46,7 +62,7 @@ const LOGO_OPTIONS: LogoOption[] = [
   { id: "rentsouq", name: "Rentsouq AE", src: "/logos/rentsouq-transparent.png", lightSrc: "/logos/rentsouq-transparent.png", whiteArt: true },
 ]
 
-function LogoRow({ logos, dark, size, stack }: { logos: LogoOption[]; dark: boolean; size: number; stack?: boolean }) {
+function LogoRow({ logos, dark, size, stack, navy = NAVY }: { logos: LogoOption[]; dark: boolean; size: number; stack?: boolean; navy?: string }) {
   if (logos.length === 0) return null
   return (
     <div className={stack ? "flex flex-col items-end" : "flex items-center"} style={{ gap: stack ? 18 : 0 }}>
@@ -57,7 +73,7 @@ function LogoRow({ logos, dark, size, stack }: { logos: LogoOption[]; dark: bool
         return (
           <Fragment key={l.id}>
             {chip ? (
-              <span className="flex items-center px-3 py-1.5" style={{ backgroundColor: dark ? "#f6f4ee" : NAVY }}>
+              <span className="flex items-center px-3 py-1.5" style={{ backgroundColor: dark ? "#f6f4ee" : navy }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={src} alt={l.name} style={{ height: Math.round(hgt * 0.7), width: "auto" }} />
               </span>
@@ -91,14 +107,23 @@ type Speaker = SpeakerOption & { role: string; topic: string }
 
 type PosterData = {
   title: string
+  titleColor?: string
   subtitle: string
+  subtitleColor?: string
   tagline: string
+  taglineColor?: string
   date: string
+  dateColor?: string
   time: string
+  timeColor?: string
   venue: string
+  venueColor?: string
   topics: string
+  topicsColor?: string
   contactPhone: string
+  contactPhoneColor?: string
   contactEmail: string
+  contactEmailColor?: string
   background: string
 }
 
@@ -122,18 +147,19 @@ type PosterProps = {
   h: number
   logos: LogoOption[]
   light: boolean
+  colors: PosterColors
 }
 
-function DetailRow({ data, light, size = 21 }: { data: PosterData; light?: boolean; size?: number }) {
+function DetailRow({ data, light, size = 21, gold = GOLD, navy = NAVY }: { data: PosterData; light?: boolean; size?: number; gold?: string; navy?: string }) {
   const items = [
-    { icon: CalendarDays, text: data.date },
-    { icon: Clock, text: data.time },
-    { icon: MapPin, text: data.venue },
+    { icon: CalendarDays, text: data.date, color: data.dateColor },
+    { icon: Clock, text: data.time, color: data.timeColor },
+    { icon: MapPin, text: data.venue, color: data.venueColor },
   ].filter((c) => c.text.trim())
   if (items.length === 0) return null
   return (
     <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2">
-      {items.map(({ icon: Icon, text }, i) => {
+      {items.map(({ icon: Icon, text, color }, i) => {
         const [first, ...rest] = text.split("\n")
         return (
           <div
@@ -141,11 +167,11 @@ function DetailRow({ data, light, size = 21 }: { data: PosterData; light?: boole
             className="flex min-w-0 items-center gap-3"
             style={i < items.length - 1 ? { paddingRight: 32, borderRight: `1px solid ${light ? "rgba(0,31,63,0.18)" : "rgba(255,255,255,0.18)"}` } : undefined}
           >
-            <Icon className="shrink-0" style={{ color: GOLD, width: size + 4, height: size + 4 }} strokeWidth={1.8} />
+            <Icon className="shrink-0" style={{ color: gold, width: size + 4, height: size + 4 }} strokeWidth={1.8} />
             <span className="min-w-0">
-              <span className="block truncate font-semibold leading-tight" style={{ fontSize: size, color: light ? NAVY : "#ffffff" }}>{first}</span>
+              <span className="block truncate font-semibold leading-tight" style={{ fontSize: size, color: color ?? (light ? navy : "#ffffff") }}>{first}</span>
               {rest.length > 0 && (
-                <span className="block truncate font-semibold leading-tight" style={{ fontSize: size * 0.72, color: light ? `${NAVY}99` : "rgba(255,255,255,0.6)" }}>{rest.join(" ")}</span>
+                <span className="block truncate font-semibold leading-tight" style={{ fontSize: size * 0.72, color: color ?? (light ? `${navy}99` : "rgba(255,255,255,0.6)") }}>{rest.join(" ")}</span>
               )}
             </span>
           </div>
@@ -177,10 +203,13 @@ function SpeakerPhoto({ s, className }: { s: Speaker; className?: string }) {
   )
 }
 
-function CollagePoster({ data, speakers, w, logos, light }: PosterProps) {
+function CollagePoster({ data, speakers, w, logos, light, colors }: PosterProps) {
+  const GOLD = colors.gold
+  const NAVY = colors.navy
+  const INK = colors.bg
   const ink = light ? NAVY : "#ffffff"
   const subInk = light ? "#3c4451" : "rgba(255,255,255,0.85)"
-  const PANEL = light ? "#ffffff" : "#0f1b2d"
+  const PANEL = light ? "#ffffff" : mixHex(colors.bg, "#ffffff", 0.05)
   const count = Math.max(1, speakers.length)
   const perRow = count === 4 ? 2 : Math.min(count, 3)
   const tileW = count <= 1 ? 440 : perRow === 2 ? 380 : 290
@@ -204,14 +233,14 @@ function CollagePoster({ data, speakers, w, logos, light }: PosterProps) {
             <LogoRow logos={logos} dark={!light} size={84} />
             <div className="mt-5">
               {titleLines.map((line, i) => (
-                <p key={i} className="text-[76px] font-black leading-[1.02] tracking-tight" style={{ color: ink }}>
+                <p key={i} className="text-[76px] font-black leading-[1.02] tracking-tight" style={{ color: data.titleColor ?? ink }}>
                   {line}
                 </p>
               ))}
             </div>
             <div className="mt-2 h-[7px] w-[420px] max-w-full" style={{ backgroundColor: GOLD }} />
             {data.subtitle && (
-              <p className="mt-5 max-w-[780px] whitespace-pre-line text-[22px] leading-relaxed" style={{ color: subInk }}>
+              <p className="mt-5 max-w-[780px] whitespace-pre-line text-[22px] leading-relaxed" style={{ color: data.subtitleColor ?? subInk }}>
                 {data.subtitle}
               </p>
             )}
@@ -270,62 +299,61 @@ function CollagePoster({ data, speakers, w, logos, light }: PosterProps) {
       </div>
 
       <div className="relative px-12" style={{ marginTop: 40 }}>
-        <GoldFooterBar data={data} light={light} />
+        <GoldFooterBar data={data} light={light} gold={GOLD} navy={NAVY} />
       </div>
     </div>
   )
 }
 
-const FOOTER_DIVIDER = { paddingLeft: 26, marginLeft: 26, borderLeft: "1.5px solid #d6b35733" } as const
-
-function GoldFooterBar({ data, marginTop = 0, light }: { data: PosterData; marginTop?: number; light?: boolean }) {
-  const ink = light ? NAVY : "#ffffff"
+function GoldFooterBar({ data, marginTop = 0, light, gold = GOLD, navy = NAVY }: { data: PosterData; marginTop?: number; light?: boolean; gold?: string; navy?: string }) {
+  const ink = light ? navy : "#ffffff"
   const subInk = light ? "#3c4451" : "rgba(255,255,255,0.8)"
+  const divider = { paddingLeft: 26, marginLeft: 26, borderLeft: `1.5px solid ${gold}33` } as const
   const details = [
-    { icon: CalendarDays, text: data.date },
-    { icon: Clock, text: data.time },
-    { icon: MapPin, text: data.venue },
+    { icon: CalendarDays, text: data.date, color: data.dateColor },
+    { icon: Clock, text: data.time, color: data.timeColor },
+    { icon: MapPin, text: data.venue, color: data.venueColor },
   ].filter((d) => d.text.trim())
   return (
     <div
       className="flex w-full items-center justify-center"
-      style={{ borderTop: `1px solid ${GOLD}44`, marginTop, paddingTop: 18, paddingBottom: 22, minHeight: 96 }}
+      style={{ borderTop: `1px solid ${gold}44`, marginTop, paddingTop: 18, paddingBottom: 22, minHeight: 96 }}
     >
-      {details.map(({ icon: Icon, text }, i) => {
+      {details.map(({ icon: Icon, text, color }, i) => {
         const [first, ...rest] = text.split("\n")
         return (
-          <div key={`d-${i}`} className="flex items-center gap-3.5" style={i > 0 ? FOOTER_DIVIDER : undefined}>
-            <span className="flex shrink-0 items-center justify-center rounded-[10px] border-2" style={{ width: 46, height: 46, borderColor: GOLD }}>
-              <Icon style={{ color: GOLD, width: 24, height: 24 }} strokeWidth={1.9} />
+          <div key={`d-${i}`} className="flex items-center gap-3.5" style={i > 0 ? divider : undefined}>
+            <span className="flex shrink-0 items-center justify-center rounded-[10px] border-2" style={{ width: 46, height: 46, borderColor: gold }}>
+              <Icon style={{ color: gold, width: 24, height: 24 }} strokeWidth={1.9} />
             </span>
             <span className="min-w-0">
-              <span className="block truncate text-[19px] font-extrabold uppercase leading-tight" style={{ color: ink }}>{first}</span>
+              <span className="block truncate text-[19px] font-extrabold uppercase leading-tight" style={{ color: color ?? ink }}>{first}</span>
               {rest.length > 0 && (
-                <span className="block truncate text-[14px] font-semibold uppercase leading-tight" style={{ color: subInk }}>{rest.join(" ")}</span>
+                <span className="block truncate text-[14px] font-semibold uppercase leading-tight" style={{ color: color ?? subInk }}>{rest.join(" ")}</span>
               )}
             </span>
           </div>
         )
       })}
       {data.contactPhone && (
-        <div className="flex min-w-0 items-center gap-3.5" style={details.length > 0 ? FOOTER_DIVIDER : undefined}>
-          <span className="flex shrink-0 items-center justify-center rounded-full border-2" style={{ width: 46, height: 46, borderColor: GOLD }}>
-            <Phone style={{ color: GOLD, width: 20, height: 20 }} strokeWidth={1.8} />
+        <div className="flex min-w-0 items-center gap-3.5" style={details.length > 0 ? divider : undefined}>
+          <span className="flex shrink-0 items-center justify-center rounded-full border-2" style={{ width: 46, height: 46, borderColor: gold }}>
+            <Phone style={{ color: gold, width: 20, height: 20 }} strokeWidth={1.8} />
           </span>
           <span className="min-w-0">
-            <span className="block text-[15px] font-bold uppercase" style={{ color: ink }}>Contact Us</span>
-            <span className="block truncate text-[15px] font-semibold" style={{ color: subInk }}>{data.contactPhone}</span>
+            <span className="block text-[15px] font-bold uppercase" style={{ color: data.contactPhoneColor ?? ink }}>Contact Us</span>
+            <span className="block truncate text-[15px] font-semibold" style={{ color: data.contactPhoneColor ?? subInk }}>{data.contactPhone}</span>
           </span>
         </div>
       )}
       {data.contactEmail && (
-        <div className="flex min-w-0 items-center gap-3.5" style={details.length > 0 || data.contactPhone ? FOOTER_DIVIDER : undefined}>
-          <span className="flex shrink-0 items-center justify-center rounded-full border-2" style={{ width: 46, height: 46, borderColor: GOLD }}>
-            <Mail style={{ color: GOLD, width: 20, height: 20 }} strokeWidth={1.8} />
+        <div className="flex min-w-0 items-center gap-3.5" style={details.length > 0 || data.contactPhone ? divider : undefined}>
+          <span className="flex shrink-0 items-center justify-center rounded-full border-2" style={{ width: 46, height: 46, borderColor: gold }}>
+            <Mail style={{ color: gold, width: 20, height: 20 }} strokeWidth={1.8} />
           </span>
           <span className="min-w-0">
-            <span className="block text-[15px] font-bold uppercase" style={{ color: ink }}>Email Us</span>
-            <span className="block truncate text-[15px] font-semibold" style={{ color: subInk }}>{data.contactEmail}</span>
+            <span className="block text-[15px] font-bold uppercase" style={{ color: data.contactEmailColor ?? ink }}>Contact Us</span>
+            <span className="block truncate text-[15px] font-semibold" style={{ color: data.contactEmailColor ?? subInk }}>{data.contactEmail}</span>
           </span>
         </div>
       )}
@@ -333,9 +361,11 @@ function GoldFooterBar({ data, marginTop = 0, light }: { data: PosterData; margi
   )
 }
 
-function MeetingPoster({ data, speakers, w, logos, light }: PosterProps) {
-  const BG = light ? "#f6f4ef" : "#0d1522"
-  const PANEL = light ? "#ffffff" : "#0f1b2d"
+function MeetingPoster({ data, speakers, w, logos, light, colors }: PosterProps) {
+  const GOLD = colors.gold
+  const NAVY = colors.navy
+  const BG = light ? "#f6f4ef" : colors.bg
+  const PANEL = light ? "#ffffff" : mixHex(colors.bg, "#ffffff", 0.05)
   const ink = light ? NAVY : "#ffffff"
   const subInk = light ? "#3c4451" : "rgba(255,255,255,0.85)"
   const titleLines = data.title.split("\n").filter(Boolean)
@@ -420,18 +450,18 @@ function MeetingPoster({ data, speakers, w, logos, light }: PosterProps) {
     <>
       <h1 className="font-black uppercase tracking-tight" style={{ lineHeight: 0.98, fontSize: 100 }}>
         {titleLines.map((line, i) => (
-          <span key={i} className="block" style={{ color: i % 2 === 1 ? GOLD : ink }}>{line}</span>
+          <span key={i} className="block" style={{ color: data.titleColor ?? (i % 2 === 1 ? GOLD : ink) }}>{line}</span>
         ))}
       </h1>
       {data.tagline && (
-        <p className="mt-4 font-bold uppercase" style={{ color: ink, letterSpacing: "0.2em", fontSize: 22 }}>
+        <p className="mt-4 font-bold uppercase" style={{ color: data.taglineColor ?? ink, letterSpacing: "0.2em", fontSize: 22 }}>
           {data.tagline.split("\n").join(" ")}
         </p>
       )}
       {desc && (
         <p
           className="mt-5 whitespace-pre-line leading-relaxed"
-          style={{ color: subInk, fontSize: 22, maxWidth: 640, borderLeft: `3px solid ${GOLD}`, paddingLeft: 20 }}
+          style={{ color: data.subtitleColor ?? subInk, fontSize: 22, maxWidth: 640, borderLeft: `3px solid ${GOLD}`, paddingLeft: 20 }}
         >
           {desc}
         </p>
@@ -473,17 +503,18 @@ function MeetingPoster({ data, speakers, w, logos, light }: PosterProps) {
           {speakerCards}
         </div>
 
-        <GoldFooterBar data={data} marginTop={30} light={light} />
+        <GoldFooterBar data={data} marginTop={30} light={light} gold={GOLD} navy={NAVY} />
       </div>
     </div>
   )
 }
 
-const INVITE_GOLD_GRAD = `linear-gradient(120deg, #f0d99b, ${GOLD} 45%, #a97e2f)`
-
-function InvitePoster({ data, speakers, w, logos, light }: PosterProps) {
+function InvitePoster({ data, speakers, w, logos, light, colors }: PosterProps) {
+  const GOLD = colors.gold
+  const NAVY = colors.navy
+  const GRAD = goldGrad(GOLD)
   const SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif"
-  const BG = light ? "#f6f4ef" : "#0a1424"
+  const BG = light ? "#f6f4ef" : colors.bg
   const ink = light ? NAVY : "#ffffff"
   const sub = light ? "#3c4451" : "rgba(255,255,255,0.82)"
   const n = speakers.length
@@ -521,7 +552,7 @@ function InvitePoster({ data, speakers, w, logos, light }: PosterProps) {
         {circle(speakers[0], 310)}
         <span
           className="-mt-5 px-7 py-1.5 text-[15px] font-extrabold uppercase tracking-[0.2em]"
-          style={{ background: INVITE_GOLD_GRAD, color: "#0a1424", borderRadius: 999 }}
+          style={{ background: GRAD, color: "#0a1424", borderRadius: 999 }}
         >
           Speaker
         </span>
@@ -566,7 +597,7 @@ function InvitePoster({ data, speakers, w, logos, light }: PosterProps) {
         {topics.map((t, i) => (
           <div key={i} className="flex items-center gap-2.5">
             <CheckCircle2 className="shrink-0" style={{ color: GOLD, width: 21, height: 21 }} strokeWidth={2} />
-            <span className="text-[15.5px] font-semibold leading-snug" style={{ color: ink }}>{t}</span>
+            <span className="text-[15.5px] font-semibold leading-snug" style={{ color: data.topicsColor ?? ink }}>{t}</span>
           </div>
         ))}
       </div>
@@ -584,7 +615,7 @@ function InvitePoster({ data, speakers, w, logos, light }: PosterProps) {
           boxShadow: light ? "0 16px 32px -20px rgba(0,31,63,0.35)" : "0 16px 32px -20px rgba(0,0,0,0.55)",
         }}
       >
-        <DetailRow data={data} light={light} size={20} />
+        <DetailRow data={data} light={light} size={20} gold={GOLD} navy={NAVY} />
       </div>
     </div>
   )
@@ -602,12 +633,12 @@ function InvitePoster({ data, speakers, w, logos, light }: PosterProps) {
         <Globe style={{ color: GOLD, width: 17, height: 17 }} strokeWidth={1.8} /> www.fhiglobal.ae
       </span>
       {data.contactEmail && (
-        <span className="flex items-center gap-2.5 text-[14.5px] font-semibold text-white/90" style={{ paddingLeft: 36, borderLeft: `1px solid ${GOLD}44` }}>
+        <span className="flex items-center gap-2.5 text-[14.5px] font-semibold text-white/90" style={{ paddingLeft: 36, borderLeft: `1px solid ${GOLD}44`, color: data.contactEmailColor }}>
           <Mail style={{ color: GOLD, width: 17, height: 17 }} strokeWidth={1.8} /> {data.contactEmail}
         </span>
       )}
       {data.contactPhone && (
-        <span className="flex items-center gap-2.5 text-[14.5px] font-semibold text-white/90" style={{ paddingLeft: 36, borderLeft: `1px solid ${GOLD}44` }}>
+        <span className="flex items-center gap-2.5 text-[14.5px] font-semibold text-white/90" style={{ paddingLeft: 36, borderLeft: `1px solid ${GOLD}44`, color: data.contactPhoneColor }}>
           <Phone style={{ color: GOLD, width: 17, height: 17 }} strokeWidth={1.8} /> {data.contactPhone}
         </span>
       )}
@@ -624,15 +655,15 @@ function InvitePoster({ data, speakers, w, logos, light }: PosterProps) {
             key={i}
             className="block font-bold uppercase"
             style={i === titleLines.length - 1 && titleLines.length > 1
-              ? { color: GOLD, fontSize: 104, letterSpacing: "0.02em", marginTop: 2 }
-              : { color: ink, fontSize: 46, letterSpacing: "0.3em", marginTop: 10 }}
+              ? { color: data.titleColor ?? GOLD, fontSize: 104, letterSpacing: "0.02em", marginTop: 2 }
+              : { color: data.titleColor ?? ink, fontSize: 46, letterSpacing: "0.3em", marginTop: 10 }}
           >
             {line}
           </span>
         ))}
       </h1>
       {data.tagline && (
-        <p className="mt-3 text-[17px] font-bold uppercase" style={{ color: ink, letterSpacing: "0.16em" }}>
+        <p className="mt-3 text-[17px] font-bold uppercase" style={{ color: data.taglineColor ?? ink, letterSpacing: "0.16em" }}>
           {data.tagline.split("\n").join(" ")}
         </p>
       )}
@@ -665,7 +696,7 @@ function InvitePoster({ data, speakers, w, logos, light }: PosterProps) {
       {n > 0 && (
         <span
           className="absolute z-10 px-6 py-2 text-[16px] font-extrabold uppercase tracking-[0.12em]"
-          style={{ top: 26, left: 26, background: INVITE_GOLD_GRAD, color: "#0a1424", clipPath: "polygon(0 0, 100% 0, calc(100% - 14px) 50%, 100% 100%, 0 100%)" }}
+          style={{ top: 26, left: 26, background: GRAD, color: "#0a1424", clipPath: "polygon(0 0, 100% 0, calc(100% - 14px) 50%, 100% 100%, 0 100%)" }}
         >
           {n} Speaker{n > 1 ? "s" : ""}
         </span>
@@ -691,9 +722,12 @@ function InvitePoster({ data, speakers, w, logos, light }: PosterProps) {
   )
 }
 
-function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
+function PremierPoster({ data, speakers, w, h, logos, light, colors }: PosterProps) {
+  const GOLD = colors.gold
+  const NAVY = colors.navy
+  const GRAD = goldGrad(GOLD)
   const SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif"
-  const BG = light ? "#f6f4ef" : "#0a1220"
+  const BG = light ? "#f6f4ef" : colors.bg
   const ink = light ? NAVY : "#ffffff"
   const subInk = light ? "#3c4451" : "rgba(255,255,255,0.75)"
   const n = speakers.length
@@ -702,9 +736,9 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
   const photo = data.background || "/background/dubai.webp"
 
   const details = [
-    { icon: CalendarDays, text: data.date },
-    { icon: Clock, text: data.time },
-    { icon: MapPin, text: data.venue },
+    { icon: CalendarDays, text: data.date, color: data.dateColor },
+    { icon: Clock, text: data.time, color: data.timeColor },
+    { icon: MapPin, text: data.venue, color: data.venueColor },
   ].filter((d) => d.text.trim())
 
   const rows = speakerRows(speakers)
@@ -738,7 +772,7 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
       {n > 0 && (
         <span
           className="absolute z-10 px-7 py-2.5 text-[17px] font-extrabold uppercase tracking-[0.14em]"
-          style={{ top: 30, left: 0, background: `linear-gradient(120deg, #f0d99b, ${GOLD} 45%, #a97e2f)`, color: "#0a1220", clipPath: "polygon(0 0, 100% 0, calc(100% - 18px) 50%, 100% 100%, 0 100%)" }}
+          style={{ top: 30, left: 0, background: GRAD, color: BG, clipPath: "polygon(0 0, 100% 0, calc(100% - 18px) 50%, 100% 100%, 0 100%)" }}
         >
           {n} Speaker{n > 1 ? "s" : ""}
         </span>
@@ -758,8 +792,8 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
                   key={i}
                   className="block font-bold uppercase"
                   style={i === titleLines.length - 1 && titleLines.length > 1
-                    ? { color: GOLD, fontSize: 150, letterSpacing: "0.02em", marginTop: 6 }
-                    : { color: ink, fontSize: 82, letterSpacing: "0.18em", marginTop: 24 }}
+                    ? { color: data.titleColor ?? GOLD, fontSize: 150, letterSpacing: "0.02em", marginTop: 6 }
+                    : { color: data.titleColor ?? ink, fontSize: 82, letterSpacing: "0.18em", marginTop: 24 }}
                 >
                   {line}
                 </span>
@@ -768,7 +802,7 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
             {data.tagline && (
               <div className="mt-7 flex items-center gap-4">
                 {goldDash}
-                <p className="text-[27px] font-bold uppercase" style={{ color: ink, letterSpacing: "0.1em" }}>
+                <p className="text-[27px] font-bold uppercase" style={{ color: data.taglineColor ?? ink, letterSpacing: "0.1em" }}>
                   {data.tagline.split("\n").join(" ")}
                 </p>
                 {goldDash}
@@ -777,14 +811,14 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
 
             {details.length > 0 && (
               <div className="mt-14 flex items-center">
-                {details.map(({ icon: Icon, text }, i) => {
+                {details.map(({ icon: Icon, text, color }, i) => {
                   const [first, ...rest] = text.split("\n")
                   return (
                     <div key={i} className="flex items-center gap-4" style={i > 0 ? { paddingLeft: 30, marginLeft: 30, borderLeft: `1.5px solid ${GOLD}55` } : undefined}>
                       <Icon className="shrink-0" style={{ color: GOLD, width: 46, height: 46 }} strokeWidth={1.7} />
                       <span className="min-w-0">
-                        <span className="block truncate text-[24px] font-extrabold uppercase leading-tight" style={{ color: ink }}>{first}</span>
-                        {rest.length > 0 && <span className="block truncate text-[18px] font-semibold uppercase leading-tight" style={{ color: subInk }}>{rest.join(" ")}</span>}
+                        <span className="block truncate text-[24px] font-extrabold uppercase leading-tight" style={{ color: color ?? ink }}>{first}</span>
+                        {rest.length > 0 && <span className="block truncate text-[18px] font-semibold uppercase leading-tight" style={{ color: color ?? subInk }}>{rest.join(" ")}</span>}
                       </span>
                     </div>
                   )
@@ -805,7 +839,7 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
                   {topics.map((t, i) => (
                     <div key={i} className="flex items-center gap-3">
                       <CheckCircle2 className="shrink-0" style={{ color: GOLD, width: 28, height: 28 }} strokeWidth={2} />
-                      <span className="text-[21px] font-semibold leading-snug" style={{ color: ink }}>{t}</span>
+                      <span className="text-[21px] font-semibold leading-snug" style={{ color: data.topicsColor ?? ink }}>{t}</span>
                     </div>
                   ))}
                 </div>
@@ -836,7 +870,7 @@ function PremierPoster({ data, speakers, w, h, logos, light }: PosterProps) {
                             </div>
                             <span
                               className="absolute bottom-0 left-1/2 block w-[88%] -translate-x-1/2 px-4 py-2.5 text-center text-[19px] font-extrabold uppercase leading-tight"
-                              style={{ background: `linear-gradient(120deg, #f0d99b, ${GOLD} 45%, #a97e2f)`, color: "#0a1220", borderRadius: 8 }}
+                              style={{ background: GRAD, color: BG, borderRadius: 8 }}
                             >
                               {sp.name}
                             </span>
@@ -877,12 +911,39 @@ function Poster({ design, ...props }: PosterProps & { design: DesignId }) {
 const INPUT_CLS =
   "w-full border border-[#e2e6ea] bg-white px-3 py-2 text-[13px] text-[#0d1117] outline-none transition-colors focus:border-[#001f3f]"
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, action, children }: { label: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#6b7280]">{label}</span>
+      <span className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-wide text-[#6b7280]">{label}</span>
+        {action}
+      </span>
       {children}
     </label>
+  )
+}
+
+function TextColor({ value, onChange }: { value?: string; onChange: (v: string | undefined) => void }) {
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      <input
+        type="color"
+        value={value ?? "#ffffff"}
+        onChange={(e) => onChange(e.target.value)}
+        title="Text color on the poster"
+        className="h-5 w-8 cursor-pointer border border-[#e2e6ea] bg-white p-0"
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); onChange(undefined) }}
+          title="Reset to design color"
+          className="text-[11px] font-bold text-[#9aa0aa] hover:text-[#0d1117]"
+        >
+          ×
+        </button>
+      )}
+    </span>
   )
 }
 
@@ -891,6 +952,7 @@ export function MeetingPosterClient() {
   const [speakers, setSpeakers] = useState<Speaker[]>([])
   const [design, setDesign] = useState<DesignId>("meeting")
   const [theme, setTheme] = useState<"dark" | "light">("dark")
+  const [globalColors, setGlobalColors] = useState<PosterColors>(DEFAULT_COLORS)
   const [logoIds, setLogoIds] = useState<string[]>(["fhiglobal", "filipinohomes"])
   const [logoScales, setLogoScales] = useState<Record<string, number>>({})
   const [logoScaleAll, setLogoScaleAll] = useState(100)
@@ -1058,25 +1120,43 @@ export function MeetingPosterClient() {
             ))}
           </div>
         </div>
-        <div>
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#6b7280]">Theme</p>
-          <div className="flex gap-2">
-            {(["dark", "light"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTheme(t)}
-                className={`flex items-center gap-2.5 border p-2 pr-3 text-left transition-colors ${
-                  theme === t ? "border-[#001f3f] bg-[#eef3f9]" : "border-[#e8eaed] bg-white hover:border-[#9aa0aa]"
-                }`}
-              >
-                <span
-                  className="h-9 w-9 shrink-0 border border-black/10"
-                  style={{ background: t === "dark" ? "linear-gradient(180deg,#0d1522,#050a12)" : "linear-gradient(160deg,#f6f4ef,#e9e2d2)" }}
-                />
-                <span className="block text-[12.5px] font-bold capitalize text-[#0d1117]">{t}</span>
-              </button>
-            ))}
+        <div className="flex flex-wrap items-start gap-x-12 gap-y-3">
+          <div>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#6b7280]">Theme</p>
+            <div className="flex gap-2">
+              {(["dark", "light"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTheme(t)}
+                  className={`flex items-center gap-2.5 border p-2 pr-3 text-left transition-colors ${
+                    theme === t ? "border-[#001f3f] bg-[#eef3f9]" : "border-[#e8eaed] bg-white hover:border-[#9aa0aa]"
+                  }`}
+                >
+                  <span
+                    className="h-9 w-9 shrink-0 border border-black/10"
+                    style={{ background: t === "dark" ? "linear-gradient(180deg,#0d1522,#050a12)" : "linear-gradient(160deg,#f6f4ef,#e9e2d2)" }}
+                  />
+                  <span className="block text-[12.5px] font-bold capitalize text-[#0d1117]">{t}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#6b7280]">Colors (all designs)</p>
+            <div className="flex h-[52px] items-center gap-4">
+              {COLOR_FIELDS.map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={globalColors[key]}
+                    onChange={(e) => setGlobalColors((prev) => ({ ...prev, [key]: e.target.value }))}
+                    className="h-8 w-10 cursor-pointer border border-[#e2e6ea] bg-white p-0.5"
+                  />
+                  <span className="text-[11.5px] font-semibold text-[#0d1117]">{label}</span>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
         <div>
@@ -1146,34 +1226,34 @@ export function MeetingPosterClient() {
 
       <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
         <div className="space-y-4 bg-white border border-[#e8eaed] p-5 self-start">
-          <Field label="Title (line breaks kept)">
+          <Field label="Title (line breaks kept)" action={<TextColor value={data.titleColor} onChange={(v) => set({ titleColor: v })} />}>
             <textarea rows={2} className={`${INPUT_CLS} resize-y`} value={data.title} onChange={(e) => set({ title: e.target.value })} />
           </Field>
-          <Field label="Subtitle">
+          <Field label="Subtitle" action={<TextColor value={data.subtitleColor} onChange={(v) => set({ subtitleColor: v })} />}>
             <textarea rows={2} className={`${INPUT_CLS} resize-y`} value={data.subtitle} onChange={(e) => set({ subtitle: e.target.value })} />
           </Field>
-          <Field label="Tagline (line breaks kept)">
+          <Field label="Tagline (line breaks kept)" action={<TextColor value={data.taglineColor} onChange={(v) => set({ taglineColor: v })} />}>
             <textarea rows={2} className={`${INPUT_CLS} resize-y`} value={data.tagline} onChange={(e) => set({ tagline: e.target.value })} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Date">
+            <Field label="Date" action={<TextColor value={data.dateColor} onChange={(v) => set({ dateColor: v })} />}>
               <input className={INPUT_CLS} value={data.date} onChange={(e) => set({ date: e.target.value })} />
             </Field>
-            <Field label="Time">
+            <Field label="Time" action={<TextColor value={data.timeColor} onChange={(v) => set({ timeColor: v })} />}>
               <input className={INPUT_CLS} value={data.time} onChange={(e) => set({ time: e.target.value })} />
             </Field>
           </div>
-          <Field label="Venue">
+          <Field label="Venue" action={<TextColor value={data.venueColor} onChange={(v) => set({ venueColor: v })} />}>
             <input className={INPUT_CLS} value={data.venue} onChange={(e) => set({ venue: e.target.value })} />
           </Field>
-          <Field label="Topics — one per line (Golden Invite designs)">
+          <Field label="Topics — one per line (Golden Invite designs)" action={<TextColor value={data.topicsColor} onChange={(v) => set({ topicsColor: v })} />}>
             <textarea rows={4} className={INPUT_CLS} value={data.topics} onChange={(e) => set({ topics: e.target.value })} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Contact phone">
+            <Field label="Contact phone" action={<TextColor value={data.contactPhoneColor} onChange={(v) => set({ contactPhoneColor: v })} />}>
               <input className={INPUT_CLS} value={data.contactPhone} onChange={(e) => set({ contactPhone: e.target.value })} />
             </Field>
-            <Field label="Contact email">
+            <Field label="Contact email" action={<TextColor value={data.contactEmailColor} onChange={(v) => set({ contactEmailColor: v })} />}>
               <input className={INPUT_CLS} value={data.contactEmail} onChange={(e) => set({ contactEmail: e.target.value })} />
             </Field>
           </div>
@@ -1298,7 +1378,7 @@ export function MeetingPosterClient() {
           <div style={{ height: displayH * scale }} className="relative overflow-hidden">
             <div style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: posterW }}>
               <div ref={posterRef}>
-                <Poster design={design} data={data} speakers={speakers} w={posterW} h={posterH} logos={selectedLogos} light={theme === "light"} />
+                <Poster design={design} data={data} speakers={speakers} w={posterW} h={posterH} logos={selectedLogos} light={theme === "light"} colors={globalColors} />
               </div>
             </div>
           </div>
