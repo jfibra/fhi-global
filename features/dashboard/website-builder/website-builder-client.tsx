@@ -28,7 +28,6 @@ import { StatsBandSection } from "@/app/website/_components/sections/stats"
 import { ServiceAreasSection } from "@/app/website/_components/sections/service-areas"
 import { GallerySection } from "@/app/website/_components/sections/gallery"
 import { TestimonialsSection } from "@/app/website/_components/sections/what-my-clients-say"
-import { ClosingCtaSection } from "@/app/website/_components/sections/closing-cta"
 
 const DRAFT_KEY = "fhi:website-builder:draft:v1"
 const VIRTUAL_WIDTH = 1440
@@ -505,7 +504,6 @@ function LivePreview({
           <ServiceAreasSection data={data} />
           <GallerySection data={data} />
           <TestimonialsSection />
-          <ClosingCtaSection data={data} />
           <SiteFooter data={data} />
         </div>
       </div>
@@ -526,7 +524,6 @@ const FORM_SECTIONS = [
   { id: "areas", label: "Service Areas" },
   { id: "gallery", label: "Gallery" },
   { id: "reviews", label: "Reviews" },
-  { id: "cta", label: "CTA" },
   { id: "link", label: "Link Preview" },
 ] as const
 
@@ -544,7 +541,6 @@ const SECTION_ANCHORS: Record<FormSectionId, string> = {
   areas: "areas",
   gallery: "gallery",
   reviews: "reviews",
-  cta: "contact",
   link: "contact",
 }
 
@@ -584,7 +580,6 @@ const ANCHOR_TO_SECTION: Record<string, FormSectionId> = {
   areas: "areas",
   gallery: "gallery",
   reviews: "reviews",
-  contact: "cta",
 }
 
 // ─── Editor ───────────────────────────────────────────────────────────────────
@@ -1313,13 +1308,6 @@ export function WebsiteBuilderClient() {
                   </div>
                 ))}
               </div>
-            </>
-          )}
-
-          {activeSection === "cta" && (
-            <>
-              <Field label="Heading"><TInput value={data.cta.heading} onChange={(v) => update((d) => { d.cta.heading = v })} /></Field>
-              <Field label="Subtext"><TInput value={data.cta.sub} onChange={(v) => update((d) => { d.cta.sub = v })} /></Field>
             </>
           )}
 

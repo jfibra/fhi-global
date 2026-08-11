@@ -9,7 +9,6 @@ import { StatsBandSection } from "../_components/sections/stats"
 import { ServiceAreasSection } from "../_components/sections/service-areas"
 import { GallerySection } from "../_components/sections/gallery"
 import { TestimonialsSection } from "../_components/sections/what-my-clients-say"
-import { ClosingCtaSection } from "../_components/sections/closing-cta"
 
 // Design sample for the next-generation Website Builder template — a full
 // standalone agent site filled with placeholder data (see ../_data.ts).
@@ -33,7 +32,6 @@ export default function WebsiteSamplePage() {
       <ServiceAreasSection />
       <GallerySection />
       <TestimonialsSection />
-      <ClosingCtaSection />
       <SiteFooter />
     </div>
   )

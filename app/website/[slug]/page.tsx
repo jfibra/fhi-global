@@ -14,7 +14,6 @@ import { StatsBandSection } from "../_components/sections/stats"
 import { ServiceAreasSection } from "../_components/sections/service-areas"
 import { GallerySection } from "../_components/sections/gallery"
 import { TestimonialsSection } from "../_components/sections/what-my-clients-say"
-import { ClosingCtaSection } from "../_components/sections/closing-cta"
 
 // A published agent site from the Website Builder. Always fresh — agents
 // expect a save in the editor to show up on their public link immediately.
@@ -70,7 +69,6 @@ export default async function AgentWebsitePage({ params }: Props) {
       <ServiceAreasSection data={data} />
       <GallerySection data={data} />
       <TestimonialsSection />
-      <ClosingCtaSection data={data} />
       <SiteFooter data={data} />
     </div>
   )
