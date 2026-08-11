@@ -44,6 +44,8 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
           {logo_url ? (
             <Image
               src={logo_url}
+              // SVG bypasses the optimizer (which rejects it; upload route accepts SVG logos).
+              unoptimized={logo_url.toLowerCase().includes(".svg")}
               alt={name}
               width={80}
               height={80}
@@ -105,6 +107,8 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
         {logo_url ? (
           <Image
             src={logo_url}
+            // SVG bypasses the optimizer (which rejects it; upload route accepts SVG logos).
+            unoptimized={logo_url.toLowerCase().includes(".svg")}
             alt={name}
             width={72}
             height={72}

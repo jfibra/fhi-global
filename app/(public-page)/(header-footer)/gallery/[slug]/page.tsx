@@ -43,12 +43,15 @@ export default async function AlbumPage({ params }: Props) {
   const { slug } = await params
   const supabase = createPublicSupabaseClient()
 
-  const { data: album } = await supabase
+  const { data: album, error: albumError } = await supabase
     .from("gallery_albums")
     .select("id, title, description, event_date")
     .eq("slug", slug)
     .eq("is_published", true)
     .maybeSingle()
+  // Same error/miss split as generateMetadata: an outage-time notFound()
+  // would be ISR-cached as a hard 404 over a live album.
+  if (albumError) throw new Error("Failed to load album")
   if (!album) notFound()
 
   const { data: photos } = await supabase

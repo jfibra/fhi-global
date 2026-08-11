@@ -26,6 +26,8 @@ const LogoTile = memo(function LogoTile({ dev }: { dev: DeveloperLogoItem }) {
       {dev.logo_url ? (
         <Image
           src={dev.logo_url}
+          // SVG bypasses the optimizer (which rejects it; upload route accepts SVG logos).
+          unoptimized={dev.logo_url.toLowerCase().includes(".svg")}
           alt={dev.name}
           width={160}
           height={160}

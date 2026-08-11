@@ -84,6 +84,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     openGraph: {
       title: article.title,
       description,
+      // Next merges metadata shallowly — this inline openGraph replaces the
+      // layout's wholesale, so siteName must be repeated here.
+      siteName: "FHI Global",
       url: canonical,
       type: "article",
       publishedTime,

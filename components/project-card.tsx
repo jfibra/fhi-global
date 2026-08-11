@@ -93,6 +93,8 @@ export function ProjectCard({ project }: ProjectCardProps) {
             {developers.logo_url ? (
               <Image
                 src={developers.logo_url}
+                // SVG bypasses the optimizer (which rejects it; upload route accepts SVG logos).
+                unoptimized={developers.logo_url.toLowerCase().includes(".svg")}
                 alt={developers.name}
                 width={96}
                 height={28}

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { revalidatePath } from "next/cache"
 import { after } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { canManageDeveloperContent, isDeveloperRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { SITE_URL } from "@/lib/seo"
 import { submitToIndexNow } from "@/lib/indexnow"
@@ -34,12 +34,18 @@ export async function POST(req: NextRequest) {
 
   // Projects and developers are anon-readable, so "the session can read the
   // row" gates nothing for them — restrict those kinds to the roles that can
-  // actually publish (admin staff + developer-portal users). Otherwise any
-  // activated member could churn the ISR cache and spam IndexNow (junk
-  // submissions get the key rate-limited or discounted by Bing). Agent
-  // listings keep the strict per-row owner check below.
+  // actually publish. canManageDeveloperContent is the SAME predicate the
+  // publish UI uses (super_admin, admin, editor — features/dashboard/projects/
+  // variants.tsx), plus developer-portal users for their own toggles.
+  // Otherwise any activated member could churn the ISR cache and spam
+  // IndexNow (junk submissions get the key rate-limited or discounted by
+  // Bing). Agent listings keep the strict per-row owner check below.
   const role = session.context.profile.role
-  if ((kind === "project" || kind === "developer") && !isAdminStaffRole(role) && role !== "developer") {
+  if (
+    (kind === "project" || kind === "developer") &&
+    !canManageDeveloperContent(role) &&
+    !isDeveloperRole(role)
+  ) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
