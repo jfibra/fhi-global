@@ -1,5 +1,6 @@
 import { Great_Vibes, Urbanist } from "next/font/google"
 import { DashboardAuthGate } from "@/components/dashboard/dashboard-auth-gate"
+import { DashboardBodyFonts } from "@/components/dashboard/dashboard-body-fonts"
 
 // Marketing-template fonts, loaded HERE and not in the root layout so public
 // pages don't pay for them. The CSS variables inherit from the wrapper div —
@@ -22,6 +23,9 @@ export default function DashboardLayout({
 }) {
   return (
     <div className={`${_urbanist.variable} ${_greatVibes.variable}`}>
+      {/* Portals (Poster Studio's StudioModal) escape this div — mirror the
+          variable classes onto <body> so they inherit there too. */}
+      <DashboardBodyFonts classNames={`${_urbanist.variable} ${_greatVibes.variable}`} />
       <DashboardAuthGate>{children}</DashboardAuthGate>
     </div>
   )

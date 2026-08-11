@@ -150,7 +150,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     listingOwnPrice(row),
     proj?.launch_price_from ?? null,
     proj?.launch_price_to ?? null,
-    row.currency,
+    // Same currency resolution as the rendered page and the listing schema —
+    // the SERP snippet must never disagree with the page.
+    row.currency?.trim() || proj?.currency || "AED",
   )
   const facts = [
     u?.bedrooms != null ? `${u.bedrooms} bed` : null,

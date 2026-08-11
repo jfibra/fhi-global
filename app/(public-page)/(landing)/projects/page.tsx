@@ -38,11 +38,16 @@ function parsePage(raw: string | undefined): number {
   return Number.isInteger(n) && n >= 1 ? n : 1
 }
 
+/** The filters pagination links carry forward — a whitelist, so arbitrary or
+ *  array-valued query params can never propagate into crawlable hrefs. */
+const FILTER_KEYS = ["q", "developer", "status", "city", "featured", "price_min", "price_max"] as const
+
 /** Pagination href that keeps every active filter and drops page=1. */
 function pageHref(sp: SpValues, page: number): string {
   const p = new URLSearchParams()
-  for (const [k, v] of Object.entries(sp)) {
-    if (v && k !== "page") p.set(k, v)
+  for (const k of FILTER_KEYS) {
+    const v = sp[k]
+    if (typeof v === "string" && v) p.set(k, v)
   }
   if (page > 1) p.set("page", String(page))
   const qs = p.toString()
@@ -112,7 +117,11 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
   if (hasPriceMax && priceMax !== null) query = query.lte("launch_price_from", priceMax)
 
   const from = (pageNum - 1) * PAGE_SIZE
-  const { data: projects, count } = await query.range(from, from + PAGE_SIZE - 1)
+  const { data: projects, count, error } = await query.range(from, from + PAGE_SIZE - 1)
+
+  // Transient failure → 5xx; a query error must not read as "empty page"
+  // and 404 the archive (ISR would cache it).
+  if (error) throw new Error("Failed to load projects")
 
   const total = count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))

@@ -48,12 +48,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
   const supabase = createPublicSupabaseClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("developers")
     .select("name, description, logo_url, address")
     .eq("slug", slug)
     .is("deleted_at", null)
     .maybeSingle()
+  // Transient query failure → 5xx (crawlers retry, and a failed ISR
+  // revalidation keeps serving the stale page); only a clean miss may 404 —
+  // a notFound() fired during an outage gets CACHED as a hard 404.
+  if (error) throw new Error("Failed to load developer")
   // Not a developer? The slug may be one of the curated SEO landing pages
   // (new-projects-in-dubai, …) served by this same root segment.
   if (!data) {
@@ -106,7 +110,9 @@ export default async function DeveloperDetailPage({ params }: Props) {
 
   if (devError) {
     console.error("[developer-detail] query error:", devError.message)
-    notFound()
+    // 5xx, not 404: a transient failure must never deindex (or ISR-cache a
+    // 404 over) a live developer page.
+    throw new Error("Failed to load developer")
   }
   if (!developer) {
     // Same fallthrough as generateMetadata: curated SEO landing pages share

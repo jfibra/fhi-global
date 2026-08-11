@@ -6,6 +6,7 @@ import { createPageMetadata, jsonLdScript, SITE_URL } from "@/lib/seo"
 import {
   fetchArticlesList,
   fetchCategoriesCountries,
+  newsConfigured,
   slugify,
   type NewsArticle,
 } from "@/lib/news-service"
@@ -164,7 +165,12 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
   for (const a of fetched) {
     if (!seen.has(a.id)) { seen.add(a.id); all.push(a) }
   }
-  // lastPage 0 is the upstream-failure sentinel; treat as a single page.
+  // lastPage 0 is the upstream-FAILURE sentinel (a real Laravel page always
+  // reports ≥ 1). An outage must answer 5xx, never notFound(): a 404 fired
+  // during ISR revalidation would cache a hard 404 over the live archive.
+  if (lastPage === 0 && all.length === 0 && newsConfigured()) {
+    throw new Error("News upstream unavailable")
+  }
   const totalPages = Math.max(1, lastPage || 1)
   // Out-of-range pages 404 instead of serving an empty shell that indexes.
   if (pageNum > 1 && all.length === 0) notFound()
@@ -222,10 +228,14 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
 
   return (
     <div className="min-h-screen bg-[#f7f8fa] font-sans">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLdScript(collectionSchema) }}
-      />
+      {/* Page 1 only: deeper pages would claim the /news identity while
+          listing a different slice of articles. */}
+      {isFirstPage && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: jsonLdScript(collectionSchema) }}
+        />
+      )}
 
       {/* ── MASTHEAD ──────────────────────────────────────────────────────
           Light split banner: copy on the left, skyline fading in from the

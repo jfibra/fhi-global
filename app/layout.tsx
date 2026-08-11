@@ -39,6 +39,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "FHI Global — Dubai Real Estate",
     description: "Discover premium property projects in Dubai from verified developers.",
+    siteName: "FHI Global",
     type: "website",
     images: [{ url: DEFAULT_PREVIEW_IMAGE_URL, width: 1200, height: 630, alt: "FHI Global — Dubai Real Estate" }],
   },

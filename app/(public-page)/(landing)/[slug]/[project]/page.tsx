@@ -49,13 +49,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug: devSlug, project: slug } = await params
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
   const supabase = createPublicSupabaseClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("projects")
     .select("name, description, meta_title, meta_description, main_image, city, location, developers(slug)")
     .eq("slug", slug)
     .eq("is_published", true)
     .is("deleted_at", null)
     .maybeSingle()
+  // Transient failure → 5xx; only a clean miss may 404 (an outage-time
+  // notFound() would be ISR-cached as a hard 404 over a live page).
+  if (error) throw new Error("Failed to load project")
   // notFound() here, not a placeholder title: returning metadata lets the
   // route start streaming, after which the page body's notFound() can only
   // swap the UI — the 200 is already on the wire. Aborting in metadata is
@@ -140,7 +143,9 @@ export default async function ProjectDetailPage({ params }: Props) {
 
   if (projectError) {
     console.error("[project-detail] query error:", projectError.message, projectError.details)
-    notFound()
+    // 5xx, not 404: a transient failure must never deindex (or ISR-cache a
+    // 404 over) a live project page.
+    throw new Error("Failed to load project")
   }
   if (!project) notFound()
 

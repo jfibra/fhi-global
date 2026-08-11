@@ -112,6 +112,7 @@ export function createPageMetadata({
     openGraph: {
       title: ogTitle,
       description: ogDescription,
+      siteName: "FHI Global",
       type: ogType,
       url: canonical,
       images: finalImageUrl

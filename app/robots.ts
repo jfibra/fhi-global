@@ -15,7 +15,7 @@ export default function robots(): MetadataRoute.Robots {
       // next.config. "/register", "/staff-login" and "/developers-login" are
       // deliberately NOT listed — a crawler must be able to fetch the page to see
       // its noindex signal and drop it (the old "/login" was indexed and
-      // 302-redirects to "/staff-login").
+      // temp-redirects (307) to "/staff-login").
       disallow: [
         "/dashboard",
         "/api",

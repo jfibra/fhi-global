@@ -76,6 +76,9 @@ export function PageLoader() {
             alt="FHI Global"
             width={163}
             height={60}
+            // priority is correct here: the component only mounts while the
+            // overlay is visible, and the logo IS its content.
+            priority
             className="object-contain"
             style={{ width: 160, height: "auto" }}
           />

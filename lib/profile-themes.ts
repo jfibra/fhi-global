@@ -408,6 +408,10 @@ const HEX = /^#[0-9a-f]{6}$/i
 
 /** Hosts a custom backdrop may come from — our own S3 and the media project. */
 export function isAllowedBackdrop(url: string): boolean {
+  // Site-relative paths are our own public/ assets — the STOCK_BACKDROPS
+  // moved there when the legacy Supabase host died. Allow plain paths only
+  // (no protocol-relative "//host", no traversal past a normal path shape).
+  if (url.startsWith("/") && !url.startsWith("//")) return true
   let u: URL
   try {
     u = new URL(url)

@@ -3,7 +3,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import {
-  fetchArticleBySlug,
+  fetchArticleBySlugResult,
   fetchArticlesList,
   toManilaIso,
 } from "@/lib/news-service"
@@ -37,9 +37,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
-  const article = await fetchArticleBySlug(slug)
-  // notFound() here, not a placeholder title: aborting in metadata is what
-  // turns a dead article URL into a real HTTP 404.
+  const { article, failed } = await fetchArticleBySlugResult(slug)
+  // Upstream outage → 5xx (crawlers retry; an ISR revalidation keeps serving
+  // the stale page); a genuinely missing article → notFound() here, not a
+  // placeholder title — aborting in metadata is what turns a dead article URL
+  // into a real HTTP 404.
+  if (failed) throw new Error("News upstream unavailable")
   if (!article) notFound()
 
   const canonical = `${siteUrl}/news/${article.slug}`
@@ -186,11 +189,13 @@ export default async function NewsDetailPage({ params }: PageProps) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
   // Fetch in parallel
-  const [article, latestList] = await Promise.all([
-    fetchArticleBySlug(slug),
+  const [{ article, failed }, latestList] = await Promise.all([
+    fetchArticleBySlugResult(slug),
     fetchArticlesList({ page: 1, perPage: 20 }),
   ])
 
+  // Same error/miss split as generateMetadata: outage → 5xx, miss → 404.
+  if (failed) throw new Error("News upstream unavailable")
   if (!article) {
     notFound()
   }
@@ -200,12 +205,17 @@ export default async function NewsDetailPage({ params }: PageProps) {
   const modifiedIso = toManilaIso(article.updatedAt) ?? publishedIso
   const timeLabel = timeAgoLabel(modifiedIso ?? publishedIso)
 
+  // JSON-LD image URLs must be absolute; article.img may carry the
+  // site-relative default (/og-default.jpg) after the legacy host died.
+  const rawSchemaImage = article.featuredImage || article.img
+  const schemaImage = rawSchemaImage?.startsWith("/") ? `${siteUrl}${rawSchemaImage}` : rawSchemaImage
+
   const articleSchema = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
     headline: article.title,
     description: article.excerpt || article.title,
-    image: article.featuredImage || article.img,
+    image: schemaImage,
     inLanguage: "en",
     author: authorSchema(article.author),
     publisher: {

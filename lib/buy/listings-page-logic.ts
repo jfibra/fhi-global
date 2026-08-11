@@ -389,7 +389,10 @@ export function deriveListings(
   const properties = items.map((i) => i.card)
   const mapMarkers = items.map((i) => i.marker).filter((m): m is BuyMapMarker => m != null)
 
-  const rawTotal = safeAgentRows.length + dedupedProjects.length
+  // Count only projects that can actually render a card (both slugs present)
+  // so "Showing all N" never overstates the list.
+  const cardableProjects = dedupedProjects.filter((p) => p.slug && p.developers?.slug)
+  const rawTotal = safeAgentRows.length + cardableProjects.length
   const shown = items.length
   const totalLabel =
     rawTotal === 0

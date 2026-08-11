@@ -49,9 +49,12 @@ async function fetchEvent(idOrSlug: string) {
     .select("id, slug, title, description, brand, image_url, event_date, venue, registration_open")
     .eq("status", "published")
     .is("deleted_at", null)
-  const { data } = UUID_RE.test(idOrSlug)
+  const { data, error } = UUID_RE.test(idOrSlug)
     ? await query.eq("id", idOrSlug).maybeSingle()
     : await query.eq("slug", idOrSlug).maybeSingle()
+  // Transient failure → 5xx from both callers; only a clean miss may reach
+  // their notFound() (an outage-time 404 would be ISR-cached over a live page).
+  if (error) throw new Error("Failed to load event")
   return data ?? null
 }
 

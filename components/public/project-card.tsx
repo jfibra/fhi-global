@@ -91,6 +91,9 @@ export function ProjectCard({ project }: { project: ProjectCardData }) {
                 alt={project.developers.name}
                 width={60}
                 height={16}
+                // The optimizer rejects SVG (dangerouslyAllowSVG is off) and
+                // the logo upload route accepts them — serve those as-is.
+                unoptimized={project.developers.logo_url.toLowerCase().includes(".svg")}
                 className="h-4 w-auto max-w-[60px] object-contain opacity-70"
               />
             ) : (

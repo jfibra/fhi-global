@@ -13,12 +13,15 @@ type Props = { params: Promise<{ slug: string }> }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const supabase = createPublicSupabaseClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("gallery_albums")
     .select("title, description, cover_url")
     .eq("slug", slug)
     .eq("is_published", true)
     .maybeSingle()
+  // Transient failure → 5xx; only a clean miss may 404 (an outage-time
+  // notFound() would be ISR-cached over a live album).
+  if (error) throw new Error("Failed to load album")
   if (!data) notFound()
   return createPageMetadata({
     title: data.title,

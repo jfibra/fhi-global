@@ -26,6 +26,9 @@ export function DeveloperCard({ developer }: { developer: DeveloperCardData }) {
             alt={developer.name}
             width={160}
             height={56}
+            // The optimizer rejects SVG (dangerouslyAllowSVG is off) and the
+            // logo upload route accepts them — serve those as-is.
+            unoptimized={developer.logo_url.toLowerCase().includes(".svg")}
             className="max-h-14 max-w-[80%] w-auto object-contain"
           />
         ) : (

@@ -120,6 +120,9 @@ export function itemListSchema(
 
 function toFiniteNumber(value: number | string | null | undefined): number | null {
   if (value == null) return null
+  // Number("") === 0 — an empty-string coordinate must read as absent, not as
+  // (0,0) "Null Island" GeoCoordinates.
+  if (typeof value === "string" && value.trim() === "") return null
   const n = typeof value === "number" ? value : Number(value)
   return Number.isFinite(n) ? n : null
 }

@@ -1,6 +1,6 @@
 import "server-only"
 
-import { DEFAULT_PREVIEW_IMAGE_URL } from "@/lib/seo"
+import { DEFAULT_PREVIEW_IMAGE_URL, LEGACY_PREVIEW_IMAGE_URL } from "@/lib/seo"
 
 /**
  * news-service.ts — server-only client for the HomesPH News external API
@@ -140,8 +140,18 @@ type ApiFetchOptions = {
   signal?: AbortSignal
 }
 
-async function apiFetch(path: string, opts: ApiFetchOptions = {}): Promise<unknown> {
-  if (!newsConfigured()) return null
+/**
+ * Like apiFetch, but distinguishes "the resource doesn't exist" (upstream 404
+ * → data null, failed false) from "the upstream is broken" (network error or
+ * 5xx → failed true). Callers that turn a miss into notFound() MUST use this:
+ * a notFound() fired during an outage gets baked into the ISR cache as a hard
+ * 404 on live content.
+ */
+async function apiFetchDetailed(
+  path: string,
+  opts: ApiFetchOptions = {},
+): Promise<{ data: unknown; failed: boolean }> {
+  if (!newsConfigured()) return { data: null, failed: false }
   try {
     const res = await fetch(`${newsBase()}${path}`, {
       method: opts.method ?? "GET",
@@ -156,11 +166,16 @@ async function apiFetch(path: string, opts: ApiFetchOptions = {}): Promise<unkno
         : { next: { revalidate: opts.revalidate ?? 300 } }),
       signal: opts.signal,
     })
-    if (!res.ok) return null
-    return await res.json()
+    if (res.status === 404) return { data: null, failed: false }
+    if (!res.ok) return { data: null, failed: true }
+    return { data: await res.json(), failed: false }
   } catch {
-    return null
+    return { data: null, failed: true }
   }
+}
+
+async function apiFetch(path: string, opts: ApiFetchOptions = {}): Promise<unknown> {
+  return (await apiFetchDetailed(path, opts)).data
 }
 
 // ── Normalize ──────────────────────────────────────────────────────────────────
@@ -170,9 +185,13 @@ function str(value: unknown): string | undefined {
 }
 
 function normalize(raw: Record<string, unknown>): NewsArticle {
-  // Absolute, existing fallback — a relative path here would leak into JSON-LD
-  // image fields and OG tags, which require absolute URLs.
-  const image = str(raw.image) ?? DEFAULT_PREVIEW_IMAGE_URL
+  // Site-relative fallback (works in next/image without a remotePattern);
+  // JSON-LD/OG emit sites absolutize it. Upstream data still carries the
+  // legacy placeholder URL whose host is dead (HTTP 402) — map it to the
+  // current default so it never renders or ships in markup.
+  const rawImage = str(raw.image)
+  const image =
+    !rawImage || rawImage === LEGACY_PREVIEW_IMAGE_URL ? DEFAULT_PREVIEW_IMAGE_URL : rawImage
   const publishedAt = str(raw.published_at) ?? str(raw.created_at) ?? str(raw.date) ?? ""
   const updatedAt = str(raw.updated_at) ?? publishedAt
 
@@ -255,15 +274,22 @@ export async function fetchArticles(
   return (await fetchArticlesList({ page }, init)).articles
 }
 
-/** Article detail — the only call that returns populated contentBlocks. */
+/** Article detail — the only call that returns populated contentBlocks.
+ *  `failed` = the upstream broke (throw, don't notFound); article null with
+ *  failed false = the article genuinely doesn't exist. */
+export async function fetchArticleBySlugResult(
+  slug: string,
+): Promise<{ article: NewsArticle | null; failed: boolean }> {
+  if (!slug) return { article: null, failed: false }
+  const { data, failed } = await apiFetchDetailed(`/external/articles/${encodeURIComponent(slug)}`)
+  if (failed) return { article: null, failed: true }
+  const article = (data as { article?: unknown } | null)?.article
+  if (!article || typeof article !== "object") return { article: null, failed: false }
+  return { article: normalize(article as Record<string, unknown>), failed: false }
+}
+
 export async function fetchArticleBySlug(slug: string): Promise<NewsArticle | null> {
-  if (!slug) return null
-  const result = (await apiFetch(`/external/articles/${encodeURIComponent(slug)}`)) as
-    | { article?: unknown }
-    | null
-  const article = result?.article
-  if (!article || typeof article !== "object") return null
-  return normalize(article as Record<string, unknown>)
+  return (await fetchArticleBySlugResult(slug)).article
 }
 
 /** Category × country pairs (with counts) for content distributed to this site. */
