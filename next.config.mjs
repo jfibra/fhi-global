@@ -172,6 +172,12 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Per-page prerender budget (default 60s). The dashboard materials/library
+  // pages probe dozens of images with sharp at build time; on a loaded local
+  // machine they queue-starve later pages past 60s and fail the whole build.
+  // Clean CI builders finish far under the old limit, so this only adds
+  // headroom where contention exists.
+  staticPageGenerationTimeout: 180,
   // Bots that get BLOCKING (non-streamed) metadata. Setting this REPLACES
   // Next's default list (node_modules/next/dist/shared/lib/router/utils/html-bots.js),
   // so the default pattern is reproduced below and extended. The additions matter
