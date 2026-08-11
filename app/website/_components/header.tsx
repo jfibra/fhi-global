@@ -6,11 +6,31 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Mail, Menu, X } from "lucide-react"
-import { BRAND_GRADIENT, BRAND_TO, GOLD, GOLD_GRADIENT, NAV_LINKS } from "../_data"
+import { ChevronDown, Menu, MessageCircle, X } from "lucide-react"
+import { BRAND_GRADIENT, BRAND_TO, GOLD, GOLD_GRADIENT, NAV_LINKS, SAMPLE_DATA, type WebsiteData } from "../_data"
+import { buildContactChannels } from "./contact-channels"
 
-export function SiteHeader({ sticky = true }: { sticky?: boolean }) {
+export function SiteHeader({ sticky = true, data = SAMPLE_DATA }: { sticky?: boolean; data?: WebsiteData }) {
   const [open, setOpen] = useState(false)
+  // Contact Me — same dropdown channels as the About section.
+  const [contactOpen, setContactOpen] = useState(false)
+  const contactChannels = buildContactChannels(data)
+
+  const channelLinks = (onPick: () => void) =>
+    contactChannels.map(({ icon: Icon, label, href }) => (
+      <a
+        key={label}
+        href={href}
+        target={href.startsWith("mailto:") || href.startsWith("tel:") ? undefined : "_blank"}
+        rel="noopener noreferrer"
+        onClick={onPick}
+        className="flex items-center gap-3 border-b border-[#f0ede4] px-4 py-3 text-left text-[13px] font-semibold last:border-b-0 hover:bg-[#faf8f4]"
+        style={{ color: BRAND_TO }}
+      >
+        <Icon className="h-4 w-4 shrink-0" style={{ color: GOLD }} />
+        {label}
+      </a>
+    ))
 
   return (
     // Same gradient treatment as the dashboard listings buttons (180deg, navy
@@ -53,13 +73,23 @@ export function SiteHeader({ sticky = true }: { sticky?: boolean }) {
           })}
         </nav>
 
-        <a
-          href="#contact"
-          className="hidden items-center gap-2 px-5 py-2.5 text-[13px] font-bold sm:inline-flex lg:ml-0"
-          style={{ background: GOLD_GRADIENT, color: BRAND_TO }}
-        >
-          <Mail className="h-4 w-4" /> Get in Touch
-        </a>
+        <div className="relative hidden sm:block lg:ml-0">
+          <button
+            type="button"
+            onClick={() => setContactOpen((o) => !o)}
+            aria-expanded={contactOpen}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-[13px] font-bold"
+            style={{ background: GOLD_GRADIENT, color: BRAND_TO }}
+          >
+            <MessageCircle className="h-4 w-4" /> Contact Me
+            <ChevronDown className={`h-4 w-4 transition-transform ${contactOpen ? "rotate-180" : ""}`} />
+          </button>
+          {contactOpen && (
+            <div className="absolute right-0 top-full z-50 mt-1 w-52 border border-[#e8e2d4] bg-white shadow-[0_18px_40px_-18px_rgba(13,27,46,0.4)]">
+              {channelLinks(() => setContactOpen(false))}
+            </div>
+          )}
+        </div>
 
         {/* Burger — mobile/tablet only */}
         <button
@@ -92,14 +122,21 @@ export function SiteHeader({ sticky = true }: { sticky?: boolean }) {
               </a>
             )
           })}
-          <a
-            href="#contact"
-            onClick={() => setOpen(false)}
+          <button
+            type="button"
+            onClick={() => setContactOpen((o) => !o)}
+            aria-expanded={contactOpen}
             className="mt-4 inline-flex w-full items-center justify-center gap-2 px-5 py-3 text-[13px] font-bold"
             style={{ background: GOLD_GRADIENT, color: BRAND_TO }}
           >
-            <Mail className="h-4 w-4" /> Get in Touch
-          </a>
+            <MessageCircle className="h-4 w-4" /> Contact Me
+            <ChevronDown className={`h-4 w-4 transition-transform ${contactOpen ? "rotate-180" : ""}`} />
+          </button>
+          {contactOpen && (
+            <div className="mt-1 border border-[#e8e2d4] bg-white">
+              {channelLinks(() => { setContactOpen(false); setOpen(false) })}
+            </div>
+          )}
         </nav>
       )}
     </header>

@@ -8,10 +8,11 @@ import { useEffect, useState } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import {
   ArrowRight, Building2, ChevronDown, Eye, Facebook, FileText, HomeIcon, Instagram,
-  Linkedin, Mail, MessageCircle, Phone, ShieldCheck, Star, Youtube,
+  Linkedin, MessageCircle, ShieldCheck, Star, Youtube,
 } from "lucide-react"
-import { BRAND_GRADIENT, DEFAULT_WA_MESSAGE, GOLD, GOLD_A40, GOLD_A50, GOLD_A60, GOLD_SOFT, GOLD_SOFT_A80, IMG, INK, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
-import { Eyebrow, MessengerIcon, WhatsAppIcon } from "../ui"
+import { BRAND_GRADIENT, GOLD, GOLD_A40, GOLD_A50, GOLD_A60, GOLD_SOFT, GOLD_SOFT_A80, IMG, INK, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
+import { buildContactChannels } from "../contact-channels"
+import { Eyebrow } from "../ui"
 
 export function AboutSection({
   data = SAMPLE_DATA,
@@ -68,44 +69,17 @@ export function AboutSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bioEl, measureEl, bio])
 
+  // Only socials with a URL render below the QR — no dead placeholder circles.
   const socials = [
     { icon: Facebook, label: "Facebook", href: about.socials.facebook },
     { icon: Instagram, label: "Instagram", href: about.socials.instagram },
     { icon: Linkedin, label: "LinkedIn", href: about.socials.linkedin },
     { icon: Youtube, label: "YouTube", href: about.socials.youtube },
-  ]
+  ].filter((s) => s.href.trim() !== "")
 
-  // Contact Me dropdown — WhatsApp/Email always; Messenger + Instagram DM only
-  // when the profile URLs are set (their handle becomes an m.me / ig.me chat
-  // link — the socials row itself stays plain profile links).
+  // Contact Me dropdown — channel list shared with the site header.
   const [contactOpen, setContactOpen] = useState(false)
-  const handleFrom = (url: string): string | null => {
-    try {
-      const u = new URL(url)
-      const seg = u.pathname.split("/").filter(Boolean)
-      if (seg[0] === "profile.php") return u.searchParams.get("id")
-      return seg[0] || null
-    } catch {
-      return null
-    }
-  }
-  const fbHandle = about.socials.facebook ? handleFrom(about.socials.facebook) : null
-  const igHandle = about.socials.instagram ? handleFrom(about.socials.instagram) : null
-  const contactChannels = [
-    {
-      icon: WhatsAppIcon,
-      label: "WhatsApp",
-      href: `https://wa.me/${agent.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(DEFAULT_WA_MESSAGE)}`,
-    },
-    ...(igHandle ? [{ icon: Instagram, label: "Instagram", href: `https://ig.me/m/${igHandle}` }] : []),
-    { icon: Mail, label: "Email", href: `mailto:${agent.email}` },
-    // m.me: on MOBILE (most visitors) it opens the Messenger app straight
-    // into the chat. Desktop web hits Meta's E2EE "Continue" flow, which
-    // drops the recipient for personal profiles with no prior thread — a
-    // Meta-side quirk no URL form avoids; only Pages get the clean web flow.
-    ...(fbHandle ? [{ icon: MessengerIcon, label: "Messenger", href: `https://m.me/${fbHandle}` }] : []),
-    { icon: Phone, label: "Call", href: `tel:${agent.phone}` },
-  ]
+  const contactChannels = buildContactChannels(data)
 
   const credentials = [
     { icon: ShieldCheck, label: "RERA Licensed Broker", value: `BRN: ${agent.brn}` },
@@ -338,22 +312,23 @@ export function AboutSection({
               </div>
 
               {/* Socials — white circles directly below the QR */}
-              <div className="mt-5 flex items-center justify-center gap-3">
-                {socials.map(({ icon: Icon, label, href }) => {
-                  const cls =
-                    "flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-white shadow-[0_10px_24px_-10px_rgba(13,27,46,0.35)] transition-colors hover:bg-[#faf5e8]"
-                  const inner = <Icon className="h-4.5 w-4.5" strokeWidth={1.8} />
-                  return href ? (
-                    <a key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label} className={cls} style={{ color: NAVY }}>
-                      {inner}
+              {socials.length > 0 && (
+                <div className="mt-5 flex items-center justify-center gap-3">
+                  {socials.map(({ icon: Icon, label, href }) => (
+                    <a
+                      key={label}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={label}
+                      className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-white shadow-[0_10px_24px_-10px_rgba(13,27,46,0.35)] transition-colors hover:bg-[#faf5e8]"
+                      style={{ color: NAVY }}
+                    >
+                      <Icon className="h-4.5 w-4.5" strokeWidth={1.8} />
                     </a>
-                  ) : (
-                    <span key={label} aria-label={label} className={cls} style={{ color: NAVY }}>
-                      {inner}
-                    </span>
-                  )
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

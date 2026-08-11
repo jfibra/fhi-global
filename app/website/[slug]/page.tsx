@@ -61,7 +61,7 @@ export default async function AgentWebsitePage({ params }: Props) {
 
   return (
     <div style={themeVars(data.theme)}>
-      <SiteHeader />
+      <SiteHeader data={data} />
       <HeroSection data={data} />
       <AboutSection data={data} qrValue={`${SITE_URL}/website/${site.slug}`} />
       <FeaturedSection data={data} />

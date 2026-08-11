@@ -496,7 +496,7 @@ function LivePreview({
     <div ref={setOuterEl} className="h-full overflow-y-auto overflow-x-hidden bg-[#dfe4ea]">
       <div style={{ height: innerH * scale }} className="relative">
         <div ref={setInnerEl} style={{ width: VIRTUAL_WIDTH, transform: `scale(${scale})`, transformOrigin: "top left", ...themeVars(data.theme) }}>
-          <SiteHeader sticky={false} />
+          <SiteHeader sticky={false} data={data} />
           <HeroSection data={data} />
           <AboutSection data={data} />
           <FeaturedSection data={data} />
