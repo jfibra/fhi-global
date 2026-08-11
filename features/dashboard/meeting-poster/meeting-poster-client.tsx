@@ -1374,7 +1374,9 @@ export function MeetingPosterClient() {
           </Field>
         </div>
 
-        <div ref={setFrameEl} className="min-w-0">
+        {/* Sticky once the design/logo panel scrolls past; taller previews
+            scroll inside their own pane so the bottom stays reachable. */}
+        <div ref={setFrameEl} className="min-w-0 lg:sticky lg:top-1 lg:max-h-[calc(100vh-0.5rem)] lg:self-start lg:overflow-y-auto">
           <div style={{ height: displayH * scale }} className="relative overflow-hidden">
             <div style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: posterW }}>
               <div ref={posterRef}>
