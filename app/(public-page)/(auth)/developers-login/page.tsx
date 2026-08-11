@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   // Structured OG/Twitter/canonical for link previews (WhatsApp/Slack), even
   // though the page itself is noindex — the two are independent signals.
   ...createPageMetadata({
-    title: "Developer Sign In | FHI Global Partners",
+    title: "Developer Sign In",
     description:
       "Secure sign-in for FHI Global developer partners — manage your projects, media, and company profile.",
     pathname: "/developers-login",

@@ -13,7 +13,7 @@ import { buildDeveloperMapMarkers } from "@/lib/developers/map-markers"
 import { Building2, BadgeCheck, ChevronRight, Users, ShieldCheck } from "lucide-react"
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Real Estate Developers in Dubai | FHI Global",
+  title: "Real Estate Developers in Dubai",
   description: "Browse top real estate developers in Dubai. Discover verified developers and their premium property projects.",
   pathname: "/developers",
   keywords: ["Dubai developers", "real estate developers Dubai", "verified developers UAE"],

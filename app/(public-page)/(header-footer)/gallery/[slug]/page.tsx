@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     .maybeSingle()
   if (!data) notFound()
   return createPageMetadata({
-    title: `${data.title} | FHI Global Gallery`,
+    title: data.title,
     description: data.description ?? `Photos from ${data.title} by FHI Global.`,
     imageUrl: data.cover_url ?? undefined,
     pathname: `/gallery/${slug}`,

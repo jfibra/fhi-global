@@ -43,7 +43,7 @@ async function resolveReferrer(refId: string | null): Promise<Referrer> {
 }
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Create Account | FHI Global",
+  title: "Create Account",
   description: "Create your FHI Global account.",
 })
 

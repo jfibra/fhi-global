@@ -5,6 +5,12 @@ export const DEFAULT_PREVIEW_IMAGE_URL =
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
+/** SITE_URL + path with exactly one slash between them. */
+export function absoluteUrl(path: string): string {
+  const base = SITE_URL.replace(/\/$/, "")
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`
+}
+
 /**
  * Serialize an object for a <script type="application/ld+json"> block.
  * Escapes "<" so untrusted strings (e.g. external article titles) can never
@@ -26,6 +32,18 @@ export function truncateTitle(title: string, max = 43): string {
   return `${(lastSpace > 20 ? cut.slice(0, lastSpace) : cut.slice(0, max)).trimEnd()}…`
 }
 
+/**
+ * Truncate a meta description on a word boundary (~155 chars is what SERPs
+ * display). Returns "" for empty input; appends "…" only when truncated.
+ */
+export function truncateDescription(text: string | null | undefined, max = 155): string {
+  const t = (text ?? "").trim()
+  if (t.length <= max) return t
+  const cut = t.slice(0, max + 1)
+  const lastSpace = cut.lastIndexOf(" ")
+  return `${(lastSpace > 60 ? cut.slice(0, lastSpace) : cut.slice(0, max)).trimEnd()}…`
+}
+
 function buildCanonical(pathname: string | undefined) {
   if (!pathname) return undefined
   const path = pathname.startsWith("/") ? pathname : `/${pathname}`
@@ -33,11 +51,24 @@ function buildCanonical(pathname: string | undefined) {
 }
 
 type CreatePageMetadataOptions = {
-  title: string
+  /**
+   * Plain strings flow through the root layout's "%s | FHI Global" template —
+   * never bake the brand into them. Pass { absolute } only when a curated
+   * title (a CMS meta_title, a news headline with its sub-brand) must render
+   * verbatim, bypassing the template.
+   */
+  title: string | { absolute: string }
   description?: string
   imageUrl?: string | null
+  /** Intrinsic og:image dimensions — declare when known (e.g. 1200×630 cards). */
+  imageWidth?: number
+  imageHeight?: number
+  imageAlt?: string
   openGraphTitle?: string
   openGraphDescription?: string
+  /** og:type — "website" unless the page is an article or a person profile. */
+  ogType?: "website" | "article" | "profile"
+  robots?: Metadata["robots"]
   pathname?: string
   keywords?: string[]
 }
@@ -46,13 +77,18 @@ export function createPageMetadata({
   title,
   description,
   imageUrl,
+  imageWidth,
+  imageHeight,
+  imageAlt,
   openGraphTitle,
   openGraphDescription,
+  ogType = "website",
+  robots,
   pathname,
   keywords,
 }: CreatePageMetadataOptions): Metadata {
   const finalImageUrl = imageUrl ?? DEFAULT_PREVIEW_IMAGE_URL
-  const ogTitle = openGraphTitle ?? title
+  const ogTitle = openGraphTitle ?? (typeof title === "string" ? title : title.absolute)
   const ogDescription = openGraphDescription ?? description
   const canonical = buildCanonical(pathname)
 
@@ -61,13 +97,16 @@ export function createPageMetadata({
     description,
     metadataBase: new URL(SITE_URL),
     keywords,
+    robots,
     alternates: canonical ? { canonical } : undefined,
     openGraph: {
       title: ogTitle,
       description: ogDescription,
-      type: "website",
+      type: ogType,
       url: canonical,
-      images: finalImageUrl ? [{ url: finalImageUrl }] : undefined,
+      images: finalImageUrl
+        ? [{ url: finalImageUrl, width: imageWidth, height: imageHeight, alt: imageAlt ?? ogTitle }]
+        : undefined,
     },
     twitter: {
       card: "summary_large_image",

@@ -11,7 +11,7 @@ import { Reveal } from "@/components/public/reveal"
 export const revalidate = 600
 
 export const metadata: Metadata = createPageMetadata({
-  title: "About FHI Global | Building Trust, Creating Value",
+  title: "About Us — Building Trust, Creating Value",
   description:
     "FHI Global Property connects investors with Dubai's leading developers — who we are, how we work, and why buyers across the world trust us with UAE real estate.",
   pathname: "/about",

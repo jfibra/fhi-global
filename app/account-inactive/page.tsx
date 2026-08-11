@@ -7,7 +7,7 @@ import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
 export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Account Status | FHI Global",
+  title: "Account Status",
   description: "Your account status.",
 })
 

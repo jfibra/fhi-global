@@ -7,7 +7,7 @@ import {
   fetchArticlesList,
   toManilaIso,
 } from "@/lib/news-service"
-import { DEFAULT_PREVIEW_IMAGE_URL, jsonLdScript, truncateTitle } from "@/lib/seo"
+import { DEFAULT_PREVIEW_IMAGE_URL, jsonLdScript, truncateDescription } from "@/lib/seo"
 import { ContentBlocks } from "@/components/news/content-blocks"
 import { CopyLinkButton } from "@/components/news/copy-link-button"
 import { NewsViewTracker } from "@/components/news/news-view-tracker"
@@ -38,14 +38,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
 
   const article = await fetchArticleBySlug(slug)
-  if (!article) {
-    return {
-      title: "Article Not Found | FHI Global News",
-    }
-  }
+  // notFound() here, not a placeholder title: aborting in metadata is what
+  // turns a dead article URL into a real HTTP 404.
+  if (!article) notFound()
 
   const canonical = `${siteUrl}/news/${article.slug}`
-  const description = article.excerpt || article.title
+  // Never fall back to the raw title — a description that duplicates the
+  // title is a duplicate-content signal, not a snippet.
+  const description =
+    truncateDescription(article.excerpt) ||
+    "Dubai real estate news and market analysis from FHI Global."
   const image = article.featuredImage && article.featuredImage !== DEFAULT_PREVIEW_IMAGE_URL
     ? article.featuredImage
     : article.img && article.img !== DEFAULT_PREVIEW_IMAGE_URL
@@ -63,7 +65,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const modifiedTime = toManilaIso(article.updatedAt) ?? publishedTime
 
   return {
-    title: `${truncateTitle(article.title)} | FHI Global News`,
+    // absolute: bypasses the layout template so the full headline survives —
+    // truncating to fit the template amputated the keyword-bearing tail, and
+    // Google shortens over-long titles far more gracefully than we can.
+    title: { absolute: `${article.title} | FHI Global News` },
     description,
     metadataBase: new URL(siteUrl),
     keywords,

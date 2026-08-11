@@ -3,7 +3,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
-import { createPageMetadata } from "@/lib/seo"
+import { createPageMetadata, truncateDescription } from "@/lib/seo"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
 import { eventBrand } from "@/lib/events/brands"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
@@ -59,9 +59,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // notFound() here, not a placeholder title: aborting in metadata is what
   // turns a dead event URL into a real HTTP 404.
   if (!event) notFound()
+  const d = event.event_date ? new Date(event.event_date) : null
+  const dateLabel =
+    d && !Number.isNaN(d.getTime())
+      ? d.toLocaleDateString("en-AE", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Dubai" })
+      : null
   return createPageMetadata({
-    title: `${event.title} | FHI Global Events`,
-    description: event.description?.trim().slice(0, 155) || `Register for ${event.title} — an FHI Global event.`,
+    title: event.title,
+    description:
+      truncateDescription(event.description) ||
+      `Register for ${event.title}${dateLabel ? ` on ${dateLabel}` : ""}${event.venue ? ` at ${event.venue}` : ""}.`,
     imageUrl: event.image_url,
     pathname: `/events/${event.slug ?? event.id}`,
     keywords: [event.title, "FHI Global event", "Dubai real estate event"],

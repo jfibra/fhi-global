@@ -13,7 +13,7 @@ import { CompleteProfileForm, type CompleteProfileInitial } from "./complete-pro
 export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
-  title: "Complete your profile | FHI Global",
+  title: "Complete your profile",
   robots: { index: false, follow: false },
 }
 

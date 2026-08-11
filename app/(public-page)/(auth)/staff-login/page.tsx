@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
   ...createPageMetadata({
-    title: "Staff Sign In | FHI Global Operations",
+    title: "Staff Sign In",
     description: "Sign in to the FHI Global operations portal — sales reports, commission tracking, team management, developer directory, and support, all in one place.",
   }),
   // Private portal page: overrides the root layout's index,follow so Google drops it.

@@ -7,7 +7,7 @@ import { FeedbackForm } from "./feedback-form"
 
 // A customer's private review link — not something search engines should list.
 export const metadata: Metadata = {
-  title: "Customer Feedback | FHI Global Property",
+  title: "Customer Feedback",
   robots: { index: false, follow: false },
 }
 

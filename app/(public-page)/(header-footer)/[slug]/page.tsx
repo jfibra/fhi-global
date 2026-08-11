@@ -3,7 +3,7 @@ import Image from "next/image"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
-import { createPageMetadata } from "@/lib/seo"
+import { createPageMetadata, truncateDescription } from "@/lib/seo"
 import { ProjectCard, type ProjectCardData } from "@/components/project-card"
 import { Reveal } from "@/components/public/reveal"
 import { SOCIAL_URLS } from "@/lib/social"
@@ -54,9 +54,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const seo = getSeoPage(slug)
     if (seo) {
       return createPageMetadata({
-        title: `${seo.title} | FHI Global`,
+        title: seo.title,
         description: seo.description,
-        openGraphTitle: `${seo.h1} | FHI Global`,
+        openGraphTitle: seo.h1,
         openGraphDescription: seo.description,
         pathname: `/${seo.slug}`,
         keywords: [seo.h1, "Dubai real estate", "UAE property", "off-plan Dubai"],
@@ -71,13 +71,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const ogImage = `${siteUrl}/og/developer/${slug}`
-  const description = data.description ?? `Explore projects by ${data.name} on FHI Global.`
+  const description =
+    truncateDescription(data.description) ||
+    `Explore projects by ${data.name} — off-plan and ready properties in Dubai on FHI Global.`
   const keywords = [data.name, data.address, "Dubai developer", "real estate developer UAE"].filter(Boolean) as string[]
 
   return createPageMetadata({
-    title: `${data.name} | FHI Global Developers`,
+    title: `${data.name} Projects`,
     description,
-    openGraphTitle: `${data.name} | FHI Global`,
+    openGraphTitle: data.name,
     openGraphDescription: description,
     imageUrl: ogImage || data.logo_url,
     pathname: `/${slug}`,

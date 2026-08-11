@@ -3,7 +3,7 @@ import Image from "next/image"
 import { notFound, permanentRedirect } from "next/navigation"
 import Link from "next/link"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
-import { createPageMetadata } from "@/lib/seo"
+import { createPageMetadata, truncateDescription } from "@/lib/seo"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
@@ -64,8 +64,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const devRel = data.developers as unknown as { slug: string | null } | null
   if (devRel?.slug && devRel.slug !== devSlug) return { title: data.meta_title ?? data.name }
 
-  const title = data.meta_title ?? `${data.name} | FHI Global`
-  const description = data.meta_description ?? `Discover ${data.name} – a premium real estate project in Dubai.`
+  // Curated meta titles render verbatim (absolute bypasses the layout's
+  // "%s | FHI Global" template); bare names get the template's single brand.
+  const title = data.meta_title ? { absolute: data.meta_title } : data.name
+  const locality = [data.location, data.city].filter(Boolean).join(", ")
+  const description =
+    truncateDescription(data.meta_description) ||
+    truncateDescription(data.description) ||
+    `Discover ${data.name}${locality ? ` in ${locality}` : ""} — a premium real estate project in Dubai on FHI Global.`
   const ogImage = `${siteUrl}/og/project/${slug}`
   const keywords = [
     data.name,

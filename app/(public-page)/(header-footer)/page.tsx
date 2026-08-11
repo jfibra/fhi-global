@@ -33,7 +33,9 @@ import {
 export const revalidate = 120;
 
 export const metadata: Metadata = createPageMetadata({
-  title: "FHI Global — Dubai Real Estate | Premium Property Projects",
+  // absolute: the brand leads this title already — the layout template would
+  // append a second "| FHI Global".
+  title: { absolute: "FHI Global — Dubai Real Estate | Premium Property Projects" },
   description:
     "Discover premium off-plan and ready properties from Dubai's top developers. Explore luxury apartments, villas, and penthouses.",
   openGraphTitle: "FHI Global — Dubai's Premier Real Estate Portal",

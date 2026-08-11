@@ -10,7 +10,7 @@ import { CalendarDays, ChevronRight, Clock, MapPin, Star } from "lucide-react"
 export const revalidate = 120
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Events | FHI Global",
+  title: "Events",
   description:
     "Property showcases, investor nights, and community events by FHI Global and partner brands across the UAE and the Philippines. Register your seat.",
   pathname: "/events",

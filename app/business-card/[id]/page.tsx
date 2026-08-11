@@ -177,7 +177,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const data = await loadProfile(id)
   if (!data) {
     return createPageMetadata({
-      title: "Profile not found | FHI Global",
+      title: "Profile not found",
       description: "This business profile link is no longer active.",
     })
   }

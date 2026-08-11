@@ -8,7 +8,7 @@ import { createPageMetadata } from "@/lib/seo"
 export const revalidate = 300
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Gallery | FHI Global",
+  title: "Gallery",
   description:
     "Photo albums from FHI Global events — showcases, developer visits and awarding ceremonies across Dubai and the UAE.",
   pathname: "/gallery",

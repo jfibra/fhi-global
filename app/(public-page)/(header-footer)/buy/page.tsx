@@ -23,7 +23,7 @@ import { ChevronRight } from "lucide-react"
 export const revalidate = 120
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Buy Property in the United Arab Emirates | FHI Global",
+  title: "Buy Property in the United Arab Emirates",
   description:
     "Browse properties for sale in the UAE from FHI Global listings — filter by location, type, and budget. Listings are curated by our sales team.",
   pathname: "/buy",

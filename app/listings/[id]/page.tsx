@@ -3,13 +3,14 @@ import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { MapPin, Building2, ArrowLeft, Mail, Phone, ChevronRight } from "lucide-react"
-import { createPageMetadata, SITE_URL } from "@/lib/seo"
+import { createPageMetadata, SITE_URL, truncateDescription, truncateTitle } from "@/lib/seo"
 import {
   fetchPublicAgentListingById,
   isUsableListingAgent,
   listingAgentName,
   listingAgentPhone,
   type PublicListingAgent,
+  type PublicAgentListingRow,
 } from "@/lib/buy/agent-listings-public"
 import { roleToLabel } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
@@ -112,6 +113,23 @@ function formatPriceLine(
   return `${code} ${fmt(useFrom)}`
 }
 
+// Shared between generateMetadata and the page body so the SERP snippet and
+// the rendered page can never disagree.
+type ListingRowLike = Pick<PublicAgentListingRow, "price" | "unit_type" | "projects">
+
+function listingOwnPrice(row: Pick<PublicAgentListingRow, "price">): number | null {
+  const n = row.price == null ? null : typeof row.price === "number" ? row.price : Number(row.price)
+  return n != null && Number.isFinite(n) ? n : null
+}
+
+function listingLocationLabel(proj: PublicAgentListingRow["projects"]): string {
+  return [proj?.city, proj?.location].filter(Boolean).join(", ") || "United Arab Emirates"
+}
+
+function listingTypeLabel(row: ListingRowLike, unitType: string | null | undefined): string {
+  return (row.unit_type?.trim() || unitType || "Property").replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   const { row, error } = await fetchPublicAgentListingById(id)
@@ -120,18 +138,39 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // in metadata is what turns a dead listing URL into a real HTTP 404.
   if (error) throw new Error("Failed to load listing")
   if (!row) notFound()
+
+  // Compose the fallback from structured fields, never from the agent's raw
+  // notes: those are free text (deposit terms, commission notes) and read as
+  // junk in a SERP snippet.
+  const proj = row.projects
+  const u = proj ? pickUnit(proj.project_units) : null
+  const priceLine = formatPriceLine(
+    listingOwnPrice(row),
+    proj?.launch_price_from ?? null,
+    proj?.launch_price_to ?? null,
+    row.currency,
+  )
+  const facts = [
+    u?.bedrooms != null ? `${u.bedrooms} bed` : null,
+    u?.bathrooms != null ? `${u.bathrooms} bath` : null,
+    priceLine === "Price on request" ? null : priceLine,
+  ]
+    .filter(Boolean)
+    .join(", ")
+  const kindLabel = row.listing_kind === "rent" ? "rent" : "sale"
   const description =
-    row.description?.trim().slice(0, 155) ||
-    `${row.title} — Browse this listing on FHI Global.`
+    truncateDescription(row.description) ||
+    `${listingTypeLabel(row, u?.unit_type)} for ${kindLabel} in ${listingLocationLabel(proj)}${facts ? ` — ${facts}` : ""}.`
+
   // The customized share card (see ShareCardModal / /og/listing). The
   // updated_at version param makes scrapers re-fetch after every save.
   const ogImageVersion = Date.parse(row.updated_at) || 0
   return createPageMetadata({
-    title: `${row.title} | FHI Global`,
+    title: truncateTitle(row.title),
     description,
     pathname: `/listings/${row.slug ?? row.id}`,
     imageUrl: `${SITE_URL.replace(/\/$/, "")}/og/listing/${row.id}?v=${ogImageVersion}`,
-    keywords: [row.title, "UAE property", row.listing_kind === "rent" ? "rent" : "sale", "FHI Global"],
+    keywords: [row.title, "UAE property", kindLabel, "FHI Global"],
   })
 }
 
@@ -151,13 +190,11 @@ export default async function PublicAgentListingPage({ params }: Props) {
 
   const proj = row.projects
   const u = proj ? pickUnit(proj.project_units) : null
-  const own =
-    row.price == null ? null : typeof row.price === "number" ? row.price : Number(row.price)
-  const ownOk = own != null && Number.isFinite(own) ? own : null
+  const ownOk = listingOwnPrice(row)
   const galleryUrls = mergedListingGalleryUrls(proj, row.agent_listing_images)
   const galleryItems = galleryUrls.map((image_url, i) => ({ id: i + 1, image_url }))
-  const loc = [proj?.city, proj?.location].filter(Boolean).join(", ") || "United Arab Emirates"
-  const typeLabel = (row.unit_type?.trim() || u?.unit_type || "Property").replace(/\b\w/g, (c) => c.toUpperCase())
+  const loc = listingLocationLabel(proj)
+  const typeLabel = listingTypeLabel(row, u?.unit_type)
   const backHref = row.listing_kind === "rent" ? "/rent" : "/buy"
 
   // Enquiries go to the agent who owns the listing. Their phone falls back to

@@ -9,7 +9,7 @@ import { titleCaseName } from "@/lib/public-profile"
 export const revalidate = 300
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Meet Our Agents | FHI Global",
+  title: "Meet Our Agents",
   description:
     "Meet the FHI Global team — property consultants across Dubai ready to guide you from first viewing to handover.",
   pathname: "/agents",

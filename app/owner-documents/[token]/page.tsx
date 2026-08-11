@@ -11,7 +11,7 @@ import { IntakeForm } from "./intake-form"
 export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
-  title: "Property Owner Documents | FHI Global",
+  title: "Property Owner Documents",
   robots: { index: false, follow: false },
 }
 

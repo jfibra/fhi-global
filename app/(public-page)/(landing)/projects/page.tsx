@@ -11,7 +11,7 @@ import { Building2 } from "lucide-react"
 import { Suspense } from "react"
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Real Estate Projects in Dubai | FHI Global",
+  title: "Real Estate Projects in Dubai",
   description: "Browse premium off-plan and ready residential projects from top Dubai developers.",
   pathname: "/projects",
   keywords: ["Dubai projects", "off-plan properties Dubai", "ready properties UAE", "Dubai investment properties"],

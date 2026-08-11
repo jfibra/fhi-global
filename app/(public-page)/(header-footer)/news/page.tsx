@@ -15,7 +15,7 @@ import { ArrowRight, Clock, TrendingUp } from "lucide-react"
 export const revalidate = 300
 
 export const metadata: Metadata = createPageMetadata({
-  title: "News | FHI Global — Real Estate Insights",
+  title: "Real Estate News & Insights",
   description:
     "Stay up to date with the latest real estate news, market trends, and investment insights from FHI Global.",
   pathname: "/news",

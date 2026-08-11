@@ -5,7 +5,7 @@ import { createPageMetadata } from "@/lib/seo"
 import { MapPin, Phone, Mail, Clock, Building2, Send } from "lucide-react"
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Contact FHI Global | Get in Touch",
+  title: "Contact Us — Get in Touch",
   description:
     "Contact FHI Global's team in Dubai. Reach out for developer partnerships, agent onboarding, or any real estate inquiry.",
   openGraphDescription: "Reach out to FHI Global's Dubai team for any real estate inquiry.",
