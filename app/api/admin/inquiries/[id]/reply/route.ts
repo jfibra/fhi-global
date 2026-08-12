@@ -23,7 +23,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
   let body: { subject?: string; message?: string }
   try {
-    body = (await req.json()) as { subject?: string; message?: string }
+    body = (await req.json()) as { subject?: string; message?: string; attachments?: unknown }
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
   }
@@ -61,6 +61,25 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     }>()
   if (!lead) return NextResponse.json({ error: "Lead not found." }, { status: 404 })
 
+  // Same trust rule as compose: only files we stored may be attached.
+  const attBase = (process.env.S3_PUBLIC_URL ?? "").replace(/[/]+$/, "") + "/fhi_global/email-attachments/"
+  const rawAtt = (body as { attachments?: unknown }).attachments
+  const attachments: Array<{ name: string; url: string; size: number; type: string }> = []
+  if (rawAtt != null) {
+    if (!Array.isArray(rawAtt) || rawAtt.length > 5) {
+      return NextResponse.json({ error: "Invalid attachments." }, { status: 400 })
+    }
+    for (const item of rawAtt as Array<{ name?: unknown; url?: unknown; size?: unknown; type?: unknown }>) {
+      const name = String(item?.name ?? "").trim().slice(0, 200)
+      const url = String(item?.url ?? "").trim()
+      if (!name || !url.startsWith(attBase)) {
+        return NextResponse.json({ error: "Invalid attachments." }, { status: 400 })
+      }
+      const size = Number(item?.size ?? 0)
+      attachments.push({ name, url, size: Number.isFinite(size) ? size : 0, type: String(item?.type ?? "").slice(0, 100) })
+    }
+  }
+
   const senderName = guard.context.profile.fullname ?? guard.context.email ?? null
   const regarding = lead.project_name
     ? `${lead.project_name}${lead.developer_name ? ` · ${lead.developer_name}` : ""}`
@@ -68,7 +87,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
   let sendError: string | null = null
   try {
-    await sendAdminDirectEmail({ to: lead.email, subject, message, senderName, regarding })
+    await sendAdminDirectEmail({ to: lead.email, subject, message, senderName, regarding, attachments })
   } catch (error) {
     sendError = error instanceof Error ? error.message : String(error)
   }
@@ -85,6 +104,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       sent_by_name: senderName,
       status: sendError ? "failed" : "sent",
       error: sendError,
+      attachments,
     })
     .select()
     .single()

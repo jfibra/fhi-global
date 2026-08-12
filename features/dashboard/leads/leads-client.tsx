@@ -15,7 +15,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   Archive, ArrowLeft, Building2, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight,
   Clock, Globe, Inbox, Loader2, Mail, MailOpen, MessageCircle, MonitorSmartphone,
-  PenSquare, Phone, PhoneCall, RefreshCw, RotateCcw, Search, Send, Star, Tag, Trash2, Undo2, X,
+  Paperclip, PenSquare, Phone, PhoneCall, RefreshCw, RotateCcw, Search, Send, Star, Tag, Trash2, Undo2, X,
 } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
 import { formatDateTime, relativeTime } from "@/lib/utils"
@@ -24,6 +24,7 @@ import {
   type InquiriesSummary,
   type InquiryCategory,
   type InquiryStatus,
+  type EmailAttachment,
   type SentEmail,
   fetchEmailThread,
   fetchInquiries,
@@ -38,6 +39,7 @@ import {
   setInquiryStarred,
   setInquiryStatus,
   syncInbox,
+  uploadEmailAttachment,
   LOOKING_FOR_LABELS,
   CATEGORY_LABELS,
 } from "@/lib/inquiries-service"
@@ -265,7 +267,6 @@ export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
   }, [])
 
   useEffect(() => {
-    if (personal) return
     const initial = setTimeout(() => { void runAutoSync() }, 100)
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") void runAutoSync()
@@ -279,11 +280,10 @@ export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
       clearInterval(timer)
       document.removeEventListener("visibilitychange", onVisible)
     }
-  }, [personal, runAutoSync])
+  }, [runAutoSync])
 
   /** Manual refresh = check the mailbox first, then reload the list. */
   const handleRefresh = async () => {
-    if (personal) { void load(); return }
     setSyncing(true)
     const { ingested, error } = await syncInbox()
     setSyncing(false)
@@ -1085,6 +1085,191 @@ function ThreadFact({ label, value }: { label: string; value: string }) {
   )
 }
 
+// ─── Email attachments (Compose / Reply) ─────────────────────────────────────────
+
+/** Draft attachments for one composer: files upload on pick, send gets URLs. */
+function useAttachments() {
+  const [attachments, setAttachments] = useState<EmailAttachment[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const add = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setError(null)
+    const room = 5 - attachments.length
+    if (room <= 0) { setError("Up to 5 attachments per email."); return }
+    const picked = Array.from(files).slice(0, room)
+    setUploading(true)
+    const uploaded: EmailAttachment[] = []
+    let failed: string | null = files.length > room ? "Up to 5 attachments per email." : null
+    for (const file of picked) {
+      const { attachment, error: err } = await uploadEmailAttachment(file)
+      if (attachment) uploaded.push(attachment)
+      else failed = err
+    }
+    setUploading(false)
+    if (uploaded.length > 0) setAttachments((a) => [...a, ...uploaded].slice(0, 5))
+    if (failed) setError(failed)
+  }
+
+  const remove = (url: string) => setAttachments((a) => a.filter((x) => x.url !== url))
+  const reset = () => { setAttachments([]); setError(null) }
+  return { attachments, uploading, error, add, remove, reset }
+}
+
+function formatBytes(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return ""
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// Mirrors the upload route's allowlist — images, PDF and office documents.
+const ATTACH_ACCEPT = ".jpg,.jpeg,.png,.webp,.gif,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+
+/** True when the attachment is an image we can preview inline. */
+function isImageAttachment(a: EmailAttachment): boolean {
+  return (a.type ?? "").startsWith("image/") || /\.(jpe?g|png|webp|gif)$/i.test(a.name || a.url)
+}
+
+/** The paperclip: opens the file picker, uploads on selection. */
+function AttachButton({
+  uploading, disabled, onPick,
+}: {
+  uploading: boolean
+  disabled: boolean
+  onPick: (files: FileList | null) => Promise<void>
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept={ATTACH_ACCEPT}
+        className="hidden"
+        onChange={(e) => { void onPick(e.target.files); e.target.value = "" }}
+      />
+      <button
+        type="button"
+        title="Attach files"
+        aria-label="Attach files"
+        onClick={() => inputRef.current?.click()}
+        disabled={disabled || uploading}
+        className="w-10 h-10 flex items-center justify-center text-[#6b7280] hover:bg-[#f1f3f4] hover:text-[#001f3f] disabled:opacity-50 transition-colors"
+      >
+        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+      </button>
+    </>
+  )
+}
+
+/** Pending attachments inside a composer — removable chips. */
+function AttachmentDrafts({
+  attachments, uploading, onRemove,
+}: {
+  attachments: EmailAttachment[]
+  uploading: boolean
+  onRemove: (url: string) => void
+}) {
+  if (attachments.length === 0 && !uploading) return null
+  return (
+    <div className="flex flex-wrap gap-2 px-5 pb-2">
+      {attachments.map((a) => (
+        <span
+          key={a.url}
+          className="inline-flex items-center gap-1.5 max-w-full pl-1.5 pr-1 py-1 bg-[#f1f3f4] text-xs text-[#374151]"
+        >
+          {isImageAttachment(a) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={a.url}
+              alt=""
+              className="w-7 h-7 object-cover shrink-0 bg-white"
+              onError={(e) => { e.currentTarget.style.display = "none" }}
+            />
+          ) : (
+            <Paperclip className="w-3 h-3 shrink-0 text-[#9ca3af] ml-1" />
+          )}
+          <span className="truncate max-w-[180px] font-semibold">{a.name}</span>
+          {formatBytes(a.size) && <span className="text-[#9ca3af]">{formatBytes(a.size)}</span>}
+          <button
+            type="button"
+            onClick={() => onRemove(a.url)}
+            aria-label={`Remove ${a.name}`}
+            className="w-5 h-5 flex items-center justify-center text-[#9ca3af] hover:text-[#0d1117] transition-colors"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </span>
+      ))}
+      {uploading && (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#f1f3f4] text-xs text-[#9ca3af]">
+          <Loader2 className="w-3 h-3 animate-spin" /> Uploading…
+        </span>
+      )}
+    </div>
+  )
+}
+
+/** Attachments on a delivered message — images preview inline (Gmail-style
+ *  thumbnail card), everything else is a chip. All open in a new tab. */
+function AttachmentLinks({ attachments }: { attachments?: EmailAttachment[] }) {
+  if (!attachments || attachments.length === 0) return null
+  return (
+    <div className="flex flex-wrap gap-2 mt-3">
+      {attachments.map((a) => (
+        <AttachmentLink key={a.url} a={a} />
+      ))}
+    </div>
+  )
+}
+
+function AttachmentLink({ a }: { a: EmailAttachment }) {
+  // A preview that fails to load falls back to the plain chip.
+  const [broken, setBroken] = useState(false)
+  if (isImageAttachment(a) && !broken) {
+    return (
+      <a
+        href={a.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={a.name}
+        className="block w-44 max-w-full border border-[#e5e8ec] bg-white hover:border-[#001f3f]/40 transition-colors overflow-hidden"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={a.url}
+          alt={a.name}
+          loading="lazy"
+          onError={() => setBroken(true)}
+          className="w-full h-28 object-cover bg-[#f1f3f4]"
+        />
+        <span className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-[#001f3f]">
+          <Paperclip className="w-3 h-3 shrink-0 text-[#9ca3af]" />
+          <span className="truncate">{a.name}</span>
+          {formatBytes(a.size) && (
+            <span className="font-normal text-[#9ca3af] shrink-0">{formatBytes(a.size)}</span>
+          )}
+        </span>
+      </a>
+    )
+  }
+  return (
+    <a
+      href={a.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 max-w-full px-2.5 py-1.5 border border-[#e5e8ec] bg-white text-xs font-semibold text-[#001f3f] hover:bg-[#f1f3f4] transition-colors"
+    >
+      <Paperclip className="w-3 h-3 shrink-0 text-[#9ca3af]" />
+      <span className="truncate max-w-[200px]">{a.name}</span>
+      {formatBytes(a.size) && <span className="font-normal text-[#9ca3af]">{formatBytes(a.size)}</span>}
+    </a>
+  )
+}
+
 // ─── Reply box ────────────────────────────────────────────────────────────────
 
 function ReplyBox({
@@ -1104,6 +1289,7 @@ function ReplyBox({
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const att = useAttachments()
 
   if (disabled) {
     return (
@@ -1131,12 +1317,13 @@ function ReplyBox({
     if (!subject.trim() || !message.trim()) { setError("Write a subject and a message first."); return }
     setSending(true)
     setError(null)
-    const { email, error: err } = await sendInquiryReply(lead.id, subject.trim(), message.trim())
+    const { email, error: err } = await sendInquiryReply(lead.id, subject.trim(), message.trim(), att.attachments)
     setSending(false)
     if (err) { setError(err); if (email) onReplied(email); return }
     if (email) onReplied(email)
     setOpen(false)
     setMessage("")
+    att.reset()
     onNotice(`Reply sent to ${lead.email}.`)
   }
 
@@ -1165,20 +1352,24 @@ function ReplyBox({
           className="w-full py-3 text-sm text-[#374151] leading-relaxed resize-y focus:outline-none"
         />
       </div>
-      {error && <p className="px-5 pb-1 text-xs font-semibold text-rose-600">{error}</p>}
+      <AttachmentDrafts attachments={att.attachments} uploading={att.uploading} onRemove={att.remove} />
+      {(error ?? att.error) && (
+        <p className="px-5 pb-1 text-xs font-semibold text-rose-600">{error ?? att.error}</p>
+      )}
       <div className="flex items-center gap-2 px-5 py-3 border-t border-[#f0f0f0]">
         <button
           type="button"
           onClick={() => void send()}
-          disabled={sending}
+          disabled={sending || att.uploading}
           className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#0a3d6b] disabled:opacity-60 transition-all"
         >
           {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           {sending ? "Sending…" : "Send"}
         </button>
+        <AttachButton uploading={att.uploading} disabled={sending} onPick={att.add} />
         <button
           type="button"
-          onClick={() => { setOpen(false); setError(null) }}
+          onClick={() => { setOpen(false); setError(null); att.reset() }}
           disabled={sending}
           className="px-4 py-2.5 text-sm font-semibold text-[#6b7280] hover:bg-[#f1f3f4] transition-all"
         >
@@ -1187,6 +1378,44 @@ function ReplyBox({
         <span className="ml-auto text-[11px] text-[#c4c4c4]">Sent from your FHI Global email</span>
       </div>
     </div>
+  )
+}
+
+// ─── Sender avatar: profile photo → Gravatar → initials ──────────────────────
+//
+// Gmail's own avatars aren't fetchable by third parties, so the chain is:
+// a registered sender's FHI photo (resolved server-side), else their
+// Gravatar (?d=404 turns "no Gravatar" into an error we can catch), else
+// the initial circle.
+function SenderAvatar({ email, name, photo }: { email: string | null; name: string; photo?: string | null }) {
+  const [src, setSrc] = useState<string | null>(photo ?? null)
+
+  useEffect(() => {
+    if (photo || !email) return
+    let alive = true
+    const run = async () => {
+      try {
+        const bytes = new TextEncoder().encode(email.trim().toLowerCase())
+        const digest = await crypto.subtle.digest("SHA-256", bytes)
+        const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("")
+        if (alive) setSrc(`https://gravatar.com/avatar/${hex}?d=404&s=96`)
+      } catch {
+        // No WebCrypto — initials it is.
+      }
+    }
+    void run()
+    return () => { alive = false }
+  }, [photo, email])
+
+  if (!src) return <UserAvatar name={name} size={40} />
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      onError={() => setSrc(null)}
+      className="w-10 h-10 rounded-full object-cover object-top shrink-0 bg-[#eef1f5]"
+    />
   )
 }
 
@@ -1229,7 +1458,11 @@ function EmailMessageCard({ m, counterpartName }: { m: SentEmail; counterpartNam
     >
       <div className="flex items-start gap-3 px-5 pt-4">
         {inbound ? (
-          <UserAvatar name={m.from_name ?? counterpartName ?? m.from_email ?? "?"} size={40} />
+          <SenderAvatar
+            email={m.from_email ?? null}
+            name={m.from_name ?? counterpartName ?? m.from_email ?? "?"}
+            photo={m.from_photo}
+          />
         ) : (
           <div className="w-10 h-10 rounded-full bg-[#001f3f] flex items-center justify-center shrink-0">
             <span className="text-white text-xs font-bold">FHI</span>
@@ -1257,6 +1490,7 @@ function EmailMessageCard({ m, counterpartName }: { m: SentEmail; counterpartNam
           </p>
         )}
         <p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">{visible}</p>
+        <AttachmentLinks attachments={m.attachments} />
         {quoted && (
           <>
             <button
@@ -1383,6 +1617,7 @@ function SentReplyBox({
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const att = useAttachments()
 
   if (!open) {
     return (
@@ -1407,12 +1642,14 @@ function SentReplyBox({
       toName: toName ?? undefined,
       subject: subject.trim(),
       message: message.trim(),
+      attachments: att.attachments,
     })
     setSending(false)
     if (err) { setError(err); return }
     if (email) onSent(email)
     setOpen(false)
     setMessage("")
+    att.reset()
   }
 
   return (
@@ -1441,20 +1678,24 @@ function SentReplyBox({
           className="w-full py-3 text-sm text-[#374151] leading-relaxed resize-y focus:outline-none"
         />
       </div>
-      {error && <p className="px-5 pb-1 text-xs font-semibold text-rose-600">{error}</p>}
+      <AttachmentDrafts attachments={att.attachments} uploading={att.uploading} onRemove={att.remove} />
+      {(error ?? att.error) && (
+        <p className="px-5 pb-1 text-xs font-semibold text-rose-600">{error ?? att.error}</p>
+      )}
       <div className="flex items-center gap-2 px-5 py-3 border-t border-[#f0f0f0]">
         <button
           type="button"
           onClick={() => void send()}
-          disabled={sending}
+          disabled={sending || att.uploading}
           className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#0a3d6b] disabled:opacity-60 transition-all"
         >
           {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           {sending ? "Sending…" : "Send"}
         </button>
+        <AttachButton uploading={att.uploading} disabled={sending} onPick={att.add} />
         <button
           type="button"
-          onClick={() => { setOpen(false); setError(null) }}
+          onClick={() => { setOpen(false); setError(null); att.reset() }}
           disabled={sending}
           className="px-4 py-2.5 text-sm font-semibold text-[#6b7280] hover:bg-[#f1f3f4] transition-all"
         >
@@ -1482,6 +1723,7 @@ function ComposeWindow({
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const att = useAttachments()
 
   const send = async () => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to.trim())) { setError("Enter a valid email address."); return }
@@ -1493,6 +1735,7 @@ function ComposeWindow({
       toName: toName.trim() || undefined,
       subject: subject.trim(),
       message: message.trim(),
+      attachments: att.attachments,
     })
     setSending(false)
     if (err) { setError(err); return }
@@ -1555,17 +1798,21 @@ function ComposeWindow({
         />
       </div>
 
-      {error && <p className="px-5 pb-2 text-xs font-semibold text-rose-600">{error}</p>}
+      <AttachmentDrafts attachments={att.attachments} uploading={att.uploading} onRemove={att.remove} />
+      {(error ?? att.error) && (
+        <p className="px-5 pb-2 text-xs font-semibold text-rose-600">{error ?? att.error}</p>
+      )}
       <div className="flex items-center gap-2 px-5 py-3 border-t border-[#f0f0f0]">
         <button
           type="button"
           onClick={() => void send()}
-          disabled={sending}
+          disabled={sending || att.uploading}
           className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#d6b357] text-[#1a1408] text-sm font-bold hover:brightness-95 disabled:opacity-60 transition-all"
         >
           {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           {sending ? "Sending…" : "Send"}
         </button>
+        <AttachButton uploading={att.uploading} disabled={sending} onPick={att.add} />
         <span className="ml-auto text-[11px] text-[#c4c4c4]">Delivered with the FHI Global template</span>
       </div>
     </div>

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireActiveSession, requireRole } from "@/lib/auth-guard"
+import { requireActiveSession } from "@/lib/auth-guard"
 import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { senderPhotoMap } from "@/lib/sender-photos"
 
 // The correspondence with one email address, for composed (non-lead) mail:
 // everything we sent to it plus every reply it sent back, oldest first.
@@ -11,9 +12,9 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 export const runtime = "nodejs"
 
 const COLUMNS: string =
-  "id, inquiry_id, to_email, to_name, subject, body_text, sent_by, sent_by_name, status, error, direction, from_email, from_name, read_at, created_at"
-// Pre-migration-034 shape (no read_at yet).
-const COLUMNS_NO_READ: string = COLUMNS.replace(", read_at", "")
+  "id, inquiry_id, to_email, to_name, subject, body_text, sent_by, sent_by_name, status, error, direction, from_email, from_name, read_at, attachments, created_at"
+// Pre-migration-034/044 shape (no read_at / attachments yet).
+const COLUMNS_NO_READ: string = COLUMNS.replace(", read_at", "").replace(", attachments", "")
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function GET(req: NextRequest) {
@@ -48,18 +49,21 @@ export async function GET(req: NextRequest) {
         if (!isAdmin) q = q.eq("sent_by", session.context.userId)
         return q
       })(),
-      // Inbound rows exist only for the house mailbox the sync watches —
-      // a personal outbox has none, so skip the query entirely.
-      isAdmin
-        ? admin
-            .from("inquiry_emails")
-            .select(columns)
-            .is("inquiry_id", null)
-            .eq("direction", "inbound")
-            .ilike("from_email", pattern)
-            .order("created_at", { ascending: true })
-            .limit(100)
-        : Promise.resolve({ data: [], error: null } as { data: unknown[]; error: null }),
+      // Inbound rows are scoped to whichever mailbox pulled them in: the
+      // admin mailroom reads the house mailbox (owner NULL), a personal
+      // mailbox reads its own — nobody sees anyone else's replies.
+      (() => {
+        let q = admin
+          .from("inquiry_emails")
+          .select(columns)
+          .is("inquiry_id", null)
+          .eq("direction", "inbound")
+          .ilike("from_email", pattern)
+          .order("created_at", { ascending: true })
+          .limit(100)
+        q = isAdmin ? q.is("owner_id", null) : q.eq("owner_id", session.context.userId)
+        return q
+      })(),
     ])
 
   let [outbound, inbound] = await run(COLUMNS)
@@ -72,17 +76,31 @@ export async function GET(req: NextRequest) {
   if (outbound.error) return NextResponse.json({ error: outbound.error.message }, { status: 500 })
 
   type Row = { created_at: string }
-  const rows = ([...(outbound.data ?? []), ...(inbound.error ? [] : inbound.data ?? [])] as unknown as Row[]).sort(
+  type LooseRow = Row & { direction?: string; from_email?: string | null; from_photo?: string | null }
+  const rows = ([...(outbound.data ?? []), ...(inbound.error ? [] : inbound.data ?? [])] as unknown as LooseRow[]).sort(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
   )
+
+  // Registered senders get their real profile photo on the thread.
+  const inboundRows = rows.filter((r) => r.direction === "inbound")
+  if (inboundRows.length > 0) {
+    const photos = await senderPhotoMap(inboundRows.map((r) => r.from_email))
+    for (const r of inboundRows) {
+      const key = (r.from_email ?? "").trim().toLowerCase()
+      if (photos[key]) r.from_photo = photos[key]
+    }
+  }
 
   return NextResponse.json({ rows })
 }
 
 /** Mark every unread reply from an address as read — opening the thread IS reading it. */
 export async function PATCH(req: NextRequest) {
-  const guard = await requireRole([...ROLES_ADMIN_STAFF])
-  if (!guard.ok) return guard.response
+  const session = await requireActiveSession()
+  if (!session.ok) return session.response
+  const isAdmin = ROLES_ADMIN_STAFF.map(String).includes(String(session.context.profile.role ?? "").toLowerCase().trim())
+  const hasMailbox = Boolean((session.context.profile.mailbox_address ?? "").trim())
+  if (!isAdmin && !hasMailbox) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   let body: { address?: string }
   try {
@@ -96,13 +114,15 @@ export async function PATCH(req: NextRequest) {
   }
 
   const admin = createAdminSupabase()
-  const { error } = await admin
+  let update = admin
     .from("inquiry_emails")
     .update({ read_at: new Date().toISOString() })
     .eq("direction", "inbound")
     .is("inquiry_id", null)
     .is("read_at", null)
     .ilike("from_email", address.replace(/([%_\\])/g, "\\$1"))
+  update = isAdmin ? update.is("owner_id", null) : update.eq("owner_id", session.context.userId)
+  const { error } = await update
   // Migration 034 not applied — read state is a no-op until then. 42703 =
   // missing column in a filter; PGRST204 = missing column in the update payload.
   if (error && error.code !== "42703" && error.code !== "PGRST204") {

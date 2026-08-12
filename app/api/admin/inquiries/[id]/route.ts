@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireRole } from "@/lib/auth-guard"
 import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { senderPhotoMap } from "@/lib/sender-photos"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
 // Read one lead, change its status, or soft-delete/restore it. Unlike the
@@ -15,7 +16,7 @@ const FULL_COLUMNS =
   "id, name, email, phone_country_code, phone, looking_for, property_category, project_id, project_name, developer_name, status, source, ip_address, user_agent, created_at, contacted_at, read_at, starred_at, updated_at, deleted_at"
 // Typed as plain string so the two fallback selects unify to one row shape.
 const EMAIL_COLUMNS: string =
-  "id, inquiry_id, to_email, to_name, subject, body_text, sent_by, sent_by_name, status, error, direction, from_email, from_name, created_at"
+  "id, inquiry_id, to_email, to_name, subject, body_text, sent_by, sent_by_name, status, error, direction, from_email, from_name, attachments, created_at"
 // Pre-migration-033 shape (no direction/from columns).
 const EMAIL_COLUMNS_LEGACY: string =
   "id, inquiry_id, to_email, to_name, subject, body_text, sent_by, sent_by_name, status, error, created_at"
@@ -63,7 +64,19 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
       .order("created_at", { ascending: true })
   }
 
-  return NextResponse.json({ inquiry: data, emails: emailsRes.data ?? [] })
+  // Registered repliers (an agent, a member who inquired) show their photo.
+  type LooseEmail = { direction?: string; from_email?: string | null; from_photo?: string | null }
+  const emails = (emailsRes.data ?? []) as LooseEmail[]
+  const inboundEmails = emails.filter((e) => e.direction === "inbound")
+  if (inboundEmails.length > 0) {
+    const photos = await senderPhotoMap(inboundEmails.map((e) => e.from_email))
+    for (const e of inboundEmails) {
+      const key = (e.from_email ?? "").trim().toLowerCase()
+      if (photos[key]) e.from_photo = photos[key]
+    }
+  }
+
+  return NextResponse.json({ inquiry: data, emails })
 }
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {

@@ -13,7 +13,7 @@ import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 export const runtime = "nodejs"
 
 const SENT_COLUMNS =
-  "id, inquiry_id, to_email, to_name, subject, body_text, sent_by, sent_by_name, status, error, direction, from_email, from_name, created_at"
+  "id, inquiry_id, to_email, to_name, subject, body_text, sent_by, sent_by_name, status, error, direction, from_email, from_name, attachments, created_at"
 // Pre-migration-033 shape (no direction/from columns).
 const SENT_COLUMNS_LEGACY =
   "id, inquiry_id, to_email, to_name, subject, body_text, sent_by, sent_by_name, status, error, created_at"
@@ -83,20 +83,25 @@ export async function GET(req: NextRequest) {
       return r
     })(),
     // Unread replies to composed mail, grouped by sender — drives the bold
-    // rows and the count badge in the Sent folder. Errors (pre-migration-034)
-    // just mean an empty map.
-    admin
-      .from("inquiry_emails")
-      .select("from_email")
-      .eq("direction", "inbound")
-      .is("inquiry_id", null)
-      .is("read_at", null)
-      .limit(500),
+    // rows and the count badge in the Sent folder. Admins read the house
+    // mailroom (owner NULL); a personal mailbox reads its own. Errors
+    // (pre-migration-034) just mean an empty map.
+    (() => {
+      let q = admin
+        .from("inquiry_emails")
+        .select("from_email")
+        .eq("direction", "inbound")
+        .is("inquiry_id", null)
+        .is("read_at", null)
+        .limit(500)
+      q = access.admin ? q.is("owner_id", null) : q.eq("owner_id", access.context.userId)
+      return q
+    })(),
   ])
   const { data, count, error } = listResult
 
   const unreadByAddress: Record<string, number> = {}
-  if (access.admin && !unreadResult.error) {
+  if (!unreadResult.error) {
     for (const row of (unreadResult.data ?? []) as Array<{ from_email: string | null }>) {
       const key = (row.from_email ?? "").toLowerCase()
       if (key) unreadByAddress[key] = (unreadByAddress[key] ?? 0) + 1
@@ -114,15 +119,44 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ rows: data ?? [], total: count ?? 0, page, perPage, unreadByAddress })
 }
 
+
+type AttachmentInput = { name?: unknown; url?: unknown; size?: unknown; type?: unknown }
+
+/**
+ * Attachments must be files WE stored: only descriptors pointing under our
+ * own email-attachments prefix are accepted, so the send can't be used to
+ * exfiltrate arbitrary URLs into people's inboxes under our name.
+ */
+function sanitizeAttachments(raw: unknown): Array<{ name: string; url: string; size: number; type: string }> | null {
+  if (raw == null) return []
+  if (!Array.isArray(raw) || raw.length > 5) return null
+  const base = (process.env.S3_PUBLIC_URL ?? "").replace(/[/]+$/, "")
+  const prefix = base + "/fhi_global/email-attachments/"
+  const out: Array<{ name: string; url: string; size: number; type: string }> = []
+  for (const item of raw as AttachmentInput[]) {
+    const name = String(item?.name ?? "").trim().slice(0, 200)
+    const url = String(item?.url ?? "").trim()
+    const size = Number(item?.size ?? 0)
+    const type = String(item?.type ?? "").trim().slice(0, 100)
+    if (!name || !url.startsWith(prefix)) return null
+    out.push({ name, url, size: Number.isFinite(size) ? size : 0, type })
+  }
+  return out
+}
+
 export async function POST(req: NextRequest) {
   const access = await resolveMailAccess()
   if ("response" in access) return access.response
 
-  let body: { to?: string; toName?: string; subject?: string; message?: string }
+  let body: { to?: string; toName?: string; subject?: string; message?: string; attachments?: unknown }
   try {
-    body = (await req.json()) as { to?: string; toName?: string; subject?: string; message?: string }
+    body = (await req.json()) as { to?: string; toName?: string; subject?: string; message?: string; attachments?: unknown }
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+  }
+  const attachments = sanitizeAttachments(body.attachments)
+  if (attachments === null) {
+    return NextResponse.json({ error: "Invalid attachments." }, { status: 400 })
   }
   const to = String(body.to ?? "").trim().toLowerCase()
   const toName = String(body.toName ?? "").trim() || null
@@ -154,6 +188,7 @@ export async function POST(req: NextRequest) {
       senderName,
       // A personal mailbox sends as itself; admins send as the house account.
       fromAccount: access.mailbox ? { address: access.mailbox, name: senderName } : undefined,
+      attachments,
     })
   } catch (error) {
     sendError = error instanceof Error ? error.message : String(error)
@@ -173,6 +208,7 @@ export async function POST(req: NextRequest) {
       from_email: access.mailbox ?? ((process.env.SMTP_FROM_EMAIL ?? "").trim().toLowerCase() || null),
       status: sendError ? "failed" : "sent",
       error: sendError,
+      attachments,
     })
     .select()
     .single()

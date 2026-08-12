@@ -51,8 +51,14 @@ export type SentEmail = {
   from_name?: string | null
   /** Inbound only: NULL until its correspondence is opened. */
   read_at?: string | null
+  /** Inbound only: registered sender's profile photo, resolved server-side. */
+  from_photo?: string | null
+  /** Files attached when the email was sent. */
+  attachments?: EmailAttachment[]
   created_at: string
 }
+
+export type EmailAttachment = { name: string; url: string; size: number; type: string }
 
 export type InquiriesSummary = {
   total: number
@@ -180,12 +186,13 @@ export async function sendInquiryReply(
   id: string,
   subject: string,
   message: string,
+  attachments: EmailAttachment[] = [],
 ): Promise<{ email: SentEmail | null; error: string | null }> {
   try {
     const res = await fetch(`/api/admin/inquiries/${id}/reply`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subject, message }),
+      body: JSON.stringify({ subject, message, attachments }),
     })
     const json = (await res.json().catch(() => ({}))) as { email?: SentEmail; error?: string }
     if (!res.ok) return { email: json.email ?? null, error: json.error ?? `Request failed (${res.status})` }
@@ -201,6 +208,7 @@ export async function sendComposedEmail(input: {
   toName?: string
   subject: string
   message: string
+  attachments?: EmailAttachment[]
 }): Promise<{ email: SentEmail | null; error: string | null }> {
   try {
     const res = await fetch(`/api/admin/emails`, {
@@ -213,6 +221,22 @@ export async function sendComposedEmail(input: {
     return { email: json.email ?? null, error: null }
   } catch (error) {
     return { email: null, error: (error as Error).message }
+  }
+}
+
+/** Upload one file to attach to an email; pass the descriptor to send. */
+export async function uploadEmailAttachment(
+  file: File,
+): Promise<{ attachment: EmailAttachment | null; error: string | null }> {
+  try {
+    const fd = new FormData()
+    fd.append("file", file)
+    const res = await fetch(`/api/upload/email-attachment`, { method: "POST", body: fd })
+    if (!res.ok) return { attachment: null, error: await readError(res) }
+    const json = (await res.json()) as EmailAttachment
+    return { attachment: json, error: null }
+  } catch (error) {
+    return { attachment: null, error: (error as Error).message }
   }
 }
 

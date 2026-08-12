@@ -65,6 +65,8 @@ type DeliverOptions = {
   html: string
   /** Mailbox to authenticate as; defaults to the main SMTP account. */
   authUser?: string
+  /** Files to attach; href points at our own S3, nodemailer streams it. */
+  attachments?: Array<{ filename: string; href: string }>
 }
 
 // Cap the stored HTML so one huge email can't balloon an audit row.
@@ -835,6 +837,8 @@ export async function sendAdminDirectEmail(input: {
   /** Send AS this personal mailbox (SMTP AUTH must match the From address);
    *  omitted → the house account. */
   fromAccount?: { address: string; name: string | null }
+  /** Attachments already uploaded to our S3. */
+  attachments?: Array<{ name: string; url: string }>
 }): Promise<void> {
   const signer = input.senderName?.trim() || "The FHI Global Team"
   const messageHtml = esc(input.message).replace(/\r?\n/g, "<br>")
@@ -864,6 +868,7 @@ export async function sendAdminDirectEmail(input: {
   await deliver("AdminDirectMailer", {
     from,
     authUser: input.fromAccount?.address,
+    attachments: input.attachments?.map((a) => ({ filename: a.name, href: a.url })),
     to: input.to,
     subject: input.subject,
     text: `${input.message}\n\n—\n${signer}\nFHI Global · Dubai, UAE${input.regarding ? `\nSent regarding your inquiry about ${input.regarding}.` : ""}`,

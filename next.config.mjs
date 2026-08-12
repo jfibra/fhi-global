@@ -49,7 +49,7 @@ const CSP = [
   `style-src 'self' 'unsafe-inline'`,
 
   // Images: own assets, data URIs, blob previews, Supabase, flag CDN, maps, Google avatars, S3/CloudFront (listing + project media)
-  `img-src 'self' data: blob: ${SUPABASE_HTTPS} https://${FLAGCDN} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://*.googleusercontent.com https://*.amazonaws.com https://*.cloudfront.net`,
+  `img-src 'self' data: blob: ${SUPABASE_HTTPS} https://${FLAGCDN} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://*.googleusercontent.com https://*.amazonaws.com https://*.cloudfront.net https://gravatar.com https://*.gravatar.com`,
 
   // Fonts: self-hosted via next/font – no external font CDN required
   `font-src 'self' data:`,
