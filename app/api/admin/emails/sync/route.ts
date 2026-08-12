@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { requireRole } from "@/lib/auth-guard"
-import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
+import { requireActiveSession } from "@/lib/auth-guard"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { hasInboundMailConfig, syncInboundEmails } from "@/lib/inbound-mail"
 
 // Pull lead replies from the company mailbox into inquiry threads. The Emails
@@ -12,15 +12,23 @@ export const runtime = "nodejs"
 export const maxDuration = 60
 
 export async function POST() {
-  const guard = await requireRole([...ROLES_ADMIN_STAFF])
-  if (!guard.ok) return guard.response
+  const session = await requireActiveSession()
+  if (!session.ok) return session.response
+  const profile = session.context.profile
+  const isAdmin = isAdminStaffRole(profile.role)
+  const hasMailbox = Boolean((profile.mailbox_address ?? "").trim())
+  if (!isAdmin && !hasMailbox) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
 
   if (!hasInboundMailConfig()) {
     return NextResponse.json({ error: "Inbound mail is not configured." }, { status: 503 })
   }
 
   try {
-    const result = await syncInboundEmails()
+    // Admins refresh the whole mailroom (house + every personal mailbox);
+    // an owner's visit polls just their own.
+    const result = await syncInboundEmails(isAdmin ? "all" : { ownerId: session.context.userId })
     return NextResponse.json({ ok: true, ...result })
   } catch (error) {
     return NextResponse.json(
