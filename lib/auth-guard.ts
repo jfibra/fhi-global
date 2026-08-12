@@ -14,6 +14,7 @@ export type GuardResult = {
     profile_url: string | null
     metadata: Record<string, unknown> | null
     is_deleted?: boolean | null
+    mailbox_address?: string | null
   }
 }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireRole } from "@/lib/auth-guard"
+import { requireActiveSession, requireRole } from "@/lib/auth-guard"
 import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 
@@ -17,8 +17,11 @@ const COLUMNS_NO_READ: string = COLUMNS.replace(", read_at", "")
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function GET(req: NextRequest) {
-  const guard = await requireRole([...ROLES_ADMIN_STAFF])
-  if (!guard.ok) return guard.response
+  const session = await requireActiveSession()
+  if (!session.ok) return session.response
+  const isAdmin = ROLES_ADMIN_STAFF.map(String).includes(String(session.context.profile.role ?? "").toLowerCase().trim())
+  const hasMailbox = Boolean((session.context.profile.mailbox_address ?? "").trim())
+  if (!isAdmin && !hasMailbox) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const address = (req.nextUrl.searchParams.get("address") ?? "").trim().toLowerCase()
   if (!EMAIL_RE.test(address)) {
@@ -32,22 +35,31 @@ export async function GET(req: NextRequest) {
   // email address may legally contain.
   const run = (columns: string) =>
     Promise.all([
-      admin
-        .from("inquiry_emails")
-        .select(columns)
-        .is("inquiry_id", null)
-        .eq("direction", "outbound")
-        .ilike("to_email", pattern)
-        .order("created_at", { ascending: true })
-        .limit(100),
-      admin
-        .from("inquiry_emails")
-        .select(columns)
-        .is("inquiry_id", null)
-        .eq("direction", "inbound")
-        .ilike("from_email", pattern)
-        .order("created_at", { ascending: true })
-        .limit(100),
+      (() => {
+        let q = admin
+          .from("inquiry_emails")
+          .select(columns)
+          .is("inquiry_id", null)
+          .eq("direction", "outbound")
+          .ilike("to_email", pattern)
+          .order("created_at", { ascending: true })
+          .limit(100)
+        // Personal mailboxes thread only their own correspondence.
+        if (!isAdmin) q = q.eq("sent_by", session.context.userId)
+        return q
+      })(),
+      // Inbound rows exist only for the house mailbox the sync watches —
+      // a personal outbox has none, so skip the query entirely.
+      isAdmin
+        ? admin
+            .from("inquiry_emails")
+            .select(columns)
+            .is("inquiry_id", null)
+            .eq("direction", "inbound")
+            .ilike("from_email", pattern)
+            .order("created_at", { ascending: true })
+            .limit(100)
+        : Promise.resolve({ data: [], error: null } as { data: unknown[]; error: null }),
     ])
 
   let [outbound, inbound] = await run(COLUMNS)

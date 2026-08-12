@@ -101,12 +101,12 @@ function IconBtn({
   )
 }
 
-export function LeadsClient() {
+export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const folder = (searchParams.get("folder") as Folder) || "inbox"
+  const folder: Folder = personal ? "sent" : (searchParams.get("folder") as Folder) || "inbox"
   const openId = searchParams.get("open") || ""
 
   // ── list state ──────────────────────────────────────────────────────────
@@ -265,6 +265,7 @@ export function LeadsClient() {
   }, [])
 
   useEffect(() => {
+    if (personal) return
     const initial = setTimeout(() => { void runAutoSync() }, 100)
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") void runAutoSync()
@@ -278,10 +279,11 @@ export function LeadsClient() {
       clearInterval(timer)
       document.removeEventListener("visibilitychange", onVisible)
     }
-  }, [runAutoSync])
+  }, [personal, runAutoSync])
 
   /** Manual refresh = check the mailbox first, then reload the list. */
   const handleRefresh = async () => {
+    if (personal) { void load(); return }
     setSyncing(true)
     const { ingested, error } = await syncInbox()
     setSyncing(false)
@@ -468,7 +470,7 @@ export function LeadsClient() {
   const folderItems: Array<{ key: Folder; label: string; icon: typeof Inbox; count?: number; urgent?: number }> = [
     { key: "inbox", label: "Inbox", icon: Inbox, urgent: unread },
     { key: "starred", label: "Starred", icon: Star, count: summary?.starred ?? 0 },
-    { key: "sent", label: "Sent", icon: Send, count: summary?.sent ?? 0, urgent: summary?.sentUnread ?? 0 },
+    { key: "sent", label: "Sent", icon: Send, count: personal ? total : summary?.sent ?? 0, urgent: summary?.sentUnread ?? 0 },
     { key: "archived", label: "Archived", icon: Archive },
   ]
   const categoryItems: Array<{ key: InquiryCategory; label: string; count: number }> = (
@@ -547,7 +549,9 @@ export function LeadsClient() {
           {/* Mailbox rail — folders + categories (desktop) */}
           <aside className="hidden md:flex flex-col w-[190px] shrink-0 border-r border-[#f0f0f0] py-3 overflow-y-auto">
             <p className="px-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">Mailbox</p>
-            {folderItems.map((f) => {
+            {folderItems
+              .filter((f) => !personal || f.key === "sent")
+              .map((f) => {
               const active = folder === f.key
               return (
                 <button
@@ -572,8 +576,10 @@ export function LeadsClient() {
               )
             })}
 
+            {!personal && (
             <p className="px-4 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">Categories</p>
-            {categoryItems.map((c) => {
+            )}
+            {!personal && categoryItems.map((c) => {
               const active = category === c.key
               return (
                 <button
@@ -598,7 +604,9 @@ export function LeadsClient() {
           <div className={`${paneOpen ? "hidden lg:flex" : "flex"} flex-col w-full lg:w-[400px] xl:w-[440px] lg:border-r border-[#f0f0f0] min-h-0`}>
             {/* Mobile folder strip — the rail is hidden below md */}
             <div className="md:hidden flex items-center gap-1 px-2 py-2 border-b border-[#f0f0f0] overflow-x-auto">
-              {folderItems.map((f) => {
+              {folderItems
+                .filter((f) => !personal || f.key === "sent")
+                .map((f) => {
                 const active = folder === f.key
                 return (
                   <button

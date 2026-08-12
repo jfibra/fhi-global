@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireRole } from "@/lib/auth-guard"
-import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
+import { requireActiveSession } from "@/lib/auth-guard"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
@@ -12,17 +12,25 @@ import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 export const runtime = "nodejs"
 
 export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const guard = await requireRole([...ROLES_ADMIN_STAFF])
-  if (!guard.ok) return guard.response
+  const session = await requireActiveSession()
+  if (!session.ok) return session.response
+  const guard = session
+  const isAdmin = isAdminStaffRole(session.context.profile.role)
+  const ownMailbox = (session.context.profile.mailbox_address ?? "").trim()
+  if (!isAdmin && !ownMailbox) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   const { id } = await context.params
 
   const admin = createAdminSupabase()
   const { data: existing } = await admin
     .from("inquiry_emails")
-    .select("id, to_email, subject")
+    .select("id, to_email, subject, sent_by")
     .eq("id", id)
-    .maybeSingle<{ id: string; to_email: string; subject: string }>()
+    .maybeSingle<{ id: string; to_email: string; subject: string; sent_by: string | null }>()
   if (!existing) return NextResponse.json({ error: "Email not found." }, { status: 404 })
+  // A personal mailbox can only clear its own outbox.
+  if (!isAdmin && existing.sent_by !== session.context.userId) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
 
   const { error } = await admin.from("inquiry_emails").delete().eq("id", id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

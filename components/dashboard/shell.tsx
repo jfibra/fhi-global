@@ -406,7 +406,8 @@ export function DashboardShell({
     ROLE_SHELL_BADGE[normalizeAppRole(effectiveRole)] ?? "bg-white/10 text-white/60 border-white/20"
 
   // Prop override wins, else the role's own list from sidebar-config.
-  const resolvedItems: NavItem[] = navItems ?? getSidebarNavItems(effectiveRole)
+  const resolvedItems: NavItem[] =
+    navItems ?? getSidebarNavItems(effectiveRole, { hasMailbox: Boolean(profile?.mailbox_address) })
 
   return (
     // The :has() classes are the full-bleed editor gate: when the page below

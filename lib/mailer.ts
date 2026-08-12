@@ -33,13 +33,22 @@ export function hasMailerConfig(): boolean {
   return getConfig() !== null
 }
 
-let cached: nodemailer.Transporter | null = null
+// One transport per authenticated mailbox. Personal company mailboxes share
+// the provider password, but SMTP AUTH must match the From mailbox — the
+// provider rejects a From the logged-in user doesn't own — so each sender
+// address logs in as itself.
+const transports = new Map<string, nodemailer.Transporter>()
 
-function transport() {
+function transport(authUser?: string) {
   const config = getConfig()
   if (!config) throw new Error("SMTP is not configured (set SMTP_HOST/SMTP_USER/SMTP_PASS).")
-  if (!cached) cached = nodemailer.createTransport(config)
-  return cached
+  const user = (authUser ?? config.auth.user).trim().toLowerCase()
+  let t = transports.get(user)
+  if (!t) {
+    t = nodemailer.createTransport({ ...config, auth: { user, pass: config.auth.pass } })
+    transports.set(user, t)
+  }
+  return t
 }
 
 function fromAddress() {
@@ -54,6 +63,8 @@ type DeliverOptions = {
   subject: string
   text: string
   html: string
+  /** Mailbox to authenticate as; defaults to the main SMTP account. */
+  authUser?: string
 }
 
 // Cap the stored HTML so one huge email can't balloon an audit row.
@@ -69,7 +80,8 @@ const AUDIT_HTML_CAP = 256 * 1024
 async function deliver(mailable: string, opts: DeliverOptions): Promise<void> {
   const recipients = Array.isArray(opts.to) ? opts.to : [opts.to]
   try {
-    await transport().sendMail(opts)
+    const { authUser, ...mail } = opts
+    await transport(authUser).sendMail(mail)
   } catch (error) {
     await auditMail(mailable, opts.subject, recipients, opts.html, error)
     throw error
@@ -820,6 +832,9 @@ export async function sendAdminDirectEmail(input: {
   senderName: string | null
   /** Context line, e.g. "Azizi Venice · Azizi Developments" — reply emails only. */
   regarding?: string | null
+  /** Send AS this personal mailbox (SMTP AUTH must match the From address);
+   *  omitted → the house account. */
+  fromAccount?: { address: string; name: string | null }
 }): Promise<void> {
   const signer = input.senderName?.trim() || "The FHI Global Team"
   const messageHtml = esc(input.message).replace(/\r?\n/g, "<br>")
@@ -843,8 +858,12 @@ export async function sendAdminDirectEmail(input: {
           </td>
         </tr>`
 
+  const from = input.fromAccount
+    ? `${(input.fromAccount.name ?? "FHI Global Property").replace(/[<>"]/g, "")} <${input.fromAccount.address}>`
+    : fromAddress()
   await deliver("AdminDirectMailer", {
-    from: fromAddress(),
+    from,
+    authUser: input.fromAccount?.address,
     to: input.to,
     subject: input.subject,
     text: `${input.message}\n\n—\n${signer}\nFHI Global · Dubai, UAE${input.regarding ? `\nSent regarding your inquiry about ${input.regarding}.` : ""}`,

@@ -35,6 +35,9 @@ export type AppProfile = {
   timezone: string | null
   birthday?: string | null
   gender?: string | null
+  /** Personal company mailbox (e.g. maisa@fhiglobal.ae). Set by admins;
+   *  unlocks the personal Emails section and send-as identity. */
+  mailbox_address?: string | null
 }
 
 export { ROLE_DASHBOARD_MAP, roleToLabel }
@@ -138,7 +141,7 @@ export async function getProfileByUserId(
 ) {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, role, fullname, status, profile_url, metadata, is_deleted, fname, lname, timezone, birthday, gender")
+    .select("id, role, fullname, status, profile_url, metadata, is_deleted, fname, lname, timezone, birthday, gender, mailbox_address")
     .eq("id", userId)
     .single<AppProfile>()
 

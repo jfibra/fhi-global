@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireRole } from "@/lib/auth-guard"
-import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
+import { requireActiveSession } from "@/lib/auth-guard"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { hasMailerConfig, sendAdminDirectEmail } from "@/lib/mailer"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
@@ -22,9 +22,33 @@ const MAX_MESSAGE = 10_000
 // Deliberately loose — SMTP is the real validator; this only catches typos.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+
+/**
+ * Personal-mailbox access model: admin staff manage the whole mailroom and
+ * send as the house account; a profile with mailbox_address gets the same
+ * screens scoped to their own mail, sent AS their address (SMTP AUTH must
+ * match the From mailbox — the provider rejects anything else).
+ */
+async function resolveMailAccess() {
+  const session = await requireActiveSession()
+  if (!session.ok) return { response: session.response } as const
+  const profile = session.context.profile
+  const admin = isAdminStaffRole(profile.role)
+  const mailbox = (profile.mailbox_address ?? "").trim().toLowerCase() || null
+  if (!admin && !mailbox) {
+    return { response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) } as const
+  }
+  return {
+    context: session.context,
+    admin,
+    mailbox,
+    senderName: profile.fullname ?? session.context.email ?? null,
+  } as const
+}
+
 export async function GET(req: NextRequest) {
-  const guard = await requireRole([...ROLES_ADMIN_STAFF])
-  if (!guard.ok) return guard.response
+  const access = await resolveMailAccess()
+  if ("response" in access) return access.response
 
   const sp = req.nextUrl.searchParams
   const page = Math.max(1, parseInt(sp.get("page") ?? "1", 10))
@@ -42,6 +66,8 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
       .range(rangeFrom, rangeFrom + perPage - 1)
     if (withDirection) query = query.eq("direction", "outbound")
+    // Personal mailboxes see their own outbox, not the whole mailroom.
+    if (!access.admin) query = query.eq("sent_by", access.context.userId)
     if (search) {
       const safe = search.replace(/[%,()]/g, " ")
       query = query.or(`to_email.ilike.%${safe}%,to_name.ilike.%${safe}%,subject.ilike.%${safe}%`)
@@ -70,7 +96,7 @@ export async function GET(req: NextRequest) {
   const { data, count, error } = listResult
 
   const unreadByAddress: Record<string, number> = {}
-  if (!unreadResult.error) {
+  if (access.admin && !unreadResult.error) {
     for (const row of (unreadResult.data ?? []) as Array<{ from_email: string | null }>) {
       const key = (row.from_email ?? "").toLowerCase()
       if (key) unreadByAddress[key] = (unreadByAddress[key] ?? 0) + 1
@@ -89,8 +115,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await requireRole([...ROLES_ADMIN_STAFF])
-  if (!guard.ok) return guard.response
+  const access = await resolveMailAccess()
+  if ("response" in access) return access.response
 
   let body: { to?: string; toName?: string; subject?: string; message?: string }
   try {
@@ -117,11 +143,18 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const senderName = guard.context.profile.fullname ?? guard.context.email ?? null
+  const senderName = access.senderName
 
   let sendError: string | null = null
   try {
-    await sendAdminDirectEmail({ to, subject, message, senderName })
+    await sendAdminDirectEmail({
+      to,
+      subject,
+      message,
+      senderName,
+      // A personal mailbox sends as itself; admins send as the house account.
+      fromAccount: access.mailbox ? { address: access.mailbox, name: senderName } : undefined,
+    })
   } catch (error) {
     sendError = error instanceof Error ? error.message : String(error)
   }
@@ -135,8 +168,9 @@ export async function POST(req: NextRequest) {
       to_name: toName,
       subject,
       body_text: message,
-      sent_by: guard.context.userId,
+      sent_by: access.context.userId,
       sent_by_name: senderName,
+      from_email: access.mailbox ?? ((process.env.SMTP_FROM_EMAIL ?? "").trim().toLowerCase() || null),
       status: sendError ? "failed" : "sent",
       error: sendError,
     })
@@ -157,7 +191,7 @@ export async function POST(req: NextRequest) {
     category: "inquiry",
     event: "composed",
     source: "dashboard",
-    actor: { id: guard.context.userId, name: senderName, role: guard.context.profile.role },
+    actor: { id: access.context.userId, name: senderName, role: access.context.profile.role },
     subjectType: "inquiry_emails",
     subjectId: emailRow?.id,
     subjectLabel: to,

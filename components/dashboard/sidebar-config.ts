@@ -63,6 +63,8 @@ export interface NavEntry {
   label: string
   to: string
   badge?: number
+  /** Row only renders when the signed-in profile has a personal mailbox. */
+  requiresMailbox?: boolean
   /** One-liner under the label on the hub tile. Only used inside a group. */
   description?: string
 }
@@ -125,6 +127,8 @@ const SALES_REPORTS: NavEntry = { icon: TrendingUp, label: "Sales Reports", to: 
 const SUPPORT_TICKETS: NavEntry = { icon: LifeBuoy, label: "Support Tickets", to: "support" }
 const FEEDBACK: NavEntry = { icon: Star, label: "Customer Feedback", to: "feedback" }
 const A2A_AGREEMENT: NavEntry = { icon: Handshake, label: "A2A Agreement", to: "a2a-agreement" }
+// Personal company mailbox (profiles.mailbox_address) — compose + own Sent.
+const MY_EMAILS: NavEntry = { icon: Mail, label: "Emails", to: "leads", requiresMailbox: true }
 // Shared marketing artwork. Open to every role, so it appears in all lists and
 // is deliberately absent from SUB_PATH_ROLES in lib/auth.ts (unlisted = shared).
 const MATERIALS: NavEntry = { icon: FolderDown, label: "Materials", to: "materials" }
@@ -252,6 +256,7 @@ const salesPipelineNav = ({ projects = false, events = false, teamSales = false 
   OVERVIEW,
   { icon: ClipboardList, label: "My listings", to: "listings" },
   OWNER_DOCUMENTS,
+  MY_EMAILS,
   // The read-only projects browser for the Poster/Reels studios — the whole
   // sales ladder has it (see ROLES_PROJECT_STUDIO_VIEWERS).
   ...(projects ? [PROJECTS] : []),
@@ -374,10 +379,15 @@ function listFor(role: string | null | undefined): RoleNavEntry[] {
 }
 
 /** The sidebar rows for a role. Groups collapse to one row each. */
-export function getSidebarNavItems(role: string | null | undefined): NavItem[] {
+export function getSidebarNavItems(
+  role: string | null | undefined,
+  opts: { hasMailbox?: boolean } = {},
+): NavItem[] {
   const base = baseFor(role)
 
-  return listFor(role).map((entry) => {
+  return listFor(role)
+    .filter((entry) => isGroup(entry) || !entry.requiresMailbox || opts.hasMailbox)
+    .map((entry) => {
     if (!isGroup(entry)) {
       return { icon: entry.icon, label: entry.label, href: hrefFor(base, entry.to), badge: entry.badge }
     }
