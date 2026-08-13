@@ -19,8 +19,9 @@ export interface DeveloperCardData {
 
 interface DeveloperCardProps {
   developer: DeveloperCardData
-  /** Split map + list reference: compact card, “Rating:” label, full-width CTA. */
-  variant?: "default" | "directory"
+  /** directory: split map + list reference — compact horizontal card.
+   *  tile: the logo-wall directory — logo panel on top, slim footer. */
+  variant?: "default" | "directory" | "tile"
 }
 
 export function DeveloperCard({ developer, variant = "default" }: DeveloperCardProps) {
@@ -30,6 +31,56 @@ export function DeveloperCard({ developer, variant = "default" }: DeveloperCardP
   // Logo panel background sampled from the logo image itself, so baked-in
   // logo backgrounds (e.g. white) fill the panel instead of floating in it.
   const [logoBg, setLogoBg] = useState<string | null>(null)
+
+  if (variant === "tile") {
+    return (
+      <Link
+        href={`/${slug}`}
+        className="group flex flex-col border border-[#e5e8ec] bg-white overflow-hidden transition-shadow duration-300 hover:shadow-[0_14px_40px_-16px_rgba(0,20,40,0.25)]"
+      >
+        {/* Logo panel — the card's hero; bg sampled from the logo itself */}
+        <div
+          className="relative aspect-[16/10] flex items-center justify-center overflow-hidden"
+          style={{ backgroundColor: logoBg ?? "#eef2f6" }}
+        >
+          {logo_url ? (
+            <Image
+              src={logo_url}
+              // SVG bypasses the optimizer (which rejects it; upload route accepts SVG logos).
+              unoptimized={logo_url.toLowerCase().includes(".svg")}
+              alt={name}
+              width={140}
+              height={140}
+              onLoad={(e) => setLogoBg(sampleLogoBg(e.currentTarget))}
+              className="max-w-[55%] max-h-[55%] object-contain transition-transform duration-300 group-hover:scale-[1.06]"
+            />
+          ) : (
+            <Building2 className="w-10 h-10 text-[#001f3f]/20" aria-hidden />
+          )}
+          {is_verified && (
+            <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 px-2 py-0.5 bg-white/95 border border-[#d6b357] text-[#b8913f] text-[9px] font-bold uppercase tracking-wide">
+              <BadgeCheck className="w-3 h-3" /> Verified
+            </span>
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-[#eef0f3]">
+          <div className="min-w-0">
+            <h3 className="font-['Outfit'] text-[14px] font-bold text-[#0d1117] leading-tight truncate group-hover:text-[#001f3f] transition-colors">
+              {name}
+            </h3>
+            <p className="text-[11px] font-semibold text-[#6b7280] mt-0.5">
+              {project_count != null && project_count > 0
+                ? `${project_count} Project${project_count !== 1 ? "s" : ""}`
+                : "Developer"}
+            </p>
+          </div>
+          <span className="w-8 h-8 shrink-0 bg-[#001f3f]/5 group-hover:bg-[#d6b357] flex items-center justify-center transition-colors duration-300">
+            <ArrowUpRight className="w-4 h-4 text-[#001f3f]" />
+          </span>
+        </div>
+      </Link>
+    )
+  }
 
   if (variant === "directory") {
     return (

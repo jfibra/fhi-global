@@ -37,17 +37,15 @@ export function DeveloperSearch({ initialQ }: { initialQ: string }) {
 
   return (
     <div className="relative">
-      <div className="relative bg-white border border-[#e2e5ea] overflow-hidden transition-shadow duration-200 focus-within:shadow-[0_4px_20px_rgba(0,31,63,0.12)] focus-within:border-[#001f3f]/30">
-        {/* top accent line */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#001f3f] via-[#d6b357] to-transparent" />
-        <div className="flex items-center gap-3 px-5">
-          <Search className="w-4 h-4 text-[#d6b357] shrink-0" />
+      <div className="relative bg-white border border-[#e5e5e5] overflow-hidden transition-all focus-within:border-[#d6b357] focus-within:ring-4 focus-within:ring-[#d6b357]/10">
+        <div className="flex items-center gap-3 px-3.5">
+          <Search className="w-4 h-4 text-[#9ca3af] shrink-0" />
           <input
             type="text"
             placeholder="Search developers by name…"
             value={value}
             onChange={(e) => handleChange(e.target.value)}
-            className="flex-1 py-4 bg-transparent text-sm text-[#111827] placeholder:text-[#b0b7c3] focus:outline-none"
+            className="flex-1 py-2.5 bg-transparent text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none"
           />
           {value && (
             <button

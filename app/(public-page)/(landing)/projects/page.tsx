@@ -131,67 +131,68 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
   return (
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
       <JsonLd schema={breadcrumbList([{ name: "Home", path: "/" }, { name: "Projects" }])} />
-      <div className="fixed top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-25 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />
-      <div className="fixed bottom-0 right-[-5%] w-[500px] h-[500px] rounded-full opacity-20 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(250,240,210)_0%,rgba(255,255,255,0)_70%)]" />
-
       <TopBar />
       <Header />
 
-      {/* Page Hero */}
-      <section className="relative pt-16 pb-16 overflow-hidden">
-        {/* Background */}
+      {/* Masthead — deliberately short: the visitor came to see projects, so
+          the header states what the page is and gets out of the way. The
+          filter bar hangs directly off it and the grid starts above the fold. */}
+      <section className="relative bg-[#001f3f] overflow-hidden">
         <div className="absolute inset-0">
           <Image
             src="/background/dubai.webp"
             alt=""
             fill
+            priority
             sizes="100vw"
             className="object-cover object-center"
             aria-hidden="true"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#001f3f]/85 via-[#001f3f]/55 to-[#001f3f]/25" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/90 via-[#001428]/60 to-[#001f3f]/30" />
         </div>
-        <div
-          className="absolute inset-0 opacity-[0.05]"
-          style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }}
-        />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#0a2647]/80 border border-white/20 text-[11px] font-bold uppercase tracking-[0.14em] text-white mb-6 backdrop-blur-sm">
-            <Building2 className="w-3.5 h-3.5 text-[#d6b357]" />
-            {featured === "true" ? "Featured Projects" : "All Projects"}
-          </div>
-          <h1 className="font-['Outfit'] text-5xl md:text-[64px] font-bold text-white leading-[1.05] tracking-tight mb-4" style={{ textShadow: "0 2px 24px rgba(0,10,30,0.55)" }}>
-            Discover Premium<br />
-            <span className="text-[#d6b357]">Property Projects</span>
-          </h1>
-          <p className="text-white/85 text-lg max-w-xl" style={{ textShadow: "0 1px 10px rgba(0,10,30,0.6)" }}>
-            Browse off-plan and ready properties from Dubai&apos;s most trusted developers.
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-7 pb-6">
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
+            FHI Global · {featured === "true" ? "Featured Projects" : "All Projects"}
           </p>
+          <div className="mt-2 flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
+            <h1
+              className="font-['Outfit'] text-3xl md:text-[38px] font-bold text-white leading-[1.1] tracking-tight"
+              style={{ textShadow: "0 2px 20px rgba(0,10,30,0.55)" }}
+            >
+              Discover Premium <span className="text-[#d6b357]">Property Projects</span>
+            </h1>
+            <p className="text-sm text-white/85 pb-1.5" style={{ textShadow: "0 1px 8px rgba(0,10,30,0.6)" }}>
+              <span className="font-['Outfit'] text-xl font-bold text-white">{total}</span>{" "}
+              project{total !== 1 ? "s" : ""} from Dubai&apos;s most trusted developers
+            </p>
+          </div>
         </div>
+        <div className="relative h-[3px] bg-[#d6b357]" />
       </section>
 
-      {/* Content */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {/* Filters */}
-        <Suspense>
-          <ProjectFilters
-            developers={(devOptions ?? []).map((d) => ({ value: d.id, label: d.name }))}
-            cities={uniqueCities.map((c) => ({ value: c, label: c }))}
-          />
-        </Suspense>
-
-        {/* Count */}
-        <div className="flex items-center gap-3 mt-6 mb-6">
-          <span className="w-2 h-2 rounded-full bg-[#d6b357]" aria-hidden="true" />
-          <span className="text-[15px] font-bold text-[#0d1117]">{total}</span>
-          <span className="text-[15px] text-[#6b7280]">
-            project{total !== 1 ? "s" : ""} found
-            {totalPages > 1 ? ` · page ${pageNum} of ${totalPages}` : ""}
-          </span>
+      {/* Filter bar — one slim row attached to the masthead */}
+      <div className="bg-white border-b border-[#e8eaed]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <Suspense>
+            <ProjectFilters
+              developers={(devOptions ?? []).map((d) => ({ value: d.id, label: d.name }))}
+              cities={uniqueCities.map((c) => ({ value: c, label: c }))}
+            />
+          </Suspense>
         </div>
+      </div>
+
+      {/* Content */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2 mb-4 text-[13px] text-[#6b7280]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#d6b357]" aria-hidden="true" />
+            Page {pageNum} of {totalPages}
+          </div>
+        )}
 
         {projects && projects.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
             {projects.map((p) => (
               <ProjectCard key={p.id} project={p as unknown as ProjectCardData} />
             ))}

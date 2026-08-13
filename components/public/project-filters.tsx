@@ -59,63 +59,62 @@ export function ProjectFilters({ developers, cities }: Omit<ProjectFiltersProps,
   const status = searchParams.get("status") ?? ""
   const city = searchParams.get("city") ?? ""
 
+  // One slim row (no boxed card) — the bar hangs off the masthead so the
+  // project grid starts above the fold.
   return (
-    <div className="relative bg-white border border-[#e5e8ec] p-6 overflow-hidden">
-      <div className="flex items-center gap-2 mb-5">
-        <div className="w-7 h-7 bg-[#f0f2f5] flex items-center justify-center">
-          <SlidersHorizontal className="w-3.5 h-3.5 text-[#001f3f]" />
-        </div>
-        <span className="text-[13px] font-bold uppercase tracking-[0.14em] text-[#0d1117]">Filter Projects</span>
+    <div className="flex flex-col lg:flex-row lg:items-center gap-2">
+      <div className="hidden lg:flex items-center gap-1.5 pr-2 shrink-0 text-[#001f3f]">
+        <SlidersHorizontal className="w-4 h-4" />
+        <span className="text-[11px] font-bold uppercase tracking-[0.14em]">Filter</span>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
-          <input
-            type="text"
-            placeholder="Search projects..."
-            defaultValue={q}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-[#e5e5e5] bg-white text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all"
-          />
-        </div>
 
-        {/* Developer */}
-        <select
-          value={developer}
-          onChange={(e) => updateParams("developer", e.target.value)}
-          className="w-full px-4 py-3 border border-[#e5e5e5] bg-white text-sm text-[#111827] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all appearance-none cursor-pointer"
-        >
-          <option value="">All Developers</option>
-          {developers.map((d) => (
-            <option key={d.value} value={d.value}>{d.label}</option>
-          ))}
-        </select>
-
-        {/* Status */}
-        <select
-          value={status}
-          onChange={(e) => updateParams("status", e.target.value)}
-          className="w-full px-4 py-3 border border-[#e5e5e5] bg-white text-sm text-[#111827] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all appearance-none cursor-pointer"
-        >
-          <option value="">All Statuses</option>
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s.value} value={s.value}>{s.label}</option>
-          ))}
-        </select>
-
-        {/* City */}
-        <select
-          value={city}
-          onChange={(e) => updateParams("city", e.target.value)}
-          className="w-full px-4 py-3 border border-[#e5e5e5] bg-white text-sm text-[#111827] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all appearance-none cursor-pointer"
-        >
-          <option value="">All Cities</option>
-          {cities.map((c) => (
-            <option key={c.value} value={c.value}>{c.label}</option>
-          ))}
-        </select>
+      {/* Search */}
+      <div className="relative flex-1 min-w-0">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+        <input
+          type="text"
+          placeholder="Search projects..."
+          defaultValue={q}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="w-full pl-9 pr-4 py-2.5 border border-[#e5e5e5] bg-white text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all"
+        />
       </div>
+
+      {/* Developer */}
+      <select
+        value={developer}
+        onChange={(e) => updateParams("developer", e.target.value)}
+        className="w-full lg:w-48 px-3.5 py-2.5 border border-[#e5e5e5] bg-white text-sm text-[#111827] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all appearance-none cursor-pointer"
+      >
+        <option value="">All Developers</option>
+        {developers.map((d) => (
+          <option key={d.value} value={d.value}>{d.label}</option>
+        ))}
+      </select>
+
+      {/* Status */}
+      <select
+        value={status}
+        onChange={(e) => updateParams("status", e.target.value)}
+        className="w-full lg:w-44 px-3.5 py-2.5 border border-[#e5e5e5] bg-white text-sm text-[#111827] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all appearance-none cursor-pointer"
+      >
+        <option value="">All Statuses</option>
+        {STATUS_OPTIONS.map((s) => (
+          <option key={s.value} value={s.value}>{s.label}</option>
+        ))}
+      </select>
+
+      {/* City */}
+      <select
+        value={city}
+        onChange={(e) => updateParams("city", e.target.value)}
+        className="w-full lg:w-40 px-3.5 py-2.5 border border-[#e5e5e5] bg-white text-sm text-[#111827] focus:outline-none focus:border-[#d6b357] focus:ring-4 focus:ring-[#d6b357]/10 transition-all appearance-none cursor-pointer"
+      >
+        <option value="">All Cities</option>
+        {cities.map((c) => (
+          <option key={c.value} value={c.value}>{c.label}</option>
+        ))}
+      </select>
     </div>
   )
 }
