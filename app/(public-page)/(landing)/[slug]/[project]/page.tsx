@@ -217,20 +217,19 @@ export default async function ProjectDetailPage({ params }: Props) {
         ]),
       ]}
     />
-    <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
-      <div className="fixed top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-20 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />
-
+    {/* No overflow-x-hidden here: overflow on an ancestor disables
+        position:sticky for the whole subtree (the Inquire Now panel).
+        Sections that need clipping (the hero) clip themselves. */}
+    <div className="relative min-h-screen bg-[#fafafa] font-sans">
       <TopBar />
       <Header />
 
-      {/* ── Hero ──────────────────────────────────────────────
-          Editorial layout: one calm left column (eyebrow, title, blurb, fact
-          row) over a scrimmed photo, with a quiet bordered share panel to the
-          right. The old version stacked pills, title, and a loud navy CTA card
-          in the same space — seven fat share buttons ended up shouting louder
-          than the project name. */}
-      <section className="relative min-h-[420px] flex items-center overflow-hidden">
-        {project.main_image ? (
+      {/* ── Hero — compact masthead: eyebrow, title, fact row and a slim
+             share strip over one scrimmed photo. The old version centered a
+             full-screen hero with a 500px share panel — the actual content
+             started below the fold. */}
+      <section className="relative overflow-hidden bg-[#001f3f]">
+        {project.main_image && (
           <Image
             src={project.main_image}
             alt={project.name}
@@ -239,86 +238,71 @@ export default async function ProjectDetailPage({ params }: Props) {
             priority
             className="absolute inset-0 object-cover"
           />
-        ) : (
-          <div className="absolute inset-0 bg-[#001f3f]" />
         )}
         {/* Left-weighted scrim: keeps the copy legible while the photo stays
             visible on the right, where the building usually is. */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/75 via-[#001428]/35 to-[#001428]/5" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/85 via-[#001428]/50 to-[#001428]/15" />
 
-        <div className="relative w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12">
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-10 lg:gap-14 items-end">
-            <div className="max-w-2xl">
-              <div className="flex items-center gap-3 mb-4">
-                <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
-                  {status.label}
-                </span>
-                <span className="h-px w-10 bg-[#d6b357]/70" aria-hidden="true" />
-                {project.is_featured && (
-                  <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">Featured</span>
-                )}
-              </div>
+        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-6">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
+              {status.label}
+            </span>
+            <span className="h-px w-10 bg-[#d6b357]/70" aria-hidden="true" />
+            {project.is_featured && (
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">Featured</span>
+            )}
+          </div>
 
-              <h1
-                className="font-['Outfit'] text-4xl md:text-5xl font-bold text-white leading-[1.06]"
-                style={{ textShadow: "0 2px 30px rgba(0,10,30,0.6)" }}
-              >
-                {project.name}
-              </h1>
-              <span className="block w-14 h-1 bg-[#d6b357] mt-4 mb-5" aria-hidden="true" />
+          <h1
+            className="font-['Outfit'] text-3xl md:text-[40px] font-bold text-white leading-[1.08]"
+            style={{ textShadow: "0 2px 24px rgba(0,10,30,0.6)" }}
+          >
+            {project.name}
+          </h1>
+          <span className="block w-12 h-1 bg-[#d6b357] mt-3" aria-hidden="true" />
 
-              {(project.description || project.about_project) && (
-                <p
-                  className="text-[16.5px] leading-[1.75] text-white/80 max-w-xl line-clamp-3"
-                  style={{ textShadow: "0 1px 10px rgba(0,10,30,0.7)" }}
-                >
-                  {project.description || project.about_project}
-                </p>
-              )}
+          {/* Fact row — Developer / Location / Type / Status / Price. Empty
+              fields drop out rather than printing a dash. */}
+          <dl className="mt-5 flex flex-wrap gap-x-10 gap-y-4">
+            {[
+              {
+                label: "Developer",
+                node: developer
+                  ? (developer.slug
+                      ? <Link href={`/${developer.slug}`} className="text-white hover:text-[#d6b357] transition-colors">{developer.name}</Link>
+                      : developer.name)
+                  : null,
+              },
+              { label: "Location", node: locationStr || null },
+              { label: "Type", node: propertyTypes[0] ?? null },
+              { label: "Status", node: status.label },
+              { label: "Starting From", node: price },
+            ]
+              .filter((f) => f.node)
+              .map((f) => (
+                <div key={f.label}>
+                  <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#d6b357] mb-1.5">
+                    {f.label}
+                  </dt>
+                  <dd className="text-[15px] font-semibold text-white" style={{ textShadow: "0 1px 8px rgba(0,10,30,0.7)" }}>
+                    {f.node}
+                  </dd>
+                </div>
+              ))}
+          </dl>
 
-              {/* Fact row — the mockup's Developer / Location / Type / Status
-                  strip. Empty fields drop out rather than printing a dash. */}
-              <dl className="mt-7 flex flex-wrap gap-x-10 gap-y-5">
-                {[
-                  {
-                    label: "Developer",
-                    node: developer
-                      ? (developer.slug
-                          ? <Link href={`/${developer.slug}`} className="text-white hover:text-[#d6b357] transition-colors">{developer.name}</Link>
-                          : developer.name)
-                      : null,
-                  },
-                  { label: "Location", node: locationStr || null },
-                  { label: "Type", node: propertyTypes[0] ?? null },
-                  { label: "Status", node: status.label },
-                  { label: "Starting From", node: price },
-                ]
-                  .filter((f) => f.node)
-                  .map((f) => (
-                    <div key={f.label}>
-                      <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#d6b357] mb-1.5">
-                        {f.label}
-                      </dt>
-                      <dd className="text-[15px] font-semibold text-white" style={{ textShadow: "0 1px 8px rgba(0,10,30,0.7)" }}>
-                        {f.node}
-                      </dd>
-                    </div>
-                  ))}
-              </dl>
-            </div>
-
-            {/* Share — a bordered panel, not a stack of pills. */}
-            <div className="lg:w-[500px] shrink-0 border border-white/20 bg-[#001428]/60 backdrop-blur-md p-6">
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white">Share this project</p>
-              <span className="block w-full h-px bg-white/15 mt-3 mb-4" aria-hidden="true" />
-              <SocialShare
-                title={`${project.name} | FHI Global`}
-                text={`Discover ${project.name} on FHI Global.`}
-                variant="bare"
-              />
-            </div>
+          {/* Share — one slim strip, not a panel. */}
+          <div className="mt-5 pt-3 border-t border-white/15 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/60">Share</p>
+            <SocialShare
+              title={`${project.name} | FHI Global`}
+              text={`Discover ${project.name} on FHI Global.`}
+              variant="bare"
+            />
           </div>
         </div>
+        <div className="relative h-[3px] bg-[#d6b357]" />
       </section>
 
       {/* Back link — out of the hero so it doesn't crowd the title. */}
@@ -338,7 +322,7 @@ export default async function ProjectDetailPage({ params }: Props) {
              stats, rather than leaving an empty navy strip under the hero. ── */}
       {quickStats.length > 0 && (
       <div className="bg-[#001f3f] border-b border-[#d6b357]/25">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-wrap gap-x-10 gap-y-5">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap gap-x-10 gap-y-3">
           {[
             { icon: Calendar, label: "Completion", value: project.delivery_quarter ?? (project.expected_completion_date ? new Date(project.expected_completion_date).toLocaleDateString("en-AE", { month: "short", year: "numeric" }) : null) },
             { icon: Home, label: "Total Units", value: project.total_units?.toLocaleString() },
@@ -350,13 +334,13 @@ export default async function ProjectDetailPage({ params }: Props) {
           ]
             .filter((s) => s.value)
             .map(({ icon: Icon, label, value }) => (
-              <div key={label} className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-full border-2 border-[#d6b357]/60 bg-[#d6b357]/10 flex items-center justify-center shrink-0">
-                  <Icon className="w-[18px] h-[18px] text-[#d6b357]" />
+              <div key={label} className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full border-2 border-[#d6b357]/60 bg-[#d6b357]/10 flex items-center justify-center shrink-0">
+                  <Icon className="w-4 h-4 text-[#d6b357]" />
                 </div>
                 <div>
                   <p className="text-[10px] text-white/60 font-bold uppercase tracking-widest">{label}</p>
-                  <p className="font-['Outfit'] text-lg font-bold text-white leading-tight">{value}</p>
+                  <p className="font-['Outfit'] text-base font-bold text-white leading-tight">{value}</p>
                 </div>
               </div>
             ))}
