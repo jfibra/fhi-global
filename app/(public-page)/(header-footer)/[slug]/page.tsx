@@ -11,7 +11,7 @@ import { getSeoPage, NON_UAE_CITIES, SEO_PAGES, type SeoPage } from "@/lib/seo-p
 import { fetchSectionPage } from "@/lib/sitemap-sections"
 import { breadcrumbList, developerOrganizationSchema, itemListSchema } from "@/lib/structured-data"
 import { JsonLd } from "@/components/json-ld"
-import { Building2, Facebook, Mail, MapPin, Star, CheckCircle2, ArrowLeft } from "lucide-react"
+import { Building2, Facebook, Mail, MapPin, CheckCircle2, ArrowLeft } from "lucide-react"
 
 /** The company inbox shown across the public site (contact page, footer). */
 const CONTACT_EMAIL = "info@fhiglobal.ae"
@@ -221,41 +221,36 @@ export default async function DeveloperDetailPage({ params }: Props) {
           ),
         ]}
       />
-      <div className="fixed top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-25 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />
-      <div className="fixed bottom-0 right-[-5%] w-[500px] h-[500px] rounded-full opacity-20 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(250,240,210)_0%,rgba(255,255,255,0)_70%)]" />
-
-
-      {/* Hero Banner — skyline photo with navy wash (approved mockup) */}
-      <section className="relative pt-16 pb-16 overflow-hidden bg-[#001428]">
-        <div className="absolute inset-0">
+      {/* Hero — light and compact (approved mockup): identity in dark ink over
+          a daytime skyline that fades to white on the left. */}
+      <section className="relative bg-white overflow-hidden">
+        <div className="absolute inset-0" aria-hidden="true">
           <Image
-            src="/background/home.webp"
+            src="/background/developers.webp"
             alt=""
             fill
             priority
             sizes="100vw"
-            className="object-cover object-center"
-            aria-hidden="true"
+            className="object-cover object-[70%_center]"
           />
-          {/* Heavier on the left where the identity sits; skyline glows on the right */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/60 via-[#001f3f]/30 to-[#001f3f]/10" />
-          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#000d1c]/40 to-transparent" />
+          {/* Photo scrim: near-solid white where the identity sits, the
+              skyline showing through on the right. */}
+          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/20" />
+          <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-white/70 to-transparent" />
         </div>
-        {/* Gold accents: top rule + faint arcs on the left (mockup's line art) */}
-        <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#d6b357]/70 to-transparent" />
 
-        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-8">
           {/* Back */}
           <Link
             href="/developers"
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#d6b357] hover:text-[#f0d890] transition-colors mb-8"
+            className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#0d1117] hover:text-[#b8913f] transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" /> All Developers
+            <ArrowLeft className="w-3.5 h-3.5" /> All Developers
           </Link>
 
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
+          <div className="mt-5 flex flex-col sm:flex-row items-start gap-6">
             {/* Logo */}
-            <div className="w-32 h-32 md:w-36 md:h-36 bg-white ring-1 ring-white/60 shadow-[0_18px_50px_-16px_rgba(0,10,25,0.6)] flex items-center justify-center shrink-0 overflow-hidden">
+            <div className="w-32 h-32 md:w-36 md:h-36 bg-white border border-[#d6b357]/50 shadow-[0_12px_32px_-16px_rgba(0,20,40,0.3)] flex items-center justify-center shrink-0 overflow-hidden">
               {developer.logo_url ? (
                 <Image
                   src={developer.logo_url}
@@ -269,74 +264,72 @@ export default async function DeveloperDetailPage({ params }: Props) {
               )}
             </div>
 
-            <div className="flex-1">
-              <div className="flex items-center gap-4 mb-3 flex-wrap">
-                <h1
-                  className="font-['Outfit'] text-4xl md:text-5xl font-bold text-white leading-[1.08]"
-                  style={{ textShadow: "0 2px 12px rgba(0,10,30,0.85), 0 2px 32px rgba(0,10,30,0.6)" }}
-                >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="font-['Outfit'] text-3xl md:text-[40px] font-bold text-[#001f3f] leading-[1.08]">
                   {developer.name}
                 </h1>
                 {developer.is_verified && (
-                  <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#0a1f38]/80 border border-[#d6b357]/60 text-[#d6b357] text-sm font-bold backdrop-blur-sm">
-                    <CheckCircle2 className="w-4 h-4" /> Verified
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-white/85 border border-[#d6b357] text-[#b8913f] text-xs font-bold uppercase tracking-wider">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Verified
                   </span>
                 )}
               </div>
-              <span className="block w-14 h-1 bg-[#d6b357] mb-4" aria-hidden="true" />
-              <p className="text-lg text-white/85 max-w-2xl mb-2" style={{ textShadow: "0 1px 8px rgba(0,10,30,0.7)" }}>
+              <span className="block w-12 h-1 bg-[#d6b357] mt-3 mb-3" aria-hidden="true" />
+              <p className="text-[15px] text-[#374151] max-w-2xl mb-2">
                 New Dubai launches, price drops and open houses — first.
               </p>
               {developer.address && (
-                <div className="flex items-start gap-2 text-base text-white/85 max-w-xl" style={{ textShadow: "0 1px 8px rgba(0,10,30,0.7)" }}>
-                  <MapPin className="w-4 h-4 text-[#d6b357] shrink-0 mt-1" /> {developer.address}
+                <div className="flex items-start gap-2 text-sm text-[#4b5563] max-w-xl">
+                  <MapPin className="w-4 h-4 text-[#b8913f] shrink-0 mt-0.5" /> {developer.address}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Two calls to action in the mockup's flat band: icon block,
+          {/* Two flat contact cards over the photo (mockup): icon block,
               title, subline, arrow. Square everything. */}
-          <div className="mt-8 border border-white/15 bg-[#001428]/70 backdrop-blur-md grid grid-cols-1 sm:grid-cols-2">
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <a
               href={SOCIAL_URLS.facebook}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Follow FHI Global on Facebook"
-              className="group flex items-center gap-4 px-6 py-5 border-b sm:border-b-0 sm:border-r border-white/10 hover:bg-white/[0.05] transition-colors"
+              className="group flex items-center gap-4 px-5 py-4 bg-white border border-[#e5e8ec] shadow-[0_14px_36px_-20px_rgba(0,20,40,0.4)] hover:border-[#d6b357]/60 transition-colors"
             >
               <span className="w-11 h-11 bg-[#1877F2] flex items-center justify-center shrink-0">
                 <Facebook className="w-5 h-5 text-white fill-current" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-bold text-white">Follow us on Facebook</span>
-                <span className="block text-xs text-white/60 mt-0.5">Stay updated with the latest news and launches.</span>
+                <span className="block text-[15px] font-bold text-[#0d1117]">Follow us on Facebook</span>
+                <span className="block text-xs text-[#6b7280] mt-0.5">Stay updated with the latest news and launches.</span>
               </span>
-              <ArrowLeft className="w-5 h-5 rotate-180 text-[#d6b357] shrink-0 transition-transform group-hover:translate-x-1" />
+              <ArrowLeft className="w-5 h-5 rotate-180 text-[#001f3f] shrink-0 transition-transform group-hover:translate-x-1" />
             </a>
             <a
               href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Enquiry — ${developer.name}`)}`}
               aria-label={`Email FHI Global about ${developer.name}`}
-              className="group flex items-center gap-4 px-6 py-5 hover:bg-white/[0.05] transition-colors"
+              className="group flex items-center gap-4 px-5 py-4 bg-white border border-[#e5e8ec] shadow-[0_14px_36px_-20px_rgba(0,20,40,0.4)] hover:border-[#d6b357]/60 transition-colors"
             >
               <span className="w-11 h-11 bg-[#d6b357] flex items-center justify-center shrink-0">
-                <Mail className="w-5 h-5 text-[#001f3f]" />
+                <Mail className="w-5 h-5 text-white" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-bold text-white">{CONTACT_EMAIL}</span>
-                <span className="block text-xs text-white/60 mt-0.5">Get in touch with us.</span>
+                <span className="block text-[15px] font-bold text-[#0d1117]">{CONTACT_EMAIL}</span>
+                <span className="block text-xs text-[#6b7280] mt-0.5">Get in touch with us.</span>
               </span>
-              <ArrowLeft className="w-5 h-5 rotate-180 text-[#d6b357] shrink-0 transition-transform group-hover:translate-x-1" />
+              <ArrowLeft className="w-5 h-5 rotate-180 text-[#001f3f] shrink-0 transition-transform group-hover:translate-x-1" />
             </a>
           </div>
         </div>
       </section>
 
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
-        {/* About */}
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+        {/* About — copy + CTA on the left, a portfolio photo in a gold offset
+            frame on the right (mockup). */}
         {developer.description && (
           <section>
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8 lg:gap-12 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-14 items-center">
               <div>
                 <div className="flex items-center gap-2.5 mb-3">
                   <span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true" />
@@ -347,18 +340,27 @@ export default async function DeveloperDetailPage({ params }: Props) {
                 </h2>
                 <span className="block w-14 h-1 bg-[#d6b357] mb-6" aria-hidden="true" />
                 <p className="text-[#374151] text-base leading-relaxed whitespace-pre-line">{developer.description}</p>
+                <Link
+                  href="/about"
+                  className="mt-6 inline-flex items-center gap-2 px-5 py-3 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00152b] transition-colors"
+                >
+                  Learn More About Us <ArrowLeft className="w-4 h-4 rotate-180" />
+                </Link>
               </div>
               {visibleProjects[0]?.main_image && (
-                <div className="relative hidden lg:block overflow-hidden ring-1 ring-[#e8eaed] aspect-[3/4]">
-                  <Image
-                    src={visibleProjects[0].main_image}
-                    alt={`${developer.name} project`}
-                    fill
-                    sizes="320px"
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#001428]/80 to-transparent px-4 pb-3 pt-10">
-                    <p className="text-white text-sm font-bold truncate">{visibleProjects[0].name}</p>
+                <div className="relative hidden lg:block">
+                  <div className="absolute top-10 -bottom-4 -right-4 w-2/3 border border-[#d6b357]" aria-hidden="true" />
+                  <div className="relative overflow-hidden ring-1 ring-[#e8eaed] aspect-[4/3] shadow-[0_18px_44px_-20px_rgba(0,20,40,0.35)]">
+                    <Image
+                      src={visibleProjects[0].main_image}
+                      alt={`${developer.name} project`}
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 50vw"
+                      className="object-cover"
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#001428]/80 to-transparent px-4 pb-3 pt-10">
+                      <p className="text-white text-sm font-bold truncate">{visibleProjects[0].name}</p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -391,7 +393,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
             </div>
             <div className="h-px bg-[#e5e8ec] mb-8" />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
               {listings.map((l) => {
                 const cover = listingCover(l)
                 const proj = l.project_id != null ? projectById.get(l.project_id) : undefined
@@ -472,7 +474,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
           <div className="h-px bg-[#e5e8ec] mb-8" />
 
           {visibleProjects.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
               {visibleProjects.map((p) => (
                 <ProjectCard key={p.id} project={p as unknown as ProjectCardData} />
               ))}
@@ -488,6 +490,32 @@ export default async function DeveloperDetailPage({ params }: Props) {
           )}
         </section>
       </div>
+
+      {/* Closing band — brand line on the left, contact CTA on the right
+          (mockup's footer strip). */}
+      <section className="border-t border-[#e8eaed] bg-white">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row lg:items-center gap-6">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <span className="w-12 h-12 border border-[#d6b357] text-[#b8913f] flex items-center justify-center shrink-0">
+              <Building2 className="w-6 h-6" />
+            </span>
+            <p className="font-['Outfit'] text-xl md:text-2xl font-bold leading-tight">
+              <span className="text-[#001f3f]">Crafting exceptional spaces.</span>{" "}
+              <span className="block text-[#b8913f]">Elevating lifestyles.</span>
+            </p>
+          </div>
+          <div className="lg:border-l lg:border-[#e8eaed] lg:pl-8">
+            <p className="text-[15px] font-bold text-[#0d1117]">Have questions or want to know more?</p>
+            <p className="text-sm text-[#6b7280] mt-0.5">Our team is here to help.</p>
+            <Link
+              href="/contact"
+              className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
+            >
+              Get in Touch <ArrowLeft className="w-4 h-4 rotate-180" />
+            </Link>
+          </div>
+        </div>
+      </section>
 
     </div>
   )
@@ -648,7 +676,7 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
 
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
         {shown.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
             {shown.map((p, i) => (
               // Stagger across the row only, so later rows don't inherit an
               // ever-growing delay and arrive late.
