@@ -9,6 +9,7 @@ import { MemberOverview as MemberOverviewCard } from "@/components/dashboard/mem
 import { AdminDashboardContent } from "./_dashboard"
 import { EditorDashboardContent } from "./editor-overview"
 import { TopSalesBoard } from "./top-sales-board"
+import { TopDevelopersBoard } from "./top-developers-board"
 
 export { DeveloperOverview } from "./developer-overview"
 
@@ -36,7 +37,12 @@ function WithTopSales({ userId, children }: { userId?: string | null; children: 
   // the board relative to the content below it.
   return (
     <div className="space-y-8">
-      <TopSalesBoard currentUserId={userId} agentHrefBase={agentHrefBase} />
+      {/* People and developers side by side on wide screens — the same sales,
+          ranked two ways. */}
+      <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
+        <TopSalesBoard currentUserId={userId} agentHrefBase={agentHrefBase} />
+        <TopDevelopersBoard />
+      </div>
       {children}
     </div>
   )
