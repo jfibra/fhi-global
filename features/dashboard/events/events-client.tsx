@@ -423,7 +423,7 @@ export function EventsClient() {
   }
 
   const inputCls =
-    "w-full px-4 py-3 rounded-xl border border-[#e5e5e5] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] transition-colors"
+    "w-full px-4 py-3 border border-[#e5e5e5] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] transition-colors"
   const labelCls = "block text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-1.5"
 
   // The dashboard shell (sidebar + header) is rendered once by
@@ -446,7 +446,7 @@ export function EventsClient() {
             <button
               type="button"
               onClick={() => void load()}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-colors"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
               Refresh
@@ -454,7 +454,7 @@ export function EventsClient() {
             <button
               type="button"
               onClick={openCreate}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors"
             >
               <Plus className="w-4 h-4" />
               New event
@@ -463,15 +463,15 @@ export function EventsClient() {
         </div>
 
         {error && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+          <div className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
         )}
 
         {loading ? (
-          <div className="rounded-2xl border border-[#e8eaed] bg-white p-12 text-center text-sm text-[#9ca3af]">
+          <div className="border border-[#e8eaed] bg-white p-12 text-center text-sm text-[#9ca3af]">
             Loading events…
           </div>
         ) : events.length === 0 ? (
-          <div className="rounded-2xl border border-[#e8eaed] bg-white p-12 text-center">
+          <div className="border border-[#e8eaed] bg-white p-12 text-center">
             <p className="text-[#6b7280] mb-4">No events yet.</p>
             <button type="button" onClick={openCreate} className="text-sm font-semibold text-[#001f3f] hover:underline">
               Create your first event
@@ -482,8 +482,8 @@ export function EventsClient() {
             {events.map((e) => {
               const brand = eventBrand(e.brand)
               return (
-                <div key={e.id} className="group relative bg-white rounded-2xl border border-[#e8eaed] overflow-hidden shadow-sm hover:shadow-lg transition-all">
-                  <span className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-[#d6b357]/30 z-10" aria-hidden="true" />
+                <div key={e.id} className="group relative bg-white border border-[#e5e8ec] overflow-hidden transition-shadow duration-300 hover:shadow-[0_14px_40px_-16px_rgba(0,20,40,0.25)]">
+                  <span className="absolute top-0 left-0 right-0 h-[3px] bg-[#d6b357] z-10" aria-hidden="true" />
                   {/* Whole poster shown (contained) over a blurred fill — faces never cropped */}
                   <div className="relative h-60 bg-[#0d1b2e] overflow-hidden">
                     {e.imageUrl ? (
@@ -505,7 +505,7 @@ export function EventsClient() {
                     )}
                     <span className="absolute top-3 right-3 flex flex-col items-end gap-1.5">
                       <span
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-bold shadow ${
+                        className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
                           e.status === "published"
                             ? "bg-emerald-50 text-emerald-800"
                             : e.status === "draft"
@@ -516,13 +516,13 @@ export function EventsClient() {
                         {e.status}
                       </span>
                       {!e.registrationOpen && (
-                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold shadow bg-rose-50 text-rose-700">
+                        <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700">
                           Registration closed
                         </span>
                       )}
                     </span>
                     <span
-                      className="absolute bottom-3 left-3 rounded-lg px-2 py-1.5 flex items-center shadow"
+                      className="absolute bottom-3 left-3 px-2 py-1.5 flex items-center border border-black/5"
                       style={{ backgroundColor: brand.logoIsWhite ? "#001f3f" : "rgba(255,255,255,0.95)" }}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -552,7 +552,7 @@ export function EventsClient() {
                       <button
                         type="button"
                         onClick={() => void openRegistrations(e)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f]/10 transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f] hover:text-white transition-colors"
                         title="View registrations"
                       >
                         <Users className="w-3.5 h-3.5" />
@@ -564,7 +564,7 @@ export function EventsClient() {
                             href={`/events/${e.slug ?? e.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-2 rounded-lg text-[#001f3f] hover:bg-[#001f3f]/10"
+                            className="p-2 text-[#001f3f] hover:bg-[#001f3f]/10"
                             aria-label="View event page"
                             title="View event page (opens in new tab)"
                           >
@@ -574,7 +574,7 @@ export function EventsClient() {
                         <button
                           type="button"
                           onClick={() => setFlyerEvent(e)}
-                          className="p-2 rounded-lg text-[#b8913f] hover:bg-[#d6b357]/15"
+                          className="p-2 text-[#b8913f] hover:bg-[#d6b357]/15"
                           aria-label="Generate flyer with registration QR"
                           title="Generate flyer (with registration QR)"
                         >
@@ -583,7 +583,7 @@ export function EventsClient() {
                         <button
                           type="button"
                           onClick={() => void toggleStatus(e)}
-                          className={`px-2 rounded-lg text-[11px] font-bold ${
+                          className={`px-2 text-[11px] font-bold ${
                             e.status === "published"
                               ? "text-amber-700 hover:bg-amber-50"
                               : "text-emerald-700 hover:bg-emerald-50"
@@ -595,7 +595,7 @@ export function EventsClient() {
                         <button
                           type="button"
                           onClick={() => openEdit(e)}
-                          className="p-2 rounded-lg text-[#001f3f] hover:bg-[#001f3f]/10"
+                          className="p-2 text-[#001f3f] hover:bg-[#001f3f]/10"
                           aria-label="Edit"
                         >
                           <Pencil className="w-4 h-4" />
@@ -603,7 +603,7 @@ export function EventsClient() {
                         <button
                           type="button"
                           onClick={() => void handleDelete(e)}
-                          className="p-2 rounded-lg text-rose-600 hover:bg-rose-50"
+                          className="p-2 text-rose-600 hover:bg-rose-50"
                           aria-label="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -622,12 +622,12 @@ export function EventsClient() {
       {modalOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <button type="button" className="absolute inset-0 bg-black/45 backdrop-blur-sm" aria-label="Close" onClick={() => setModalOpen(false)} />
-          <div className="relative bg-white rounded-2xl border border-[#e8eaed] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+          <div className="relative bg-white border border-[#e8eaed] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
             <div className="flex items-start justify-between mb-5">
               <h2 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">
                 {editing ? "Edit event" : "New event"}
               </h2>
-              <button type="button" onClick={() => setModalOpen(false)} className="p-2 -mr-2 -mt-2 rounded-lg text-[#6b7280] hover:bg-[#f5f5f5]" aria-label="Close">
+              <button type="button" onClick={() => setModalOpen(false)} className="p-2 -mr-2 -mt-2 text-[#6b7280] hover:bg-[#f5f5f5]" aria-label="Close">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -642,13 +642,13 @@ export function EventsClient() {
                       key={b.key}
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, brand: b.key }))}
-                      className={`rounded-xl border-2 p-2 transition-all ${
+                      className={`border-2 p-2 transition-all ${
                         form.brand === b.key ? "border-[#001f3f] shadow-md" : "border-[#e5e5e5] hover:border-[#9ca3af]"
                       }`}
                       title={b.name}
                     >
                       <span
-                        className="h-10 rounded-lg flex items-center justify-center px-1"
+                        className="h-10 flex items-center justify-center px-1"
                         style={{ backgroundColor: b.logoIsWhite ? "#001f3f" : "#f6f7f9" }}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -693,13 +693,13 @@ export function EventsClient() {
                 <div className="flex items-center gap-3">
                   {form.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={form.imageUrl} alt="Event" className="h-20 w-32 rounded-xl object-cover border border-[#e5e5e5]" />
+                    <img src={form.imageUrl} alt="Event" className="h-20 w-32 object-cover border border-[#e5e5e5]" />
                   ) : (
-                    <div className="h-20 w-32 rounded-xl border border-dashed border-[#d1d5db] flex items-center justify-center text-[#b8bfc9]">
+                    <div className="h-20 w-32 border border-dashed border-[#d1d5db] flex items-center justify-center text-[#b8bfc9]">
                       <ImagePlus className="w-6 h-6" />
                     </div>
                   )}
-                  <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-colors cursor-pointer">
+                  <label className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-colors cursor-pointer">
                     {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
                     {form.imageUrl ? "Replace photo" : "Upload photo"}
                     <input
@@ -719,7 +719,7 @@ export function EventsClient() {
               <div className="flex flex-wrap gap-6">
                 <div>
                   <p className={labelCls}>Status</p>
-                  <div className="inline-flex rounded-xl border border-[#e5e5e5] overflow-hidden">
+                  <div className="inline-flex border border-[#e5e5e5] overflow-hidden">
                     {["draft", "published"].map((s) => (
                       <button
                         key={s}
@@ -736,7 +736,7 @@ export function EventsClient() {
                 </div>
                 <div>
                   <p className={labelCls}>Registration</p>
-                  <div className="inline-flex rounded-xl border border-[#e5e5e5] overflow-hidden">
+                  <div className="inline-flex border border-[#e5e5e5] overflow-hidden">
                     <button
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, registrationOpen: true }))}
@@ -763,18 +763,18 @@ export function EventsClient() {
               </div>
 
               {formError && (
-                <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{formError}</p>
+                <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{formError}</p>
               )}
 
               <div className="flex justify-end gap-2 pt-2 border-t border-[#f0f0f0]">
-                <button type="button" onClick={() => setModalOpen(false)} className="px-5 py-2.5 rounded-xl border border-[#e5e5e5] text-sm font-semibold text-[#374151]">
+                <button type="button" onClick={() => setModalOpen(false)} className="px-5 py-2.5 border border-[#e5e5e5] text-sm font-semibold text-[#374151]">
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={() => void handleSave()}
                   disabled={saving || uploading}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors disabled:opacity-50"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   {editing ? "Save changes" : "Create event"}
@@ -804,7 +804,7 @@ export function EventsClient() {
       {regEvent && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <button type="button" className="absolute inset-0 bg-black/45 backdrop-blur-sm" aria-label="Close" onClick={() => setRegEvent(null)} />
-          <div className="relative bg-white rounded-2xl border border-[#e8eaed] shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6">
+          <div className="relative bg-white border border-[#e8eaed] shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6">
             <div className="flex items-start justify-between mb-4 gap-3">
               <div className="min-w-0">
                 <h3 className="font-['Outfit'] font-bold text-[#001f3f] truncate">{regEvent.title}</h3>
@@ -817,7 +817,7 @@ export function EventsClient() {
                   type="button"
                   onClick={() => void toggleRegistration(regEvent)}
                   title={regEvent.registrationOpen ? "Stop accepting new registrations" : "Accept registrations again"}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold transition-colors ${
                     regEvent.registrationOpen
                       ? "border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
                       : "border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
@@ -830,7 +830,7 @@ export function EventsClient() {
                   onClick={exportRegistrationsPdf}
                   disabled={regsLoading || filteredRegs.length === 0}
                   title="Download attendee list as PDF"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f]/10 transition-colors disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f]/10 transition-colors disabled:opacity-40"
                 >
                   <FileText className="w-4 h-4" />
                   PDF
@@ -840,12 +840,12 @@ export function EventsClient() {
                   onClick={() => setRaffleOpen(true)}
                   disabled={regsLoading || registrations.length === 0}
                   title="Start a live raffle — pick a random winner"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#d6b357] to-[#b8913f] text-[#001428] text-xs font-bold shadow-sm hover:shadow-md transition-shadow disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#d6b357] text-[#001f3f] text-xs font-bold hover:bg-[#c8a544] transition-colors disabled:opacity-40"
                 >
                   <Trophy className="w-4 h-4" />
                   Raffle
                 </button>
-                <button type="button" onClick={() => setRegEvent(null)} className="p-2 -mr-2 -mt-2 rounded-lg text-[#6b7280] hover:bg-[#f5f5f5]" aria-label="Close">
+                <button type="button" onClick={() => setRegEvent(null)} className="p-2 -mr-2 -mt-2 text-[#6b7280] hover:bg-[#f5f5f5]" aria-label="Close">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -862,7 +862,7 @@ export function EventsClient() {
                     setRegPage(1)
                   }}
                   placeholder="Search by name or email…"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#e5e5e5] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] transition-colors"
+                  className="w-full pl-10 pr-4 py-2.5 border border-[#e5e5e5] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] transition-colors"
                 />
               </div>
             )}
@@ -920,7 +920,7 @@ export function EventsClient() {
                             type="button"
                             onClick={() => void deleteRegistration(r)}
                             disabled={deletingRegId === r.id}
-                            className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50"
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50"
                             aria-label={`Remove ${r.fullName}`}
                             title="Remove this registration"
                           >
@@ -948,7 +948,7 @@ export function EventsClient() {
                         type="button"
                         onClick={() => setRegPage(regSafePage - 1)}
                         disabled={regSafePage <= 1}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#e5e5e5] text-xs font-bold text-[#374151] hover:border-[#001f3f] transition-colors disabled:opacity-40"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 border border-[#e5e5e5] text-xs font-bold text-[#374151] hover:border-[#001f3f] transition-colors disabled:opacity-40"
                       >
                         <ChevronLeft className="w-3.5 h-3.5" />
                         Prev
@@ -960,7 +960,7 @@ export function EventsClient() {
                         type="button"
                         onClick={() => setRegPage(regSafePage + 1)}
                         disabled={regSafePage >= regTotalPages}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#e5e5e5] text-xs font-bold text-[#374151] hover:border-[#001f3f] transition-colors disabled:opacity-40"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 border border-[#e5e5e5] text-xs font-bold text-[#374151] hover:border-[#001f3f] transition-colors disabled:opacity-40"
                       >
                         Next
                         <ChevronRight className="w-3.5 h-3.5" />
