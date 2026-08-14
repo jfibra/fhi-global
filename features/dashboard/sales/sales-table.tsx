@@ -29,6 +29,7 @@ import {
 import { formatCurrency, formatDate, StatusBadge, toTitleCase } from "./sale-ui"
 import { AgentSalesPanel } from "./agent-sales-panel"
 import { TopSellerStudio } from "./marketing/top-seller-studio"
+import { TopDeveloperStudio } from "./marketing/top-developer-studio"
 import {
   canEditSaleForRole,
   canManageSaleAttachmentsForRole,
@@ -332,6 +333,7 @@ export function SalesTable({
   // row's name so the header isn't blank while the panel fetches the profile.
   const [agentDrill, setAgentDrill] = useState<{ id: string; name: string | null } | null>(null)
   const [showTopSeller, setShowTopSeller] = useState(false)
+  const [showTopDeveloper, setShowTopDeveloper] = useState(false)
 
   // Confirmation flow. Validate is a direct click; Invalid Sale / Under Review
   // ask for a click-confirm; Delete asks for a press-and-hold confirm.
@@ -960,14 +962,24 @@ export function SalesTable({
                       the sales they can already see. */}
                   <SaleExportButton onExport={handleExport} />
                   {isAdminUser && (
-                    <button
-                      type="button"
-                      onClick={() => setShowTopSeller(true)}
-                      className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
-                    >
-                      <Crown className="w-4 h-4" />
-                      Top Seller Poster
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShowTopSeller(true)}
+                        className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
+                      >
+                        <Crown className="w-4 h-4" />
+                        Top Seller Poster
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowTopDeveloper(true)}
+                        className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-full border-2 border-[#d6b357] bg-white text-[#8a6d2a] text-sm font-bold hover:bg-[#faf7ee] transition-colors"
+                      >
+                        <Building2 className="w-4 h-4" />
+                        Top Developer Poster
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -1366,6 +1378,7 @@ export function SalesTable({
       )}
 
       {showTopSeller && <TopSellerStudio onClose={() => setShowTopSeller(false)} />}
+      {showTopDeveloper && <TopDeveloperStudio onClose={() => setShowTopDeveloper(false)} />}
 
       <ToastStack
         toasts={toasts}

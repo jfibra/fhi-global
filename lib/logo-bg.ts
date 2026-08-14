@@ -37,7 +37,13 @@ export function sampleLogoBgFromUrl(url: string): Promise<string | null> {
   })
 }
 
-export function sampleLogoBg(img: HTMLImageElement): string | null {
+export function sampleLogoBg(
+  img: HTMLImageElement,
+  /** acceptMidTones: keep mid-tone gray backgrounds instead of vetoing them
+   *  to white — right for large surfaces (the poster medallion) where a
+   *  solid gray disc looks deliberate, wrong for small list tiles. */
+  opts?: { acceptMidTones?: boolean },
+): string | null {
   try {
     const w = img.naturalWidth
     const h = img.naturalHeight
@@ -70,8 +76,9 @@ export function sampleLogoBg(img: HTMLImageElement): string | null {
     const [r, g, b] = avg
     const chroma = Math.max(r, g, b) - Math.min(r, g, b)
     const lum = (r + g + b) / 3
-    // Mid-tone gray reads as muddy — use white.
-    if (chroma < 25 && lum > 50 && lum < 225) {
+    // Mid-tone gray reads as muddy on small tiles — use white unless the
+    // caller explicitly wants the true color.
+    if (!opts?.acceptMidTones && chroma < 25 && lum > 50 && lum < 225) {
       return WHITE_BG
     }
 
