@@ -50,7 +50,7 @@ function FiltersFallback() {
 
 function ToolbarFallback() {
   return (
-    <div className="h-10 w-full sm:w-48 shrink-0 rounded-full bg-[#f1f5f9] animate-pulse mb-0" aria-hidden />
+    <div className="h-10 w-full sm:w-48 shrink-0 bg-[#f1f5f9] animate-pulse mb-0" aria-hidden />
   )
 }
 
@@ -66,13 +66,13 @@ function BuyMapPropertyListSkeleton() {
       {[1, 2, 3].map((i) => (
         <div
           key={i}
-          className="flex flex-col overflow-hidden rounded-xl border border-[#d1d5db] bg-white shadow-sm md:flex-row"
+          className="flex flex-col overflow-hidden border border-[#d1d5db] bg-white shadow-sm md:flex-row"
         >
           <div className="aspect-[4/3] w-full bg-[#e2e8f0] md:w-[min(42%,320px)] md:min-h-[200px]" />
           <div className="flex flex-1 flex-col space-y-3 p-5">
-            <div className="h-7 w-48 rounded bg-[#e2e8f0]" />
-            <div className="h-3 w-full rounded bg-[#e2e8f0]" />
-            <div className="h-3 w-3/4 rounded bg-[#e2e8f0]" />
+            <div className="h-7 w-48 bg-[#e2e8f0]" />
+            <div className="h-3 w-full bg-[#e2e8f0]" />
+            <div className="h-3 w-3/4 bg-[#e2e8f0]" />
           </div>
         </div>
       ))}
@@ -82,7 +82,7 @@ function BuyMapPropertyListSkeleton() {
 
 function BuyMapPropertyMapSkeleton() {
   return (
-    <div className="min-h-[min(55vh,520px)] w-full rounded-xl border border-[#e8eaed] bg-[#e2e8f0] animate-pulse lg:min-h-[calc(100vh-9rem)]" />
+    <div className="min-h-[min(55vh,520px)] w-full border border-[#e8eaed] bg-[#e2e8f0] animate-pulse lg:min-h-[calc(100vh-9rem)]" />
   )
 }
 
@@ -92,13 +92,13 @@ function BuyListingsSkeleton() {
       {[1, 2, 3].map((i) => (
         <div
           key={i}
-          className="bg-white rounded-xl border border-[#d1d5db] overflow-hidden flex flex-col md:flex-row animate-pulse shadow-sm"
+          className="bg-white border border-[#d1d5db] overflow-hidden flex flex-col md:flex-row animate-pulse shadow-sm"
         >
           <div className="w-full md:w-[min(42%,380px)] aspect-[4/3] md:min-h-[240px] bg-[#e2e8f0]" />
           <div className="flex-1 p-6 space-y-3">
-            <div className="h-8 w-48 bg-[#e2e8f0] rounded" />
-            <div className="h-4 w-full bg-[#e2e8f0] rounded" />
-            <div className="h-4 w-3/4 bg-[#e2e8f0] rounded" />
+            <div className="h-8 w-48 bg-[#e2e8f0] " />
+            <div className="h-4 w-full bg-[#e2e8f0] " />
+            <div className="h-4 w-3/4 bg-[#e2e8f0] " />
           </div>
         </div>
       ))}
@@ -127,7 +127,7 @@ async function BuyMapSplitList({ sp }: { sp: Sp }) {
     <div className="space-y-5 min-w-0 max-w-full">
       {agentErr && projErr && (
         <div
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
           role="alert"
         >
           We couldn&apos;t load listings from the server. Check your connection and Supabase settings, then refresh
@@ -135,14 +135,14 @@ async function BuyMapSplitList({ sp }: { sp: Sp }) {
         </div>
       )}
       {!(agentErr && projErr) && properties.length === 0 && (
-        <div className="rounded-2xl border border-[#e8eaed] bg-white p-12 text-center">
+        <div className="border border-[#e8eaed] bg-white p-12 text-center">
           <p className="mb-4 text-[#475569]">
             No properties for sale match your filters yet. Try clearing filters or contact us for off-market
             options.
           </p>
           <Link
             href="/contact"
-            className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#d6b357] to-[#f0d890] px-6 py-3 text-sm font-bold text-[#001f3f]"
+            className="inline-flex items-center justify-center rounded-full bg-[#d6b357] px-6 py-3 text-sm font-bold text-[#001f3f]"
           >
             Contact an advisor
           </Link>
@@ -191,7 +191,7 @@ async function BuyListingsColumn({ sp }: { sp: Sp }) {
     <>
       {agentErr && projErr && (
         <div
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
           role="alert"
         >
           We couldn&apos;t load listings from the server. Check your connection and Supabase settings, then refresh
@@ -200,14 +200,14 @@ async function BuyListingsColumn({ sp }: { sp: Sp }) {
       )}
       {totalLabel && !(agentErr && projErr) && <p className="text-sm text-[#64748b]">{totalLabel}</p>}
       {!(agentErr && projErr) && properties.length === 0 && (
-        <div className="rounded-2xl border border-[#e8eaed] bg-white p-12 text-center">
+        <div className="border border-[#e8eaed] bg-white p-12 text-center">
           <p className="text-[#475569] mb-4">
             No properties for sale match your filters yet. Try clearing filters or contact us for off-market
             options.
           </p>
           <Link
             href="/contact"
-            className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-gradient-to-r from-[#d6b357] to-[#f0d890] text-[#001f3f] text-sm font-bold"
+            className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-[#d6b357] text-[#001f3f] text-sm font-bold"
           >
             Contact an advisor
           </Link>
@@ -253,7 +253,7 @@ export default async function BuyPage({ searchParams }: { searchParams: ListingS
           Properties for sale in the UAE
         </h1>
         <Suspense
-          fallback={<span className="mt-2 inline-block h-5 w-56 animate-pulse rounded bg-[#e2e8f0]" aria-hidden />}
+          fallback={<span className="mt-2 inline-block h-5 w-56 animate-pulse bg-[#e2e8f0]" aria-hidden />}
         >
           <BuyMapListingSubtitle sp={sp} />
         </Suspense>
@@ -271,10 +271,6 @@ export default async function BuyPage({ searchParams }: { searchParams: ListingS
       {/* Breadcrumb only — the result list varies with searchParams inside
           Suspense, so an ItemList here would misrepresent the page. */}
       <JsonLd schema={breadcrumbList([{ name: "Home", path: "/" }, { name: "Buy" }])} />
-      {view !== "map" && (
-        <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full opacity-20 blur-[100px] -z-10 bg-[radial-gradient(circle,rgb(200,235,255)_0%,transparent_70%)]" />
-      )}
-
       <Suspense fallback={<FiltersFallback />}>
         <BuyFiltersLoader />
       </Suspense>

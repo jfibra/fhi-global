@@ -54,7 +54,7 @@ const WA = "971567428288"
 
 /** Reference: light yellow buttons (Email / Call). */
 const lightYellowBtn =
-  "inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#fff8e1] border border-[#f5e6a8] text-[#0f2940] text-sm font-semibold hover:bg-[#fff3cc] transition-colors"
+  "inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#fff8e1] border border-[#f5e6a8] text-[#0f2940] text-sm font-semibold hover:bg-[#fff3cc] transition-colors"
 
 function WhatsAppGlyph({ className }: { className?: string }) {
   return (
@@ -100,7 +100,7 @@ export function BuyPropertyCard({ property }: { property: BuyPropertyCardData })
     `Spacious 1BR Apartment | High Finishing | Prime Location`
 
   return (
-    <article className="relative bg-white rounded-xl border border-[#d1d5db] shadow-sm overflow-hidden flex flex-col md:flex-row transition-shadow duration-300 hover:shadow-[0_16px_44px_-14px_rgba(0,20,40,0.3)]">
+    <article className="relative bg-white border border-[#d1d5db] shadow-sm overflow-hidden flex flex-col md:flex-row transition-shadow duration-300 hover:shadow-[0_16px_44px_-14px_rgba(0,20,40,0.3)]">
       {/* Gold signature trim (site-wide card accent) */}
       <span className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#d6b357] via-[#f0d890] to-[#d6b357]/30 z-10" aria-hidden="true" />
       <div className="relative w-full md:w-[min(44%,400px)] shrink-0 aspect-[4/3] md:aspect-auto md:min-h-[260px] bg-[#f3f4f6]">
@@ -228,7 +228,7 @@ export function BuyPropertyCard({ property }: { property: BuyPropertyCardData })
             href={`https://wa.me/${WA}?text=${encodeURIComponent(`Hi, I'm interested in ${property.name}`)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#d8f5e4] border border-[#86efac] text-[#166534] text-sm font-semibold hover:bg-[#c4eed8] transition-colors"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#d8f5e4] border border-[#86efac] text-[#166534] text-sm font-semibold hover:bg-[#c4eed8] transition-colors"
           >
             <WhatsAppGlyph className="w-[18px] h-[18px] text-[#25d366]" />
             WhatsApp

@@ -63,11 +63,11 @@ export function BuyListToolbar({
         />
       </div>
 
-      <div className="inline-flex rounded-full border border-[#d1d5db] bg-white p-1 self-start sm:self-auto shadow-sm">
+      <div className="inline-flex border border-[#d1d5db] bg-white p-1 self-start sm:self-auto shadow-sm">
         <button
           type="button"
           onClick={() => setParam("view", "list")}
-          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold transition-colors ${
+          className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold transition-colors ${
             view === "list" ? listMapActive : listMapInactive
           }`}
         >
@@ -77,7 +77,7 @@ export function BuyListToolbar({
         <button
           type="button"
           onClick={() => setParam("view", "map")}
-          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold transition-colors ${
+          className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold transition-colors ${
             view === "map" ? listMapActive : listMapInactive
           }`}
         >

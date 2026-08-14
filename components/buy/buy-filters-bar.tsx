@@ -53,7 +53,7 @@ type FilterSnapshot = {
 }
 
 const pillInput =
-  "w-full pl-10 pr-4 py-2.5 rounded-full border border-[#d1d5db] text-sm text-[#0f2940] placeholder:text-[#9ca3af] bg-white focus:outline-none focus:ring-2 focus:ring-[#d6b357]/30 focus:border-[#d6b357]"
+  "w-full pl-10 pr-4 py-2.5 border border-[#d1d5db] text-sm text-[#0f2940] placeholder:text-[#9ca3af] bg-white focus:outline-none focus:ring-2 focus:ring-[#d6b357]/30 focus:border-[#d6b357]"
 const linkNavy = "text-sm font-medium text-[#0f2940] hover:text-[#d6b357] hover:underline transition-colors"
 
 export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTypeOption[] }) {
@@ -202,13 +202,13 @@ export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTyp
 
   return (
     <div className="flow-root w-full bg-gradient-to-b from-[#001f3f] to-[#002a52] border-b border-[#d6b357]/25 px-4 sm:px-6 lg:px-8 py-5">
-      <div className="max-w-[1920px] mx-auto min-w-0 rounded-2xl bg-white shadow-[0_14px_40px_-12px_rgba(0,10,30,0.5)] px-4 sm:px-6 py-4">
+      <div className="max-w-[1920px] mx-auto min-w-0 bg-white shadow-[0_14px_40px_-12px_rgba(0,10,30,0.5)] px-4 sm:px-6 py-4">
         {canRestore && (
           <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-[#f3f4f6]">
             <button
               type="button"
               onClick={restoreSavedSearch}
-              className="text-xs font-semibold text-[#0c6d8c] border border-[#e5e7eb] px-3 py-1.5 rounded-full bg-white hover:bg-[#f9fafb]"
+              className="text-xs font-semibold text-[#0c6d8c] border border-[#e5e7eb] px-3 py-1.5 bg-white hover:bg-[#f9fafb]"
             >
               Restore saved search
             </button>
@@ -230,14 +230,14 @@ export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTyp
                 />
               </div>
               <div
-                className="inline-flex w-full shrink-0 rounded-full border border-[#d1d5db] bg-white p-1 shadow-sm sm:w-auto"
+                className="inline-flex w-full shrink-0 border border-[#d1d5db] bg-white p-1 shadow-sm sm:w-auto"
                 role="group"
                 aria-label="Buy or Rent"
               >
                 <Link
                   href="/buy"
                   className={cn(
-                    "flex-1 rounded-full px-5 py-2 text-center text-sm font-bold transition-colors sm:flex-none",
+                    "flex-1 px-5 py-2 text-center text-sm font-bold transition-colors sm:flex-none",
                     buyActive ? "bg-[#0f2940] text-white shadow-sm" : "text-[#6b7280] hover:text-[#0f2940]",
                   )}
                 >
@@ -246,7 +246,7 @@ export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTyp
                 <Link
                   href="/rent"
                   className={cn(
-                    "flex-1 rounded-full px-5 py-2 text-center text-sm font-bold transition-colors sm:flex-none",
+                    "flex-1 px-5 py-2 text-center text-sm font-bold transition-colors sm:flex-none",
                     rentActive ? "bg-[#0f2940] text-white shadow-sm" : "text-[#6b7280] hover:text-[#0f2940]",
                   )}
                 >
@@ -284,7 +284,7 @@ export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTyp
                 <button
                   type="button"
                   onClick={() => setMoreOpen((v) => !v)}
-                  className={`inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-full border px-4 py-2.5 text-sm font-medium transition-colors sm:col-span-2 xl:w-auto ${
+                  className={`inline-flex w-full items-center justify-center gap-2 whitespace-nowrap border px-4 py-2.5 text-sm font-medium transition-colors sm:col-span-2 xl:w-auto ${
                     moreOpen
                       ? "border-[#d6b357] bg-[#fffdf8] text-[#0f2940]"
                       : "border-[#d1d5db] bg-white text-[#0f2940] hover:bg-[#f9fafb]"
@@ -302,7 +302,7 @@ export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTyp
             </div>
 
             {moreOpen && (
-              <div className="flex flex-col sm:flex-row flex-wrap gap-3 rounded-2xl border border-[#e5e7eb] bg-[#fafafa] px-4 py-3">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-3 border border-[#e5e7eb] bg-[#fafafa] px-4 py-3">
                 <input
                   type="number"
                   min={0}
@@ -311,7 +311,7 @@ export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTyp
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
                   onBlur={() => pushSnapshot(stateRef.current)}
-                  className="w-full sm:w-[150px] px-4 py-2.5 rounded-full border border-[#d1d5db] text-sm text-[#0f2940] bg-white focus:outline-none focus:ring-2 focus:ring-[#d6b357]/30"
+                  className="w-full sm:w-[150px] px-4 py-2.5 border border-[#d1d5db] text-sm text-[#0f2940] bg-white focus:outline-none focus:ring-2 focus:ring-[#d6b357]/30"
                 />
                 <input
                   type="number"
@@ -321,7 +321,7 @@ export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTyp
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
                   onBlur={() => pushSnapshot(stateRef.current)}
-                  className="w-full sm:w-[150px] px-4 py-2.5 rounded-full border border-[#d1d5db] text-sm text-[#0f2940] bg-white focus:outline-none focus:ring-2 focus:ring-[#d6b357]/30"
+                  className="w-full sm:w-[150px] px-4 py-2.5 border border-[#d1d5db] text-sm text-[#0f2940] bg-white focus:outline-none focus:ring-2 focus:ring-[#d6b357]/30"
                 />
                 <div className="shrink-0">
                   <PillSelect

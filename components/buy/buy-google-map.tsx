@@ -127,7 +127,7 @@ function propertyMarkerIconDataUrl(imageUrl: string | null): Promise<string> {
 
 function loadErrorMessage(err: string) {
   return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50 min-h-[420px] flex flex-col items-center justify-center text-center px-6">
+    <div className="border border-amber-200 bg-amber-50 min-h-[420px] flex flex-col items-center justify-center text-center px-6">
       <p className="text-sm font-medium text-amber-900 mb-1">Map could not load</p>
       <p className="text-xs text-amber-800/90 max-w-md">{err}</p>
     </div>
@@ -168,16 +168,16 @@ export function BuyGoogleMap({
     return (
       <div
         className={cn(
-          "rounded-2xl border border-[#e8eaed] bg-gradient-to-br from-[#f0f9ff] to-[#e0f2fe] min-h-[420px] flex flex-col items-center justify-center text-center px-6",
+          "border border-[#e8eaed] bg-gradient-to-br from-[#f0f9ff] to-[#e0f2fe] min-h-[420px] flex flex-col items-center justify-center text-center px-6",
           className,
         )}
       >
         <MapPin className="w-10 h-10 text-[#001f3f] mb-3" />
         <p className="font-['Outfit'] text-lg font-semibold text-[#001f3f] mb-2">Map view</p>
         <p className="text-sm text-[#64748b] max-w-sm mb-2">
-          Add <code className="text-xs bg-white/80 px-1 rounded">GOOGLE_MAPS_API_KEY</code> or{" "}
-          <code className="text-xs bg-white/80 px-1 rounded">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> to your{" "}
-          <code className="text-xs bg-white/80 px-1 rounded">.env</code> file, then restart the dev server.
+          Add <code className="text-xs bg-white/80 px-1 ">GOOGLE_MAPS_API_KEY</code> or{" "}
+          <code className="text-xs bg-white/80 px-1 ">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> to your{" "}
+          <code className="text-xs bg-white/80 px-1 ">.env</code> file, then restart the dev server.
         </p>
         <p className="text-xs text-[#94a3b8]">Enable Maps JavaScript API and restrict the key by HTTP referrer.</p>
       </div>
@@ -303,8 +303,8 @@ export function BuyGoogleMap({
       className={cn(
         "border border-[#e8eaed] overflow-hidden bg-[#e8eaed] relative",
         fillHeight
-          ? "rounded-2xl flex flex-col w-full min-w-0 max-w-full min-h-[min(55vh,520px)] lg:h-[calc(100vh-9rem)] lg:min-h-[480px]"
-          : "rounded-2xl min-h-[420px]",
+          ? "flex flex-col w-full min-w-0 max-w-full min-h-[min(55vh,520px)] lg:h-[calc(100vh-9rem)] lg:min-h-[480px]"
+          : "min-h-[420px]",
         className,
       )}
     >

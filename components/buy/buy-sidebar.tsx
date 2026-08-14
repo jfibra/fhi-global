@@ -38,17 +38,17 @@ const USEFUL = [
 export function BuySidebarNewsSkeleton() {
   return (
     <div
-      className="rounded-2xl border border-[#e8eaed] bg-white p-5 shadow-sm animate-pulse"
+      className="border border-[#e8eaed] bg-white p-5 shadow-sm animate-pulse"
       aria-hidden
     >
-      <div className="h-4 w-48 bg-[#e2e8f0] rounded mb-4" />
+      <div className="h-4 w-48 bg-[#e2e8f0] mb-4" />
       <ul className="space-y-4">
         {[1, 2, 3, 4].map((i) => (
           <li key={i} className="flex gap-3">
-            <div className="w-20 h-14 shrink-0 rounded-lg bg-[#e2e8f0]" />
+            <div className="w-20 h-14 shrink-0 bg-[#e2e8f0]" />
             <div className="flex-1 space-y-2 min-w-0">
-              <div className="h-3 bg-[#e2e8f0] rounded w-full" />
-              <div className="h-3 bg-[#e2e8f0] rounded w-4/5" />
+              <div className="h-3 bg-[#e2e8f0] w-full" />
+              <div className="h-3 bg-[#e2e8f0] w-4/5" />
             </div>
           </li>
         ))}
@@ -60,14 +60,14 @@ export function BuySidebarNewsSkeleton() {
 export function BuySidebarTop() {
   return (
     <>
-      <div className="rounded-xl border border-[#e8e4dc] bg-[#e8e6e1] min-h-[200px] flex flex-col items-center justify-center gap-1 py-8 px-4">
+      <div className="border border-[#e8e4dc] bg-[#e8e6e1] min-h-[200px] flex flex-col items-center justify-center gap-1 py-8 px-4">
         <span className="text-sm font-bold tracking-[0.2em] text-[#9ca3af]">ADS</span>
         <span className="text-xs text-[#94a3b8]">Advertisement</span>
       </div>
 
       <Link
         href="/contact"
-        className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-lg bg-white border-2 border-[#d6b357] text-[#c9a449] text-[11px] font-bold uppercase tracking-[0.12em] hover:bg-[#fffdf8] transition-colors shadow-sm"
+        className="w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-white border-2 border-[#d6b357] text-[#c9a449] text-[11px] font-bold uppercase tracking-[0.12em] hover:bg-[#fffdf8] transition-colors shadow-sm"
       >
         <Bell className="w-4 h-4 text-[#d6b357] shrink-0" />
         Alert me of new properties
@@ -92,7 +92,7 @@ export async function BuySidebarNews() {
   const articles = await loadSidebarArticles()
 
   return (
-    <div className="rounded-2xl border border-[#e8eaed] bg-white p-5 shadow-sm">
+    <div className="border border-[#e8eaed] bg-white p-5 shadow-sm">
       <div className="flex items-center gap-2 border-b border-[#001f3f]/10 pb-3 mb-4">
         <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" />
         <h3 className="text-xs font-bold uppercase tracking-widest text-[#001f3f]">
@@ -111,7 +111,7 @@ export async function BuySidebarNews() {
           {articles.map((item) => (
             <li key={item.id}>
               <Link href={`/news/${item.slug}`} className="flex gap-3 group">
-                <div className="relative w-20 h-14 shrink-0 rounded-lg overflow-hidden bg-[#f1f5f9]">
+                <div className="relative w-20 h-14 shrink-0 overflow-hidden bg-[#f1f5f9]">
                   <Image
                     src={item.img}
                     alt=""
@@ -141,7 +141,7 @@ export function BuySidebarBottom({ searchBasePath = "/buy" }: { searchBasePath?:
   const recommended = recommendedForListingBase(searchBasePath)
   return (
     <>
-      <div className="rounded-2xl border border-[#e8eaed] bg-white p-5 shadow-sm">
+      <div className="border border-[#e8eaed] bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2 border-b border-[#001f3f]/10 pb-3 mb-4">
           <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" />
           <h3 className="text-xs font-bold uppercase tracking-widest text-[#001f3f]">
@@ -162,7 +162,7 @@ export function BuySidebarBottom({ searchBasePath = "/buy" }: { searchBasePath?:
         </ul>
       </div>
 
-      <div className="rounded-2xl border border-[#e8eaed] bg-white p-5 shadow-sm">
+      <div className="border border-[#e8eaed] bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2 border-b border-[#001f3f]/10 pb-3 mb-4">
           <Star className="w-3.5 h-3.5 text-[#d6b357] fill-[#d6b357]" />
           <h3 className="text-xs font-bold uppercase tracking-widest text-[#001f3f]">
@@ -183,7 +183,7 @@ export function BuySidebarBottom({ searchBasePath = "/buy" }: { searchBasePath?:
         </ul>
       </div>
 
-      <div className="rounded-xl border border-[#e8e4dc] bg-[#e8e6e1] min-h-[160px] flex flex-col items-center justify-center gap-1 py-8 px-4">
+      <div className="border border-[#e8e4dc] bg-[#e8e6e1] min-h-[160px] flex flex-col items-center justify-center gap-1 py-8 px-4">
         <span className="text-sm font-bold tracking-[0.2em] text-[#9ca3af]">ADS</span>
         <span className="text-xs text-[#94a3b8]">Advertisement</span>
       </div>
