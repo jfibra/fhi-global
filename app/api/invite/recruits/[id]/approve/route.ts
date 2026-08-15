@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { canGrantInviteRole, invitableRolesFor, isAdminStaffRole, normalizeAppRole, roleToLabel } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { sendWelcomeEmail } from "@/lib/welcome-email"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
 /**
@@ -122,5 +123,16 @@ export async function POST(
     ...requestContextFromRequest(req),
   })
 
-  return NextResponse.json({ ok: true, role: finalRole })
+  // Welcome email — sent from the approver's own @fhiglobal.ae mailbox when
+  // they have one (the personal Emails accounts), the company address
+  // otherwise. The account is already active either way: a mail hiccup is
+  // reported via `welcomeSent`, never as an approval failure.
+  const welcomeSent = await sendWelcomeEmail({
+    targetId: id,
+    targetName: target.fullname,
+    approver: { id: userId, name: profile.fullname ?? email ?? null, mailbox: profile.mailbox_address },
+    personalTeam: true,
+  })
+
+  return NextResponse.json({ ok: true, role: finalRole, welcomeSent })
 }

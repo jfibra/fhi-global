@@ -104,6 +104,7 @@ export function InviteClient({
   const [recruitsError, setRecruitsError] = useState(false)
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [approveError, setApproveError] = useState<string | null>(null)
+  const [approveNotice, setApproveNotice] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   // Role chosen for each pending recruit at approval time (member | agent).
   const [roleChoice, setRoleChoice] = useState<Record<string, string>>({})
@@ -346,6 +347,7 @@ export function InviteClient({
     const role = recruit ? roleFor(recruit) : "member"
     setApprovingId(id)
     setApproveError(null)
+    setApproveNotice(null)
     try {
       const res = await fetch(`/api/invite/recruits/${id}/approve`, {
         method: "POST",
@@ -356,7 +358,13 @@ export function InviteClient({
         const data = (await res.json().catch(() => ({}))) as { error?: string }
         throw new Error(data.error ?? "Couldn't approve this recruit.")
       }
+      const data = (await res.json().catch(() => ({}))) as { welcomeSent?: boolean }
       setRecruits((prev) => prev.map((r) => (r.id === id ? { ...r, status: "active", role } : r)))
+      setApproveNotice(
+        data.welcomeSent
+          ? `Approved — a welcome email is on its way to ${recruit?.fullname ?? recruit?.email ?? "the recruit"}.`
+          : "Approved.",
+      )
     } catch (e) {
       setApproveError(e instanceof Error ? e.message : "Couldn't approve this recruit.")
     } finally {
@@ -753,6 +761,9 @@ export function InviteClient({
                 </div>
               )}
 
+              {approveNotice && !approveError && (
+                <p className="text-xs font-semibold text-emerald-700 mt-3">{approveNotice}</p>
+              )}
               {approveError && (
                 <p className="text-xs text-rose-600 mt-3">{approveError}</p>
               )}

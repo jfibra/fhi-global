@@ -3,9 +3,10 @@ import { isAdminStaffRole, isKnownAppRoleId } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import type { UpdateUserPayload } from "@/lib/user-service"
+import { sendWelcomeEmail } from "@/lib/welcome-email"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
-type AdminCaller = { id: string; name: string | null; role: string | null }
+type AdminCaller = { id: string; name: string | null; role: string | null; mailbox: string | null }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -15,11 +16,16 @@ async function requireAdmin(): Promise<AdminCaller | null> {
   if (!user) return null
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, fullname")
+    .select("role, fullname, mailbox_address")
     .eq("id", user.id)
     .single()
   if (!profile || !isAdminStaffRole(profile.role)) return null
-  return { id: user.id, name: profile.fullname ?? user.email ?? null, role: profile.role }
+  return {
+    id: user.id,
+    name: profile.fullname ?? user.email ?? null,
+    role: profile.role,
+    mailbox: (profile.mailbox_address as string | null) ?? null,
+  }
 }
 
 // ─── GET /api/admin/users/[id] ─────────────────────────────────────────────────
@@ -271,7 +277,20 @@ export async function PATCH(
     })
   }
 
-  return NextResponse.json({ ok: true })
+  // First activation → the same welcome email the invite Approve sends.
+  // Reactivations (active → active edits, restores of once-active users who
+  // already got one) are covered by the status transition check.
+  let welcomeSent = false
+  if (newStatus === "active" && (before?.status ?? null) !== "active") {
+    welcomeSent = await sendWelcomeEmail({
+      targetId: id,
+      targetName: before?.fullname ?? null,
+      approver: { id: caller.id, name: caller.name, mailbox: caller.mailbox },
+      personalTeam: false,
+    })
+  }
+
+  return NextResponse.json({ ok: true, welcomeSent })
 }
 
 // ─── DELETE /api/admin/users/[id] ──────────────────────────────────────────────
