@@ -12,6 +12,8 @@
 export const SOCIAL_URLS = {
   facebook: "https://www.facebook.com/fhiglobal",
   instagram: "#",
+  linkedin: "#",
+  youtube: "#",
 } as const
 
 /** True for a real profile link, false for an unpublished "#" placeholder. */
