@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { TileMockup } from "@/components/dashboard/hub-tile-mockups"
 import Link from "next/link"
 import {
   ArrowLeft, ArrowRight, Building2, Check, CheckCircle2, ChevronDown,
@@ -60,24 +61,28 @@ function emptyForm(saleType: SaleType): SaleFormData {
 
 const TYPE_CARDS: Array<{
   type: SaleType
+  mock: string
   icon: typeof Building2
   title: string
   desc: string
 }> = [
   {
     type: "project",
+    mock: "sale-project",
     icon: Building2,
     title: "Project Sale / Off-Plan",
     desc: "A unit in a developer's project — pick the developer, project and unit.",
   },
   {
     type: "brokerage",
+    mock: "sale-brokerage",
     icon: Handshake,
     title: "Brokerage / Ready Unit",
     desc: "A resale / private-owner deal — no developer, just the property details.",
   },
   {
     type: "rental",
+    mock: "sale-rental",
     icon: KeyRound,
     title: "Rental",
     desc: "A rental transaction — property details and the lease contract.",
@@ -326,16 +331,20 @@ export function EncodeSaleClient({
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {TYPE_CARDS.map(({ type, icon: Icon, title, desc }) => (
+          {TYPE_CARDS.map(({ type, mock, icon: Icon, title, desc }) => (
             <button
               key={type}
               type="button"
               onClick={() => pickType(type)}
               className="group text-left bg-white rounded-2xl border border-[#eceef1] p-8 shadow-[0_2px_12px_rgba(15,30,50,0.05)] hover:shadow-[0_18px_48px_-16px_rgba(0,20,40,0.22)] hover:-translate-y-1 hover:border-[#d6b357]/60 transition-all duration-300"
             >
-              <span className="w-20 h-20 rounded-full bg-[#f4f5f7] group-hover:bg-[#d6b357]/10 flex items-center justify-center mb-7 transition-colors">
-                <Icon className="w-9 h-9 text-[#b8913f]" strokeWidth={1.5} />
-              </span>
+              <div className="flex items-start justify-between gap-3 mb-7">
+                <span className="w-20 h-20 rounded-full bg-[#f4f5f7] group-hover:bg-[#d6b357]/10 flex items-center justify-center transition-colors">
+                  <Icon className="w-9 h-9 text-[#b8913f]" strokeWidth={1.5} />
+                </span>
+                {/* Miniature of this deal type. */}
+                <TileMockup kind={mock} />
+              </div>
               <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] mb-3">{title}</h2>
               <p className="text-[15px] text-[#6b7280] leading-relaxed mb-7">{desc}</p>
               <ArrowRight className="w-6 h-6 text-[#b8913f] group-hover:translate-x-1.5 transition-transform duration-300" />

@@ -176,9 +176,9 @@ const ADMIN_NAV: RoleNavEntry[] = [
     to: "finance",
     icon: Wallet,
     items: [
-      { icon: ShoppingCart, label: "Purchases",           to: "purchases",           description: "Recorded company purchases." },
-      { icon: Tag,          label: "Purchase Categories", to: "purchase-categories", description: "Categories purchases are filed under." },
-      { icon: Landmark,     label: "Tax Entities",        to: "tax-entities",        description: "Entities purchases and sales are booked to." },
+      { icon: ShoppingCart, label: "Purchases",           to: "purchases",           description: "Recorded company purchases.", mock: "purchases" },
+      { icon: Tag,          label: "Purchase Categories", to: "purchase-categories", description: "Categories purchases are filed under.", mock: "purchase-categories" },
+      { icon: Landmark,     label: "Tax Entities",        to: "tax-entities",        description: "Entities purchases and sales are booked to.", mock: "tax-entities" },
     ],
   },
   // Sales Reports sits at the top level rather than inside the Finance hub: it is
@@ -205,8 +205,8 @@ const ADMIN_NAV: RoleNavEntry[] = [
     to: "communication",
     icon: MessagesSquare,
     items: [
-      { icon: Inbox, label: "Contact Inbox", to: "contact-inbox", description: "Enquiries sent from the public site." },
-      { ...SUPPORT_TICKETS,                                        description: "Tickets raised by agents and clients." },
+      { icon: Inbox, label: "Contact Inbox", to: "contact-inbox", description: "Enquiries sent from the public site.", mock: "contact-inbox" },
+      { ...SUPPORT_TICKETS,                                        description: "Tickets raised by agents and clients.", mock: "support-tickets" },
     ],
   },
   // Marketing artwork + training PDFs, grouped under one hub (same as the sales roles).
@@ -215,8 +215,8 @@ const ADMIN_NAV: RoleNavEntry[] = [
     to: "library",
     icon: Library,
     items: [
-      { ...MATERIALS, description: "Branded marketing artwork to download and share." },
-      { ...EBOOKS,    description: "Training guides and reference PDFs." },
+      { ...MATERIALS, description: "Branded marketing artwork to download and share.", mock: "materials" },
+      { ...EBOOKS,    description: "Training guides and reference PDFs.", mock: "ebooks" },
     ],
   },
   { icon: ScrollText, label: "Activity Logs", to: "system-logs" },
@@ -294,8 +294,8 @@ const salesPipelineNav = ({ projects = false, events = false, teamSales = false 
     to: "library",
     icon: Library,
     items: [
-      { ...MATERIALS, description: "Branded marketing artwork to download and share." },
-      { ...EBOOKS,    description: "Training guides and reference PDFs." },
+      { ...MATERIALS, description: "Branded marketing artwork to download and share.", mock: "materials" },
+      { ...EBOOKS,    description: "Training guides and reference PDFs.", mock: "ebooks" },
     ],
   },
 ]

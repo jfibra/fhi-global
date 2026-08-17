@@ -190,6 +190,204 @@ const MOCKUPS: Record<string, React.ReactNode> = {
       <span className="mt-auto h-[3px] w-4 rounded bg-white/50" />
     </span>
   ),
+  // A till receipt: header, line items with amounts, gold total, torn edge.
+  purchases: (
+    <span className="relative block h-[52px] w-9 rotate-[3deg]">
+      <span className="flex h-[48px] w-full flex-col rounded-t-[2px] border border-b-0 border-[#dfe4ea] bg-white p-1 shadow-md">
+        <span className="mx-auto h-[3px] w-4 rounded bg-[#001f3f]" />
+        <span className="mt-1 flex items-center justify-between">
+          <span className="h-[3px] w-3 rounded bg-[#c3c9d1]" />
+          <span className="h-[3px] w-1.5 rounded bg-[#aab3bf]" />
+        </span>
+        <span className="mt-0.5 flex items-center justify-between">
+          <span className="h-[3px] w-4 rounded bg-[#c3c9d1]" />
+          <span className="h-[3px] w-1.5 rounded bg-[#aab3bf]" />
+        </span>
+        <span className="mt-0.5 flex items-center justify-between">
+          <span className="h-[3px] w-2.5 rounded bg-[#c3c9d1]" />
+          <span className="h-[3px] w-1.5 rounded bg-[#aab3bf]" />
+        </span>
+        <span className="mt-auto border-t border-dashed border-[#c8d4de] pt-0.5">
+          <span className="flex items-center justify-between">
+            <span className="h-[3px] w-2 rounded bg-[#001f3f]" />
+            <span className="h-1 w-3 rounded-[1px] bg-[#d6b357]" />
+          </span>
+        </span>
+      </span>
+      <svg viewBox="0 0 36 4" className="block h-1 w-full text-white drop-shadow-sm">
+        <path d="M0 0h36L33 4 30 0l-3 4-3-4-3 4-3-4-3 4-3-4-3 4-3-4-3 4L3 0 0 4z" fill="currentColor" stroke="#dfe4ea" strokeWidth="0.4" />
+      </svg>
+    </span>
+  ),
+  // Two swing tags on a ring — one gold, one navy.
+  "purchase-categories": (
+    <span className="relative block h-[46px] w-[64px]">
+      <span className="absolute left-3 top-1 h-9 w-7 rotate-[-14deg] rounded-[3px] bg-[#12365a] shadow-sm">
+        <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-[#f3f5f8]" />
+      </span>
+      <span className="absolute left-8 top-2 flex h-9 w-7 rotate-[12deg] flex-col items-center rounded-[3px] bg-[#d6b357] p-1 shadow-md">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#f3f5f8] ring-1 ring-[#b8913f]" />
+        <span className="mt-1.5 h-[3px] w-4 rounded bg-[#001f3f]" />
+        <span className="mt-0.5 h-[3px] w-3 rounded bg-[#001f3f]/50" />
+      </span>
+    </span>
+  ),
+  // The institution: pediment, columns, steps — with a gold ledger line.
+  "tax-entities": (
+    <span className="relative flex h-[46px] w-[64px] flex-col items-center justify-end">
+      <svg viewBox="0 0 40 10" className="w-12">
+        <polygon points="20,0 40,10 0,10" fill="#001f3f" />
+        <circle cx="20" cy="6" r="1.6" fill="#d6b357" />
+      </svg>
+      <span className="flex w-12 justify-between bg-[#f3f5f8] px-1 py-0.5" style={{ columnGap: 2 }}>
+        {[0, 1, 2, 3].map((i) => (
+          <span key={i} className="h-4 w-1.5 rounded-[1px] bg-[#12365a]" />
+        ))}
+      </span>
+      <span className="h-1 w-12 bg-[#001f3f]" />
+      <span className="mt-0.5 h-1 w-[56px] bg-[#c8d4de]" />
+      <span className="mt-0.5 h-[3px] w-8 rounded bg-[#d6b357]" />
+    </span>
+  ),
+  // A tower going up: crane, windows lighting on, a smaller finished block.
+  "sale-project": (
+    <span className="relative block h-[50px] w-[70px]">
+      <svg viewBox="0 0 40 30" className="absolute left-0 top-0 h-[42px] w-[58px]">
+        <path
+          d="M6 28V6 M2 6h22 M14 6v5"
+          stroke="#b8913f"
+          strokeWidth="1.6"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <rect x="12.5" y="11" width="3" height="3" fill="#d6b357" />
+      </svg>
+      <span className="absolute bottom-0.5 right-8 h-5 w-4 rounded-t-[2px] bg-[#12365a]" />
+      <span className="absolute bottom-0.5 right-1 grid h-9 w-6 grid-cols-2 content-start gap-0.5 rounded-t-[2px] bg-[#001f3f] p-1">
+        <span className="h-1 w-1 rounded-[1px] bg-[#d6b357]" />
+        <span className="h-1 w-1 rounded-[1px] bg-white/40" />
+        <span className="h-1 w-1 rounded-[1px] bg-white/40" />
+        <span className="h-1 w-1 rounded-[1px] bg-[#d6b357]" />
+        <span className="h-1 w-1 rounded-[1px] bg-[#d6b357]" />
+        <span className="h-1 w-1 rounded-[1px] bg-white/40" />
+      </span>
+      <span className="absolute bottom-0 left-1 right-1 h-[2px] rounded bg-[#c8d4de]" />
+    </span>
+  ),
+  // A ready home changing hands: house with lit windows and the SOLD sticker.
+  "sale-brokerage": (
+    <span className="relative block h-[50px] w-[70px]">
+      <svg viewBox="0 0 34 26" className="absolute bottom-0 left-1/2 h-10 w-[52px] -translate-x-1/2">
+        <polygon points="17,0 34,12 0,12" fill="#1d4166" />
+        <rect x="4" y="12" width="26" height="14" fill="#123252" />
+        <rect x="14" y="17" width="6" height="9" fill="#d6b357" />
+        <rect x="7" y="15" width="5" height="4" fill="#9fc2dd" />
+        <rect x="22" y="15" width="5" height="4" fill="#9fc2dd" />
+      </svg>
+      <span className="absolute right-0 top-0 flex h-4 w-7 rotate-6 items-center justify-center rounded-[2px] bg-[#d6b357] shadow-sm">
+        <span className="h-[3px] w-4 rounded bg-[#001f3f]" />
+      </span>
+    </span>
+  ),
+  // Keys handed over: the door, the key, and the FOR RENT chip.
+  "sale-rental": (
+    <span className="relative block h-[50px] w-[70px]">
+      <span className="absolute bottom-1 left-3 h-10 w-7 rounded-t-[6px] bg-[#001f3f]">
+        <span className="absolute right-1 top-5 h-1 w-1 rounded-full bg-[#d6b357]" />
+      </span>
+      <span className="absolute bottom-0.5 left-1.5 h-[2px] w-10 rounded bg-[#c8d4de]" />
+      <svg viewBox="0 0 26 12" className="absolute right-0 top-2 h-4 w-9 rotate-12">
+        <circle cx="5" cy="6" r="3.4" fill="none" stroke="#b8913f" strokeWidth="2" />
+        <path d="M9 6h13 M17 6v4 M21 6v3" stroke="#b8913f" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+      <span className="absolute bottom-1 right-0 flex h-3.5 w-8 items-center justify-center rounded-[2px] border border-[#d6b357] bg-white">
+        <span className="h-[3px] w-5 rounded bg-[#b8913f]" />
+      </span>
+    </span>
+  ),
+  // An inbox: message rows with senders, the top one unread with a gold dot.
+  "contact-inbox": (
+    <span className="flex h-[50px] w-[74px] flex-col overflow-hidden rounded-[4px] border border-[#dfe4ea] bg-white shadow-md">
+      <span className="flex h-3 shrink-0 items-center gap-1 bg-[#001f3f] px-1">
+        <span className="h-[3px] w-5 rounded bg-[#d6b357]" />
+        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#d6b357]" />
+      </span>
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className={`flex flex-1 items-center gap-1 border-b border-[#eef1f5] px-1 ${i === 0 ? "bg-[#faf7ee]" : ""}`}
+        >
+          <span className={`h-2 w-2 shrink-0 rounded-full ${i === 0 ? "bg-[#d6b357]" : "bg-[#c8d4de]"}`} />
+          <span className="min-w-0 flex-1">
+            <span className={`block h-[3px] w-7 rounded ${i === 0 ? "bg-[#001f3f]" : "bg-[#aab3bf]"}`} />
+          </span>
+          <span className="h-[3px] w-2 rounded bg-[#c3c9d1]" />
+        </span>
+      ))}
+    </span>
+  ),
+  // A support ticket stub: notched edge, dashed tear line, priority chip.
+  "support-tickets": (
+    <span className="relative block rotate-[-4deg]">
+      <span className="relative flex h-9 w-[72px] items-stretch overflow-hidden rounded-[4px] bg-[#001f3f] shadow-md">
+        <span className="flex flex-1 flex-col justify-center gap-0.5 px-1.5">
+          <span className="h-[3px] w-8 rounded bg-white/85" />
+          <span className="h-[3px] w-6 rounded bg-white/40" />
+          <span className="mt-0.5 h-1.5 w-5 rounded-[2px] bg-[#d6b357]" />
+        </span>
+        <span className="my-1 w-px border-l border-dashed border-white/40" />
+        <span className="flex w-4 items-center justify-center">
+          <span className="h-2 w-2 rounded-full border border-[#d6b357]" />
+        </span>
+        {/* ticket notches */}
+        <span className="absolute -top-1 right-[18px] h-2 w-2 rounded-full bg-[#f3f5f8]" />
+        <span className="absolute -bottom-1 right-[18px] h-2 w-2 rounded-full bg-[#f3f5f8]" />
+      </span>
+    </span>
+  ),
+  // A stack of marketing artworks with a gold download badge.
+  materials: (
+    <span className="relative block h-[50px] w-[70px]">
+      <span className="absolute left-4 top-0 flex h-10 w-8 flex-col rounded-[3px] bg-[#12365a] p-1 shadow-sm rotate-3">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#d6b357]" />
+        <span className="mt-auto h-[3px] w-4 rounded bg-white/60" />
+      </span>
+      <span className="absolute left-0 top-1.5 flex h-10 w-8 flex-col overflow-hidden rounded-[3px] border border-[#dfe4ea] bg-white shadow-md -rotate-3">
+        <span className="relative h-4 w-full bg-[#d7e4ee]">
+          <span className="absolute bottom-0 left-1 h-2 w-1.5 bg-[#1d4166]" />
+          <span className="absolute bottom-0 left-3 h-3 w-1.5 bg-[#123252]" />
+          <span className="absolute right-1 top-0.5 h-1 w-1 rounded-full bg-[#d6b357]" />
+        </span>
+        <span className="m-1 h-[3px] w-4 rounded bg-[#001f3f]" />
+        <span className="mx-1 h-[3px] w-3 rounded bg-[#c3c9d1]" />
+      </span>
+      {/* download badge */}
+      <span className="absolute -bottom-0.5 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-[#d6b357] shadow-sm ring-1 ring-white">
+        <svg viewBox="0 0 10 10" className="h-2 w-2">
+          <path d="M5 1v5M2.5 4 5 6.5 7.5 4M2 8.5h6" fill="none" stroke="#001f3f" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+    </span>
+  ),
+  // A hardcover book with spine, gold title, and a bookmark ribbon.
+  ebooks: (
+    <span className="relative block h-[50px] w-[64px]">
+      <span className="absolute left-9 top-2 h-10 w-7 rounded-[3px] rounded-l-none bg-[#12365a] shadow-sm" />
+      <span className="relative flex h-[46px] w-9 rounded-[3px] bg-[#001f3f] shadow-md">
+        <span className="h-full w-1.5 rounded-l-[3px] bg-[#0b2a4d]" />
+        <span className="flex flex-1 flex-col items-center pt-2">
+          <span className="h-[3px] w-5 rounded bg-[#d6b357]" />
+          <span className="mt-0.5 h-[3px] w-4 rounded bg-[#d6b357]/60" />
+          <span className="mt-2 h-3 w-3 rounded-full border border-[#d6b357]/70" />
+          <span className="mt-auto mb-1.5 h-[3px] w-4 rounded bg-white/40" />
+        </span>
+        {/* bookmark ribbon */}
+        <svg viewBox="0 0 6 12" className="absolute right-1 -top-0.5 h-3.5 w-2">
+          <path d="M0 0h6v11L3 8 0 11z" fill="#d6b357" />
+        </svg>
+      </span>
+    </span>
+  ),
   // A contract: centered title, clause lines, a real signature squiggle over
   // its line, and the gold notary seal.
   "a2a-agreement": (
