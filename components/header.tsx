@@ -536,8 +536,14 @@ export function Header() {
             </button>
           </div>
 
+          {/* Everything below the drawer header scrolls as ONE column. The
+              nav used to be the only scroll area, with account/contact pinned
+              under it — expanding a section then hid its items behind the
+              pinned blocks. Now an expanded section just pushes them down. */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+
           {/* Nav Links */}
-          <nav className="flex flex-col gap-1 px-4 py-5 flex-1 overflow-y-auto">
+          <nav className="flex flex-col gap-1 px-4 py-5">
             {NAV_LINKS.map((item) => {
               const { label, href, children } = item
               const isActive = children
@@ -718,6 +724,8 @@ export function Header() {
             <p className="text-[11px] text-white/20 text-center">
               © {new Date().getFullYear()} FHI Global • Dubai Operations
             </p>
+          </div>
+
           </div>
         </div>
       </div>
