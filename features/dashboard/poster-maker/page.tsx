@@ -9,6 +9,7 @@ import { canUsePosterMaker } from "@/lib/app-roles"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { PosterMakerClient } from "./poster-maker-client"
 import { BirthdayStudio } from "./birthday-studio"
+import { TileMockup } from "@/components/dashboard/hub-tile-mockups"
 
 const STUDIOS = [
   {
@@ -16,18 +17,21 @@ const STUDIOS = [
     icon: FileImage,
     title: "Listing Posters",
     desc: "Create flyers and Just Listed / Sold announcement posters from any published listing — multiple templates and skins.",
+    mock: "listing-posters",
   },
   {
     type: "projects",
     icon: LayoutTemplate,
     title: "Project Posters",
     desc: "Open a published project's Poster Studio — three designs across story, square, and print formats.",
+    mock: "project-posters",
   },
   {
     type: "birthday",
     icon: Cake,
     title: "Birthday Poster",
     desc: "Greet a teammate or client — drop in a photo, position it in the frame, and add their name.",
+    mock: "birthday-poster",
   },
 ] as const
 
@@ -46,14 +50,18 @@ function StudioBento({ pathname }: { pathname: string }) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-3xl">
-        {STUDIOS.map(({ type, icon: Icon, title, desc }) => (
+        {STUDIOS.map(({ type, icon: Icon, title, desc, mock }) => (
           <Link
             key={type}
             href={`${pathname}?type=${type}`}
             className="group relative bg-white rounded-2xl border border-[#e8eaed] p-6 shadow-[0_2px_16px_rgba(0,0,0,0.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_-8px_rgba(0,31,63,0.25)]"
           >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#001f3f] to-[#002a52] flex items-center justify-center">
-              <Icon className="w-6 h-6 text-[#d6b357]" />
+            <div className="flex items-start justify-between gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-[#001f3f] flex items-center justify-center">
+                <Icon className="w-6 h-6 text-[#d6b357]" />
+              </div>
+              {/* Miniature of the format this studio produces. */}
+              <TileMockup kind={mock} />
             </div>
             <h2 className="mt-4 font-['Outfit'] text-lg font-bold text-[#0d1117]">{title}</h2>
             <p className="mt-1.5 text-sm text-[#6b7280] leading-relaxed">{desc}</p>

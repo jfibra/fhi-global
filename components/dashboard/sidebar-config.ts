@@ -67,6 +67,8 @@ export interface NavEntry {
   requiresMailbox?: boolean
   /** One-liner under the label on the hub tile. Only used inside a group. */
   description?: string
+  /** Which format mockup the hub tile shows (see hub-tile-mockups.tsx). */
+  mock?: string
 }
 
 /** A set of entries reachable through one sidebar row → a hub page of tiles. */
@@ -97,6 +99,7 @@ export interface HubTile {
   label: string
   href: string
   description: string
+  mock?: string
 }
 
 /** A destination the topbar search can jump to. */
@@ -188,13 +191,13 @@ const ADMIN_NAV: RoleNavEntry[] = [
     to: "agent-resource",
     icon: FileText,
     items: [
-      { ...BUSINESS_CARD,  description: "Your shareable digital business card." },
-      { ...DIGITAL_CARD, description: "The one link you share — contacts, socials and QR." },
-      { ...REELS_MAKER,   description: "Turn a listing or project into a shareable reel." },
-      { ...POSTER_MAKER,  description: "Flyers and posters from any listing or project." },
-      { icon: Presentation, label: "Meeting Poster", to: "meeting-poster", description: "Event posters with your choice of speakers." },
-      { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website." },
-      { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement." },
+      { ...BUSINESS_CARD,  description: "Your shareable digital business card.", mock: "business-card" },
+      { ...DIGITAL_CARD, description: "The one link you share — contacts, socials and QR.", mock: "digital-business-card" },
+      { ...REELS_MAKER,   description: "Turn a listing or project into a shareable reel.", mock: "reels-maker" },
+      { ...POSTER_MAKER,  description: "Flyers and posters from any listing or project.", mock: "poster-maker" },
+      { icon: Presentation, label: "Meeting Poster", to: "meeting-poster", description: "Event posters with your choice of speakers.", mock: "meeting-poster" },
+      { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website.", mock: "website-builder" },
+      { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement.", mock: "a2a-agreement" },
     ],
   },
   {
@@ -277,12 +280,12 @@ const salesPipelineNav = ({ projects = false, events = false, teamSales = false 
     to: "agent-resource",
     icon: FileText,
     items: [
-      { ...BUSINESS_CARD,   description: "Your shareable digital business card." },
-      { ...DIGITAL_CARD,    description: "The one link you share — contacts, socials and QR." },
-      { ...REELS_MAKER,     description: "Turn a listing or project into a shareable reel." },
-      { ...POSTER_MAKER,    description: "Flyers and posters from any listing or project." },
-      { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website." },
-      { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement." },
+      { ...BUSINESS_CARD,   description: "Your shareable digital business card.", mock: "business-card" },
+      { ...DIGITAL_CARD,    description: "The one link you share — contacts, socials and QR.", mock: "digital-business-card" },
+      { ...REELS_MAKER,     description: "Turn a listing or project into a shareable reel.", mock: "reels-maker" },
+      { ...POSTER_MAKER,    description: "Flyers and posters from any listing or project.", mock: "poster-maker" },
+      { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website.", mock: "website-builder" },
+      { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement.", mock: "a2a-agreement" },
     ],
   },
   // Marketing artwork + training PDFs, grouped under one hub.
@@ -502,6 +505,7 @@ export function getHubTiles(
       label: item.label,
       href: hubItemHref(base, group, item),
       description: item.description ?? "",
+      mock: item.mock,
     })),
   }
 }
