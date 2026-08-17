@@ -128,16 +128,39 @@ type PosterData = {
 }
 
 const DEFAULTS: PosterData = {
-  title: "BUSINESS\nMEETING",
-  subtitle: "Join industry leaders and experts as we discuss key insights, innovative strategies, and opportunities for future growth.",
-  tagline: "DISCUSS • STRATEGIZE • GROW TOGETHER",
-  date: "MAY 25, 2026\nSUNDAY",
-  time: "10:00 AM\nTO 01:00 PM",
-  venue: "FHI GLOBAL OFFICE\nDUBAI, UAE",
-  topics: "Dubai Real Estate Market Outlook\nInvestment Opportunities in 2026\nStrategies for Smart Investors\nBuilding Long-Term Wealth",
+  title: "",
+  subtitle: "",
+  tagline: "",
+  date: "",
+  time: "",
+  venue: "",
+  topics: "",
   contactPhone: "",
   contactEmail: "",
   background: "",
+}
+
+function formatPosterDate(iso: string): string {
+  if (!iso) return ""
+  const d = new Date(`${iso}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return ""
+  const line1 = d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }).toUpperCase()
+  const line2 = d.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase()
+  return `${line1}\n${line2}`
+}
+
+function formatTime12(t: string): string {
+  const [h, m] = t.split(":").map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) return ""
+  const h12 = h % 12 || 12
+  return `${String(h12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`
+}
+
+function formatPosterTime(start: string, end: string): string {
+  const s = formatTime12(start)
+  const e = formatTime12(end)
+  if (s && e) return `${s}\nTO ${e}`
+  return s || e
 }
 
 type PosterProps = {
@@ -314,6 +337,7 @@ function GoldFooterBar({ data, marginTop = 0, light, gold = GOLD, navy = NAVY }:
     { icon: Clock, text: data.time, color: data.timeColor },
     { icon: MapPin, text: data.venue, color: data.venueColor },
   ].filter((d) => d.text.trim())
+  if (details.length === 0 && !data.contactPhone && !data.contactEmail) return null
   return (
     <div
       className="flex w-full items-center justify-center"
@@ -483,7 +507,7 @@ function MeetingPoster({ data, speakers, w, logos, light, colors }: PosterProps)
       <div className="absolute inset-x-0 bottom-0" style={{ height: 300 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/background/dubai.webp"
+          src={displayImg(data.background || "/background/dubai.webp")}
           alt=""
           className="h-full w-full object-cover object-bottom"
           style={{ filter: light ? "grayscale(0.4) brightness(1.05)" : "sepia(1) saturate(1.7) brightness(0.9)", opacity: light ? 0.35 : 0.55 }}
@@ -604,7 +628,7 @@ function InvitePoster({ data, speakers, w, logos, light, colors }: PosterProps) 
     </div>
   )
 
-  const detailsPanel = (
+  const detailsPanel = ![data.date, data.time, data.venue].some((t) => t.trim()) ? null : (
     <div className="flex w-full justify-center">
       <div
         className="px-10 py-5"
@@ -678,7 +702,7 @@ function InvitePoster({ data, speakers, w, logos, light, colors }: PosterProps) 
       <div className="absolute inset-x-0 bottom-0" style={{ height: light ? 620 : 540, opacity: light ? 0.28 : 0.4 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/background/dubai.webp"
+          src={displayImg(data.background || "/background/dubai.webp")}
           alt=""
           className="h-full w-full object-cover object-bottom"
           style={{ filter: light ? "grayscale(0.4) brightness(1.05)" : "sepia(0.9) saturate(1.5) brightness(0.75)" }}
@@ -949,11 +973,16 @@ function TextColor({ value, onChange }: { value?: string; onChange: (v: string |
 
 export function MeetingPosterClient() {
   const [data, setData] = useState<PosterData>(DEFAULTS)
+  const [dateISO, setDateISO] = useState("")
+  const [timeStart, setTimeStart] = useState("")
+  const [timeEnd, setTimeEnd] = useState("")
+  const [venueName, setVenueName] = useState("")
+  const [venuePlace, setVenuePlace] = useState("")
   const [speakers, setSpeakers] = useState<Speaker[]>([])
   const [design, setDesign] = useState<DesignId>("meeting")
   const [theme, setTheme] = useState<"dark" | "light">("dark")
   const [globalColors, setGlobalColors] = useState<PosterColors>(DEFAULT_COLORS)
-  const [logoIds, setLogoIds] = useState<string[]>(["fhiglobal", "filipinohomes"])
+  const [logoIds, setLogoIds] = useState<string[]>([])
   const [logoScales, setLogoScales] = useState<Record<string, number>>({})
   const [logoScaleAll, setLogoScaleAll] = useState(100)
   const [options, setOptions] = useState<SpeakerOption[] | null>(null)
@@ -961,6 +990,8 @@ export function MeetingPosterClient() {
   const [query, setQuery] = useState("")
   const [downloading, setDownloading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [bgImporting, setBgImporting] = useState(false)
+  const [bgError, setBgError] = useState<string | null>(null)
 
   const posterRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -1022,6 +1053,52 @@ export function MeetingPosterClient() {
 
   const set = (patch: Partial<PosterData>) => setData((d) => ({ ...d, ...patch }))
 
+  // A pasted link on an arbitrary host can't be previewed (CSP img-src) or
+  // exported (cross-origin canvas fetch), so import it into S3 first and swap
+  // the field to the S3 URL. Debounced so typing doesn't fire partial imports.
+  useEffect(() => {
+    const raw = data.background.trim()
+    if (!raw || raw.startsWith("/") || raw.startsWith("data:") || raw.startsWith("blob:")) return
+    if (isSafeRemoteImageUrl(raw)) return
+    try {
+      if (!["http:", "https:"].includes(new URL(raw).protocol)) return
+    } catch {
+      return
+    }
+    const t = setTimeout(async () => {
+      setBgImporting(true)
+      setBgError(null)
+      try {
+        const res = await fetch("/api/upload/import-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: raw }),
+        })
+        const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string }
+        if (res.ok && json.url) {
+          setData((d) => (d.background.trim() === raw ? { ...d, background: json.url! } : d))
+        } else {
+          setBgError(json.error || "Could not load that image link")
+        }
+      } catch {
+        setBgError("Could not load that image link")
+      } finally {
+        setBgImporting(false)
+      }
+    }, 700)
+    return () => clearTimeout(t)
+  }, [data.background])
+
+  const posterData = useMemo<PosterData>(
+    () => ({
+      ...data,
+      date: formatPosterDate(dateISO),
+      time: formatPosterTime(timeStart, timeEnd),
+      venue: [venueName.trim(), venuePlace.trim()].filter(Boolean).join("\n"),
+    }),
+    [data, dateISO, timeStart, timeEnd, venueName, venuePlace],
+  )
+
   const selectedIds = useMemo(() => new Set(speakers.map((s) => s.id)), [speakers])
   const needle = query.trim().toLowerCase()
   const visibleOptions = (options ?? []).filter((o) => !needle || o.name.toLowerCase().includes(needle))
@@ -1077,25 +1154,14 @@ export function MeetingPosterClient() {
 
   return (
     <div className="w-full space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] flex items-center gap-2">
-            <Presentation className="w-6 h-6 text-[#001f3f]" />
-            Meeting Poster
-          </h1>
-          <p className="text-sm text-[#6b7280] mt-1">
-            Pick a design, choose up to {MAX_SPEAKERS} speakers from the team, set the details, download as PNG.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void download()}
-          disabled={downloading}
-          className="inline-flex items-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-5 py-2.5 text-[13px] font-bold text-white disabled:opacity-60"
-        >
-          {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-          Download PNG
-        </button>
+      <div>
+        <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] flex items-center gap-2">
+          <Presentation className="w-6 h-6 text-[#001f3f]" />
+          Meeting Poster
+        </h1>
+        <p className="text-sm text-[#6b7280] mt-1">
+          Pick a design, choose up to {MAX_SPEAKERS} speakers from the team, set the details, download as PNG.
+        </p>
       </div>
 
       <div className="flex flex-col gap-5 bg-white border border-[#e8eaed] p-4">
@@ -1227,27 +1293,34 @@ export function MeetingPosterClient() {
       <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
         <div className="space-y-4 bg-white border border-[#e8eaed] p-5 self-start">
           <Field label="Title (line breaks kept)" action={<TextColor value={data.titleColor} onChange={(v) => set({ titleColor: v })} />}>
-            <textarea rows={2} className={`${INPUT_CLS} resize-y`} value={data.title} onChange={(e) => set({ title: e.target.value })} />
+            <textarea rows={2} className={`${INPUT_CLS} resize-y`} value={data.title} placeholder={"e.g. BUSINESS\nMEETING"} onChange={(e) => set({ title: e.target.value })} />
           </Field>
           <Field label="Subtitle" action={<TextColor value={data.subtitleColor} onChange={(v) => set({ subtitleColor: v })} />}>
-            <textarea rows={2} className={`${INPUT_CLS} resize-y`} value={data.subtitle} onChange={(e) => set({ subtitle: e.target.value })} />
+            <textarea rows={2} className={`${INPUT_CLS} resize-y`} value={data.subtitle} placeholder="Short description shown under the title" onChange={(e) => set({ subtitle: e.target.value })} />
           </Field>
           <Field label="Tagline (line breaks kept)" action={<TextColor value={data.taglineColor} onChange={(v) => set({ taglineColor: v })} />}>
-            <textarea rows={2} className={`${INPUT_CLS} resize-y`} value={data.tagline} onChange={(e) => set({ tagline: e.target.value })} />
+            <textarea rows={2} className={`${INPUT_CLS} resize-y`} value={data.tagline} placeholder="e.g. DISCUSS • STRATEGIZE • GROW TOGETHER" onChange={(e) => set({ tagline: e.target.value })} />
+          </Field>
+          <Field label="Date (day shows automatically)" action={<TextColor value={data.dateColor} onChange={(v) => set({ dateColor: v })} />}>
+            <input type="date" className={INPUT_CLS} value={dateISO} onChange={(e) => setDateISO(e.target.value)} />
+          </Field>
+          <Field label="Time (start – end)" action={<TextColor value={data.timeColor} onChange={(v) => set({ timeColor: v })} />}>
+            <div className="flex items-center gap-2">
+              <input type="time" className={INPUT_CLS} value={timeStart} onChange={(e) => setTimeStart(e.target.value)} />
+              <span className="shrink-0 text-[11px] font-bold text-[#9aa0aa]">TO</span>
+              <input type="time" className={INPUT_CLS} value={timeEnd} onChange={(e) => setTimeEnd(e.target.value)} />
+            </div>
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Date" action={<TextColor value={data.dateColor} onChange={(v) => set({ dateColor: v })} />}>
-              <input className={INPUT_CLS} value={data.date} onChange={(e) => set({ date: e.target.value })} />
+            <Field label="Venue" action={<TextColor value={data.venueColor} onChange={(v) => set({ venueColor: v })} />}>
+              <input className={INPUT_CLS} value={venueName} placeholder="e.g. FHI GLOBAL OFFICE" onChange={(e) => setVenueName(e.target.value)} />
             </Field>
-            <Field label="Time" action={<TextColor value={data.timeColor} onChange={(v) => set({ timeColor: v })} />}>
-              <input className={INPUT_CLS} value={data.time} onChange={(e) => set({ time: e.target.value })} />
+            <Field label="Venue location (below)">
+              <input className={INPUT_CLS} value={venuePlace} placeholder="e.g. DUBAI, UAE" onChange={(e) => setVenuePlace(e.target.value)} />
             </Field>
           </div>
-          <Field label="Venue" action={<TextColor value={data.venueColor} onChange={(v) => set({ venueColor: v })} />}>
-            <input className={INPUT_CLS} value={data.venue} onChange={(e) => set({ venue: e.target.value })} />
-          </Field>
           <Field label="Topics — one per line (Golden Invite designs)" action={<TextColor value={data.topicsColor} onChange={(v) => set({ topicsColor: v })} />}>
-            <textarea rows={4} className={INPUT_CLS} value={data.topics} onChange={(e) => set({ topics: e.target.value })} />
+            <textarea rows={4} className={INPUT_CLS} value={data.topics} placeholder={"e.g. Dubai Real Estate Market Outlook\nInvestment Opportunities in 2026"} onChange={(e) => set({ topics: e.target.value })} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Contact phone" action={<TextColor value={data.contactPhoneColor} onChange={(v) => set({ contactPhoneColor: v })} />}>
@@ -1257,7 +1330,7 @@ export function MeetingPosterClient() {
               <input className={INPUT_CLS} value={data.contactEmail} onChange={(e) => set({ contactEmail: e.target.value })} />
             </Field>
           </div>
-          <Field label="Background photo">
+          <Field label="Background photo (paste an image link or upload)">
             <div className="flex items-center gap-2">
               <input
                 className={INPUT_CLS}
@@ -1285,6 +1358,12 @@ export function MeetingPosterClient() {
                 }}
               />
             </div>
+            {bgImporting && (
+              <span className="mt-1.5 flex items-center gap-1.5 text-[11.5px] font-semibold text-[#6b7280]">
+                <Loader2 className="h-3 w-3 animate-spin" /> Importing image…
+              </span>
+            )}
+            {bgError && <span className="mt-1.5 block text-[11.5px] font-semibold text-red-600">{bgError}</span>}
           </Field>
 
           <Field label={`Speakers — ${speakers.length}/${MAX_SPEAKERS} selected`}>
@@ -1380,10 +1459,19 @@ export function MeetingPosterClient() {
           <div style={{ height: displayH * scale }} className="relative overflow-hidden">
             <div style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: posterW }}>
               <div ref={posterRef}>
-                <Poster design={design} data={data} speakers={speakers} w={posterW} h={posterH} logos={selectedLogos} light={theme === "light"} colors={globalColors} />
+                <Poster design={design} data={posterData} speakers={speakers} w={posterW} h={posterH} logos={selectedLogos} light={theme === "light"} colors={globalColors} />
               </div>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => void download()}
+            disabled={downloading}
+            className="mt-4 flex w-full items-center justify-center gap-2.5 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-6 py-4 text-[16px] font-extrabold uppercase tracking-[0.08em] text-white shadow-[0_10px_24px_-10px_rgba(0,31,63,0.6)] transition-transform hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
+          >
+            {downloading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
+            {downloading ? "Preparing PNG…" : "Download Poster"}
+          </button>
         </div>
       </div>
     </div>
