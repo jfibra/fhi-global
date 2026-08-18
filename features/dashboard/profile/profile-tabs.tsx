@@ -7,6 +7,7 @@ import { isDeveloperRole } from "@/lib/app-roles"
 import type { DashboardProfile } from "./profile-form"
 import { BankAccountsTab } from "./bank-accounts-tab"
 import { ChangePasswordSection } from "./change-password-section"
+import { ChangeEmailSection } from "./change-email-section"
 import { PhoneCountrySelect } from "@/components/phone-country-select"
 import { NATIONALITIES } from "@/lib/nationalities"
 
@@ -483,6 +484,16 @@ export function ProfileTabs({
                 </div>
               </div>
             </div>
+
+            {/* Change email — OTP-confirmed, for every account EXCEPT developers:
+                their auth email is the synthetic username bridge
+                (<username>@developers.fhiglobal.ae), so changing it would break
+                username login. */}
+            {!isDeveloper && (
+              <div className="pt-8 border-t border-[#f0f0f0]">
+                <ChangeEmailSection currentEmail={email} onSuccess={onSuccess} onError={onError} />
+              </div>
+            )}
 
             {/* Change password — developer accounts sign in with a password they can rotate. */}
             {isDeveloper && (

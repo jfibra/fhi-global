@@ -99,3 +99,69 @@ export async function checkOtpChallenge(
 
   return { ok: true }
 }
+
+// ─── Email-change challenge ───────────────────────────────────────────────────
+// Same hash/expiry/attempt mechanics as the login OTP, but under its own
+// app_metadata key (so it can't collide with a login code) and carrying the
+// pending new email — the verify step needs to know WHAT address was proven.
+
+type EmailChangeChallenge = OtpChallenge & { em: string }
+
+async function writeEmailChangeChallenge(userId: string, challenge: EmailChangeChallenge | null): Promise<void> {
+  const admin = createAdminSupabase()
+  const { error } = await admin.auth.admin.updateUserById(userId, {
+    app_metadata: { fhi_email_change: challenge },
+  })
+  if (error) throw new Error(error.message)
+}
+
+/** Persist a fresh email-change challenge; the code is emailed to `newEmail`. */
+export async function storeEmailChangeChallenge(userId: string, code: string, newEmail: string): Promise<void> {
+  await writeEmailChangeChallenge(userId, {
+    ch: hashCode(code),
+    exp: Date.now() + OTP_TTL_MS,
+    at: 0,
+    em: newEmail,
+  })
+}
+
+export async function clearEmailChangeChallenge(userId: string): Promise<void> {
+  await writeEmailChangeChallenge(userId, null)
+}
+
+/**
+ * Validate a submitted email-change code. On success returns the pending new
+ * email WITHOUT clearing the challenge — the caller clears it only after the
+ * auth email has actually been rotated.
+ */
+export async function checkEmailChangeChallenge(
+  userId: string,
+  code: string,
+): Promise<{ ok: true; email: string } | { error: string }> {
+  const admin = createAdminSupabase()
+  const { data, error } = await admin.auth.admin.getUserById(userId)
+  if (error || !data.user) return { error: "Couldn't verify the code. Request a new one." }
+
+  const raw = data.user.app_metadata?.fhi_email_change as Partial<EmailChangeChallenge> | null | undefined
+  if (!raw || typeof raw.ch !== "string" || typeof raw.em !== "string") {
+    return { error: "No active code. Request a new one." }
+  }
+  const challenge: EmailChangeChallenge = { ch: raw.ch, exp: Number(raw.exp ?? 0), at: Number(raw.at ?? 0), em: raw.em }
+
+  if (Date.now() > challenge.exp) {
+    await writeEmailChangeChallenge(userId, null)
+    return { error: "That code has expired. Request a new one." }
+  }
+
+  if (challenge.at >= MAX_ATTEMPTS) {
+    await writeEmailChangeChallenge(userId, null)
+    return { error: "Too many incorrect attempts. Request a new code." }
+  }
+
+  if (hashCode(code) !== challenge.ch) {
+    await writeEmailChangeChallenge(userId, { ...challenge, at: challenge.at + 1 })
+    return { error: "Invalid code. Check the digits and try again." }
+  }
+
+  return { ok: true, email: challenge.em }
+}

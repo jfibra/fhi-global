@@ -117,20 +117,28 @@ async function auditMail(
   })
 }
 
-/** Send a numeric auth code. `purpose` tweaks the copy (sign in vs sign up). */
+/** Send a numeric auth code. `purpose` tweaks the copy (sign in / sign up / email change). */
 export async function sendOtpEmail(
   to: string,
   code: string,
-  purpose: "login" | "register" = "login",
+  purpose: "login" | "register" | "email_change" = "login",
 ): Promise<void> {
-  const eyebrow = purpose === "register" ? "Verify your email" : "Secure sign-in"
-  const heading = purpose === "register" ? "Confirm your email address" : "Sign in to FHI Global"
+  const eyebrow =
+    purpose === "register" ? "Verify your email" : purpose === "email_change" ? "Confirm email change" : "Secure sign-in"
+  const heading =
+    purpose === "register"
+      ? "Confirm your email address"
+      : purpose === "email_change"
+        ? "Confirm your new email address"
+        : "Sign in to FHI Global"
   const intro =
     purpose === "register"
       ? "You're almost there. Enter this code to finish creating your FHI Global account."
-      : "Enter this code to securely sign in to your FHI Global account."
+      : purpose === "email_change"
+        ? "Enter this code to confirm switching your FHI Global sign-in email to this address."
+        : "Enter this code to securely sign in to your FHI Global account."
 
-  const subject = `${code} is your FHI Global ${purpose === "register" ? "sign-up" : "sign-in"} code`
+  const subject = `${code} is your FHI Global ${purpose === "register" ? "sign-up" : purpose === "email_change" ? "email-change" : "sign-in"} code`
   const text = `${heading}\n\n${intro}\n\nYour code: ${code}\n\nIf you didn't request it, you can safely ignore this email.\n\n© ${new Date().getFullYear()} FHI Global · Dubai, UAE`
 
   const html = `<!doctype html>
@@ -209,6 +217,85 @@ export async function sendOtpEmail(
   await deliver("OtpMailer", {
     from: fromAddress(),
     to,
+    subject,
+    text,
+    html,
+  })
+}
+
+/**
+ * Security notice to the PREVIOUS address after a successful email change,
+ * so a hijacked account can't be silently re-pointed.
+ */
+export async function sendEmailChangedNotice(oldEmail: string, newEmail: string): Promise<void> {
+  const subject = "Your FHI Global sign-in email was changed"
+  const text = `Your sign-in email was changed\n\nThe email on your FHI Global account was changed from ${oldEmail} to ${newEmail}.\n\nIf you made this change, no action is needed. If you did NOT make this change, contact us immediately so we can secure your account.\n\n© ${new Date().getFullYear()} FHI Global · Dubai, UAE`
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light only">
+  <title>${subject}</title>
+</head>
+<body style="margin:0;padding:0;background:#eef1f5;-webkit-font-smoothing:antialiased;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+    The email on your FHI Global account was changed.
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;padding:32px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 12px 40px -16px rgba(0,20,45,0.35);">
+
+        <tr>
+          <td align="center" bgcolor="${NAVY}" style="background:${NAVY};padding:30px 32px 26px;border-bottom:3px solid ${GOLD};">
+            <img src="${LOGO_URL}" alt="FHI Global" height="40" style="height:40px;width:auto;display:block;border:0;outline:none;text-decoration:none;">
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:36px 40px 8px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">Security notice</p>
+            <h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;font-weight:700;color:#0d1117;">Your sign-in email was changed</h1>
+            <p style="margin:0 0 4px;font-size:15px;line-height:1.65;color:#4b5563;">
+              The email on your FHI Global account was changed from
+              <strong style="color:#0d1117;">${esc(oldEmail)}</strong> to
+              <strong style="color:#0d1117;">${esc(newEmail)}</strong>.
+              This address will no longer receive sign-in codes.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:16px 40px 32px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr><td style="border-top:1px solid #eef0f3;padding-top:18px;">
+                <p style="margin:0;font-size:12.5px;line-height:1.6;color:#9ca3af;">
+                  If you made this change, no action is needed.
+                  If you did NOT make this change, contact FHI Global support immediately so we can secure your account.
+                </p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" bgcolor="#fafbfc" style="background:#fafbfc;border-top:1px solid #eef0f3;padding:22px 32px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <p style="margin:10px 0 0;font-size:11px;color:#b6bdc7;">© ${new Date().getFullYear()} FHI Global Property. All rights reserved.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+
+  await deliver("EmailChangedNoticeMailer", {
+    from: fromAddress(),
+    to: oldEmail,
     subject,
     text,
     html,
