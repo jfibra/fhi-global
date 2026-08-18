@@ -1,23 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { Phone, MessageCircle, ChevronDown } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { ChevronDown } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { isDeveloperRole } from "@/lib/app-roles"
 import type { DashboardProfile } from "./profile-form"
-import { BankAccountsTab } from "./bank-accounts-tab"
 import { ChangePasswordSection } from "./change-password-section"
-import { ChangeEmailSection } from "./change-email-section"
 import { PhoneCountrySelect } from "@/components/phone-country-select"
 import { NATIONALITIES } from "@/lib/nationalities"
-
-type TabKey = "profile" | "account" | "bank_accounts"
-
-const TABS: Array<{ key: TabKey; label: string }> = [
-  { key: "profile",       label: "Profile Info" },
-  { key: "account",       label: "Account Settings" },
-  { key: "bank_accounts", label: "Bank Accounts" },
-]
 
 // ─── Timezone options ──────────────────────────────────────────────────────────
 const TIMEZONES = [
@@ -50,14 +40,12 @@ const TIMEZONES = [
 // ─── Phone input sub-component ────────────────────────────────────────────────
 function PhoneField({
   label,
-  icon: Icon,
   countryCode,
   number,
   onCountryChange,
   onNumberChange,
 }: {
   label: string
-  icon: React.ElementType
   countryCode: string
   number: string
   onCountryChange: (v: string) => void
@@ -65,16 +53,15 @@ function PhoneField({
 }) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-1.5 ml-1">
-        <Icon className="w-3.5 h-3.5 text-[#6b7280]" />
-        <label className="text-xs font-bold uppercase tracking-wider text-[#374151]">{label}</label>
-      </div>
-      <div className="flex gap-2">
+      <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">{label}</label>
+      {/* One combined control: shared outer border, dial code divided from the
+          number by a single inner rule. */}
+      <div className="flex border border-[#e5e7eb] bg-white transition-colors focus-within:border-[#001f3f]">
         <PhoneCountrySelect
           value={countryCode}
           onChange={onCountryChange}
           ariaLabel={`${label} country calling code`}
-          className="px-3 py-3.5"
+          className="px-3 py-2.5 rounded-none border-0 border-r border-[#e5e7eb] focus:ring-0"
           style={{ minWidth: 90 }}
         />
         <input
@@ -82,7 +69,7 @@ function PhoneField({
           value={number}
           onChange={(e) => onNumberChange(e.target.value.replace(/\D/g, ""))}
           placeholder="9123456789"
-          className="flex-1 px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
+          className="flex-1 min-w-0 px-4 py-2.5 rounded-none border-0 bg-transparent focus:outline-none text-sm"
         />
       </div>
     </div>
@@ -126,25 +113,31 @@ function toISOStringDateOnly(input: string) {
 
 export function ProfileTabs({
   profile,
-  email,
   onProfileChange,
   onSuccess,
   onError,
 }: {
   profile: DashboardProfile
-  email: string
   onProfileChange: (next: DashboardProfile) => void
   onSuccess: (message: string) => void
   onError: (message: string) => void
 }) {
-  const userId = profile.id
   const isDeveloper = isDeveloperRole(profile.role)
-  // Bank accounts aren't relevant to developer partner accounts — hide the tab
-  // for them (the tab is shared across every role's profile page).
-  const visibleTabs = isDeveloper ? TABS.filter((t) => t.key !== "bank_accounts") : TABS
-  const [activeTab, setActiveTab] = useState<TabKey>("profile")
   const [busySection, setBusySection] = useState<"profile" | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+  // Bio auto-grow: expand to fit the text up to this cap; past it the user
+  // drags the resize handle. Only grows — never shrinks a manual resize.
+  const BIO_AUTO_MAX = 220
+  const bioRef = useRef<HTMLTextAreaElement>(null)
+  const autoGrowBio = () => {
+    const el = bioRef.current
+    if (!el) return
+    const fit = Math.min(el.scrollHeight + 2, BIO_AUTO_MAX)
+    if (fit > el.offsetHeight) el.style.height = `${fit}px`
+  }
+  // Fit any pre-existing multi-line bio on first render.
+  useEffect(() => { autoGrowBio() }, [])
 
   const [profileInfo, setProfileInfo] = useState(() => ({
     fname: profile.fname ?? "",
@@ -166,12 +159,6 @@ export function ProfileTabs({
     window.addEventListener("beforeunload", handler)
     return () => window.removeEventListener("beforeunload", handler)
   }, [hasUnsavedChanges])
-
-  const joinedDate = useMemo(() => {
-    if (!profile.joined_at) return "—"
-    const date = new Date(profile.joined_at)
-    return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString()
-  }, [profile.joined_at])
 
   const handleProfileFieldChange = (key: keyof typeof profileInfo, value: string) => {
     setHasUnsavedChanges(true)
@@ -240,12 +227,14 @@ export function ProfileTabs({
     setBusySection("profile")
 
     const supabase = createClient()
+    // The browser client has no Database generic, so the chain is untyped —
+    // cast the row instead of passing a type argument (TS2347).
     const { data, error } = await supabase
       .from("profiles")
       .update(payload)
       .eq("id", profile.id)
       .select("id, role, fname, mname, lname, fullname, birthday, gender, profile_url, status, timezone, metadata, joined_at, updated_at, is_deleted, deleted_at")
-      .single<DashboardProfile>()
+      .single()
 
     setBusySection(null)
 
@@ -255,47 +244,24 @@ export function ProfileTabs({
       return
     }
 
-    onProfileChange(data)
+    onProfileChange(data as DashboardProfile)
     setHasUnsavedChanges(false)
     onSuccess("Profile information updated.")
     await logActivity("profile_info_update", payload)
   }
 
   return (
-    <section className="bg-white/60 backdrop-blur-2xl rounded-[24px] border border-white/60 shadow-xl shadow-black/5 overflow-hidden">
-      {/* ── Tab Bar ── */}
-      <div className="border-b border-[#f0f0f0] px-6 pt-5">
-        <div className="flex flex-wrap gap-2 pb-0">
-          {visibleTabs.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              className={`px-5 py-2 text-sm font-semibold rounded-full transition-all duration-200 ${
-                activeTab === tab.key
-                  ? "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white shadow-md"
-                  : "text-[#6b7280] hover:text-[#001f3f] hover:bg-[#f8fafc]"
-              }`}
-              onClick={() => setActiveTab(tab.key)}
-              aria-selected={activeTab === tab.key}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
+    <section className="bg-white border border-[#e5e7eb] overflow-hidden">
+      <div className="p-6">
 
-      <div className="p-6 md:p-8">
-
-        {/* ── Profile Info Tab ── */}
-        {activeTab === "profile" && (
-          <div className="space-y-5">
+        <div className="space-y-5">
 
             {/* Name row: 3 columns */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">First Name *</label>
+                <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">First Name</label>
                 <input
-                  className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
+                  className="w-full px-5 py-2.5 border border-[#e5e7eb] bg-white transition-colors focus:outline-none focus:border-[#001f3f] text-sm"
                   value={profileInfo.fname}
                   onChange={(e) => handleProfileFieldChange("fname", e.target.value)}
                 />
@@ -303,27 +269,19 @@ export function ProfileTabs({
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Middle Name</label>
                 <input
-                  className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
+                  className="w-full px-5 py-2.5 border border-[#e5e7eb] bg-white transition-colors focus:outline-none focus:border-[#001f3f] text-sm"
                   value={profileInfo.mname}
                   onChange={(e) => handleProfileFieldChange("mname", e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Last Name *</label>
+                <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Last Name</label>
                 <input
-                  className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
+                  className="w-full px-5 py-2.5 border border-[#e5e7eb] bg-white transition-colors focus:outline-none focus:border-[#001f3f] text-sm"
                   value={profileInfo.lname}
                   onChange={(e) => handleProfileFieldChange("lname", e.target.value)}
                 />
               </div>
-            </div>
-
-            {/* Full name preview (read-only) */}
-            <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-[#f8fafc] border border-[#f0f0f0] text-sm text-[#6b7280]">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">Full name preview</span>
-              <span className="font-medium text-[#374151]">
-                {[profileInfo.fname, profileInfo.mname, profileInfo.lname].map(p => p.trim()).filter(Boolean).join(" ") || "—"}
-              </span>
             </div>
 
             {/* Birthday, Gender, Nationality, Timezone */}
@@ -332,7 +290,7 @@ export function ProfileTabs({
                 <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Birthday</label>
                 <input
                   type="date"
-                  className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
+                  className="w-full px-5 py-2.5 border border-[#e5e7eb] bg-white transition-colors focus:outline-none focus:border-[#001f3f] text-sm"
                   value={profileInfo.birthday ?? ""}
                   onChange={(e) => handleProfileFieldChange("birthday", e.target.value)}
                 />
@@ -341,15 +299,13 @@ export function ProfileTabs({
                 <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Gender</label>
                 <div className="relative">
                   <select
-                    className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm appearance-none cursor-pointer"
+                    className="w-full px-5 py-2.5 border border-[#e5e7eb] bg-white transition-colors focus:outline-none focus:border-[#001f3f] text-sm appearance-none cursor-pointer"
                     value={profileInfo.gender}
                     onChange={(e) => handleProfileFieldChange("gender", e.target.value)}
                   >
                     <option value="">Select gender</option>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
-                    <option value="other">Other</option>
-                    <option value="prefer_not_to_say">Prefer not to say</option>
                   </select>
                   <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
                 </div>
@@ -358,7 +314,7 @@ export function ProfileTabs({
                 <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Nationality</label>
                 <div className="relative">
                   <select
-                    className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm appearance-none cursor-pointer"
+                    className="w-full px-5 py-2.5 border border-[#e5e7eb] bg-white transition-colors focus:outline-none focus:border-[#001f3f] text-sm appearance-none cursor-pointer"
                     value={profileInfo.nationality ?? ""}
                     onChange={(e) => handleProfileFieldChange("nationality", e.target.value)}
                   >
@@ -374,7 +330,7 @@ export function ProfileTabs({
                 <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Timezone</label>
                 <div className="relative">
                   <select
-                    className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm appearance-none cursor-pointer"
+                    className="w-full px-5 py-2.5 border border-[#e5e7eb] bg-white transition-colors focus:outline-none focus:border-[#001f3f] text-sm appearance-none cursor-pointer"
                     value={profileInfo.timezone}
                     onChange={(e) => handleProfileFieldChange("timezone", e.target.value)}
                   >
@@ -391,7 +347,6 @@ export function ProfileTabs({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <PhoneField
                 label="Phone"
-                icon={Phone}
                 countryCode={profileInfo.phone_country_code ?? "+971"}
                 number={profileInfo.phone_number ?? ""}
                 onCountryChange={(v) => handleProfileFieldChange("phone_country_code", v)}
@@ -399,7 +354,6 @@ export function ProfileTabs({
               />
               <PhoneField
                 label="WhatsApp"
-                icon={MessageCircle}
                 countryCode={profileInfo.whatsapp_country_code ?? "+971"}
                 number={profileInfo.whatsapp_number ?? ""}
                 onCountryChange={(v) => handleProfileFieldChange("whatsapp_country_code", v)}
@@ -412,7 +366,7 @@ export function ProfileTabs({
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">LinkedIn</label>
                 <input
-                  className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
+                  className="w-full px-5 py-2.5 border border-[#e5e7eb] bg-white transition-colors focus:outline-none focus:border-[#001f3f] text-sm"
                   value={profileInfo.linkedin ?? ""}
                   onChange={(e) => handleProfileFieldChange("linkedin", e.target.value)}
                   placeholder="linkedin.com/in/yourname"
@@ -421,7 +375,7 @@ export function ProfileTabs({
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Facebook</label>
                 <input
-                  className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
+                  className="w-full px-5 py-2.5 border border-[#e5e7eb] bg-white transition-colors focus:outline-none focus:border-[#001f3f] text-sm"
                   value={profileInfo.facebook ?? ""}
                   onChange={(e) => handleProfileFieldChange("facebook", e.target.value)}
                   placeholder="facebook.com/yourname"
@@ -433,19 +387,26 @@ export function ProfileTabs({
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">License Number</label>
               <input
-                className="w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm"
+                className="w-full px-5 py-2.5 border border-[#e5e7eb] bg-white transition-colors focus:outline-none focus:border-[#001f3f] text-sm"
                 value={profileInfo.license_number ?? ""}
                 onChange={(e) => handleProfileFieldChange("license_number", e.target.value)}
               />
             </div>
 
-            {/* Bio */}
+            {/* Bio — starts one input tall, auto-grows with the text up to
+                BIO_AUTO_MAX, and stays manually resizable beyond that (auto-
+                grow only ever expands, so it never fights a dragged height). */}
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Bio</label>
               <textarea
-                className="w-full px-5 py-4 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm resize-none min-h-[100px]"
+                ref={bioRef}
+                rows={1}
+                className="w-full px-5 py-2.5 border border-[#e5e7eb] bg-white transition-colors focus:outline-none focus:border-[#001f3f] text-sm resize-y h-[84px] min-h-[42px]"
                 value={profileInfo.bio ?? ""}
-                onChange={(e) => handleProfileFieldChange("bio", e.target.value)}
+                onChange={(e) => {
+                  handleProfileFieldChange("bio", e.target.value)
+                  autoGrowBio()
+                }}
               />
             </div>
 
@@ -454,60 +415,22 @@ export function ProfileTabs({
                 type="button"
                 onClick={() => void handleSaveProfileInfo()}
                 disabled={busySection === "profile"}
-                className="bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
+                className="bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-7 py-3 font-semibold text-sm transition-all hover:brightness-110 disabled:opacity-60 flex items-center gap-2"
               >
                 {busySection === "profile" ? (
                   <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
                 ) : "Save Profile Info"}
               </button>
             </div>
-          </div>
-        )}
-
-        {/* ── Account Settings Tab ── */}
-        {activeTab === "account" && (
-          <div className="space-y-8 max-w-2xl">
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold text-[#0d1117] font-['Outfit']">Account Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Email</label>
-                  <input className="w-full px-5 py-3.5 rounded-2xl border border-[#f0f0f0] bg-[#f8fafc] text-[#6b7280] text-sm cursor-not-allowed" value={email} readOnly />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Role</label>
-                  <input className="w-full px-5 py-3.5 rounded-2xl border border-[#f0f0f0] bg-[#f8fafc] text-[#6b7280] text-sm cursor-not-allowed" value={profile.role ?? "member"} readOnly />
-                </div>
-                <div className="md:col-span-2 space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">Joined Date</label>
-                  <input className="w-full px-5 py-3.5 rounded-2xl border border-[#f0f0f0] bg-[#f8fafc] text-[#6b7280] text-sm cursor-not-allowed" value={joinedDate} readOnly />
-                </div>
-              </div>
-            </div>
-
-            {/* Change email — OTP-confirmed, for every account EXCEPT developers:
-                their auth email is the synthetic username bridge
-                (<username>@developers.fhiglobal.ae), so changing it would break
-                username login. */}
-            {!isDeveloper && (
-              <div className="pt-8 border-t border-[#f0f0f0]">
-                <ChangeEmailSection currentEmail={email} onSuccess={onSuccess} onError={onError} />
-              </div>
-            )}
-
-            {/* Change password — developer accounts sign in with a password they can rotate. */}
+            {/* Change password — developer accounts sign in with a password they can rotate.
+                (Email changes live in the sidebar modal; developer emails are the
+                username bridge and can't be changed.) */}
             {isDeveloper && (
               <div className="pt-8 border-t border-[#f0f0f0]">
                 <ChangePasswordSection onSuccess={onSuccess} onError={onError} />
               </div>
             )}
           </div>
-        )}
-
-        {/* ── Bank Accounts Tab (hidden for developer accounts) ── */}
-        {activeTab === "bank_accounts" && !isDeveloper && (
-          <BankAccountsTab userId={userId} />
-        )}
 
       </div>
     </section>

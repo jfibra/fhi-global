@@ -89,40 +89,15 @@ export function ProfileForm({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="font-['Outfit'] text-2xl font-bold tracking-tight text-[#0d1117]">Profile Management</h2>
-        <p className="text-sm text-[#6b7280] mt-1">Update your account profile and personal details.</p>
-      </div>
-
-      {completion < 100 && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-4 text-sm text-amber-900 shadow-sm shadow-amber-100">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-9 h-9 rounded-2xl bg-white shadow-inner shadow-amber-100">
-              <AlertCircle className="w-4 h-4 text-amber-700" />
-            </div>
-            <div>
-              <p className="font-semibold">Complete your profile to unlock dashboard access.</p>
-              <p className="text-[13px] text-amber-700">Profile completion: <span className="font-bold text-amber-900">{completion}%</span></p>
-            </div>
-          </div>
-          <div className="mt-3 h-1.5 rounded-full bg-white/70 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] transition-all"
-              style={{ width: `${completion}%` }}
-            />
-          </div>
-        </div>
-      )}
-
       {banner && (
         <div
-          className={`rounded-2xl border px-4 py-3.5 text-sm flex items-center gap-3 ${
+          className={`border px-4 py-3.5 text-sm flex items-center gap-3 ${
             banner.type === "success"
               ? "bg-green-50 border-green-100 text-green-700"
               : "bg-rose-50 border-rose-100 text-rose-700"
           }`}
         >
-          <div className="bg-white p-1 rounded-full shadow-sm flex-shrink-0">
+          <div className="bg-white p-1 rounded-full flex-shrink-0">
             {banner.type === "success" ? (
               <Check className="w-3 h-3 text-green-600" />
             ) : (
@@ -151,7 +126,6 @@ export function ProfileForm({
 
         <ProfileTabs
           profile={profile}
-          email={user.email}
           onProfileChange={setProfile}
           onSuccess={(message) => setBanner({ type: "success", message })}
           onError={(message) => setBanner({ type: "error", message })}

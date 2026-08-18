@@ -20,7 +20,7 @@ export function ChangePasswordSection({
   const [busy, setBusy] = useState(false)
 
   const inputClass =
-    "w-full px-5 py-3.5 rounded-2xl border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm pr-12"
+    "w-full px-5 py-2.5 border border-[#e5e5e5] bg-white transition-all focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5 text-sm pr-12"
 
   const handleSubmit = async () => {
     if (!currentPassword || !newPassword) {
@@ -127,7 +127,7 @@ export function ChangePasswordSection({
             type="button"
             onClick={() => void handleSubmit()}
             disabled={busy}
-            className="bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-7 py-3 rounded-full font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
+            className="bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-7 py-3 font-semibold text-sm transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg shadow-md disabled:opacity-60 disabled:translate-y-0 flex items-center gap-2"
           >
             {busy ? (
               <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Updating…</>
