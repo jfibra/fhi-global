@@ -30,6 +30,7 @@ import {
   fetchInquiries,
   fetchInquiry,
   fetchSentEmails,
+  fetchInboxEmails,
   deleteSentEmail,
   markEmailThreadRead,
   sendComposedEmail,
@@ -45,7 +46,10 @@ import {
 } from "@/lib/inquiries-service"
 
 const PER_PAGE = 25
-type Folder = "inbox" | "starred" | "sent" | "archived"
+// "inbox" = website leads (the sales pipeline). "mailbox" = replies that
+// arrived by email: the house account for admin staff, their own address
+// for a personal mailbox (where it IS the inbox, so it is labelled that).
+type Folder = "inbox" | "mailbox" | "starred" | "sent" | "archived"
 
 /** Gmail-style time: clock time today, "Aug 5" this year, date otherwise. */
 function mailTime(iso: string): string {
@@ -108,12 +112,18 @@ export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const folder: Folder = personal ? "sent" : (searchParams.get("folder") as Folder) || "inbox"
+  // A personal mailbox has two folders: Inbox (mail addressed to them) and
+  // Sent. The lead folders (starred/archived/categories) are admin-only.
+  const rawFolder = (searchParams.get("folder") as Folder) || "inbox"
+  const folder: Folder = personal ? (rawFolder === "sent" ? "sent" : "mailbox") : rawFolder
   const openId = searchParams.get("open") || ""
 
   // ── list state ──────────────────────────────────────────────────────────
   const [rows, setRows] = useState<Inquiry[]>([])
   const [sentRows, setSentRows] = useState<SentEmail[]>([])
+  // Personal-mailbox Inbox: inbound messages, newest first.
+  const [inboxRows, setInboxRows] = useState<SentEmail[]>([])
+  const [inboxUnread, setInboxUnread] = useState(0)
   // Unread replies per correspondent (lowercased address → count).
   const [sentUnread, setSentUnread] = useState<Record<string, number>>({})
   const [total, setTotal] = useState(0)
@@ -179,6 +189,7 @@ export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
     const cached = cacheRef.current.get(cacheKey)
     if (cached) {
       if (folder === "sent") setSentRows(cached.sent ?? [])
+      else if (folder === "mailbox") setInboxRows(cached.sent ?? [])
       else setRows(cached.rows ?? [])
       setTotal(cached.total)
       setLoading(false)
@@ -188,7 +199,19 @@ export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
     setListError(null)
     setSelected(new Set())
     try {
-      if (folder === "sent") {
+      if (folder === "mailbox") {
+        const { data, total: t, unreadCount, error } = await fetchInboxEmails({ page, perPage: PER_PAGE, search })
+        if (seq !== loadSeq.current) return
+        if (error) {
+          if (cached) setNotice(error)
+          else { setListError(error); setInboxRows([]); setTotal(0) }
+          return
+        }
+        setInboxRows(data)
+        setInboxUnread(unreadCount)
+        setTotal(t)
+        cacheRef.current.set(cacheKey, { sent: data, total: t })
+      } else if (folder === "sent") {
         const { data, total: t, unreadByAddress, error } = await fetchSentEmails({ page, perPage: PER_PAGE, search })
         if (seq !== loadSeq.current) return
         if (error) {
@@ -233,6 +256,18 @@ export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
     const t = setTimeout(() => { void load() }, 0)
     return () => clearTimeout(t)
   }, [load])
+
+  // The Mailbox badge has to be live while ANOTHER folder is open — that is
+  // the whole point of it (a reply just arrived). One head-count request, so
+  // it costs nothing; refreshed whenever the sync lands mail.
+  useEffect(() => {
+    let alive = true
+    const t = setTimeout(async () => {
+      const { unreadCount } = await fetchInboxEmails({ page: 1, perPage: 1 })
+      if (alive) setInboxUnread(unreadCount)
+    }, 0)
+    return () => { alive = false; clearTimeout(t) }
+  }, [folder, threadVersion])
 
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput); setPage(1) }, 400)
@@ -402,7 +437,11 @@ export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
   }
 
   // ── bulk selection ──────────────────────────────────────────────────────
-  const pageIds = folder === "sent" ? sentRows.map((r) => r.id) : rows.map((r) => r.id)
+  // Mail rows have no bulk actions, and `rows` still holds the leads from
+  // whichever folder was open before — leaving them selectable here would let
+  // an archive/delete hit leads that aren't even on screen.
+  const pageIds =
+    folder === "mailbox" ? [] : folder === "sent" ? sentRows.map((r) => r.id) : rows.map((r) => r.id)
   const allSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id))
 
   const toggleSelect = (id: string) => {
@@ -457,18 +496,53 @@ export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
     void load()
   }
 
+  // Clearing a message out of the mailbox — test mail, spam, anything not
+  // worth keeping. Deletes the dashboard record only; the message still
+  // exists in the real mailbox, and the audit trail keeps the event.
+  const deleteInboxRow = async (m: SentEmail) => {
+    const who = m.from_name || m.from_email || "this sender"
+    if (!window.confirm(`Delete this message from ${who}? It disappears from this mailbox for everyone who can see it.`)) return
+    setBusy(true)
+    const { error } = await deleteSentEmail(m.id)
+    setBusy(false)
+    if (error) { setNotice(error); return }
+    setInboxRows((rs) => rs.filter((r) => r.id !== m.id))
+    setTotal((t) => Math.max(0, t - 1))
+    if (!m.read_at) setInboxUnread((n) => Math.max(0, n - 1))
+    if (openId === m.id) setParams({ open: null })
+    setNotice("Message deleted.")
+  }
+
   const selectedSent = useMemo(
     () => (folder === "sent" ? sentRows.find((r) => r.id === openId) ?? null : null),
     [folder, sentRows, openId],
   )
 
-  const paneOpen = folder === "sent" ? Boolean(selectedSent) : Boolean(openId)
+  // An inbound row read through the same correspondence reader: the thread is
+  // keyed by the OTHER party, which for inbound mail is the sender.
+  const selectedInbox = useMemo(() => {
+    if (folder !== "mailbox") return null
+    const row = inboxRows.find((r) => r.id === openId)
+    if (!row) return null
+    return {
+      ...row,
+      inquiry_id: null,
+      to_email: row.from_email ?? row.to_email,
+      to_name: row.from_name ?? null,
+    } as SentEmail
+  }, [folder, inboxRows, openId])
+
+  const paneOpen =
+    folder === "sent" ? Boolean(selectedSent)
+    : folder === "mailbox" ? Boolean(selectedInbox)
+    : Boolean(openId)
 
   // ── render ──────────────────────────────────────────────────────────────
   // `urgent` renders as the gold attention badge (unread things); `count` is
   // the quiet gray total shown when nothing needs attention.
   const folderItems: Array<{ key: Folder; label: string; icon: typeof Inbox; count?: number; urgent?: number }> = [
     { key: "inbox", label: "Inbox", icon: Inbox, urgent: unread },
+    { key: "mailbox", label: personal ? "Inbox" : "Mailbox", icon: MailOpen, urgent: inboxUnread },
     { key: "starred", label: "Starred", icon: Star, count: summary?.starred ?? 0 },
     { key: "sent", label: "Sent", icon: Send, count: personal ? total : summary?.sent ?? 0, urgent: summary?.sentUnread ?? 0 },
     { key: "archived", label: "Archived", icon: Archive },
@@ -550,7 +624,7 @@ export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
           <aside className="hidden md:flex flex-col w-[190px] shrink-0 border-r border-[#f0f0f0] py-3 overflow-y-auto">
             <p className="px-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">Mailbox</p>
             {folderItems
-              .filter((f) => !personal || f.key === "sent")
+              .filter((f) => !personal || f.key === "sent" || f.key === "mailbox")
               .map((f) => {
               const active = folder === f.key
               return (
@@ -605,7 +679,7 @@ export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
             {/* Mobile folder strip — the rail is hidden below md */}
             <div className="md:hidden flex items-center gap-1 px-2 py-2 border-b border-[#f0f0f0] overflow-x-auto">
               {folderItems
-                .filter((f) => !personal || f.key === "sent")
+                .filter((f) => !personal || f.key === "sent" || f.key === "mailbox")
                 .map((f) => {
                 const active = folder === f.key
                 return (
@@ -684,6 +758,70 @@ export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
                 </div>
               ) : listError ? (
                 <div className="p-8 text-center text-sm text-rose-600">{listError}</div>
+              ) : folder === "mailbox" ? (
+                inboxRows.length === 0 ? (
+                  <EmptyList
+                    icon={Inbox}
+                    title="No replies yet"
+                    hint={personal
+                      ? "Replies to your emails land here, just like your normal mailbox."
+                      : "Replies to mail sent from the company address land here."}
+                  />
+                ) : (
+                  inboxRows.map((m) => {
+                    const active = openId === m.id
+                    const isUnread = !m.read_at
+                    return (
+                      <div
+                        key={m.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setParams({ open: m.id })}
+                        onKeyDown={(e) => { if (e.key === "Enter") setParams({ open: m.id }) }}
+                        className={`group/mail w-full text-left px-4 py-3 border-b border-[#f5f5f5] cursor-pointer transition-colors ${
+                          active ? "bg-[#001f3f]/[0.05]" : "hover:bg-[#f8f9fa]"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <SenderAvatar
+                            email={m.from_email ?? null}
+                            name={m.from_name ?? m.from_email ?? "?"}
+                            photo={m.from_photo}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className={`flex-1 min-w-0 text-sm truncate ${isUnread ? "font-bold text-[#0d1117]" : "font-semibold text-[#374151]"}`}>
+                                {m.from_name || m.from_email}
+                              </p>
+                              {isUnread && (
+                                <span className="w-2 h-2 bg-[#d6b357] shrink-0" aria-label="Unread" />
+                              )}
+                              <span className={`text-[11px] shrink-0 ${isUnread ? "font-bold text-[#0d1117]" : "text-[#9ca3af]"}`}>
+                                {mailTime(m.created_at)}
+                              </span>
+                            </div>
+                            <p className={`text-[13px] truncate mt-0.5 ${isUnread ? "font-bold text-[#0d1117]" : "text-[#0d1117] font-medium"}`}>
+                              {m.subject}
+                            </p>
+                            <p className="text-xs text-[#9ca3af] truncate mt-0.5">{m.body_text}</p>
+                          </div>
+                          {/* Delete — appears on hover (always visible on
+                              touch, which has no hover state). */}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); void deleteInboxRow(m) }}
+                            disabled={busy}
+                            aria-label={`Delete message from ${m.from_name || m.from_email || "sender"}`}
+                            title="Delete this message"
+                            className="shrink-0 p-1.5 text-[#c0c6cf] opacity-100 md:opacity-0 md:group-hover/mail:opacity-100 hover:bg-rose-50 hover:text-rose-600 transition-all disabled:opacity-40"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })
+                )
               ) : folder === "sent" ? (
                 sentRows.length === 0 ? (
                   <EmptyList icon={Send} title="Nothing sent yet" hint="Replies and composed emails will appear here." />
@@ -831,7 +969,34 @@ export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
 
           {/* Reading pane */}
           <div className={`${paneOpen ? "flex" : "hidden lg:flex"} flex-col flex-1 min-w-0 min-h-0`}>
-            {folder === "sent" ? (
+            {folder === "mailbox" ? (
+              selectedInbox ? (
+                <SentReader
+                  email={selectedInbox}
+                  threadVersion={threadVersion}
+                  onBack={() => setParams({ open: null })}
+                  onOpenLead={(inquiryId) => setParams({ folder: null, open: inquiryId })}
+                  onMarkedRead={(address, count) => {
+                    onCorrespondenceRead(address, count)
+                    // The row is read now — un-bold it and drop the badge.
+                    setInboxRows((rs) =>
+                      rs.map((r) =>
+                        (r.from_email ?? "").toLowerCase() === address && !r.read_at
+                          ? { ...r, read_at: new Date().toISOString() }
+                          : r,
+                      ),
+                    )
+                    setInboxUnread((n) => Math.max(0, n - count))
+                  }}
+                  onSent={(m) => {
+                    setNotice(`Email sent to ${m.to_email}.`)
+                    setSentRows((rs) => [m, ...rs])
+                  }}
+                />
+              ) : (
+                <EmptyPane />
+              )
+            ) : folder === "sent" ? (
               selectedSent ? (
                 <SentReader
                   email={selectedSent}

@@ -317,6 +317,37 @@ export async function fetchSentEmails(query: {
   }
 }
 
+/**
+ * The Inbox — mail that arrived for this mailbox (replies to what was sent,
+ * plus anything else the sync matched). Personal mailboxes see only their
+ * own; admin staff see the house mailroom.
+ */
+export async function fetchInboxEmails(query: {
+  page: number
+  perPage: number
+  search?: string
+}): Promise<{ data: SentEmail[]; total: number; unreadCount: number; error: string | null }> {
+  const sp = new URLSearchParams({
+    box: "inbox",
+    page: String(query.page),
+    perPage: String(query.perPage),
+  })
+  if (query.search) sp.set("search", query.search)
+  try {
+    const res = await fetch(`/api/admin/emails?${sp.toString()}`, { cache: "no-store" })
+    if (!res.ok) return { data: [], total: 0, unreadCount: 0, error: await readError(res) }
+    const json = (await res.json()) as { rows: SentEmail[]; total: number; unreadCount?: number }
+    return {
+      data: json.rows ?? [],
+      total: json.total ?? 0,
+      unreadCount: json.unreadCount ?? 0,
+      error: null,
+    }
+  } catch (error) {
+    return { data: [], total: 0, unreadCount: 0, error: (error as Error).message }
+  }
+}
+
 /** Opening a correspondence marks its replies read. */
 export async function markEmailThreadRead(address: string): Promise<{ error: string | null }> {
   try {

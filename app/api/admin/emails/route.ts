@@ -54,9 +54,65 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(sp.get("page") ?? "1", 10))
   const perPage = Math.min(100, Math.max(1, parseInt(sp.get("perPage") ?? "20", 10)))
   const search = (sp.get("search") ?? "").trim()
+  const box = sp.get("box") === "inbox" ? "inbox" : "sent"
 
   const admin = createAdminSupabase()
   const rangeFrom = (page - 1) * perPage
+
+  /**
+   * The Inbox: mail that arrived FOR this mailbox. Admin staff read the house
+   * mailroom (owner_id NULL); a personal mailbox reads only its own, which is
+   * what keeps Michelle's and Maysa's replies private from each other and
+   * from the admins.
+   */
+  if (box === "inbox") {
+    const scope = <T extends { is: (c: string, v: null) => T; eq: (c: string, v: string) => T }>(q: T) =>
+      access.admin ? q.is("owner_id", null) : q.eq("owner_id", access.context.userId)
+
+    // read_at drives the bold/unread state — without it every row reads as
+    // unread forever. Falls back to the pre-migration-034 shape.
+    const buildInbox = (columns: string) => {
+      let q = admin
+        .from("inquiry_emails")
+        .select(columns, { count: "exact" })
+        .eq("direction", "inbound")
+        .order("created_at", { ascending: false })
+        .range(rangeFrom, rangeFrom + perPage - 1)
+      q = scope(q)
+      if (search) {
+        const safe = search.replace(/[%,()]/g, " ")
+        q = q.or(`from_email.ilike.%${safe}%,from_name.ilike.%${safe}%,subject.ilike.%${safe}%`)
+      }
+      return q
+    }
+    const listQuery = (async () => {
+      const withRead = await buildInbox(`${SENT_COLUMNS}, read_at`)
+      return withRead.error?.code === "42703" ? await buildInbox(SENT_COLUMNS) : withRead
+    })()
+
+    let unreadQuery = admin
+      .from("inquiry_emails")
+      .select("id", { count: "exact", head: true })
+      .eq("direction", "inbound")
+      .is("read_at", null)
+    unreadQuery = scope(unreadQuery)
+
+    const [list, unread] = await Promise.all([listQuery, unreadQuery])
+    if (list.error) {
+      // Pre-migration environments: an empty inbox, not an error page.
+      if (["42P01", "PGRST205", "42703"].includes(list.error.code ?? "")) {
+        return NextResponse.json({ rows: [], total: 0, unreadCount: 0, page, perPage })
+      }
+      return NextResponse.json({ error: list.error.message }, { status: 500 })
+    }
+    return NextResponse.json({
+      rows: list.data ?? [],
+      total: list.count ?? 0,
+      unreadCount: unread.error ? 0 : unread.count ?? 0,
+      page,
+      perPage,
+    })
+  }
 
   // The Sent folder lists what WE sent — inbound replies live on the threads.
   const buildQuery = (columns: string, withDirection: boolean) => {
