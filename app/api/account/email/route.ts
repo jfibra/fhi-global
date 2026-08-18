@@ -113,12 +113,42 @@ export async function POST(req: NextRequest) {
 
     await clearEmailChangeChallenge(userId)
 
+    // Unlink any Google identity whose address no longer matches the new
+    // email — otherwise the OLD address's "Sign in with Google" button would
+    // remain a permanent key to this account. Best-effort: GoTrue may refuse
+    // (e.g. it's the account's only identity); the email change stands either
+    // way and the user can re-link by signing in with Google on the new email.
+    let googleUnlinked = false
+    try {
+      const { data: fresh } = await admin.auth.admin.getUserById(userId)
+      const stale = (fresh?.user?.identities ?? []).filter(
+        (i) =>
+          i.provider === "google" &&
+          String((i.identity_data as Record<string, unknown> | null)?.email ?? "").toLowerCase() !== newEmail,
+      )
+      for (const identity of stale) {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users/${userId}/identities/${identity.identity_id}`,
+          {
+            method: "DELETE",
+            headers: {
+              apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+              Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
+            },
+          },
+        )
+        if (res.ok) googleUnlinked = true
+      }
+    } catch {
+      /* best-effort; audit below records whether it happened */
+    }
+
     // Security notice to the PREVIOUS address — a hijacked account can't be
     // silently re-pointed. Best-effort: the change already succeeded, so a
     // mailer hiccup must not fail the request (deliver() audits failures).
     if (currentEmail && currentEmail.toLowerCase() !== newEmail) {
       try {
-        await sendEmailChangedNotice(currentEmail, newEmail)
+        await sendEmailChangedNotice(currentEmail, newEmail, googleUnlinked)
       } catch {
         /* audited by the mailer; nothing actionable for the user */
       }
@@ -129,7 +159,7 @@ export async function POST(req: NextRequest) {
       category: "auth",
       event: "email_changed",
       source: "auth",
-      description: `Email changed from ${currentEmail ?? "unknown"} to ${newEmail}`,
+      description: `Email changed from ${currentEmail ?? "unknown"} to ${newEmail}${googleUnlinked ? " (stale Google identity unlinked)" : ""}`,
       subjectType: "user",
       subjectId: userId,
       ...ctx,

@@ -227,9 +227,12 @@ export async function sendOtpEmail(
  * Security notice to the PREVIOUS address after a successful email change,
  * so a hijacked account can't be silently re-pointed.
  */
-export async function sendEmailChangedNotice(oldEmail: string, newEmail: string): Promise<void> {
+export async function sendEmailChangedNotice(oldEmail: string, newEmail: string, googleUnlinked = false): Promise<void> {
   const subject = "Your FHI Global sign-in email was changed"
-  const text = `Your sign-in email was changed\n\nThe email on your FHI Global account was changed from ${oldEmail} to ${newEmail}.\n\nIf you made this change, no action is needed. If you did NOT make this change, contact us immediately so we can secure your account.\n\n© ${new Date().getFullYear()} FHI Global · Dubai, UAE`
+  const googleLine = googleUnlinked
+    ? " Google sign-in with this address has also been disconnected from the account."
+    : ""
+  const text = `Your sign-in email was changed\n\nThe email on your FHI Global account was changed from ${oldEmail} to ${newEmail}.${googleLine}\n\nIf you made this change, no action is needed. If you did NOT make this change, contact us immediately so we can secure your account.\n\n© ${new Date().getFullYear()} FHI Global · Dubai, UAE`
 
   const html = `<!doctype html>
 <html lang="en">
@@ -263,7 +266,7 @@ export async function sendEmailChangedNotice(oldEmail: string, newEmail: string)
               The email on your FHI Global account was changed from
               <strong style="color:#0d1117;">${esc(oldEmail)}</strong> to
               <strong style="color:#0d1117;">${esc(newEmail)}</strong>.
-              This address will no longer receive sign-in codes.
+              This address will no longer receive sign-in codes.${googleUnlinked ? " Google sign-in with this address has also been disconnected from the account." : ""}
             </p>
           </td>
         </tr>
