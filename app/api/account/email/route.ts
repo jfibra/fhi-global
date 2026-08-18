@@ -115,30 +115,16 @@ export async function POST(req: NextRequest) {
 
     // Unlink any Google identity whose address no longer matches the new
     // email — otherwise the OLD address's "Sign in with Google" button would
-    // remain a permanent key to this account. Best-effort: GoTrue may refuse
-    // (e.g. it's the account's only identity); the email change stands either
-    // way and the user can re-link by signing in with Google on the new email.
+    // remain a permanent key to this account. Uses the service-role RPC from
+    // migration 046 (the GoTrue admin identity-delete REST endpoint 404s on
+    // this instance). Best-effort: the email change stands either way, and the
+    // user can re-link by signing in with Google on the new email.
     let googleUnlinked = false
     try {
-      const { data: fresh } = await admin.auth.admin.getUserById(userId)
-      const stale = (fresh?.user?.identities ?? []).filter(
-        (i) =>
-          i.provider === "google" &&
-          String((i.identity_data as Record<string, unknown> | null)?.email ?? "").toLowerCase() !== newEmail,
-      )
-      for (const identity of stale) {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users/${userId}/identities/${identity.identity_id}`,
-          {
-            method: "DELETE",
-            headers: {
-              apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-              Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
-            },
-          },
-        )
-        if (res.ok) googleUnlinked = true
-      }
+      const { data: removed, error: unlinkError } = await admin.rpc("admin_unlink_stale_google_identity", {
+        target_user: userId,
+      })
+      googleUnlinked = !unlinkError && Number(removed ?? 0) > 0
     } catch {
       /* best-effort; audit below records whether it happened */
     }
