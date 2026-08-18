@@ -126,13 +126,28 @@ const TRUST = [
 export default async function HomePage() {
   const { developers, featuredProjects, cityRows } = await getCachedHomePageData();
 
-  const uniqueCities = [
-    ...new Set(cityRows.map((r) => r.city).filter(Boolean) as string[]),
-  ].sort();
   const devOptions = (developers ?? []).map((d) => ({
     id: d.id,
     name: d.name,
   }));
+
+  // The hero's "popular" row — the developers with the most live projects,
+  // counted from the catalog itself. Every link lands on a real portfolio
+  // page with inventory behind it (the old hardcoded area names filtered on
+  // `city`, which only ever holds "Dubai"/"Abu Dhabi", so they hit empty
+  // result pages).
+  const developerCounts = new Map<string, { name: string; slug: string; count: number }>();
+  for (const row of cityRows) {
+    const dev = row.developers as unknown as { name?: string | null; slug?: string | null } | null;
+    if (!dev?.slug || !dev?.name) continue;
+    const entry = developerCounts.get(dev.slug) ?? { name: dev.name, slug: dev.slug, count: 0 };
+    entry.count += 1;
+    developerCounts.set(dev.slug, entry);
+  }
+  const popularDevelopers = [...developerCounts.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+    .map((d) => ({ label: d.name, href: `/${d.slug}` }));
 
   // Rotating spotlight in the hero — real featured projects, compact price.
   const heroStatusLabels: Record<string, string> = {
@@ -179,7 +194,7 @@ export default async function HomePage() {
       <div className="fixed top-[-10%] left-[-10%] w-[700px] h-[700px] rounded-full opacity-30 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />
       <div className="fixed bottom-0 right-[-5%] w-[600px] h-[600px] rounded-full opacity-25 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(250,240,210)_0%,rgba(255,255,255,0)_70%)]" />
 
-      <HeroSection developers={devOptions} cities={uniqueCities} spotlight={heroSpotlight} />
+      <HeroSection developers={devOptions} popular={popularDevelopers} spotlight={heroSpotlight} />
 
       {/* ----------------------------------------------- */}
       {/* STATS BANNER                                    */}

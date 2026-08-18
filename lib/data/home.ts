@@ -48,12 +48,14 @@ async function loadHomePageData() {
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(6),
+      // One pass over the live catalog serves two homepage needs: the city
+      // list, and which developers actually carry the most projects (the
+      // hero's "popular" links) — no second round-trip.
       supabase
         .from("projects")
-        .select("city")
+        .select("city, developers(name, slug)")
         .eq("is_active", true)
         .eq("is_published", true)
-        .not("city", "is", null)
         .order("created_at", { ascending: false })
         .limit(4000),
     ])
