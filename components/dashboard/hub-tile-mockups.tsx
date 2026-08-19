@@ -54,6 +54,29 @@ const MOCKUPS: Record<string, React.ReactNode> = {
       <QrCode className="mt-auto h-3 w-3 text-white/80" />
     </span>
   ),
+  // A photo mid-stage: house scene, gold sparkles, a person appearing.
+  "photo-studio": (
+    <span className="relative flex h-[50px] w-[70px] flex-col overflow-hidden rounded-[4px] border border-[#dfe4ea] bg-white shadow-md">
+      <span className="relative h-full w-full bg-[#d7e4ee]">
+        <svg viewBox="0 0 20 14" className="absolute bottom-1 left-2 h-6 w-9">
+          <polygon points="10,0 20,7 0,7" fill="#1d4166" />
+          <rect x="3" y="7" width="14" height="7" fill="#123252" />
+          <rect x="8" y="9" width="4" height="5" fill="#d6b357" />
+        </svg>
+        {/* the person the AI just added */}
+        <span className="absolute bottom-1 right-3 flex flex-col items-center">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#d6b357]" />
+          <span className="mt-[1px] h-2.5 w-2 rounded-t-full bg-[#001f3f]" />
+        </span>
+        {/* sparkles */}
+        <svg viewBox="0 0 8 8" className="absolute right-1 top-1 h-2.5 w-2.5">
+          <path d="M4 0 4.9 3.1 8 4 4.9 4.9 4 8 3.1 4.9 0 4 3.1 3.1z" fill="#d6b357" />
+        </svg>
+        <span className="absolute right-4 top-3 h-1 w-1 rotate-45 bg-[#d6b357]/80" />
+        <span className="absolute left-1.5 top-1.5 h-[3px] w-[3px] rounded-full bg-white/90" />
+      </span>
+    </span>
+  ),
   // A reel mid-play: skyline scene, play button, action rail, progress bar.
   "reels-maker": (
     <span className="relative h-[54px] w-8 overflow-hidden rounded-[7px] bg-[#0a2136] shadow-md ring-1 ring-[#0b2a4d]">

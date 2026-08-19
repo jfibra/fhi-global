@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library,
-  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation,
+  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -122,6 +122,7 @@ const EVENTS: NavEntry = { icon: CalendarDays, label: "Events", to: "events" }
 const PROJECTS: NavEntry = { icon: FolderOpen, label: "Projects", to: "projects" }
 const INVITE: NavEntry = { icon: QrCode, label: "Invite", to: "invite" }
 const REELS_MAKER: NavEntry = { icon: Clapperboard, label: "Reels Maker", to: "reels-maker" }
+const PHOTO_STUDIO: NavEntry = { icon: Wand2, label: "AI Photo Studio", to: "photo-studio" }
 const POSTER_MAKER: NavEntry = { icon: LayoutTemplate, label: "Poster Maker", to: "poster-maker" }
 const BUSINESS_CARD: NavEntry = { icon: CreditCard, label: "Business Card", to: "business-card" }
 const WEBSITE_BUILDER: NavEntry = { icon: PanelsTopLeft, label: "Website Builder", to: "website-builder" }
@@ -194,6 +195,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { ...BUSINESS_CARD,  description: "Your shareable digital business card.", mock: "business-card" },
       { ...DIGITAL_CARD, description: "The one link you share — contacts, socials and QR.", mock: "digital-business-card" },
       { ...REELS_MAKER,   description: "Turn a listing or project into a shareable reel.", mock: "reels-maker" },
+      { ...PHOTO_STUDIO, description: "Stage a photo with AI — add people, furniture or landscaping.", mock: "photo-studio" },
       { ...POSTER_MAKER,  description: "Flyers and posters from any listing or project.", mock: "poster-maker" },
       { icon: Presentation, label: "Meeting Poster", to: "meeting-poster", description: "Event posters with your choice of speakers.", mock: "meeting-poster" },
       { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website.", mock: "website-builder" },
