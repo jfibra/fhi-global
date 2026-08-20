@@ -3,16 +3,17 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { randomUUID } from "node:crypto"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { isAdminStaffRole } from "@/lib/app-roles"
+import { createAdminSupabase } from "@/lib/admin-supabase"
 
 /**
- * AI Photo Studio — virtual staging for listing photos. The agent uploads a
+ * AI Photo Studio — virtual staging for listing photos. The user uploads a
  * property photo and a set of edit instructions (add people, furnish, fix
  * the sky…); OpenAI's gpt-image-1 EDITS the actual photo rather than
- * generating a new one, and the result is stored in our S3 so the agent gets
- * a durable URL to download and share.
+ * generating a new one. Both the source and the result land in our S3, and
+ * every generation is recorded in ai_photo_edits — that history powers the
+ * results gallery, chained edits, deletes, and (later) per-user daily caps.
  *
- * Costs real money per image (the key bills per generation), so it sits
- * behind the same role gate as the other Agent Resource studios.
+ * GET lists the caller's recent generations.
  */
 
 export const runtime = "nodejs"
@@ -22,6 +23,11 @@ export const maxDuration = 120
 const MAX_BYTES = 12 * 1024 * 1024
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
 const QUALITIES = new Set(["low", "medium", "high"])
+const EXT_BY_TYPE: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+}
 
 const s3 = new S3Client({
   region: process.env.S3_REGION!,
@@ -31,14 +37,40 @@ const s3 = new S3Client({
   },
 })
 
-export async function POST(req: NextRequest) {
+const s3Base = () => (process.env.S3_PUBLIC_URL ?? "").replace(/\/+$/, "")
+const STUDIO_PREFIX = "fhi_global/ai-photo-studio/"
+
+async function requireStudioAccess() {
   const session = await requireActiveSession()
-  if (!session.ok) return session.response
-  // Admin staff only for now — each generation bills the company AI
-  // account. Widen to agents later with a per-day cap.
+  if (!session.ok) return { response: session.response } as const
+  // Admin staff only for now — each generation bills the company AI account.
+  // Widen to agents later with a per-day cap over ai_photo_edits.
   if (!isAdminStaffRole(session.context.profile.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    return { response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) } as const
   }
+  return { context: session.context } as const
+}
+
+/** The caller's recent generations, newest first. */
+export async function GET() {
+  const access = await requireStudioAccess()
+  if ("response" in access) return access.response
+
+  const admin = createAdminSupabase()
+  const { data, error } = await admin
+    .from("ai_photo_edits")
+    .select("id, result_url, source_url, prompt, quality, created_at")
+    .eq("user_id", access.context.userId)
+    .order("created_at", { ascending: false })
+    .limit(40)
+  // Pre-migration environments: an empty gallery, not an error page.
+  if (error) return NextResponse.json({ rows: [] })
+  return NextResponse.json({ rows: data ?? [] })
+}
+
+export async function POST(req: NextRequest) {
+  const access = await requireStudioAccess()
+  if ("response" in access) return access.response
 
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
@@ -53,6 +85,9 @@ export async function POST(req: NextRequest) {
   const prompt = String(form?.get("prompt") ?? "").trim()
   const qualityRaw = String(form?.get("quality") ?? "medium")
   const quality = QUALITIES.has(qualityRaw) ? qualityRaw : "medium"
+  // Set when the edit chains off an earlier result: that result's URL is the
+  // source of record, so history shows the true before/after of THIS step.
+  const chainedSource = String(form?.get("sourceUrl") ?? "").trim()
 
   if (!(image instanceof File)) {
     return NextResponse.json({ error: "Attach a photo to edit." }, { status: 400 })
@@ -65,6 +100,9 @@ export async function POST(req: NextRequest) {
   }
   if (!prompt) {
     return NextResponse.json({ error: "Pick at least one edit or describe one." }, { status: 400 })
+  }
+  if (chainedSource && !chainedSource.startsWith(`${s3Base()}/${STUDIO_PREFIX}`)) {
+    return NextResponse.json({ error: "Invalid source." }, { status: 400 })
   }
 
   // gpt-image-1 edits the supplied photo in place of generating from scratch.
@@ -107,19 +145,60 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "The image service returned no image." }, { status: 502 })
   }
 
-  // Durable copy in our own bucket — the agent gets a link, not a blob.
+  // Durable copies in our own bucket. A fresh upload also stores the source
+  // (as src-*), so the gallery can replay the before/after; a chained edit
+  // records the earlier result's URL instead of re-uploading it.
   const bytes = Buffer.from(b64, "base64")
-  const key = `fhi_global/ai-photo-studio/${randomUUID()}.webp`
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: process.env.S3_BUCKET_NAME!,
-      Key: key,
-      Body: bytes,
-      ContentType: "image/webp",
-      CacheControl: "public, max-age=31536000, immutable",
-    }),
-  )
+  const resultKey = `${STUDIO_PREFIX}${randomUUID()}.webp`
+  const puts: Promise<unknown>[] = [
+    s3.send(
+      new PutObjectCommand({
+        Bucket: process.env.S3_BUCKET_NAME!,
+        Key: resultKey,
+        Body: bytes,
+        ContentType: "image/webp",
+        CacheControl: "public, max-age=31536000, immutable",
+      }),
+    ),
+  ]
+  let sourceUrl = chainedSource || null
+  if (!sourceUrl) {
+    const ext = EXT_BY_TYPE[image.type] ?? "jpg"
+    const sourceKey = `${STUDIO_PREFIX}src-${randomUUID()}.${ext}`
+    puts.push(
+      s3.send(
+        new PutObjectCommand({
+          Bucket: process.env.S3_BUCKET_NAME!,
+          Key: sourceKey,
+          Body: Buffer.from(await image.arrayBuffer()),
+          ContentType: image.type || "image/jpeg",
+          CacheControl: "public, max-age=31536000, immutable",
+        }),
+      ),
+    )
+    sourceUrl = `${s3Base()}/${sourceKey}`
+  }
+  await Promise.all(puts)
 
-  const base = (process.env.S3_PUBLIC_URL ?? "").replace(/\/+$/, "")
-  return NextResponse.json({ url: `${base}/${key}` })
+  const resultUrl = `${s3Base()}/${resultKey}`
+
+  // The gallery record. A failed insert must not eat a paid generation —
+  // return the image either way.
+  const admin = createAdminSupabase()
+  const { data: row, error: insertError } = await admin
+    .from("ai_photo_edits")
+    .insert({
+      user_id: access.context.userId,
+      result_url: resultUrl,
+      source_url: sourceUrl,
+      prompt: prompt.slice(0, 2000),
+      quality,
+    })
+    .select("id")
+    .maybeSingle<{ id: string }>()
+  if (insertError) {
+    console.warn("[ai/photo-studio] history insert failed:", insertError.message)
+  }
+
+  return NextResponse.json({ url: resultUrl, sourceUrl, id: row?.id ?? null })
 }

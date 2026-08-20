@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import {
-  ChevronsLeftRight, Download, ImagePlus, Loader2, MapPin, RotateCcw, Sofa, Sun, Sparkles, Trees, Users, Wand2, X,
+  ChevronsLeftRight, Download, ImagePlus, Images, Loader2, MapPin, Pencil, RotateCcw, Sofa, Sun, Sparkles, Trash2, Trees, Users, Wand2, X,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { isAdminStaffRole } from "@/lib/app-roles"
@@ -15,6 +15,21 @@ import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 type PresetKey = "people" | "furnish" | "garden" | "sky" | "clean"
+type FurnishStyle = "modern" | "luxury" | "minimalist" | "majlis"
+
+const FURNISH_STYLES: Array<{ key: FurnishStyle; label: string }> = [
+  { key: "modern", label: "Modern" },
+  { key: "luxury", label: "Luxury" },
+  { key: "minimalist", label: "Minimalist" },
+  { key: "majlis", label: "Majlis" },
+]
+
+const FURNISH_WORDING: Record<FurnishStyle, string> = {
+  modern: "tasteful modern furniture and decor",
+  luxury: "high-end luxury furniture, rich textures and elegant statement decor",
+  minimalist: "clean minimalist furniture in light tones with uncluttered styling",
+  majlis: "an elegant Arabic majlis arrangement — low seating, rich fabrics, traditional patterns and warm ambient lighting",
+}
 
 const PRESETS: Array<{ key: PresetKey; icon: typeof Users; label: string; hint: string }> = [
   { key: "people", icon: Users, label: "Add People", hint: "Bring the space to life" },
@@ -25,12 +40,12 @@ const PRESETS: Array<{ key: PresetKey; icon: typeof Users; label: string; hint: 
 ]
 
 /** Each preset becomes one clear instruction sentence for the model. */
-function presetInstruction(key: PresetKey, people: number): string {
+function presetInstruction(key: PresetKey, people: number, style: FurnishStyle): string {
   switch (key) {
     case "people":
       return `Add ${people} realistic ${people === 1 ? "person" : "people"} naturally enjoying the space — relaxed poses, correct scale, matching the scene's lighting and perspective`
     case "furnish":
-      return "Furnish the space with tasteful modern furniture and decor suited to a premium Dubai property"
+      return "Furnish the space with " + FURNISH_WORDING[style] + ", suited to a premium Dubai property"
     case "garden":
       return "Landscape the outdoor area with lush greenery, plants and a manicured lawn"
     case "sky":
@@ -127,6 +142,25 @@ function CompareSlider({ before, after }: { before: string; after: string }) {
   )
 }
 
+type EditRow = {
+  id: string
+  result_url: string
+  source_url: string | null
+  prompt: string
+  quality: string
+  created_at: string
+}
+
+function whenLabel(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  return (
+    d.toLocaleDateString("en-AE", { month: "short", day: "numeric" }) +
+    " · " +
+    d.toLocaleTimeString("en-AE", { hour: "numeric", minute: "2-digit" })
+  )
+}
+
 const BUSY_LINES = [
   "Editing your photo…",
   "Matching light and perspective…",
@@ -148,6 +182,12 @@ export default function PhotoStudioPage() {
   const [busyLine, setBusyLine] = useState(0)
   const [result, setResult] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
+  const [furnishStyle, setFurnishStyle] = useState<FurnishStyle>("modern")
+  // When editing an earlier result, its URL is the source of record.
+  const [chainSource, setChainSource] = useState<string | null>(null)
+  const [history, setHistory] = useState<EditRow[]>([])
+  const [historyLoaded, setHistoryLoaded] = useState(false)
+  const [rowBusy, setRowBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -161,6 +201,21 @@ export default function PhotoStudioPage() {
   // Object URLs leak without revocation.
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
 
+  // The results gallery — everything this user generated before.
+  useEffect(() => {
+    let alive = true
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/ai/photo-studio", { cache: "no-store" })
+        const data = (await res.json().catch(() => ({}))) as { rows?: EditRow[] }
+        if (alive) setHistory(data.rows ?? [])
+      } finally {
+        if (alive) setHistoryLoaded(true)
+      }
+    }, 0)
+    return () => { alive = false; clearTimeout(t) }
+  }, [])
+
   if (!allowed) return null
 
   const pickFile = (f: File | null) => {
@@ -168,8 +223,61 @@ export default function PhotoStudioPage() {
     if (preview) URL.revokeObjectURL(preview)
     setFile(f)
     setPreview(URL.createObjectURL(f))
+    setChainSource(null)
     setResult(null)
     setError(null)
+  }
+
+  /** Save any stored image to disk (cross-origin links will not download). */
+  const downloadUrl = async (url: string) => {
+    try {
+      const res = await fetch("/api/image-proxy?url=" + encodeURIComponent(url))
+      if (!res.ok) throw new Error("download failed")
+      const blob = await res.blob()
+      const href = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = href
+      a.download = "fhi-ai-staging-" + (url.split("/").pop() ?? "photo.webp")
+      a.click()
+      URL.revokeObjectURL(href)
+    } catch {
+      window.open(url, "_blank", "noopener")
+    }
+  }
+
+  /** Chained editing: pull a result back in as the next round's photo. */
+  const editResult = async (url: string) => {
+    setError(null)
+    try {
+      const res = await fetch("/api/image-proxy?url=" + encodeURIComponent(url))
+      if (!res.ok) throw new Error("load failed")
+      const blob = await res.blob()
+      if (preview) URL.revokeObjectURL(preview)
+      setFile(new File([blob], "staged.webp", { type: blob.type || "image/webp" }))
+      setPreview(URL.createObjectURL(blob))
+      setChainSource(url)
+      setResult(null)
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    } catch {
+      setError("Could not load that result for editing — try again.")
+    }
+  }
+
+  /** Delete a gallery result — the record and the file in storage. */
+  const deleteRow = async (row: EditRow) => {
+    if (!window.confirm("Delete this image? The file is removed from storage permanently.")) return
+    setRowBusy(row.id)
+    try {
+      const res = await fetch("/api/ai/photo-studio/" + row.id, { method: "DELETE" })
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) throw new Error(data.error ?? "Delete failed.")
+      setHistory((rs) => rs.filter((r) => r.id !== row.id))
+      if (result === row.result_url) setResult(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Delete failed.")
+    } finally {
+      setRowBusy(null)
+    }
   }
 
   const togglePreset = (key: PresetKey) => {
@@ -182,7 +290,7 @@ export default function PhotoStudioPage() {
   }
 
   const buildPrompt = (): string => {
-    const parts = [...picked].map((k) => presetInstruction(k, people))
+    const parts = [...picked].map((k) => presetInstruction(k, people, furnishStyle))
     if (custom.trim()) parts.push(custom.trim())
     if (parts.length === 0) return ""
     return (
@@ -196,18 +304,7 @@ export default function PhotoStudioPage() {
     if (!result || downloading) return
     setDownloading(true)
     try {
-      const res = await fetch("/api/image-proxy?url=" + encodeURIComponent(result))
-      if (!res.ok) throw new Error("download failed")
-      const blob = await res.blob()
-      const href = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = href
-      a.download = "fhi-ai-staging-" + (result.split("/").pop() ?? "photo.webp")
-      a.click()
-      URL.revokeObjectURL(href)
-    } catch {
-      // Fall back to opening it — the visitor can still save from the tab.
-      window.open(result, "_blank", "noopener")
+      await downloadUrl(result)
     } finally {
       setDownloading(false)
     }
@@ -231,10 +328,16 @@ export default function PhotoStudioPage() {
       fd.append("image", toSend, toSend.name)
       fd.append("prompt", prompt)
       fd.append("quality", quality)
+      if (chainSource) fd.append("sourceUrl", chainSource)
       const res = await fetch("/api/ai/photo-studio", { method: "POST", body: fd })
       const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string }
       if (!res.ok || !data.url) throw new Error(data.error ?? "Generation failed — try again.")
       setResult(data.url)
+      // Refresh the gallery so the new result appears at the top.
+      void fetch("/api/ai/photo-studio", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d: { rows?: EditRow[] }) => setHistory(d.rows ?? []))
+        .catch(() => {})
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generation failed — try again.")
     } finally {
@@ -267,7 +370,14 @@ export default function PhotoStudioPage() {
         <div className="space-y-5 bg-white border border-[#e5e8ec] p-5">
           {/* Photo */}
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-2">1 · Photo</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-2">
+              1 · Photo
+              {chainSource && (
+                <span className="ml-2 normal-case tracking-normal font-bold text-[#b8913f]">
+                  · editing a previous result
+                </span>
+              )}
+            </p>
             <input
               ref={inputRef}
               type="file"
@@ -318,6 +428,31 @@ export default function PhotoStudioPage() {
                       <span className="block text-sm font-bold text-[#0d1117]">{label}</span>
                       <span className="block text-xs text-[#8a93a0]">{hint}</span>
                     </span>
+                    {key === "furnish" && active && (
+                      <span
+                        className="flex flex-wrap items-center justify-end gap-1 shrink-0 max-w-[150px]"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        role="group"
+                        aria-label="Furnishing style"
+                      >
+                        {FURNISH_STYLES.map(({ key: fs, label: fl }) => (
+                          <button
+                            key={fs}
+                            type="button"
+                            onClick={() => setFurnishStyle(fs)}
+                            aria-pressed={furnishStyle === fs}
+                            className={"px-2 py-1 text-[11px] font-bold transition-colors " + (
+                              furnishStyle === fs
+                                ? "bg-[#001f3f] text-white"
+                                : "bg-white border border-[#e5e5e5] text-[#6b7280] hover:border-[#001f3f]"
+                            )}
+                          >
+                            {fl}
+                          </button>
+                        ))}
+                      </span>
+                    )}
                     {key === "people" && active && (
                       <span
                         className="flex items-center gap-1 shrink-0"
@@ -425,6 +560,13 @@ export default function PhotoStudioPage() {
                 </a>
                 <button
                   type="button"
+                  onClick={() => result && void editResult(result)}
+                  className="inline-flex items-center gap-2 border border-[#d6b357] px-5 py-2.5 text-sm font-bold text-[#8a6d2a] hover:bg-[#faf7ee] transition-colors"
+                >
+                  <Pencil className="w-4 h-4" /> Edit This Result
+                </button>
+                <button
+                  type="button"
                   onClick={() => setResult(null)}
                   className="inline-flex items-center gap-2 border border-[#e5e5e5] px-5 py-2.5 text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-colors"
                 >
@@ -459,6 +601,71 @@ export default function PhotoStudioPage() {
           )}
         </div>
       </div>
+
+      {/* ── Results gallery — every generation, with download/edit/delete ── */}
+      {historyLoaded && history.length > 0 && (
+        <div className="bg-white border border-[#e5e8ec] p-5">
+          <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117] flex items-center gap-2">
+            <Images className="w-5 h-5 text-[#b8913f]" />
+            My Results
+            <span className="text-sm font-semibold text-[#9ca3af]">{history.length}</span>
+          </h2>
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+            {history.map((row) => (
+              <figure key={row.id} className="group border border-[#eceef1] overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => void editResult(row.result_url)}
+                  title="Open this result for another edit"
+                  className="relative block aspect-[4/3] w-full overflow-hidden bg-[#f4f5f7]"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={row.result_url}
+                    alt={row.prompt.slice(0, 60)}
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                  />
+                </button>
+                <figcaption className="px-2.5 py-2">
+                  <p className="text-[11px] text-[#9ca3af]">{whenLabel(row.created_at)}</p>
+                  <p className="text-xs text-[#374151] line-clamp-1" title={row.prompt}>{row.prompt}</p>
+                  <div className="mt-1.5 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void downloadUrl(row.result_url)}
+                      title="Download"
+                      aria-label="Download this result"
+                      className="p-1.5 text-[#001f3f] hover:bg-[#001f3f]/10 transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void editResult(row.result_url)}
+                      title="Edit this result again"
+                      aria-label="Edit this result again"
+                      className="p-1.5 text-[#b8913f] hover:bg-[#d6b357]/15 transition-colors"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void deleteRow(row)}
+                      disabled={rowBusy === row.id}
+                      title="Delete permanently"
+                      aria-label="Delete this result permanently"
+                      className="ml-auto p-1.5 text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50"
+                    >
+                      {rowBusy === row.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
