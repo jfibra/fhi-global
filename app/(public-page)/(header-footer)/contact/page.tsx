@@ -4,7 +4,7 @@ import { ContactForm } from "./contact-form"
 import { createPageMetadata } from "@/lib/seo"
 import { breadcrumbList, realEstateAgentOfficeSchema } from "@/lib/structured-data"
 import { JsonLd } from "@/components/json-ld"
-import { MapPin, Phone, Mail, Clock, Building2, Send } from "lucide-react"
+import { MapPin, Phone, Mail, Clock, Building2, Send, ArrowRight } from "lucide-react"
 
 export const metadata: Metadata = createPageMetadata({
   title: "Contact Us — Get in Touch",
@@ -39,30 +39,6 @@ const DEPARTMENTS = [
   { name: "Press & Media", desc: "Media enquiries and announcements.", email: "press@fhiglobal.ae" },
 ]
 
-const QUICK_CONTACT = [
-  {
-    icon: Phone,
-    label: "Main Office",
-    value: "+971 56 742 8288",
-    sub: "Sun–Thu, 9AM–6PM GST",
-    href: "tel:+971567428288",
-  },
-  {
-    icon: Mail,
-    label: "Email Us",
-    value: "info@fhiglobal.ae",
-    sub: "We respond within one business day.",
-    href: "mailto:info@fhiglobal.ae",
-  },
-  {
-    icon: MapPin,
-    label: "HQ Location",
-    value: "Al Rigga, Deira, Dubai, UAE",
-    sub: "Visit our main office",
-    href: "#offices",
-  },
-]
-
 export default function ContactPage() {
   return (
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
@@ -76,70 +52,89 @@ export default function ContactPage() {
           breadcrumbList([{ name: "Home", path: "/" }, { name: "Contact" }]),
         ]}
       />
-      {/* ── Hero ── */}
-      <section className="relative bg-[#f7f5f1] border-b border-[#ebe7e0] overflow-hidden">
-        {/* Skyline kept faint and to the right: texture behind the headline,
-            not a photo competing with it. */}
-        <div className="absolute inset-y-0 right-0 w-full lg:w-[58%] opacity-[0.16]" aria-hidden="true">
-          <Image
-            src="/background/dubai.webp"
-            alt=""
-            fill
-            priority
-            sizes="(max-width: 1024px) 100vw, 58vw"
-            className="object-cover object-center"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#f7f5f1] via-[#f7f5f1]/50 to-transparent" />
-        </div>
 
-        <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-16 text-center">
-          <h1 className="font-['Outfit'] text-4xl md:text-[52px] font-bold leading-[1.05] tracking-tight">
-            <span className="text-[#001f3f]">Get In </span>
-            <span className="text-[#d6b357]">Touch</span>
+      {/* ── Masthead — light editorial header, the same design language as
+             the project and search pages: navy type on white, gold caps
+             labels with hairline dividers, the skyline filling the right
+             half. The old page's separate Quick Contact card lives here now,
+             as the fact columns. ── */}
+      <section className="relative overflow-hidden bg-white border-b border-[#e8eaed]">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10 lg:pr-[46%] lg:min-h-[360px]">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="h-px w-10 bg-[#d6b357]" aria-hidden="true" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f]">
+              FHI Global · Contact Us
+            </span>
+          </div>
+          <h1 className="font-['Outfit'] text-3xl md:text-[42px] font-bold text-[#001f3f] leading-[1.08]">
+            Get in Touch
           </h1>
-          <span className="block w-16 h-[3px] bg-[#d6b357] mx-auto my-5" aria-hidden="true" />
-          <p className="text-[#5f6368] text-[15px] leading-relaxed max-w-lg mx-auto">
-            Our Dubai-based team is ready to help. Reach out for developer partnerships, agent
-            onboarding, or any real estate inquiry.
+          <p className="mt-4 text-[15px] leading-relaxed text-[#6b7280] max-w-xl">
+            Our Dubai-based team is ready to help — developer partnerships, agent onboarding, or any
+            real estate inquiry. We respond within one business day.
           </p>
+
+          {/* The skyline — right half on desktop, after the title on mobile. */}
+          <div className="relative mt-6 aspect-[16/10] bg-[#001f3f] lg:absolute lg:inset-y-0 lg:right-0 lg:left-[56%] lg:z-10 lg:mt-0 lg:aspect-auto">
+            <Image
+              src="/background/dubai.webp"
+              alt="Dubai skyline"
+              fill
+              priority
+              sizes="(min-width: 1024px) 44vw, 100vw"
+              className="object-cover"
+            />
+          </div>
+
+          {/* Contact columns — this page's quick facts. */}
+          <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:gap-x-0 sm:gap-y-4">
+            {[
+              {
+                label: "Call Us",
+                node: (
+                  <a href="tel:+971567428288" className="hover:text-[#b8913f] transition-colors">
+                    +971 56 742 8288
+                  </a>
+                ),
+              },
+              {
+                label: "Email Us",
+                node: (
+                  <a href="mailto:info@fhiglobal.ae" className="hover:text-[#b8913f] transition-colors">
+                    info@fhiglobal.ae
+                  </a>
+                ),
+              },
+              {
+                label: "Visit Us",
+                node: (
+                  <a href="#offices" className="hover:text-[#b8913f] transition-colors">
+                    Al Rigga, Deira, Dubai
+                  </a>
+                ),
+              },
+              { label: "Office Hours", node: "Sun–Thu · 9AM–6PM" },
+            ].map((f) => (
+              <div
+                key={f.label}
+                className="sm:max-w-[250px] sm:pr-7 sm:mr-7 sm:border-r sm:border-[#e8eaed] sm:last:mr-0 sm:last:border-0 sm:last:pr-0"
+              >
+                <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b8913f] mb-1.5">
+                  {f.label}
+                </dt>
+                <dd className="text-[15px] font-semibold text-[#001f3f] leading-snug">{f.node}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </section>
 
-      {/* ── Quick contact + form ── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] gap-6 items-start">
-        <div className="bg-white border border-[#e5e8ec] p-6">
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#b8913f] mb-5">
-            Quick Contact
-          </p>
-          <div className="space-y-1">
-            {QUICK_CONTACT.map(({ icon: Icon, label, value, sub, href }) => (
-              <div
-                key={label}
-                className="flex items-start gap-4 py-4 border-b border-[#f0f0f0] last:border-0"
-              >
-                <span className="w-11 h-11 rounded-full bg-[#001f3f] flex items-center justify-center shrink-0">
-                  <Icon className="w-[18px] h-[18px] text-[#d6b357]" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9ca3af] mb-1">
-                    {label}
-                  </p>
-                  <a
-                    href={href}
-                    className="block font-['Outfit'] text-[15px] font-bold text-[#001f3f] leading-snug hover:text-[#b8913f] transition-colors"
-                  >
-                    {value}
-                  </a>
-                  <p className="text-xs text-[#9ca3af] mt-1 leading-relaxed">{sub}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white border border-[#e5e8ec] p-6 sm:p-8">
+      {/* ── Form + right rail — the message form is the page's main event;
+             offices and department inboxes support it from the side. ── */}
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-3 gap-10 lg:gap-12 items-start">
+        <div className="lg:col-span-2 bg-white border border-[#e5e8ec] p-6 sm:p-8">
           <div className="flex items-center gap-4">
-            <span className="w-12 h-12 rounded-full bg-[#001f3f] flex items-center justify-center shrink-0">
+            <span className="w-12 h-12 bg-[#001f3f] flex items-center justify-center shrink-0">
               <Send className="w-5 h-5 text-[#d6b357]" />
             </span>
             <div>
@@ -154,71 +149,70 @@ export default function ContactPage() {
           <span className="block h-[2px] bg-[#d6b357] mt-5 mb-7" aria-hidden="true" />
           <ContactForm />
         </div>
-      </section>
 
-      {/* ── Offices ── */}
-      <section id="offices" className="scroll-mt-24 bg-white border-y border-[#ebedf0]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-          <h2 className="font-['Outfit'] text-sm font-bold uppercase tracking-[0.16em] text-[#001f3f]">
-            Our offices
-          </h2>
-          <span className="block w-10 h-[2px] bg-[#d6b357] mt-2.5 mb-7" aria-hidden="true" />
+        <div className="space-y-10">
+          {/* Offices */}
+          <div id="offices" className="scroll-mt-24">
+            <p className="font-['Outfit'] text-[13px] font-bold uppercase tracking-[0.16em] text-[#0d1117] mb-3">
+              Our Offices
+            </p>
+            <div className="space-y-4">
+              {OFFICES.map(({ city, address, phone, email, hours }) => (
+                <div key={city} className="bg-white border border-[#e5e8ec] p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="w-9 h-9 bg-[#001f3f] flex items-center justify-center shrink-0">
+                      <Building2 className="w-[18px] h-[18px] text-[#d6b357]" />
+                    </span>
+                    <h3 className="font-['Outfit'] text-base font-bold text-[#001f3f]">{city}</h3>
+                  </div>
+                  <div className="space-y-2.5">
+                    {[
+                      { icon: MapPin, value: address },
+                      { icon: Phone, value: phone, href: `tel:${phone.replace(/\s/g, "")}` },
+                      { icon: Mail, value: email, href: `mailto:${email}` },
+                      { icon: Clock, value: hours },
+                    ].map(({ icon: Icon, value, href }) => (
+                      <div key={value} className="flex items-start gap-3">
+                        <Icon className="w-4 h-4 text-[#d6b357] shrink-0 mt-0.5" />
+                        {href ? (
+                          <a href={href} className="text-sm text-[#4b5563] hover:text-[#001f3f] transition-colors">
+                            {value}
+                          </a>
+                        ) : (
+                          <span className="text-sm text-[#4b5563] leading-relaxed">{value}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {OFFICES.map(({ city, address, phone, email, hours }) => (
-              <div key={city} className="border border-[#e5e8ec] p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="w-9 h-9 bg-[#001f3f] flex items-center justify-center shrink-0">
-                    <Building2 className="w-[18px] h-[18px] text-[#d6b357]" />
-                  </span>
-                  <h3 className="font-['Outfit'] text-base font-bold text-[#001f3f]">{city}</h3>
-                </div>
-                <div className="space-y-2.5">
-                  {[
-                    { icon: MapPin, value: address },
-                    { icon: Phone, value: phone, href: `tel:${phone.replace(/\s/g, "")}` },
-                    { icon: Mail, value: email, href: `mailto:${email}` },
-                    { icon: Clock, value: hours },
-                  ].map(({ icon: Icon, value, href }) => (
-                    <div key={value} className="flex items-start gap-3">
-                      <Icon className="w-4 h-4 text-[#d6b357] shrink-0 mt-0.5" />
-                      {href ? (
-                        <a href={href} className="text-sm text-[#4b5563] hover:text-[#001f3f] transition-colors">
-                          {value}
-                        </a>
-                      ) : (
-                        <span className="text-sm text-[#4b5563] leading-relaxed">{value}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+          {/* Departments — one row per desk, straight to the right inbox. */}
+          <div>
+            <p className="font-['Outfit'] text-[13px] font-bold uppercase tracking-[0.16em] text-[#0d1117] mb-3">
+              Reach the Right Team
+            </p>
+            <div className="bg-white border border-[#e5e8ec] divide-y divide-[#eef0f3]">
+              {DEPARTMENTS.map(({ name, desc, email }) => (
+                <a
+                  key={name}
+                  href={`mailto:${email}`}
+                  className="group flex items-center gap-4 p-5 hover:bg-[#faf9f6] transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-['Outfit'] text-[15px] font-bold text-[#001f3f]">{name}</p>
+                    <p className="text-xs text-[#6b7280] leading-relaxed mt-0.5">{desc}</p>
+                    <p className="text-xs font-bold text-[#b8913f] mt-1.5 group-hover:underline">{email}</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-[#001f3f] shrink-0 transition-transform group-hover:translate-x-1" />
+                </a>
+              ))}
+            </div>
           </div>
         </div>
-      </section>
-
-      {/* ── Departments ── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-        <h2 className="font-['Outfit'] text-sm font-bold uppercase tracking-[0.16em] text-[#001f3f]">
-          Reach the right team
-        </h2>
-        <span className="block w-10 h-[2px] bg-[#d6b357] mt-2.5 mb-7" aria-hidden="true" />
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          {DEPARTMENTS.map(({ name, desc, email }) => (
-            <a
-              key={name}
-              href={`mailto:${email}`}
-              className="group bg-white border border-[#e5e8ec] p-5 hover:border-[#d6b357] transition-colors"
-            >
-              <p className="font-['Outfit'] text-[15px] font-bold text-[#001f3f]">{name}</p>
-              <p className="text-xs text-[#6b7280] leading-relaxed mt-1.5 mb-3">{desc}</p>
-              <span className="text-xs font-bold text-[#b8913f] group-hover:underline">{email}</span>
-            </a>
-          ))}
-        </div>
-      </section>
+      </div>
     </div>
   )
 }

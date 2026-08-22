@@ -48,7 +48,7 @@ const CTA_POINTS = [
   { icon: ShieldCheck, title: "Secure Transactions", desc: "We ensure a smooth, safe, and transparent process." },
 ]
 
-// The band under the hero. Deliberately claims rather than counts: figures
+// The band under the masthead. Deliberately claims rather than counts: figures
 // like "10,000+ happy clients" can't be evidenced, and a live count would
 // read as smaller than it is on a young platform.
 const HIGHLIGHTS = [
@@ -58,164 +58,335 @@ const HIGHLIGHTS = [
   { icon: MapPin, title: "Dubai, UAE", desc: "On the ground where you're buying" },
 ]
 
+// Real photos from our own gallery (the FHI Dubai Global event album) — the
+// actual team and leadership, not stock imagery. Same S3 host as the /gallery
+// page, already allowed in next.config images.
+const GALLERY_BASE =
+  "https://filipinohomes123.s3.ap-southeast-1.amazonaws.com/FHI_GLOBAL/gallery/fhi-global-dubai-event/web"
+const PHOTOS = {
+  team: {
+    url: `${GALLERY_BASE}/0ec466a7-dsc04617.jpg`,
+    alt: "The FHI Global team on a Dubai rooftop",
+  },
+  leaders: {
+    url: `${GALLERY_BASE}/c7c6af0d-dsc03609-edit.jpg`,
+    alt: "FHI Global leadership at the Dubai Fountain, Downtown Dubai",
+    caption: "Our leadership in Downtown Dubai",
+  },
+  siteVisit: {
+    url: `${GALLERY_BASE}/3f72486c-dsc04660.jpg`,
+    alt: "The FHI Global team visiting a developer construction site in Dubai",
+    caption: "On site with our developer partners",
+  },
+  moments: [
+    {
+      url: `${GALLERY_BASE}/cd7c1545-dsc04635.jpg`,
+      alt: "The FHI Global team celebrating together on a Dubai rooftop",
+    },
+    {
+      url: `${GALLERY_BASE}/3b70b14a-dsc04669-edit.jpg`,
+      alt: "Reviewing a new project scale model at a developer showroom",
+    },
+    {
+      url: `${GALLERY_BASE}/95e383bc-mw501247-edit.jpg`,
+      alt: "Studying a masterplan model at a developer sales gallery",
+    },
+  ],
+}
+
+/** Diamond node pinned to the story rail — mobile left, desktop center. */
+function RailNode() {
+  return (
+    <span
+      className="absolute left-4 top-14 lg:left-1/2 lg:top-1/2 w-3 h-3 rotate-45 bg-[#d6b357] -translate-x-1/2 lg:-translate-y-1/2"
+      aria-hidden="true"
+    />
+  )
+}
+
+/** Chapter header — gold numeral, kicker, navy title. */
+function ChapterHead({ num, kicker, title }: { num: string; kicker: string; title: string }) {
+  return (
+    <div>
+      <p className="font-['Outfit'] text-5xl font-bold text-[#d6b357]/35 leading-none">{num}</p>
+      <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f]">{kicker}</p>
+      <h3 className="mt-2 font-['Outfit'] text-2xl md:text-[30px] font-bold text-[#001f3f] leading-tight">
+        {title}
+      </h3>
+      <span className="block w-12 h-[3px] bg-[#d6b357] mt-4" aria-hidden="true" />
+    </div>
+  )
+}
+
 export default function AboutPage() {
   return (
     <div className="bg-[#fafafa] overflow-x-hidden">
-      {/* ── Hero ── */}
+      {/* ── Masthead — cinematic: the whole company full-bleed behind the
+             words, under a left-weighted navy scrim. The story pages below
+             stay light; this is the emotional open. ── */}
       <section className="relative bg-[#001428] overflow-hidden">
-        <div className="absolute inset-0" aria-hidden="true">
-          {/* The bright golden-hour skyline, not the dusk shot — no scrim
-              setting can lighten a photo that is itself dark. */}
-          <Image
-            src="/background/dubai.webp"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover object-center animate-kenburns"
-          />
-          {/* Strong only under the type on the left, then opening fast so the
-              skyline reads as a bright photo rather than a dark wash. */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/85 via-[#001428]/35 to-transparent" />
-        </div>
+        <Image
+          src={PHOTOS.team.url}
+          alt={PHOTOS.team.alt}
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-[70%_55%]"
+        />
+        {/* Photo scrim — heavy under the type, open right so the team reads. */}
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-[#001428]/95 via-[#001428]/65 to-[#001428]/10"
+          aria-hidden="true"
+        />
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-28 md:pt-20 md:pb-32">
-          <p className="animate-hero-item text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357] mb-5" style={{ animationDelay: "60ms" }}>
-            About FHI Global
-          </p>
-          <h1 className="animate-hero-item font-['Outfit'] text-4xl md:text-[52px] font-bold leading-[1.08] tracking-tight" style={{ animationDelay: "150ms" }}>
+        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 lg:min-h-[520px] flex flex-col justify-center">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="h-px w-10 bg-[#d6b357]" aria-hidden="true" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
+              FHI Global · Our Story
+            </span>
+          </div>
+          <h1
+            className="font-['Outfit'] text-4xl md:text-[58px] font-bold leading-[1.05] tracking-tight"
+            style={{ textShadow: "0 2px 24px rgba(0,10,30,0.55)" }}
+          >
             <span className="block text-white">Building Trust.</span>
             <span className="block text-[#d6b357]">Creating Value.</span>
           </h1>
-          <span className="animate-hero-item block w-16 h-[3px] bg-[#d6b357] my-6" style={{ animationDelay: "240ms" }} aria-hidden="true" />
-          <p className="animate-hero-item text-white/75 text-[15px] leading-relaxed max-w-md" style={{ animationDelay: "320ms" }}>
-            FHI Global Property is Dubai&apos;s premier real estate platform, connecting investors
-            with exceptional opportunities and world-class development.
+          <p
+            className="mt-5 text-[15.5px] leading-relaxed text-white/85 max-w-xl"
+            style={{ textShadow: "0 1px 12px rgba(0,10,30,0.6)" }}
+          >
+            From a simple vision to one of Dubai&apos;s most connected property platforms — this is
+            who we are, how we work, and why buyers across the world trust us with UAE real estate.
           </p>
-          <div className="animate-hero-item" style={{ animationDelay: "400ms" }}>
+          <div className="mt-9 flex flex-wrap items-center gap-3">
             <Link
               href="#story"
-              className="mt-8 inline-flex items-center gap-2 px-7 py-3.5 bg-[#d6b357] text-[#1a1408] text-sm font-bold hover:brightness-95 transition-all"
+              className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#d6b357] text-[#1a1408] text-sm font-bold hover:brightness-95 transition-all"
             >
-              Our Story <ArrowRight className="w-4 h-4" />
+              Read Our Story <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/contact"
+              className="inline-flex items-center gap-2 px-7 py-3.5 border border-white/35 text-white text-sm font-bold hover:border-[#d6b357] hover:text-[#d6b357] transition-colors"
+            >
+              Get in Touch
             </Link>
           </div>
         </div>
       </section>
 
-      {/* ── Highlights — overlapping the hero, as in the design ── */}
-      <section className="relative z-10 -mt-16 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Reveal>
-        <div className="bg-white border border-[#e5e8ec] shadow-[0_18px_50px_-24px_rgba(0,20,45,0.35)] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#eef0f3]">
+      {/* Highlights band — anchors the hero into the page. */}
+      <div className="relative bg-[#001f3f] border-b border-[#d6b357]/25">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap gap-x-10 gap-y-3">
           {HIGHLIGHTS.map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="px-6 py-7 text-center">
-              <Icon className="w-7 h-7 text-[#d6b357] mx-auto mb-3" strokeWidth={1.5} />
-              <p className="font-['Outfit'] text-[15px] font-bold text-[#001f3f] leading-tight">{title}</p>
-              <p className="text-xs text-[#6b7280] mt-2 leading-relaxed">{desc}</p>
+            <div key={title} className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-full border-2 border-[#d6b357]/60 bg-[#d6b357]/10 flex items-center justify-center shrink-0">
+                <Icon className="w-4 h-4 text-[#d6b357]" />
+              </div>
+              <div>
+                <p className="font-['Outfit'] text-sm font-bold text-white leading-tight">{title}</p>
+                <p className="text-[10px] text-white/60">{desc}</p>
+              </div>
             </div>
           ))}
         </div>
-        </Reveal>
-      </section>
+      </div>
 
-      {/* ── Who we are ── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
+      {/* ── The story — four chapters on a gold rail. ── */}
+      <section id="story" className="scroll-mt-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
         <Reveal>
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f] mb-3">
-            Who We Are
-          </p>
-          <h2 className="font-['Outfit'] text-3xl md:text-[38px] font-bold tracking-tight text-[#001f3f] leading-tight">
-            More Than a <span className="text-[#d6b357]">Real Estate</span> Platform
-          </h2>
-          <p className="text-[#5f6368] text-[15px] leading-relaxed mt-4">
-            We are a team of property experts, market analysts and technology specialists committed
-            to making real estate investment in Dubai simple, transparent and rewarding.
-          </p>
-        </div>
+          <div className="text-center max-w-2xl mx-auto mb-6">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f] mb-3">
+              The FHI Story
+            </p>
+            <h2 className="font-['Outfit'] text-3xl md:text-[38px] font-bold tracking-tight text-[#001f3f] leading-tight">
+              From a vision to a <span className="text-[#d6b357]">skyline</span>
+            </h2>
+          </div>
         </Reveal>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {VALUES.map(({ icon: Icon, title, desc }, i) => (
-            <Reveal key={title} delay={i * 90}>
-            <div
-              className="group h-full bg-white border border-[#e5e8ec] p-7 text-center hover:border-[#d6b357] transition-colors"
-            >
-              <Icon className="w-9 h-9 text-[#d6b357] mx-auto mb-4" strokeWidth={1.4} />
-              <h3 className="font-['Outfit'] text-base font-bold text-[#001f3f]">{title}</h3>
-              <p className="text-[13px] text-[#6b7280] leading-relaxed mt-2.5">{desc}</p>
-              <span className="block w-8 h-[2px] bg-[#d6b357] mx-auto mt-5" aria-hidden="true" />
-            </div>
+        <div className="relative">
+          {/* The rail — left on mobile, center on desktop. */}
+          <span
+            className="absolute left-4 lg:left-1/2 top-4 bottom-4 w-px bg-[#d6b357]/35 -translate-x-1/2"
+            aria-hidden="true"
+          />
+
+          {/* 01 · The Vision — text left, photo right. */}
+          <div className="relative pl-12 lg:pl-0 py-10 lg:py-14 lg:grid lg:grid-cols-2 lg:gap-20 items-center">
+            <RailNode />
+            <Reveal direction="left">
+              <div className="lg:pr-8">
+                <ChapterHead num="01" kicker="The Vision" title="It started with a question." />
+                <p className="mt-5 text-[15px] leading-[1.8] text-[#4b5563] max-w-lg">
+                  Why does buying property in Dubai feel complicated from abroad? FHI Global was
+                  founded to answer it — with a simple vision: to redefine how people discover,
+                  invest in, and own real estate in Dubai. No noise, no pressure. Just honest
+                  guidance and real inventory.
+                </p>
+              </div>
             </Reveal>
-          ))}
+            <Reveal direction="right">
+              <div className="mt-8 lg:mt-0">
+                <div className="relative aspect-[4/3] overflow-hidden ring-1 ring-[#e8eaed]">
+                  <Image
+                    src={PHOTOS.leaders.url}
+                    alt={PHOTOS.leaders.alt}
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                    className="object-cover"
+                  />
+                </div>
+                <p className="mt-2.5 flex items-center gap-2 text-xs font-semibold text-[#6b7280]">
+                  <span className="w-5 h-px bg-[#d6b357]" aria-hidden="true" /> {PHOTOS.leaders.caption}
+                </p>
+              </div>
+            </Reveal>
+          </div>
+
+          {/* 02 · What We Believe — values left, text right. */}
+          <div className="relative pl-12 lg:pl-0 py-10 lg:py-14 lg:grid lg:grid-cols-2 lg:gap-20 items-center">
+            <RailNode />
+            <Reveal direction="right">
+              <div className="lg:order-2 lg:pl-8">
+                <ChapterHead num="02" kicker="What We Believe" title="Values that do the work." />
+                <p className="mt-5 text-[15px] leading-[1.8] text-[#4b5563] max-w-lg">
+                  We are property experts, market analysts and technology specialists — but four
+                  principles carry every deal we touch. They are why a first conversation so often
+                  becomes a long relationship.
+                </p>
+              </div>
+            </Reveal>
+            <Reveal direction="left">
+              <div className="lg:order-1 mt-8 lg:mt-0 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {VALUES.map(({ icon: Icon, title, desc }) => (
+                  <div key={title} className="bg-white border border-[#e5e8ec] p-5 hover:border-[#d6b357] transition-colors">
+                    <Icon className="w-7 h-7 text-[#d6b357] mb-3" strokeWidth={1.4} />
+                    <p className="font-['Outfit'] text-[15px] font-bold text-[#001f3f]">{title}</p>
+                    <p className="text-[12.5px] text-[#6b7280] leading-relaxed mt-1.5">{desc}</p>
+                  </div>
+                ))}
+              </div>
+            </Reveal>
+          </div>
+
+          {/* 03 · The Partnerships — text left, photo right. */}
+          <div className="relative pl-12 lg:pl-0 py-10 lg:py-14 lg:grid lg:grid-cols-2 lg:gap-20 items-center">
+            <RailNode />
+            <Reveal direction="left">
+              <div className="lg:pr-8">
+                <ChapterHead num="03" kicker="The Partnerships" title="Straight from the source." />
+                <p className="mt-5 text-[15px] leading-[1.8] text-[#4b5563] max-w-lg">
+                  We work directly with Dubai&apos;s most accomplished developers, so the prices and
+                  payment plans you see are theirs — no mark-up, and our guidance costs you
+                  nothing. Every partner we bring you is vetted and RERA-registered.
+                </p>
+                <Link
+                  href="/developers"
+                  className="mt-5 inline-flex items-center gap-1.5 text-sm font-bold text-[#001f3f] hover:text-[#b8913f] transition-colors"
+                >
+                  Meet Our Developer Partners <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </Reveal>
+            <Reveal direction="right">
+              <div className="mt-8 lg:mt-0">
+                <div className="relative aspect-[4/3] overflow-hidden ring-1 ring-[#e8eaed]">
+                  <Image
+                    src={PHOTOS.siteVisit.url}
+                    alt={PHOTOS.siteVisit.alt}
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                    className="object-cover"
+                  />
+                </div>
+                <p className="mt-2.5 flex items-center gap-2 text-xs font-semibold text-[#6b7280]">
+                  <span className="w-5 h-px bg-[#d6b357]" aria-hidden="true" /> {PHOTOS.siteVisit.caption}
+                </p>
+              </div>
+            </Reveal>
+          </div>
+
+          {/* 04 · The Promise — mission card left, text right. */}
+          <div className="relative pl-12 lg:pl-0 py-10 lg:py-14 lg:grid lg:grid-cols-2 lg:gap-20 items-center">
+            <RailNode />
+            <Reveal direction="right">
+              <div className="lg:order-2 lg:pl-8">
+                <ChapterHead num="04" kicker="The Promise" title="Together, we build futures." />
+                <p className="mt-5 text-[15px] leading-[1.8] text-[#4b5563] max-w-lg">
+                  Every client, every developer, every home — the story ends the same way it
+                  started: with trust. Wherever you&apos;re buying from, our team in Dubai is on
+                  the ground, speaking your language, until the keys are in your hand.
+                </p>
+              </div>
+            </Reveal>
+            <Reveal direction="left">
+              <div className="lg:order-1 relative mt-10 lg:mt-0 bg-[#001f3f] p-8">
+                <span
+                  className="absolute -top-5 left-7 w-11 h-11 border-2 border-[#d6b357] bg-[#001f3f] flex items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <span className="font-['Outfit'] text-2xl font-bold text-[#d6b357] leading-none pt-1.5">&ldquo;</span>
+                </span>
+                <p className="text-white text-[15px] sm:text-base leading-relaxed pt-3">
+                  Our mission is to empower people to make confident real estate decisions by
+                  providing expert guidance, market insights, and exceptional service.
+                </p>
+                <span className="block w-10 h-[2px] bg-[#d6b357] mt-5 mb-3" aria-hidden="true" />
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#d6b357]">
+                  FHI Global Property
+                </p>
+              </div>
+            </Reveal>
+          </div>
         </div>
       </section>
 
-      {/* ── Our story ── */}
-      <section id="story" className="scroll-mt-24 bg-[#001f3f]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
-          <Reveal direction="left">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357] mb-4">
-              Our Story
-            </p>
-            <h2 className="font-['Outfit'] text-3xl md:text-[38px] font-bold tracking-tight leading-tight">
-              <span className="text-white">A Vision That</span>{" "}
-              <span className="text-white">Became a </span>
-              <span className="text-[#d6b357]">Mission</span>
-            </h2>
-            <span className="block w-16 h-[3px] bg-[#d6b357] my-6" aria-hidden="true" />
-            <div className="space-y-4 max-w-lg">
-              <p className="text-white/75 text-[15px] leading-relaxed">
-                FHI Global was founded with a simple vision — to redefine how people discover,
-                invest in, and own real estate in Dubai.
+      {/* ── Moments — real frames from the gallery, routing into it. ── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+        <Reveal>
+          <div className="flex items-end justify-between mb-5">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f] mb-2">
+                Moments
               </p>
-              <p className="text-white/60 text-[15px] leading-relaxed">
-                Through trust, expertise and strong developer partnerships, we have grown into a
-                platform serving clients from around the world — pairing on-the-ground knowledge of
-                the UAE market with a team that speaks our clients&apos; language, wherever they
-                are buying from.
-              </p>
-              <p className="text-white/60 text-[15px] leading-relaxed">
-                We work directly with the developers, so the prices and payment plans you see are
-                theirs — no mark-up, and our guidance costs you nothing.
-              </p>
+              <h2 className="font-['Outfit'] text-2xl font-bold text-[#001f3f] leading-tight">
+                The people behind the platform
+              </h2>
             </div>
+            <Link
+              href="/gallery"
+              className="hidden sm:inline-flex items-center gap-1.5 text-sm font-bold text-[#001f3f] hover:text-[#b8913f] transition-colors"
+            >
+              Visit Our Gallery <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
-          </Reveal>
-
-          <Reveal direction="right">
-          <div>
-            <div className="relative aspect-[4/3] w-full">
-              <Image
-                src="/background/home.webp"
-                alt="Dubai skyline"
-                fill
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                className="object-cover"
-              />
-            </div>
-            {/* Mission card, tucked under the photo the way the design has it. */}
-            <div className="relative -mt-12 mx-4 sm:mx-8 bg-[#07182c] border border-white/10 p-7 sm:p-8">
-              <span className="absolute -top-6 left-7 w-12 h-12 rounded-full border-2 border-[#d6b357] bg-[#001f3f] flex items-center justify-center" aria-hidden="true">
-                <span className="font-['Outfit'] text-2xl font-bold text-[#d6b357] leading-none pt-1">&ldquo;</span>
-              </span>
-              <p className="text-white text-[15px] sm:text-base leading-relaxed pt-3">
-                Our mission is to empower people to make confident real estate decisions by
-                providing expert guidance, market insights, and exceptional service.
-              </p>
-              <span className="block w-10 h-[2px] bg-[#d6b357] mt-5 mb-3" aria-hidden="true" />
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#d6b357]">
-                FHI Global Property
-              </p>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {PHOTOS.moments.map((m) => (
+              <Link key={m.url} href="/gallery" className="group relative aspect-[4/3] overflow-hidden ring-1 ring-[#e8eaed]">
+                <Image
+                  src={m.url}
+                  alt={m.alt}
+                  fill
+                  sizes="(max-width: 640px) 100vw, 33vw"
+                  className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                />
+              </Link>
+            ))}
           </div>
-          </Reveal>
-        </div>
+          <Link
+            href="/gallery"
+            className="sm:hidden mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-[#001f3f]"
+          >
+            Visit Our Gallery <ArrowRight className="w-4 h-4" />
+          </Link>
+        </Reveal>
       </section>
 
       {/* ── CTA ── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
         <Reveal>
         <div className="bg-[#001f3f] p-8 sm:p-12 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
           <div>
@@ -256,4 +427,3 @@ export default function AboutPage() {
     </div>
   )
 }
-
