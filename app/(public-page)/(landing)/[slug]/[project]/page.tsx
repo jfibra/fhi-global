@@ -190,6 +190,10 @@ export default async function ProjectDetailPage({ params }: Props) {
     project.total_units, project.number_of_buildings, project.floors,
     project.expected_roi, project.rental_yield, project.down_payment_percentage,
   ].filter(Boolean)
+  // Masthead collage — the main image plus gallery shots, four at most.
+  const mastheadImages = [project.main_image as string | null, ...images.map((i) => i.image_url)]
+    .filter((u, idx, arr): u is string => Boolean(u) && arr.indexOf(u) === idx)
+    .slice(0, 4)
   const listingSchema = realEstateListingSchema({
     name: project.name,
     description: project.meta_description || project.description || project.about_project || project.name,
@@ -224,53 +228,73 @@ export default async function ProjectDetailPage({ params }: Props) {
       <TopBar />
       <Header />
 
-      {/* ── Hero — compact masthead: eyebrow, title, fact row and a slim
-             share strip over one scrimmed photo. The old version centered a
-             full-screen hero with a 500px share panel — the actual content
-             started below the fold. */}
-      <section className="relative overflow-hidden bg-[#001f3f]">
-        {project.main_image && (
-          <Image
-            src={project.main_image}
-            alt={project.name}
-            fill
-            sizes="100vw"
-            priority
-            className="absolute inset-0 object-cover"
-          />
-        )}
-        {/* Left-weighted scrim: keeps the copy legible while the photo stays
-            visible on the right, where the building usually is. */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/85 via-[#001428]/50 to-[#001428]/15" />
-
-        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-6">
+      {/* ── Masthead — light editorial header (approved mockup): navy type
+             on white, gold caps labels with hairline dividers, the photo
+             filling the right half, and the navy stats band anchoring it.
+             On mobile the photo slots in right after the title. */}
+      <section className="relative overflow-hidden bg-white">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10 lg:pr-[46%] lg:min-h-[430px]">
           <div className="flex items-center gap-3 mb-3">
-            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
+            <span className="h-px w-10 bg-[#d6b357]" aria-hidden="true" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f]">
               {status.label}
             </span>
-            <span className="h-px w-10 bg-[#d6b357]/70" aria-hidden="true" />
             {project.is_featured && (
-              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">Featured</span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#9ca3af]">Featured</span>
             )}
           </div>
 
-          <h1
-            className="font-['Outfit'] text-3xl md:text-[40px] font-bold text-white leading-[1.08]"
-            style={{ textShadow: "0 2px 24px rgba(0,10,30,0.6)" }}
-          >
+          <h1 className="font-['Outfit'] text-3xl md:text-[42px] font-bold text-[#001f3f] leading-[1.08]">
             {project.name}
           </h1>
-          <span className="block w-12 h-1 bg-[#d6b357] mt-3" aria-hidden="true" />
 
-          {/* Fact row — Developer / Location / Type / Status / Price. Empty
-              fields drop out rather than printing a dash. */}
-          <dl className="mt-5 flex flex-wrap gap-x-10 gap-y-4">
+          {/* The photos — a collage of up to four fills the masthead's right
+              half on desktop, running all the way down past the stats band;
+              on mobile it sits between the title and the facts. */}
+          <div className="relative mt-6 aspect-[16/10] bg-[#001f3f] lg:absolute lg:inset-y-0 lg:right-0 lg:left-[56%] lg:z-10 lg:mt-0 lg:aspect-auto">
+            {mastheadImages.length === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Building2 className="w-14 h-14 text-[#d6b357]/50" />
+              </div>
+            ) : mastheadImages.length === 1 ? (
+              <Image
+                src={mastheadImages[0]}
+                alt={project.name}
+                fill
+                priority
+                sizes="(min-width: 1024px) 44vw, 100vw"
+                className="object-cover"
+              />
+            ) : (
+              <div className={`absolute inset-0 grid grid-cols-2 gap-[3px] bg-white ${mastheadImages.length > 2 ? "grid-rows-2" : ""}`}>
+                {mastheadImages.map((url, i) => (
+                  <div
+                    key={url}
+                    className={`relative overflow-hidden ${mastheadImages.length === 3 && i === 0 ? "row-span-2" : ""}`}
+                  >
+                    <Image
+                      src={url}
+                      alt={`${project.name} — photo ${i + 1}`}
+                      fill
+                      priority={i === 0}
+                      sizes="(min-width: 1024px) 22vw, 50vw"
+                      className="object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Fact columns — Developer / Location / Type / Status / Price with
+              hairline dividers. Empty fields drop out, never a dash. */}
+          <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:gap-x-0 sm:gap-y-4">
             {[
               {
                 label: "Developer",
                 node: developer
                   ? (developer.slug
-                      ? <Link href={`/${developer.slug}`} className="text-white hover:text-[#d6b357] transition-colors">{developer.name}</Link>
+                      ? <Link href={`/${developer.slug}`} className="hover:text-[#b8913f] transition-colors">{developer.name}</Link>
                       : developer.name)
                   : null,
               },
@@ -281,48 +305,37 @@ export default async function ProjectDetailPage({ params }: Props) {
             ]
               .filter((f) => f.node)
               .map((f) => (
-                <div key={f.label}>
-                  <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#d6b357] mb-1.5">
+                <div
+                  key={f.label}
+                  className="sm:max-w-[250px] sm:pr-7 sm:mr-7 sm:border-r sm:border-[#e8eaed] sm:last:mr-0 sm:last:border-0 sm:last:pr-0"
+                >
+                  <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b8913f] mb-1.5">
                     {f.label}
                   </dt>
-                  <dd className="text-[15px] font-semibold text-white" style={{ textShadow: "0 1px 8px rgba(0,10,30,0.7)" }}>
+                  <dd className="text-[15px] font-semibold text-[#001f3f] leading-snug">
                     {f.node}
                   </dd>
                 </div>
               ))}
           </dl>
 
-          {/* Share — one slim strip, not a panel. */}
-          <div className="mt-5 pt-3 border-t border-white/15 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/60">Share</p>
+          {/* Share — slim strip of boxed icons. */}
+          <div className="mt-7 flex flex-wrap items-start gap-x-5 gap-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9ca3af] pt-3">Share</p>
             <SocialShare
               title={`${project.name} | FHI Global`}
               text={`Discover ${project.name} on FHI Global.`}
-              variant="bare"
+              variant="bare-light"
             />
           </div>
         </div>
-        <div className="relative h-[3px] bg-[#d6b357]" />
-      </section>
 
-      {/* Back link — out of the hero so it doesn't crowd the title. */}
-      <div className="bg-white border-b border-[#e8eaed]">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <Link
-            href={developer?.slug ? `/${developer.slug}` : "/projects"}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            {developer?.name ? `All ${developer.name} projects` : "All Projects"}
-          </Link>
-        </div>
-      </div>
-
-      {/* ── Quick stats band — omitted entirely when a project carries no
-             stats, rather than leaving an empty navy strip under the hero. ── */}
-      {quickStats.length > 0 && (
-      <div className="bg-[#001f3f] border-b border-[#d6b357]/25">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap gap-x-10 gap-y-3">
+        {/* ── Quick stats band — inside the masthead so the photo runs all
+               the way down past it; on desktop it only shows left of the
+               photo. Omitted when a project carries no stats. ── */}
+        {quickStats.length > 0 && (
+        <div className="relative bg-[#001f3f] border-b border-[#d6b357]/25">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:pr-[46%] flex flex-wrap gap-x-10 gap-y-3">
           {[
             { icon: Calendar, label: "Completion", value: project.delivery_quarter ?? (project.expected_completion_date ? new Date(project.expected_completion_date).toLocaleDateString("en-AE", { month: "short", year: "numeric" }) : null) },
             { icon: Home, label: "Total Units", value: project.total_units?.toLocaleString() },
@@ -344,9 +357,23 @@ export default async function ProjectDetailPage({ params }: Props) {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+        )}
+      </section>
+
+      {/* Back link — under the band, out of the masthead's way. */}
+      <div className="bg-white border-b border-[#e8eaed]">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <Link
+            href={developer?.slug ? `/${developer.slug}` : "/projects"}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            {developer?.name ? `All ${developer.name} projects` : "All Projects"}
+          </Link>
         </div>
       </div>
-      )}
 
       {/* ── Main content — flat editorial layout, per the approved mockup:
              uppercase section headings with a hairline, content directly on

@@ -17,8 +17,9 @@ type SocialShareProps = {
   title: string
   text?: string
   /** "bare" drops the card, heading and URL — for callers that supply
-   *  their own panel (the project hero). Renders icon-over-label tiles. */
-  variant?: "light" | "dark" | "bare"
+   *  their own panel. Renders icon-over-label tiles for a dark surface;
+   *  "bare-light" is the same layout with boxed icons for white pages. */
+  variant?: "light" | "dark" | "bare" | "bare-light"
 }
 
 export function SocialShare({ title, text, variant = "light" }: SocialShareProps) {
@@ -56,7 +57,8 @@ export function SocialShare({ title, text, variant = "light" }: SocialShareProps
     }
   }, [shareText, title, url])
 
-  const isBare = variant === "bare"
+  const isBareLight = variant === "bare-light"
+  const isBare = variant === "bare" || isBareLight
   const isDark = variant === "dark"
   const wrapClass = isBare
     ? ""
@@ -66,12 +68,16 @@ export function SocialShare({ title, text, variant = "light" }: SocialShareProps
   const titleClass = isDark
     ? "text-xs font-bold uppercase tracking-[0.2em] text-[#d6b357]"
     : "text-xs font-bold uppercase tracking-widest text-[#6b7280]"
-  const btnBase = isBare
+  const btnBase = isBareLight
+    ? "group inline-flex w-[62px] flex-col items-center gap-1.5 py-1 text-[10.5px] font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors"
+    : isBare
     ? "group inline-flex w-[58px] flex-col items-center gap-1.5 py-1 text-[10.5px] font-semibold text-white/70 hover:text-[#d6b357] transition-colors"
     : isDark
     ? "inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/[0.06] px-4 py-2 text-xs font-semibold text-white hover:border-[#d6b357]/70 hover:bg-[#d6b357]/15 hover:text-[#f0d890] transition-colors"
     : "inline-flex items-center gap-2 rounded-xl border border-[#e8eaed] bg-white px-3 py-2 text-xs font-semibold text-[#0d1117] hover:bg-[#fafafa] transition-colors"
-  const iconClass = isBare
+  const iconClass = isBareLight
+    ? "w-9 h-9 p-[9px] border border-[#e5e8ec] bg-white text-[#b8913f] group-hover:border-[#001f3f]/40 transition-colors"
+    : isBare
     ? "w-[18px] h-[18px] text-[#d6b357]"
     : isDark ? "w-3.5 h-3.5 text-[#d6b357]" : "w-3.5 h-3.5 text-[#001f3f]"
 
