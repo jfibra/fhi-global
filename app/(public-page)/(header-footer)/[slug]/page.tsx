@@ -568,9 +568,9 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
     .map((p) => ({ ...p, main_image: p.main_image?.trim() || galleryFallback.get(p.id) || null }))
     .filter((p) => p.main_image)
 
-  // Hero backdrop + facts, all from the projects already loaded — no extra
-  // query, and the photo is guaranteed to be one of the results below.
-  const heroPhoto = visible[0]?.main_image ? { url: visible[0].main_image } : null
+  // Masthead collage + facts, all from the projects already loaded — no extra
+  // query, and every photo is one of the results below.
+  const collagePhotos = visible.slice(0, 4).map((p) => p.main_image as string)
   const developerCount = new Set(
     visible.map((p) => (p.developers as { name?: string } | null)?.name).filter(Boolean),
   ).size
@@ -604,74 +604,113 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
           ),
         ]}
       />
-      {/* Masthead — the copy sits over a real project from the very list below,
-          rather than a flat navy block or stock imagery. Left-weighted scrim so
-          the text stays legible while the building shows through on the right. */}
-      <section className="relative bg-[#001f3f] overflow-hidden">
-        {heroPhoto && (
-          <>
-            <Image
-              src={heroPhoto.url}
-              alt=""
-              fill
-              sizes="100vw"
-              priority
-              // Slow cinematic drift, so the masthead isn't a still slab.
-              className="absolute inset-0 object-cover animate-kenburns"
-              aria-hidden="true"
-            />
-            {/* Scrim only where the type sits — heavy enough on the left to
-                keep the headline legible, clear on the right so the building
-                reads as a photo rather than a flat blue panel. */}
-            <div className="absolute inset-0 bg-gradient-to-r from-[#001428]/88 via-[#001428]/45 to-transparent" />
-          </>
-        )}
-
-        {/* Deliberately short: the visitor came to see projects, so the header
-            states what this page is and gets out of the way. The explanatory
-            copy — which is what actually ranks — sits under the grid. */}
-        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-9">
-          <p
-            className="animate-hero-item text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]"
-            style={{ animationDelay: "60ms" }}
-          >
-            FHI Global · Popular Searches
-          </p>
-          <h1
-            className="animate-hero-item font-['Outfit'] text-4xl md:text-[46px] font-bold text-white mt-2.5 leading-[1.1] tracking-tight"
-            style={{ textShadow: "0 2px 22px rgba(0,10,30,0.55)", animationDelay: "150ms" }}
-          >
+      {/* Masthead — light editorial header, the same design language as the
+          project pages: navy type on white, gold caps labels with hairline
+          dividers, and a collage of up to four projects from the very grid
+          below filling the right half. Deliberately short: the visitor came
+          to see projects; the copy that ranks sits under the grid. */}
+      <section className="relative overflow-hidden bg-white border-b border-[#e8eaed]">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10 lg:pr-[46%] lg:min-h-[360px]">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="h-px w-10 bg-[#d6b357]" aria-hidden="true" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f]">
+              FHI Global · Popular Searches
+            </span>
+          </div>
+          <h1 className="font-['Outfit'] text-3xl md:text-[42px] font-bold text-[#001f3f] leading-[1.08]">
             {seo.h1}
           </h1>
-          <span
-            className="animate-hero-item block w-14 h-[3px] bg-[#d6b357] mt-5"
-            style={{ animationDelay: "240ms" }}
-            aria-hidden="true"
-          />
+          <p className="mt-4 text-[15px] leading-relaxed text-[#6b7280] max-w-xl">
+            {seo.description}
+          </p>
 
-          {/* Facts strip — the count plus what the filter actually means, so the
-              header carries information instead of one lonely pill. */}
-          <dl className="animate-hero-item mt-7 flex flex-wrap gap-x-12 gap-y-5" style={{ animationDelay: "330ms" }}>
+          {/* Collage — real projects from the grid below; on mobile it sits
+              between the title and the facts. */}
+          <div className="relative mt-6 aspect-[16/10] bg-[#001f3f] lg:absolute lg:inset-y-0 lg:right-0 lg:left-[56%] lg:z-10 lg:mt-0 lg:aspect-auto">
+            {collagePhotos.length === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Building2 className="w-14 h-14 text-[#d6b357]/50" />
+              </div>
+            ) : collagePhotos.length === 1 ? (
+              <Image
+                src={collagePhotos[0]}
+                alt={seo.h1}
+                fill
+                priority
+                sizes="(min-width: 1024px) 44vw, 100vw"
+                className="object-cover"
+              />
+            ) : (
+              <div className={`absolute inset-0 grid grid-cols-2 gap-[3px] bg-white ${collagePhotos.length > 2 ? "grid-rows-2" : ""}`}>
+                {collagePhotos.map((url, i) => (
+                  <div
+                    key={url}
+                    className={`relative overflow-hidden ${collagePhotos.length === 3 && i === 0 ? "row-span-2" : ""}`}
+                  >
+                    <Image
+                      src={url}
+                      alt={`${seo.h1} — photo ${i + 1}`}
+                      fill
+                      priority={i === 0}
+                      sizes="(min-width: 1024px) 22vw, 50vw"
+                      className="object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Facts — the count plus what the filter actually means, in the
+              same gold-label columns as the project masthead. */}
+          <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:gap-x-0 sm:gap-y-4">
             {[
-              { label: "Projects available", value: String(visible.length) },
+              { label: "Projects Available", value: String(visible.length) },
               { label: "Developers", value: String(developerCount) },
-              ...(priceFrom ? [{ label: "Starting from", value: priceFrom }] : []),
+              ...(priceFrom ? [{ label: "Starting From", value: priceFrom }] : []),
             ].map((f) => (
-              <div key={f.label}>
-                <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#d6b357] mb-1.5">
+              <div
+                key={f.label}
+                className="sm:pr-8 sm:mr-8 sm:border-r sm:border-[#e8eaed] sm:last:mr-0 sm:last:border-0 sm:last:pr-0"
+              >
+                <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b8913f] mb-1.5">
                   {f.label}
                 </dt>
-                <dd
-                  className="font-['Outfit'] text-2xl font-bold text-white leading-none"
-                  style={{ textShadow: "0 1px 10px rgba(0,10,30,0.5)" }}
-                >
+                <dd className="font-['Outfit'] text-2xl font-bold text-[#001f3f] leading-none">
                   {f.value}
                 </dd>
               </div>
             ))}
           </dl>
+
+          {/* CTAs + trust line — the column carries weight and routes the
+              visitor instead of trailing off into white space. */}
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link
+              href="/contact"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00152b] transition-colors"
+            >
+              Talk to a Consultant <ArrowLeft className="w-4 h-4 rotate-180" />
+            </Link>
+            <Link
+              href="/developers"
+              className="inline-flex items-center gap-2 px-6 py-3 border border-[#d6b357] text-[#8a6d2a] text-sm font-bold hover:bg-[#d6b357]/10 transition-colors"
+            >
+              Browse Developers
+            </Link>
+          </div>
+          <p className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] font-semibold text-[#6b7280]">
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#b8913f]" /> RERA-registered developers
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#b8913f]" /> Direct developer prices
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#b8913f]" /> Guidance from launch to handover
+            </span>
+          </p>
         </div>
-        <div className="relative h-[3px] bg-[#d6b357]" />
       </section>
 
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
