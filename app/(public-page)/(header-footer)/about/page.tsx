@@ -220,7 +220,7 @@ export default function AboutPage() {
             <Reveal direction="left">
               <div className="lg:pr-8">
                 <ChapterHead num="01" kicker="The Vision" title="It started with a question." />
-                <p className="mt-5 text-[15px] leading-[1.8] text-[#4b5563] max-w-lg">
+                <p className="mt-5 text-[19px] leading-[1.85] text-[#4b5563] max-w-lg">
                   Why does buying property in Dubai feel complicated from abroad? FHI Global was
                   founded to answer it — with a simple vision: to redefine how people discover,
                   invest in, and own real estate in Dubai. No noise, no pressure. Just honest
@@ -252,7 +252,7 @@ export default function AboutPage() {
             <Reveal direction="right">
               <div className="lg:order-2 lg:pl-8">
                 <ChapterHead num="02" kicker="What We Believe" title="Values that do the work." />
-                <p className="mt-5 text-[15px] leading-[1.8] text-[#4b5563] max-w-lg">
+                <p className="mt-5 text-[19px] leading-[1.85] text-[#4b5563] max-w-lg">
                   We are property experts, market analysts and technology specialists — but four
                   principles carry every deal we touch. They are why a first conversation so often
                   becomes a long relationship.
@@ -278,7 +278,7 @@ export default function AboutPage() {
             <Reveal direction="left">
               <div className="lg:pr-8">
                 <ChapterHead num="03" kicker="The Partnerships" title="Straight from the source." />
-                <p className="mt-5 text-[15px] leading-[1.8] text-[#4b5563] max-w-lg">
+                <p className="mt-5 text-[19px] leading-[1.85] text-[#4b5563] max-w-lg">
                   We work directly with Dubai&apos;s most accomplished developers, so the prices and
                   payment plans you see are theirs — no mark-up, and our guidance costs you
                   nothing. Every partner we bring you is vetted and RERA-registered.
@@ -315,7 +315,7 @@ export default function AboutPage() {
             <Reveal direction="right">
               <div className="lg:order-2 lg:pl-8">
                 <ChapterHead num="04" kicker="The Promise" title="Together, we build futures." />
-                <p className="mt-5 text-[15px] leading-[1.8] text-[#4b5563] max-w-lg">
+                <p className="mt-5 text-[19px] leading-[1.85] text-[#4b5563] max-w-lg">
                   Every client, every developer, every home — the story ends the same way it
                   started: with trust. Wherever you&apos;re buying from, our team in Dubai is on
                   the ground, speaking your language, until the keys are in your hand.
