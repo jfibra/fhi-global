@@ -232,7 +232,7 @@ export default async function PublicAgentListingPage({ params }: Props) {
         {/* Floating back chip over the photos */}
         <Link
           href={backHref}
-          className="absolute top-4 left-4 z-10 inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-sm font-bold text-[#0f2940] shadow-md hover:bg-white transition-colors"
+          className="absolute top-4 left-4 z-10 inline-flex items-center gap-2 bg-white/95 px-4 py-2 text-sm font-bold text-[#0f2940] shadow-md hover:bg-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to {row.listing_kind === "rent" ? "rent" : "buy"}
@@ -280,20 +280,24 @@ export default async function PublicAgentListingPage({ params }: Props) {
         </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-6 items-start">
-          {/* ── Main details ── */}
-          <div className="bg-white rounded-2xl border border-[#e8eaed] shadow-sm p-6 sm:p-8 min-w-0">
-            <div className="flex flex-wrap items-start justify-between gap-4 mb-3">
+          {/* ── Main details — the project-page masthead language: gold dash
+                 eyebrow, navy title, gold caps fact columns with hairline
+                 dividers. Square and flat, like every surface on the site. ── */}
+          <div className="bg-white border border-[#e5e8ec] p-6 sm:p-8 min-w-0">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-widest text-[#d6b357] mb-2">
-                  {row.listing_kind === "rent" ? "For rent" : "For sale"} · Agent listing
-                </p>
-                <p className="font-['Outfit'] text-3xl sm:text-4xl font-bold text-[#0f2940] leading-tight">
-                  {formatPriceLine(
-                    ownOk,
-                    proj?.launch_price_from ?? null,
-                    proj?.launch_price_to ?? null,
-                    row.currency?.trim() || proj?.currency || "AED",
-                  )}
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="h-px w-10 bg-[#d6b357]" aria-hidden="true" />
+                  <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f]">
+                    {row.listing_kind === "rent" ? "For Rent" : "For Sale"} · Agent Listing
+                  </span>
+                </div>
+                <h1 className="font-['Outfit'] text-2xl sm:text-[32px] font-bold text-[#001f3f] leading-[1.15]">
+                  {row.title}
+                </h1>
+                <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-[#4b5563]">
+                  <MapPin className="w-4 h-4 text-[#d6b357]" />
+                  {loc}
                 </p>
               </div>
               {proj?.developers?.logo_url && (
@@ -307,50 +311,61 @@ export default async function PublicAgentListingPage({ params }: Props) {
               )}
             </div>
 
-            <h1 className="text-lg sm:text-xl font-semibold text-[#374151] leading-snug mb-1.5">{row.title}</h1>
-            <p className="inline-flex items-center gap-1.5 text-sm text-[#4b5563] mb-6">
-              <MapPin className="w-4 h-4 text-[#d6b357]" />
-              {loc}
-            </p>
-
-            {/* Specs strip — divided columns like the reference */}
-            <div className="flex flex-wrap divide-x divide-[#e8eaed] rounded-xl border border-[#e8eaed] overflow-hidden mb-7">
-              <div className="flex-1 min-w-[110px] px-4 py-3 text-center">
-                <p className="font-['Outfit'] text-lg font-bold text-[#0f2940] leading-tight">{typeLabel}</p>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6b7280] mt-0.5">Type</p>
-              </div>
-              {u?.bedrooms != null && (
-                <div className="flex-1 min-w-[110px] px-4 py-3 text-center">
-                  <p className="font-['Outfit'] text-lg font-bold text-[#0f2940] leading-tight">{u.bedrooms}</p>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6b7280] mt-0.5">
-                    Bed{u.bedrooms === 1 ? "" : "s"}
-                  </p>
+            {/* Fact columns — price leads; empty fields drop out. */}
+            <dl className="mt-6 mb-8 grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:gap-x-0 sm:gap-y-4">
+              {[
+                {
+                  label: "Price",
+                  value: formatPriceLine(
+                    ownOk,
+                    proj?.launch_price_from ?? null,
+                    proj?.launch_price_to ?? null,
+                    row.currency?.trim() || proj?.currency || "AED",
+                  ),
+                },
+                { label: "Type", value: typeLabel },
+                ...(u?.bedrooms != null
+                  ? [{ label: `Bed${u.bedrooms === 1 ? "" : "s"}`, value: String(u.bedrooms) }]
+                  : []),
+                ...(u?.bathrooms != null
+                  ? [{ label: `Bath${u.bathrooms === 1 ? "" : "s"}`, value: String(u.bathrooms) }]
+                  : []),
+                ...(u?.size_sqft != null || u?.size_sqm != null
+                  ? [
+                      {
+                        label: u?.size_sqft != null ? "Sq Ft" : "Sqm",
+                        value:
+                          u?.size_sqft != null
+                            ? Number(u.size_sqft).toLocaleString()
+                            : Number(u?.size_sqm).toLocaleString(),
+                      },
+                    ]
+                  : []),
+              ].map((f) => (
+                <div
+                  key={f.label}
+                  className="sm:pr-7 sm:mr-7 sm:border-r sm:border-[#e8eaed] sm:last:mr-0 sm:last:border-0 sm:last:pr-0"
+                >
+                  <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b8913f] mb-1.5">
+                    {f.label}
+                  </dt>
+                  <dd className="font-['Outfit'] text-xl font-bold text-[#001f3f] leading-tight">
+                    {f.value}
+                  </dd>
                 </div>
-              )}
-              {u?.bathrooms != null && (
-                <div className="flex-1 min-w-[110px] px-4 py-3 text-center">
-                  <p className="font-['Outfit'] text-lg font-bold text-[#0f2940] leading-tight">{u.bathrooms}</p>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6b7280] mt-0.5">
-                    Bath{u.bathrooms === 1 ? "" : "s"}
-                  </p>
-                </div>
-              )}
-              {(u?.size_sqft != null || u?.size_sqm != null) && (
-                <div className="flex-1 min-w-[110px] px-4 py-3 text-center">
-                  <p className="font-['Outfit'] text-lg font-bold text-[#0f2940] leading-tight">
-                    {u?.size_sqft != null
-                      ? Number(u.size_sqft).toLocaleString()
-                      : Number(u?.size_sqm).toLocaleString()}
-                  </p>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6b7280] mt-0.5">
-                    {u?.size_sqft != null ? "Sq Ft" : "Sqm"}
-                  </p>
-                </div>
-              )}
-            </div>
+              ))}
+            </dl>
 
             {row.description?.trim() && (
-              <p className="text-[#374151] leading-relaxed whitespace-pre-wrap mb-7">{row.description.trim()}</p>
+              <div className="mb-7">
+                <h2 className="font-['Outfit'] text-[17px] font-bold uppercase tracking-[0.1em] text-[#0d1117]">
+                  Overview
+                </h2>
+                <div className="h-px bg-[#e5e8ec] mt-2.5 mb-4" />
+                <p className="text-[15.5px] text-[#374151] leading-[1.8] whitespace-pre-wrap">
+                  {row.description.trim()}
+                </p>
+              </div>
             )}
 
             {proj?.slug && (
@@ -366,11 +381,11 @@ export default async function PublicAgentListingPage({ params }: Props) {
           </div>
 
           {/* ── Contact card (sticky, like the reference's agent panel) ── */}
-          <aside className="lg:sticky lg:top-24 bg-white rounded-2xl border border-[#e8eaed] shadow-[0_16px_44px_-16px_rgba(0,20,40,0.18)] overflow-hidden">
+          <aside className="lg:sticky lg:top-24 bg-white border border-[#e5e8ec] overflow-hidden">
             {/* Header: the listing's own agent when we have one, otherwise the
                 house team — a deactivated agent or one with no phone on file
                 must not leave the enquiry pointing nowhere. */}
-            <div className="bg-gradient-to-r from-[#001f3f] to-[#002a52] px-5 py-4 flex items-center gap-3">
+            <div className="bg-[#001f3f] border-b-2 border-[#d6b357] px-5 py-4 flex items-center gap-3">
               {agentName ? (
                 <>
                   {agent?.profile_url ? (
@@ -404,28 +419,28 @@ export default async function PublicAgentListingPage({ params }: Props) {
               )}
             </div>
             <div className="p-5 space-y-2.5">
-              <p className="rounded-xl bg-[#f8faff] border border-[#e0e7ff] px-4 py-3 text-sm text-[#4b5563] leading-relaxed">
+              <p className="bg-[#f8fafc] border border-[#e5e8ec] px-4 py-3 text-sm text-[#4b5563] leading-relaxed">
                 Hi, I&apos;m interested in <span className="font-semibold text-[#0f2940]">{row.title}</span>.
               </p>
               <a
                 href={`https://wa.me/${contactWa}?text=${encodeURIComponent(`Hi, I'm interested in ${row.title}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl bg-[#25d366] text-white text-sm font-bold hover:bg-[#1fb457] transition-colors"
+                className="flex items-center justify-center gap-2 w-full px-5 py-3 bg-[#25d366] text-white text-sm font-bold hover:bg-[#1fb457] transition-colors"
               >
                 <WhatsAppGlyph className="w-[18px] h-[18px]" />
                 WhatsApp
               </a>
               <a
                 href={`tel:${contactTel}`}
-                className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl bg-gradient-to-r from-[#d6b357] to-[#c9a449] text-[#001f3f] text-sm font-bold hover:from-[#c9a449] hover:to-[#b8913f] transition-colors"
+                className="flex items-center justify-center gap-2 w-full px-5 py-3 bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
               >
                 <Phone className="w-4 h-4" />
                 Call
               </a>
               <a
                 href={`mailto:${contactEmail}?subject=Inquiry:%20${encodeURIComponent(row.title)}`}
-                className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl border border-[#d1d5db] text-[#0f2940] text-sm font-bold hover:border-[#001f3f] transition-colors"
+                className="flex items-center justify-center gap-2 w-full px-5 py-3 border border-[#e5e8ec] text-[#0f2940] text-sm font-bold hover:border-[#001f3f] transition-colors"
               >
                 <Mail className="w-4 h-4" />
                 Email
