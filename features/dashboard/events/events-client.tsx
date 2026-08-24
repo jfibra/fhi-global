@@ -374,6 +374,17 @@ export function EventsClient() {
     const w = window.open("", "_blank", "width=900,height=700")
     if (!w) return
     const generated = new Date().toLocaleDateString("en-AE", { year: "numeric", month: "long", day: "numeric" })
+    // Compact stamp for the sheet — day + time only, so the column stays
+    // narrow enough to leave room for the signature line.
+    const shortRegistered = (iso: string) => {
+      const d = new Date(iso)
+      if (Number.isNaN(d.getTime())) return "—"
+      return (
+        d.toLocaleDateString("en-AE", { month: "short", day: "numeric", timeZone: "Asia/Dubai" }) +
+        " · " +
+        d.toLocaleTimeString("en-AE", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Dubai" })
+      )
+    }
     const body = filteredRegs
       .map(
         (r, i) => `<tr>
@@ -381,7 +392,8 @@ export function EventsClient() {
           <td><strong>${esc(r.fullName)}</strong></td>
           <td>${esc(r.email)}</td>
           <td>${esc(r.whatsapp ?? "—")}</td>
-          <td>${esc(registeredLabel(r.createdAt))}</td>
+          <td class="reg">${esc(shortRegistered(r.createdAt))}</td>
+          <td class="sig"><span class="line"></span></td>
         </tr>`,
       )
       .join("")
@@ -399,6 +411,9 @@ export function EventsClient() {
   td { padding: 9px 12px; border-bottom: 1px solid #eef0f3; }
   tr:nth-child(even) td { background: #fafbfc; }
   .n { color: #9ca3af; width: 34px; }
+  .reg { white-space: nowrap; color: #4b5563; }
+  .sig { width: 150px; }
+  .sig .line { display: block; height: 22px; border-bottom: 1.5px solid #9aa3ae; }
   .foot { margin-top: 22px; text-align: center; font-size: 11px; color: #9ca3af; }
   .foot b { color: #b8913f; }
   @page { margin: 14mm; }
@@ -412,7 +427,7 @@ export function EventsClient() {
     ${regQuery.trim() ? `<span>Filter: <strong>“${esc(regQuery.trim())}”</strong></span>` : ""}
   </div>
   <table>
-    <thead><tr><th>#</th><th>Name</th><th>Email</th><th>WhatsApp</th><th>Registered</th></tr></thead>
+    <thead><tr><th>#</th><th>Name</th><th>Email</th><th>WhatsApp</th><th>Registered</th><th>Signature</th></tr></thead>
     <tbody>${body}</tbody>
   </table>
   <p class="foot">Generated from the FHI Global dashboard · <b>fhiglobal.ae</b></p>
