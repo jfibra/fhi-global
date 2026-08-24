@@ -12,6 +12,7 @@ import {
   type ListingSearchParams,
 } from "@/lib/buy/listings-page-logic"
 import { BuyFiltersLoader } from "./buy-filters-loader"
+import { ListingsMasthead } from "@/components/buy/listings-masthead"
 import { BuyListToolbar } from "@/components/buy/buy-list-toolbar"
 import { BuyPropertyCard } from "@/components/buy/buy-property-card"
 import {
@@ -106,14 +107,18 @@ function BuyListingsSkeleton() {
   )
 }
 
-async function BuyMapListingSubtitle({ sp }: { sp: Sp }) {
+async function BuyMastheadCount({ sp }: { sp: Sp }) {
   const [{ rows: agentRows, error: agentErr }, { rows: projectRows, error: projErr }] = await Promise.all([
     loadBuyListings(),
     loadListingPageProjects("buy"),
   ])
   const { totalLabel } = deriveListings(sp, agentRows, agentErr, projectRows, projErr)
   if ((agentErr && projErr) || !totalLabel) return null
-  return <p className="mt-1 text-sm text-[#64748b] sm:text-base">{totalLabel}</p>
+  return (
+    <p className="text-sm text-white/85 pb-1.5" style={{ textShadow: "0 1px 8px rgba(0,10,30,0.6)" }}>
+      {totalLabel}
+    </p>
+  )
 }
 
 async function BuyMapSplitList({ sp }: { sp: Sp }) {
@@ -224,42 +229,20 @@ export default async function BuyPage({ searchParams }: { searchParams: ListingS
   const sp = await searchParams
   const view = sp.view === "map" ? "map" : "list"
 
-  const breadcrumbs = (
-    <nav className="flex flex-wrap items-center gap-1 text-sm text-[#6b7280] mb-4">
-      <span className="text-[#0f2940] font-medium">For Sale:</span>
-      <Link href="/" className="text-[#0f2940] hover:text-[#d6b357] transition-colors">
-        Home
-      </Link>
-      <ChevronRight className="w-4 h-4 shrink-0 text-[#9ca3af]" />
-      <span className="text-[#d6b357] font-semibold">Buy</span>
-    </nav>
-  )
-
-  const titleRow = (
-    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-5 md:gap-x-6 lg:flex-nowrap min-w-0 mb-6 lg:mb-7">
-      <h1 className="font-['Outfit'] text-2xl sm:text-3xl md:text-[2.05rem] font-bold text-[#0f2940] tracking-tight leading-tight shrink-0 min-w-0">
-        Properties for sale in the UAE
-      </h1>
+  // The h1 lives in the masthead now — this slim row just orients (trail)
+  // and controls (view/sort toolbar).
+  const toolbarRow = (
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <nav className="flex flex-wrap items-center gap-1 text-sm text-[#6b7280]">
+        <span className="text-[#0f2940] font-medium">For Sale:</span>
+        <Link href="/" className="text-[#0f2940] hover:text-[#d6b357] transition-colors">
+          Home
+        </Link>
+        <ChevronRight className="w-4 h-4 shrink-0 text-[#9ca3af]" />
+        <span className="text-[#d6b357] font-semibold">Buy</span>
+      </nav>
       <Suspense fallback={<ToolbarFallback />}>
         <BuyListToolbar listingBasePath="/buy" className="mb-0 w-full sm:w-auto shrink-0 min-w-0" />
-      </Suspense>
-    </div>
-  )
-
-  const mapViewTitleRow = (
-    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div className="min-w-0">
-        <h1 className="font-['Outfit'] text-2xl font-bold leading-tight tracking-tight text-[#0f2940] sm:text-3xl">
-          Properties for sale in the UAE
-        </h1>
-        <Suspense
-          fallback={<span className="mt-2 inline-block h-5 w-56 animate-pulse bg-[#e2e8f0]" aria-hidden />}
-        >
-          <BuyMapListingSubtitle sp={sp} />
-        </Suspense>
-      </div>
-      <Suspense fallback={<ToolbarFallback />}>
-        <BuyListToolbar listingBasePath="/buy" className="mb-0 shrink-0" />
       </Suspense>
     </div>
   )
@@ -271,6 +254,13 @@ export default async function BuyPage({ searchParams }: { searchParams: ListingS
       {/* Breadcrumb only — the result list varies with searchParams inside
           Suspense, so an ItemList here would misrepresent the page. */}
       <JsonLd schema={breadcrumbList([{ name: "Home", path: "/" }, { name: "Buy" }])} />
+
+      <ListingsMasthead eyebrow="FHI Global · For Sale" accent="Sale">
+        <Suspense fallback={<span className="mb-1.5 inline-block h-5 w-44 animate-pulse bg-white/15" aria-hidden />}>
+          <BuyMastheadCount sp={sp} />
+        </Suspense>
+      </ListingsMasthead>
+
       <Suspense fallback={<FiltersFallback />}>
         <BuyFiltersLoader />
       </Suspense>
@@ -279,8 +269,7 @@ export default async function BuyPage({ searchParams }: { searchParams: ListingS
         <div className="mx-auto max-w-[1920px] px-4 py-8 pb-16 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,50%)_minmax(0,1fr)] lg:items-start lg:gap-8">
             <div className="scrollbar-none min-w-0 max-w-full lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto">
-              {breadcrumbs}
-              {mapViewTitleRow}
+              {toolbarRow}
               <Suspense fallback={<BuyMapPropertyListSkeleton />}>
                 <BuyMapSplitList sp={sp} />
               </Suspense>
@@ -296,8 +285,7 @@ export default async function BuyPage({ searchParams }: { searchParams: ListingS
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
           <div className="flex flex-col lg:flex-row lg:items-start lg:gap-x-10 gap-8">
             <div className="min-w-0 flex-1 w-full">
-              {breadcrumbs}
-              {titleRow}
+              {toolbarRow}
 
               <div className="space-y-5 min-w-0">
                 <Suspense fallback={<BuyListingsSkeleton />}>
