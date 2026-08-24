@@ -48,25 +48,90 @@ export default async function GalleryPage() {
   }
 
   const rows = (albums ?? []) as AlbumRow[]
+  const totalPhotos = Array.from(counts.values()).reduce((a, b) => a + b, 0)
+  const latestEvent = dateLabel(rows[0]?.event_date ?? null)
+  const collage = rows.map((a) => a.cover_url).filter((u): u is string => Boolean(u)).slice(0, 4)
 
   return (
     <div className="min-h-screen bg-[#fafafa]">
-      {/* ── Hero ── */}
-      <section className="relative bg-[#f7f5f1] border-b border-[#ebe7e0] overflow-hidden">
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-          <p className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#b8913f] mb-4">
-            <Camera className="w-4 h-4" />
-            FHI Global · Moments
-          </p>
-          <h1 className="font-['Outfit'] text-4xl md:text-6xl font-bold uppercase leading-[0.95] tracking-tight">
-            <span className="block text-[#001f3f]">Photo</span>
-            <span className="block text-[#d6b357]">Gallery</span>
+      {/* ── Masthead — the site's light editorial header: navy type on white,
+             gold caps labels with hairline dividers, and a collage of album
+             covers filling the right half. ── */}
+      <section className="relative overflow-hidden bg-white border-b border-[#e8eaed]">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10 lg:pr-[46%] lg:min-h-[340px]">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="h-px w-10 bg-[#d6b357]" aria-hidden="true" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f]">
+              FHI Global · Moments
+            </span>
+          </div>
+          <h1 className="font-['Outfit'] text-3xl md:text-[42px] font-bold leading-[1.08] tracking-tight">
+            <span className="text-[#001f3f]">Photo </span>
+            <span className="text-[#b8913f]">Gallery</span>
           </h1>
-          <span className="block w-16 h-[3px] bg-[#d6b357] my-5" aria-hidden="true" />
-          <p className="text-[#5f6368] text-[15px] leading-relaxed max-w-md">
+          <p className="mt-4 text-[15px] leading-relaxed text-[#6b7280] max-w-xl">
             Showcases, developer visits and awarding ceremonies — the moments behind FHI Global,
             album by album.
           </p>
+
+          {/* Covers collage — right half on desktop, after the copy on mobile. */}
+          <div className="relative mt-6 aspect-[16/10] bg-[#001f3f] lg:absolute lg:inset-y-0 lg:right-0 lg:left-[56%] lg:z-10 lg:mt-0 lg:aspect-auto">
+            {collage.length === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Images className="w-14 h-14 text-[#d6b357]/50" />
+              </div>
+            ) : collage.length === 1 ? (
+              <Image
+                src={collage[0]}
+                alt="FHI Global event photos"
+                fill
+                priority
+                unoptimized
+                sizes="(min-width: 1024px) 44vw, 100vw"
+                className="object-cover"
+              />
+            ) : (
+              <div className={`absolute inset-0 grid grid-cols-2 gap-[3px] bg-white ${collage.length > 2 ? "grid-rows-2" : ""}`}>
+                {collage.map((url, i) => (
+                  <div
+                    key={url}
+                    className={`relative overflow-hidden ${collage.length === 3 && i === 0 ? "row-span-2" : ""}`}
+                  >
+                    <Image
+                      src={url}
+                      alt={`FHI Global event photos ${i + 1}`}
+                      fill
+                      priority={i === 0}
+                      unoptimized
+                      sizes="(min-width: 1024px) 22vw, 50vw"
+                      className="object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Facts — album and photo counts in the gold-label columns. */}
+          <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:gap-x-0 sm:gap-y-4">
+            {[
+              { label: "Albums", value: String(rows.length) },
+              { label: "Photos", value: totalPhotos.toLocaleString() },
+              ...(latestEvent ? [{ label: "Latest Event", value: latestEvent }] : []),
+            ].map((f) => (
+              <div
+                key={f.label}
+                className="sm:pr-8 sm:mr-8 sm:border-r sm:border-[#e8eaed] sm:last:mr-0 sm:last:border-0 sm:last:pr-0"
+              >
+                <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b8913f] mb-1.5">
+                  {f.label}
+                </dt>
+                <dd className="font-['Outfit'] text-2xl font-bold text-[#001f3f] leading-none">
+                  {f.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </section>
 
@@ -83,7 +148,7 @@ export default async function GalleryPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
             {rows.map((album) => {
               const count = counts.get(album.id) ?? 0
               const date = dateLabel(album.event_date)
