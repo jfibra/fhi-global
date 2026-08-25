@@ -40,6 +40,9 @@ export type SeoPageFilter = {
    *  floor, so placeholder rows can't fill a "budget" page. */
   priceMin?: number
   priceMax?: number
+  /** Handover year ("2027") — matches the delivery_quarter text or the
+   *  expected_completion_date year. */
+  handoverYear?: string
 }
 
 export type SeoPage = {
@@ -1014,6 +1017,45 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
   },
 ]
 
+// ─── Handover-year searches ──────────────────────────────────────────────────
+// Investors shop by delivery date ("projects handover 2027 dubai"). Backed by
+// delivery_quarter / expected_completion_date; counts checked before shipping.
+
+const HANDOVER_INTRO: Record<string, [string, string]> = {
+  "2026": [
+    "Handover in 2026 means the finish line is in sight: construction is in its final stretches, most of the payment plan is already behind the original buyers, and what's left on the market skews toward assignments and the developer's last units. These are the Dubai projects scheduled to hand over in 2026.",
+    "Buying this close to completion trades the longest payment plans for near-term certainty — you can see what you're getting, and rent starts flowing within months rather than years.",
+  ],
+  "2027": [
+    "2027 is the current sweet spot of Dubai's off-plan market: far enough out for a genuine construction-linked payment plan, close enough that the wait is measured in a couple of years. This page tracks every project on our books delivering in 2027.",
+    "Mid-build projects also carry the clearest signal — you can see how construction is actually progressing before you commit, not just the render.",
+  ],
+  "2028": [
+    "Projects handing over in 2028 are today's launches and early-construction communities — which is exactly where launch pricing and the friendliest payment plans live. These are the 2028 deliveries we cover in Dubai.",
+    "The longer runway suits investors paying from cash flow: instalments spread across three years, with the balance often payable at or after handover.",
+  ],
+  "2029": [
+    "A 2029 handover is the earliest entry Dubai currently offers: brand-new launches at first-release pricing, with the longest payment plans in the market. These are the projects scheduled to deliver in 2029.",
+    "Early entry earns the widest unit choice — the best stacks, views and floor plates go in the first releases — in exchange for patience and faith in the developer's track record. We help with the second part.",
+  ],
+}
+
+const HANDOVER_PAGES: SeoPage[] = (["2026", "2027", "2028", "2029"] as const).map((year, i, years) => ({
+  slug: `dubai-projects-handover-${year}`,
+  label: `Handover ${year}`,
+  title: `Dubai Projects Handing Over in ${year} — Off-Plan by Delivery Date`,
+  h1: `Dubai Projects Handing Over in ${year}`,
+  description: `Off-plan projects in Dubai with handover scheduled for ${year} — developer prices, payment plans and construction status, updated from live inventory.`,
+  intro: [...HANDOVER_INTRO[year]],
+  kind: "projects" as const,
+  filter: { cityLike: "dubai", handoverYear: year },
+  related: [
+    ...years.filter((y) => y !== year).slice(0, 2).map((y) => `dubai-projects-handover-${y}`),
+    "off-plan-projects-in-dubai",
+    "how-to-buy-off-plan-property-in-dubai",
+  ],
+}))
+
 // ─── Buyer guides ────────────────────────────────────────────────────────────
 // Informational pages answering the questions every Dubai buyer searches
 // before committing. Static content on the guide template; each carries
@@ -1240,7 +1282,13 @@ const INFO_GUIDES: SeoPage[] = [
   },
 ]
 
-export const SEO_PAGES: SeoPage[] = [...PROJECT_PAGES, ...TYPE_AND_AREA_PAGES, ...INFO_GUIDES, ...AREA_GUIDES]
+export const SEO_PAGES: SeoPage[] = [
+  ...PROJECT_PAGES,
+  ...TYPE_AND_AREA_PAGES,
+  ...HANDOVER_PAGES,
+  ...INFO_GUIDES,
+  ...AREA_GUIDES,
+]
 
 /** The footer's grouped rails — the flagship six only; the long tail is
  *  reached through related-links and the sitemap. */

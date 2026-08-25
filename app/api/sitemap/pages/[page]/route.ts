@@ -17,6 +17,7 @@ const STATIC_PATHS = [
   "/gallery",
   "/about",
   "/contact",
+  "/dubai-mortgage-calculator",
   // Popular-searches landing pages (lib/seo-pages.ts) — derived from the
   // catalog so a new entry is in the sitemap the moment it ships.
   ...SEO_PAGES.map((p) => `/${p.slug}`),

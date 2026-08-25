@@ -570,6 +570,12 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
     // The realistic floor keeps placeholder AED 1 rows off "budget" pages.
     query = query.gte("launch_price_from", MIN_REALISTIC_PRICE_AED).lte("launch_price_from", filter.priceMax)
   }
+  if (filter.handoverYear) {
+    const y = filter.handoverYear
+    query = query.or(
+      `delivery_quarter.ilike.%${y}%,and(expected_completion_date.gte.${y}-01-01,expected_completion_date.lte.${y}-12-31)`,
+    )
+  }
 
   type SeoGridRow = {
     id: number

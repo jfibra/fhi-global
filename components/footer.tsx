@@ -15,6 +15,7 @@ const COMPANY_LINKS = [
   { label: "Developers", href: "/developers" },
   { label: "News", href: "/news" },
   { label: "Projects", href: "/projects" },
+  { label: "Mortgage Calculator", href: "/dubai-mortgage-calculator" },
 ]
 
 const ACCOUNT_LINKS = [
