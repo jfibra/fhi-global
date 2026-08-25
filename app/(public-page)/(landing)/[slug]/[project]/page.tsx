@@ -4,6 +4,8 @@ import { notFound, permanentRedirect } from "next/navigation"
 import Link from "next/link"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata, truncateDescription } from "@/lib/seo"
+import { relatedSeoPagesForProject } from "@/lib/seo-pages"
+import { ProjectCard, type ProjectCardData } from "@/components/project-card"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
 import { breadcrumbList, realEstateListingSchema } from "@/lib/structured-data"
 import { JsonLd } from "@/components/json-ld"
@@ -194,6 +196,33 @@ export default async function ProjectDetailPage({ params }: Props) {
   const mastheadImages = [project.main_image as string | null, ...images.map((i) => i.image_url)]
     .filter((u, idx, arr): u is string => Boolean(u) && arr.indexOf(u) === idx)
     .slice(0, 4)
+  // Internal-linking block: more projects from this developer + the SEO
+  // landing pages this project belongs on. ~240 project pages funnel their
+  // link equity into the money pages this way.
+  const { data: moreRows } = await supabase
+    .from("projects")
+    .select(
+      "id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)",
+    )
+    .eq("developer_id", developer.id)
+    .eq("is_active", true)
+    .eq("is_published", true)
+    .is("deleted_at", null)
+    .neq("id", project.id as number)
+    .not("main_image", "is", null)
+    .neq("main_image", "")
+    .order("created_at", { ascending: false })
+    .limit(4)
+  const moreProjects = moreRows ?? []
+  const seoLinks = relatedSeoPagesForProject({
+    city: project.city,
+    location: project.location,
+    community: project.community,
+    propertyType: propertyTypes[0] ?? null,
+    priceFrom: project.launch_price_from != null ? Number(project.launch_price_from) : null,
+    status: project.status,
+  })
+
   const listingSchema = realEstateListingSchema({
     name: project.name,
     description: project.meta_description || project.description || project.about_project || project.name,
@@ -711,6 +740,62 @@ export default async function ProjectDetailPage({ params }: Props) {
           </SidePanel>
         </div>
       </div>
+
+      {/* ── More from the developer + popular searches — engagement for the
+             visitor, internal links for the crawler. ── */}
+      {(moreProjects.length > 0 || seoLinks.length > 0) && (
+        <section className="bg-white border-t border-[#e8eaed]">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-10">
+            {moreProjects.length > 0 && (
+              <div>
+                <div className="flex items-end justify-between gap-4 mb-5">
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-2">
+                      <span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true" />
+                      <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0d1117]">
+                        Keep Exploring
+                      </span>
+                    </div>
+                    <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] leading-tight">
+                      More from <span className="text-[#b8913f]">{developer.name}</span>
+                    </h2>
+                  </div>
+                  <Link
+                    href={`/${developer.slug}`}
+                    className="hidden sm:inline-flex items-center gap-1.5 text-sm font-bold text-[#001f3f] hover:text-[#b8913f] transition-colors shrink-0"
+                  >
+                    View All <ArrowLeft className="w-4 h-4 rotate-180" />
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {moreProjects.map((p) => (
+                    <ProjectCard key={p.id} project={p as unknown as ProjectCardData} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {seoLinks.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af] mb-4">
+                  Popular searches
+                </p>
+                <div className="flex flex-wrap gap-2.5">
+                  {seoLinks.map((s) => (
+                    <Link
+                      key={s.slug}
+                      href={`/${s.slug}`}
+                      className="px-4 py-2 border border-[#e5e5e5] bg-[#f8fafc] text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] hover:bg-[#d6b357]/10 transition-colors"
+                    >
+                      {s.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       <Footer />
     </div>

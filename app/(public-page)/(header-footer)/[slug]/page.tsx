@@ -8,6 +8,7 @@ import { ProjectCard, type ProjectCardData } from "@/components/project-card"
 import { Reveal } from "@/components/public/reveal"
 import { SOCIAL_URLS } from "@/lib/social"
 import { getSeoPage, NON_UAE_CITIES, SEO_PAGES, type SeoPage } from "@/lib/seo-pages"
+import { ContactForm } from "../contact/contact-form"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
 import { breadcrumbList, developerOrganizationSchema, faqPageSchema, itemListSchema } from "@/lib/structured-data"
 import { JsonLd } from "@/components/json-ld"
@@ -780,6 +781,30 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
             </Link>
           </div>
         )}
+
+        {/* Enquiry — the lead form on the page itself, so the path from a
+            Google search to a consultant is one scroll, not a navigation. */}
+        <Reveal>
+          <section className="bg-white border border-[#e8eaed] grid grid-cols-1 lg:grid-cols-5">
+            <div className="lg:col-span-2 bg-[#001f3f] p-6 sm:p-8">
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
+                Enquire Now
+              </p>
+              <h2 className="mt-2 font-['Outfit'] text-2xl font-bold text-white leading-tight">
+                Tell us what you&apos;re looking for
+              </h2>
+              <span className="block w-12 h-[3px] bg-[#d6b357] mt-4 mb-5" aria-hidden="true" />
+              <p className="text-white/75 text-[14.5px] leading-relaxed">
+                Share your budget and goals, and a consultant will come back the same business day
+                with a shortlist matched to this search — developer pricing, no mark-up, and our
+                guidance costs you nothing.
+              </p>
+            </div>
+            <div className="lg:col-span-3 p-6 sm:p-8">
+              <ContactForm />
+            </div>
+          </section>
+        </Reveal>
 
         {/* The page's explanatory copy. It sits below the results rather than
             above them: buyers want the projects first, but this prose is what

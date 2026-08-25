@@ -268,6 +268,20 @@ const AREA_GUIDES: SeoPage[] = [
         body: "Studios and one-beds dominate the market and let fast, which is why the Marina is a fixture in rental-yield conversations. Larger layouts in the older towers price well below newer districts per square foot. When you compare units, weigh the service charge and the tower's chiller arrangement — they move the net yield more than the headline rent does.",
       },
     ],
+    faqs: [
+      {
+        q: "Is Dubai Marina freehold for foreigners?",
+        a: "Yes — Dubai Marina is one of Dubai's designated freehold zones, so foreign buyers own outright with a title deed, no residency required.",
+      },
+      {
+        q: "Is Dubai Marina a good investment?",
+        a: "It has the deepest tenant pool in the city — professionals, crews and remote workers renew demand every season — so furnished units enjoy pricing power and short vacancy. You trade some yield for the waterfront premium.",
+      },
+      {
+        q: "Can I still buy off-plan in Dubai Marina?",
+        a: "Rarely — the Marina is essentially built out, so most purchases are resale in established towers. That means no construction risk and immediate rent, but check building age and service charges closely.",
+      },
+    ],
     related: ["jumeirah-beach-residence", "palm-jumeirah", "business-bay"],
   },
   {
@@ -300,6 +314,20 @@ const AREA_GUIDES: SeoPage[] = [
       {
         heading: "Buying and renting here",
         body: "Price per square foot varies enormously with the view line — a Burj-and-fountain stack can carry a premium of a third over the same layout facing inward. Short-term letting performs strongly here, but check the building's policy before underwriting on it; several towers restrict holiday homes.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Is Downtown Dubai freehold?",
+        a: "Yes — Downtown is a designated freehold zone; foreign buyers hold full title. It is also one of the market's most liquid districts to resell in.",
+      },
+      {
+        q: "Why is Downtown Dubai so expensive?",
+        a: "The address itself: Burj Khalifa, the fountain and Dubai Mall anchor global demand, supply is essentially fixed, and Emaar's management keeps the district's standard high. Buyers pay for value retention as much as lifestyle.",
+      },
+      {
+        q: "Is Downtown better for living or investment?",
+        a: "Both, with a tilt to capital preservation — yields run below the city average, but the address defends its value in soft markets better than almost anywhere in Dubai.",
       },
     ],
     related: ["business-bay", "difc", "dubai-creek-harbour"],
@@ -336,6 +364,20 @@ const AREA_GUIDES: SeoPage[] = [
         body: "One-beds are the district's currency and turnover is fast in both directions, which keeps the market honest on price. Off-plan launches still happen on the remaining plots, so the ready-versus-launch comparison is live here in a way it no longer is in Downtown — often the deciding factor is simply the payment plan.",
       },
     ],
+    faqs: [
+      {
+        q: "Is Business Bay freehold for foreigners?",
+        a: "Yes — Business Bay is a designated freehold zone with full foreign ownership and a Dubai Land Department title deed.",
+      },
+      {
+        q: "Is Business Bay cheaper than Downtown?",
+        a: "Meaningfully — the Bay delivers a next-door address at a friendlier ticket, which is why investors cross-shop the two. Yields in the Bay typically run higher; Downtown holds the prestige premium.",
+      },
+      {
+        q: "Why are there so many branded residences in Business Bay?",
+        a: "The district became Dubai's laboratory for hotel-flagged living — brands pair hotel amenities with private ownership here, and the launch calendar rarely pauses. It adds a premium but also a strong rental story.",
+      },
+    ],
     related: ["downtown-dubai", "difc", "off-plan-projects-in-dubai"],
   },
   {
@@ -368,6 +410,20 @@ const AREA_GUIDES: SeoPage[] = [
       {
         heading: "Buying and renting here",
         body: "Villas on the fronds are among the very few genuinely scarce assets in Dubai — they trade rarely and command it. Trunk apartments offer the same postcode at a fraction of the ticket, and the short-let market for them is deep. On the crescent, branded residences carry hotel service and hotel service charges; read the fine print on both.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Can foreigners buy on Palm Jumeirah?",
+        a: "Yes — the Palm is freehold, and it is one of the districts where international buyers dominate. Villas on the fronds and apartments on the trunk both carry full title.",
+      },
+      {
+        q: "Is Palm Jumeirah a good investment?",
+        a: "It behaves like a trophy market: entry prices are among Dubai's highest, supply is fixed by geography, and short-let performance on the beachfront is exceptional. Buyers here optimise for prestige and capital strength over headline yield.",
+      },
+      {
+        q: "Apartments or villas on the Palm — what's the difference?",
+        a: "Trunk and crescent apartments offer resort living with hotel amenities at a lower entry; frond villas offer private beaches and the Palm's scarcest asset — land. The two trade almost as separate markets.",
       },
     ],
     related: ["dubai-marina", "jumeirah-beach-residence", "new-projects-in-dubai"],
@@ -404,7 +460,21 @@ const AREA_GUIDES: SeoPage[] = [
         body: "This is the strongest gross-yield district in mainstream Dubai, and off-plan payment plans here are among the longest developers offer anywhere. The discipline is developer selection: in a district with this many mid-tier builders, the completed quality gap between the best and the rest is wide. We're candid about which is which.",
       },
     ],
-    related: ["dubailand", "al-furjan", "off-plan-projects-in-dubai"],
+    faqs: [
+      {
+        q: "Is JVC freehold?",
+        a: "Yes — Jumeirah Village Circle is a designated freehold zone, and it is consistently one of Dubai's most-bought districts by international investors.",
+      },
+      {
+        q: "Why is JVC so popular with investors?",
+        a: "The arithmetic: a central location between the city's main roads, entry prices well below the coastal districts, and some of the strongest gross rental yields in Dubai. More new projects launch here than anywhere else.",
+      },
+      {
+        q: "What should I check before buying in JVC?",
+        a: "The developer, above all — with this much simultaneous construction, delivery track record and service-charge levels separate the towers that hold value from the ones that don't.",
+      },
+    ],
+    related: ["projects-in-jumeirah-village-circle", "dubailand", "al-furjan", "off-plan-projects-in-dubai"],
   },
   {
     slug: "dubai-creek-harbour",
@@ -436,6 +506,20 @@ const AREA_GUIDES: SeoPage[] = [
       {
         heading: "Buying and renting here",
         body: "Launches here carry Downtown DNA at a meaningful discount, on payment plans that regularly stretch past handover. Resale of earlier phases gives a clean read on the trajectory. The comparison worth doing before committing is Creek Harbour off-plan versus Downtown ready — same developer, different decades, and the answer depends on your horizon.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Is Dubai Creek Harbour freehold?",
+        a: "Yes — Creek Harbour is freehold, master-planned and largely developed by Emaar, with full foreign ownership throughout.",
+      },
+      {
+        q: "Is Dubai Creek Harbour finished?",
+        a: "It is a district still being delivered in phases — which is exactly its appeal to off-plan buyers: today's prices in a waterfront masterplan designed as a second Downtown, with new launches arriving regularly.",
+      },
+      {
+        q: "Who is Creek Harbour best suited for?",
+        a: "Buyers with a medium-to-long horizon: you are buying the masterplan's trajectory. Early residents get a quiet waterfront district; investors get Emaar delivery confidence and a growing rental base.",
       },
     ],
     related: ["downtown-dubai", "new-projects-in-dubai", "off-plan-projects-in-dubai"],
@@ -472,6 +556,20 @@ const AREA_GUIDES: SeoPage[] = [
         body: "Villa demand consistently outruns supply here, and golf-course-line addresses carry the district's premium. Apartments near the mall let quickly to families waiting for villas. Most stock is now ready or resale; the occasional new phase from Emaar prices confidently, because the district has earned it.",
       },
     ],
+    faqs: [
+      {
+        q: "Is Dubai Hills Estate freehold?",
+        a: "Yes — Dubai Hills Estate is freehold, part of the Mohammed bin Rashid City belt, with full foreign ownership across its villas, townhouses and apartments.",
+      },
+      {
+        q: "Is Dubai Hills good for families?",
+        a: "It is arguably the city's flagship family district: the golf course and central park, schools inside the community, Dubai Hills Mall, and a location that reaches both Downtown and Marina in about twenty minutes.",
+      },
+      {
+        q: "Is Dubai Hills Estate a good investment?",
+        a: "Emaar's delivery record and the district's end-user demand make it one of Dubai's most resilient markets — villas and townhouses especially have shown strong value retention and steady family rental demand.",
+      },
+    ],
     related: ["arabian-ranches", "jumeirah-village-circle", "new-projects-in-dubai"],
   },
   {
@@ -504,6 +602,20 @@ const AREA_GUIDES: SeoPage[] = [
       {
         heading: "Buying and renting here",
         body: "JBR is one of Dubai's strongest short-let micro-markets — beach frontage does that — and the large layouts also hold a steady long-let family audience. Because the towers date from the 2000s, unit condition varies widely; a renovated unit against an original one is effectively a different product at a different price.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Is JBR freehold for foreign buyers?",
+        a: "Yes — Jumeirah Beach Residence is freehold; foreigners own outright, and the district's beachfront apartments are perennial favourites with international buyers.",
+      },
+      {
+        q: "Is JBR good for short-term rentals?",
+        a: "Among the best in Dubai — The Walk, the beach and year-round tourism keep holiday-let occupancy strong, and many owners run furnished units on short-let licences.",
+      },
+      {
+        q: "What's the difference between JBR and Dubai Marina?",
+        a: "They are neighbours that share a lifestyle: JBR is the beachfront row itself — sea views, sand at the doorstep — while the Marina wraps the yacht harbour behind it with more tower choice and price points.",
       },
     ],
     related: ["dubai-marina", "palm-jumeirah", "ready-properties-in-dubai"],
@@ -540,6 +652,20 @@ const AREA_GUIDES: SeoPage[] = [
         body: "Original Ranches villas trade on plot and position, and the best streets rarely list openly — much of the market moves by word of mouth. As a rental, the community draws multi-year family tenancies with minimal vacancy. It is a hold asset, not a flip: the return here has always been stability.",
       },
     ],
+    faqs: [
+      {
+        q: "Is Arabian Ranches freehold?",
+        a: "Yes — Arabian Ranches is freehold, and as one of Dubai's first villa communities it has two decades of resale history behind it.",
+      },
+      {
+        q: "Is Arabian Ranches good for families?",
+        a: "It set the template: gated villa streets, parks, pools, schools and a golf club, with a settled community feel newer districts are still growing into.",
+      },
+      {
+        q: "Villas only, or are there apartments?",
+        a: "The Ranches is a villa-and-townhouse community by design — buyers who want the same belt with apartment price points usually look at the newer districts around it.",
+      },
+    ],
     related: ["dubai-hills-estate", "dubailand", "ready-properties-in-dubai"],
   },
   {
@@ -572,6 +698,20 @@ const AREA_GUIDES: SeoPage[] = [
       {
         heading: "Buying and renting here",
         body: "Metro proximity is the dividing line in both rent and resale; check the walking distance, not the map distance. The newer apartment launches target investors on entry price, while the townhouse market is dominated by end-users upgrading out of apartments. Both markets are liquid without being frantic.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Is Al Furjan freehold?",
+        a: "Yes — Al Furjan is a designated freehold zone with full foreign ownership across its villas, townhouses and apartment buildings.",
+      },
+      {
+        q: "Why do buyers choose Al Furjan?",
+        a: "The metro is the headline: Route 2020 gave the district its own stations, which few villa-and-townhouse communities can claim — commuting value at family-community prices.",
+      },
+      {
+        q: "Is Al Furjan better for living or investment?",
+        a: "It works both ways — end-users get space and connectivity; investors get steady tenant demand from families priced out of the coastal districts, with yields typical of Dubai's value belt.",
       },
     ],
     related: ["jumeirah-village-circle", "dubailand", "off-plan-projects-in-dubai"],
@@ -608,6 +748,20 @@ const AREA_GUIDES: SeoPage[] = [
         body: "Tenant demand is effectively institutional — relocating bankers and lawyers on employer budgets — which keeps voids short and covenants strong. Purchase stock turns over slowly; when the well-known towers list, they move fast. Central Park's newer units set the district's current ceiling.",
       },
     ],
+    faqs: [
+      {
+        q: "Can foreigners buy property in DIFC?",
+        a: "Yes — DIFC apartments are owned outright by foreign buyers; the district additionally operates its own DIFC legal framework, which many international investors consider a feature.",
+      },
+      {
+        q: "Who rents in DIFC?",
+        a: "The finance world next door: professionals from the banks, funds and law firms inside the Centre — a tenant base that is stable, well-paid and walking distance from the towers they rent in.",
+      },
+      {
+        q: "Is DIFC apartment supply large?",
+        a: "No — residential stock inside the Centre is deliberately limited, which supports both rents and resale values. New launches around Gate Avenue are infrequent and sell quickly.",
+      },
+    ],
     related: ["downtown-dubai", "business-bay", "ready-properties-in-dubai"],
   },
   {
@@ -642,7 +796,21 @@ const AREA_GUIDES: SeoPage[] = [
         body: "The launch calendar never stops here, so comparing three active payment plans is normal shopping. Rental demand tracks handovers — early residents of a new community enjoy strong tenant interest from families following the schools in. The variable to respect is delivery track record; in this belt it varies more than anywhere in the city.",
       },
     ],
-    related: ["jumeirah-village-circle", "arabian-ranches", "off-plan-projects-in-uae"],
+    faqs: [
+      {
+        q: "Is Dubailand freehold?",
+        a: "Yes — Dubailand's communities are freehold, and the belt hosts some of the most affordable full-ownership family homes in Dubai.",
+      },
+      {
+        q: "Is Dubailand a good place to invest?",
+        a: "It offers the widest price-to-space ratio in the city and the strongest launch calendar, which keeps pricing honest. The variable to respect is developer delivery record — it varies more here than anywhere else.",
+      },
+      {
+        q: "How far is Dubailand from the city?",
+        a: "Budget real commutes: the communities sit along Sheikh Mohammed bin Zayed and Emirates Roads, roughly 20–35 minutes from the coastal districts by car. In exchange you get space the coast stopped offering a decade ago.",
+      },
+    ],
+    related: ["projects-in-dubailand", "jumeirah-village-circle", "arabian-ranches", "off-plan-projects-in-uae"],
   },
 ]
 
@@ -1081,4 +1249,67 @@ export const SEO_AREA_GUIDES = AREA_GUIDES
 
 export function getSeoPage(slug: string): SeoPage | undefined {
   return SEO_PAGES.find((p) => p.slug === slug)
+}
+
+/**
+ * Contextual SEO links for one project — powers the "Popular searches" block
+ * on project detail pages, which funnels the link equity of ~240 project
+ * pages into the landing pages. Lives here so it can never drift from the
+ * catalog above.
+ */
+export function relatedSeoPagesForProject(p: {
+  city?: string | null
+  location?: string | null
+  community?: string | null
+  propertyType?: string | null
+  priceFrom?: number | null
+  status?: string | null
+}): SeoPage[] {
+  const out: SeoPage[] = []
+  const add = (slug: string) => {
+    const page = getSeoPage(slug)
+    if (page && !out.some((x) => x.slug === page.slug)) out.push(page)
+  }
+  const hay = `${p.location ?? ""} ${p.community ?? ""}`.toLowerCase()
+  const city = (p.city ?? "").toLowerCase()
+  const type = (p.propertyType ?? "").toLowerCase()
+  const price = p.priceFrom ?? null
+
+  // Area — the live-inventory page first, then the area guide.
+  const AREA_MATCHES: Array<[needle: string, slugs: string[]]> = [
+    ["jumeirah village circle", ["projects-in-jumeirah-village-circle", "jumeirah-village-circle"]],
+    ["jumeirah village triangle", ["projects-in-jumeirah-village-triangle"]],
+    ["business bay", ["projects-in-business-bay", "business-bay"]],
+    ["dubailand", ["projects-in-dubailand", "dubailand"]],
+    ["marina", ["dubai-marina"]],
+    ["downtown", ["downtown-dubai"]],
+    ["palm jumeirah", ["palm-jumeirah"]],
+    ["creek", ["dubai-creek-harbour"]],
+    ["hills estate", ["dubai-hills-estate"]],
+    ["jumeirah beach residence", ["jumeirah-beach-residence"]],
+    ["arabian ranches", ["arabian-ranches"]],
+    ["furjan", ["al-furjan"]],
+    ["difc", ["difc"]],
+  ]
+  for (const [needle, slugs] of AREA_MATCHES) {
+    if (hay.includes(needle)) slugs.forEach(add)
+  }
+
+  // Property type.
+  if (type.includes("apartment")) add("apartments-for-sale-in-dubai")
+  else if (type.includes("villa")) add("villas-for-sale-in-dubai")
+  else if (type.includes("townhouse")) add("townhouses-for-sale-in-dubai")
+  else if (type.includes("penthouse")) add("penthouses-for-sale-in-dubai")
+
+  // Price band (same realistic floor as the budget page itself).
+  if (price != null && price >= 50_000 && price <= 1_000_000) add("properties-under-1m-in-dubai")
+  if (price != null && price >= 2_000_000) add("golden-visa-properties-in-dubai")
+
+  // Status and city.
+  if (city.includes("abu dhabi")) add("new-projects-in-abu-dhabi")
+  else if (p.status === "completed") add("ready-properties-in-dubai")
+  else add("off-plan-projects-in-dubai")
+  if (city.includes("dubai")) add("new-projects-in-dubai")
+
+  return out.slice(0, 6)
 }
