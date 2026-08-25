@@ -241,6 +241,20 @@ export function realEstateAgentOfficeSchema(office: Office): Record<string, unkn
   }
 }
 
+/** FAQ rich results — the questions must be visibly rendered on the page
+ *  with the same wording, or Google treats the markup as spam. */
+export function faqPageSchema(faqs: { q: string; a: string }[]): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  }
+}
+
 /** The agent directory (/agents) — Person nodes carry no url because agents
  *  have no public profile URLs on the main site. */
 export function personListSchema(people: { name: string; image?: string | null }[]): Record<string, unknown> {

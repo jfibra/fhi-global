@@ -9,7 +9,7 @@ import { Reveal } from "@/components/public/reveal"
 import { SOCIAL_URLS } from "@/lib/social"
 import { getSeoPage, NON_UAE_CITIES, SEO_PAGES, type SeoPage } from "@/lib/seo-pages"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
-import { breadcrumbList, developerOrganizationSchema, itemListSchema } from "@/lib/structured-data"
+import { breadcrumbList, developerOrganizationSchema, faqPageSchema, itemListSchema } from "@/lib/structured-data"
 import { JsonLd } from "@/components/json-ld"
 import { Building2, Facebook, Mail, MapPin, CheckCircle2, ArrowLeft } from "lucide-react"
 
@@ -533,9 +533,19 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
   const filter = seo.filter ?? {}
   const supabase = createPublicSupabaseClient()
 
+  // Property-type pages need an inner join so only projects carrying the
+  // type survive; every other page keeps the plain select.
+  const baseSelect =
+    "id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)"
+  // Widened to string on purpose: supabase-js's type-level parser can't read
+  // the conditional embed, and these rows are consumed loosely below anyway.
+  const select: string = filter.propertyTypeLike
+    ? `${baseSelect}, project_property_types!inner(property_types!inner(name))`
+    : baseSelect
+
   let query = supabase
     .from("projects")
-    .select("id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)")
+    .select(select)
     .eq("is_active", true)
     .eq("is_published", true)
     .order("created_at", { ascending: false })
@@ -548,8 +558,34 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
     for (const c of NON_UAE_CITIES) query = query.not("city", "ilike", `%${c}%`)
   }
   if (filter.statuses?.length) query = query.in("status", filter.statuses)
+  if (filter.propertyTypeLike) {
+    query = query.ilike("project_property_types.property_types.name", `%${filter.propertyTypeLike}%`)
+  }
+  if (filter.locationLike) {
+    query = query.or(`location.ilike.%${filter.locationLike}%,community.ilike.%${filter.locationLike}%`)
+  }
+  if (filter.priceMin != null) query = query.gte("launch_price_from", filter.priceMin)
+  if (filter.priceMax != null) {
+    // The realistic floor keeps placeholder AED 1 rows off "budget" pages.
+    query = query.gte("launch_price_from", MIN_REALISTIC_PRICE_AED).lte("launch_price_from", filter.priceMax)
+  }
 
-  const { data: projects } = await query
+  type SeoGridRow = {
+    id: number
+    name: string
+    slug: string | null
+    main_image: string | null
+    location: string | null
+    city: string | null
+    launch_price_from: number | string | null
+    launch_price_to: number | string | null
+    currency: string | null
+    status: string
+    is_featured: boolean | null
+    developers: { name: string | null; logo_url: string | null; slug: string | null } | null
+  }
+  const { data: projectsRaw } = await query
+  const projects = (projectsRaw ?? []) as unknown as SeoGridRow[]
 
   const missingIds = (projects ?? []).filter((p) => !p.main_image?.trim()).map((p) => p.id)
   const galleryFallback = new Map<number, string>()
@@ -591,7 +627,8 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
 
   return (
     <div className="bg-[#f7f8fa]">
-      {/* Trail + exactly the projects rendered in the grid below. */}
+      {/* Trail + exactly the projects rendered in the grid below (+ the FAQ
+          rich-result markup when the page carries a visible FAQ block). */}
       <JsonLd
         schema={[
           breadcrumbList([{ name: "Home", path: "/" }, { name: seo.h1 }]),
@@ -602,6 +639,7 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
             }),
             seo.h1,
           ),
+          ...(seo.faqs?.length ? [faqPageSchema(seo.faqs)] : []),
         ]}
       />
       {/* Masthead — light editorial header, the same design language as the
@@ -762,6 +800,24 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
           </Reveal>
         )}
 
+        {/* FAQ — visible copy first, FAQPage markup mirrors it exactly. */}
+        {seo.faqs && seo.faqs.length > 0 && (
+          <Reveal>
+          <section className="bg-white border border-[#e8eaed] p-6 sm:p-8">
+            <h2 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">Frequently Asked Questions</h2>
+            <span className="block w-10 h-[2px] bg-[#d6b357] mt-2.5 mb-5" aria-hidden="true" />
+            <div className="divide-y divide-[#eef0f3]">
+              {seo.faqs.map((f) => (
+                <div key={f.q} className="py-4 first:pt-0 last:pb-0">
+                  <h3 className="text-[15px] font-bold text-[#0d1117]">{f.q}</h3>
+                  <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#4b5563] max-w-3xl">{f.a}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+          </Reveal>
+        )}
+
         {/* Related searches — the interlinking is half the SEO value. */}
         {related.length > 0 && (
           <div className="bg-white border border-[#e8eaed] p-6">
@@ -841,7 +897,12 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
 
   return (
     <div className="bg-white">
-      <JsonLd schema={breadcrumbList([{ name: "Home", path: "/" }, { name: seo.h1 }])} />
+      <JsonLd
+        schema={[
+          breadcrumbList([{ name: "Home", path: "/" }, { name: seo.h1 }]),
+          ...(seo.faqs?.length ? [faqPageSchema(seo.faqs)] : []),
+        ]}
+      />
       {/* Editorial intro — headline and copy on the left, our project photo on
           the right, like the area pages on the major portals. */}
       <section className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-4">
@@ -892,7 +953,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
       {seo.facts && seo.facts.length > 0 && (
         <section className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <h2 className="font-['Outfit'] text-2xl md:text-3xl font-bold text-[#001f3f] text-center">
-            Why invest in {seo.label}
+            {seo.factsHeading ?? `Why invest in ${seo.label}`}
           </h2>
           <span className="block w-14 h-1 bg-[#d6b357] mt-3 mb-8 mx-auto" aria-hidden="true" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto">
@@ -924,6 +985,24 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
           ))}
         </div>
       </section>
+
+      {/* FAQ — visible copy first, FAQPage markup mirrors it exactly. */}
+      {seo.faqs && seo.faqs.length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <h2 className="font-['Outfit'] text-2xl md:text-3xl font-bold text-[#001f3f] text-center">
+            Frequently asked questions
+          </h2>
+          <span className="block w-14 h-1 bg-[#d6b357] mt-3 mb-8 mx-auto" aria-hidden="true" />
+          <div className="max-w-3xl mx-auto border border-[#e8eaed] bg-white divide-y divide-[#eef0f3]">
+            {seo.faqs.map((f) => (
+              <div key={f.q} className="p-6">
+                <h3 className="text-base font-bold text-[#0d1117]">{f.q}</h3>
+                <p className="mt-2 text-[15px] leading-relaxed text-[#4b5563]">{f.a}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
         {/* Route into live inventory */}
