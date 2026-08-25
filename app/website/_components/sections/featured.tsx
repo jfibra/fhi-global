@@ -13,7 +13,7 @@ export function FeaturedSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) 
   if (!hasProjects && !hasProperties) return null
 
   return (
-    <section className="relative overflow-hidden">
+    <section id="featured" className="relative scroll-mt-[72px] overflow-hidden">
       {/* Background photo + white wash */}
       <div className="absolute inset-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}

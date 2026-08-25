@@ -14,7 +14,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   SAMPLE_DATA,
-  type EditableStat, type GalleryCategory, type Project, type Property,
+  type EditableStat, type GalleryCategory, type Project, type ProjectStatus, type Property,
   type StatIconKey, type WebsiteData,
 } from "@/app/website/_data"
 
@@ -31,7 +31,44 @@ function compactPrice(value: number | null, currency: string): string {
 }
 
 const PROJECT_CARD_SELECT =
-  "id, name, location, community, city, launch_price_from, currency, main_image, developers ( name, logo_url ), project_units ( bedrooms ), project_property_types ( property_types ( name ) ), project_images ( url, is_main, rank )"
+  "id, name, slug, status, location, community, city, launch_price_from, currency, main_image, developers ( name, slug, logo_url, is_verified ), project_units ( bedrooms, size_sqft ), project_property_types ( property_types ( name ) ), project_images ( url, is_main, rank )"
+
+const PROJECT_STATUSES: readonly ProjectStatus[] = ["pre_launch", "launch", "under_construction", "completed"]
+
+const isProjectStatus = (v: unknown): v is ProjectStatus =>
+  typeof v === "string" && (PROJECT_STATUSES as readonly string[]).includes(v)
+
+/** The raw status shown as-is, just readable: "under_construction" →
+ *  "Under Construction" (no relabelling). */
+const statusLabel = (status: string) =>
+  status.split("_").filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+
+/** "Apartment" → "Apartments"; names already plural are left alone. */
+const pluralize = (name: string) => (/s$/i.test(name) ? name : `${name}s`)
+
+/** ["Apartments", "Townhouses"] → "Apartments & Townhouses";
+ *  three or more → "Apartments, Villas & Townhouses". */
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? ""
+  return `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}`
+}
+
+/** Bedroom counts → "Studio – 3 BR" / "3 BR" / "Studio" (0 = studio). */
+function bedRangeLabel(beds: number[]): string {
+  if (!beds.length) return ""
+  const fmt = (n: number) => (n === 0 ? "Studio" : `${n}`)
+  const min = Math.min(...beds), max = Math.max(...beds)
+  if (min === max) return min === 0 ? "Studio" : `${min} BR`
+  return `${fmt(min)} – ${max} BR`
+}
+
+/** Unit sizes → "390 – 1,650" (SQ.FT. is appended by the card). */
+function sizeRangeLabel(sizes: number[]): string {
+  if (!sizes.length) return ""
+  const min = Math.min(...sizes), max = Math.max(...sizes)
+  const fmt = (n: number) => Math.round(n).toLocaleString("en-US")
+  return min === max ? fmt(min) : `${fmt(min)} – ${fmt(max)}`
+}
 
 /** Published projects mapped to the template's ProjectCard shape. When `ids`
  *  is given, only those projects are returned, in the ids' order. */
@@ -56,39 +93,54 @@ export async function fetchProjectCards(
 
   const cards: Project[] = (data ?? []).map((row) => {
     const developer = (Array.isArray(row.developers) ? row.developers[0] : row.developers) as
-      | { name: string | null; logo_url: string | null }
+      | { name: string | null; slug: string | null; logo_url: string | null; is_verified: boolean | null }
       | null
+    // Same URL scheme as the main site's project cards (components/project-card.tsx).
+    const slug = (row.slug as string | null) ?? ""
+    const href = slug ? (developer?.slug ? `/${developer.slug}/${slug}` : `/projects/${slug}`) : undefined
 
     const images = ((row.project_images ?? []) as { url: string; is_main: boolean | null; rank: number | null }[])
       .slice()
       .sort((a, b) => Number(b.is_main ?? false) - Number(a.is_main ?? false) || (a.rank ?? 0) - (b.rank ?? 0))
     const image = (row.main_image as string | null) ?? images[0]?.url ?? ""
 
-    const beds = ((row.project_units ?? []) as { bedrooms: number | null }[])
-      .map((u) => u.bedrooms)
-      .filter((b): b is number => b != null)
-    const bedRange = beds.length
+    const unitRows = (row.project_units ?? []) as { bedrooms: number | null; size_sqft: number | string | null }[]
+    const beds = unitRows.map((u) => u.bedrooms).filter((b): b is number => b != null)
+    const sizes = unitRows
+      .map((u) => (u.size_sqft == null ? NaN : Number(u.size_sqft)))
+      .filter((n) => Number.isFinite(n) && n > 0)
+    const legacyBedRange = beds.length
       ? Math.min(...beds) === Math.max(...beds)
         ? `${Math.min(...beds)} Bed`
         : `${Math.min(...beds)} - ${Math.max(...beds)} Bed`
       : ""
-    const typeName = (((row.project_property_types ?? []) as { property_types: { name: string | null } | { name: string | null }[] | null }[])
-      .map((t) => (Array.isArray(t.property_types) ? t.property_types[0]?.name : t.property_types?.name))
-      .find(Boolean) ?? "") as string
-    const units = [bedRange, typeName ? `${typeName}s` : ""].filter(Boolean).join(" ")
+    const typeNames = Array.from(new Set(
+      ((row.project_property_types ?? []) as { property_types: { name: string | null } | { name: string | null }[] | null }[])
+        .map((t) => (Array.isArray(t.property_types) ? t.property_types[0]?.name : t.property_types?.name))
+        .filter((n): n is string => !!n)
+        .map(pluralize),
+    ))
+    const units = [legacyBedRange, typeNames[0] ?? ""].filter(Boolean).join(" ")
+    const status = isProjectStatus(row.status) ? row.status : undefined
 
     const location = [row.community, row.city].filter(Boolean).join(", ") || ((row.location as string | null) ?? "")
     const currency = ((row.currency as string | null) ?? "AED").trim() || "AED"
 
     return {
       sourceId: String(row.id),
+      href,
       image,
-      badge: "Off Plan",
+      badge: status ? statusLabel(status) : "",
+      status,
       developerName: developer?.name ?? "",
       developerLogo: developer?.logo_url ?? "",
+      developerVerified: developer?.is_verified ?? false,
       title: (row.name as string) ?? "",
       location,
       units,
+      propertyTypes: joinNames(typeNames),
+      bedRange: bedRangeLabel(beds),
+      sizeRange: sizeRangeLabel(sizes),
       from: compactPrice(row.launch_price_from as number | null, currency),
     } satisfies Project
   })

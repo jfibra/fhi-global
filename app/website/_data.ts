@@ -34,6 +34,7 @@ export const GOLD_TINT = "var(--wb-gold-tint)"
 export const GOLD_A40 = "var(--wb-gold-a40)"
 export const GOLD_A50 = "var(--wb-gold-a50)"
 export const GOLD_A60 = "var(--wb-gold-a60)"
+export const GOLD_A80 = "var(--wb-gold-a80)"
 export const GOLD_SOFT_A80 = "var(--wb-gold-soft-a80)"
 
 export const BRAND_FROM = "var(--wb-brand-from)"
@@ -92,6 +93,7 @@ export function themeVars(theme?: WebsiteTheme | null): React.CSSProperties {
     "--wb-gold-a40": hexToRgba(gold, 0.4),
     "--wb-gold-a50": hexToRgba(gold, 0.5),
     "--wb-gold-a60": hexToRgba(gold, 0.6),
+    "--wb-gold-a80": hexToRgba(gold, 0.8),
     "--wb-gold-soft-a80": hexToRgba(goldSoft, 0.8),
     "--wb-brand-from": brand,
     "--wb-brand-to": brandTo,
@@ -132,13 +134,12 @@ const LOGO = {
 
 /** Fixed template chrome — the navbar is not per-agent editable. */
 export const NAV_LINKS: { label: string; href: string }[] = [
-  { label: "FHI Global Homepage", href: "/" },
-  { label: "Home", href: "#home" },
-  { label: "Projects", href: "#projects" },
-  { label: "Buy", href: "#properties" },
-  { label: "Rent", href: "#properties" },
-  { label: "About", href: "#about" },
+  { label: "Home", href: "/" },
+  { label: "Overview", href: "#home" },
+  { label: "About Me", href: "#about" },
+  { label: "Featured", href: "#featured" },
   { label: "Service Areas", href: "#areas" },
+  { label: "Gallery", href: "#gallery" },
   { label: "Reviews", href: "#reviews" },
   { label: "Agent Profile", href: "#about" },
 ]
@@ -189,16 +190,33 @@ export type Property = {
   suffix?: string
 }
 
+export type ProjectStatus = "pre_launch" | "launch" | "under_construction" | "completed"
+
 export type Project = {
   /** Set when the card was picked from a real project in the editor. */
   sourceId?: string
+  /** Main-site project page (`/{developerSlug}/{slug}` or `/projects/{slug}`);
+   *  the card is a link when present. */
+  href?: string
   image: string
+  /** Badge label shown over the photo (derived from `status` for real projects). */
   badge: string
+  /** Raw project status — picks the badge icon; badge text alone when absent. */
+  status?: ProjectStatus
   developerName: string
   developerLogo: string
+  developerVerified?: boolean
   title: string
   location: string
+  /** Legacy one-line summary ("1 - 4 Bed Apartments"); the card prefers the
+   *  split facts below and falls back to this. */
   units: string
+  /** "Apartments & Townhouses" */
+  propertyTypes?: string
+  /** "Studio – 3 BR" */
+  bedRange?: string
+  /** "390 – 1,650" (the card appends SQ.FT.) */
+  sizeRange?: string
   from: string
 }
 
@@ -343,10 +361,9 @@ export const SAMPLE_DATA: WebsiteData = {
     socials: { facebook: "", instagram: "", linkedin: "", youtube: "" },
   },
   projects: [
-    { image: IMG.skylineA, badge: "Off Plan", developerName: "Aldar", developerLogo: LOGO.aldar, title: "Aldar Beachfront", location: "Dubai Harbour", units: "1 - 4 Bed Apartments", from: "AED 2.1M" },
-    { image: IMG.aptC, badge: "Off Plan", developerName: "Sobha", developerLogo: LOGO.sobha, title: "Sobha Hartland II", location: "Mohammed Bin Rashid City", units: "1 - 5 Bed Apartments & Villas", from: "AED 1.6M" },
-    { image: IMG.skylineC, badge: "Off Plan", developerName: "Danube", developerLogo: LOGO.danube, title: "Palm Jebel Ali", location: "Palm Jebel Ali", units: "4 - 6 Bed Villas", from: "AED 5.2M" },
-    { image: IMG.skylineB, badge: "Off Plan", developerName: "Ellington", developerLogo: LOGO.ellington, title: "Ellington House IV", location: "Dubai Hills Estate", units: "1 - 3 Bed Apartments", from: "AED 1.3M" },
+    { image: IMG.skylineA, badge: "Under Construction", status: "under_construction", developerName: "Aldar", developerLogo: LOGO.aldar, developerVerified: true, title: "Aldar Beachfront", location: "Dubai Harbour", units: "1 - 4 Bed Apartments", propertyTypes: "Luxury Apartments", bedRange: "1 – 4 BR", sizeRange: "750 – 2,200", from: "AED 2.1M" },
+    { image: IMG.aptC, badge: "Under Construction", status: "under_construction", developerName: "Sobha", developerLogo: LOGO.sobha, developerVerified: true, title: "Sobha Hartland II", location: "Mohammed Bin Rashid City", units: "1 - 5 Bed Apartments & Villas", propertyTypes: "Apartments & Villas", bedRange: "1 – 5 BR", sizeRange: "680 – 4,800", from: "AED 1.6M" },
+    { image: IMG.skylineC, badge: "Pre Launch", status: "pre_launch", developerName: "Danube", developerLogo: LOGO.danube, developerVerified: true, title: "Palm Jebel Ali", location: "Palm Jebel Ali", units: "4 - 6 Bed Villas", propertyTypes: "Villas", bedRange: "4 – 6 BR", sizeRange: "3,900 – 7,400", from: "AED 5.2M" },
   ],
   properties: [
     { image: IMG.houseA, badge: "For Sale", title: "Address Residences Dubai Opera", location: "Downtown Dubai", beds: "2", baths: "3", sqft: "1,267", price: "AED 4,200,000" },

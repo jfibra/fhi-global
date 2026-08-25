@@ -4,14 +4,56 @@
 // logo links back to the platform homepage, not the personal site. Below lg
 // the links collapse into a burger menu panel.
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ChevronDown, Menu, MessageCircle, X } from "lucide-react"
 import { BRAND_GRADIENT, BRAND_TO, GOLD, GOLD_GRADIENT, NAV_LINKS, SAMPLE_DATA, type WebsiteData } from "../_data"
 import { buildContactChannels } from "./contact-channels"
 
+/** In-page anchors the nav can point at, in page order. */
+const ANCHOR_HREFS = NAV_LINKS.map((l) => l.href).filter((h) => h.startsWith("#"))
+
+/** Scroll-spy: the nav link whose section is currently under the header.
+ *  A section counts as current once its top has scrolled past the header
+ *  band; the last such section wins. Falls back to the first anchor (#home). */
+function useActiveAnchor(offset = 96) {
+  const [active, setActive] = useState<string>(ANCHOR_HREFS[0] ?? "#home")
+  useEffect(() => {
+    let raf = 0
+    const update = () => {
+      raf = 0
+      // Sections in PAGE order (nav order differs — e.g. About precedes
+      // Featured on the page), each with its current top edge.
+      const tops = ANCHOR_HREFS.flatMap((href) => {
+        const el = document.getElementById(href.slice(1))
+        return el ? [{ href, top: el.getBoundingClientRect().top }] : []
+      }).sort((a, b) => a.top - b.top)
+      let current = tops[0]?.href ?? ANCHOR_HREFS[0] ?? "#home"
+      for (const t of tops) if (t.top <= offset) current = t.href
+      // Pinned to the bottom: the last section is in view even if its top
+      // never reaches the header band on short pages.
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2
+      if (atBottom && tops.length) current = tops[tops.length - 1].href
+      setActive(current)
+    }
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update) }
+    update()
+    window.addEventListener("scroll", onScroll, { passive: true })
+    window.addEventListener("resize", onScroll)
+    window.addEventListener("hashchange", onScroll)
+    return () => {
+      window.removeEventListener("scroll", onScroll)
+      window.removeEventListener("resize", onScroll)
+      window.removeEventListener("hashchange", onScroll)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [offset])
+  return active
+}
+
 export function SiteHeader({ sticky = true, data = SAMPLE_DATA }: { sticky?: boolean; data?: WebsiteData }) {
   const [open, setOpen] = useState(false)
+  const activeHref = useActiveAnchor()
   // Contact Me — same dropdown channels as the About section.
   const [contactOpen, setContactOpen] = useState(false)
   const contactChannels = buildContactChannels(data)
@@ -46,9 +88,9 @@ export function SiteHeader({ sticky = true, data = SAMPLE_DATA }: { sticky?: boo
 
         <nav className="ml-auto hidden items-center gap-7 lg:flex">
           {NAV_LINKS.map(({ label, href }) => {
-            // "Home" (#home) is the active link — not whatever sits first in
-            // the list (e.g. the FHI Global Homepage link).
-            const active = href === "#home"
+            // Active = the section currently under the header (scroll-spy);
+            // external links (e.g. FHI Global Homepage) are never active.
+            const active = href === activeHref
             return (
               <a
                 key={label}
@@ -107,7 +149,7 @@ export function SiteHeader({ sticky = true, data = SAMPLE_DATA }: { sticky?: boo
       {open && (
         <nav className="border-t border-white/10 px-5 pb-6 pt-2 lg:hidden" style={{ backgroundColor: BRAND_TO }}>
           {NAV_LINKS.map(({ label, href }) => {
-            const active = href === "#home"
+            const active = href === activeHref
             return (
               <a
                 key={label}
