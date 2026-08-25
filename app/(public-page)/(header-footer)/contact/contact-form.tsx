@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { gaEvent } from "@/lib/ga"
 import {
   Mail, Phone, CheckCircle2, User, MessageSquare,
   Building2, Loader2
@@ -45,6 +46,7 @@ export function ContactForm() {
         return
       }
       setStatus("success")
+      gaEvent("submit_inquiry", { form: "contact" })
       form.reset()
     } catch {
       setError("Network error. Please check your connection and try again.")

@@ -19,6 +19,7 @@ import { fetchSectionPage } from "@/lib/sitemap-sections"
 import { breadcrumbList, realEstateListingSchema } from "@/lib/structured-data"
 import { JsonLd } from "@/components/json-ld"
 import { mergedListingGalleryUrls } from "@/lib/listing-gallery-urls"
+import { LeadLink } from "@/components/public/lead-link"
 import { ListingPhotoMosaic } from "@/components/public/listing-photo-mosaic"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
@@ -132,6 +133,36 @@ function listingTypeLabel(row: ListingRowLike, unitType: string | null | undefin
   return (row.unit_type?.trim() || unitType || "Property").replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+/**
+ * SEO title composed from structured fields — "1 Bedroom Apartment for Rent
+ * in Mirdif Villas, Dubai" — instead of whatever the agent typed ("1BHK",
+ * "luxury"). The agent's own title stays as the visible H1; this only feeds
+ * the <title>/OG, where consistency and keywords matter. Falls back to the
+ * agent title when the fields are too thin to compose from.
+ */
+function composedSeoTitle(
+  row: Pick<PublicAgentListingRow, "listing_kind"> & ListingRowLike,
+  u: { bedrooms: number | null; unit_type: string | null } | null,
+  loc: string,
+): string | null {
+  const typeLabel = listingTypeLabel(row, u?.unit_type)
+  if (typeLabel === "Property") return null
+  const proj = row.projects
+  // A test-named project must never leak into a composed title.
+  const projName = proj?.name && !/test|demo|sample|dummy|placeholder/i.test(proj.name) ? proj.name : null
+  const place = projName ? `${projName}, ${proj?.city ?? "Dubai"}` : loc
+  if (!place || place === "United Arab Emirates") return null
+  const kind = row.listing_kind === "rent" ? "for Rent" : "for Sale"
+  const isStudioType = typeLabel.toLowerCase().includes("studio")
+  const beds =
+    u?.bedrooms == null || isStudioType
+      ? ""
+      : u.bedrooms === 0
+        ? "Studio "
+        : `${u.bedrooms} Bedroom `
+  return `${beds}${typeLabel} ${kind} in ${place}`
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   const { row, error } = await fetchPublicAgentListingById(id)
@@ -169,8 +200,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // The customized share card (see ShareCardModal / /og/listing). The
   // updated_at version param makes scrapers re-fetch after every save.
   const ogImageVersion = Date.parse(row.updated_at) || 0
+  const seoTitle = composedSeoTitle(row, u ? { bedrooms: u.bedrooms, unit_type: u.unit_type } : null, listingLocationLabel(proj))
   return createPageMetadata({
-    title: truncateTitle(row.title),
+    title: truncateTitle(seoTitle ?? row.title),
     description,
     pathname: `/listings/${row.slug ?? row.id}`,
     imageUrl: `${SITE_URL.replace(/\/$/, "")}/og/listing/${row.id}?v=${ogImageVersion}`,
@@ -422,7 +454,9 @@ export default async function PublicAgentListingPage({ params }: Props) {
               <p className="bg-[#f8fafc] border border-[#e5e8ec] px-4 py-3 text-sm text-[#4b5563] leading-relaxed">
                 Hi, I&apos;m interested in <span className="font-semibold text-[#0f2940]">{row.title}</span>.
               </p>
-              <a
+              <LeadLink
+                event="click_whatsapp"
+                params={{ location: "listing_contact", listing: row.slug ?? String(row.id) }}
                 href={`https://wa.me/${contactWa}?text=${encodeURIComponent(`Hi, I'm interested in ${row.title}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -430,21 +464,25 @@ export default async function PublicAgentListingPage({ params }: Props) {
               >
                 <WhatsAppGlyph className="w-[18px] h-[18px]" />
                 WhatsApp
-              </a>
-              <a
+              </LeadLink>
+              <LeadLink
+                event="click_phone"
+                params={{ location: "listing_contact", listing: row.slug ?? String(row.id) }}
                 href={`tel:${contactTel}`}
                 className="flex items-center justify-center gap-2 w-full px-5 py-3 bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
               >
                 <Phone className="w-4 h-4" />
                 Call
-              </a>
-              <a
+              </LeadLink>
+              <LeadLink
+                event="click_email"
+                params={{ location: "listing_contact", listing: row.slug ?? String(row.id) }}
                 href={`mailto:${contactEmail}?subject=Inquiry:%20${encodeURIComponent(row.title)}`}
                 className="flex items-center justify-center gap-2 w-full px-5 py-3 border border-[#e5e8ec] text-[#0f2940] text-sm font-bold hover:border-[#001f3f] transition-colors"
               >
                 <Mail className="w-4 h-4" />
                 Email
-              </a>
+              </LeadLink>
             </div>
           </aside>
         </div>

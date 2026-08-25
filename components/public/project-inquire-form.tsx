@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { CheckCircle2, ChevronDown, Loader2, Mail, User } from "lucide-react"
+import { gaEvent } from "@/lib/ga"
 import { PhoneCountrySelect } from "@/components/phone-country-select"
 
 type Category = "off_plan" | "ready" | "rent"
@@ -56,6 +57,7 @@ export function ProjectInquireForm({
       const data = (await res.json().catch(() => ({}))) as { error?: string }
       if (!res.ok) throw new Error(data.error ?? "Could not send your inquiry — please try again")
       setStatus("done")
+      gaEvent("submit_inquiry", { form: "project", project: projectName })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send your inquiry — please try again")
       setStatus("idle")

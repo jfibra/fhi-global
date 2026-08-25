@@ -1,7 +1,11 @@
+"use client"
+
+import { gaEvent } from "@/lib/ga"
+
 /**
  * Floating WhatsApp button — the standard Dubai real-estate conversion
  * element. Rendered from the public Footer so it appears on every public
- * page and never inside the dashboards.
+ * page and never inside the dashboards. Clicks report a GA4 lead event.
  */
 export function WhatsAppFab() {
   const text = encodeURIComponent("Hi! I'm interested in a property with FHI Global.")
@@ -11,6 +15,7 @@ export function WhatsAppFab() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat with FHI Global on WhatsApp"
+      onClick={() => gaEvent("click_whatsapp", { location: "floating_button" })}
       className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#25d366] text-white shadow-[0_10px_28px_-6px_rgba(15,60,30,0.5)] transition-transform duration-200 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#25d366]"
     >
       <svg className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
