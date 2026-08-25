@@ -42,20 +42,20 @@ const CSP = [
   // Fallback for anything not matched below
   `default-src 'self'`,
 
-  // JS: own scripts + Next.js inline chunks + Vercel Analytics + Google Maps
-  `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://${MAPS_API} https://${MAPS_GSTATIC} ${VERCEL_SCRIPTS} https://${CF_INSIGHTS_SCRIPT}`,
+  // JS: own scripts + Next.js inline chunks + Vercel Analytics + Google Maps + GA4
+  `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://${MAPS_API} https://${MAPS_GSTATIC} ${VERCEL_SCRIPTS} https://${CF_INSIGHTS_SCRIPT} https://www.googletagmanager.com`,
 
   // CSS: Tailwind / Next.js injects inline styles
   `style-src 'self' 'unsafe-inline'`,
 
   // Images: own assets, data URIs, blob previews, Supabase, flag CDN, maps, Google avatars, S3/CloudFront (listing + project media)
-  `img-src 'self' data: blob: ${SUPABASE_HTTPS} https://${FLAGCDN} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://*.googleusercontent.com https://*.amazonaws.com https://*.cloudfront.net https://gravatar.com https://*.gravatar.com`,
+  `img-src 'self' data: blob: ${SUPABASE_HTTPS} https://${FLAGCDN} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://*.googleusercontent.com https://*.amazonaws.com https://*.cloudfront.net https://gravatar.com https://*.gravatar.com https://*.google-analytics.com`,
 
   // Fonts: self-hosted via next/font – no external font CDN required
   `font-src 'self' data:`,
 
-  // XHR / fetch: Supabase REST + Auth + Realtime, Vercel Analytics, Google Maps
-  `connect-src 'self' ${SUPABASE_CONNECT} https://${VERCEL_VITALS} https://${VERCEL_SCRIPTS} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.googleapis.com https://${CF_INSIGHTS_API}`,
+  // XHR / fetch: Supabase REST + Auth + Realtime, Vercel Analytics, Google Maps, GA4
+  `connect-src 'self' ${SUPABASE_CONNECT} https://${VERCEL_VITALS} https://${VERCEL_SCRIPTS} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.googleapis.com https://${CF_INSIGHTS_API} https://*.google-analytics.com https://www.googletagmanager.com`,
 
   // Camera / microphone captured media (face-verify & ID-capture steps)
   `media-src 'self' blob:`,

@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono, Outfit } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import { GoogleAnalytics } from "@/components/google-analytics"
 import { AppToaster } from "@/components/app-toaster"
 import "./globals.css"
 import { DEFAULT_PREVIEW_IMAGE_URL } from "@/lib/seo"
@@ -79,6 +80,7 @@ export default function RootLayout({
         <PageTransitionWrapper>{children}</PageTransitionWrapper>
         <AppToaster />
         <Analytics />
+        <GoogleAnalytics />
       </body>
     </html>
   )

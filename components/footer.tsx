@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
 import { SEO_SEARCH_PAGES, SEO_AREA_GUIDES } from "@/lib/seo-pages"
+import { WhatsAppFab } from "@/components/public/whatsapp-fab"
 
 const COMPANY_LINKS = [
   { label: "Contact Us", href: "/contact" },
@@ -276,6 +277,10 @@ export function Footer() {
           </div>
         </div>
       </div>
+
+      {/* Floating WhatsApp — footer renders on every public page, so this
+          reaches all of them without touching the dashboards. */}
+      <WhatsAppFab />
     </footer>
   )
 }
