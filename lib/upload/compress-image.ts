@@ -1,15 +1,22 @@
 /**
  * Client-side upload compression — runs in the BROWSER, before the file is sent.
  *
- * Same shape as filipinohomes-api's ImageUploadController::handleS3Upload
- * (scale down to a max width, re-encode as WebP, search the quality setting for
- * the largest one that fits a byte budget), but done with canvas instead of
- * libvips/GD, and on the user's machine instead of the server.
+ * Same shape as filipinohomes-api's ImageUploadController::uploadHq (scale down
+ * to a max width, re-encode as WebP at a FIXED quality, no byte target), but
+ * done with canvas instead of libvips/GD, and on the user's machine instead of
+ * the server.
+ *
+ * There used to be a 100KB byte budget with a binary search over the quality
+ * setting (mirroring the old sitewide /upload). Dropped 2026-08-26 by the
+ * owner's call: it crushed photographs to whatever quality happened to fit —
+ * routinely q0.3-0.5 on a real photo — and the website builder's images looked
+ * visibly softer than the same photos on filipinohomes.com. Now the result is
+ * whatever q0.88 produces at the capped size, even when that exceeds 100KB.
  *
  * Why client-side: the dominant cost of an upload is pushing the ORIGINAL over
  * the user's connection. A 12MP phone photo is ~8-12MB; on a typical mobile
  * uplink that is tens of seconds before the server has even seen it. Shrinking
- * first turns that into ~100KB, so the network leg — not the encoding — stops
+ * first turns that into a few hundred KB, so the network leg — not the encoding — stops
  * being the bottleneck. It also takes the CPU work out of the serverless
  * function entirely.
  *
@@ -21,15 +28,9 @@
 
 /** Max dimension after resize; never upscales a smaller source. */
 const MAX_WIDTH = 1200
-/** Quality ladder bounds, as fractions (canvas takes 0..1, not 0..100). */
-const MIN_QUALITY = 0.04
-const MAX_QUALITY = 0.92
-/** Target output size — the search keeps the best quality that still fits. */
-const TARGET_BYTES = 100 * 1024
-/** Probe count for the quality search. 5 halvings over the 0.04..0.92 range
- *  lands within ~0.03 of the optimum — past that the file-size difference is
- *  smaller than the cost of another encode. */
-const SEARCH_STEPS = 5
+/** Fixed WebP quality, as a fraction (canvas takes 0..1, not 0..100). The same
+ *  88 filipinohomes-api uses for /upload-hq and the NATCON/album galleries. */
+const QUALITY = 0.88
 
 const COMPRESSIBLE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
 
@@ -151,30 +152,9 @@ export async function compressImageForUpload(file: File): Promise<CompressedImag
     if ("close" in source) source.close()
     if (!canvas) return unchanged
 
-    // Highest quality first: if it already fits, no search is needed at all.
-    let best = await canvasToBlob(canvas, MAX_QUALITY)
+    // One encode at the fixed quality — the size is whatever that produces.
+    const best = await canvasToBlob(canvas, QUALITY)
     if (!best) return unchanged
-
-    if (best.size > TARGET_BYTES) {
-      // Binary search downward for the best quality that fits. If even the floor
-      // overshoots, the floor is what ships — mirrors the server/PHP behaviour,
-      // since there is no further knob once the dimensions are already capped.
-      let lo = MIN_QUALITY
-      let hi = MAX_QUALITY
-      const floor = await canvasToBlob(canvas, MIN_QUALITY)
-      if (floor) best = floor
-      for (let i = 0; i < SEARCH_STEPS; i++) {
-        const mid = (lo + hi) / 2
-        const candidate = await canvasToBlob(canvas, mid)
-        if (!candidate) break
-        if (candidate.size <= TARGET_BYTES) {
-          best = candidate
-          lo = mid
-        } else {
-          hi = mid
-        }
-      }
-    }
 
     // A pathological source can compress *worse* than it arrived (e.g. an
     // already-optimised small JPEG). Keep whichever is actually smaller.

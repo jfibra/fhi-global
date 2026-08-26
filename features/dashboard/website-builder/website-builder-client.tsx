@@ -29,15 +29,21 @@ import { ServiceAreasSection } from "@/app/website/_components/sections/service-
 import { GallerySection } from "@/app/website/_components/sections/gallery"
 import { TestimonialsSection } from "@/app/website/_components/sections/what-my-clients-say"
 
-const DRAFT_KEY = "fhi:website-builder:draft:v1"
+// Drafts are PER ACCOUNT: the key carries the user id, so two agents sharing
+// a browser (or one person switching accounts) never see — or save over each
+// other with — the other's unsaved edits. v1 was a single fixed key, which did
+// exactly that; it is removed on first load.
+const LEGACY_DRAFT_KEY = "fhi:website-builder:draft:v1"
+const draftKey = (userId: string) => `fhi:website-builder:draft:v2:${userId}`
 const VIRTUAL_WIDTH = 1440
 const MAX_FEATURED = 8
 
 // ─── Draft persistence + profile seeding ─────────────────────────────────────
 
-function loadDraft(): WebsiteData | null {
+function loadDraft(key: string): WebsiteData | null {
   try {
-    const raw = localStorage.getItem(DRAFT_KEY)
+    localStorage.removeItem(LEGACY_DRAFT_KEY)
+    const raw = localStorage.getItem(key)
     if (!raw) return null
     const parsed = JSON.parse(raw) as WebsiteData
     // Newly added fields fall back to the sample so old drafts never render holes.
@@ -610,14 +616,14 @@ export function WebsiteBuilderClient() {
     youtube: "",
   }
 
-  // Whether a local draft existed at mount — when it didn't, the saved site
-  // from the DB (if any) becomes the initial state instead.
-  const [hadDraft] = useState(() => typeof window !== "undefined" && !!localStorage.getItem(DRAFT_KEY))
-  const [data, setData] = useState<WebsiteData>(() => {
-    if (typeof window === "undefined") return SAMPLE_DATA
-    const draft = loadDraft()
-    return draft ? seedEmptySocials(draft, seed) : emptySite(seed)
-  })
+  // The editor's content. Starts empty; the load effect below fills it from
+  // THIS account's local draft (unsaved edits win) or, failing that, the saved
+  // site in the DB — both need the user id, which is not known at first render.
+  const [data, setData] = useState<WebsiteData>(() => emptySite(seed))
+  // Autosave must not run until that load has happened, or the empty initial
+  // state would overwrite the very draft we are about to read.
+  const [draftReady, setDraftReady] = useState(false)
+  const userId = user?.id ?? null
   const [activeSection, setActiveSection] = useState<FormSectionId>("agent")
   const [activeGalleryCat, setActiveGalleryCat] = useState<GalleryCategory>("Event Photos")
   // Cache-buster for the link-share (OG) preview image.
@@ -661,8 +667,11 @@ export function WebsiteBuilderClient() {
   const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!mounted) return
+    if (!mounted || !userId) return
     let alive = true
+    // This account's unsaved draft on this browser beats the DB copy (it is
+    // newer by definition — it only exists between an edit and a Save).
+    const draft = loadDraft(draftKey(userId))
     fetch("/api/website-builder/site")
       .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
       .then(({ ok, j }) => {
@@ -670,16 +679,24 @@ export function WebsiteBuilderClient() {
         const site = j as { exists?: boolean; slug?: string; data?: WebsiteData }
         if (!site.exists || !site.slug || !site.data) return
         setSiteSlug(site.slug)
-        // A local draft is newer than the DB copy on this browser — keep it.
-        if (!hadDraft) setData(site.data)
+        if (!draft) setData(site.data)
       })
       .catch(() => {
         // No saved site / table not migrated yet — the editor stays local-only.
       })
+      .finally(() => {
+        if (!alive) return
+        // Applied here (async), not synchronously in the effect body, so the
+        // draft shows whether or not the DB read succeeded.
+        if (draft) setData(seedEmptySocials(draft, seed))
+        setDraftReady(true)
+      })
     return () => {
       alive = false
     }
-  }, [mounted, hadDraft])
+    // `seed` is derived from the profile each render; the draft is seeded once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, userId])
 
   const save = async () => {
     setSaving(true)
@@ -693,6 +710,10 @@ export function WebsiteBuilderClient() {
       const json = (await res.json().catch(() => ({}))) as { slug?: string; error?: string }
       if (!res.ok || !json.slug) throw new Error(json.error || "Failed to save")
       setSiteSlug(json.slug)
+      // Saved = the DB is now the truth; drop the draft so a stale copy can't
+      // shadow the live site on the next visit. Autosave re-creates it on the
+      // next edit.
+      if (userId) localStorage.removeItem(draftKey(userId))
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Failed to save")
     } finally {
@@ -744,18 +765,27 @@ export function WebsiteBuilderClient() {
     }
   }, [mounted])
 
-  // Debounced localStorage autosave.
+  // Debounced localStorage autosave, per account. Skips the initial load
+  // (draftReady) and the first data value it produced — only real edits
+  // after that create a draft, so merely opening the builder never leaves a
+  // draft that would later shadow the saved site.
+  const loadedData = useRef<WebsiteData | null>(null)
   useEffect(() => {
-    if (!mounted) return
+    if (!mounted || !draftReady || !userId) return
+    if (loadedData.current === null) {
+      loadedData.current = data
+      return
+    }
+    if (loadedData.current === data) return
     const id = setTimeout(() => {
       try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(data))
+        localStorage.setItem(draftKey(userId), JSON.stringify(data))
       } catch {
         // storage full/blocked — the draft just won't persist
       }
     }, 400)
     return () => clearTimeout(id)
-  }, [data, mounted])
+  }, [data, mounted, draftReady, userId])
 
   /** Clone-and-mutate updater: keeps every field handler a one-liner. */
   const update = (fn: (d: WebsiteData) => void) =>
@@ -772,7 +802,7 @@ export function WebsiteBuilderClient() {
     if (!window.confirm("Discard unsaved edits and reload your saved site?")) return
     setResetting(true)
     try {
-      localStorage.removeItem(DRAFT_KEY)
+      if (userId) localStorage.removeItem(draftKey(userId))
       const res = await fetch("/api/website-builder/site")
       const json = (await res.json().catch(() => ({}))) as { exists?: boolean; slug?: string; data?: WebsiteData }
       if (res.ok && json.exists && json.data) {
