@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Loader2, Send, Sparkles } from "lucide-react"
+import { Check, Copy, Loader2, Printer, Send, Sparkles } from "lucide-react"
 
 /**
  * FHI Chat — the admin one-stop shop for questions about the business.
@@ -162,13 +162,55 @@ const TOOL_LABELS: Record<string, string> = {
   search_keywords: "Google Search Console",
 }
 
+/** Branded print view — the browser's print dialog offers "Save as PDF",
+ *  same pattern as the events attendee sheet. */
+function exportAnswer(content: string) {
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  const w = window.open("", "_blank", "width=900,height=700")
+  if (!w) return
+  const generated = new Date().toLocaleString("en-AE", { dateStyle: "long", timeStyle: "short" })
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>FHI Chat Report</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; padding: 32px; }
+  .band { background: #001f3f; border-bottom: 4px solid #d6b357; border-radius: 12px 12px 0 0; padding: 22px 28px; }
+  .band h1 { color: #ffffff; font-size: 20px; }
+  .band .gold { color: #d6b357; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+  .meta { padding: 12px 28px; background: #f6f8fb; border: 1px solid #e8eaed; border-top: 0; font-size: 12px; color: #4b5563; }
+  .meta strong { color: #001f3f; }
+  pre { margin-top: 20px; padding: 0 4px; font-family: inherit; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; word-wrap: break-word; }
+  .foot { margin-top: 26px; text-align: center; font-size: 11px; color: #9ca3af; }
+  .foot b { color: #b8913f; }
+  @page { margin: 14mm; }
+</style></head><body>
+  <div class="band"><p class="gold">FHI Global · FHI Chat</p><h1>Report</h1></div>
+  <div class="meta">Generated: <strong>${esc(generated)}</strong> · Source: live FHI database & Google Analytics</div>
+  <pre>${esc(content)}</pre>
+  <p class="foot">Generated from the FHI Global dashboard · <b>fhiglobal.ae</b></p>
+</body></html>`)
+  w.document.close()
+  w.focus()
+  setTimeout(() => w.print(), 350)
+}
+
 export default function FhiChatPage() {
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
   const endRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
+
+  const copyAnswer = async (i: number, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopiedIdx(i)
+      window.setTimeout(() => setCopiedIdx((cur) => (cur === i ? null : cur)), 1500)
+    } catch {
+      // Clipboard can be blocked — the export path still works.
+    }
+  }
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
@@ -298,10 +340,29 @@ export default function FhiChatPage() {
                         </div>
                       )}
                     </div>
-                    {m.typed !== false && m.used && m.used.length > 0 && (
-                      <p className="mt-1 text-[11px] text-[#9ca3af]">
-                        Checked: {m.used.map((u) => TOOL_LABELS[u] ?? u).join(" · ")}
-                      </p>
+                    {m.typed !== false && (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        {m.used && m.used.length > 0 && (
+                          <p className="text-[11px] text-[#9ca3af]">
+                            Checked: {m.used.map((u) => TOOL_LABELS[u] ?? u).join(" · ")}
+                          </p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void copyAnswer(i, m.content)}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#9ca3af] hover:text-[#001f3f] transition-colors"
+                        >
+                          {copiedIdx === i ? <Check className="h-3 w-3 text-[#15803d]" /> : <Copy className="h-3 w-3" />}
+                          {copiedIdx === i ? "Copied" : "Copy"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => exportAnswer(m.content)}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#9ca3af] hover:text-[#001f3f] transition-colors"
+                        >
+                          <Printer className="h-3 w-3" /> Export PDF
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
