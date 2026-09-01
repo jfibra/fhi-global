@@ -174,10 +174,16 @@ async function findProfiles(admin: Admin, q: string): Promise<Array<{ id: string
 
 // ─── The tools ───────────────────────────────────────────────────────────────
 
-async function topAgents(admin: Admin, args: { scope?: string; year?: number; month?: number; limit?: number }) {
+async function topAgents(
+  admin: Admin,
+  args: { scope?: string; year?: number; month?: number; limit?: number; from_date?: string; to_date?: string },
+) {
   const now = new Date()
   const scope = normScope(args.scope)
-  const { from, to } = periodRange(scope, args.year ?? now.getUTCFullYear(), args.month ?? now.getUTCMonth() + 1)
+  let { from, to } = periodRange(scope, args.year ?? now.getUTCFullYear(), args.month ?? now.getUTCMonth() + 1)
+  // Explicit dates beat the scope shorthand ("today", "May-August").
+  if (args.from_date?.trim()) from = args.from_date.trim()
+  if (args.to_date?.trim()) to = args.to_date.trim()
   const sales = (await fetchAllSales(admin)).filter(
     (s) => s.validation_status === "validated" && inRange(s, from, to),
   )
@@ -212,10 +218,15 @@ async function topAgents(admin: Admin, args: { scope?: string; year?: number; mo
   }
 }
 
-async function topDevelopers(admin: Admin, args: { scope?: string; year?: number; month?: number }) {
+async function topDevelopers(
+  admin: Admin,
+  args: { scope?: string; year?: number; month?: number; from_date?: string; to_date?: string },
+) {
   const now = new Date()
   const scope = normScope(args.scope)
-  const { from, to } = periodRange(scope, args.year ?? now.getUTCFullYear(), args.month ?? now.getUTCMonth() + 1)
+  let { from, to } = periodRange(scope, args.year ?? now.getUTCFullYear(), args.month ?? now.getUTCMonth() + 1)
+  if (args.from_date?.trim()) from = args.from_date.trim()
+  if (args.to_date?.trim()) to = args.to_date.trim()
   const sales = (await fetchAllSales(admin)).filter(
     (s) => s.validation_status === "validated" && inRange(s, from, to),
   )
@@ -250,10 +261,15 @@ async function topDevelopers(admin: Admin, args: { scope?: string; year?: number
   }
 }
 
-async function topTeams(admin: Admin, args: { scope?: string; year?: number; month?: number }) {
+async function topTeams(
+  admin: Admin,
+  args: { scope?: string; year?: number; month?: number; from_date?: string; to_date?: string },
+) {
   const now = new Date()
   const scope = normScope(args.scope ?? "all")
-  const { from, to } = periodRange(scope, args.year ?? now.getUTCFullYear(), args.month ?? now.getUTCMonth() + 1)
+  let { from, to } = periodRange(scope, args.year ?? now.getUTCFullYear(), args.month ?? now.getUTCMonth() + 1)
+  if (args.from_date?.trim()) from = args.from_date.trim()
+  if (args.to_date?.trim()) to = args.to_date.trim()
   const [{ data: teams, error: teamErr }, { data: memberships, error: memErr }] = await Promise.all([
     admin.from("teams").select("id, name, logo_url, is_active").eq("is_active", true).limit(500),
     admin.from("team_memberships").select("user_id, team_id").eq("is_active", true).limit(5000),
@@ -1079,6 +1095,8 @@ export const FHI_CHAT_TOOLS = [
         properties: {
           scope: { type: "string", enum: ["month", "quarter", "year", "all"], description: "Period shape. Default year." },
           year: { type: "integer" }, month: { type: "integer", description: "1-12, anchors month/quarter" },
+          from_date: { type: "string", description: "YYYY-MM-DD inclusive — overrides scope for exact ranges like today" },
+          to_date: { type: "string", description: "YYYY-MM-DD exclusive" },
           limit: { type: "integer" },
         },
       },
@@ -1094,6 +1112,8 @@ export const FHI_CHAT_TOOLS = [
         properties: {
           scope: { type: "string", enum: ["month", "quarter", "year", "all"] },
           year: { type: "integer" }, month: { type: "integer" },
+          from_date: { type: "string", description: "YYYY-MM-DD inclusive — overrides scope for exact ranges" },
+          to_date: { type: "string", description: "YYYY-MM-DD exclusive" },
         },
       },
     },
@@ -1109,6 +1129,8 @@ export const FHI_CHAT_TOOLS = [
         properties: {
           scope: { type: "string", enum: ["month", "quarter", "year", "all"] },
           year: { type: "integer" }, month: { type: "integer" },
+          from_date: { type: "string", description: "YYYY-MM-DD inclusive — overrides scope for exact ranges" },
+          to_date: { type: "string", description: "YYYY-MM-DD exclusive" },
         },
       },
     },
