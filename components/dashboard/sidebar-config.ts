@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library,
-  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2,
+  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -151,6 +151,8 @@ const ADMIN_NAV: RoleNavEntry[] = [
   // first thing admins check, so they sit one click away right under Overview.
   // Gmail-style client — leads read as an inbox, replies go out as real email.
   { icon: Mail, label: "Emails", to: "leads" },
+  // The one-stop analytics assistant — answers from live queries, admin only.
+  { icon: Sparkles, label: "FHI Chat", to: "fhi-chat" },
   {
     group: "Accounts & Invites",
     to: "accounts",
