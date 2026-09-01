@@ -1,6 +1,7 @@
 import "server-only"
 
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { gaConfigured, gaRunRealtime, gaRunReport } from "@/lib/ga-data"
 
 /**
  * FHI Chat's toolbox — the predefined, parameterized queries the assistant is
@@ -835,6 +836,196 @@ async function eventAttendees(admin: Admin, args: { event_title?: string }) {
   }
 }
 
+/** Internal dashboard/auth paths — excluded from public traffic answers. */
+const INTERNAL_PATH_RE =
+  /^\/(admin|superadmin|agent|teamleader|unitmanager|member|secretary|teamsecretary|developer|editor|dashboard|login|staff-login|register|account-inactive)(\/|$)/
+
+async function websiteTraffic(args: { days?: number; from_date?: string; to_date?: string; country?: string }) {
+  if (!gaConfigured()) {
+    return { error: "Google Analytics is not connected on this server." }
+  }
+  const startDate = (args.from_date ?? "").trim() || `${Math.min(Math.max(args.days ?? 7, 1), 365)}daysAgo`
+  const endDate = (args.to_date ?? "").trim() || "today"
+  const dateRanges = [{ startDate, endDate }]
+
+  const [totals, pages, channels, countries, sources, cities, devices, leadEvents, realtime] = await Promise.all([
+    gaRunReport({
+      dateRanges,
+      metrics: [
+        { name: "activeUsers" },
+        { name: "sessions" },
+        { name: "screenPageViews" },
+        { name: "newUsers" },
+        { name: "averageSessionDuration" },
+        { name: "engagementRate" },
+      ],
+    }),
+    gaRunReport({
+      dateRanges,
+      dimensions: [{ name: "pagePath" }],
+      metrics: [{ name: "screenPageViews" }],
+      orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
+      limit: 40,
+    }),
+    gaRunReport({
+      dateRanges,
+      dimensions: [{ name: "sessionDefaultChannelGroup" }],
+      metrics: [{ name: "sessions" }],
+      orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+      limit: 10,
+    }),
+    gaRunReport({
+      dateRanges,
+      dimensions: [{ name: "country" }, { name: "countryId" }],
+      metrics: [{ name: "activeUsers" }],
+      orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+      limit: 12,
+    }),
+    gaRunReport({
+      dateRanges,
+      dimensions: [{ name: "sessionSource" }],
+      metrics: [{ name: "sessions" }],
+      orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+      limit: 20,
+    }),
+    gaRunReport({
+      dateRanges,
+      dimensions: [{ name: "city" }, { name: "country" }],
+      metrics: [{ name: "activeUsers" }],
+      orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+      limit: args.country?.trim() ? 50 : 30,
+      ...(args.country?.trim()
+        ? {
+            dimensionFilter: {
+              filter: {
+                fieldName: "country",
+                stringFilter: { matchType: "CONTAINS", value: args.country.trim(), caseSensitive: false },
+              },
+            },
+          }
+        : {}),
+    }),
+    gaRunReport({
+      dateRanges,
+      dimensions: [{ name: "deviceCategory" }],
+      metrics: [{ name: "activeUsers" }],
+      orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+      limit: 5,
+    }),
+    gaRunReport({
+      dateRanges,
+      dimensions: [{ name: "eventName" }],
+      metrics: [{ name: "eventCount" }],
+      dimensionFilter: {
+        filter: {
+          fieldName: "eventName",
+          inListFilter: { values: ["click_whatsapp", "click_phone", "click_email", "submit_inquiry"] },
+        },
+      },
+    }).catch(() => null),
+    gaRunRealtime({ metrics: [{ name: "activeUsers" }] }).catch(() => null),
+  ])
+
+  const countryRows = (countries.rows ?? [])
+    .map((r) => ({
+      country: r.dimensionValues?.[0]?.value ?? "",
+      iso: (r.dimensionValues?.[1]?.value ?? "").toLowerCase(),
+      visitors: Number(r.metricValues?.[0]?.value ?? 0),
+    }))
+    .filter((c) => c.country && c.country !== "(not set)" && c.visitors > 0)
+
+  // Exact origins ("google", "facebook.com", "bing") — variants of the same
+  // platform merge into one row, so facebook.com + m.facebook.com = facebook.
+  const sourceTotals = new Map<string, number>()
+  for (const r of sources.rows ?? []) {
+    let s = (r.dimensionValues?.[0]?.value ?? "").toLowerCase().replace(/^www\./, "")
+    if (!s || s === "(not set)") continue
+    if (s === "(direct)") s = "direct"
+    s = s.replace(/^(m|l|lm|web)\.facebook\.com$/, "facebook.com")
+    if (s.includes("instagram")) s = "instagram.com"
+    sourceTotals.set(s, (sourceTotals.get(s) ?? 0) + Number(r.metricValues?.[0]?.value ?? 0))
+  }
+  const sourceRows = [...sourceTotals.entries()]
+    .map(([source, sessions]) => ({ source, sessions }))
+    .sort((a, b) => b.sessions - a.sessions)
+
+  const t = totals.rows?.[0]?.metricValues ?? []
+  const num = (i: number) => Number(t[i]?.value ?? 0)
+  const leadCounts = Object.fromEntries(
+    (leadEvents?.rows ?? []).map((r) => [
+      r.dimensionValues?.[0]?.value ?? "?",
+      Number(r.metricValues?.[0]?.value ?? 0),
+    ]),
+  )
+  return {
+    period: { from: startDate, to: endDate },
+    note: "public website only (internal dashboard pages excluded from top pages); GA data can lag up to 24-48h",
+    visitors: num(0),
+    sessions: num(1),
+    page_views: num(2),
+    new_visitors: num(3),
+    returning_visitors: Math.max(0, num(0) - num(3)),
+    avg_session_duration: `${Math.floor(num(4) / 60)}m ${Math.round(num(4) % 60)}s`,
+    engagement_rate_percent: Math.round(num(5) * 100),
+    visitors_by_device: (devices.rows ?? []).map((r) => {
+      const v = Number(r.metricValues?.[0]?.value ?? 0)
+      return {
+        device: r.dimensionValues?.[0]?.value ?? "?",
+        visitors: v,
+        percent: num(0) > 0 ? Math.round((v / num(0)) * 100) : 0,
+      }
+    }),
+    lead_clicks: {
+      whatsapp: leadCounts["click_whatsapp"] ?? 0,
+      phone: leadCounts["click_phone"] ?? 0,
+      email: leadCounts["click_email"] ?? 0,
+      inquiries_submitted: leadCounts["submit_inquiry"] ?? 0,
+      note: "tracked since 1 Sep 2026 when lead tracking went live",
+    },
+    active_right_now: realtime ? Number(realtime.rows?.[0]?.metricValues?.[0]?.value ?? 0) : null,
+    top_pages: (pages.rows ?? [])
+      .map((r) => ({ path: r.dimensionValues?.[0]?.value ?? "", views: Number(r.metricValues?.[0]?.value ?? 0) }))
+      .filter((p) => p.path && !INTERNAL_PATH_RE.test(p.path))
+      .slice(0, 10),
+    traffic_sources: (channels.rows ?? []).map((r) => ({
+      channel: r.dimensionValues?.[0]?.value ?? "?",
+      sessions: Number(r.metricValues?.[0]?.value ?? 0),
+    })),
+    visitors_by_country: countryRows.map(({ country, visitors }) => ({ country, visitors })),
+    visitors_by_city: (cities.rows ?? [])
+      .map((r) => ({
+        city: r.dimensionValues?.[0]?.value ?? "",
+        country: r.dimensionValues?.[1]?.value ?? "",
+        visitors: Number(r.metricValues?.[0]?.value ?? 0),
+      }))
+      .filter((c) => c.city && c.city !== "(not set)" && c.visitors > 0)
+      .slice(0, 20),
+    traffic_by_exact_source: sourceRows.slice(0, 10),
+    _cards: [
+      // Where from — real site icons (Google's favicon service; *.google.com
+      // is an allowed image host site-wide).
+      ...sourceRows.slice(0, 4).map((s): FhiChatCard => ({
+        kind: "developer",
+        title: s.source === "direct" ? "Direct / typed the address" : s.source.replace(/\.(com|net|org|ae)$/, ""),
+        subtitle: `${s.sessions} session${s.sessions === 1 ? "" : "s"}`,
+        image: s.source.includes(".")
+          ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(s.source)}&sz=64`
+          : s.source === "google"
+            ? "https://www.google.com/s2/favicons?domain=google.com&sz=64"
+            : null,
+      })),
+      ...countryRows.slice(0, 6).map((c): FhiChatCard => ({
+        kind: "project",
+        title: c.country,
+        subtitle: `${c.visitors} visitor${c.visitors === 1 ? "" : "s"}`,
+        // flagcdn.com is already an allowed image host site-wide.
+        image: c.iso && /^[a-z]{2}$/.test(c.iso) ? `https://flagcdn.com/w80/${c.iso}.png` : null,
+      })),
+    ],
+    _names: [...sourceRows.slice(0, 10).map((s) => s.source), ...countryRows.map((c) => c.country)],
+  }
+}
+
 // ─── OpenAI tool definitions + dispatcher ────────────────────────────────────
 
 export const FHI_CHAT_TOOLS = [
@@ -964,6 +1155,26 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "website_traffic",
+      description:
+        "Website statistics from Google Analytics for a period: visitors (new vs RETURNING), sessions, page views, engagement, avg time on site, device split (mobile/desktop), live visitors right now, top pages, traffic sources (channels AND exact platforms like google/facebook), LEAD CLICKS (WhatsApp/phone/email/inquiry submissions), visitor COUNTRIES and CITIES. Defaults to the last 7 days.",
+      parameters: {
+        type: "object",
+        properties: {
+          days: { type: "integer", description: "Window back from today (default 7)" },
+          from_date: { type: "string", description: "YYYY-MM-DD" },
+          to_date: { type: "string", description: "YYYY-MM-DD" },
+          country: {
+            type: "string",
+            description: "Limit the CITY breakdown to one country (e.g. 'Philippines') — use for 'which cities in X' questions",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "events_overview",
       description: "Recent and upcoming FHI events with dates, venues and registration counts. For the registrant NAMES use event_attendees.",
       parameters: { type: "object", properties: {} },
@@ -1020,6 +1231,7 @@ export async function runFhiChatTool(
       case "events_overview": result = await eventsOverview(admin); break
       case "event_attendees": result = await eventAttendees(admin, args); break
       case "new_accounts": result = await newAccounts(admin, args); break
+      case "website_traffic": result = await websiteTraffic(args); break
       default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [] }
     }
     const { _cards, _names, ...rest } = result as { _cards?: FhiChatCard[]; _names?: string[] } & Record<string, unknown>

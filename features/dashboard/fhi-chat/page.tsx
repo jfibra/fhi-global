@@ -136,11 +136,11 @@ function CardRow({ cards }: { cards: Card[] }) {
 
 const SUGGESTIONS = [
   "Who are the top agents this year?",
+  "How many website visits this week?",
   "Total validated sales value in 2026?",
   "How many projects does each developer have?",
   "What were our most recent sales?",
   "How many registrations does our latest event have?",
-  "Any open support tickets?",
 ]
 
 /** Tool names → human wording for the tiny "checked" line. */
@@ -158,6 +158,7 @@ const TOOL_LABELS: Record<string, string> = {
   events_overview: "events",
   event_attendees: "event registrations",
   new_accounts: "new signups",
+  website_traffic: "Google Analytics",
 }
 
 export default function FhiChatPage() {
