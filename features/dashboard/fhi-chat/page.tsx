@@ -159,6 +159,7 @@ const TOOL_LABELS: Record<string, string> = {
   event_attendees: "event registrations",
   new_accounts: "new signups",
   website_traffic: "Google Analytics",
+  search_keywords: "Google Search Console",
 }
 
 export default function FhiChatPage() {

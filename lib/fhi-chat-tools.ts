@@ -1,7 +1,7 @@
 import "server-only"
 
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { gaConfigured, gaRunRealtime, gaRunReport } from "@/lib/ga-data"
+import { gaConfigured, gaRunRealtime, gaRunReport, gscQuery } from "@/lib/ga-data"
 
 /**
  * FHI Chat's toolbox — the predefined, parameterized queries the assistant is
@@ -1026,6 +1026,46 @@ async function websiteTraffic(args: { days?: number; from_date?: string; to_date
   }
 }
 
+async function searchKeywords(args: { days?: number; from_date?: string; to_date?: string; limit?: number }) {
+  // GSC wants explicit dates and its data lags ~2 days behind.
+  const iso = (d: Date) => d.toISOString().slice(0, 10)
+  const end = (args.to_date ?? "").trim() || iso(new Date())
+  let start = (args.from_date ?? "").trim()
+  if (!start) {
+    const d = new Date()
+    d.setUTCDate(d.getUTCDate() - Math.min(Math.max(args.days ?? 28, 1), 480))
+    start = iso(d)
+  }
+  const limit = Math.min(Math.max(args.limit ?? 15, 1), 50)
+
+  const [queries, pages] = await Promise.all([
+    gscQuery({ startDate: start, endDate: end, dimensions: ["query"], rowLimit: limit }),
+    gscQuery({ startDate: start, endDate: end, dimensions: ["page"], rowLimit: 10 }),
+  ])
+
+  const totals = (queries.rows ?? []).reduce<{ clicks: number; impressions: number }>(
+    (a, r) => ({ clicks: a.clicks + (r.clicks ?? 0), impressions: a.impressions + (r.impressions ?? 0) }),
+    { clicks: 0, impressions: 0 },
+  )
+  return {
+    period: { from: start, to: end },
+    note: "Google Search performance (Search Console); data lags ~2 days",
+    top_search_keywords: (queries.rows ?? []).map((r) => ({
+      keyword: r.keys?.[0] ?? "?",
+      clicks: r.clicks ?? 0,
+      impressions: r.impressions ?? 0,
+      avg_position: r.position != null ? Math.round(r.position * 10) / 10 : null,
+    })),
+    top_pages_in_google: (pages.rows ?? []).map((r) => ({
+      page: (r.keys?.[0] ?? "").replace(/^https?:\/\/[^/]+/, "") || "/",
+      clicks: r.clicks ?? 0,
+      impressions: r.impressions ?? 0,
+    })),
+    keyword_totals: totals,
+    _names: (queries.rows ?? []).map((r) => r.keys?.[0]).filter((k): k is string => Boolean(k)),
+  }
+}
+
 // ─── OpenAI tool definitions + dispatcher ────────────────────────────────────
 
 export const FHI_CHAT_TOOLS = [
@@ -1175,6 +1215,23 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "search_keywords",
+      description:
+        "What people type into GOOGLE SEARCH to find the website (Search Console): top keywords with clicks, impressions and average position, plus the pages that appear most in Google. Defaults to the last 28 days.",
+      parameters: {
+        type: "object",
+        properties: {
+          days: { type: "integer", description: "Window back from today (default 28)" },
+          from_date: { type: "string", description: "YYYY-MM-DD" },
+          to_date: { type: "string", description: "YYYY-MM-DD" },
+          limit: { type: "integer", description: "Max keywords (default 15)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "events_overview",
       description: "Recent and upcoming FHI events with dates, venues and registration counts. For the registrant NAMES use event_attendees.",
       parameters: { type: "object", properties: {} },
@@ -1232,6 +1289,7 @@ export async function runFhiChatTool(
       case "event_attendees": result = await eventAttendees(admin, args); break
       case "new_accounts": result = await newAccounts(admin, args); break
       case "website_traffic": result = await websiteTraffic(args); break
+      case "search_keywords": result = await searchKeywords(args); break
       default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [] }
     }
     const { _cards, _names, ...rest } = result as { _cards?: FhiChatCard[]; _names?: string[] } & Record<string, unknown>

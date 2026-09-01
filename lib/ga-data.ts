@@ -26,21 +26,22 @@ export function gaConfigured(): boolean {
   return Boolean(process.env.GA4_PROPERTY_ID?.trim() && loadKey())
 }
 
-// Access tokens live ~1h; cache per server instance.
-let cached: { token: string; exp: number } | null = null
+// Access tokens live ~1h; cache per scope per server instance.
+const tokenCache = new Map<string, { token: string; exp: number }>()
 
-async function accessToken(): Promise<string> {
+async function accessToken(scope: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
-  if (cached && cached.exp > now + 60) return cached.token
+  const hit = tokenCache.get(scope)
+  if (hit && hit.exp > now + 60) return hit.token
   const key = loadKey()
-  if (!key) throw new Error("Google Analytics is not configured")
+  if (!key) throw new Error("Google service account is not configured")
 
   const b64url = (buf: Buffer | string) => Buffer.from(buf).toString("base64url")
   const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))
   const claims = b64url(
     JSON.stringify({
       iss: key.client_email,
-      scope: "https://www.googleapis.com/auth/analytics.readonly",
+      scope,
       aud: "https://oauth2.googleapis.com/token",
       iat: now,
       exp: now + 3600,
@@ -58,9 +59,9 @@ async function accessToken(): Promise<string> {
   })
   const data = (await res.json().catch(() => null)) as { access_token?: string; error_description?: string } | null
   if (!res.ok || !data?.access_token) {
-    throw new Error(`GA auth failed: ${data?.error_description ?? res.status}`)
+    throw new Error(`Google auth failed: ${data?.error_description ?? res.status}`)
   }
-  cached = { token: data.access_token, exp: now + 3500 }
+  tokenCache.set(scope, { token: data.access_token, exp: now + 3500 })
   return data.access_token
 }
 
@@ -69,7 +70,7 @@ type GaReport = {
 }
 
 async function gaPost(method: "runReport" | "runRealtimeReport", body: Record<string, unknown>): Promise<GaReport> {
-  const token = await accessToken()
+  const token = await accessToken("https://www.googleapis.com/auth/analytics.readonly")
   const property = process.env.GA4_PROPERTY_ID?.trim()
   const res = await fetch(
     `https://analyticsdata.googleapis.com/v1beta/properties/${property}:${method}`,
@@ -87,3 +88,28 @@ async function gaPost(method: "runReport" | "runRealtimeReport", body: Record<st
 
 export const gaRunReport = (body: Record<string, unknown>) => gaPost("runReport", body)
 export const gaRunRealtime = (body: Record<string, unknown>) => gaPost("runRealtimeReport", body)
+
+// ─── Google Search Console (same service account, webmasters.readonly) ──────
+
+/** The GSC property — ours is a domain property. */
+const GSC_SITE = () => process.env.GSC_SITE?.trim() || "sc-domain:fhiglobal.ae"
+
+export type GscRow = { keys?: string[]; clicks?: number; impressions?: number; ctr?: number; position?: number }
+
+/** Search analytics query — requires the service account to be added as a
+ *  (Restricted) user on the Search Console property. */
+export async function gscQuery(body: Record<string, unknown>): Promise<{ rows?: GscRow[] }> {
+  const token = await accessToken("https://www.googleapis.com/auth/webmasters.readonly")
+  const res = await fetch(
+    `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(GSC_SITE())}/searchAnalytics/query`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    },
+  )
+  const data = (await res.json().catch(() => null)) as ({ rows?: GscRow[] } & { error?: { message?: string } }) | null
+  if (!res.ok) throw new Error(`Search Console query failed: ${data?.error?.message ?? res.status}`)
+  return data ?? {}
+}
