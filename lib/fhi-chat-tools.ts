@@ -4,7 +4,7 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import { gaConfigured, gaRunRealtime, gaRunReport, gscQuery } from "@/lib/ga-data"
 
 /**
- * FHI Chat's toolbox — the predefined, parameterized queries the assistant is
+ * FHI Assistant's toolbox — the predefined, parameterized queries the assistant is
  * allowed to run. The model never writes SQL and never sees the database; it
  * picks a tool, we execute it on the service-role client, and it answers from
  * the returned JSON. That is what keeps the numbers exact.
@@ -254,6 +254,17 @@ async function topAgents(
       subtitle: `${l.deals} deal${l.deals === 1 ? "" : "s"} · ${AED(l.value)}`,
       image: names.agent.get(l.id)?.image ?? null,
     })),
+    _charts: (ranked.length > 1
+      ? [{
+          kind: "shares" as const,
+          title: "Sales value by agent",
+          rows: ranked.slice(0, 8).map((l) => ({
+            label: names.agent.get(l.id)?.name ?? "Agent",
+            value: l.value,
+            display: AED(l.value),
+          })),
+        }]
+      : []) satisfies FhiChatChart[],
   }
 }
 
@@ -297,6 +308,17 @@ async function topDevelopers(
       subtitle: `${l.deals} deal${l.deals === 1 ? "" : "s"} · ${AED(l.value)}`,
       image: names.dev.get(l.id)?.image ?? null,
     })),
+    _charts: (ranked.length > 1
+      ? [{
+          kind: "shares" as const,
+          title: "Sales value by developer",
+          rows: ranked.slice(0, 8).map((l) => ({
+            label: names.dev.get(l.id)?.name ?? "Developer",
+            value: l.value,
+            display: AED(l.value),
+          })),
+        }]
+      : []) satisfies FhiChatChart[],
   }
 }
 
@@ -1122,7 +1144,7 @@ async function websiteTraffic(args: { days?: number; from_date?: string; to_date
     prevRange = { startDate: `${2 * n + 1}daysAgo`, endDate: `${n + 1}daysAgo` }
   }
 
-  const [totals, pages, channels, countries, sources, cities, devices, leadEvents, realtime, prevTotals] = await Promise.all([
+  const [totals, pages, channels, countries, sources, cities, devices, leadEvents, realtime, prevTotals, daily] = await Promise.all([
     gaRunReport({
       dateRanges,
       metrics: [
@@ -1207,7 +1229,45 @@ async function websiteTraffic(args: { days?: number; from_date?: string; to_date
         { name: "newUsers" },
       ],
     }).catch(() => null),
+    gaRunReport({
+      dateRanges,
+      dimensions: [{ name: "date" }],
+      metrics: [{ name: "activeUsers" }],
+      orderBys: [{ dimension: { dimensionName: "date" } }],
+      limit: 366,
+    }).catch(() => null),
   ])
+
+  // Day-by-day visitors — the trend. GA returns dates as "20260827"; long
+  // ranges collapse into weeks so the answer stays readable.
+  let byDay = (daily?.rows ?? []).map((r) => {
+    const raw = r.dimensionValues?.[0]?.value ?? ""
+    return {
+      date: `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`,
+      visitors: Number(r.metricValues?.[0]?.value ?? 0),
+    }
+  })
+  let trendGranularity: "day" | "week" = "day"
+  if (byDay.length > 45) {
+    trendGranularity = "week"
+    const weeks = new Map<string, number>()
+    for (const d of byDay) {
+      const dt = new Date(`${d.date}T00:00:00Z`)
+      dt.setUTCDate(dt.getUTCDate() - ((dt.getUTCDay() + 6) % 7)) // Monday start
+      const key = dt.toISOString().slice(0, 10)
+      weeks.set(key, (weeks.get(key) ?? 0) + d.visitors)
+    }
+    byDay = [...weeks.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, visitors]) => ({ date, visitors }))
+  }
+  // Simple direction: average of the second half vs the first half.
+  let trendDirection = "not enough data"
+  if (byDay.length >= 4) {
+    const half = Math.floor(byDay.length / 2)
+    const avg = (rows: typeof byDay) => rows.reduce((a, r) => a + r.visitors, 0) / Math.max(rows.length, 1)
+    const a = avg(byDay.slice(0, half))
+    const b = avg(byDay.slice(byDay.length - half))
+    trendDirection = a === 0 ? (b > 0 ? "rising" : "flat") : `${b >= a * 1.1 ? "rising" : b <= a * 0.9 ? "falling" : "flat"} (${pctChange(Math.round(b * 10), Math.round(a * 10))} second half vs first half)`
+  }
 
   const countryRows = (countries.rows ?? [])
     .map((r) => ({
@@ -1236,6 +1296,14 @@ async function websiteTraffic(args: { days?: number; from_date?: string; to_date
   const num = (i: number) => Number(t[i]?.value ?? 0)
   const pt = prevTotals?.rows?.[0]?.metricValues ?? []
   const pnum = (i: number) => Number(pt[i]?.value ?? 0)
+  const deviceRows = (devices.rows ?? []).map((r) => {
+    const v = Number(r.metricValues?.[0]?.value ?? 0)
+    return {
+      device: r.dimensionValues?.[0]?.value ?? "?",
+      visitors: v,
+      percent: num(0) > 0 ? Math.round((v / num(0)) * 100) : 0,
+    }
+  })
   const leadCounts = Object.fromEntries(
     (leadEvents?.rows ?? []).map((r) => [
       r.dimensionValues?.[0]?.value ?? "?",
@@ -1250,6 +1318,15 @@ async function websiteTraffic(args: { days?: number; from_date?: string; to_date
     page_views: num(2),
     new_visitors: num(3),
     returning_visitors: Math.max(0, num(0) - num(3)),
+    ...(byDay.length
+      ? {
+          visitors_trend: {
+            granularity: trendGranularity,
+            direction: trendDirection,
+            [trendGranularity === "week" ? "by_week" : "by_day"]: byDay,
+          },
+        }
+      : {}),
     ...(prevTotals
       ? {
           previous_period: {
@@ -1269,14 +1346,7 @@ async function websiteTraffic(args: { days?: number; from_date?: string; to_date
       : {}),
     avg_session_duration: `${Math.floor(num(4) / 60)}m ${Math.round(num(4) % 60)}s`,
     engagement_rate_percent: Math.round(num(5) * 100),
-    visitors_by_device: (devices.rows ?? []).map((r) => {
-      const v = Number(r.metricValues?.[0]?.value ?? 0)
-      return {
-        device: r.dimensionValues?.[0]?.value ?? "?",
-        visitors: v,
-        percent: num(0) > 0 ? Math.round((v / num(0)) * 100) : 0,
-      }
-    }),
+    visitors_by_device: deviceRows,
     lead_clicks: {
       whatsapp: leadCounts["click_whatsapp"] ?? 0,
       phone: leadCounts["click_phone"] ?? 0,
@@ -1325,6 +1395,46 @@ async function websiteTraffic(args: { days?: number; from_date?: string; to_date
       })),
     ],
     _names: [...sourceRows.slice(0, 10).map((s) => s.source), ...countryRows.map((c) => c.country)],
+    _charts: [
+      ...(byDay.length > 1
+        ? [{ kind: "trend" as const, title: `Visitors by ${trendGranularity}`, points: byDay }]
+        : []),
+      ...(deviceRows.length
+        ? [{
+            kind: "shares" as const,
+            title: "Devices",
+            rows: deviceRows.map((d) => ({ label: d.device, value: d.visitors, display: `${d.visitors} · ${d.percent}%` })),
+          }]
+        : []),
+      ...(sourceRows.length
+        ? [{
+            kind: "shares" as const,
+            title: "Traffic sources",
+            rows: sourceRows.slice(0, 6).map((s) => ({
+              label: s.source === "direct" ? "Direct" : s.source.replace(/\.(com|net|org|ae)$/, ""),
+              value: s.sessions,
+              display: `${s.sessions}`,
+              // Real site icon, like the source cards ("bing" → bing.com).
+              icon:
+                s.source === "direct"
+                  ? null
+                  : `https://www.google.com/s2/favicons?domain=${encodeURIComponent(s.source.includes(".") ? s.source : `${s.source}.com`)}&sz=64`,
+            })),
+          }]
+        : []),
+      ...(countryRows.length
+        ? [{
+            kind: "shares" as const,
+            title: "Visitors by country",
+            rows: countryRows.slice(0, 6).map((c) => ({
+              label: c.country,
+              value: c.visitors,
+              display: `${c.visitors}`,
+              iso: /^[a-z]{2}$/.test(c.iso) ? c.iso : null,
+            })),
+          }]
+        : []),
+    ] satisfies FhiChatChart[],
   }
 }
 
@@ -1594,10 +1704,18 @@ export const FHI_CHAT_TOOLS = [
 /** Runs a tool. Returns the model-facing JSON and the UI cards separately —
  *  image URLs never enter the model context (wasted tokens, and the model
  *  must never be able to alter them). */
+export type FhiChatTrendPoint = { date: string; visitors: number }
+export type FhiChatShareRow = { label: string; value: number; display?: string; iso?: string | null; icon?: string | null }
+/** Charts the UI renders under an answer — attached by tools as `_charts`,
+ *  stripped before the model sees the JSON (same contract as cards). */
+export type FhiChatChart =
+  | { kind: "trend"; title: string; points: FhiChatTrendPoint[] }
+  | { kind: "shares"; title: string; rows: FhiChatShareRow[] }
+
 export async function runFhiChatTool(
   name: string,
   args: Record<string, unknown>,
-): Promise<{ forModel: string; cards: FhiChatCard[]; names: string[] }> {
+): Promise<{ forModel: string; cards: FhiChatCard[]; names: string[]; charts: FhiChatChart[] }> {
   const admin = createAdminSupabase()
   try {
     let result: Record<string, unknown>
@@ -1618,15 +1736,18 @@ export async function runFhiChatTool(
       case "website_traffic": result = await websiteTraffic(args); break
       case "search_keywords": result = await searchKeywords(args); break
       case "activity_feed": result = await activityFeed(admin, args); break
-      default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [] }
+      default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [] }
     }
-    const { _cards, _names, ...rest } = result as { _cards?: FhiChatCard[]; _names?: string[] } & Record<string, unknown>
+    const { _cards, _names, _charts, ...rest } = result as {
+      _cards?: FhiChatCard[]; _names?: string[]; _charts?: FhiChatChart[]
+    } & Record<string, unknown>
     return {
       forModel: JSON.stringify(rest),
       cards: Array.isArray(_cards) ? _cards : [],
       names: Array.isArray(_names) ? _names : [],
+      charts: Array.isArray(_charts) ? _charts : [],
     }
   } catch (e) {
-    return { forModel: JSON.stringify({ error: e instanceof Error ? e.message : "Query failed" }), cards: [], names: [] }
+    return { forModel: JSON.stringify({ error: e instanceof Error ? e.message : "Query failed" }), cards: [], names: [], charts: [] }
   }
 }

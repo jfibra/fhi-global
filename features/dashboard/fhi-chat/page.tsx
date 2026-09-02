@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Check, Copy, FileText, Loader2, Printer, Send, Sparkles } from "lucide-react"
+import { Check, Copy, FileText, Globe, Loader2, Monitor, Printer, Send, Smartphone, Sparkles, Tablet } from "lucide-react"
 
 /**
- * FHI Chat — the admin one-stop shop for questions about the business.
+ * FHI Assistant — the admin one-stop shop for questions about the business.
  * Ask in plain language; the assistant runs the real database queries
  * server-side and answers with exact figures. Admin staff only.
  */
@@ -16,12 +16,18 @@ type Card = {
   image?: string | null
   rank?: number
 }
+type TrendPoint = { date: string; visitors: number }
+type ShareRow = { label: string; value: number; display?: string; iso?: string | null; icon?: string | null }
+type ChartSpec =
+  | { kind: "trend"; title: string; points: TrendPoint[] }
+  | { kind: "shares"; title: string; rows: ShareRow[] }
 type Msg = {
   role: "user" | "assistant"
   content: string
   used?: string[]
   cards?: Card[]
   names?: string[]
+  charts?: ChartSpec[]
   typed?: boolean
 }
 
@@ -134,6 +140,89 @@ function CardRow({ cards }: { cards: Card[] }) {
   )
 }
 
+/** Visitors-per-day mini bar chart — one series, navy bars, gold peak.
+ *  Detail lives in the hover tooltips; the text answer states the trend. */
+function TrendChart({ title, points }: { title: string; points: TrendPoint[] }) {
+  if (points.length < 2) return null
+  const max = Math.max(...points.map((p) => p.visitors), 1)
+  const peak = points.reduce((a, b) => (b.visitors > a.visitors ? b : a))
+  const fmt = (d: string) =>
+    new Date(`${d}T00:00:00`).toLocaleDateString("en-AE", { month: "short", day: "numeric" })
+  return (
+    <div>
+      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[#9ca3af]">
+        {title} · peak {fmt(peak.date)} ({peak.visitors})
+      </p>
+      <div className="flex h-16 items-end gap-[3px]">
+        {points.map((p) => (
+          <div
+            key={p.date}
+            title={`${fmt(p.date)} — ${p.visitors} visitor${p.visitors === 1 ? "" : "s"}`}
+            className={`min-w-[3px] flex-1 ${p === peak ? "bg-[#d6b357]" : "bg-[#001f3f]"}`}
+            style={{ height: `${Math.max((p.visitors / max) * 60, 2)}px`, opacity: p.visitors ? 1 : 0.15 }}
+          />
+        ))}
+      </div>
+      <div className="mt-1 flex justify-between border-t border-[#e5e8ec] pt-1 text-[10.5px] text-[#9ca3af]">
+        <span>{fmt(points[0].date)}</span>
+        <span>{fmt(points[points.length - 1].date)}</span>
+      </div>
+    </div>
+  )
+}
+
+/** The little identity mark in front of a share row: country flag, real site
+ *  favicon, a device pictogram, or a neutral globe so rows stay aligned. */
+function RowIcon({ row }: { row: ShareRow }) {
+  if (row.iso)
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={`https://flagcdn.com/w20/${row.iso}.png`} alt="" className="h-3 w-5 shrink-0 object-cover" />
+  if (row.icon)
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={row.icon} alt="" loading="lazy" className="h-4 w-4 shrink-0 object-contain" />
+  const l = row.label.toLowerCase()
+  if (l === "mobile") return <Smartphone className="h-4 w-4 shrink-0 text-[#001f3f]" />
+  if (l === "desktop") return <Monitor className="h-4 w-4 shrink-0 text-[#001f3f]" />
+  if (l === "tablet") return <Tablet className="h-4 w-4 shrink-0 text-[#001f3f]" />
+  return <Globe className="h-4 w-4 shrink-0 text-[#9ca3af]" />
+}
+
+/** Horizontal share bars — the ranked comparison (leaderboards, devices,
+ *  sources, countries). One series: navy bars, gold leader. */
+function ShareChart({ chart }: { chart: { title: string; rows: ShareRow[] } }) {
+  if (chart.rows.length < 2) return null
+  const max = Math.max(...chart.rows.map((r) => r.value), 1)
+  // Leaderboards (agents/developers) carry no identity marks — only charts
+  // where at least one row has a flag, favicon, or device label get the slot.
+  const hasIcons = chart.rows.some(
+    (r) => r.iso || r.icon || ["mobile", "desktop", "tablet"].includes(r.label.toLowerCase()),
+  )
+  return (
+    <div>
+      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[#9ca3af]">{chart.title}</p>
+      <div className="space-y-1.5">
+        {chart.rows.map((r, i) => (
+          <div key={r.label} className="flex items-center gap-2">
+            {hasIcons && <RowIcon row={r} />}
+            <span className="w-[36%] shrink-0 truncate text-[12px] font-semibold text-[#0d1117] capitalize">
+              {r.label}
+            </span>
+            <div className="h-3.5 flex-1 bg-[#f1f3f6]">
+              <div
+                className={`h-full ${i === 0 ? "bg-[#d6b357]" : "bg-[#001f3f]"}`}
+                style={{ width: `${Math.max((r.value / max) * 100, 1.5)}%` }}
+              />
+            </div>
+            <span className="min-w-[60px] shrink-0 text-right text-[11px] tabular-nums text-[#374151]">
+              {r.display ?? r.value.toLocaleString()}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 const SUGGESTIONS = [
   "Who are the top agents this year?",
   "How many website visits this week?",
@@ -193,7 +282,7 @@ function exportAnswer(content: string) {
   }
 
   const lines = content.split(/\r?\n/).map((l) => l.trim())
-  let title = "FHI Chat Report"
+  let title = "FHI Assistant Report"
   let period = ""
   let firstHeadingUsed = false
   let inSection = false
@@ -295,7 +384,7 @@ function exportAnswer(content: string) {
   <div class="sheet">
     <div class="band">
       <div>
-        <p class="gold">FHI Global Property · FHI Chat</p>
+        <p class="gold">FHI Global Property · FHI Assistant</p>
         <h1>${esc(title)}</h1>
         ${period ? `<p class="period">${esc(period)}</p>` : ""}
       </div>
@@ -304,7 +393,7 @@ function exportAnswer(content: string) {
     <div class="meta"><span>Generated: <strong>${esc(generated)}</strong></span><span>Source: live FHI database &amp; Google Analytics</span></div>
     ${body.join("\n")}
   </div>
-  <p class="foot">Generated by FHI Chat · FHI Global Property · <b>fhiglobal.ae</b></p>
+  <p class="foot">Generated by FHI Assistant · FHI Global Property · <b>fhiglobal.ae</b></p>
 </body></html>`)
   w.document.close()
   w.focus()
@@ -364,9 +453,10 @@ export default function FhiChatPage() {
         used?: string[]
         cards?: Card[]
         names?: string[]
+        charts?: ChartSpec[]
         error?: string
       }
-      if (!res.ok || !data.reply) throw new Error(data.error ?? "FHI Chat couldn't answer — try again.")
+      if (!res.ok || !data.reply) throw new Error(data.error ?? "FHI Assistant couldn't answer — try again.")
       setMessages((ms) => [
         ...ms,
         {
@@ -375,6 +465,7 @@ export default function FhiChatPage() {
           used: data.used,
           cards: data.cards,
           names: data.names,
+          charts: data.charts,
           typed: false,
         },
       ])
@@ -395,7 +486,7 @@ export default function FhiChatPage() {
           <Sparkles className="h-5 w-5 text-[#d6b357]" />
         </span>
         <div>
-          <h1 className="font-['Outfit'] text-xl font-bold text-[#0d1117] leading-tight">FHI Chat</h1>
+          <h1 className="font-['Outfit'] text-xl font-bold text-[#0d1117] leading-tight">FHI Assistant</h1>
           <p className="text-xs text-[#6b7280]">
             Ask anything about FHI&apos;s data — sales, agents, developers, projects, events. Answers come from live queries.
           </p>
@@ -452,6 +543,19 @@ export default function FhiChatPage() {
                           <RichText text={m.content} names={m.names ?? (m.cards ?? []).map((c) => c.title)} />
                         )}
                       </div>
+                      {m.typed !== false && m.charts && m.charts.length > 0 && (
+                        <div className="grid gap-x-6 gap-y-4 border-t border-[#eceef1] px-4 py-3 sm:grid-cols-2">
+                          {m.charts.map((c, ci) =>
+                            c.kind === "trend" ? (
+                              <div key={ci} className="sm:col-span-2">
+                                <TrendChart title={c.title} points={c.points} />
+                              </div>
+                            ) : (
+                              <ShareChart key={ci} chart={c} />
+                            ),
+                          )}
+                        </div>
+                      )}
                       {m.typed !== false && m.cards && m.cards.length > 0 && (
                         <div className="border-t border-[#eceef1] p-2.5">
                           <CardRow cards={m.cards} />
@@ -532,7 +636,7 @@ export default function FhiChatPage() {
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder='Ask FHI Chat — e.g. "Who sold the most this month?"'
+          placeholder='Ask FHI Assistant — e.g. "Who sold the most this month?"'
           disabled={busy}
           className="w-full border border-[#e5e5e5] px-4 py-3 text-sm text-[#111827] placeholder:text-[#9ca3af] focus:border-[#001f3f] focus:outline-none transition-colors disabled:bg-[#f8fafc]"
         />
