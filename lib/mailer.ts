@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer"
 import { SITE_URL } from "@/lib/seo"
 import { logAuditEvent } from "@/lib/audit-log"
+import type { DailyReport } from "@/lib/daily-report"
 
 /**
  * Server-only SMTP mailer. Used to deliver auth OTP codes ourselves instead of
@@ -965,6 +966,82 @@ export async function sendAdminDirectEmail(input: {
     html: eventEmailShell({
       subject: input.subject,
       preheader: input.message.slice(0, 120),
+      bodyHtml,
+    }),
+  })
+}
+
+// ─── Daily boss report ─────────────────────────────────────────────────────────
+
+/** Gold section heading + its label/value rows, matching the FHI Assistant
+ *  PDF export's section style. */
+function reportSection(title: string, rowsHtml: string): string {
+  return `
+        <tr>
+          <td style="padding:24px 40px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <p style="margin:0 0 2px;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:${NAVY};border-bottom:2px solid ${GOLD};padding-bottom:6px;">${esc(title)}</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rowsHtml}</table>
+          </td>
+        </tr>`
+}
+
+/** The automated morning report — same navy/gold shell as every FHI email. */
+export async function sendDailyReportEmail(to: string | string[], report: DailyReport): Promise<void> {
+  const subject = `FHI Daily Report — ${report.dateLabel}`
+
+  const sectionsHtml = report.sections
+    .map((s) => reportSection(s.title, s.rows.map((r) => detailRow(r.label, r.value)).join("")))
+    .join("")
+
+  const activityHtml = report.activity.length
+    ? `
+        <tr>
+          <td style="padding:24px 40px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <p style="margin:0 0 8px;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:${NAVY};border-bottom:2px solid ${GOLD};padding-bottom:6px;">What happened</p>
+            ${report.activity
+              .map(
+                (l) =>
+                  `<p style="margin:0;padding:7px 0;border-bottom:1px solid #eef0f3;font-size:13px;line-height:1.55;color:#374151;">${esc(l)}</p>`,
+              )
+              .join("")}
+          </td>
+        </tr>`
+    : ""
+
+  const bodyHtml = `
+        <tr>
+          <td style="padding:34px 40px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">Daily report</p>
+            <h1 style="margin:0 0 6px;font-size:22px;line-height:1.3;font-weight:700;color:#0d1117;">${esc(report.dateLabel)}</h1>
+            <p style="margin:0;font-size:13.5px;line-height:1.6;color:#6b7280;">Yesterday at FHI Global Property — sales, signups and website, with month-to-date standings.</p>
+          </td>
+        </tr>
+        ${sectionsHtml}
+        ${activityHtml}
+        <tr>
+          <td style="padding:26px 40px 30px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <p style="margin:0;font-size:11.5px;line-height:1.6;color:#9ca3af;">
+              Generated automatically by FHI Assistant from the live database and Google Analytics.
+              Analytics can lag up to 24 hours, so yesterday's website numbers may still settle.
+            </p>
+          </td>
+        </tr>`
+
+  const text = [
+    `FHI DAILY REPORT — ${report.dateLabel}`,
+    "",
+    ...report.sections.flatMap((s) => [s.title.toUpperCase(), ...s.rows.map((r) => `- ${r.label}: ${r.value}`), ""]),
+    ...(report.activity.length ? ["WHAT HAPPENED", ...report.activity.map((l) => `- ${l}`)] : []),
+  ].join("\n")
+
+  await deliver("DailyReportMailer", {
+    from: fromAddress(),
+    to,
+    subject,
+    text,
+    html: eventEmailShell({
+      subject,
+      preheader: `Yesterday at FHI Global — sales, signups and website performance.`,
       bodyHtml,
     }),
   })
