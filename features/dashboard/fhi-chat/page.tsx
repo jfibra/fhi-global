@@ -170,31 +170,141 @@ const TOOL_LABELS: Record<string, string> = {
   activity_feed: "activity feed",
 }
 
-/** Branded print view — the browser's print dialog offers "Save as PDF",
- *  same pattern as the events attendee sheet. */
+/** Branded print view — parses the plain-text answer into a real report
+ *  layout (title band, sections, ranked rows, insight callout) so "Save as
+ *  PDF" produces something you can forward unedited. */
 function exportAnswer(content: string) {
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  // Escape first, then decorate: gold amounts, green/red period deltas.
+  const decorate = (s: string) =>
+    esc(s)
+      .replace(/AED \d{1,3}(?:,\d{3})*(?:\.\d+)?/g, (m) => `<b class="aed">${m}</b>`)
+      .replace(/\b(up \d+(?:\.\d+)?%)/gi, '<span class="up">$1</span>')
+      .replace(/\b(down \d+(?:\.\d+)?%)/gi, '<span class="down">$1</span>')
+      .replace(/\(\+(\d+(?:\.\d+)?%)/g, '(<span class="up">+$1</span>')
+      .replace(/\(-(\d+(?:\.\d+)?%)/g, '(<span class="down">-$1</span>')
+
+  // A heading is an ALL-CAPS line ("SALES", "TOP AGENTS"), optionally with a
+  // lowercase parenthetical ("FULL REPORT (this week)").
+  const isHeading = (l: string) => {
+    if (l.startsWith("- ")) return false
+    const base = l.replace(/\s*\(.*\)\s*$/, "").trim()
+    return base.length >= 3 && base.length <= 40 && /[A-Z]/.test(base) && base === base.toUpperCase()
+  }
+
+  const lines = content.split(/\r?\n/).map((l) => l.trim())
+  let title = "FHI Chat Report"
+  let period = ""
+  let firstHeadingUsed = false
+  let inSection = false
+  const body: string[] = []
+  const closeSection = () => {
+    if (inSection) {
+      body.push("</div>")
+      inSection = false
+    }
+  }
+
+  for (const line of lines) {
+    if (!line) continue
+    if (isHeading(line)) {
+      // The first heading is the report's own title ("FULL REPORT (today)").
+      if (!firstHeadingUsed) {
+        firstHeadingUsed = true
+        const m = line.match(/^(.*?)\s*\((.*)\)\s*$/)
+        title = m ? m[1] : line
+        period = m ? m[2] : ""
+        continue
+      }
+      closeSection()
+      body.push(`<div class="section"><h2>${decorate(line)}</h2>`)
+      inSection = true
+      continue
+    }
+    if (/^insight\s*:/i.test(line)) {
+      closeSection()
+      body.push(
+        `<div class="insight"><span>Insight</span><p>${decorate(line.replace(/^insight\s*:\s*/i, ""))}</p></div>`,
+      )
+      continue
+    }
+    if (line.startsWith("- ")) {
+      if (!inSection) {
+        body.push('<div class="section">')
+        inSection = true
+      }
+      const item = line.slice(2)
+      const rank = item.match(/^(\d+)\.\s+(.*)$/)
+      const rest = rank ? rank[2] : item
+      const split = rest.match(/^(.{2,42}?):\s+(.*)$/)
+      body.push(
+        `<div class="row">${rank ? `<span class="rank">${rank[1]}</span>` : ""}` +
+          (split
+            ? `<span class="lbl">${decorate(split[1])}</span><span class="val">${decorate(split[2])}</span>`
+            : `<span class="txt">${decorate(rest)}</span>`) +
+          `</div>`,
+      )
+      continue
+    }
+    closeSection()
+    body.push(`<p class="para">${decorate(line)}</p>`)
+  }
+  closeSection()
+
   const w = window.open("", "_blank", "width=900,height=700")
   if (!w) return
   const generated = new Date().toLocaleString("en-AE", { dateStyle: "long", timeStyle: "short" })
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>FHI Chat Report</title>
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)} — FHI Global</title>
 <style>
   * { box-sizing: border-box; margin: 0; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; padding: 32px; }
-  .band { background: #001f3f; border-bottom: 4px solid #d6b357; border-radius: 12px 12px 0 0; padding: 22px 28px; }
-  .band h1 { color: #ffffff; font-size: 20px; }
-  .band .gold { color: #d6b357; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
-  .meta { padding: 12px 28px; background: #f6f8fb; border: 1px solid #e8eaed; border-top: 0; font-size: 12px; color: #4b5563; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; background: #ffffff;
+         -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sheet { max-width: 820px; margin: 0 auto; padding: 28px 30px 80px; }
+  .band { display: flex; justify-content: space-between; align-items: center; background: #001f3f;
+          border-bottom: 4px solid #d6b357; padding: 24px 30px; }
+  .band .gold { color: #d6b357; font-size: 10.5px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; }
+  .band h1 { color: #ffffff; font-size: 23px; letter-spacing: .5px; margin-top: 5px; }
+  .band .period { color: #c7d2e0; font-size: 12.5px; margin-top: 5px; text-transform: capitalize; }
+  .mark { flex: 0 0 auto; width: 46px; height: 46px; border: 2px solid #d6b357; color: #d6b357;
+          display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; }
+  .meta { display: flex; gap: 26px; padding: 10px 30px; background: #f6f8fb; border: 1px solid #e8eaed;
+          border-top: 0; font-size: 11.5px; color: #4b5563; }
   .meta strong { color: #001f3f; }
-  pre { margin-top: 20px; padding: 0 4px; font-family: inherit; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; word-wrap: break-word; }
-  .foot { margin-top: 26px; text-align: center; font-size: 11px; color: #9ca3af; }
+  .section { margin-top: 24px; break-inside: avoid; }
+  h2 { font-size: 12.5px; letter-spacing: 1.8px; color: #001f3f; text-transform: uppercase;
+       padding-bottom: 6px; border-bottom: 2px solid #d6b357; }
+  .row { display: flex; gap: 10px; align-items: baseline; padding: 7.5px 2px; border-bottom: 1px solid #eef1f4;
+         font-size: 13px; }
+  .rank { flex: 0 0 auto; width: 20px; height: 20px; background: #001f3f; color: #d6b357; font-size: 11px;
+          font-weight: 700; display: inline-flex; align-items: center; justify-content: center; align-self: center; }
+  .lbl { color: #111827; font-weight: 600; }
+  .val { margin-left: auto; text-align: right; color: #374151; }
+  .txt { color: #374151; }
+  .aed { color: #b8913f; font-weight: 700; }
+  .up { color: #157347; font-weight: 600; }
+  .down { color: #b02a37; font-weight: 600; }
+  .insight { margin-top: 26px; border-left: 4px solid #d6b357; background: #fbf7ee; padding: 12px 16px; }
+  .insight span { font-size: 10.5px; font-weight: 800; letter-spacing: 1.5px; color: #b8913f; text-transform: uppercase; }
+  .insight p { margin-top: 4px; font-size: 13px; line-height: 1.6; color: #1f2937; }
+  .para { margin-top: 14px; font-size: 13px; line-height: 1.7; }
+  .foot { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; font-size: 10.5px; color: #9ca3af;
+          padding: 10px; background: #ffffff; border-top: 1px solid #eef1f4; }
   .foot b { color: #b8913f; }
-  @page { margin: 14mm; }
+  @page { margin: 12mm; }
 </style></head><body>
-  <div class="band"><p class="gold">FHI Global · FHI Chat</p><h1>Report</h1></div>
-  <div class="meta">Generated: <strong>${esc(generated)}</strong> · Source: live FHI database & Google Analytics</div>
-  <pre>${esc(content)}</pre>
-  <p class="foot">Generated from the FHI Global dashboard · <b>fhiglobal.ae</b></p>
+  <div class="sheet">
+    <div class="band">
+      <div>
+        <p class="gold">FHI Global Property · FHI Chat</p>
+        <h1>${esc(title)}</h1>
+        ${period ? `<p class="period">${esc(period)}</p>` : ""}
+      </div>
+      <div class="mark">F</div>
+    </div>
+    <div class="meta"><span>Generated: <strong>${esc(generated)}</strong></span><span>Source: live FHI database &amp; Google Analytics</span></div>
+    ${body.join("\n")}
+  </div>
+  <p class="foot">Generated by FHI Chat · FHI Global Property · <b>fhiglobal.ae</b></p>
 </body></html>`)
   w.document.close()
   w.focus()
