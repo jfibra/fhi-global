@@ -194,7 +194,10 @@ async function findProfiles(admin: Admin, q: string): Promise<Array<{ id: string
 
 async function topAgents(
   admin: Admin,
-  args: { scope?: string; year?: number; month?: number; limit?: number; from_date?: string; to_date?: string },
+  args: {
+    scope?: string; year?: number; month?: number; limit?: number; from_date?: string; to_date?: string
+    developer_name?: string; project_name?: string
+  },
 ) {
   const now = new Date()
   const scope = normScope(args.scope)
@@ -202,9 +205,25 @@ async function topAgents(
   // Explicit dates beat the scope shorthand ("today", "May-August").
   if (args.from_date?.trim()) from = args.from_date.trim()
   if (args.to_date?.trim()) to = args.to_date.trim()
-  const sales = (await fetchAllSales(admin)).filter(
+  let sales = (await fetchAllSales(admin)).filter(
     (s) => s.validation_status === "validated" && inRange(s, from, to),
   )
+  // "Which agents sold Azizi deals?" — narrow to one developer's or one
+  // project's sales before ranking.
+  const devFilter = (args.developer_name ?? "").trim()
+  if (devFilter) {
+    const { data } = await admin.from("developers").select("id").ilike("name", `%${devFilter}%`)
+    const ids = new Set((data ?? []).map((d) => String(d.id)))
+    sales = sales.filter((s) => ids.has(String(s.developer_id)))
+    if (!ids.size) return { error: `No developer matches "${devFilter}".` }
+  }
+  const projFilter = (args.project_name ?? "").trim()
+  if (projFilter) {
+    const { data } = await admin.from("projects").select("id").ilike("name", `%${projFilter}%`)
+    const ids = new Set((data ?? []).map((p) => Number(p.id)))
+    sales = sales.filter((s) => ids.has(Number(s.project_id)))
+    if (!ids.size) return { error: `No project matches "${projFilter}".` }
+  }
   const byAgent = new Map<string, { deals: number; value: number }>()
   for (const s of sales) {
     const t = byAgent.get(s.agent_id) ?? { deals: 0, value: 0 }
@@ -220,6 +239,8 @@ async function topAgents(
   return {
     period: { scope, from, to },
     note: "validated sales only",
+    ...(devFilter ? { filtered_to_developer: devFilter } : {}),
+    ...(projFilter ? { filtered_to_project: projFilter } : {}),
     leaders: ranked.map((l, i) => ({
       rank: i + 1,
       agent: names.agent.get(l.id)?.name ?? l.id,
@@ -1354,7 +1375,8 @@ export const FHI_CHAT_TOOLS = [
     type: "function" as const,
     function: {
       name: "top_agents",
-      description: "Leaderboard of agents by VALIDATED sales value for a period (company Top Sales board).",
+      description:
+        "Leaderboard of agents by VALIDATED sales value for a period (company Top Sales board). Can be narrowed to ONE developer's or ONE project's deals — use that for 'which agents sold Azizi deals' / 'who sold this project'.",
       parameters: {
         type: "object",
         properties: {
@@ -1362,6 +1384,8 @@ export const FHI_CHAT_TOOLS = [
           year: { type: "integer" }, month: { type: "integer", description: "1-12, anchors month/quarter" },
           from_date: { type: "string", description: "YYYY-MM-DD inclusive — overrides scope for exact ranges like today" },
           to_date: { type: "string", description: "YYYY-MM-DD exclusive" },
+          developer_name: { type: "string", description: "Only deals of this developer (partial name ok)" },
+          project_name: { type: "string", description: "Only deals of this project (partial name ok)" },
           limit: { type: "integer" },
         },
       },
@@ -1419,7 +1443,7 @@ export const FHI_CHAT_TOOLS = [
     function: {
       name: "agent_sales",
       description:
-        "One agent's profile, CONTACT DETAILS (phone, email) and sales record, looked up by (partial) name. Use for any question about a specific person.",
+        "One agent's profile, CONTACT DETAILS (phone, email) and sales record, looked up by (partial) name. ONE SPECIFIC PERSON only — NEVER a company or developer name. For 'which agents sold developer X's deals' use top_agents with developer_name instead.",
       parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
     },
   },

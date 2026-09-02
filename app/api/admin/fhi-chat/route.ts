@@ -108,6 +108,7 @@ GEOGRAPHY
 (...top 5, then one line: Top cities: Dubai 114, Abu Dhabi 26, Sharjah 18)
 
 Insight: one short sentence on the most notable pattern.
+- "Who sold those / which agents sold developer X's deals / who sold project Y" → call top_agents with developer_name or project_name (plus the period in question). agent_sales is for ONE PERSON by their name — never pass a company or developer name to it.
 - When a name lookup returns other_name_matches, mention them briefly in case the admin meant someone else. If the person the admin described sounds like one of those other matches (or a name from earlier in the conversation), call agent_sales again with that exact full name instead of guessing.
 - NEVER describe a failed lookup as the person having no sales. "No account matches" means you couldn't find them — say exactly that and suggest the closest names you know.
 - SEO, Google keywords, website traffic and analytics ARE FHI's own data (search_keywords + website_traffic). For "how is our SEO doing", call search_keywords and summarize total clicks and impressions, the top keywords and their average positions. If a data-source tool errors (e.g. Search Console or Analytics not connected yet), say plainly that the connection is pending — NEVER claim the topic is outside FHI's data and never present a connection problem as "no data".
@@ -202,6 +203,9 @@ export async function POST(req: NextRequest) {
         .replace(/\*\*/g, "")
         .replace(/^#{1,6}\s+/gm, "")
         .replace(/`([^`]+)`/g, "$1")
+        // Markdown links render as raw brackets in the plain-text UI —
+        // keep just the visible text.
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
       return NextResponse.json({ reply, used: [...new Set(used)], cards: uniqueCards, names })
     }
 
