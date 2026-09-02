@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Check, Copy, FileText, Globe, Loader2, Monitor, Printer, Send, Smartphone, Sparkles, Tablet } from "lucide-react"
+import { Check, Copy, FileText, Globe, Loader2, Monitor, Printer, RotateCcw, Send, Smartphone, Sparkles, Tablet } from "lucide-react"
 
 /**
  * FHI Assistant — the admin one-stop shop for questions about the business.
@@ -400,6 +400,10 @@ function exportAnswer(content: string) {
   setTimeout(() => w.print(), 350)
 }
 
+/** The conversation survives dashboard navigation: it is kept per browser
+ *  tab (sessionStorage) and cleared when the tab closes or via "New chat". */
+const CHAT_STORAGE_KEY = "fhi-assistant-chat"
+
 export default function FhiChatPage() {
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState("")
@@ -417,6 +421,45 @@ export default function FhiChatPage() {
     } catch {
       // Clipboard can be blocked — the export path still works.
     }
+  }
+
+  // Restore the tab's conversation after navigating away and back. Restored
+  // replies never re-run the typewriter. Deferred a tick so the restore never
+  // sets state synchronously inside the effect (avoids cascading renders).
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      try {
+        const raw = sessionStorage.getItem(CHAT_STORAGE_KEY)
+        if (!raw) return
+        const saved = JSON.parse(raw) as Msg[]
+        if (Array.isArray(saved) && saved.length) {
+          setMessages((cur) => (cur.length ? cur : saved.map((m) => ({ ...m, typed: true }))))
+        }
+      } catch {
+        // Corrupt or blocked storage — start fresh.
+      }
+    }, 0)
+    return () => window.clearTimeout(id)
+  }, [])
+
+  useEffect(() => {
+    // Never delete here: on mount this runs with an empty chat BEFORE the
+    // deferred restore reads storage — clearing belongs to "New chat" only.
+    if (!messages.length) return
+    try {
+      sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages.slice(-30)))
+    } catch {
+      // Storage full or blocked — the chat still works, it just won't persist.
+    }
+  }, [messages])
+
+  const newChat = () => {
+    setMessages([])
+    setError(null)
+    try {
+      sessionStorage.removeItem(CHAT_STORAGE_KEY)
+    } catch {}
+    inputRef.current?.focus()
   }
 
   useEffect(() => {
@@ -491,6 +534,16 @@ export default function FhiChatPage() {
             Ask anything about FHI&apos;s data — sales, agents, developers, projects, events. Answers come from live queries.
           </p>
         </div>
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={newChat}
+            disabled={busy}
+            className="ml-auto inline-flex shrink-0 items-center gap-1.5 border border-[#e5e5e5] bg-white px-3 py-2 text-[12px] font-semibold text-[#001f3f] transition-colors hover:border-[#d6b357] hover:bg-[#d6b357]/10 disabled:opacity-50"
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> New chat
+          </button>
+        )}
       </div>
 
       {/* Thread */}
