@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Check, Copy, Loader2, Printer, Send, Sparkles } from "lucide-react"
+import { Check, Copy, FileText, Loader2, Printer, Send, Sparkles } from "lucide-react"
 
 /**
  * FHI Chat — the admin one-stop shop for questions about the business.
@@ -142,6 +142,13 @@ const SUGGESTIONS = [
   "What were our most recent sales?",
   "How many registrations does our latest event have?",
 ]
+
+/** One-tap professional reports — each sends a preset question. */
+const REPORT_BUTTONS = [
+  { label: "Daily Report", prompt: "Give me the full report for today" },
+  { label: "Weekly Report", prompt: "Give me the full report for the last 7 days" },
+  { label: "Monthly Report", prompt: "Give me the full report for this month" },
+] as const
 
 /** Tool names → human wording for the tiny "checked" line. */
 const TOOL_LABELS: Record<string, string> = {
@@ -378,6 +385,24 @@ export default function FhiChatPage() {
             <div ref={endRef} />
           </div>
         )}
+      </div>
+
+      {/* One-tap reports — the "one command" professional report. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#9ca3af]">
+          <FileText className="h-3.5 w-3.5" /> Reports
+        </span>
+        {REPORT_BUTTONS.map((r) => (
+          <button
+            key={r.label}
+            type="button"
+            disabled={busy}
+            onClick={() => void ask(r.prompt)}
+            className="border border-[#001f3f]/20 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-[#001f3f] transition-colors hover:border-[#d6b357] hover:bg-[#d6b357]/10 disabled:opacity-50"
+          >
+            {r.label}
+          </button>
+        ))}
       </div>
 
       {/* Composer */}

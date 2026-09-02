@@ -72,6 +72,24 @@ function periodRange(
   }
 }
 
+/** "+25%" / "-8%" vs the previous period; special-cased when it was empty. */
+function pctChange(cur: number, prev: number): string {
+  if (prev === 0) return cur === 0 ? "0% (both periods 0)" : "new (previous period was 0)"
+  const p = Math.round(((cur - prev) / prev) * 100)
+  return `${p >= 0 ? "+" : ""}${p}%`
+}
+
+/** The equal-length window immediately before [from, to) — what "vs previous
+ *  period" compares against. A missing `to` means "through today". */
+function previousWindow(from: string, to: string | null): { from: string; to: string } {
+  const DAY = 86400e3
+  const f = Date.parse(`${from}T00:00:00Z`)
+  const t = to ? Date.parse(`${to}T00:00:00Z`) : Date.now() + DAY
+  const len = Math.max(t - f, DAY)
+  const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+  return { from: iso(f - len), to: iso(f) }
+}
+
 function normScope(raw: string | undefined): "month" | "quarter" | "year" | "all" {
   return (["month", "quarter", "year", "all"].includes(raw ?? "") ? raw : "year") as
     | "month" | "quarter" | "year" | "all"
@@ -328,17 +346,44 @@ async function topTeams(
 async function salesSummary(admin: Admin, args: { from_date?: string; to_date?: string }) {
   const from = args.from_date ?? null
   const to = args.to_date ?? null
-  const sales = (await fetchAllSales(admin)).filter((s) => inRange(s, from, to))
-  const bucket = (status: string) => {
-    const rows = sales.filter((s) => (s.validation_status ?? "pending") === status)
-    return { count: rows.length, total: AED(rows.reduce((a, s) => a + Number(s.contract_price ?? 0), 0)) }
+  const all = await fetchAllSales(admin)
+  const sales = all.filter((s) => inRange(s, from, to))
+  const bucket = (rows: SaleRow[], status: string) => {
+    const b = rows.filter((s) => (s.validation_status ?? "pending") === status)
+    return {
+      count: b.length,
+      total: AED(b.reduce((a, s) => a + Number(s.contract_price ?? 0), 0)),
+      raw_total: b.reduce((a, s) => a + Number(s.contract_price ?? 0), 0),
+    }
+  }
+  const cur = { validated: bucket(sales, "validated"), pending: bucket(sales, "pending"), rejected: bucket(sales, "rejected") }
+  // Professional reports show context: compare against the equal-length
+  // window immediately before (only meaningful when a period was given).
+  let comparison: Record<string, unknown> = {}
+  if (from) {
+    const prev = previousWindow(from, to)
+    const prevSales = all.filter((s) => inRange(s, prev.from, prev.to))
+    const pv = bucket(prevSales, "validated")
+    comparison = {
+      previous_period: {
+        from: prev.from,
+        to: prev.to,
+        validated: { count: pv.count, total: pv.total },
+        pending_count: bucket(prevSales, "pending").count,
+      },
+      change_vs_previous: {
+        validated_deals: pctChange(cur.validated.count, pv.count),
+        validated_value: pctChange(cur.validated.raw_total, pv.raw_total),
+      },
+    }
   }
   return {
     period: { from: from ?? "beginning", to: to ?? "no upper bound" },
-    validated: bucket("validated"),
-    pending: bucket("pending"),
-    rejected: bucket("rejected"),
+    validated: { count: cur.validated.count, total: cur.validated.total },
+    pending: { count: cur.pending.count, total: cur.pending.total },
+    rejected: { count: cur.rejected.count, total: cur.rejected.total },
     all_statuses_count: sales.length,
+    ...comparison,
   }
 }
 
@@ -777,11 +822,25 @@ async function newAccounts(admin: Admin, args: { from_date?: string; to_date?: s
     .sort((a, b) => b.recruits - a.recruits)
     .slice(0, 8)
 
+  // Same-length previous window for "up/down vs last period" context.
+  const prev = previousWindow(from, to || null)
+  const { data: prevRows } = await admin
+    .from("profiles")
+    .select("id, metadata")
+    .neq("is_deleted", true)
+    .gte("joined_at", prev.from)
+    .lt("joined_at", prev.to)
+    .limit(1000)
+  const prevAll = prevRows ?? []
+  const prevRecruited = prevAll.filter((r) => recruiterOf(r)).length
+
   return {
     period: { from, to: to || "today" },
     new_accounts_total: rows.length,
     recruited_count: recruited.length,
     organic_count: rows.length - recruited.length,
+    previous_period: { from: prev.from, to: prev.to, total: prevAll.length, recruited: prevRecruited },
+    change_vs_previous: { signups: pctChange(rows.length, prevAll.length) },
     top_recruiters_in_period: topRecruiters,
     by_role: group("role"),
     by_status: group("status"),
@@ -1027,7 +1086,22 @@ async function websiteTraffic(args: { days?: number; from_date?: string; to_date
   const endDate = (args.to_date ?? "").trim() || "today"
   const dateRanges = [{ startDate, endDate }]
 
-  const [totals, pages, channels, countries, sources, cities, devices, leadEvents, realtime] = await Promise.all([
+  // The equal-length window right before this one, for "vs previous period"
+  // context (GA date ranges are inclusive on both ends).
+  let prevRange: { startDate: string; endDate: string }
+  if ((args.from_date ?? "").trim()) {
+    const DAY = 86400e3
+    const f = Date.parse(`${startDate}T00:00:00Z`)
+    const e = Date.parse(`${(args.to_date ?? "").trim() || new Date().toISOString().slice(0, 10)}T00:00:00Z`)
+    const len = Math.max(e - f, 0) + DAY
+    const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+    prevRange = { startDate: iso(f - len), endDate: iso(f - DAY) }
+  } else {
+    const n = Math.min(Math.max(args.days ?? 7, 1), 365)
+    prevRange = { startDate: `${2 * n + 1}daysAgo`, endDate: `${n + 1}daysAgo` }
+  }
+
+  const [totals, pages, channels, countries, sources, cities, devices, leadEvents, realtime, prevTotals] = await Promise.all([
     gaRunReport({
       dateRanges,
       metrics: [
@@ -1103,6 +1177,15 @@ async function websiteTraffic(args: { days?: number; from_date?: string; to_date
       },
     }).catch(() => null),
     gaRunRealtime({ metrics: [{ name: "activeUsers" }] }).catch(() => null),
+    gaRunReport({
+      dateRanges: [prevRange],
+      metrics: [
+        { name: "activeUsers" },
+        { name: "sessions" },
+        { name: "screenPageViews" },
+        { name: "newUsers" },
+      ],
+    }).catch(() => null),
   ])
 
   const countryRows = (countries.rows ?? [])
@@ -1130,6 +1213,8 @@ async function websiteTraffic(args: { days?: number; from_date?: string; to_date
 
   const t = totals.rows?.[0]?.metricValues ?? []
   const num = (i: number) => Number(t[i]?.value ?? 0)
+  const pt = prevTotals?.rows?.[0]?.metricValues ?? []
+  const pnum = (i: number) => Number(pt[i]?.value ?? 0)
   const leadCounts = Object.fromEntries(
     (leadEvents?.rows ?? []).map((r) => [
       r.dimensionValues?.[0]?.value ?? "?",
@@ -1144,6 +1229,23 @@ async function websiteTraffic(args: { days?: number; from_date?: string; to_date
     page_views: num(2),
     new_visitors: num(3),
     returning_visitors: Math.max(0, num(0) - num(3)),
+    ...(prevTotals
+      ? {
+          previous_period: {
+            from: prevRange.startDate,
+            to: prevRange.endDate,
+            visitors: pnum(0),
+            sessions: pnum(1),
+            page_views: pnum(2),
+            new_visitors: pnum(3),
+          },
+          change_vs_previous: {
+            visitors: pctChange(num(0), pnum(0)),
+            sessions: pctChange(num(1), pnum(1)),
+            page_views: pctChange(num(2), pnum(2)),
+          },
+        }
+      : {}),
     avg_session_duration: `${Math.floor(num(4) / 60)}m ${Math.round(num(4) % 60)}s`,
     engagement_rate_percent: Math.round(num(5) * 100),
     visitors_by_device: (devices.rows ?? []).map((r) => {
