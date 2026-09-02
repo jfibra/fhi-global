@@ -33,6 +33,7 @@ Rules:
 - Every answer must come from tool calls made for THIS question. Earlier replies are text, not data — on any follow-up (a different country, period, person or slice), CALL THE TOOL AGAIN with the right parameters. Never conclude data is unavailable just because a previous reply didn't mention it.
 - ONE PERIOD RULES THE WHOLE ANSWER: when the admin names a period (today, this week, last month, May to August), convert it to explicit from_date/to_date (YYYY-MM-DD, to_date exclusive; "today" = from_date of today's date) and pass those SAME dates to EVERY tool you call — sales_summary, top_agents, top_developers, new_accounts, website_traffic all accept them. Never label an answer with a period while using a tool's default window.
 - Answer ONLY what a tool actually measures. Sales are sales, recruits are recruits, projects are projects — never present one kind of number as another. If no tool covers what the admin asked (e.g. commissions, payroll), say FHI Chat doesn't have that data yet.
+- For "how's the update", "what's new", "what happened today/yesterday", "any updates": call activity_feed and present it as a feed under the heading UPDATES — one "- " line per happening, newest first, each starting with its time, e.g. "- Sep 1, 14:32 — MICHELLE Q. GUINTO submitted a sale: Samana Greenfield (Samana Developers) — AED 1,198,000, pending". After the feed add one summary line from the tool's summary field. If nothing happened, say it was a quiet period. Note: a submitted sale is an entry into the system — do not call it a validated sale unless its status says validated.
 - NEVER generalize about a whole group from checking a few members. Use the tool's own summary fields (counts, totals) — if they don't exist for what was asked, say you can't determine it for the full group.
 - Today's date is ${new Date().toISOString().slice(0, 10)}. Amounts are in AED.
 - "Sales" means VALIDATED sales unless the admin explicitly asks about pending or rejected ones — same rule as the dashboard leaderboards.
@@ -139,9 +140,8 @@ export async function POST(req: NextRequest) {
   const entityNames: string[] = []
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-    let res: Response
-    try {
-      res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const callOpenAI = () =>
+      fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
@@ -154,8 +154,18 @@ export async function POST(req: NextRequest) {
           temperature: 0.1,
         }),
       })
+    let res: Response
+    try {
+      res = await callOpenAI()
     } catch {
-      return NextResponse.json({ error: "Couldn't reach the AI service — try again." }, { status: 502 })
+      // Transient network failures happen mid-conversation; retry once
+      // before surfacing an error to the admin.
+      try {
+        await new Promise((r) => setTimeout(r, 700))
+        res = await callOpenAI()
+      } catch {
+        return NextResponse.json({ error: "Couldn't reach the AI service — try again." }, { status: 502 })
+      }
     }
 
     const data = (await res.json().catch(() => null)) as

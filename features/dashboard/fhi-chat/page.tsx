@@ -160,6 +160,7 @@ const TOOL_LABELS: Record<string, string> = {
   new_accounts: "new signups",
   website_traffic: "Google Analytics",
   search_keywords: "Google Search Console",
+  activity_feed: "activity feed",
 }
 
 /** Branded print view — the browser's print dialog offers "Save as PDF",

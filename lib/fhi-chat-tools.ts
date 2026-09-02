@@ -852,6 +852,169 @@ async function eventAttendees(admin: Admin, args: { event_title?: string }) {
   }
 }
 
+/** Chronological "what happened" feed — sales submitted, signups, listings and
+ *  projects added, event registrations. Timestamps are created_at (when it was
+ *  entered into the system), NOT the deal's business date: this answers
+ *  "how's the update today", not "which period does this sale count in". */
+async function activityFeed(admin: Admin, args: { from_date?: string; to_date?: string; days?: number }) {
+  const iso = (d: Date) => d.toISOString().slice(0, 10)
+  let from = (args.from_date ?? "").trim()
+  if (!from) {
+    const d = new Date()
+    d.setUTCDate(d.getUTCDate() - Math.min(Math.max(args.days ?? 1, 0), 90))
+    from = iso(d)
+  }
+  const to = (args.to_date ?? "").trim()
+
+  let salesQ = admin
+    .from("sales_reports")
+    .select("id, agent_id, developer_id, project_id, contract_price, validation_status, reservation_date, created_at")
+    .gte("created_at", from)
+    .order("created_at", { ascending: false })
+    .limit(200)
+  if (to) salesQ = salesQ.lt("created_at", to)
+
+  let signupsQ = admin
+    .from("profiles")
+    .select("id, fullname, role, metadata, joined_at, profile_url")
+    .neq("is_deleted", true)
+    .gte("joined_at", from)
+    .order("joined_at", { ascending: false })
+    .limit(200)
+  if (to) signupsQ = signupsQ.lt("joined_at", to)
+
+  let listingsQ = admin
+    .from("agent_listings")
+    .select("id, title, agent_id, status, created_at")
+    .is("deleted_at", null)
+    .gte("created_at", from)
+    .order("created_at", { ascending: false })
+    .limit(100)
+  if (to) listingsQ = listingsQ.lt("created_at", to)
+
+  let projectsQ = admin
+    .from("projects")
+    .select("id, name, developer_id, is_published, created_at")
+    .is("deleted_at", null)
+    .gte("created_at", from)
+    .order("created_at", { ascending: false })
+    .limit(100)
+  if (to) projectsQ = projectsQ.lt("created_at", to)
+
+  let regsQ = admin
+    .from("event_registrations")
+    .select("full_name, event_id, created_at")
+    .gte("created_at", from)
+    .order("created_at", { ascending: false })
+    .limit(100)
+  if (to) regsQ = regsQ.lt("created_at", to)
+
+  const [salesRes, signupsRes, listingsRes, projectsRes, regsRes] = await Promise.all([
+    salesQ, signupsQ, listingsQ, projectsQ, regsQ,
+  ])
+  for (const r of [salesRes, signupsRes, listingsRes, projectsRes, regsRes]) {
+    if (r.error) throw new Error(r.error.message)
+  }
+  const sales = (salesRes.data ?? []) as SaleRow[]
+  const signups = signupsRes.data ?? []
+  const listings = listingsRes.data ?? []
+  const projectsAdded = projectsRes.data ?? []
+  const regs = regsRes.data ?? []
+
+  // Names for everything the feed mentions: sale entities via nameMaps, then
+  // listing agents, project developers, recruiters and event titles on top.
+  const names = await nameMaps(admin, sales)
+  const recruiterOf = (m: unknown) => {
+    const v = (m as Record<string, unknown> | null)?.invited_by
+    return typeof v === "string" && v ? v : null
+  }
+  const extraAgentIds = [...new Set(listings.map((l) => String(l.agent_id)))].filter((id) => !names.agent.has(id))
+  const recruiterIds = [...new Set(signups.map((s) => recruiterOf(s.metadata)).filter((v): v is string => Boolean(v)))]
+  const extraDevIds = [...new Set(projectsAdded.map((p) => String(p.developer_id)))].filter((id) => !names.dev.has(id))
+  const eventIds = [...new Set(regs.map((r) => String(r.event_id)))]
+  const [extraAgents, recruiters, extraDevs, eventRows] = await Promise.all([
+    extraAgentIds.length
+      ? admin.from("profiles").select("id, fullname").in("id", extraAgentIds)
+      : Promise.resolve({ data: [] as { id: string; fullname: string | null }[] }),
+    recruiterIds.length
+      ? admin.from("profiles").select("id, fullname").in("id", recruiterIds)
+      : Promise.resolve({ data: [] as { id: string; fullname: string | null }[] }),
+    extraDevIds.length
+      ? admin.from("developers").select("id, name").in("id", extraDevIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    eventIds.length
+      ? admin.from("events").select("id, title").in("id", eventIds)
+      : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+  ])
+  const agentName = (id: string) =>
+    names.agent.get(id)?.name ?? (extraAgents.data ?? []).find((a) => String(a.id) === id)?.fullname ?? "Unknown agent"
+  const recruiterName = new Map((recruiters.data ?? []).map((p) => [String(p.id), p.fullname ?? "Unknown"]))
+  const devName = (id: string) =>
+    names.dev.get(id)?.name ?? (extraDevs.data ?? []).find((d) => String(d.id) === id)?.name ?? "Unknown developer"
+  const eventTitle = new Map((eventRows.data ?? []).map((e) => [String(e.id), e.title]))
+
+  const when = (v: string | null | undefined) => (v ? String(v).slice(0, 16).replace("T", " ") : "")
+  const feed: Array<{ at: string; happened: string }> = []
+  for (const s of sales)
+    feed.push({
+      at: when(s.created_at),
+      happened: `${agentName(s.agent_id)} submitted a sale: ${names.proj.get(s.project_id)?.name ?? "?"} (${devName(String(s.developer_id))}) — ${AED(Number(s.contract_price ?? 0))}, ${s.validation_status ?? "pending"}`,
+    })
+  for (const s of signups) {
+    const upline = recruiterOf(s.metadata)
+    feed.push({
+      at: when(s.joined_at as string | null),
+      happened: `${s.fullname?.trim() || "Unnamed account"} created an account${upline ? ` (recruited by ${recruiterName.get(upline) ?? "Unknown"})` : ""}`,
+    })
+  }
+  for (const l of listings)
+    feed.push({ at: when(l.created_at), happened: `${agentName(String(l.agent_id))} added a listing: ${l.title} (${l.status})` })
+  for (const p of projectsAdded)
+    feed.push({
+      at: when(p.created_at),
+      happened: `New project added: ${p.name} by ${devName(String(p.developer_id))}${p.is_published ? "" : " (not yet published)"}`,
+    })
+  for (const r of regs)
+    feed.push({ at: when(r.created_at), happened: `${r.full_name} registered for the event ${eventTitle.get(String(r.event_id)) ?? "?"}` })
+  feed.sort((a, b) => b.at.localeCompare(a.at))
+
+  return {
+    period: { from, to: to || "now" },
+    note: "Times are when each entry was submitted into the system (UTC), not the deal's business date.",
+    summary: {
+      sales_submitted: sales.length,
+      sales_value_submitted: AED(sales.reduce((a, s) => a + Number(s.contract_price ?? 0), 0)),
+      new_accounts: signups.length,
+      listings_added: listings.length,
+      projects_added: projectsAdded.length,
+      event_registrations: regs.length,
+    },
+    activity: feed.slice(0, 40),
+    activity_total: feed.length,
+    _names: [
+      ...new Set([
+        ...sales.map((s) => agentName(s.agent_id)),
+        ...sales.map((s) => names.proj.get(s.project_id)?.name),
+        ...signups.map((s) => s.fullname?.trim()),
+      ]),
+    ].filter((n): n is string => Boolean(n) && n !== "Unknown agent"),
+    _cards: [
+      ...sales.slice(0, 4).map((s): FhiChatCard => ({
+        kind: "agent",
+        title: agentName(s.agent_id),
+        subtitle: `${AED(Number(s.contract_price ?? 0))} · ${names.proj.get(s.project_id)?.name ?? ""}`,
+        image: names.agent.get(s.agent_id)?.image ?? null,
+      })),
+      ...signups.slice(0, 3).map((s): FhiChatCard => ({
+        kind: "agent",
+        title: s.fullname?.trim() || "Unnamed account",
+        subtitle: `new account · ${when(s.joined_at as string | null).slice(0, 10)}`,
+        image: (s.profile_url as string | null) ?? null,
+      })),
+    ].slice(0, 6),
+  }
+}
+
 /** Internal dashboard/auth paths — excluded from public traffic answers. */
 const INTERNAL_PATH_RE =
   /^\/(admin|superadmin|agent|teamleader|unitmanager|member|secretary|teamsecretary|developer|editor|dashboard|login|staff-login|register|account-inactive)(\/|$)/
@@ -1254,6 +1417,22 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "activity_feed",
+      description:
+        "Chronological WHAT-HAPPENED feed of platform activity: every sale submitted (who, project, amount, status), account created (with recruiter), listing added, project added and event registration in the window. Use for 'how's the update today', 'what's new', 'what happened yesterday', 'any updates'. Defaults to since yesterday.",
+      parameters: {
+        type: "object",
+        properties: {
+          from_date: { type: "string", description: "YYYY-MM-DD inclusive (default: yesterday)" },
+          to_date: { type: "string", description: "YYYY-MM-DD exclusive" },
+          days: { type: "integer", description: "Alternative: days back from today (default 1)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "events_overview",
       description: "Recent and upcoming FHI events with dates, venues and registration counts. For the registrant NAMES use event_attendees.",
       parameters: { type: "object", properties: {} },
@@ -1312,6 +1491,7 @@ export async function runFhiChatTool(
       case "new_accounts": result = await newAccounts(admin, args); break
       case "website_traffic": result = await websiteTraffic(args); break
       case "search_keywords": result = await searchKeywords(args); break
+      case "activity_feed": result = await activityFeed(admin, args); break
       default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [] }
     }
     const { _cards, _names, ...rest } = result as { _cards?: FhiChatCard[]; _names?: string[] } & Record<string, unknown>
