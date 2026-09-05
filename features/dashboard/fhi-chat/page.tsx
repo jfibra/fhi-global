@@ -257,6 +257,7 @@ const TOOL_LABELS: Record<string, string> = {
   website_traffic: "Google Analytics",
   search_keywords: "Google Search Console",
   activity_feed: "activity feed",
+  upcoming_birthdays: "birthday calendar",
 }
 
 /** Branded print view — parses the plain-text answer into a real report

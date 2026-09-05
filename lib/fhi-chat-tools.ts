@@ -1117,6 +1117,62 @@ async function activityFeed(admin: Admin, args: { from_date?: string; to_date?: 
   }
 }
 
+/** Upcoming birthdays of active members — "whose birthday is next?" Sorted
+ *  soonest first; Dubai-time days. Matches the birthday-greetings cron rules
+ *  (active, not deleted, birthday saved). */
+async function upcomingBirthdays(admin: Admin, args: { days?: number; limit?: number }) {
+  const windowDays = Math.min(Math.max(args.days ?? 30, 0), 366)
+  const limit = Math.min(Math.max(args.limit ?? 15, 1), 60)
+  const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" })
+  const base = new Date(`${todayIso}T00:00:00Z`)
+
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id, fullname, fname, role, birthday, profile_url")
+    .eq("status", "active")
+    .neq("is_deleted", true)
+    .not("birthday", "is", null)
+    .limit(3000)
+  if (error) throw new Error(error.message)
+
+  const upcoming = (data ?? [])
+    .map((p) => {
+      const bday = String(p.birthday)
+      const month = Number(bday.slice(5, 7))
+      const day = Number(bday.slice(8, 10))
+      if (!month || !day) return null
+      // Next occurrence (Feb 29 rolls to Mar 1 in non-leap years).
+      let next = new Date(Date.UTC(base.getUTCFullYear(), month - 1, day))
+      if (next.getTime() < base.getTime()) next = new Date(Date.UTC(base.getUTCFullYear() + 1, month - 1, day))
+      const daysUntil = Math.round((next.getTime() - base.getTime()) / 86400e3)
+      return {
+        name: (p.fullname ?? p.fname ?? "").trim().replace(/\s+/g, " ") || "Unnamed account",
+        role: p.role ?? null,
+        image: (p.profile_url as string | null) ?? null,
+        dateLabel: next.toLocaleDateString("en-AE", { month: "short", day: "numeric", timeZone: "UTC" }),
+        daysUntil,
+      }
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null && r.daysUntil <= windowDays)
+    .sort((a, b) => a.daysUntil - b.daysUntil || a.name.localeCompare(b.name))
+
+  const whenLabel = (d: number) => (d === 0 ? "TODAY" : d === 1 ? "tomorrow" : `in ${d} days`)
+  const listed = upcoming.slice(0, limit)
+  return {
+    window_days: windowDays,
+    total_in_window: upcoming.length,
+    note: "Active accounts with a saved birthday only. Each of them automatically receives the FHI birthday greeting email (with their poster) on their day at 8:30 AM Dubai.",
+    birthdays: listed.map((r) => ({ name: r.name, role: r.role, date: r.dateLabel, when: whenLabel(r.daysUntil) })),
+    _names: listed.map((r) => r.name),
+    _cards: listed.slice(0, 8).map((r): FhiChatCard => ({
+      kind: "agent",
+      title: r.name,
+      subtitle: `🎂 ${r.dateLabel} · ${whenLabel(r.daysUntil)}`,
+      image: r.image,
+    })),
+  }
+}
+
 /** Internal dashboard/auth paths — excluded from public traffic answers. */
 const INTERNAL_PATH_RE =
   /^\/(admin|superadmin|agent|teamleader|unitmanager|member|secretary|teamsecretary|developer|editor|dashboard|login|staff-login|register|account-inactive)(\/|$)/
@@ -1653,6 +1709,21 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "upcoming_birthdays",
+      description:
+        "Upcoming birthdays of ACTIVE members/agents, soonest first — use for 'whose birthday is today / this week / this month / coming up'. Returns name, role and date with photo cards.",
+      parameters: {
+        type: "object",
+        properties: {
+          days: { type: "integer", description: "Days ahead to look: 0 = today only, 7 = this week, 30 = this month-ish (default 30, max 366)" },
+          limit: { type: "integer", description: "Max people listed (default 15)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "activity_feed",
       description:
         "Chronological WHAT-HAPPENED feed of platform activity: every sale submitted (who, project, amount, status), account created (with recruiter), listing added, project added and event registration in the window. Use for 'how's the update today', 'what's new', 'what happened yesterday', 'any updates'. Defaults to since yesterday.",
@@ -1736,6 +1807,7 @@ export async function runFhiChatTool(
       case "website_traffic": result = await websiteTraffic(args); break
       case "search_keywords": result = await searchKeywords(args); break
       case "activity_feed": result = await activityFeed(admin, args); break
+      case "upcoming_birthdays": result = await upcomingBirthdays(admin, args); break
       default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [] }
     }
     const { _cards, _names, _charts, ...rest } = result as {
