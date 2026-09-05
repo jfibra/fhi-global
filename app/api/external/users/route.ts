@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { timingSafeEqual } from "node:crypto"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 
 /**
- * GET /api/external/users — server-to-server users API for partner sites
+ * GET /api/external/users — public users API for partner sites
  * (Rentsouq.ae auto-login/account-linking).
  *
- * Auth: "Authorization: Bearer $FHI_EXTERNAL_API_KEY" or "x-api-key" header.
- * The key is a shared secret for backend use only — never call this from a
- * browser. With no key configured the route is disabled (503).
+ * Currently UNAUTHENTICATED by request — an API key (FHI_EXTERNAL_API_KEY)
+ * will be added later before wider rollout.
  *
  *   ?email=<address>       exact, case-insensitive single-user lookup
  *                          → { success, data: user } | 404
@@ -38,23 +36,6 @@ type ExternalUser = {
 
 const PROFILE_COLUMNS =
   "id, fname, mname, lname, fullname, role, status, profile_url, timezone, joined_at, is_deleted"
-
-function safeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a)
-  const bufB = Buffer.from(b)
-  if (bufA.length !== bufB.length) return false
-  return timingSafeEqual(bufA, bufB)
-}
-
-function isAuthorized(req: NextRequest): boolean | null {
-  const key = process.env.FHI_EXTERNAL_API_KEY?.trim()
-  if (!key) return null // not configured → feature disabled
-
-  const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim()
-  const headerKey = req.headers.get("x-api-key")?.trim()
-  const provided = bearer || headerKey
-  return !!provided && safeEqual(provided, key)
-}
 
 type ProfileRow = {
   id: string
@@ -87,17 +68,6 @@ function toExternalUser(p: ProfileRow, email: string | null): ExternalUser {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = isAuthorized(req)
-  if (auth === null) {
-    return NextResponse.json(
-      { success: false, error: "External users API is not configured." },
-      { status: 503 },
-    )
-  }
-  if (!auth) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-  }
-
   const admin = createAdminSupabase()
   const sp = req.nextUrl.searchParams
   const emailParam = sp.get("email")?.trim().toLowerCase() ?? ""
