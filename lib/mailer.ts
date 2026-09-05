@@ -932,6 +932,9 @@ export async function sendAdminDirectEmail(input: {
   fromAccount?: { address: string; name: string | null }
   /** Attachments already uploaded to our S3. */
   attachments?: Array<{ name: string; url: string }>
+  /** A generated image (poster, card) embedded inline after the message and
+   *  attached as a file. */
+  inlineImage?: { content: Buffer; filename: string; alt: string } | null
 }): Promise<void> {
   const signer = input.senderName?.trim() || "The FHI Global Team"
   const messageHtml = esc(input.message).replace(/\r?\n/g, "<br>")
@@ -943,6 +946,13 @@ export async function sendAdminDirectEmail(input: {
             <div style="font-size:15px;line-height:1.75;color:#374151;">${messageHtml}</div>
           </td>
         </tr>
+        ${input.inlineImage ? `
+        <tr>
+          <td align="center" style="padding:18px 40px 0;">
+            <img src="cid:direct-inline-image" width="420" alt="${esc(input.inlineImage.alt)}"
+                 style="display:block;width:100%;max-width:420px;border:1px solid #e7d9a8;border-radius:10px;">
+          </td>
+        </tr>` : ""}
         <tr>
           <td style="padding:22px 40px 30px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
@@ -961,7 +971,17 @@ export async function sendAdminDirectEmail(input: {
   await deliver("AdminDirectMailer", {
     from,
     authUser: input.fromAccount?.address,
-    attachments: input.attachments?.map((a) => ({ filename: a.name, href: a.url })),
+    attachments: [
+      ...(input.attachments?.map((a) => ({ filename: a.name, href: a.url })) ?? []),
+      ...(input.inlineImage
+        ? [{
+            filename: input.inlineImage.filename,
+            content: input.inlineImage.content,
+            cid: "direct-inline-image",
+            contentType: "image/png",
+          }]
+        : []),
+    ],
     to: input.to,
     subject: input.subject,
     text: `${input.message}\n\n—\n${signer}\nFHI Global · Dubai, UAE${input.regarding ? `\nSent regarding your inquiry about ${input.regarding}.` : ""}`,

@@ -2,7 +2,8 @@ import "server-only"
 
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { gaConfigured, gaRunRealtime, gaRunReport, gscQuery } from "@/lib/ga-data"
-import { DEFAULT_POSTER_DESIGN, posterDesignIds, posterDesignLabel } from "@/lib/birthday-poster"
+import { DEFAULT_POSTER_DESIGN, posterDesignIds, posterDesignLabel, renderBirthdayPosterPng } from "@/lib/birthday-poster"
+import { renderMeetingPosterPng, type MeetingPosterData } from "@/lib/meeting-poster"
 import { SITE_URL } from "@/lib/seo"
 import { DESIGNS as CARD_DESIGNS, isDesignId as isCardDesignId } from "@/features/business-card/card-render"
 import { sendAdminDirectEmail, sendCongratsEmail } from "@/lib/mailer"
@@ -1229,6 +1230,14 @@ async function birthdayPoster(admin: Admin, args: { name?: string; design?: stri
     posters_created_for: people.map((p) => p.name),
     designs_used: designs.map((id) => posterDesignLabel(id)),
     available_designs: allIds.map((id) => `${id} (${posterDesignLabel(id)})`),
+    // To email one of these posters, echo its ref into send_email.
+    email_attachment_refs: people.flatMap((p) =>
+      designs.map((id) => ({
+        label: `${p.name} — ${posterDesignLabel(id)}`,
+        birthday_poster_uid: p.id,
+        birthday_poster_design: id,
+      })),
+    ),
     note: "The poster(s) render below this reply — the admin can click one to open the full-size PNG and download or share it. The Midnight Skyline design is the one the automatic birthday emails use.",
     _names: people.map((p) => p.name),
     _cards: people.flatMap((p) =>
@@ -1304,6 +1313,8 @@ async function meetingPoster(
   return {
     poster_ready: true,
     title: payload.title,
+    // To email this poster, echo this ref into send_email.
+    email_attachment_ref: { meeting_poster_payload: encoded },
     speakers_on_poster: speakers.map((sp) => `${sp.name}${sp.photo ? "" : " (no photo — shown with initial)"}`),
     note: "The meeting poster renders below this reply — the admin can click it to open the full-size PNG for download or sharing.",
     _names: speakers.map((sp) => sp.name),
@@ -1356,6 +1367,8 @@ async function businessCard(admin: Admin, args: { names?: string[] | string }) {
     business_cards: found.map((p) => ({
       name: p.name,
       public_profile_link: `${SITE_URL}/business-card/${p.id}`,
+      // To email this card, echo business_card_uid into send_email.
+      business_card_uid: p.id,
       ...(p.role === "developer" ? { note: "internal partner account — shows the brand card, not a personal one" } : {}),
     })),
     ...(misses.length ? { not_found: misses } : {}),
@@ -1439,7 +1452,16 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
  *  admin who asked. One recipient per call. */
 async function sendChatEmail(
   admin: Admin,
-  args: { to?: string; subject?: string; message?: string },
+  args: {
+    to?: string
+    subject?: string
+    message?: string
+    /** Poster references echoed from a poster tool's result — attached inline. */
+    birthday_poster_uid?: string
+    birthday_poster_design?: string
+    meeting_poster_payload?: string
+    business_card_uid?: string
+  },
   sender?: FhiChatSender,
 ) {
   const subject = (args.subject ?? "").trim().slice(0, 150)
@@ -1467,18 +1489,53 @@ async function sendChatEmail(
     if (!to) return { error: `${toLabel} has no email on file.` }
   }
 
+  // Attach a just-generated visual when the admin asked to email it: the
+  // renderers run in-process (no session-guarded HTTP hop).
+  let inlineImage: { content: Buffer; filename: string; alt: string } | null = null
+  try {
+    if (args.birthday_poster_uid?.trim()) {
+      const { data: p } = await admin
+        .from("profiles")
+        .select("fullname, fname, profile_url")
+        .eq("id", args.birthday_poster_uid.trim())
+        .maybeSingle()
+      if (p) {
+        const png = await renderBirthdayPosterPng({
+          name: (p.fullname ?? p.fname ?? "You").trim().replace(/\s+/g, " "),
+          photoUrl: p.profile_url ?? null,
+          designId: args.birthday_poster_design?.trim() || undefined,
+        })
+        if (png) inlineImage = { content: png, filename: "happy-birthday.png", alt: "Birthday poster" }
+      }
+    } else if (args.meeting_poster_payload?.trim()) {
+      const raw = JSON.parse(Buffer.from(args.meeting_poster_payload.trim(), "base64url").toString("utf8")) as MeetingPosterData
+      const png = await renderMeetingPosterPng(raw)
+      if (png) inlineImage = { content: png, filename: "meeting-poster.png", alt: "Meeting poster" }
+    } else if (args.business_card_uid?.trim()) {
+      const res = await fetch(`${SITE_URL}/og/business-card/${encodeURIComponent(args.business_card_uid.trim())}`, { cache: "no-store" })
+      if (res.ok) {
+        inlineImage = { content: Buffer.from(await res.arrayBuffer()), filename: "business-card.png", alt: "Business card" }
+      }
+    }
+  } catch {
+    // A failed attachment must not block the email — it goes out as text.
+  }
+
   await sendAdminDirectEmail({
     to,
     subject,
     message,
     senderName: sender?.name?.trim() || "The FHI Global Team",
+    inlineImage,
   })
   return {
     sent: true,
     to,
     recipient: toLabel,
     subject,
-    note: "Delivered from info@fhiglobal.ae in the FHI brand shell, signed with the admin's name. Confirm to the admin what was sent and to whom.",
+    attachment_included: Boolean(inlineImage),
+    note: "Delivered from info@fhiglobal.ae in the FHI brand shell, signed with the admin's name. Confirm to the admin what was sent and to whom" +
+      (inlineImage ? ", including that the image is embedded in the email." : "."),
   }
 }
 
@@ -2223,6 +2280,10 @@ export const FHI_CHAT_TOOLS = [
           to: { type: "string", description: "'me', an email address, or one member's name (default: me)" },
           subject: { type: "string", description: "Email subject line" },
           message: { type: "string", description: "Full plain-text body composed from the conversation content the admin asked to send" },
+          birthday_poster_uid: { type: "string", description: "Echo from a birthday_poster result's email_attachment_refs to embed that poster" },
+          birthday_poster_design: { type: "string", description: "Goes with birthday_poster_uid" },
+          meeting_poster_payload: { type: "string", description: "Echo from a meeting_poster result's email_attachment_ref to embed that poster" },
+          business_card_uid: { type: "string", description: "Echo from a business_card result to embed that card image" },
         },
         required: ["subject", "message"],
       },
