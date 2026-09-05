@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { findTodaysBirthdays, sendBirthdayGreetings } from "@/lib/birthday-greetings"
 import { sendBirthdayEmail, hasMailerConfig } from "@/lib/mailer"
 import { renderBirthdayPosterPng } from "@/lib/birthday-poster"
+import { renderTopSellerCertificatePng } from "@/lib/congrats-poster"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 
 /**
@@ -34,6 +35,30 @@ export async function GET(req: NextRequest) {
 
   if (!hasMailerConfig()) {
     return NextResponse.json({ error: "SMTP is not configured." }, { status: 503 })
+  }
+
+  // ?cert=<profile id> — preview the Top Seller certificate render with
+  // sample stats (secret-protected, dev convenience).
+  const certUid = req.nextUrl.searchParams.get("cert")?.trim()
+  if (certUid) {
+    const admin = createAdminSupabase()
+    const { data: p } = await admin
+      .from("profiles")
+      .select("fullname, fname, profile_url")
+      .eq("id", certUid)
+      .maybeSingle()
+    if (!p) return NextResponse.json({ error: "No such profile." }, { status: 404 })
+    const png = await renderTopSellerCertificatePng({
+      name: (p.fullname ?? p.fname ?? "You").trim().replace(/\s+/g, " "),
+      photoUrl: p.profile_url ?? null,
+      totalLabel: "AED 6,651,720",
+      dealsLabel: "5 deals",
+      periodLabel: "September 2026",
+    })
+    if (!png) return NextResponse.json({ error: "Certificate render failed." }, { status: 500 })
+    return new NextResponse(new Uint8Array(png), {
+      headers: { "content-type": "image/png", "cache-control": "no-store" },
+    })
   }
 
   // ?poster=<profile id> — preview that member's rendered poster PNG in the

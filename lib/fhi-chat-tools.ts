@@ -5,6 +5,8 @@ import { gaConfigured, gaRunRealtime, gaRunReport, gscQuery } from "@/lib/ga-dat
 import { DEFAULT_POSTER_DESIGN, posterDesignIds, posterDesignLabel } from "@/lib/birthday-poster"
 import { SITE_URL } from "@/lib/seo"
 import { DESIGNS as CARD_DESIGNS, isDesignId as isCardDesignId } from "@/features/business-card/card-render"
+import { sendAdminDirectEmail, sendCongratsEmail } from "@/lib/mailer"
+import { renderTopSellerCertificatePng } from "@/lib/congrats-poster"
 
 /**
  * FHI Assistant's toolbox — the predefined, parameterized queries the assistant is
@@ -1426,6 +1428,145 @@ async function printBusinessCard(admin: Admin, args: { name?: string; design?: s
   }
 }
 
+/** Who is asking the chat — used by send_email ("me") and the signature. */
+export type FhiChatSender = { email: string | null; name: string | null }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** Send an email straight from the chat — "email me this report", "send this
+ *  to Michelle". Composed by the model from the conversation, delivered
+ *  through the same branded mailer as the admin Emails page, signed by the
+ *  admin who asked. One recipient per call. */
+async function sendChatEmail(
+  admin: Admin,
+  args: { to?: string; subject?: string; message?: string },
+  sender?: FhiChatSender,
+) {
+  const subject = (args.subject ?? "").trim().slice(0, 150)
+  const message = (args.message ?? "").trim()
+  if (!subject || !message) return { error: "Both subject and message are required." }
+  if (message.length > 8000) return { error: "Message too long — keep it under 8000 characters." }
+
+  const toRaw = (args.to ?? "").trim()
+  let to: string | null = null
+  let toLabel = toRaw
+  if (!toRaw || /^me$/i.test(toRaw)) {
+    to = sender?.email ?? null
+    toLabel = "you"
+    if (!to) return { error: "Couldn't determine your own email — give the address explicitly." }
+  } else if (EMAIL_RE.test(toRaw)) {
+    to = toRaw
+  } else {
+    const m = (await findProfiles(admin, toRaw))[0]
+    if (!m) return { error: `No member matches "${toRaw}" — give an email address or a member's name.` }
+    toLabel = m.fullname?.trim() || toRaw
+    to = await admin.auth.admin
+      .getUserById(m.id)
+      .then((r) => r.data?.user?.email?.trim() ?? null)
+      .catch(() => null)
+    if (!to) return { error: `${toLabel} has no email on file.` }
+  }
+
+  await sendAdminDirectEmail({
+    to,
+    subject,
+    message,
+    senderName: sender?.name?.trim() || "The FHI Global Team",
+  })
+  return {
+    sent: true,
+    to,
+    recipient: toLabel,
+    subject,
+    note: "Delivered from info@fhiglobal.ae in the FHI brand shell, signed with the admin's name. Confirm to the admin what was sent and to whom.",
+  }
+}
+
+/** Bulk congratulations for the period's top sellers — SAFETY: every email is
+ *  a labeled PREVIEW delivered to the asking admin's own inbox, never to the
+ *  agents. The admin forwards the ones they want to send. */
+async function congratulateTopAgents(
+  admin: Admin,
+  args: {
+    scope?: string; year?: number; month?: number; from_date?: string; to_date?: string
+    limit?: number; custom_note?: string
+  },
+  sender?: FhiChatSender,
+) {
+  if (!sender?.email) return { error: "Couldn't determine your email to deliver the previews." }
+  const now = new Date()
+  const scope = normScope(args.scope)
+  let { from, to } = periodRange(scope, args.year ?? now.getUTCFullYear(), args.month ?? now.getUTCMonth() + 1)
+  if (args.from_date?.trim()) from = args.from_date.trim()
+  if (args.to_date?.trim()) to = args.to_date.trim()
+  const periodLabel =
+    args.from_date || args.to_date
+      ? `${from ?? "…"} to ${to ?? "today"}`
+      : scope === "all" ? "all-time" : scope
+
+  const sales = (await fetchAllSales(admin)).filter(
+    (s) => s.validation_status === "validated" && inRange(s, from, to),
+  )
+  const byAgent = new Map<string, { deals: number; value: number }>()
+  for (const s of sales) {
+    const t = byAgent.get(s.agent_id) ?? { deals: 0, value: 0 }
+    t.deals += 1
+    t.value += Number(s.contract_price ?? 0)
+    byAgent.set(s.agent_id, t)
+  }
+  const ranked = [...byAgent.entries()]
+    .map(([id, t]) => ({ id, deals: t.deals, value: t.value }))
+    .sort((a, b) => b.value - a.value || b.deals - a.deals)
+    .slice(0, Math.min(Math.max(args.limit ?? 3, 1), 8))
+  if (!ranked.length) return { error: `No validated sales in that period (${periodLabel}) — nobody to congratulate.` }
+
+  const names = await nameMaps(admin, sales)
+  const previews: Array<{ rank: number; agent: string; total: string; intended_recipient: string }> = []
+  for (const [i, l] of ranked.entries()) {
+    const agentName = names.agent.get(l.id)?.name ?? "Agent"
+    const agentEmail = await admin.auth.admin
+      .getUserById(l.id)
+      .then((r) => r.data?.user?.email?.trim() ?? "no email on file")
+      .catch(() => "no email on file")
+    // Their personalized Top Seller certificate — a render failure never
+    // blocks the congratulation itself.
+    const certificatePng = await renderTopSellerCertificatePng({
+      name: agentName,
+      photoUrl: names.agent.get(l.id)?.image ?? null,
+      totalLabel: AED(l.value),
+      dealsLabel: `${l.deals} ${l.deals === 1 ? "deal" : "deals"}`,
+      periodLabel,
+    }).catch(() => null)
+    await sendCongratsEmail({
+      to: sender.email,
+      agentName,
+      rank: i + 1,
+      deals: l.deals,
+      totalLabel: AED(l.value),
+      periodLabel,
+      senderName: sender.name ?? null,
+      customNote: args.custom_note ?? null,
+      previewFor: { name: agentName, email: agentEmail },
+      certificatePng,
+    })
+    previews.push({ rank: i + 1, agent: agentName, total: AED(l.value), intended_recipient: agentEmail })
+  }
+  return {
+    period: periodLabel,
+    previews_delivered_to: sender.email,
+    congratulated: previews,
+    note: "IMPORTANT: all congratulation emails were delivered to the ADMIN'S OWN inbox as labeled previews — none were sent to the agents. The admin can forward each one, and direct sending can be enabled later.",
+    _names: previews.map((p) => p.agent),
+    _cards: ranked.map((l, i): FhiChatCard => ({
+      kind: "agent",
+      rank: i + 1,
+      title: names.agent.get(l.id)?.name ?? "Agent",
+      subtitle: `🏆 ${AED(l.value)} · preview in your inbox`,
+      image: names.agent.get(l.id)?.image ?? null,
+    })),
+  }
+}
+
 /** Internal dashboard/auth paths — excluded from public traffic answers. */
 const INTERNAL_PATH_RE =
   /^\/(admin|superadmin|agent|teamleader|unitmanager|member|secretary|teamsecretary|developer|editor|dashboard|login|staff-login|register|account-inactive)(\/|$)/
@@ -2058,6 +2199,42 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "send_email",
+      description:
+        "Send an email NOW, composed from this conversation — use ONLY when the admin explicitly asks to email something ('email me this report', 'send this to Michelle'). One recipient: 'me' (the admin asking), an email address, or one FHI member's name. Write the full message body yourself from what the admin asked to send (plain text, line breaks preserved).",
+      parameters: {
+        type: "object",
+        properties: {
+          to: { type: "string", description: "'me', an email address, or one member's name (default: me)" },
+          subject: { type: "string", description: "Email subject line" },
+          message: { type: "string", description: "Full plain-text body composed from the conversation content the admin asked to send" },
+        },
+        required: ["subject", "message"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "congratulate_top_agents",
+      description:
+        "BULK congratulations for the top sellers of a period ('email the top agents this month to congratulate them'). Sends one branded congratulation email PER top agent — but as SAFETY, every email is a labeled preview delivered to the asking admin's own inbox, never to the agents; the admin forwards the ones they approve. Accepts the same period parameters as top_agents, an optional limit (default top 3) and an optional custom_note added to each email.",
+      parameters: {
+        type: "object",
+        properties: {
+          scope: { type: "string", enum: ["month", "quarter", "year", "all"] },
+          year: { type: "integer" }, month: { type: "integer", description: "1-12" },
+          from_date: { type: "string", description: "YYYY-MM-DD inclusive" },
+          to_date: { type: "string", description: "YYYY-MM-DD exclusive" },
+          limit: { type: "integer", description: "How many top agents (default 3, max 8)" },
+          custom_note: { type: "string", description: "Optional personal line added to each email" },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "activity_feed",
       description:
         "Chronological WHAT-HAPPENED feed of platform activity: every sale submitted (who, project, amount, status), account created (with recruiter), listing added, project added and event registration in the window. Use for 'how's the update today', 'what's new', 'what happened yesterday', 'any updates'. Defaults to since yesterday.",
@@ -2120,6 +2297,7 @@ export type FhiChatChart =
 export async function runFhiChatTool(
   name: string,
   args: Record<string, unknown>,
+  sender?: FhiChatSender,
 ): Promise<{
   forModel: string
   cards: FhiChatCard[]
@@ -2152,6 +2330,8 @@ export async function runFhiChatTool(
       case "meeting_poster": result = await meetingPoster(admin, args as Parameters<typeof meetingPoster>[1]); break
       case "business_card": result = await businessCard(admin, args); break
       case "print_business_card": result = await printBusinessCard(admin, args); break
+      case "send_email": result = await sendChatEmail(admin, args, sender); break
+      case "congratulate_top_agents": result = await congratulateTopAgents(admin, args, sender); break
       default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [], printCards: [] }
     }
     const { _cards, _names, _charts, _printCards, ...rest } = result as {

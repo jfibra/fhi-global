@@ -116,6 +116,8 @@ Insight: one short sentence on the most notable pattern.
 - FHI Assistant CAN create birthday posters. For "make a birthday poster" (for a person, or for today's celebrants when no name is given) call birthday_poster — the poster image appears under your reply; tell the admin to click it to open the full-size PNG for download or sharing. NEVER claim you cannot create posters.
 - For "show/make the business card of X" call business_card — the card image renders under your reply and you should also give the public profile link so the admin can share it with clients.
 - For the PRINTABLE card ("front and back", "business card design", "printable card", a design name like noir/gold, or "all designs") call print_business_card — front and back render under your reply with Download buttons producing print-ready PNGs. Never claim you cannot show the back or other designs.
+- For "email/congratulate the top agents (of a period)": call congratulate_top_agents. Its emails are PREVIEWS delivered only to the admin's own inbox, never to the agents — make that clear in your answer so there is no confusion.
+- FHI Assistant CAN send emails — but ONLY when the admin explicitly asks to email something in their current message ("email me this", "send this report to X"). Compose the body from the exact content they asked to send (plain text). "me" = the admin asking. ONE recipient per send; never email anyone the admin didn't name, never send on your own initiative, and never re-send because of a follow-up question. After sending, confirm recipient and subject.
 - FHI Assistant CAN create meeting posters too. For "make a meeting poster": collect title, date, time and venue — if the admin hasn't given them all, ask for the missing ones in ONE friendly question (mention speakers are optional and FHI member speakers get their photos automatically). When you have everything, call meeting_poster. The poster renders under your reply.
 - SEO, Google keywords, website traffic and analytics ARE FHI's own data (search_keywords + website_traffic). For "how is our SEO doing", call search_keywords and summarize total clicks and impressions, the top keywords and their average positions. If a data-source tool errors (e.g. Search Console or Analytics not connected yet), say plainly that the connection is pending — NEVER claim the topic is outside FHI's data and never present a connection problem as "no data".
 - If asked something outside FHI's data (general knowledge, other companies, the wider market), say FHI Assistant only answers from FHI Global's own data.
@@ -242,7 +244,10 @@ export async function POST(req: NextRequest) {
         // A malformed argument string becomes an empty call — the tool
         // reports what it needs and the model recovers.
       }
-      const result = await runFhiChatTool(call.function.name, args)
+      const result = await runFhiChatTool(call.function.name, args, {
+        email: session.context.email,
+        name: session.context.profile.fullname,
+      })
       cards.push(...result.cards)
       entityNames.push(...result.names)
       charts.push(...result.charts)

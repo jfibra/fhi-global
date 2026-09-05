@@ -397,6 +397,8 @@ const TOOL_LABELS: Record<string, string> = {
   meeting_poster: "poster studio",
   business_card: "business cards",
   print_business_card: "card designer",
+  send_email: "email sender",
+  congratulate_top_agents: "congratulations mailer",
 }
 
 /** Branded print view — parses the plain-text answer into a real report

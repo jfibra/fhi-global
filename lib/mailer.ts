@@ -1050,6 +1050,107 @@ export async function sendBirthdayEmail(input: { to: string; name: string | null
   })
 }
 
+/** Top-performer congratulations. With previewFor set, a banner marks the
+ *  email as a PREVIEW delivered to the admin instead of the agent. */
+export async function sendCongratsEmail(input: {
+  to: string
+  agentName: string
+  rank: number
+  deals: number
+  totalLabel: string
+  periodLabel: string
+  senderName: string | null
+  customNote?: string | null
+  /** The intended recipient this preview stands in for. */
+  previewFor?: { name: string; email: string } | null
+  /** Personalized Top Seller certificate, embedded inline when present. */
+  certificatePng?: Buffer | null
+}): Promise<void> {
+  const name = greetingName(input.agentName)
+  const subject = input.previewFor
+    ? `[PREVIEW for ${input.previewFor.name}] Congratulations on your ${input.periodLabel} performance! 🏆`
+    : `Congratulations, ${name} — you're a ${input.periodLabel} top performer! 🏆`
+  const rankLabel = input.rank === 1 ? "No. 1 Top Seller" : `Top ${input.rank} Seller`
+
+  const bodyHtml = `
+        ${input.previewFor ? `
+        <tr>
+          <td style="padding:14px 40px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr><td style="background:#fff7e0;border:1px dashed #d6b357;padding:10px 14px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;color:#8a6d2a;">
+                PREVIEW — this email was NOT sent to the agent. Intended recipient: <strong>${esc(input.previewFor.name)}</strong> (${esc(input.previewFor.email)}). Forward it if you'd like them to receive it.
+              </td></tr>
+            </table>
+          </td>
+        </tr>` : ""}
+        <tr>
+          <td style="padding:30px 40px 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">Top performer</p>
+            <h1 style="margin:0 0 12px;font-size:23px;line-height:1.3;font-weight:700;color:#0d1117;">Congratulations, ${esc(name)}! 🏆</h1>
+            <p style="margin:0;font-size:15px;line-height:1.7;color:#4b5563;">
+              Your results this ${esc(input.periodLabel)} put you among FHI Global's very best. Numbers like these
+              don't happen by accident — they're the mark of real work, real skill and real dedication.
+            </p>
+          </td>
+        </tr>
+        ${input.certificatePng ? `
+        <tr>
+          <td align="center" style="padding:20px 40px 6px;">
+            <img src="cid:congrats-certificate" width="440" alt="Top Seller certificate for ${esc(input.agentName)}"
+                 style="display:block;width:100%;max-width:440px;border:1px solid #e7d9a8;border-radius:10px;">
+          </td>
+        </tr>` : `
+        <tr>
+          <td style="padding:20px 40px 6px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr><td align="center" style="background:#fdf6e3;border:1px solid #e7d9a8;border-radius:14px;padding:24px 20px;">
+                <p style="margin:0 0 4px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;color:#8a6d2a;text-transform:uppercase;">${esc(input.periodLabel)} · ${esc(rankLabel)}</p>
+                <p style="margin:0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:26px;font-weight:800;color:#8a6d2a;">${esc(input.totalLabel)}</p>
+                <p style="margin:4px 0 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;color:#6b7280;">${input.deals} validated ${input.deals === 1 ? "deal" : "deals"}</p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>`}
+        <tr>
+          <td style="padding:20px 40px 32px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            ${input.customNote?.trim() ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#4b5563;">${esc(input.customNote.trim())}</p>` : ""}
+            <p style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#4b5563;">
+              Thank you for the example you set for the whole team. Keep going — we're cheering for you. 🥂
+            </p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr><td style="border-top:1px solid #eef0f3;padding-top:16px;">
+                <p style="margin:0;font-size:14px;font-weight:700;color:#0d1117;">${esc(input.senderName?.trim() || "The FHI Global Team")}</p>
+                <p style="margin:2px 0 0;font-size:12.5px;color:#6b7280;">FHI Global · Dubai, UAE</p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>`
+
+  await deliver("CongratsMailer", {
+    from: fromAddress(),
+    to: input.to,
+    subject,
+    ...(input.certificatePng
+      ? {
+          attachments: [
+            {
+              filename: `top-seller-certificate-${input.agentName.replace(/\s+/g, "-").toLowerCase()}.png`,
+              content: input.certificatePng,
+              cid: "congrats-certificate",
+              contentType: "image/png",
+            },
+          ],
+        }
+      : {}),
+    text: `Congratulations, ${name}!\n\nYour results this ${input.periodLabel} put you among FHI Global's very best.\n\n${input.periodLabel} · ${rankLabel}\n${input.totalLabel} · ${input.deals} validated ${input.deals === 1 ? "deal" : "deals"}\n${input.customNote?.trim() ? `\n${input.customNote.trim()}\n` : ""}\nThank you for the example you set for the whole team.\n\n${input.senderName?.trim() || "The FHI Global Team"}\nFHI Global · Dubai, UAE${input.previewFor ? `\n\n[PREVIEW — intended recipient: ${input.previewFor.name} <${input.previewFor.email}>]` : ""}`,
+    html: eventEmailShell({
+      subject,
+      preheader: `${input.agentName} — ${input.periodLabel} ${rankLabel}: ${input.totalLabel}.`,
+      bodyHtml,
+    }),
+  })
+}
+
 // ─── Daily boss report ─────────────────────────────────────────────────────────
 
 /** Gold section heading + its label/value rows, matching the FHI Assistant
