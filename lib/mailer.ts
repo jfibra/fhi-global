@@ -971,6 +971,63 @@ export async function sendAdminDirectEmail(input: {
   })
 }
 
+/** The birthday greeting — warm, personal, no sales pitch, no buttons. */
+export async function sendBirthdayEmail(input: { to: string; name: string | null }): Promise<void> {
+  const name = greetingName(input.name)
+  const subject = `Happy Birthday, ${name}! 🎂 From all of us at FHI Global`
+
+  const bodyHtml = `
+        <tr>
+          <td style="padding:36px 40px 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">Happy birthday</p>
+            <h1 style="margin:0 0 12px;font-size:24px;line-height:1.3;font-weight:700;color:#0d1117;">Happy Birthday, ${esc(name)}! 🎉</h1>
+            <p style="margin:0;font-size:15px;line-height:1.7;color:#4b5563;">
+              Today is all about you. On behalf of the entire FHI Global family, we want you to know how
+              much we value having you with us — not just as a colleague, but as part of what makes this
+              company special.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:22px 40px 6px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr><td align="center" style="background:#fdf6e3;border:1px solid #e7d9a8;border-radius:14px;padding:26px 20px;">
+                <p style="margin:0 0 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:30px;line-height:1;">🎂</p>
+                <p style="margin:0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:17px;font-weight:700;color:#8a6d2a;line-height:1.5;">
+                  Wishing you health, happiness and<br>record-breaking success in the year ahead.
+                </p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px 32px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <p style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#4b5563;">
+              Enjoy your day — you've earned every bit of it. Here's to another amazing year together. 🥂
+            </p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr><td style="border-top:1px solid #eef0f3;padding-top:16px;">
+                <p style="margin:0;font-size:14px;font-weight:700;color:#0d1117;">With warm wishes,</p>
+                <p style="margin:2px 0 0;font-size:14px;font-weight:700;color:#8a6d2a;">The FHI Global Family</p>
+                <p style="margin:2px 0 0;font-size:12.5px;color:#6b7280;">FHI Global · Dubai, UAE</p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>`
+
+  await deliver("BirthdayMailer", {
+    from: fromAddress(),
+    to: input.to,
+    subject,
+    text: `Happy Birthday, ${name}! 🎉\n\nToday is all about you. On behalf of the entire FHI Global family, we want you to know how much we value having you with us.\n\nWishing you health, happiness and record-breaking success in the year ahead.\n\nEnjoy your day — you've earned every bit of it. Here's to another amazing year together.\n\nWith warm wishes,\nThe FHI Global Family\nFHI Global · Dubai, UAE`,
+    html: eventEmailShell({
+      subject,
+      preheader: `Happy Birthday, ${name} — with love from the FHI Global family. 🎂`,
+      bodyHtml,
+    }),
+  })
+}
+
 // ─── Daily boss report ─────────────────────────────────────────────────────────
 
 /** Gold section heading + its label/value rows, matching the FHI Assistant
