@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
     const png = await renderBirthdayPosterPng({
       name: (p.fullname ?? p.fname ?? "You").trim().replace(/\s+/g, " "),
       photoUrl: p.profile_url ?? null,
+      designId: req.nextUrl.searchParams.get("design")?.trim() || undefined,
     })
     if (!png) return NextResponse.json({ error: "Poster render failed." }, { status: 500 })
     return new NextResponse(new Uint8Array(png), {

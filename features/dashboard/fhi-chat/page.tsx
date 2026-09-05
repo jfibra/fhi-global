@@ -10,7 +10,7 @@ import { Check, Copy, FileText, Globe, Loader2, Monitor, Printer, RotateCcw, Sen
  */
 
 type Card = {
-  kind: "agent" | "developer" | "project"
+  kind: "agent" | "developer" | "project" | "poster"
   title: string
   subtitle?: string
   image?: string | null
@@ -102,7 +102,31 @@ function TypedText({ text, names, onDone }: { text: string; names: string[]; onD
 function CardRow({ cards }: { cards: Card[] }) {
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-      {cards.map((c) => (
+      {cards.map((c) =>
+        c.kind === "poster" ? (
+          // A generated poster: shown big, opens full size for download/share.
+          <a
+            key={`${c.kind}:${c.title}`}
+            href={c.image ?? "#"}
+            target="_blank"
+            rel="noreferrer"
+            className="flex flex-col items-center gap-2 border border-[#eceef1] bg-white p-3 transition-colors hover:border-[#d6b357]"
+          >
+            {c.image && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={c.image}
+                alt={`Birthday poster for ${c.title}`}
+                loading="lazy"
+                className="aspect-[2/3] w-full max-w-[220px] border border-[#e7d9a8] object-cover"
+              />
+            )}
+            <div className="text-center">
+              <p className="text-[13px] font-bold text-[#0d1117]">{c.title}</p>
+              {c.subtitle && <p className="text-[11.5px] text-[#6b7280]">{c.subtitle}</p>}
+            </div>
+          </a>
+        ) : (
         <div key={`${c.kind}:${c.title}`} className="flex items-center gap-3 border border-[#eceef1] bg-white px-3 py-2.5">
           {c.rank != null && (
             <span className="flex h-6 w-6 shrink-0 items-center justify-center bg-[#d6b357] font-['Outfit'] text-[12px] font-bold text-[#001f3f]">
@@ -135,7 +159,8 @@ function CardRow({ cards }: { cards: Card[] }) {
             {c.subtitle && <p className="truncate text-[11.5px] text-[#6b7280]">{c.subtitle}</p>}
           </div>
         </div>
-      ))}
+        ),
+      )}
     </div>
   )
 }
@@ -258,6 +283,7 @@ const TOOL_LABELS: Record<string, string> = {
   search_keywords: "Google Search Console",
   activity_feed: "activity feed",
   upcoming_birthdays: "birthday calendar",
+  birthday_poster: "poster studio",
 }
 
 /** Branded print view — parses the plain-text answer into a real report

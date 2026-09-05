@@ -2,6 +2,7 @@ import "server-only"
 
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { gaConfigured, gaRunRealtime, gaRunReport, gscQuery } from "@/lib/ga-data"
+import { DEFAULT_POSTER_DESIGN, posterDesignIds, posterDesignLabel } from "@/lib/birthday-poster"
 
 /**
  * FHI Assistant's toolbox — the predefined, parameterized queries the assistant is
@@ -21,7 +22,7 @@ import { gaConfigured, gaRunRealtime, gaRunReport, gscQuery } from "@/lib/ga-dat
 type Admin = ReturnType<typeof createAdminSupabase>
 
 export type FhiChatCard = {
-  kind: "agent" | "developer" | "project"
+  kind: "agent" | "developer" | "project" | "poster"
   title: string
   subtitle?: string
   image?: string | null
@@ -1173,6 +1174,70 @@ async function upcomingBirthdays(admin: Admin, args: { days?: number; limit?: nu
   }
 }
 
+/** Make a birthday poster on demand — for a named member, or for today's
+ *  celebrant(s), in any of the studio's designs (or all of them). The card
+ *  points at the admin-guarded poster route; the browser (already logged in)
+ *  fetches the image itself. */
+async function birthdayPoster(admin: Admin, args: { name?: string; design?: string }) {
+  const q = (args.name ?? "").trim()
+  let people: Array<{ id: string; name: string }> = []
+  if (q) {
+    const matches = await findProfiles(admin, q)
+    if (!matches.length) {
+      return { error: `No account matches "${q}" (checked with typo tolerance).` }
+    }
+    people = [{ id: matches[0].id, name: matches[0].fullname?.trim() || "Member" }]
+  } else {
+    const todayMd = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" }).slice(5)
+    const { data, error } = await admin
+      .from("profiles")
+      .select("id, fullname, birthday")
+      .eq("status", "active")
+      .neq("is_deleted", true)
+      .not("birthday", "is", null)
+      .limit(3000)
+    if (error) throw new Error(error.message)
+    people = (data ?? [])
+      .filter((p) => String(p.birthday).slice(5, 10) === todayMd)
+      .slice(0, 3)
+      .map((p) => ({ id: String(p.id), name: p.fullname?.trim() || "Member" }))
+    if (!people.length) {
+      return {
+        error:
+          "No active member has a birthday today. Ask for a specific person instead — e.g. 'make a birthday poster for Michelle'.",
+      }
+    }
+  }
+  // Which artwork(s): one named design, "all" of them, or the default.
+  const requested = (args.design ?? "").trim().toLowerCase()
+  const allIds = posterDesignIds()
+  let designs: string[]
+  if (requested === "all") designs = allIds
+  else if (allIds.includes(requested)) designs = [requested]
+  else if (requested) {
+    const byLabel = allIds.find((id) => posterDesignLabel(id).toLowerCase().includes(requested))
+    designs = [byLabel ?? DEFAULT_POSTER_DESIGN]
+  } else designs = [DEFAULT_POSTER_DESIGN]
+  // All designs for several people would flood the chat — one person keeps it tidy.
+  if (designs.length > 1) people = people.slice(0, 1)
+
+  return {
+    posters_created_for: people.map((p) => p.name),
+    designs_used: designs.map((id) => posterDesignLabel(id)),
+    available_designs: allIds.map((id) => `${id} (${posterDesignLabel(id)})`),
+    note: "The poster(s) render below this reply — the admin can click one to open the full-size PNG and download or share it. The Midnight Skyline design is the one the automatic birthday emails use.",
+    _names: people.map((p) => p.name),
+    _cards: people.flatMap((p) =>
+      designs.map((id): FhiChatCard => ({
+        kind: "poster",
+        title: designs.length > 1 ? `${p.name} — ${posterDesignLabel(id)}` : p.name,
+        subtitle: `🎂 ${posterDesignLabel(id)} · click to open full size`,
+        image: `/api/admin/birthday-poster?uid=${encodeURIComponent(p.id)}&design=${encodeURIComponent(id)}`,
+      })),
+    ),
+  }
+}
+
 /** Internal dashboard/auth paths — excluded from public traffic answers. */
 const INTERNAL_PATH_RE =
   /^\/(admin|superadmin|agent|teamleader|unitmanager|member|secretary|teamsecretary|developer|editor|dashboard|login|staff-login|register|account-inactive)(\/|$)/
@@ -1724,6 +1789,21 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "birthday_poster",
+      description:
+        "CREATE a personalized birthday poster image (the member's photo on FHI birthday artwork). Use whenever the admin asks to make/generate a birthday poster — for a named person, or for today's birthday celebrant(s) when no name is given. Four designs: navy (Navy Balloons), marble (Marble & Gold), midnight (Midnight Skyline, default), cream (Cream Minimal) — or 'all' to render every design for one person. The posters render in the chat under the reply.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "The member's name; omit to use today's birthday celebrant(s)" },
+          design: { type: "string", enum: ["navy", "marble", "midnight", "cream", "all"], description: "Artwork choice; default midnight; 'all' shows every design" },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "activity_feed",
       description:
         "Chronological WHAT-HAPPENED feed of platform activity: every sale submitted (who, project, amount, status), account created (with recruiter), listing added, project added and event registration in the window. Use for 'how's the update today', 'what's new', 'what happened yesterday', 'any updates'. Defaults to since yesterday.",
@@ -1808,6 +1888,7 @@ export async function runFhiChatTool(
       case "search_keywords": result = await searchKeywords(args); break
       case "activity_feed": result = await activityFeed(admin, args); break
       case "upcoming_birthdays": result = await upcomingBirthdays(admin, args); break
+      case "birthday_poster": result = await birthdayPoster(admin, args); break
       default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [] }
     }
     const { _cards, _names, _charts, ...rest } = result as {

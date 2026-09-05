@@ -2,23 +2,29 @@ import "server-only"
 
 import { ImageResponse } from "next/og"
 import { SITE_URL } from "@/lib/seo"
+import { BIRTHDAY_DESIGNS, NAME_FILL, TEMPLATE_H, TEMPLATE_W } from "@/features/dashboard/poster-maker/birthday-designs"
 
 /**
- * Server-rendered birthday poster for the greeting email — the poster
- * studio's "Midnight Skyline" design (Dubai at dusk) with the celebrant's
- * photo in the artwork's opening and their name in gold. The studio's
- * pixel-mask fitting is a client-canvas trick; this design's opening is an
- * ellipse fit anyway (see features/dashboard/poster-maker/birthday-designs.ts),
- * so an absolutely-positioned rounded photo lands exactly where the studio
- * would put it.
+ * Server-rendered birthday poster — any of the poster studio's designs with
+ * the celebrant's photo in the artwork's opening and their name in the
+ * design's lettering color. The studio's pixel-mask fitting is a client-canvas
+ * trick; satori gets the ellipse fit instead, which is what most designs use
+ * anyway (see features/dashboard/poster-maker/birthday-designs.ts). Used by
+ * the birthday greeting emails (Midnight Skyline default) and FHI Assistant's
+ * on-demand poster tool.
  */
 
-const W = 1024
-const H = 1536
-// Measured from the artwork — same numbers as the studio's "midnight" design.
-const WELL = { x0: 265, y0: 548, x1: 787, y1: 1066 }
-const NAME = { cx: 519, baseline: 1152, maxWidth: 520, size: 58 }
-const GOLD = "#e3c169"
+const W = TEMPLATE_W
+const H = TEMPLATE_H
+export const DEFAULT_POSTER_DESIGN = "midnight"
+
+export function posterDesignIds(): string[] {
+  return BIRTHDAY_DESIGNS.map((d) => d.id)
+}
+
+export function posterDesignLabel(id: string): string {
+  return BIRTHDAY_DESIGNS.find((d) => d.id === id)?.label ?? id
+}
 
 /** Inline a remote image so satori never depends on a second fetch. */
 async function asDataUri(url: string): Promise<string | null> {
@@ -38,8 +44,16 @@ async function asDataUri(url: string): Promise<string | null> {
 export async function renderBirthdayPosterPng(input: {
   name: string
   photoUrl: string | null
+  designId?: string
 }): Promise<Buffer | null> {
-  const template = await asDataUri(`${SITE_URL}/images/birthday2-blank.png`)
+  const design =
+    BIRTHDAY_DESIGNS.find((d) => d.id === (input.designId ?? DEFAULT_POSTER_DESIGN)) ??
+    BIRTHDAY_DESIGNS.find((d) => d.id === DEFAULT_POSTER_DESIGN) ??
+    BIRTHDAY_DESIGNS[0]
+  const WELL = design.well
+  const NAME = design.name
+  const nameColor = NAME_FILL[design.name.style].mid
+  const template = await asDataUri(`${SITE_URL}${design.src}`)
   if (!template) return null
   const photo = input.photoUrl ? await asDataUri(input.photoUrl) : null
   const wellW = WELL.x1 - WELL.x0
@@ -78,7 +92,7 @@ export async function renderBirthdayPosterPng(input: {
               height: wellH,
               borderRadius: "50%",
               background: "#0a2647",
-              color: GOLD,
+              color: "#e3c169",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -99,8 +113,8 @@ export async function renderBirthdayPosterPng(input: {
             justifyContent: "center",
             fontSize: size,
             fontWeight: 700,
-            color: GOLD,
-            letterSpacing: 2,
+            color: nameColor,
+            letterSpacing: NAME.tracking ?? 2,
             whiteSpace: "nowrap",
           }}
         >
