@@ -1,7 +1,19 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Check, Copy, FileText, Globe, Loader2, Monitor, Printer, RotateCcw, Send, Smartphone, Sparkles, Tablet } from "lucide-react"
+import { Check, Copy, Download, FileText, Globe, Loader2, Monitor, Printer, RotateCcw, Send, Smartphone, Sparkles, Tablet } from "lucide-react"
+import {
+  DESIGNS as CARD_DESIGNS,
+  DISP_H,
+  DISP_W,
+  EXPORT_H,
+  EXPORT_W,
+  isDesignId,
+  renderCard,
+  type CardData,
+  type DesignId,
+} from "@/features/business-card/card-render"
+import { isSafeRemoteImageUrl } from "@/lib/image-hosts"
 
 /**
  * FHI Assistant — the admin one-stop shop for questions about the business.
@@ -21,6 +33,10 @@ type ShareRow = { label: string; value: number; display?: string; iso?: string |
 type ChartSpec =
   | { kind: "trend"; title: string; points: TrendPoint[] }
   | { kind: "shares"; title: string; rows: ShareRow[] }
+type PrintCardSpec = {
+  member: { name: string; phoneDial: string; phoneLocal: string; email: string; avatarUrl: string | null; initials: string }
+  designs: string[]
+}
 type Msg = {
   role: "user" | "assistant"
   content: string
@@ -28,6 +44,7 @@ type Msg = {
   cards?: Card[]
   names?: string[]
   charts?: ChartSpec[]
+  printCards?: PrintCardSpec[]
   typed?: boolean
 }
 
@@ -116,9 +133,9 @@ function CardRow({ cards }: { cards: Card[] }) {
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={c.image}
-                alt={`Birthday poster for ${c.title}`}
+                alt={`Poster: ${c.title}`}
                 loading="lazy"
-                className="aspect-[2/3] w-full max-w-[220px] border border-[#e7d9a8] object-cover"
+                className="h-auto w-full max-w-[220px] border border-[#e7d9a8]"
               />
             )}
             <div className="text-center">
@@ -248,6 +265,99 @@ function ShareChart({ chart }: { chart: { title: string; rows: ShareRow[] } }) {
   )
 }
 
+/** Printable business card faces — drawn in the browser with the SAME canvas
+ *  renderer as the Business Card maker (pixel-identical), so front and back of
+ *  every design work here, with print-size downloads. */
+function PrintBusinessCards({ spec }: { spec: PrintCardSpec }) {
+  const [faces, setFaces] = useState<Record<string, { front: string; back: string }>>({})
+  const designs = spec.designs.filter(isDesignId)
+  const data: CardData = {
+    name: spec.member.name,
+    phoneDial: spec.member.phoneDial,
+    phoneLocal: spec.member.phoneLocal,
+    email: spec.member.email,
+    // Remote S3/Google photos go through the image proxy so the canvas can
+    // export without tainting — same trick as the poster maker.
+    avatarUrl:
+      spec.member.avatarUrl && isSafeRemoteImageUrl(spec.member.avatarUrl)
+        ? `/api/image-proxy?url=${encodeURIComponent(spec.member.avatarUrl)}`
+        : spec.member.avatarUrl,
+    initials: spec.member.initials,
+  }
+  const dataKey = JSON.stringify(spec)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      const out: Record<string, { front: string; back: string }> = {}
+      for (const id of designs) {
+        try {
+          const [front, back] = await Promise.all([
+            renderCard("front", id, data, DISP_W, DISP_H),
+            renderCard("back", id, data, DISP_W, DISP_H),
+          ])
+          out[id] = { front, back }
+          if (alive) setFaces({ ...out })
+        } catch {
+          // One failed design must not blank the rest.
+        }
+      }
+    })()
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataKey])
+
+  const download = async (id: DesignId, side: "front" | "back") => {
+    const url = await renderCard(side, id, data, EXPORT_W, EXPORT_H)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `business-card-${id}-${side}-${spec.member.name.replace(/\s+/g, "-").toLowerCase()}.png`
+    a.click()
+  }
+
+  return (
+    <div className="space-y-4">
+      {designs.map((id) => {
+        const d = CARD_DESIGNS.find((x) => x.id === id)
+        const f = faces[id]
+        return (
+          <div key={id}>
+            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[#9ca3af]">
+              {d?.name ?? id} — {spec.member.name}
+            </p>
+            {f ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {(["front", "back"] as const).map((side) => (
+                  <div key={side} className="border border-[#eceef1] bg-white p-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={f[side]} alt={`${d?.name ?? id} ${side}`} className="h-auto w-full" />
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-[#6b7280]">{side}</span>
+                      <button
+                        type="button"
+                        onClick={() => void download(id, side)}
+                        className="inline-flex items-center gap-1 text-[11.5px] font-bold text-[#001f3f] hover:text-[#8a6d2a]"
+                      >
+                        <Download className="h-3.5 w-3.5" /> Download print size
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex h-24 items-center justify-center border border-[#eceef1] bg-white text-[12px] text-[#9ca3af]">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Rendering…
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 const SUGGESTIONS = [
   "Who are the top agents this year?",
   "How many website visits this week?",
@@ -284,6 +394,9 @@ const TOOL_LABELS: Record<string, string> = {
   activity_feed: "activity feed",
   upcoming_birthdays: "birthday calendar",
   birthday_poster: "poster studio",
+  meeting_poster: "poster studio",
+  business_card: "business cards",
+  print_business_card: "card designer",
 }
 
 /** Branded print view — parses the plain-text answer into a real report
@@ -524,6 +637,7 @@ export default function FhiChatPage() {
         cards?: Card[]
         names?: string[]
         charts?: ChartSpec[]
+        printCards?: PrintCardSpec[]
         error?: string
       }
       if (!res.ok || !data.reply) throw new Error(data.error ?? "FHI Assistant couldn't answer — try again.")
@@ -536,6 +650,7 @@ export default function FhiChatPage() {
           cards: data.cards,
           names: data.names,
           charts: data.charts,
+          printCards: data.printCards,
           typed: false,
         },
       ])
@@ -634,6 +749,13 @@ export default function FhiChatPage() {
                               <ShareChart key={ci} chart={c} />
                             ),
                           )}
+                        </div>
+                      )}
+                      {m.typed !== false && m.printCards && m.printCards.length > 0 && (
+                        <div className="space-y-4 border-t border-[#eceef1] px-4 py-3">
+                          {m.printCards.map((pc, pi) => (
+                            <PrintBusinessCards key={pi} spec={pc} />
+                          ))}
                         </div>
                       )}
                       {m.typed !== false && m.cards && m.cards.length > 0 && (

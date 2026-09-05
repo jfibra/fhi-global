@@ -3,6 +3,8 @@ import "server-only"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { gaConfigured, gaRunRealtime, gaRunReport, gscQuery } from "@/lib/ga-data"
 import { DEFAULT_POSTER_DESIGN, posterDesignIds, posterDesignLabel } from "@/lib/birthday-poster"
+import { SITE_URL } from "@/lib/seo"
+import { DESIGNS as CARD_DESIGNS, isDesignId as isCardDesignId } from "@/features/business-card/card-render"
 
 /**
  * FHI Assistant's toolbox — the predefined, parameterized queries the assistant is
@@ -1238,6 +1240,192 @@ async function birthdayPoster(admin: Admin, args: { name?: string; design?: stri
   }
 }
 
+/** Make a meeting poster from chat — the model gathers title/date/time/venue
+ *  (and optional speakers) from the admin, then this packs the payload into a
+ *  stateless admin-guarded render URL. FHI member speakers get their photo. */
+async function meetingPoster(
+  admin: Admin,
+  args: {
+    title?: string
+    subtitle?: string
+    tagline?: string
+    date?: string
+    time?: string
+    venue?: string
+    speakers?: Array<{ name?: string; role?: string; topic?: string }>
+  },
+) {
+  const required: Record<string, string | undefined> = {
+    title: args.title, date: args.date, time: args.time, venue: args.venue,
+  }
+  const missing = Object.entries(required)
+    .filter(([, v]) => !(v ?? "").trim())
+    .map(([k]) => k)
+  if (missing.length) {
+    return {
+      need_more_info: true,
+      missing_fields: missing,
+      optional_fields: [
+        "subtitle",
+        "tagline (e.g. YOU'RE INVITED)",
+        "speakers — names (FHI members get their photo automatically), each with optional role and topic",
+      ],
+      note: "Ask the admin for the missing details in ONE friendly question, then call this tool again with everything provided.",
+    }
+  }
+
+  const speakers: Array<{ name: string; role?: string; topic?: string; photo: string | null }> = []
+  for (const sp of (args.speakers ?? []).slice(0, 6)) {
+    const nm = (sp?.name ?? "").trim()
+    if (!nm) continue
+    const match = (await findProfiles(admin, nm))[0]
+    let photo: string | null = null
+    let name = nm
+    if (match) {
+      const { data } = await admin.from("profiles").select("fullname, profile_url").eq("id", match.id).maybeSingle()
+      photo = (data?.profile_url as string | null) ?? null
+      name = data?.fullname?.trim().replace(/\s+/g, " ") || nm
+    }
+    speakers.push({ name, role: sp?.role?.trim() || undefined, topic: sp?.topic?.trim() || undefined, photo })
+  }
+
+  const payload = {
+    title: (args.title ?? "").trim(),
+    subtitle: (args.subtitle ?? "").trim(),
+    tagline: (args.tagline ?? "").trim(),
+    date: (args.date ?? "").trim(),
+    time: (args.time ?? "").trim(),
+    venue: (args.venue ?? "").trim(),
+    speakers,
+  }
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url")
+  return {
+    poster_ready: true,
+    title: payload.title,
+    speakers_on_poster: speakers.map((sp) => `${sp.name}${sp.photo ? "" : " (no photo — shown with initial)"}`),
+    note: "The meeting poster renders below this reply — the admin can click it to open the full-size PNG for download or sharing.",
+    _names: speakers.map((sp) => sp.name),
+    _cards: [
+      {
+        kind: "poster" as const,
+        title: payload.title,
+        subtitle: "📋 Meeting poster · click to open full size",
+        image: `/api/admin/meeting-poster?d=${encoded}`,
+      },
+    ],
+  }
+}
+
+/** Business cards — every member already has a share card at
+ *  /og/business-card/[id] (the design they customized on their profile).
+ *  The chat resolves names and hands back the card image + public link. */
+async function businessCard(admin: Admin, args: { names?: string[] | string }) {
+  const raw = Array.isArray(args.names)
+    ? args.names
+    : typeof args.names === "string"
+      ? args.names.split(/,|\band\b/i)
+      : []
+  const queries = raw.map((n) => (n ?? "").trim()).filter(Boolean).slice(0, 6)
+  if (!queries.length) return { error: "Give at least one member name." }
+
+  const found: Array<{ id: string; name: string; role: string | null }> = []
+  const misses: string[] = []
+  for (const q of queries) {
+    const m = (await findProfiles(admin, q))[0]
+    if (!m) {
+      misses.push(q)
+      continue
+    }
+    const { data } = await admin
+      .from("profiles")
+      .select("id, fullname, role, is_deleted")
+      .eq("id", m.id)
+      .maybeSingle()
+    if (!data || data.is_deleted === true) {
+      misses.push(q)
+      continue
+    }
+    found.push({ id: String(data.id), name: data.fullname?.trim().replace(/\s+/g, " ") || q, role: data.role ?? null })
+  }
+  if (!found.length) {
+    return { error: `No account matches ${misses.map((m) => `"${m}"`).join(", ")} (checked with typo tolerance).` }
+  }
+  return {
+    business_cards: found.map((p) => ({
+      name: p.name,
+      public_profile_link: `${SITE_URL}/business-card/${p.id}`,
+      ...(p.role === "developer" ? { note: "internal partner account — shows the brand card, not a personal one" } : {}),
+    })),
+    ...(misses.length ? { not_found: misses } : {}),
+    note: "Each business card renders below this reply — click one to open the full-size image. The public profile link can be shared with clients directly.",
+    _names: found.map((p) => p.name),
+    _cards: found.map((p): FhiChatCard => ({
+      kind: "poster",
+      title: p.name,
+      subtitle: "💼 Business card · click to open full size",
+      image: `/og/business-card/${p.id}`,
+    })),
+  }
+}
+
+export type FhiChatPrintCard = {
+  member: { name: string; phoneDial: string; phoneLocal: string; email: string; avatarUrl: string | null; initials: string }
+  designs: string[]
+}
+
+/** Printable business card (front + back) — the chat UI renders it with the
+ *  SAME canvas renderer as the Business Card maker, so every design is
+ *  pixel-identical and downloads at print size. This tool only gathers the
+ *  member's card data and which design(s) to draw. */
+async function printBusinessCard(admin: Admin, args: { name?: string; design?: string }) {
+  const q = (args.name ?? "").trim()
+  if (!q) return { error: "Give the member's name." }
+  const m = (await findProfiles(admin, q))[0]
+  if (!m) return { error: `No account matches "${q}" (checked with typo tolerance).` }
+  const { data: p, error } = await admin
+    .from("profiles")
+    .select("id, fullname, profile_url, metadata")
+    .eq("id", m.id)
+    .maybeSingle()
+  if (error || !p) throw new Error(error?.message ?? "Profile fetch failed")
+
+  const meta = (p.metadata ?? {}) as Record<string, unknown>
+  const email = await admin.auth.admin
+    .getUserById(String(p.id))
+    .then((r) => r.data?.user?.email?.trim() ?? "")
+    .catch(() => "")
+  // metadata stores the picker value ("+971" or "+971-AE") — the dial is the
+  // part before the dash, same rule as the maker's dialFromValue.
+  const ccRaw = typeof meta.phone_country_code === "string" ? meta.phone_country_code.trim() : ""
+  const phoneDial = ccRaw ? ccRaw.split("-")[0] : "+971"
+  const phoneLocal = typeof meta.phone_number === "string" ? meta.phone_number.replace(/\D/g, "") : ""
+  const name = (p.fullname ?? "").trim().replace(/\s+/g, " ") || q
+  const parts = name.split(/\s+/).filter(Boolean)
+  const initials = ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase() || "?"
+
+  const saved =
+    typeof meta.business_card_design === "string" && isCardDesignId(meta.business_card_design)
+      ? meta.business_card_design
+      : "classic"
+  const req = (args.design ?? "").trim().toLowerCase()
+  const designs: string[] = req === "all" ? CARD_DESIGNS.map((d) => d.id) : isCardDesignId(req) ? [req] : [saved]
+
+  return {
+    print_card_for: name,
+    designs_used: designs.map((id) => CARD_DESIGNS.find((d) => d.id === id)?.name ?? id),
+    available_designs: CARD_DESIGNS.map((d) => `${d.id} (${d.name})`),
+    contact_on_card: { phone: phoneLocal ? `${phoneDial} ${phoneLocal}` : "none saved", email: email || "none" },
+    note: "The printable card renders below this reply — FRONT and BACK for each design, each with a Download button that produces the print-ready 2100×1200 PNG, exactly like the Business Card maker.",
+    _names: [name],
+    _printCards: [
+      {
+        member: { name, phoneDial, phoneLocal, email, avatarUrl: (p.profile_url as string | null) ?? null, initials },
+        designs,
+      },
+    ] satisfies FhiChatPrintCard[],
+  }
+}
+
 /** Internal dashboard/auth paths — excluded from public traffic answers. */
 const INTERNAL_PATH_RE =
   /^\/(admin|superadmin|agent|teamleader|unitmanager|member|secretary|teamsecretary|developer|editor|dashboard|login|staff-login|register|account-inactive)(\/|$)/
@@ -1804,6 +1992,72 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "meeting_poster",
+      description:
+        "CREATE a meeting/event invite poster (navy & gold FHI design with speaker cards). Use when the admin asks to make a meeting poster. Requires title, date, time and venue — if any are missing, the tool says so: ask the admin ONE friendly question for the missing details, then call again. Speakers are optional; FHI member names get their profile photo automatically. The poster renders in the chat under the reply.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Event title, e.g. Monthly Sales Rally" },
+          subtitle: { type: "string", description: "One supporting line (optional)" },
+          tagline: { type: "string", description: "Small eyebrow text, default YOU'RE INVITED (optional)" },
+          date: { type: "string", description: "Human date, e.g. Saturday, 12 September 2026" },
+          time: { type: "string", description: "e.g. 7:00 PM GST" },
+          venue: { type: "string", description: "Place or link, e.g. FHI Global Office, Business Bay" },
+          speakers: {
+            type: "array",
+            description: "Up to 6 speakers (optional)",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                role: { type: "string", description: "e.g. CEO, Top Agent (optional)" },
+                topic: { type: "string", description: "What they present (optional)" },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "business_card",
+      description:
+        "Show the FHI business card(s) of one or more members — the branded share card each member customized on their profile, plus their public profile link to share with clients. Use for 'show/make the business card of X'.",
+      parameters: {
+        type: "object",
+        properties: {
+          names: {
+            type: "array",
+            items: { type: "string" },
+            description: "Member name(s), up to 6 — typo-tolerant lookup",
+          },
+        },
+        required: ["names"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "print_business_card",
+      description:
+        "PRINTABLE business card (FRONT and BACK) for one member — six designs: classic (Skyline Classic), platinum (Pearl Prestige), noir (Executive Noir), arc (Gilded Arc), split (Marina Split), gold (Gold Leaf), or 'all' to show every design. Use for 'business card design / front and back / printable card'. Defaults to the member's own saved design. (business_card is the DIGITAL share card + link; this one is the print card.)",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "The member's name — typo-tolerant" },
+          design: { type: "string", enum: ["classic", "platinum", "noir", "arc", "split", "gold", "all"], description: "Design choice; omit for the member's saved design" },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "activity_feed",
       description:
         "Chronological WHAT-HAPPENED feed of platform activity: every sale submitted (who, project, amount, status), account created (with recruiter), listing added, project added and event registration in the window. Use for 'how's the update today', 'what's new', 'what happened yesterday', 'any updates'. Defaults to since yesterday.",
@@ -1866,7 +2120,13 @@ export type FhiChatChart =
 export async function runFhiChatTool(
   name: string,
   args: Record<string, unknown>,
-): Promise<{ forModel: string; cards: FhiChatCard[]; names: string[]; charts: FhiChatChart[] }> {
+): Promise<{
+  forModel: string
+  cards: FhiChatCard[]
+  names: string[]
+  charts: FhiChatChart[]
+  printCards: FhiChatPrintCard[]
+}> {
   const admin = createAdminSupabase()
   try {
     let result: Record<string, unknown>
@@ -1889,18 +2149,25 @@ export async function runFhiChatTool(
       case "activity_feed": result = await activityFeed(admin, args); break
       case "upcoming_birthdays": result = await upcomingBirthdays(admin, args); break
       case "birthday_poster": result = await birthdayPoster(admin, args); break
-      default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [] }
+      case "meeting_poster": result = await meetingPoster(admin, args as Parameters<typeof meetingPoster>[1]); break
+      case "business_card": result = await businessCard(admin, args); break
+      case "print_business_card": result = await printBusinessCard(admin, args); break
+      default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [], printCards: [] }
     }
-    const { _cards, _names, _charts, ...rest } = result as {
-      _cards?: FhiChatCard[]; _names?: string[]; _charts?: FhiChatChart[]
+    const { _cards, _names, _charts, _printCards, ...rest } = result as {
+      _cards?: FhiChatCard[]; _names?: string[]; _charts?: FhiChatChart[]; _printCards?: FhiChatPrintCard[]
     } & Record<string, unknown>
     return {
       forModel: JSON.stringify(rest),
       cards: Array.isArray(_cards) ? _cards : [],
       names: Array.isArray(_names) ? _names : [],
       charts: Array.isArray(_charts) ? _charts : [],
+      printCards: Array.isArray(_printCards) ? _printCards : [],
     }
   } catch (e) {
-    return { forModel: JSON.stringify({ error: e instanceof Error ? e.message : "Query failed" }), cards: [], names: [], charts: [] }
+    return {
+      forModel: JSON.stringify({ error: e instanceof Error ? e.message : "Query failed" }),
+      cards: [], names: [], charts: [], printCards: [],
+    }
   }
 }
