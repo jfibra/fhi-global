@@ -1482,14 +1482,15 @@ async function sendChatEmail(
   }
 }
 
-/** Bulk congratulations for the period's top sellers — SAFETY: every email is
- *  a labeled PREVIEW delivered to the asking admin's own inbox, never to the
- *  agents. The admin forwards the ones they want to send. */
+/** Bulk congratulations for the period's top sellers. Two modes:
+ *  send_directly=true → each agent receives their email (with certificate) at
+ *  their own address; otherwise every email is a labeled PREVIEW delivered to
+ *  the asking admin's inbox. The model sets the mode from the admin's words. */
 async function congratulateTopAgents(
   admin: Admin,
   args: {
     scope?: string; year?: number; month?: number; from_date?: string; to_date?: string
-    limit?: number; custom_note?: string
+    limit?: number; custom_note?: string; send_directly?: boolean
   },
   sender?: FhiChatSender,
 ) {
@@ -1520,14 +1521,20 @@ async function congratulateTopAgents(
     .slice(0, Math.min(Math.max(args.limit ?? 3, 1), 8))
   if (!ranked.length) return { error: `No validated sales in that period (${periodLabel}) — nobody to congratulate.` }
 
+  const direct = args.send_directly === true
   const names = await nameMaps(admin, sales)
-  const previews: Array<{ rank: number; agent: string; total: string; intended_recipient: string }> = []
+  const results: Array<{ rank: number; agent: string; total: string; recipient: string }> = []
+  const skipped: string[] = []
   for (const [i, l] of ranked.entries()) {
     const agentName = names.agent.get(l.id)?.name ?? "Agent"
     const agentEmail = await admin.auth.admin
       .getUserById(l.id)
-      .then((r) => r.data?.user?.email?.trim() ?? "no email on file")
-      .catch(() => "no email on file")
+      .then((r) => r.data?.user?.email?.trim() ?? null)
+      .catch(() => null)
+    if (direct && !agentEmail) {
+      skipped.push(`${agentName} (no email on file)`)
+      continue
+    }
     // Their personalized Top Seller certificate — a render failure never
     // blocks the congratulation itself.
     const certificatePng = await renderTopSellerCertificatePng({
@@ -1538,7 +1545,7 @@ async function congratulateTopAgents(
       periodLabel,
     }).catch(() => null)
     await sendCongratsEmail({
-      to: sender.email,
+      to: direct ? (agentEmail as string) : sender.email,
       agentName,
       rank: i + 1,
       deals: l.deals,
@@ -1546,22 +1553,30 @@ async function congratulateTopAgents(
       periodLabel,
       senderName: sender.name ?? null,
       customNote: args.custom_note ?? null,
-      previewFor: { name: agentName, email: agentEmail },
+      previewFor: direct ? null : { name: agentName, email: agentEmail ?? "no email on file" },
       certificatePng,
     })
-    previews.push({ rank: i + 1, agent: agentName, total: AED(l.value), intended_recipient: agentEmail })
+    results.push({
+      rank: i + 1,
+      agent: agentName,
+      total: AED(l.value),
+      recipient: direct ? (agentEmail as string) : `${sender.email} (preview)`,
+    })
   }
   return {
     period: periodLabel,
-    previews_delivered_to: sender.email,
-    congratulated: previews,
-    note: "IMPORTANT: all congratulation emails were delivered to the ADMIN'S OWN inbox as labeled previews — none were sent to the agents. The admin can forward each one, and direct sending can be enabled later.",
-    _names: previews.map((p) => p.agent),
+    mode: direct ? "SENT DIRECTLY to each agent's own email" : "previews delivered to the admin's inbox only",
+    congratulated: results,
+    ...(skipped.length ? { skipped } : {}),
+    note: direct
+      ? "The congratulation emails (with each agent's Top Seller certificate) were sent DIRECTLY to the agents. Confirm to the admin exactly who received one."
+      : "All congratulation emails were delivered to the ADMIN'S OWN inbox as labeled previews — none were sent to the agents.",
+    _names: results.map((p) => p.agent),
     _cards: ranked.map((l, i): FhiChatCard => ({
       kind: "agent",
       rank: i + 1,
       title: names.agent.get(l.id)?.name ?? "Agent",
-      subtitle: `🏆 ${AED(l.value)} · preview in your inbox`,
+      subtitle: `🏆 ${AED(l.value)} · ${direct ? "emailed 🎉" : "preview in your inbox"}`,
       image: names.agent.get(l.id)?.image ?? null,
     })),
   }
@@ -2218,7 +2233,7 @@ export const FHI_CHAT_TOOLS = [
     function: {
       name: "congratulate_top_agents",
       description:
-        "BULK congratulations for the top sellers of a period ('email the top agents this month to congratulate them'). Sends one branded congratulation email PER top agent — but as SAFETY, every email is a labeled preview delivered to the asking admin's own inbox, never to the agents; the admin forwards the ones they approve. Accepts the same period parameters as top_agents, an optional limit (default top 3) and an optional custom_note added to each email.",
+        "BULK congratulations for the top sellers of a period ('email the top agents this month to congratulate them'). Sends one branded congratulation email PER top agent, each with their personalized Top Seller certificate. send_directly=true delivers to each agent's own email; false/omitted delivers labeled previews to the asking admin's inbox instead. Accepts the same period parameters as top_agents, an optional limit (default top 3) and an optional custom_note added to each email.",
       parameters: {
         type: "object",
         properties: {
@@ -2228,6 +2243,7 @@ export const FHI_CHAT_TOOLS = [
           to_date: { type: "string", description: "YYYY-MM-DD exclusive" },
           limit: { type: "integer", description: "How many top agents (default 3, max 8)" },
           custom_note: { type: "string", description: "Optional personal line added to each email" },
+          send_directly: { type: "boolean", description: "true ONLY when the admin asked to email the agents themselves ('email this to them'); false/omitted = previews to the admin" },
         },
       },
     },
