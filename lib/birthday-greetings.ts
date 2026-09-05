@@ -2,6 +2,7 @@ import "server-only"
 
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { sendBirthdayEmail } from "@/lib/mailer"
+import { renderBirthdayPosterPng } from "@/lib/birthday-poster"
 
 /**
  * Birthday greetings — every ACTIVE member/agent whose birthday (Dubai time)
@@ -13,7 +14,15 @@ import { sendBirthdayEmail } from "@/lib/mailer"
 const dubaiToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" })
 const isLeap = (y: number) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0
 
-export type BirthdayPerson = { id: string; name: string; role: string | null; email: string | null }
+export type BirthdayPerson = {
+  id: string
+  name: string
+  /** Full name as it should appear on the poster artwork. */
+  posterName: string
+  photo: string | null
+  role: string | null
+  email: string | null
+}
 
 export async function findTodaysBirthdays(): Promise<BirthdayPerson[]> {
   const admin = createAdminSupabase()
@@ -23,7 +32,7 @@ export async function findTodaysBirthdays(): Promise<BirthdayPerson[]> {
 
   const { data, error } = await admin
     .from("profiles")
-    .select("id, fname, fullname, role, birthday")
+    .select("id, fname, fullname, role, birthday, profile_url")
     .eq("status", "active")
     .neq("is_deleted", true)
     .not("birthday", "is", null)
@@ -41,6 +50,8 @@ export async function findTodaysBirthdays(): Promise<BirthdayPerson[]> {
     out.push({
       id: String(p.id),
       name: (p.fname ?? p.fullname ?? "").trim() || "there",
+      posterName: (p.fullname ?? p.fname ?? "").trim().replace(/\s+/g, " ") || "You",
+      photo: (p.profile_url as string | null) ?? null,
       role: p.role ?? null,
       email,
     })
@@ -62,7 +73,9 @@ export async function sendBirthdayGreetings(): Promise<{
       continue
     }
     try {
-      await sendBirthdayEmail({ to: p.email, name: p.name })
+      // The poster is a bonus — a render failure never blocks the greeting.
+      const posterPng = await renderBirthdayPosterPng({ name: p.posterName, photoUrl: p.photo }).catch(() => null)
+      await sendBirthdayEmail({ to: p.email, name: p.name, posterPng })
       sent.push(p.email)
     } catch {
       // One failed send must not stop the other birthdays.

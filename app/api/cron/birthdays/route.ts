@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { findTodaysBirthdays, sendBirthdayGreetings } from "@/lib/birthday-greetings"
 import { sendBirthdayEmail, hasMailerConfig } from "@/lib/mailer"
+import { renderBirthdayPosterPng } from "@/lib/birthday-poster"
+import { createAdminSupabase } from "@/lib/admin-supabase"
 
 /**
  * Birthday greetings cron — 8:30 AM Dubai daily (vercel.json "30 4 * * *"
@@ -34,10 +36,50 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "SMTP is not configured." }, { status: 503 })
   }
 
+  // ?poster=<profile id> — preview that member's rendered poster PNG in the
+  // browser (secret-protected; handy to check the artwork placement).
+  const posterUid = req.nextUrl.searchParams.get("poster")?.trim()
+  if (posterUid) {
+    const admin = createAdminSupabase()
+    const { data: p } = await admin
+      .from("profiles")
+      .select("fullname, fname, profile_url")
+      .eq("id", posterUid)
+      .maybeSingle()
+    if (!p) return NextResponse.json({ error: "No such profile." }, { status: 404 })
+    const png = await renderBirthdayPosterPng({
+      name: (p.fullname ?? p.fname ?? "You").trim().replace(/\s+/g, " "),
+      photoUrl: p.profile_url ?? null,
+    })
+    if (!png) return NextResponse.json({ error: "Poster render failed." }, { status: 500 })
+    return new NextResponse(new Uint8Array(png), {
+      headers: { "content-type": "image/png", "cache-control": "no-store" },
+    })
+  }
+
   const test = req.nextUrl.searchParams.get("test")?.trim()
   if (test && !isProd) {
-    await sendBirthdayEmail({ to: test, name: req.nextUrl.searchParams.get("name") ?? "Juliecor" })
-    return NextResponse.json({ ok: true, sample_sent_to: test })
+    // A uid makes the sample use that member's real name + photo poster.
+    const uid = req.nextUrl.searchParams.get("uid")?.trim()
+    let posterPng: Buffer | null = null
+    let name = req.nextUrl.searchParams.get("name") ?? "Juliecor"
+    if (uid) {
+      const admin = createAdminSupabase()
+      const { data: p } = await admin
+        .from("profiles")
+        .select("fullname, fname, profile_url")
+        .eq("id", uid)
+        .maybeSingle()
+      if (p) {
+        name = (p.fname ?? p.fullname ?? name).trim()
+        posterPng = await renderBirthdayPosterPng({
+          name: (p.fullname ?? p.fname ?? name).trim().replace(/\s+/g, " "),
+          photoUrl: p.profile_url ?? null,
+        }).catch(() => null)
+      }
+    }
+    await sendBirthdayEmail({ to: test, name, posterPng })
+    return NextResponse.json({ ok: true, sample_sent_to: test, poster_included: Boolean(posterPng) })
   }
 
   if (req.nextUrl.searchParams.get("dry")) {

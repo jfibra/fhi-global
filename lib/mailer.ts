@@ -66,8 +66,10 @@ type DeliverOptions = {
   html: string
   /** Mailbox to authenticate as; defaults to the main SMTP account. */
   authUser?: string
-  /** Files to attach; href points at our own S3, nodemailer streams it. */
-  attachments?: Array<{ filename: string; href: string }>
+  /** Files to attach; href points at our own S3 (nodemailer streams it) or
+   *  content carries the bytes directly. A cid makes it renderable inline
+   *  via <img src="cid:...">. */
+  attachments?: Array<{ filename: string; href?: string; content?: Buffer; cid?: string; contentType?: string }>
 }
 
 // Cap the stored HTML so one huge email can't balloon an audit row.
@@ -971,10 +973,34 @@ export async function sendAdminDirectEmail(input: {
   })
 }
 
-/** The birthday greeting — warm, personal, no sales pitch, no buttons. */
-export async function sendBirthdayEmail(input: { to: string; name: string | null }): Promise<void> {
+/** The birthday greeting — warm, personal, no sales pitch, no buttons.
+ *  With posterPng, the member's personalized birthday poster (their photo on
+ *  the studio artwork) is embedded inline; without it, a gold wish card. */
+export async function sendBirthdayEmail(input: { to: string; name: string | null; posterPng?: Buffer | null }): Promise<void> {
   const name = greetingName(input.name)
   const subject = `Happy Birthday, ${name}! 🎂 From all of us at FHI Global`
+
+  const centerpiece = input.posterPng
+    ? `
+        <tr>
+          <td align="center" style="padding:22px 40px 6px;">
+            <img src="cid:birthday-poster" width="400" alt="Happy Birthday, ${esc(name)}!"
+                 style="display:block;width:100%;max-width:400px;border-radius:14px;border:1px solid #e7d9a8;">
+          </td>
+        </tr>`
+    : `
+        <tr>
+          <td style="padding:22px 40px 6px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr><td align="center" style="background:#fdf6e3;border:1px solid #e7d9a8;border-radius:14px;padding:26px 20px;">
+                <p style="margin:0 0 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:30px;line-height:1;">🎂</p>
+                <p style="margin:0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:17px;font-weight:700;color:#8a6d2a;line-height:1.5;">
+                  Wishing you health, happiness and<br>record-breaking success in the year ahead.
+                </p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>`
 
   const bodyHtml = `
         <tr>
@@ -988,18 +1014,7 @@ export async function sendBirthdayEmail(input: { to: string; name: string | null
             </p>
           </td>
         </tr>
-        <tr>
-          <td style="padding:22px 40px 6px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-              <tr><td align="center" style="background:#fdf6e3;border:1px solid #e7d9a8;border-radius:14px;padding:26px 20px;">
-                <p style="margin:0 0 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:30px;line-height:1;">🎂</p>
-                <p style="margin:0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:17px;font-weight:700;color:#8a6d2a;line-height:1.5;">
-                  Wishing you health, happiness and<br>record-breaking success in the year ahead.
-                </p>
-              </td></tr>
-            </table>
-          </td>
-        </tr>
+        ${centerpiece}
         <tr>
           <td style="padding:20px 40px 32px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
             <p style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#4b5563;">
@@ -1019,6 +1034,13 @@ export async function sendBirthdayEmail(input: { to: string; name: string | null
     from: fromAddress(),
     to: input.to,
     subject,
+    ...(input.posterPng
+      ? {
+          attachments: [
+            { filename: "happy-birthday.png", content: input.posterPng, cid: "birthday-poster", contentType: "image/png" },
+          ],
+        }
+      : {}),
     text: `Happy Birthday, ${name}! 🎉\n\nToday is all about you. On behalf of the entire FHI Global family, we want you to know how much we value having you with us.\n\nWishing you health, happiness and record-breaking success in the year ahead.\n\nEnjoy your day — you've earned every bit of it. Here's to another amazing year together.\n\nWith warm wishes,\nThe FHI Global Family\nFHI Global · Dubai, UAE`,
     html: eventEmailShell({
       subject,
