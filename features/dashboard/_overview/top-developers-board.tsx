@@ -22,7 +22,14 @@ type Leader = {
   rank: number
 }
 
-type Scope = "month" | "year" | "all"
+type Scope = "month" | "quarter" | "year" | "all"
+
+const QUARTERS = [
+  { value: 1, label: "Q1 (Jan–Mar)" },
+  { value: 4, label: "Q2 (Apr–Jun)" },
+  { value: 7, label: "Q3 (Jul–Sep)" },
+  { value: 10, label: "Q4 (Oct–Dec)" },
+]
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -92,7 +99,13 @@ export function TopDevelopersBoard() {
   )
 
   const periodLabel =
-    scope === "all" ? "All time" : scope === "year" ? `${year}` : `${MONTHS[month - 1]} ${year}`
+    scope === "all"
+      ? "All time"
+      : scope === "year"
+        ? `${year}`
+        : scope === "quarter"
+          ? `Q${Math.floor((month - 1) / 3) + 1} ${year}`
+          : `${MONTHS[month - 1]} ${year}`
 
   const selectCls =
     "rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#374151] focus:border-[#001f3f] focus:outline-none"
@@ -111,7 +124,7 @@ export function TopDevelopersBoard() {
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-lg bg-[#f3f4f6] p-0.5">
-          {(["month", "year", "all"] as Scope[]).map((s) => (
+          {(["month", "quarter", "year", "all"] as Scope[]).map((s) => (
             <button
               key={s}
               type="button"
@@ -121,7 +134,7 @@ export function TopDevelopersBoard() {
                 scope === s ? "bg-[#001f3f] text-white" : "text-[#6b7280] hover:text-[#001f3f]"
               }`}
             >
-              {s === "month" ? "Monthly" : s === "year" ? "Yearly" : "All time"}
+              {s === "month" ? "Monthly" : s === "quarter" ? "Quarterly" : s === "year" ? "Yearly" : "All time"}
             </button>
           ))}
         </div>
@@ -130,6 +143,20 @@ export function TopDevelopersBoard() {
           <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={selectCls} aria-label="Month">
             {MONTHS.map((m, i) => (
               <option key={m} value={i + 1}>{m}</option>
+            ))}
+          </select>
+        )}
+        {scope === "quarter" && (
+          // The API derives the quarter from any month inside it, so the
+          // select simply snaps `month` to the quarter's first month.
+          <select
+            value={Math.floor((month - 1) / 3) * 3 + 1}
+            onChange={(e) => setMonth(Number(e.target.value))}
+            className={selectCls}
+            aria-label="Quarter"
+          >
+            {QUARTERS.map((q) => (
+              <option key={q.value} value={q.value}>{q.label}</option>
             ))}
           </select>
         )}
