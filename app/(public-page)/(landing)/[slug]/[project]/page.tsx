@@ -4,10 +4,19 @@ import { notFound, permanentRedirect } from "next/navigation"
 import Link from "next/link"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata, truncateDescription } from "@/lib/seo"
+import {
+  composeProjectDescription,
+  composeProjectTitle,
+  formatPrice,
+  projectAtAGlance,
+  projectFaqs,
+  projectSubtitle,
+  type ProjectSeoInput,
+} from "@/lib/project-seo"
 import { relatedSeoPagesForProject } from "@/lib/seo-pages"
 import { ProjectCard, type ProjectCardData } from "@/components/project-card"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
-import { breadcrumbList, realEstateListingSchema } from "@/lib/structured-data"
+import { breadcrumbList, faqPageSchema, realEstateListingSchema } from "@/lib/structured-data"
 import { JsonLd } from "@/components/json-ld"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
@@ -53,7 +62,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const supabase = createPublicSupabaseClient()
   const { data, error } = await supabase
     .from("projects")
-    .select("name, description, meta_title, meta_description, main_image, city, location, developers(slug)")
+    .select(
+      "name, status, description, meta_title, meta_description, main_image, city, location, community, launch_price_from, launch_price_to, currency, delivery_quarter, expected_completion_date, delivery_date, developers(name, slug), project_property_types(property_types(name)), project_units(unit_type, bedrooms, size_sqft, price_from)",
+    )
     .eq("slug", slug)
     .eq("is_published", true)
     .is("deleted_at", null)
@@ -68,24 +79,44 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!data) notFound()
   // Wrong developer segment: the page body issues the permanent redirect to
   // the canonical pair; metadata just needs to not claim the wrong URL.
-  const devRel = data.developers as unknown as { slug: string | null } | null
+  const devRel = data.developers as unknown as { name: string; slug: string | null } | null
   if (devRel?.slug && devRel.slug !== devSlug) return { title: data.meta_title ?? data.name }
 
-  // Curated meta titles render verbatim (absolute bypasses the layout's
-  // "%s | FHI Global" template); bare names get the template's single brand.
-  const title = data.meta_title ? { absolute: data.meta_title } : data.name
-  const locality = [data.location, data.city].filter(Boolean).join(", ")
-  const description =
-    truncateDescription(data.meta_description) ||
-    truncateDescription(data.description) ||
-    `Discover ${data.name}${locality ? ` in ${locality}` : ""} — a premium real estate project in Dubai on FHI Global.`
+  const seoInput: ProjectSeoInput = {
+    name: data.name,
+    status: data.status,
+    community: data.community,
+    location: data.location,
+    city: data.city,
+    launch_price_from: data.launch_price_from,
+    launch_price_to: data.launch_price_to,
+    currency: data.currency,
+    delivery_quarter: data.delivery_quarter,
+    expected_completion_date: data.expected_completion_date,
+    delivery_date: data.delivery_date,
+    developer: devRel ? { name: devRel.name } : null,
+    propertyTypes: ((data.project_property_types ?? []) as unknown as { property_types: { name: string } | null }[])
+      .map((pt) => pt.property_types?.name)
+      .filter((n): n is string => Boolean(n)),
+    units: (data.project_units ?? []) as ProjectSeoInput["units"],
+  }
+  // Curated meta fields render verbatim (absolute bypasses the layout's
+  // "%s | FHI Global" template). Everything else is composed from the row's
+  // facts (lib/project-seo.ts): "Coventry 49 | FHI Global" over a one-line
+  // tagline told Google nothing, and 256 of 257 projects have no curated copy.
+  const title = data.meta_title ? { absolute: data.meta_title } : composeProjectTitle(seoInput)
+  const description = truncateDescription(data.meta_description) || composeProjectDescription(seoInput)
   const ogImage = `${siteUrl}/og/project/${slug}`
+  const area = data.community || data.location
   const keywords = [
     data.name,
+    devRel?.name ? `${data.name} ${devRel.name}` : null,
+    `${data.name} price`,
+    `${data.name} payment plan`,
+    area ? `off-plan projects in ${area}` : null,
+    area,
     data.city,
-    data.location,
-    "Dubai project",
-    "off-plan property",
+    "off-plan property Dubai",
     "real estate Dubai",
   ].filter(Boolean) as string[]
 
@@ -96,7 +127,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     pathname: `/${devSlug}/${slug}`,
     keywords,
     openGraphTitle: data.name,
-    openGraphDescription: data.description ?? description,
+    openGraphDescription: description,
   })
 }
 
@@ -105,18 +136,6 @@ const STATUS_STYLES: Record<string, { label: string; bg: string; text: string; b
   launch:             { label: "Launching",           bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" },
   under_construction: { label: "Under Construction", bg: "#fffbeb", text: "#b45309", border: "#fde68a" },
   completed:          { label: "Completed",           bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" },
-}
-
-function formatPrice(from: number | null, to: number | null, currency: string | null) {
-  const cur = currency ?? "AED"
-  if (!from) return null
-  const fmt = (n: number) => {
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`
-    return n.toLocaleString()
-  }
-  if (to && to !== from) return `${cur} ${fmt(from)} – ${fmt(to)}`
-  return `${cur} ${fmt(from)}`
 }
 
 export default async function ProjectDetailPage({ params }: Props) {
@@ -179,6 +198,41 @@ export default async function ProjectDetailPage({ params }: Props) {
   const constructionUpdates = (cuRows ?? []) as { id:string; title:string; file_url:string; file_type:string; created_at:string|null }[]
   const propertyTypes = ((project.project_property_types ?? []) as { property_types: { name: string } | null }[])
     .map((pt) => pt.property_types?.name).filter(Boolean) as string[]
+  const amenityNames = ((project.project_amenities ?? []) as { amenities: { name: string } | null }[])
+    .map((a) => a.amenities?.name).filter((n): n is string => Boolean(n))
+  const neighborNames = ((project.project_neighbors ?? []) as { description: string | null }[])
+    .map((n) => n.description).filter((d): d is string => Boolean(d))
+  // Same facts feed the subtitle, the at-a-glance overview and the FAQ, so
+  // the visible page and the metadata never disagree.
+  const seoInput: ProjectSeoInput = {
+    name: project.name,
+    status: project.status,
+    community: project.community,
+    location: project.location,
+    city: project.city,
+    launch_price_from: project.launch_price_from,
+    launch_price_to: project.launch_price_to,
+    currency: project.currency,
+    delivery_quarter: project.delivery_quarter,
+    expected_completion_date: project.expected_completion_date,
+    delivery_date: project.delivery_date,
+    total_units: project.total_units,
+    floors: project.floors,
+    number_of_buildings: project.number_of_buildings,
+    down_payment_percentage: project.down_payment_percentage,
+    payment_plan_details: project.payment_plan_details,
+    installment_available: project.installment_available,
+    freehold: project.freehold,
+    ownership_type: project.ownership_type,
+    developer: { name: developer.name },
+    propertyTypes,
+    units,
+    amenities: amenityNames,
+    neighbors: neighborNames,
+  }
+  const subtitle = projectSubtitle(seoInput)
+  const atAGlance = projectAtAGlance(seoInput)
+  const faqs = projectFaqs(seoInput)
   const quickFacts = [
     { icon: CheckCircle2, label: "Ownership", value: project.ownership_type ?? (project.freehold ? "Freehold" : null) },
     { icon: MapPin, label: "Region", value: project.region },
@@ -214,6 +268,44 @@ export default async function ProjectDetailPage({ params }: Props) {
     .order("created_at", { ascending: false })
     .limit(4)
   const moreProjects = moreRows ?? []
+  // Sideways links across developers: the same community (else the same
+  // city), excluding what the developer block already shows. Most developers
+  // here have one to three projects, so without this the catalog only links
+  // within a developer. Area values are DB-driven — strip PostgREST filter
+  // syntax before interpolating into .or().
+  const shownIds = [project.id as number, ...moreProjects.map((p) => p.id as number)]
+  const areaKey = (project.community || project.location || "").replace(/[(),.:*%]/g, " ").trim()
+  const similarSelect =
+    "id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)"
+  const similarBase = () =>
+    supabase
+      .from("projects")
+      .select(similarSelect)
+      .eq("is_active", true)
+      .eq("is_published", true)
+      .is("deleted_at", null)
+      .not("id", "in", `(${shownIds.join(",")})`)
+      .not("main_image", "is", null)
+      .neq("main_image", "")
+      .order("is_featured", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(4)
+  let similarProjects: NonNullable<typeof moreRows> = []
+  let similarLabel: string | null = null
+  if (areaKey.length >= 3) {
+    const { data } = await similarBase().or(`community.ilike.%${areaKey}%,location.ilike.%${areaKey}%`)
+    if (data && data.length >= 2) {
+      similarProjects = data
+      similarLabel = project.community || project.location
+    }
+  }
+  if (similarProjects.length === 0 && project.city) {
+    const { data } = await similarBase().ilike("city", `%${project.city.trim()}%`)
+    if (data && data.length >= 2) {
+      similarProjects = data
+      similarLabel = project.city.trim()
+    }
+  }
   const seoLinks = relatedSeoPagesForProject({
     city: project.city,
     location: project.location,
@@ -248,6 +340,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           { name: developer.name, path: `/${developer.slug}` },
           { name: project.name },
         ]),
+        ...(faqs.length > 0 ? [faqPageSchema(faqs)] : []),
       ]}
     />
     {/* No overflow-x-hidden here: overflow on an ancestor disables
@@ -276,6 +369,11 @@ export default async function ProjectDetailPage({ params }: Props) {
           <h1 className="font-['Outfit'] text-3xl md:text-[42px] font-bold text-[#001f3f] leading-[1.08]">
             {project.name}
           </h1>
+          {/* What it is, by whom, where — the words a searcher typed, right
+              under the name (the H1 stays the bare project name). */}
+          {subtitle && (
+            <p className="mt-3 text-[15px] font-medium text-[#6b7280]">{subtitle}</p>
+          )}
 
           {/* The photos — a collage of up to four fills the masthead's right
               half on desktop, running all the way down past the stats band;
@@ -411,18 +509,18 @@ export default async function ProjectDetailPage({ params }: Props) {
         {/* Left / main column */}
         <div className="lg:col-span-2 space-y-12">
 
-          {/* Overview */}
-          {(project.description || project.about_project) && (
-            <section>
-              <SectionHeading title="Overview" />
-              {project.description && (
-                <p className="mt-5 text-[15.5px] leading-[1.8] text-[#374151]">{project.description}</p>
-              )}
-              {project.about_project && project.about_project !== project.description && (
-                <p className="mt-4 text-[15.5px] leading-[1.8] text-[#374151]">{project.about_project}</p>
-              )}
-            </section>
-          )}
+          {/* Overview — the composed facts lead (every project gets a real
+              overview; ~40 had none), then the developer's own copy. */}
+          <section>
+            <SectionHeading title="Overview" />
+            <p className="mt-5 text-[15.5px] leading-[1.8] text-[#374151]">{atAGlance.join(" ")}</p>
+            {project.description && (
+              <p className="mt-4 text-[15.5px] leading-[1.8] text-[#374151]">{project.description}</p>
+            )}
+            {project.about_project && project.about_project !== project.description && (
+              <p className="mt-4 text-[15.5px] leading-[1.8] text-[#374151]">{project.about_project}</p>
+            )}
+          </section>
 
           {/* Features */}
           {features.length > 0 && (
@@ -610,6 +708,23 @@ export default async function ProjectDetailPage({ params }: Props) {
               </div>
             </section>
           )}
+
+          {/* FAQ — visible Q&A mirrored 1:1 in the FAQPage schema above
+              (hidden or mismatched FAQ markup reads as spam to Google). Only
+              questions the row can actually answer are asked. */}
+          {faqs.length > 0 && (
+            <section id="faq" className="scroll-mt-24">
+              <SectionHeading title="Frequently Asked Questions" />
+              <dl className="mt-2 divide-y divide-[#eef0f3]">
+                {faqs.map((f) => (
+                  <div key={f.q} className="py-4">
+                    <dt className="text-[15px] font-semibold text-[#0d1117]">{f.q}</dt>
+                    <dd className="mt-1.5 text-[15px] leading-relaxed text-[#374151]">{f.a}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
         </div>
 
         {/* ── Right sidebar — headings sit on the page, panels are square.
@@ -743,7 +858,7 @@ export default async function ProjectDetailPage({ params }: Props) {
 
       {/* ── More from the developer + popular searches — engagement for the
              visitor, internal links for the crawler. ── */}
-      {(moreProjects.length > 0 || seoLinks.length > 0) && (
+      {(moreProjects.length > 0 || similarProjects.length > 0 || seoLinks.length > 0) && (
         <section className="bg-white border-t border-[#e8eaed]">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-10">
             {moreProjects.length > 0 && (
@@ -769,6 +884,35 @@ export default async function ProjectDetailPage({ params }: Props) {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                   {moreProjects.map((p) => (
+                    <ProjectCard key={p.id} project={p as unknown as ProjectCardData} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {similarProjects.length > 0 && similarLabel && (
+              <div>
+                <div className="flex items-end justify-between gap-4 mb-5">
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-2">
+                      <span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true" />
+                      <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0d1117]">
+                        Nearby
+                      </span>
+                    </div>
+                    <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] leading-tight">
+                      Other projects in <span className="text-[#b8913f]">{similarLabel}</span>
+                    </h2>
+                  </div>
+                  <Link
+                    href="/projects"
+                    className="hidden sm:inline-flex items-center gap-1.5 text-sm font-bold text-[#001f3f] hover:text-[#b8913f] transition-colors shrink-0"
+                  >
+                    All Projects <ArrowLeft className="w-4 h-4 rotate-180" />
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {similarProjects.map((p) => (
                     <ProjectCard key={p.id} project={p as unknown as ProjectCardData} />
                   ))}
                 </div>
