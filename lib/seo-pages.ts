@@ -815,6 +815,58 @@ const AREA_GUIDES: SeoPage[] = [
     ],
     related: ["projects-in-dubailand", "jumeirah-village-circle", "arabian-ranches", "off-plan-projects-in-uae"],
   },
+  {
+    slug: "al-jaddaf",
+    imageQuery: "jaddaf",
+    label: "Al Jaddaf",
+    title: "Al Jaddaf Area Guide — Living, Buying & New Projects",
+    h1: "Al Jaddaf",
+    description:
+      "Al Jaddaf area guide: Dubai Creek-side apartments minutes from Downtown and the airport, two Metro stations, and one of the busiest off-plan pipelines in central Dubai.",
+    intro: [
+      "Al Jaddaf sits on the Bur Dubai bank of Dubai Creek, between Dubai Healthcare City, Ras Al Khor and the water — ten to fifteen minutes from Downtown in one direction and the airport in the other. For decades it was the city's boatyard; today it is one of the densest construction zones in central Dubai, with a creekside promenade, the Mohammed Bin Rashid Library and Jameel Arts Centre as its cultural anchors and Dubai Festival City lit up across the water.",
+      "What draws buyers is the arithmetic: a genuinely central address at prices closer to the outer belts than to Downtown. Most of the launches on our books here start between AED 700,000 and AED 850,000 for studios and one-bedroom units, and the district's two Green Line Metro stations — Al Jaddaf and Creek — make it one of the few off-plan hotspots where a tenant can live without a car.",
+      "The trade-off is that Al Jaddaf is still being built. Expect cranes, road works and a skyline that changes every quarter until the current wave hands over between 2026 and 2028. Binghatti and Azizi between them account for most of the towers rising here, so developer track record is easier to judge than in more fragmented districts — and it is the first thing we check.",
+    ],
+    kind: "guide",
+    facts: [
+      { label: "Property mix", value: "Mid- and high-rise apartments — studios to three-beds, a handful of penthouses" },
+      { label: "Who it suits", value: "Yield-focused investors, first-time buyers priced out of Downtown, medical and airport professionals" },
+      { label: "Getting around", value: "Al Jaddaf & Creek Metro stations (Green Line); Al Khail Road to Downtown; Al Garhoud Bridge and Business Bay Crossing over the creek" },
+      { label: "Character", value: "Creekside and culture-led, still under construction — a district finding its street life" },
+      { label: "Investment angle", value: "Central-Dubai location at mid-market entry prices; rental demand from Dubai Healthcare City and the airport belt" },
+      { label: "Lifestyle & amenities", value: "Jaddaf Waterfront promenade, Mohammed Bin Rashid Library, Jameel Arts Centre, Palazzo Versace, Festival City Mall one bridge away" },
+    ],
+    sections: [
+      {
+        heading: "Living in Al Jaddaf",
+        body: "Daily life runs along the creek and the Metro. Dubai Healthcare City and its clinics are a walk away, Dubai Festival City Mall is one bridge across the water, and Downtown, DIFC and Business Bay are a short drive or a few Metro stops. Supermarkets and cafes are arriving tower by tower rather than all at once — buyers who move in early should expect a district in transition, and tenants who value the commute over nightlife.",
+      },
+      {
+        heading: "Buying and renting here",
+        body: "Almost everything for sale in Al Jaddaf is off-plan, which means construction-linked payment plans and launch pricing — but also the need to check the developer's delivery history and the SPA's handover clauses. Studios and one-beds dominate the unit mix; per square foot the district prices well below Downtown and Dubai Creek Harbour for a comparable commute. The two Metro stations underpin tenant demand from DHCC medical staff, airport and airline employees, and Downtown commuters.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Is Al Jaddaf freehold for foreigners?",
+        a: "Yes — Al Jaddaf sits inside Dubai's designated freehold zones, so foreign buyers hold a full title deed with no residency requirement.",
+      },
+      {
+        q: "Is Al Jaddaf a good place to invest?",
+        a: "It combines a central-Dubai location — ten to fifteen minutes to Downtown and the airport, two Metro stations — with entry prices well below the neighbouring districts. The trade-off is buying into an area still under construction, so developer track record matters more than the render.",
+      },
+      {
+        q: "Which developers are building in Al Jaddaf?",
+        a: "Binghatti and Azizi account for most of the current towers, with several launches each handing over between 2026 and 2028. Our Al Jaddaf projects page lists every one live on our books.",
+      },
+      {
+        q: "How far is Al Jaddaf from Downtown Dubai and the airport?",
+        a: "Roughly ten to fifteen minutes by car to either — Downtown via Al Khail Road, Dubai International Airport via Al Garhoud Bridge. Al Jaddaf and Creek Metro stations on the Green Line connect to the rest of the network.",
+      },
+    ],
+    related: ["projects-in-al-jaddaf", "dubai-creek-harbour", "downtown-dubai", "properties-under-1m-in-dubai"],
+  },
 ]
 
 // ─── Property-type, budget and area-inventory searches ──────────────────────
@@ -994,10 +1046,30 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
       "New and off-plan projects in Dubailand — townhouse districts and value apartments in Dubai's biggest family belt, with developer payment plans.",
     intro: [
       "Dubailand is where Dubai builds room to grow: self-contained family communities with pools, parks and schools inside the gates, at the widest price-to-space ratio in the city. The launch calendar here never stops, which is exactly what keeps pricing honest.",
+      "It is less one neighbourhood than a belt of them. Arjan and Majan supply mid-rise apartments beside Dubai Miracle Garden and the Al Barari fringe; Dubai Land Residence Complex (DLRC) and Liwan run to value studios and one-beds; Wadi Al Safa, Villanova, Rukan and Mudon are townhouse and villa country. Prices on our books span compact apartments from under AED 500,000 to villas above AED 5 million — no other Dubai district covers that range.",
       "These are the Dubailand projects live on our books. The variable that deserves your attention in this belt is delivery track record — it varies more here than anywhere else, and it's the first thing we check before recommending a project.",
+      "Two practical notes for buyers: the district is car-first — the Metro does not reach Dubailand, so weigh the drive to Sheikh Mohammed bin Zayed Road and Al Ain Road — and service charges in the gated townhouse communities are typically lower than in tower districts, which shows up in net yield.",
     ],
     kind: "projects",
     filter: { cityLike: "dubai", locationLike: "dubailand" },
+    faqs: [
+      {
+        q: "Which areas count as Dubailand?",
+        a: "Dubailand is a master-development belt along Sheikh Mohammed bin Zayed and Al Ain Roads. Its main residential districts are Arjan, Majan, Dubai Land Residence Complex (DLRC), Liwan, Wadi Al Safa, Villanova, Rukan and Mudon, with Global Village, IMG Worlds of Adventure and Dubai Miracle Garden as the landmarks.",
+      },
+      {
+        q: "How much do new projects in Dubailand cost?",
+        a: "Studios and one-beds in the apartment districts — DLRC, Liwan, Majan, Arjan — start from roughly AED 400,000 to 650,000 in current launches; townhouses and villas in the gated communities run from the low millions upward. Exact prices sit on each project page.",
+      },
+      {
+        q: "Is there a Metro station in Dubailand?",
+        a: "Not yet. The belt is served by Sheikh Mohammed bin Zayed Road, Al Ain Road and Emirates Road; the planned Blue Line is scheduled to reach Academic City and Dubai Silicon Oasis on its eastern edge, but most Dubailand communities will remain car-first.",
+      },
+      {
+        q: "Is Dubailand a good area for off-plan investment?",
+        a: "For price-to-space and family rental demand, yes — it is where Dubai's mid-market growth lands. The risk to manage is delivery: track records vary more here than anywhere else, so we weigh the developer's completed phases before the payment plan.",
+      },
+    ],
     related: ["dubailand", "townhouses-for-sale-in-dubai", "properties-under-1m-in-dubai", "new-projects-in-dubai"],
   },
   {
@@ -1015,13 +1087,43 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
     filter: { cityLike: "dubai", locationLike: "jumeirah village triangle" },
     related: ["projects-in-jumeirah-village-circle", "townhouses-for-sale-in-dubai", "new-projects-in-dubai", "jumeirah-village-circle"],
   },
+  {
+    slug: "projects-in-al-jaddaf",
+    label: "Projects in Al Jaddaf",
+    title: "New Projects in Al Jaddaf — Off-Plan Prices & Payment Plans",
+    h1: "New Projects in Al Jaddaf",
+    description:
+      "New and off-plan projects in Al Jaddaf, Dubai — Binghatti and Azizi towers on the Creek, minutes from Downtown and the airport, with developer prices and payment plans.",
+    intro: [
+      "Al Jaddaf has quietly become one of the busiest off-plan districts in central Dubai. The creekside strip between Dubai Healthcare City and Ras Al Khor is filling with mid- and high-rise apartment towers, most of them from Binghatti and Azizi, with handovers rolling from 2026 into 2028.",
+      "The projects below are live in Al Jaddaf now. Read the price column against the map: these are Downtown-adjacent addresses with Metro access, priced closer to the outer belts. Studio and one-bedroom launches cluster between AED 700,000 and AED 850,000; the premium is for creek views and the newer Jaddaf Waterfront plots.",
+      "Because so much of the district delivers in the same two-year window, compare handover dates and payment schedules side by side — a project completing in 2026 buys certainty, a 2028 launch buys the longest plan and the widest unit choice.",
+    ],
+    kind: "projects",
+    filter: { cityLike: "dubai", locationLike: "jaddaf" },
+    faqs: [
+      {
+        q: "What is the starting price for off-plan apartments in Al Jaddaf?",
+        a: "Most current launches start between AED 700,000 and AED 850,000 for studios and one-bedroom units, with two- and three-bedroom apartments and creek-view units priced above that. Exact figures sit on each project page.",
+      },
+      {
+        q: "When do the Al Jaddaf projects hand over?",
+        a: "The current pipeline delivers between 2026 and 2028 — several Binghatti towers in 2026–2027, the larger Azizi communities into 2028. Every project page shows its scheduled quarter.",
+      },
+      {
+        q: "Is Al Jaddaf connected to the Dubai Metro?",
+        a: "Yes — Al Jaddaf and Creek stations on the Green Line both serve the district, which is rare among Dubai's off-plan hotspots and a core part of its rental case.",
+      },
+    ],
+    related: ["al-jaddaf", "apartments-for-sale-in-dubai", "properties-under-1m-in-dubai", "dubai-projects-handover-2027"],
+  },
 ]
 
 // ─── Handover-year searches ──────────────────────────────────────────────────
 // Investors shop by delivery date ("projects handover 2027 dubai"). Backed by
 // delivery_quarter / expected_completion_date; counts checked before shipping.
 
-const HANDOVER_INTRO: Record<string, [string, string]> = {
+const HANDOVER_INTRO: Record<string, string[]> = {
   "2026": [
     "Handover in 2026 means the finish line is in sight: construction is in its final stretches, most of the payment plan is already behind the original buyers, and what's left on the market skews toward assignments and the developer's last units. These are the Dubai projects scheduled to hand over in 2026.",
     "Buying this close to completion trades the longest payment plans for near-term certainty — you can see what you're getting, and rent starts flowing within months rather than years.",
@@ -1029,6 +1131,8 @@ const HANDOVER_INTRO: Record<string, [string, string]> = {
   "2027": [
     "2027 is the current sweet spot of Dubai's off-plan market: far enough out for a genuine construction-linked payment plan, close enough that the wait is measured in a couple of years. This page tracks every project on our books delivering in 2027.",
     "Mid-build projects also carry the clearest signal — you can see how construction is actually progressing before you commit, not just the render.",
+    "The 2027 pipeline on our books is mid-market by design: the bulk of launches sit under AED 1 million, concentrated in Dubailand and Majan, Business Bay, Jumeirah Village Circle, Al Furjan and Al Jaddaf, with Binghatti, Samana, Azizi and Reportage taking the largest share of deliveries. Q4 2027 is the single busiest quarter.",
+    "For anyone buying in 2026, a 2027 handover typically means 18–24 months of construction-linked instalments, then rent — or a resale in a completed building — from late 2027. Check three things on each project page: the developer's record on earlier phases, whether the plan carries post-handover instalments, and the SPA's grace period, which in Dubai commonly runs six to twelve months past the stated quarter.",
   ],
   "2028": [
     "Projects handing over in 2028 are today's launches and early-construction communities — which is exactly where launch pricing and the friendliest payment plans live. These are the 2028 deliveries we cover in Dubai.",
@@ -1040,6 +1144,27 @@ const HANDOVER_INTRO: Record<string, [string, string]> = {
   ],
 }
 
+// The mechanics of handover are the same every year; buyers searching by
+// delivery date ask exactly these questions.
+const HANDOVER_FAQS = (year: string): { q: string; a: string }[] => [
+  {
+    q: `What does "handover in ${year}" actually mean?`,
+    a: `The developer expects to complete construction and hand over the keys during ${year}, once the building has its completion certificate and the buyer has paid the instalments due at completion. The quarter shown on each project page is the developer's schedule, not a guarantee.`,
+  },
+  {
+    q: "Can the handover date slip?",
+    a: "Yes. Off-plan sale agreements in Dubai typically allow a grace period — commonly six to twelve months — beyond the stated date before the buyer has remedies, and schedules do move. A developer's record on its earlier phases is the most reliable predictor.",
+  },
+  {
+    q: "What do I pay at handover?",
+    a: "The completion instalment under your payment plan, the Dubai Land Department title-deed registration (the 4% DLD fee is usually settled at Oqood registration when you buy — check your agreement), utility connection deposits, and the first service-charge period. Any post-handover instalments then continue on schedule.",
+  },
+  {
+    q: "Can I sell an off-plan unit before handover?",
+    a: "Usually yes, by assigning the sale agreement to a new buyer once a minimum share of the price — commonly 30–40% — has been paid and the developer issues a no-objection certificate. Each developer sets its own threshold and fee.",
+  },
+]
+
 const HANDOVER_PAGES: SeoPage[] = (["2026", "2027", "2028", "2029"] as const).map((year, i, years) => ({
   slug: `dubai-projects-handover-${year}`,
   label: `Handover ${year}`,
@@ -1049,6 +1174,7 @@ const HANDOVER_PAGES: SeoPage[] = (["2026", "2027", "2028", "2029"] as const).ma
   intro: [...HANDOVER_INTRO[year]],
   kind: "projects" as const,
   filter: { cityLike: "dubai", handoverYear: year },
+  faqs: HANDOVER_FAQS(year),
   related: [
     ...years.filter((y) => y !== year).slice(0, 2).map((y) => `dubai-projects-handover-${y}`),
     "off-plan-projects-in-dubai",
@@ -1337,6 +1463,7 @@ export function relatedSeoPagesForProject(p: {
     ["jumeirah beach residence", ["jumeirah-beach-residence"]],
     ["arabian ranches", ["arabian-ranches"]],
     ["furjan", ["al-furjan"]],
+    ["jaddaf", ["projects-in-al-jaddaf", "al-jaddaf"]],
     ["difc", ["difc"]],
   ]
   for (const [needle, slugs] of AREA_MATCHES) {

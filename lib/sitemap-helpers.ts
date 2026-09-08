@@ -17,7 +17,7 @@ export { SITE_URL }
  * changes (the two consumers previously kept hand-maintained copies that
  * drifted apart).
  */
-export const PAGES_LASTMOD = "2026-08-11"
+export const PAGES_LASTMOD = "2026-09-08"
 
 export type SitemapUrl = {
   loc: string
