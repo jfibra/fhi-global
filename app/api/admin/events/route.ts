@@ -122,8 +122,7 @@ export async function POST(req: NextRequest) {
   })
 
   // Created live → tell IndexNow after the response is sent (after() keeps
-  // the serverless function alive past the response, where a bare floating
-  // promise could be killed at response time).
+  // the serverless function alive; see app/news-sitemap.xml/route.ts).
   if (input.status === "published") {
     const loc = `${SITE_URL.replace(/\/$/, "")}/events/${slug ?? result.data.id}`
     after(() => submitToIndexNow([loc]))

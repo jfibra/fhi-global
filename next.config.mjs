@@ -246,7 +246,7 @@ const nextConfig = {
     // route handlers under /api/sitemap. The sitemap INDEX must reference only
     // these rewritten URLs: robots.txt disallows /api, and Google honors
     // robots.txt when fetching sitemaps.
-    return ["pages", "projects", "developers", "listings", "events", "gallery"].map((section) => ({
+    return ["pages", "projects", "developers", "listings", "events", "news", "gallery"].map((section) => ({
       source: `/sitemap-${section}-:page(\\d+).xml`,
       destination: `/api/sitemap/${section}/:page`,
     }))

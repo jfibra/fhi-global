@@ -32,6 +32,7 @@ Contact: info@fhiglobal.ae · +971 56 742 8288
 ## Machine-readable indexes
 
 - [Sitemap index](${SITE_URL}/sitemap.xml): all indexable URLs, sharded by section
+- [Google News sitemap](${SITE_URL}/news-sitemap.xml): articles from the last 48 hours
 `
   return new Response(body, {
     status: 200,

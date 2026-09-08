@@ -6,7 +6,7 @@ import { SITE_URL } from "@/lib/seo"
  * Shared XML builders + response helper for the sitemap-index architecture:
  * /sitemap.xml is a <sitemapindex> pointing at per-section shards
  * (/sitemap-<section>-N.xml, served by app/api/sitemap/<section>/[page] via
- * next.config rewrites).
+ * next.config rewrites) plus the Google News /news-sitemap.xml.
  */
 
 export { SITE_URL }
@@ -28,6 +28,13 @@ export type SitemapUrl = {
 export type SitemapIndexEntry = {
   loc: string
   lastmod?: string
+}
+
+export type NewsSitemapItem = {
+  loc: string
+  title: string
+  /** Full ISO 8601 with offset, e.g. 2026-08-03T13:31:04+08:00 */
+  publicationDate: string
 }
 
 export function escapeXml(value: string): string {
@@ -65,6 +72,26 @@ export function buildSitemapIndexXml(sitemaps: SitemapIndexEntry[]): string {
     })
     .join("\n")
   return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${items}\n</sitemapindex>`
+}
+
+/** Google News sitemap (only articles from the last 48h belong here). */
+export function buildNewsSitemapXml(items: NewsSitemapItem[]): string {
+  const body = items
+    .map(
+      (item) => `  <url>
+    <loc>${escapeXml(item.loc)}</loc>
+    <news:news>
+      <news:publication>
+        <news:name>FHI Global News</news:name>
+        <news:language>en</news:language>
+      </news:publication>
+      <news:publication_date>${escapeXml(item.publicationDate)}</news:publication_date>
+      <news:title>${escapeXml(item.title)}</news:title>
+    </news:news>
+  </url>`,
+    )
+    .join("\n")
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">\n${body}\n</urlset>`
 }
 
 /**
