@@ -116,8 +116,8 @@ export function HeroSection({ developers, popular = [], spotlight = [] }: HeroSe
             className="animate-hero-item font-['Outfit'] text-4xl sm:text-5xl lg:text-[3.4rem] xl:text-[3.9rem] leading-[1.06] mb-6 tracking-tight drop-shadow-[0_2px_16px_rgba(0,10,30,0.55)]"
             style={{ animationDelay: "0.18s" }}
           >
-            <span className="block font-light text-white">Discover Premium</span>
-            <span className="block font-bold text-[#e3c06c]">Real Estate in Dubai</span>
+            <span className="block font-light text-white">Off-Plan &amp; Ready</span>{" "}
+            <span className="block font-bold text-[#e3c06c]">Dubai Properties for Sale</span>
           </h1>
 
           <p

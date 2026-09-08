@@ -34,15 +34,26 @@ import {
 export const revalidate = 120;
 
 export const metadata: Metadata = createPageMetadata({
-  // absolute: the brand leads this title already — the layout template would
-  // append a second "| FHI Global".
-  title: { absolute: "FHI Global — Dubai Real Estate | Premium Property Projects" },
+  // absolute: this title already carries the brand — the layout template would
+  // append a second "| FHI Global". The head term leads: the page never used
+  // the words "Dubai properties" before, and Google won't rank a page for a
+  // phrase it doesn't contain. Brand searches still land here via the WebSite
+  // schema and the site name Google shows separately.
+  title: { absolute: "Dubai Properties for Sale — Off-Plan & Ready | FHI Global" },
   description:
-    "Discover premium off-plan and ready properties from Dubai's top developers. Explore luxury apartments, villas, and penthouses.",
-  openGraphTitle: "FHI Global — Dubai's Premier Real Estate Portal",
-  openGraphDescription: "Discover premium off-plan and ready properties from Dubai's top developers.",
+    "Dubai properties for sale: off-plan launches and ready apartments, villas & penthouses from verified developers — prices, payment plans & handover dates.",
+  openGraphTitle: "FHI Global — Dubai Properties for Sale",
+  openGraphDescription:
+    "Off-plan and ready properties for sale in Dubai from verified developers — prices, payment plans and handover dates.",
   pathname: "/",
-  keywords: ["Dubai real estate", "off-plan projects Dubai", "luxury apartments Dubai", "FHI Global"],
+  keywords: [
+    "Dubai properties for sale",
+    "Dubai properties",
+    "Dubai real estate",
+    "off-plan projects Dubai",
+    "ready properties Dubai",
+    "FHI Global",
+  ],
 });
 
 const STATS = [
@@ -299,8 +310,8 @@ export default async function HomePage() {
                   Hand-Picked Selection
                 </div>
                 <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight">
-                  <span className="text-[#0d1117]">Featured</span>{" "}
-                  <span className="text-[#b8913f]">Projects</span>
+                  <span className="text-[#0d1117]">Featured Off-Plan</span>{" "}
+                  <span className="text-[#b8913f]">Projects in Dubai</span>
                 </h2>
                 <p className="text-[#4b5563] text-base leading-relaxed mt-4 max-w-xl">
                   A curated selection of Dubai&apos;s most sought-after developments,
@@ -447,8 +458,8 @@ export default async function HomePage() {
             </div>
 
             <h2 className="font-['Outfit'] text-4xl md:text-[52px] font-bold leading-[1.08] tracking-tight">
-              <span className="block text-[#0d1117]">Start Exploring</span>
-              <span className="block text-[#b8913f]">Luxury Properties.</span>
+              <span className="block text-[#0d1117]">Explore Properties</span>{" "}
+              <span className="block text-[#b8913f]">for Sale in Dubai.</span>
             </h2>
 
             <span className="block w-14 h-[3px] bg-[#d6b357] mt-6 mb-6" aria-hidden="true" />
