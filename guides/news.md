@@ -42,13 +42,18 @@ state, sitemap index skips news shards, view/subscribe endpoints answer without 
 - Hub extras: category filter chips (`/news?category=<slug>` fed by the category ×
   country counts) and the `?title=` → slug redirect (legacy shared links).
 
-## Sitemaps
+## Indexing (changed 2026-09-08)
 
-- `/sitemap-news-N.xml` — all distributed articles (1000-URL shards aggregated from
-  upstream pages of 100), part of the sitemap index. See `lib/sitemap-sections.ts`.
-- `/news-sitemap.xml` — Google News sitemap: ONLY articles published in the last 48
-  hours, `publication_date` normalized to `+08:00`. Fresh articles are also pinged to
-  IndexNow from this route.
+- Article pages (`/news/[slug]`) are `noindex, follow`. The feed is syndicated — the
+  same articles are live on homes.ph — and Search Console was already excluding them as
+  duplicates (~230 URLs in "Crawled – currently not indexed"). Keeping them out of the
+  index stops them counting against the domain; the section stays for visitors.
+- No news sitemaps: the former `/sitemap-news-N.xml` shards and the Google News
+  `/news-sitemap.xml` were removed (routes deleted, `news` dropped from the
+  next.config rewrites, robots.txt lists only `/sitemap.xml`). The `/news` hub itself
+  stays indexable and in the static-pages shard.
+- To reverse: drop the `robots` field from the detail page's `generateMetadata` and
+  restore the two routes from git history (`app/api/sitemap/news/`, `app/news-sitemap.xml/`).
 
 ## Gotchas
 

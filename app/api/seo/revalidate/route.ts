@@ -11,8 +11,8 @@ import { submitToIndexNow } from "@/lib/indexnow"
 // happen client-side through the browser Supabase client, so nothing
 // server-side sees the moment content goes live. Publish flows call this
 // route afterwards to (a) purge the entity's ISR cache and (b) ping IndexNow
-// (Bing/Copilot ecosystem) — the same pairing the news sitemap does in
-// after() (app/news-sitemap.xml/route.ts). Only publicly visible entities are
+// (Bing/Copilot ecosystem) — the same after() pairing the events publish
+// route uses (app/api/admin/events/route.ts). Only publicly visible entities are
 // ever submitted; unpublished ones just get their (now-404ing) path purged.
 
 export const runtime = "nodejs"

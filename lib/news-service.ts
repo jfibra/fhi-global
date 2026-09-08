@@ -120,8 +120,8 @@ export function slugify(text: string): string {
 
 /**
  * Upstream timestamps are naive "Y-m-d H:i:s" wall-clock in the API server's
- * locale (Philippines). Pin them to +08:00 so schema.org dates and the Google
- * News sitemap carry a real offset instead of being reinterpreted as UTC.
+ * locale (Philippines). Pin them to +08:00 so schema.org dates carry a real
+ * offset instead of being reinterpreted as UTC.
  */
 export function toManilaIso(raw: string | null | undefined): string | null {
   if (!raw) return null

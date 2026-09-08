@@ -6,8 +6,7 @@ import {
   todayISO,
   type SitemapIndexEntry,
 } from "@/lib/sitemap-helpers"
-import { countNewsShards, countSection, SUPABASE_PER_PAGE } from "@/lib/sitemap-sections"
-import { newsConfigured } from "@/lib/news-service"
+import { countSection, SUPABASE_PER_PAGE } from "@/lib/sitemap-sections"
 
 /**
  * /sitemap.xml — the <sitemapindex>. Sections are advertised only when they
@@ -16,6 +15,10 @@ import { newsConfigured } from "@/lib/news-service"
  * Cache-Control from sitemapResponse (1h, or 60s when any count fetch failed)
  * is what actually bounds regeneration. Do NOT export `revalidate` here —
  * it would fight the hand-set Cache-Control.
+ *
+ * News is deliberately absent: the articles are a syndicated feed (the same
+ * content is live on homes.ph) and the pages carry noindex — advertising
+ * noindexed URLs in a sitemap is a contradiction Search Console flags.
  */
 export const dynamic = "force-dynamic"
 
@@ -32,22 +35,16 @@ function appendPaginated(
 }
 
 export async function GET() {
-  const [projects, developers, listings, events, gallery, newsShards] = await Promise.all([
+  const [projects, developers, listings, events, gallery] = await Promise.all([
     countSection("projects"),
     countSection("developers"),
     countSection("listings"),
     countSection("events"),
     countSection("gallery"),
-    countNewsShards(),
   ])
 
   const degraded =
-    projects === null ||
-    developers === null ||
-    listings === null ||
-    events === null ||
-    gallery === null ||
-    newsShards === null
+    projects === null || developers === null || listings === null || events === null || gallery === null
 
   const shards = (count: number | null) =>
     count === null ? null : Math.ceil(count / SUPABASE_PER_PAGE)
@@ -61,11 +58,6 @@ export async function GET() {
   appendPaginated(sitemaps, "sitemap-listings", shards(listings), lastmod)
   appendPaginated(sitemaps, "sitemap-events", shards(events), lastmod)
   appendPaginated(sitemaps, "sitemap-gallery", shards(gallery), lastmod)
-  appendPaginated(sitemaps, "sitemap-news", newsShards, lastmod)
-  // Google News sitemap only exists meaningfully when the news feature is on.
-  if (newsConfigured()) {
-    sitemaps.push({ loc: `${SITE_URL}/news-sitemap.xml`, lastmod })
-  }
 
   return sitemapResponse(buildSitemapIndexXml(sitemaps), { shortCache: degraded })
 }

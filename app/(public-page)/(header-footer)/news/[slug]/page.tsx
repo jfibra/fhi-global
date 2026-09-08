@@ -81,6 +81,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     metadataBase: new URL(siteUrl),
     keywords,
     alternates: { canonical },
+    // Syndicated feed: every article is also published on homes.ph (the
+    // feed's origin), and Search Console was already leaving these out as
+    // duplicates. noindex keeps the section for visitors without 230+
+    // duplicate URLs counting against the domain; follow keeps the internal
+    // links live. The sitemaps no longer advertise these URLs either.
+    robots: { index: false, follow: true },
     openGraph: {
       title: article.title,
       description,
