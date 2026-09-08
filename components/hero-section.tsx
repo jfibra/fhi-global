@@ -124,8 +124,8 @@ export function HeroSection({ developers, popular = [], spotlight = [] }: HeroSe
             className="animate-hero-item text-white/90 text-base sm:text-[17px] leading-relaxed mb-10 max-w-xl drop-shadow-[0_1px_4px_rgba(0,8,20,0.9)]"
             style={{ animationDelay: "0.32s" }}
           >
-            Off-plan launches and ready residences from the city&apos;s most
-            trusted developers — curated for investors who expect more.
+            Apartments, villas and penthouses from Dubai&apos;s most trusted
+            developers — with prices, payment plans and handover dates upfront.
           </p>
 
           {/* ── Search — the omnibox. Live results from the catalog itself:
