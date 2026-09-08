@@ -1,0 +1,13 @@
+{
+  "_comment": "Virtual-tour providers whose players may be framed on project pages. Single source of truth: next.config.mjs adds these to the CSP frame-src, and lib/media-embed.ts only embeds a tour whose host matches (anything else falls back to an outbound link). Every host here was checked to serve without X-Frame-Options / frame-ancestors restrictions. CSP wildcard *.example.com covers nested subdomains too.",
+  "virtualTourFrameHosts": [
+    "https://kuula.co",
+    "https://view.propvr.tech",
+    "https://flatshow.property",
+    "https://*.discoverin360.com",
+    "https://*.virtualvisions.studio",
+    "https://virtualtours.qbd.ae",
+    "https://*.3dapp.space",
+    "https://my.matterport.com"
+  ]
+}

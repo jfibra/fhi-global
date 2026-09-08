@@ -27,9 +27,11 @@ import { PdfPagePreviews } from "@/components/public/pdf-page-previews"
 import { AmenitiesGrid, NearbyPlaces } from "@/components/public/amenities-grid"
 import { ProjectInquireForm } from "@/components/public/project-inquire-form"
 import { ProjectLocationMap } from "@/components/public/project-location-map"
+import { MediaEmbedCard } from "@/components/public/media-embed"
+import { classifyMedia, isShortLink, mediaLabel } from "@/lib/media-embed"
 import {
   MapPin, Building2, Calendar, Home, Layers, Phone, Mail, ArrowLeft,
-  CheckCircle2, Play, Globe, BedDouble, Bath, Maximize2, DollarSign,
+  CheckCircle2, Globe, BedDouble, Bath, Maximize2, DollarSign,
   TrendingUp, Star
 } from "lucide-react"
 
@@ -187,7 +189,23 @@ export default async function ProjectDetailPage({ params }: Props) {
   if (developer.slug !== devSlug) permanentRedirect(`/${developer.slug}/${project.slug}`)
   const units = (project.project_units ?? []) as { id:number; unit_type:string|null; bedrooms:number|null; bathrooms:number|null; size_sqft:number|null; price_from:number|null; price_to:number|null; available_units:number|null; is_available:boolean|null }[]
   const features = (project.project_features ?? []) as { id:number; description:string }[]
-  const media = (project.project_media ?? []) as { id:number; media_type:string|null; url:string }[]
+  const mediaRows = (project.project_media ?? []) as { id:number; media_type:string|null; url:string }[]
+  // projects.video_url is the same kind of thing as a project_media video row
+  // — surface it in the same section (skipping an exact duplicate).
+  if (project.video_url && !mediaRows.some((m) => m.url === project.video_url)) {
+    mediaRows.push({ id: -1, media_type: "video", url: project.video_url as string })
+  }
+  // Short links (bit.ly → kuula.co) must be resolved before classification: the
+  // CSP frame-src allows the tour host, not the shortener, and a redirecting
+  // frame is checked against every hop. Resolution is cached a day; a failure
+  // just leaves the tile as an outbound link.
+  const media = await Promise.all(
+    mediaRows.map(async (m) => {
+      const url = isShortLink(m.url) ? await resolveShortLink(m.url) : m.url
+      const embed = classifyMedia(url, m.media_type)
+      return { ...m, embed, label: mediaLabel(embed, m.media_type) }
+    }),
+  )
   // Fetched separately (not embedded) so a missing table in older environments
   // never breaks the page; the anon RLS policy gates rows to published projects.
   const { data: cuRows } = await supabase
@@ -681,29 +699,21 @@ export default async function ProjectDetailPage({ params }: Props) {
             </section>
           )}
 
-          {/* Media */}
+          {/* Media — click-to-play tiles: YouTube with its own thumbnail, 360°
+              tours behind the project photo, unframeable rows as link tiles.
+              A lone item takes the full width so the preview is not a stamp. */}
           {media.length > 0 && (
             <section>
               <SectionHeading title="Media & Virtual Tours" />
-              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className={`mt-5 grid grid-cols-1 gap-5 ${media.length > 1 ? "lg:grid-cols-2" : ""}`}>
                 {media.map((m) => (
-                  <a
+                  <MediaEmbedCard
                     key={m.id}
-                    href={m.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex items-center gap-4 p-4 border border-[#e5e8ec] hover:border-[#001f3f]/40 transition-colors"
-                  >
-                    <div className="w-10 h-10 bg-[#001f3f] flex items-center justify-center shrink-0">
-                      <Play className="w-4 h-4 text-[#d6b357]" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-[#0d1117]">
-                        {m.media_type === "video" ? "Watch Video" : "Virtual Tour"}
-                      </p>
-                      <p className="text-xs text-[#9ca3af] capitalize">{m.media_type ?? "media"}</p>
-                    </div>
-                  </a>
+                    embed={m.embed}
+                    label={m.label}
+                    title={project.name}
+                    poster={mastheadImages[0] ?? (project.main_image as string | null)}
+                  />
                 ))}
               </div>
             </section>
@@ -945,6 +955,17 @@ export default async function ProjectDetailPage({ params }: Props) {
     </div>
     </>
   )
+}
+
+/** Follow a shortener redirect (one hop, HEAD, cached a day). Returns the input on any failure. */
+async function resolveShortLink(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, { method: "HEAD", redirect: "manual", next: { revalidate: 86_400 } })
+    const location = res.headers.get("location")
+    return location ? new URL(location, url).toString() : url
+  } catch {
+    return url
+  }
 }
 
 // ── Flat-layout helpers (approved mockup): headings live on the page, not in

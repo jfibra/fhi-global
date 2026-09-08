@@ -78,4 +78,4 @@ A fifth factory, `lib/supabase/middleware.ts` (`updateSession`), exists solely f
 
 ### Security headers / CSP
 
-CSP and all security headers are centralized in `next.config.mjs`. Any new external origin (image host, script, API endpoint) must be added both to the CSP directives and, for images, to `images.remotePatterns` — otherwise it will be blocked in the browser. The same file applies `X-Robots-Tag: noindex` to private paths (`/dashboard`, `/api`, `/login`, `/register`, `/profile`, `/admin`, `/internal`).
+CSP and all security headers are centralized in `next.config.mjs`. Any new external origin (image host, script, API endpoint) must be added both to the CSP directives and, for images, to `images.remotePatterns` — otherwise it will be blocked in the browser. Exception: 360° virtual-tour providers framed on project pages live in `lib/embed-hosts.json`, which feeds both the CSP `frame-src` and `lib/media-embed.ts` (hosts not on the list render as outbound links, never blocked frames). The same file applies `X-Robots-Tag: noindex` to private paths (`/dashboard`, `/api`, `/login`, `/register`, `/profile`, `/admin`, `/internal`).

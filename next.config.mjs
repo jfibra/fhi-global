@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 
+import embedHosts from "./lib/embed-hosts.json" with { type: "json" }
+
 const isProd = process.env.NODE_ENV === "production"
 
 // ── External origins used by the app ────────────────────────────────────────
@@ -33,6 +35,12 @@ const EBOOK_PDF_HOST = "https://leuteriorealty.com"
 const S3_FRAME_HOST = process.env.S3_PUBLIC_URL
   ? `https://${new URL(process.env.S3_PUBLIC_URL).host}`
   : ""
+// 360° virtual-tour players framed on project pages. The list is shared with
+// lib/media-embed.ts (which only embeds hosts on it) so the CSP and the
+// classifier can never disagree — add a provider in the JSON, not here.
+const TOUR_FRAME_HOSTS = embedHosts.virtualTourFrameHosts.join(" ")
+// YouTube poster thumbnails for the click-to-play video tiles
+const YT_THUMBS = "i.ytimg.com"
 
 // ── Content-Security-Policy ──────────────────────────────────────────────────
 // next/font/google self-hosts fonts at build-time → no fonts.googleapis.com needed.
@@ -48,8 +56,8 @@ const CSP = [
   // CSS: Tailwind / Next.js injects inline styles
   `style-src 'self' 'unsafe-inline'`,
 
-  // Images: own assets, data URIs, blob previews, Supabase, flag CDN, maps, Google avatars, S3/CloudFront (listing + project media)
-  `img-src 'self' data: blob: ${SUPABASE_HTTPS} https://${FLAGCDN} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://*.googleusercontent.com https://*.amazonaws.com https://*.cloudfront.net https://gravatar.com https://*.gravatar.com https://*.google-analytics.com`,
+  // Images: own assets, data URIs, blob previews, Supabase, flag CDN, maps, Google avatars, S3/CloudFront (listing + project media), YouTube thumbnails
+  `img-src 'self' data: blob: ${SUPABASE_HTTPS} https://${FLAGCDN} https://${YT_THUMBS} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://*.googleusercontent.com https://*.amazonaws.com https://*.cloudfront.net https://gravatar.com https://*.gravatar.com https://*.google-analytics.com`,
 
   // Fonts: self-hosted via next/font – no external font CDN required
   `font-src 'self' data:`,
@@ -66,11 +74,11 @@ const CSP = [
   // No plugins / Flash / PDFs embedded via <object>/<embed>
   `object-src 'none'`,
 
-  // Only the ebook host and the uploads bucket may be framed — the dashboard
-  // reader embeds ebook PDFs (see lib/ebooks.ts) and the sale-attachments
-  // viewer embeds uploaded ones, both in the browser's native viewer. Google
-  // sign-in uses a full-page redirect, not a frame, so nothing else needs it.
-  `frame-src ${EBOOK_PDF_HOST}${S3_FRAME_HOST ? ` ${S3_FRAME_HOST}` : ""} https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://www.facebook.com https://www.instagram.com https://www.tiktok.com`,
+  // Framed content: the ebook host and the uploads bucket (dashboard PDF
+  // readers), video players (agent-website heroes + project media tiles),
+  // and the virtual-tour providers from lib/embed-hosts.json (project media
+  // tiles). Google sign-in uses a full-page redirect, not a frame.
+  `frame-src ${EBOOK_PDF_HOST}${S3_FRAME_HOST ? ` ${S3_FRAME_HOST}` : ""} https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://www.facebook.com https://www.instagram.com https://www.tiktok.com ${TOUR_FRAME_HOSTS}`,
   // Prevent this app from being embedded in iframes elsewhere
   `frame-ancestors 'none'`,
 
@@ -207,6 +215,11 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: FLAGCDN,
+      },
+      // YouTube poster thumbnails (project media tiles)
+      {
+        protocol: "https",
+        hostname: YT_THUMBS,
       },
       // Ebook cover art, stored beside each PDF (see lib/ebooks.ts). Served
       // through our own optimizer, so those 1 MB PNGs reach the shelf as
