@@ -337,10 +337,14 @@ export default async function NewsDetailPage({ params }: PageProps) {
 
             {/* Featured image */}
             <div className="relative overflow-hidden aspect-video bg-gray-100 mb-6">
+              {/* The article's largest above-the-fold element: priority gives it
+                  a preload and fetchpriority=high instead of the default lazy
+                  loading, which Lighthouse flagged as the LCP bottleneck. */}
               <Image
                 src={article.img}
                 alt={article.title}
                 fill
+                priority
                 sizes="(max-width: 1024px) 100vw, 66vw"
                 className="object-cover"
               />

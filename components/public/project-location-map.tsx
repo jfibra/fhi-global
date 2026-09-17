@@ -46,8 +46,35 @@ export function ProjectLocationMap({
   lat?: number | null
   lng?: number | null
 }) {
+  const rootRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
   const streetRef = useRef<HTMLDivElement>(null)
+  // The Maps JS is ~290 KB plus a geocode call on every project page, and the
+  // section sits well below the fold — request it only once the visitor is
+  // within a screen of it. Deduped by next/script if another map page
+  // already loaded it.
+  const [wanted, setWanted] = useState(false)
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    if (typeof IntersectionObserver === "undefined") {
+      // No observer support: load on the next tick (deferred so this effect
+      // never sets state synchronously).
+      const t = setTimeout(() => setWanted(true), 0)
+      return () => clearTimeout(t)
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setWanted(true)
+          io.disconnect()
+        }
+      },
+      { rootMargin: "600px 0px" },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
   const mapObj = useRef<google.maps.Map | null>(null)
   const panoObj = useRef<google.maps.StreetViewPanorama | null>(null)
 
@@ -150,17 +177,19 @@ export function ProjectLocationMap({
   const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 
   return (
-    <div className="border border-[#e5e8ec] bg-white">
+    <div ref={rootRef} className="border border-[#e5e8ec] bg-white">
       {/* Same exact src as the buy/rent/developers maps, so next/script
           dedupes when a visitor navigates between them. onReady (NOT onLoad)
           is what makes that safe: it also fires when the script is already
-          on the page from a previous route. */}
-      <Script
-        src={`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`}
-        strategy="afterInteractive"
-        onReady={() => setReady(true)}
-        onError={() => setError("The map failed to load.")}
-      />
+          on the page from a previous route. Mounted lazily — see `wanted`. */}
+      {wanted && (
+        <Script
+          src={`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`}
+          strategy="afterInteractive"
+          onReady={() => setReady(true)}
+          onError={() => setError("The map failed to load.")}
+        />
+      )}
 
       {/* Toolbar — view tabs + the escape hatch to real Google Maps. */}
       <div className="flex flex-wrap items-center gap-1 border-b border-[#eef0f3] p-2">

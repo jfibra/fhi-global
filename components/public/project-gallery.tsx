@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { X, ChevronLeft, ChevronRight, ZoomIn } from "lucide-react"
 
 type ProjectImage = {
@@ -43,12 +44,17 @@ export function ProjectGallery({
             aria-label={`View ${altFor(img, idx)}`}
             className="group relative aspect-square overflow-hidden bg-[#f3f4f6] border border-[#e8eaed] hover:border-[#001f3f]/30 transition-all"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            {/* Thumbnails go through the image optimizer sized to the grid cell
+                (the raw originals here are 70–230 KB each and the first four
+                used to load eagerly, competing with the masthead LCP image for
+                bandwidth). The gallery sits below the fold, so every tile is
+                lazy; the lightbox below still opens the full original. */}
+            <Image
               src={img.image_url}
               alt={altFor(img, idx)}
-              loading={idx > 3 ? "lazy" : undefined}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              fill
+              sizes="(min-width: 1024px) 22vw, (min-width: 768px) 30vw, 46vw"
+              className="object-cover group-hover:scale-105 transition-transform duration-300"
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
               <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
