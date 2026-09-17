@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import {
   fetchArticleBySlugResult,
   fetchArticlesList,
+  isIndexableNewsArticle,
   toManilaIso,
 } from "@/lib/news-service"
 import { DEFAULT_PREVIEW_IMAGE_URL, LEGACY_PREVIEW_IMAGE_URL, jsonLdScript, truncateDescription } from "@/lib/seo"
@@ -81,6 +82,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     metadataBase: new URL(siteUrl),
     keywords,
     alternates: { canonical },
+    // Off-topic feed categories (tourism, community, sports…) stay readable but
+    // are kept out of the index — see isIndexableNewsArticle. follow keeps the
+    // internal links live.
+    ...(isIndexableNewsArticle(article) ? {} : { robots: { index: false, follow: true } }),
     openGraph: {
       title: article.title,
       description,

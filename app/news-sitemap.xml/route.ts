@@ -1,6 +1,6 @@
 import { after } from "next/server"
 import { buildNewsSitemapXml, sitemapResponse, SITE_URL, type NewsSitemapItem } from "@/lib/sitemap-helpers"
-import { fetchArticlesList, newsConfigured, toManilaIso } from "@/lib/news-service"
+import { fetchArticlesList, isIndexableNewsArticle, newsConfigured, toManilaIso } from "@/lib/news-service"
 import { submitToIndexNow } from "@/lib/indexnow"
 
 /**
@@ -31,6 +31,7 @@ export async function GET() {
   const items: NewsSitemapItem[] = []
   for (const article of articles) {
     if (!article.slug || article.isPublished === false) continue
+    if (!isIndexableNewsArticle(article)) continue
     const iso = toManilaIso(article.publishedAt || article.date)
     if (!iso) continue
     const publishedMs = Date.parse(iso)

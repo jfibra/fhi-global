@@ -103,6 +103,31 @@ export function newsConfigured(): boolean {
   return Boolean(newsBase() && apiKey())
 }
 
+// ── Indexability ───────────────────────────────────────────────────────────────
+//
+// The feed is a general Dubai/UAE news wire: of ~280 articles only ~45% are
+// about property or the economy; the rest are tourism, community, sports,
+// gastronomy… An audit (2026-09-17) found 0 of 10 sampled articles indexed by
+// Google on any domain, and the off-topic ones dilute what a property site is
+// about while consuming crawl budget the project pages need. So only the
+// categories a Dubai property buyer would search stay indexable; the rest
+// render normally for visitors but carry noindex,follow and are left out of
+// both news sitemaps. Slugs are the upstream category_slug values
+// (GET /external/categories).
+const INDEXABLE_NEWS_CATEGORY_SLUGS = new Set([
+  "real-estate",
+  "housing",
+  "business-economy",
+  "infrastructure",
+  "law",
+])
+
+/** Should this article be offered to search engines? Unknown/missing category → no. */
+export function isIndexableNewsArticle(article: Pick<NewsArticle, "categorySlug" | "category">): boolean {
+  const slug = (article.categorySlug ?? slugify(article.category ?? "")).toLowerCase()
+  return INDEXABLE_NEWS_CATEGORY_SLUGS.has(slug)
+}
+
 // ── Slugify ────────────────────────────────────────────────────────────────────
 
 export function slugify(text: string): string {

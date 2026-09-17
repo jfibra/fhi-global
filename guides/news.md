@@ -42,13 +42,25 @@ state, sitemap index skips news shards, view/subscribe endpoints answer without 
 - Hub extras: category filter chips (`/news?category=<slug>` fed by the category ×
   country counts) and the `?title=` → slug redirect (legacy shared links).
 
+## Indexability (added 2026-09-17)
+
+- Only property-relevant categories are offered to search engines:
+  `real-estate`, `housing`, `business-economy`, `infrastructure`, `law`
+  (`isIndexableNewsArticle` in `lib/news-service.ts`). Everything else — tourism
+  (~72 of ~280 articles), community, entertainment, sports, gastronomy… — still
+  renders for visitors but carries `noindex, follow` and is excluded from both
+  sitemaps. Reason: a 2026-09-17 audit found 0 of 10 sampled articles indexed on
+  any domain; the off-topic half dilutes the site's property focus and spends
+  crawl budget the project pages need. Add a category to the allowlist to
+  re-include it everywhere at once.
+
 ## Sitemaps
 
-- `/sitemap-news-N.xml` — all distributed articles (1000-URL shards aggregated from
+- `/sitemap-news-N.xml` — indexable articles (1000-URL shards aggregated from
   upstream pages of 100), part of the sitemap index. See `lib/sitemap-sections.ts`.
-- `/news-sitemap.xml` — Google News sitemap: ONLY articles published in the last 48
-  hours, `publication_date` normalized to `+08:00`. Fresh articles are also pinged to
-  IndexNow from this route.
+- `/news-sitemap.xml` — Google News sitemap: ONLY indexable articles published in
+  the last 48 hours, `publication_date` normalized to `+08:00`. Fresh articles are
+  also pinged to IndexNow from this route.
 
 ## Gotchas
 

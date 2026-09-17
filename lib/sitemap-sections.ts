@@ -1,7 +1,7 @@
 import "server-only"
 
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
-import { fetchArticlesList, newsConfigured, toManilaIso } from "@/lib/news-service"
+import { fetchArticlesList, isIndexableNewsArticle, newsConfigured, toManilaIso } from "@/lib/news-service"
 
 /**
  * Data access for the sitemap shards. Supabase sections read through the ANON
@@ -142,6 +142,8 @@ export async function fetchNewsShard(page: number): Promise<NewsShardRow[] | nul
     if (lastPage === 0) return null // upstream failure, not end-of-data
     for (const a of articles) {
       if (!a.slug || seen.has(a.slug)) continue
+      // noindex pages must not be advertised in a sitemap (contradictory signal).
+      if (!isIndexableNewsArticle(a)) continue
       seen.add(a.slug)
       rows.push({
         slug: a.slug,
