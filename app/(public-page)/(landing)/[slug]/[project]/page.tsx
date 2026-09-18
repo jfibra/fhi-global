@@ -8,6 +8,7 @@ import {
   composeProjectDescription,
   composeProjectTitle,
   formatPrice,
+  parsePaymentPlan,
   priceFromValue,
   priceToValue,
   projectAtAGlance,
@@ -262,6 +263,13 @@ export default async function ProjectDetailPage({ params }: Props) {
   const shownUnits = units.filter(
     (u) => u.unit_type || u.bedrooms != null || u.size_sqft != null || u.price_from != null,
   )
+  const paymentPlan = parsePaymentPlan(project.payment_plan_details, project.down_payment_percentage)
+  const hasPaymentPlan =
+    paymentPlan.milestones.length > 0 ||
+    paymentPlan.fees.length > 0 ||
+    Boolean(paymentPlan.note) ||
+    Boolean(project.government_fee_percentage) ||
+    Boolean(project.installment_available)
   const quickFacts = [
     { icon: CheckCircle2, label: "Ownership", value: project.ownership_type ?? (project.freehold ? "Freehold" : null) },
     { icon: MapPin, label: "Region", value: project.region },
@@ -564,6 +572,51 @@ export default async function ProjectDetailPage({ params }: Props) {
             )}
           </section>
 
+          {/* Payment plan — the question buyers of off-plan property ask
+              first, and the one every competing page for these projects
+              answers. A written schedule renders as milestone tiles; anything
+              that is not a schedule ("1% monthly", "8 Years Payment Plan")
+              keeps its own wording rather than being forced into steps. */}
+          {hasPaymentPlan && (
+            <section id="payment-plan" className="scroll-mt-24">
+              <SectionHeading title="Payment Plan" />
+              {paymentPlan.milestones.length > 0 && (
+                <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                  {paymentPlan.milestones.map((m, i) => (
+                    <div key={`${m.percent}-${m.label}-${i}`} className="border border-[#e5e8ec] bg-white p-4">
+                      <p className="font-['Outfit'] text-2xl font-bold text-[#001f3f] leading-none">{m.percent}%</p>
+                      {m.label && (
+                        <p className="mt-1.5 text-[13px] leading-snug text-[#6b7280]">{m.label}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {paymentPlan.note && (
+                <p className="mt-4 text-[15px] leading-relaxed text-[#374151]">{paymentPlan.note}</p>
+              )}
+              <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-sm">
+                {paymentPlan.fees.map((f) => (
+                  <div key={f.label} className="flex items-center gap-2">
+                    <dt className="text-[#6b7280]">{f.label}</dt>
+                    <dd className="font-bold text-[#0d1117]">{f.percent}%</dd>
+                  </div>
+                ))}
+                {project.government_fee_percentage && (
+                  <div className="flex items-center gap-2">
+                    <dt className="text-[#6b7280]">DLD fee</dt>
+                    <dd className="font-bold text-[#0d1117]">{project.government_fee_percentage}%</dd>
+                  </div>
+                )}
+                {project.installment_available && (
+                  <div className="flex items-center gap-2 font-semibold text-[#15803d]">
+                    <CheckCircle2 className="w-4 h-4" /> Instalments available
+                  </div>
+                )}
+              </dl>
+            </section>
+          )}
+
           {/* Features */}
           {features.length > 0 && (
             <section>
@@ -812,34 +865,6 @@ export default async function ProjectDetailPage({ params }: Props) {
                 >
                   View Developer Profile <ArrowLeft className="w-4 h-4 rotate-180" />
                 </Link>
-              </div>
-            </SidePanel>
-          )}
-
-          {/* Payment plan */}
-          {(project.down_payment_percentage || project.payment_plan_details || project.installment_available) && (
-            <SidePanel title="Payment Plan">
-              <div className="space-y-3">
-                {project.down_payment_percentage && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-[#6b7280]">Down Payment</span>
-                    <span className="font-bold text-[#0d1117]">{project.down_payment_percentage}%</span>
-                  </div>
-                )}
-                {project.government_fee_percentage && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-[#6b7280]">DLD Fee</span>
-                    <span className="font-bold text-[#0d1117]">{project.government_fee_percentage}%</span>
-                  </div>
-                )}
-                {project.installment_available && (
-                  <div className="flex items-center gap-2 text-sm font-semibold text-[#15803d]">
-                    <CheckCircle2 className="w-4 h-4" /> Installment Available
-                  </div>
-                )}
-                {project.payment_plan_details && (
-                  <p className="text-xs text-[#6b7280] leading-relaxed pt-2 border-t border-[#eef0f3]">{project.payment_plan_details}</p>
-                )}
               </div>
             </SidePanel>
           )}

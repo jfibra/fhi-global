@@ -469,6 +469,77 @@ export function projectFaqs(p: ProjectSeoInput): Faq[] {
   return faqs
 }
 
+export type PaymentMilestone = { percent: number; label: string }
+export type PaymentPlan = {
+  /** Instalments that together account for the price, in the order written. */
+  milestones: PaymentMilestone[]
+  /** Percentages that are charges rather than instalments (DLD, admin fees). */
+  fees: PaymentMilestone[]
+  /** The original sentence, kept whenever it cannot be read as a schedule. */
+  note: string | null
+}
+
+/** A charge on top of the price, not a step in paying it. */
+const FEE_LABEL = /\b(dld|fee|registration|commission|vat|service charge|admin|oqood)\b/i
+/** Recurring instalments ("1% monthly") are not a single milestone. */
+const RECURRING_LABEL = /\b(month|monthly|quarter|quarterly|annual|annually|year|yearly)\b/i
+
+/** Tidy a milestone label: "on booking" → "On booking", "ON HANDOVER" → "On handover". */
+function milestoneLabel(raw: string): string {
+  const t = raw
+    .replace(/^[\s\-–—:/|]+/, "")
+    .replace(/[\s\-–—:/|]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim()
+  if (!t) return ""
+  const lower = t === t.toUpperCase() ? t.toLowerCase() : t.charAt(0).toLowerCase() + t.slice(1)
+  return lower.charAt(0).toUpperCase() + lower.slice(1)
+}
+
+/**
+ * Read a free-text payment plan into milestones.
+ *
+ * The field is written by hand, so it arrives in every shape: "20% on booking,
+ * 50% during construction, 30% on handover", "70% During Construction / 30% On
+ * Handover", but also "8 Years Payment Plan" and "1% Payment Per Month", which
+ * describe a plan without splitting it. Milestones are only returned when at
+ * least two percentages are present AND they account for roughly the whole
+ * price — otherwise the text is passed through as a note, so a monthly-instalment
+ * plan is never rendered as though 1% were the entire schedule.
+ */
+export function parsePaymentPlan(
+  text: string | null | undefined,
+  downPaymentPercent?: number | string | null,
+): PaymentPlan {
+  const raw = clean(text)
+  const milestones: PaymentMilestone[] = []
+  const fees: PaymentMilestone[] = []
+  if (raw) {
+    // The label runs to the next separator — "/" included, or
+    // "70% During Construction / 30% On Handover" reads as a single 70% step.
+    for (const m of raw.matchAll(/(\d{1,3}(?:\.\d+)?)\s*%\s*([^,;.|/\n]*)/g)) {
+      const percent = Number(m[1])
+      if (!Number.isFinite(percent) || percent <= 0 || percent > 100) continue
+      const label = milestoneLabel(m[2] ?? "")
+      if (FEE_LABEL.test(label)) fees.push({ percent, label })
+      else if (!RECURRING_LABEL.test(label)) milestones.push({ percent, label })
+    }
+  }
+  const total = milestones.reduce((sum, m) => sum + m.percent, 0)
+  // A schedule has to be at least two steps that between them buy the property.
+  // Anything else (a "1% monthly" plan, "8 Years Payment Plan", a per-unit-type
+  // split) keeps its sentence rather than being rendered as a partial schedule.
+  if (milestones.length >= 2 && total >= 90 && total <= 110) {
+    return { milestones, fees, note: null }
+  }
+  const dp = toNum(downPaymentPercent)
+  return {
+    milestones: dp != null && dp > 0 && dp <= 100 ? [{ percent: dp, label: "Down payment" }] : [],
+    fees,
+    note: raw,
+  }
+}
+
 /** Visible sub-heading under the H1: "Off-Plan Apartments by GFS Developments in Dubai South". */
 export function projectSubtitle(p: ProjectSeoInput): string | null {
   const dev = clean(p.developer?.name)
