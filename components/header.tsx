@@ -114,6 +114,10 @@ function initialsFrom(displayName: string, email: string | null) {
 
 export function Header() {
   const [scrolled, setScrolled]     = useState(false)
+  // Auto-hiding header: scrolling down gives the page back ~65px of a phone
+  // screen, scrolling up returns the nav immediately.
+  const [hiddenByScroll, setHiddenByScroll] = useState(false)
+  const lastScrollY = useRef(0)
   const [mobileOpen, setMobileOpen] = useState(false)
   // Which desktop dropdown is open, by label. Also drives the mobile accordion.
   const [openMenu, setOpenMenu] = useState<string | null>(null)
@@ -238,7 +242,18 @@ export function Header() {
   }
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40)
+    lastScrollY.current = window.scrollY
+    const onScroll = () => {
+      const y = window.scrollY
+      setScrolled(y > 40)
+      // A 6px dead zone stops the bar flickering on momentum wobble, and the
+      // 90px floor keeps it pinned near the top of the page where there is
+      // nothing to reclaim.
+      const delta = y - lastScrollY.current
+      if (Math.abs(delta) < 6) return
+      setHiddenByScroll(y > 90 && delta > 0)
+      lastScrollY.current = y
+    }
     window.addEventListener("scroll", onScroll, { passive: true })
     return () => window.removeEventListener("scroll", onScroll)
   }, [])
@@ -255,7 +270,15 @@ export function Header() {
   return (
     <>
       <header
-        className={`sticky top-0 z-[900] w-full transition-all duration-300 ${
+        // Hidden only on small screens, only while scrolling down, and never
+        // while a menu is open — an open sidebar or dropdown must not slide
+        // away under the user's finger. transform, not height, so the page
+        // below never shifts.
+        className={`sticky top-0 z-[900] w-full transition-all duration-300 motion-reduce:transition-none ${
+          hiddenByScroll && !mobileOpen && !openMenu && !accountOpen
+            ? "-translate-y-full lg:translate-y-0"
+            : "translate-y-0"
+        } ${
           scrolled
             ? "bg-[#001f3f]/95 backdrop-blur-xl shadow-[0_4px_32px_rgba(0,31,63,0.35)] border-b border-white/8"
             : "bg-[#001f3f]"
