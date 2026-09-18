@@ -31,6 +31,7 @@ import { AmenitiesGrid, NearbyPlaces } from "@/components/public/amenities-grid"
 import { ProjectInquireForm } from "@/components/public/project-inquire-form"
 import { ProjectLocationMap } from "@/components/public/project-location-map"
 import { MediaEmbedCard } from "@/components/public/media-embed"
+import { ReadMore } from "@/components/public/read-more"
 import { classifyMedia, isShortLink, mediaLabel } from "@/lib/media-embed"
 import {
   MapPin, Building2, Calendar, Home, Layers, Phone, Mail, ArrowLeft,
@@ -255,6 +256,17 @@ export default async function ProjectDetailPage({ params }: Props) {
   const subtitle = projectSubtitle(seoInput)
   const atAGlance = projectAtAGlance(seoInput)
   const faqs = projectFaqs(seoInput)
+  // The Overview runs to ~1,380 characters on a median project and 2,470 on
+  // the longest — 36 and 65 lines on a phone — which pushed the unit table,
+  // payment plan and gallery far down the page. Long ones collapse on mobile;
+  // short ones are left alone so no one taps "Read more" for two extra lines.
+  const collapseOverview =
+    atAGlance.join(" ").length +
+      (project.description?.length ?? 0) +
+      (project.about_project && project.about_project !== project.description
+        ? project.about_project.length
+        : 0) >
+    700
   // One reconciled price for the whole page — see priceFromValue: the stored
   // launch_price_from undercuts the cheapest real unit on 52 projects.
   const price = formatPrice(priceFromValue(seoInput), priceToValue(seoInput), project.currency)
@@ -563,13 +575,20 @@ export default async function ProjectDetailPage({ params }: Props) {
               overview; ~40 had none), then the developer's own copy. */}
           <section>
             <SectionHeading title="Overview" />
-            <p className="mt-5 text-[15.5px] leading-[1.8] text-[#374151]">{atAGlance.join(" ")}</p>
-            {project.description && (
-              <p className="mt-4 text-[15.5px] leading-[1.8] text-[#374151]">{project.description}</p>
-            )}
-            {project.about_project && project.about_project !== project.description && (
-              <p className="mt-4 text-[15.5px] leading-[1.8] text-[#374151]">{project.about_project}</p>
-            )}
+            {(() => {
+              const body = (
+                <>
+                  <p className="mt-5 text-[15.5px] leading-[1.8] text-[#374151]">{atAGlance.join(" ")}</p>
+                  {project.description && (
+                    <p className="mt-4 text-[15.5px] leading-[1.8] text-[#374151]">{project.description}</p>
+                  )}
+                  {project.about_project && project.about_project !== project.description && (
+                    <p className="mt-4 text-[15.5px] leading-[1.8] text-[#374151]">{project.about_project}</p>
+                  )}
+                </>
+              )
+              return collapseOverview ? <ReadMore>{body}</ReadMore> : body
+            })()}
           </section>
 
           {/* Payment plan — the question buyers of off-plan property ask
