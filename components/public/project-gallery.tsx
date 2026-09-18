@@ -2,7 +2,15 @@
 
 import { useState } from "react"
 import Image from "next/image"
-import { X, ChevronLeft, ChevronRight, ZoomIn } from "lucide-react"
+import { ChevronDown, X, ChevronLeft, ChevronRight, ZoomIn } from "lucide-react"
+
+/**
+ * Tiles shown before "View all photos". Galleries run to a median of 13 and a
+ * maximum of 70 images — 7 and 35 rows on a two-column phone — which buried
+ * the unit table, location and FAQ beneath them. Eight fills two desktop rows
+ * and four mobile rows.
+ */
+const COLLAPSED_COUNT = 8
 
 type ProjectImage = {
   id: number
@@ -23,8 +31,11 @@ export function ProjectGallery({
   location?: string | null
 }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const [showAll, setShowAll] = useState(false)
 
   if (!images.length) return null
+
+  const collapsible = images.length > COLLAPSED_COUNT
 
   const subject = [projectName, location].filter(Boolean).join(", ")
   const altFor = (img: ProjectImage, idx: number) =>
@@ -42,6 +53,9 @@ export function ProjectGallery({
             key={img.id}
             onClick={() => setLightboxIndex(idx)}
             aria-label={`View ${altFor(img, idx)}`}
+            // Hidden tiles stay in the markup (alt text included) but are not
+            // painted, so the browser never fetches them until they are shown.
+            hidden={collapsible && !showAll && idx >= COLLAPSED_COUNT}
             className="group relative aspect-square overflow-hidden bg-[#f3f4f6] border border-[#e8eaed] hover:border-[#001f3f]/30 transition-all"
           >
             {/* Thumbnails go through the image optimizer sized to the grid cell
@@ -62,6 +76,18 @@ export function ProjectGallery({
           </button>
         ))}
       </div>
+
+      {collapsible && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          aria-expanded={showAll}
+          className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-[0.12em] text-[#001f3f] hover:text-[#b8913f] transition-colors"
+        >
+          {showAll ? "Show fewer photos" : `View all ${images.length} photos`}
+          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showAll ? "rotate-180" : ""}`} />
+        </button>
+      )}
 
       {/* Lightbox */}
       {lightboxIndex !== null && (
