@@ -703,7 +703,7 @@ export function Header() {
 
           {/* Contact Info */}
           <div className="px-6 py-4 border-t border-white/10">
-            <p className="text-xs font-semibold uppercase tracking-widest text-white/30 mb-3">Contact Us</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-white/55 mb-3">Contact Us</p>
             <div className="flex flex-col gap-2.5">
               <a
                 href="tel:+971567428288"
@@ -728,7 +728,7 @@ export function Header() {
 
           {/* Social Media */}
           <div className="px-6 py-4 border-t border-white/10">
-            <p className="text-xs font-semibold uppercase tracking-widest text-white/30 mb-3">Follow Us</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-white/55 mb-3">Follow Us</p>
             <div className="flex items-center gap-2">
               {SOCIAL_LINKS.map(({ label, href, Icon }) => (
                 <a
@@ -747,7 +747,7 @@ export function Header() {
 
           {/* Footer note */}
           <div className="px-6 py-4 border-t border-white/10">
-            <p className="text-[11px] text-white/20 text-center">
+            <p className="text-[11px] text-white/50 text-center">
               © {new Date().getFullYear()} FHI Global • Dubai Operations
             </p>
           </div>
