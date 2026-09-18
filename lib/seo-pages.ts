@@ -61,6 +61,13 @@ export type SeoPage = {
   /** guide kind: matches projects.location/name to pick the page photo from
    *  our own portfolio; pages with no match fall back to the Dubai pool. */
   imageQuery?: string
+  /** guide kind: which of our projects sit in this area. When at least three
+   *  match, the guide renders a live stats strip and project grid — the area
+   *  guides used to be the only pages on the site that showed no inventory and
+   *  linked to no project, which left the project pages with almost no
+   *  internal links. Guides whose area has fewer than three projects simply
+   *  render without the block rather than fake a listing page. */
+  inventoryFilter?: SeoPageFilter
   /** guide kind: the quick-facts strip. */
   facts?: { label: string; value: string }[]
   /** guide kind: heading over the facts strip (defaults to
@@ -253,6 +260,7 @@ const AREA_GUIDES: SeoPage[] = [
       "The Marina's tenant pool is also the deepest in the city — airline crews, consultants, remote founders — and it renews itself every hiring season. For owners that means pricing power in furnished units and short vacancy windows; for residents, a district that never quite sleeps, with padel courts, yacht charters and a seven-kilometre running loop built into daily life.",
     ],
     kind: "guide",
+    inventoryFilter: { cityLike: "dubai", locationLike: "marina" },
     facts: [
       { label: "Property mix", value: "High-rise apartments, penthouses, a handful of villas on the water" },
       { label: "Who it suits", value: "Professionals, investors chasing rental yield, weekend-lifestyle buyers" },
@@ -301,6 +309,7 @@ const AREA_GUIDES: SeoPage[] = [
       "Emaar built Downtown and still operates most of it, which shows in the maintenance standard and in resale confidence. Supply is essentially fixed — the district is built out — so the market moves on demand alone. When Dubai has a strong year, Downtown usually has a stronger one; when the market cools, the address defends its value better than almost anywhere.",
     ],
     kind: "guide",
+    inventoryFilter: { cityLike: "dubai", locationLike: "downtown" },
     facts: [
       { label: "Property mix", value: "Apartments and branded residences; Old Town's low-rise Arabic-style blocks" },
       { label: "Who it suits", value: "End-users, prestige buyers, short-let investors" },
@@ -349,6 +358,7 @@ const AREA_GUIDES: SeoPage[] = [
       "The Bay has also become Dubai's laboratory for branded living — hotel-flagged residences cluster here, pairing hotel amenities with private ownership. And because the district began as an office masterplan, its road grid and utilities were engineered for more density than it carries today, which is why construction continues without the growing pains older districts feel.",
     ],
     kind: "guide",
+    inventoryFilter: { cityLike: "dubai", locationLike: "business bay" },
     facts: [
       { label: "Property mix", value: "New high-rise apartments, serviced and branded residences, canal-front penthouses" },
       { label: "Who it suits", value: "Yield investors, young professionals, first-time Dubai buyers" },
@@ -397,6 +407,7 @@ const AREA_GUIDES: SeoPage[] = [
       "The crescent's hotels — Atlantis at the crown — anchor the island's service economy, and residents borrow their beach clubs, spas and restaurants as neighbourhood amenities. Add the Palm West Beach strip and its boardwalk, and the island now has genuine street life to go with its privacy — something it lacked entirely in its first decade.",
     ],
     kind: "guide",
+    inventoryFilter: { cityLike: "dubai", locationLike: "palm jumeirah" },
     facts: [
       { label: "Property mix", value: "Beachfront frond villas, trunk apartments, branded residences on the crescent" },
       { label: "Who it suits", value: "Family end-users, ultra-prime buyers, beach-led lifestyle purchases" },
@@ -445,6 +456,7 @@ const AREA_GUIDES: SeoPage[] = [
       "Circle Mall gave the district its retail anchor, and more than thirty pocket parks do the daily work between the schools and nurseries. Developers here compete hard on amenities — rooftop pools, co-working lounges and serious gyms are standard in the newer buildings, at price points where the older districts offer none of it.",
     ],
     kind: "guide",
+    inventoryFilter: { cityLike: "dubai", locationLike: "jumeirah village circle" },
     facts: [
       { label: "Property mix", value: "Mid-rise apartments, townhouses, some villas around the circle's gardens" },
       { label: "Who it suits", value: "First-time buyers, yield investors, families on a budget" },
@@ -493,6 +505,7 @@ const AREA_GUIDES: SeoPage[] = [
       "The masterplan is sized for a population larger than some emirates — a reminder that this is a decade-long story, not a finished district. Early buyers are effectively buying Emaar's delivery machine: every handed-over phase adds retail, schools and transport links, and each addition marks up the phases that came before it.",
     ],
     kind: "guide",
+    inventoryFilter: { cityLike: "dubai", locationLike: "creek harbour" },
     facts: [
       { label: "Property mix", value: "New apartments and waterfront towers, nearly all Emaar-built" },
       { label: "Who it suits", value: "Off-plan investors, buyers priced out of Downtown, long-horizon holders" },
@@ -541,6 +554,7 @@ const AREA_GUIDES: SeoPage[] = [
       "The numbers behind the lifestyle hold up too: Dubai Hills Mall trades among the city's busiest, King's College Hospital anchors the healthcare offer, and the district's central seam between Downtown and the Marina makes it one of the few family communities that shortens commutes instead of lengthening them.",
     ],
     kind: "guide",
+    inventoryFilter: { cityLike: "dubai", locationLike: "dubai hills" },
     facts: [
       { label: "Property mix", value: "Villas, townhouses, mid-rise apartments around the park and mall" },
       { label: "Who it suits", value: "Families settling long-term, villa upgraders, school-run households" },
@@ -589,6 +603,7 @@ const AREA_GUIDES: SeoPage[] = [
       "The strip's economics are simple: a beach that draws millions of visitors a year, directly beneath a few thousand apartments. That footfall sustains The Walk's retail through every season and keeps short-let occupancy among the city's highest — while the tram and the Marina's Metro stations put the business districts within an easy commute.",
     ],
     kind: "guide",
+    inventoryFilter: { cityLike: "dubai", locationLike: "jumeirah beach residence" },
     facts: [
       { label: "Property mix", value: "Large-format apartments in the Rimal, Bahar, Murjan, Sadaf, Amwaj & Shams clusters" },
       { label: "Who it suits", value: "Beach-first buyers, short-let investors, space hunters" },
@@ -637,6 +652,7 @@ const AREA_GUIDES: SeoPage[] = [
       "The Ranches also benefits from what grew up around it: the polo club, Global Village and Dubailand's newer districts wrap it in amenities that didn't exist when the first villas sold. And two decades of resales give buyers something genuinely rare in Dubai — a real price history, street by street, to negotiate from.",
     ],
     kind: "guide",
+    inventoryFilter: { cityLike: "dubai", locationLike: "arabian ranches" },
     facts: [
       { label: "Property mix", value: "Villas and townhouses across gated sub-communities; no apartments" },
       { label: "Who it suits", value: "Settled families, equestrian and golf households, long-term residents" },
@@ -685,6 +701,7 @@ const AREA_GUIDES: SeoPage[] = [
       "Nakheel's original masterplan left room to breathe — plots and road widths here are more generous than in the newer value districts — and Ibn Battuta's own Metro station, Discovery Gardens and the Gardens bracket the community with infrastructure that is already mature. It is quietly becoming the commuter choice for Expo City's growing workforce.",
     ],
     kind: "guide",
+    inventoryFilter: { cityLike: "dubai", locationLike: "furjan" },
     facts: [
       { label: "Property mix", value: "Townhouses and villas in the original phases, newer mid-rise apartments along the spine" },
       { label: "Who it suits", value: "Commuting families, first villa buyers, Metro-dependent tenants" },
@@ -733,6 +750,7 @@ const AREA_GUIDES: SeoPage[] = [
       "The free-zone charter gives DIFC its own courts and a common-law framework, and property inside the district sits under that umbrella — a distinction institutional buyers price in. Gate Avenue's retail spine, the arts cluster and a packed calendar of gallery nights keep the district alive well past office hours.",
     ],
     kind: "guide",
+    inventoryFilter: { cityLike: "dubai", locationLike: "difc" },
     facts: [
       { label: "Property mix", value: "Apartments in a small set of towers — Index, Limestone, Central Park and peers" },
       { label: "Who it suits", value: "Finance professionals, art-and-dining loyalists, pied-à-terre buyers" },
@@ -781,6 +799,7 @@ const AREA_GUIDES: SeoPage[] = [
       "The belt keeps absorbing Dubai's growth corridors: Academic City's universities, the Al Maktoum airport axis and the Emirates Road logistics spine all pull tenants inward. For investors the arithmetic is entry price against city-average rents — the spread that made JVC famous a cycle ago is now widest out here.",
     ],
     kind: "guide",
+    inventoryFilter: { cityLike: "dubai", locationLike: "dubailand" },
     facts: [
       { label: "Property mix", value: "Townhouse communities, mid-rise apartments, occasional villa districts" },
       { label: "Who it suits", value: "Budget-led families, first-time buyers, long-horizon investors" },
@@ -829,6 +848,7 @@ const AREA_GUIDES: SeoPage[] = [
       "The trade-off is that Al Jaddaf is still being built. Expect cranes, road works and a skyline that changes every quarter until the current wave hands over between 2026 and 2028. Binghatti and Azizi between them account for most of the towers rising here, so developer track record is easier to judge than in more fragmented districts — and it is the first thing we check.",
     ],
     kind: "guide",
+    inventoryFilter: { cityLike: "dubai", locationLike: "jaddaf" },
     facts: [
       { label: "Property mix", value: "Mid- and high-rise apartments — studios to three-beds, a handful of penthouses" },
       { label: "Who it suits", value: "Yield-focused investors, first-time buyers priced out of Downtown, medical and airport professionals" },

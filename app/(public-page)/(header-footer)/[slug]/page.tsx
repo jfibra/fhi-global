@@ -7,7 +7,7 @@ import { createPageMetadata, truncateDescription } from "@/lib/seo"
 import { ProjectCard, type ProjectCardData } from "@/components/project-card"
 import { Reveal } from "@/components/public/reveal"
 import { SOCIAL_URLS } from "@/lib/social"
-import { getSeoPage, NON_UAE_CITIES, SEO_PAGES, type SeoPage } from "@/lib/seo-pages"
+import { getSeoPage, NON_UAE_CITIES, SEO_PAGES, type SeoPage, type SeoPageFilter } from "@/lib/seo-pages"
 import { ContactForm } from "../contact/contact-form"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
 import { breadcrumbList, developerOrganizationSchema, faqPageSchema, itemListSchema } from "@/lib/structured-data"
@@ -527,17 +527,37 @@ export default async function DeveloperDetailPage({ params }: Props) {
 // server-rendered project grid. The grid uses the same visibility rule as the
 // developer portfolio above — no picture anywhere, no card — so these pages
 // can never degrade into grids of grey placeholders.
-async function SeoLandingPage({ seo }: { seo: SeoPage }) {
-  // Area guides are fully static content pages — no inventory query at all.
-  if (seo.kind === "guide") return <SeoGuidePage seo={seo} />
+type SeoGridRow = {
+  id: number
+  name: string
+  slug: string | null
+  main_image: string | null
+  location: string | null
+  city: string | null
+  community: string | null
+  delivery_quarter: string | null
+  launch_price_from: number | string | null
+  launch_price_to: number | string | null
+  currency: string | null
+  status: string
+  is_featured: boolean | null
+  developers: { name: string | null; logo_url: string | null; slug: string | null } | null
+  /** Unit prices, used to keep the "starting from" stat honest — see inventoryPriceFrom. */
+  project_units: { price_from: number | string | null }[] | null
+}
 
-  const filter = seo.filter ?? {}
+/**
+ * Projects matching a SeoPageFilter, with a gallery image substituted for any
+ * row whose main_image is blank and rows that still have no photo dropped.
+ * Shared by the inventory landing pages and the area guides.
+ */
+async function fetchSeoInventory(filter: SeoPageFilter): Promise<SeoGridRow[]> {
   const supabase = createPublicSupabaseClient()
 
   // Property-type pages need an inner join so only projects carrying the
   // type survive; every other page keeps the plain select.
   const baseSelect =
-    "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)"
+    "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug), project_units(price_from)"
   // Widened to string on purpose: supabase-js's type-level parser can't read
   // the conditional embed, and these rows are consumed loosely below anyway.
   const select: string = filter.propertyTypeLike
@@ -577,20 +597,6 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
     )
   }
 
-  type SeoGridRow = {
-    id: number
-    name: string
-    slug: string | null
-    main_image: string | null
-    location: string | null
-    city: string | null
-    launch_price_from: number | string | null
-    launch_price_to: number | string | null
-    currency: string | null
-    status: string
-    is_featured: boolean | null
-    developers: { name: string | null; logo_url: string | null; slug: string | null } | null
-  }
   const { data: projectsRaw } = await query
   const projects = (projectsRaw ?? []) as unknown as SeoGridRow[]
 
@@ -607,9 +613,69 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
       if (g.url && !galleryFallback.has(g.project_id)) galleryFallback.set(g.project_id, g.url)
     }
   }
-  const visible = (projects ?? [])
+  return (projects ?? [])
     .map((p) => ({ ...p, main_image: p.main_image?.trim() || galleryFallback.get(p.id) || null }))
     .filter((p) => p.main_image)
+}
+
+/**
+ * Lowest price actually on sale across a result set.
+ *
+ * launch_price_from undercuts the project's own unit table on 124 of the 174
+ * projects that carry both, so a bare MIN over that column advertised prices
+ * nothing was sold at (Al Jaddaf led with "AED 199,999" against a cheapest
+ * real unit of AED 1,999,999). Same rule as priceFromValue on project pages.
+ */
+function projectFloorPrice(p: SeoGridRow): number | null {
+  const head = Number(p.launch_price_from)
+  const headline = Number.isFinite(head) && head >= MIN_REALISTIC_PRICE_AED ? head : null
+  const units = (p.project_units ?? [])
+    .map((u) => Number(u.price_from))
+    .filter((n) => Number.isFinite(n) && n >= MIN_REALISTIC_PRICE_AED)
+  if (units.length === 0) return headline
+  const cheapestUnit = Math.min(...units)
+  if (headline == null) return cheapestUnit
+  return headline < cheapestUnit * 0.9 ? cheapestUnit : Math.min(headline, cheapestUnit)
+}
+
+/** Cheapest price on sale in a result set, formatted. */
+function inventoryPriceFrom(rows: SeoGridRow[]): string | null {
+  const priced = rows
+    .map((p) => ({ p, floor: projectFloorPrice(p) }))
+    .filter((x): x is { p: SeoGridRow; floor: number } => x.floor != null)
+    .sort((a, b) => a.floor - b.floor)[0]
+  if (!priced) return null
+  const cheapest = priced.floor
+  const currency = (priced.p.currency ?? "AED").toUpperCase()
+  return `${currency} ${
+    cheapest >= 1_000_000
+      ? `${(cheapest / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`
+      : cheapest.toLocaleString("en-AE", { maximumFractionDigits: 0 })
+  }`
+}
+
+/**
+ * "2026–2029" across the stock still being delivered. Completed projects are
+ * excluded — an area guide that announced "Handover 2018–2028" was quoting a
+ * building handed over years ago.
+ */
+function inventoryHandoverRange(rows: SeoGridRow[]): string | null {
+  const years = rows
+    .filter((p) => p.status !== "completed")
+    .map((p) => p.delivery_quarter?.match(/\d{4}/)?.[0])
+    .filter((y): y is string => Boolean(y))
+    .sort()
+  if (years.length === 0) return null
+  const first = years[0]
+  const last = years[years.length - 1]
+  return first === last ? first : `${first}–${last}`
+}
+
+async function SeoLandingPage({ seo }: { seo: SeoPage }) {
+  if (seo.kind === "guide") return <SeoGuidePage seo={seo} />
+
+  const filter = seo.filter ?? {}
+  const visible = await fetchSeoInventory(filter)
 
   // Masthead collage + facts, all from the projects already loaded — no extra
   // query, and every photo is one of the results below.
@@ -617,17 +683,7 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
   const developerCount = new Set(
     visible.map((p) => (p.developers as { name?: string } | null)?.name).filter(Boolean),
   ).size
-  // Sanity floor: a placeholder launch_price_from of 1 in a single DB row
-  // used to make the flagship landing page lead with "Starting from AED 1".
-  const cheapest = visible
-    .map((p) => Number(p.launch_price_from))
-    .filter((n) => Number.isFinite(n) && n >= MIN_REALISTIC_PRICE_AED)
-    .sort((a, b) => a - b)[0]
-  const priceFrom = cheapest
-    ? `${(visible.find((p) => Number(p.launch_price_from) === cheapest)?.currency ?? "AED").toUpperCase()} ${
-        cheapest >= 1_000_000 ? `${(cheapest / 1_000_000).toFixed(1).replace(/\.0$/, "")}M` : cheapest.toLocaleString("en-AE", { maximumFractionDigits: 0 })
-      }`
-    : null
+  const priceFrom = inventoryPriceFrom(visible)
 
   const shown = visible.slice(0, 24)
   const related = seo.related.map(getSeoPage).filter((r): r is SeoPage => Boolean(r))
@@ -883,11 +939,31 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
 // intro beside a photo from OUR OWN portfolio, a "why invest here" card grid,
 // prose sections, then routes into the live inventory pages. The photo is a
 // real project we sell (and links to it) — not stock imagery.
+/** Below this an area has too little of our own stock to headline a grid. */
+const MIN_GUIDE_INVENTORY = 3
+
 async function SeoGuidePage({ seo }: { seo: SeoPage }) {
   const supabase = createPublicSupabaseClient()
 
+  // Our projects in this area. The guides used to query nothing at all, so
+  // they showed no inventory and linked to no project — the reason a project
+  // page like Binghatti Cullinan had two internal links on the whole site.
+  const inventory = seo.inventoryFilter ? await fetchSeoInventory(seo.inventoryFilter) : []
+  const hasInventory = inventory.length >= MIN_GUIDE_INVENTORY
+  const gridProjects = hasInventory ? inventory.slice(0, 8) : []
+
   type Photo = { url: string; name: string; slug: string | null; devSlug: string | null }
   let photo: Photo | null = null
+  // Prefer a project actually in this area — already loaded, so no extra query.
+  if (hasInventory) {
+    const lead = inventory[0]
+    photo = {
+      url: lead.main_image as string,
+      name: lead.name,
+      slug: lead.slug,
+      devSlug: (lead.developers as { slug: string | null } | null)?.slug ?? null,
+    }
+  }
 
   if (seo.imageQuery) {
     const { data } = await supabase
@@ -931,6 +1007,17 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
       <JsonLd
         schema={[
           breadcrumbList([{ name: "Home", path: "/" }, { name: seo.h1 }]),
+          ...(gridProjects.length > 0
+            ? [
+                itemListSchema(
+                  gridProjects.flatMap((p) => {
+                    const dev = p.developers as { slug: string | null } | null
+                    return p.slug && dev?.slug ? [{ name: p.name, path: `/${dev.slug}/${p.slug}` }] : []
+                  }),
+                  `Projects in ${seo.label}`,
+                ),
+              ]
+            : []),
           ...(seo.faqs?.length ? [faqPageSchema(seo.faqs)] : []),
         ]}
       />
@@ -1000,6 +1087,64 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
                 <p className="mt-1.5 text-[15px] leading-relaxed text-[#4b5563]">{f.value}</p>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* Live inventory — the stats and the projects come from the same query,
+          so the numbers can never disagree with the cards beneath them. Only
+          rendered for areas where we actually hold stock. */}
+      {hasInventory && (
+        <section className="bg-[#f7f8fa] border-y border-[#e8eaed]">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
+                  From our portfolio
+                </p>
+                <h2 className="mt-2 font-['Outfit'] text-2xl md:text-3xl font-bold text-[#001f3f]">
+                  Projects in {seo.label}
+                </h2>
+              </div>
+              <Link
+                href="/new-projects-in-dubai"
+                className="inline-flex items-center gap-1.5 text-sm font-bold text-[#001f3f] hover:text-[#b8913f] transition-colors"
+              >
+                All new projects in Dubai
+                <ArrowLeft className="w-4 h-4 rotate-180" />
+              </Link>
+            </div>
+
+            <dl className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-[#e8eaed] border border-[#e8eaed] mb-8">
+              {[
+                { label: "Projects available", value: String(inventory.length) },
+                { label: "Starting from", value: inventoryPriceFrom(inventory) },
+                { label: "Handover", value: inventoryHandoverRange(inventory) },
+                {
+                  label: "Developers",
+                  value: String(
+                    new Set(
+                      inventory.map((p) => (p.developers as { name?: string } | null)?.name).filter(Boolean),
+                    ).size,
+                  ),
+                },
+              ]
+                .filter((s) => s.value)
+                .map((s) => (
+                  <div key={s.label} className="bg-white px-5 py-4">
+                    <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9ca3af]">
+                      {s.label}
+                    </dt>
+                    <dd className="mt-1 font-['Outfit'] text-xl font-bold text-[#001f3f]">{s.value}</dd>
+                  </div>
+                ))}
+            </dl>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {gridProjects.map((p) => (
+                <ProjectCard key={p.id} project={p as unknown as ProjectCardData} />
+              ))}
+            </div>
           </div>
         </section>
       )}
