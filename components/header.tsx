@@ -530,7 +530,10 @@ export function Header() {
 
         {/* Sidebar Panel */}
         <div
-          className={`absolute top-0 right-0 h-full w-[300px] sm:w-[340px] bg-[#001428] flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
+          // #001f3f, the header navy, rather than the near-black #001428 used
+          // by the footer and topbar: the drawer slides out of the header and
+          // reads as part of it. Every label stays at AA or better.
+          className={`absolute top-0 right-0 h-full w-[300px] sm:w-[340px] bg-[#001f3f] flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
             mobileOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
@@ -606,10 +609,10 @@ export function Header() {
                                 childActive ? "text-[#d6b357] bg-white/[0.06]" : "text-white/65 hover:text-white hover:bg-white/8"
                               }`}
                             >
-                              <c.icon className={`w-4 h-4 shrink-0 ${childActive ? "text-[#d6b357]" : "text-white/40"}`} />
+                              <c.icon className={`w-4 h-4 shrink-0 ${childActive ? "text-[#d6b357]" : "text-white/55"}`} />
                               <span className="min-w-0">
                                 <span className="block text-sm font-semibold leading-tight">{c.label}</span>
-                                <span className="block text-[11px] text-white/40 leading-snug mt-0.5">{c.desc}</span>
+                                <span className="block text-[11px] text-white/55 leading-snug mt-0.5">{c.desc}</span>
                               </span>
                             </Link>
                           )
@@ -664,7 +667,7 @@ export function Header() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-white truncate">{session.displayName}</p>
                     {session.email && (
-                      <p className="text-xs text-white/45 truncate">{session.email}</p>
+                      <p className="text-xs text-white/60 truncate">{session.email}</p>
                     )}
                   </div>
                 </div>
