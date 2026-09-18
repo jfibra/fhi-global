@@ -8,6 +8,8 @@ import {
   composeProjectDescription,
   composeProjectTitle,
   formatPrice,
+  priceFromValue,
+  priceToValue,
   projectAtAGlance,
   projectFaqs,
   projectSubtitle,
@@ -173,7 +175,8 @@ export default async function ProjectDetailPage({ params }: Props) {
   if (!project) notFound()
 
   const status = STATUS_STYLES[project.status] ?? { label: project.status, bg: "#f3f4f6", text: "#374151", border: "#e5e7eb" }
-  const price = formatPrice(project.launch_price_from, project.launch_price_to, project.currency)
+  // Price is computed AFTER seoInput below, so the hero, the schema, the
+  // overview and the FAQ all quote the same reconciled figure.
   const locationStr = [project.community, project.location, project.city].filter(Boolean).join(", ")
   const mapsApiKey =
     process.env.GOOGLE_MAPS_API_KEY?.trim() || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || ""
@@ -251,6 +254,14 @@ export default async function ProjectDetailPage({ params }: Props) {
   const subtitle = projectSubtitle(seoInput)
   const atAGlance = projectAtAGlance(seoInput)
   const faqs = projectFaqs(seoInput)
+  // One reconciled price for the whole page — see priceFromValue: the stored
+  // launch_price_from undercuts the cheapest real unit on 52 projects.
+  const price = formatPrice(priceFromValue(seoInput), priceToValue(seoInput), project.currency)
+  // 89 projects carry unit rows with no type, size or price — an empty table
+  // is worse than no table, so a row must say something to be rendered.
+  const shownUnits = units.filter(
+    (u) => u.unit_type || u.bedrooms != null || u.size_sqft != null || u.price_from != null,
+  )
   const quickFacts = [
     { icon: CheckCircle2, label: "Ownership", value: project.ownership_type ?? (project.freehold ? "Freehold" : null) },
     { icon: MapPin, label: "Region", value: project.region },
@@ -274,7 +285,7 @@ export default async function ProjectDetailPage({ params }: Props) {
   const { data: moreRows } = await supabase
     .from("projects")
     .select(
-      "id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)",
+      "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)",
     )
     .eq("developer_id", developer.id)
     .eq("is_active", true)
@@ -294,7 +305,7 @@ export default async function ProjectDetailPage({ params }: Props) {
   const shownIds = [project.id as number, ...moreProjects.map((p) => p.id as number)]
   const areaKey = (project.community || project.location || "").replace(/[(),.:*%]/g, " ").trim()
   const similarSelect =
-    "id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)"
+    "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)"
   const similarBase = () =>
     supabase
       .from("projects")
@@ -338,7 +349,9 @@ export default async function ProjectDetailPage({ params }: Props) {
     description: project.meta_description || project.description || project.about_project || project.name,
     path: `/${developer.slug}/${project.slug}`,
     images: [project.main_image, ...images.map((image) => image.image_url)],
-    price: project.launch_price_from,
+    // The same reconciled figure the page shows — quoting the raw column here
+    // put an Offer price in the markup that contradicted the visible one.
+    price: priceFromValue(seoInput),
     currency: project.currency,
     city: project.city,
     street: [project.location, project.community].filter(Boolean).join(", ") || null,
@@ -507,17 +520,28 @@ export default async function ProjectDetailPage({ params }: Props) {
         )}
       </section>
 
-      {/* Back link — under the band, out of the masthead's way. */}
+      {/* Breadcrumb — the same trail the BreadcrumbList JSON-LD declares.
+          Shipping the markup without the visible trail left users with no way
+          up the hierarchy and gave Google a schema with nothing to mirror. */}
       <div className="bg-white border-b border-[#e8eaed]">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <Link
-            href={developer?.slug ? `/${developer.slug}` : "/projects"}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#6b7280] hover:text-[#001f3f] transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            {developer?.name ? `All ${developer.name} projects` : "All Projects"}
-          </Link>
-        </div>
+        <nav
+          aria-label="Breadcrumb"
+          className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3"
+        >
+          <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[#6b7280]">
+            <li><Link href="/" className="hover:text-[#001f3f] transition-colors">Home</Link></li>
+            <li aria-hidden="true" className="text-[#c9ced6]">/</li>
+            <li><Link href="/projects" className="hover:text-[#001f3f] transition-colors">Projects</Link></li>
+            <li aria-hidden="true" className="text-[#c9ced6]">/</li>
+            <li>
+              <Link href={`/${developer.slug}`} className="hover:text-[#001f3f] transition-colors">
+                {developer.name}
+              </Link>
+            </li>
+            <li aria-hidden="true" className="text-[#c9ced6]">/</li>
+            <li aria-current="page" className="font-semibold text-[#001f3f]">{project.name}</li>
+          </ol>
+        </nav>
       </div>
 
       {/* ── Main content — flat editorial layout, per the approved mockup:
@@ -577,7 +601,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           )}
 
           {/* Units */}
-          {units.length > 0 && (
+          {shownUnits.length > 0 && (
             <section id="units" className="scroll-mt-24">
               <SectionHeading title="Available Unit Types" />
               <div className="mt-5 overflow-x-auto">
@@ -590,7 +614,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {units.map((u) => (
+                    {shownUnits.map((u) => (
                       <tr key={u.id} className="border-b border-[#eef0f3]">
                         <td className="py-3.5 pr-6 font-semibold text-[#0d1117]">{u.unit_type ?? "—"}</td>
                         <td className="py-3.5 pr-6 text-[#374151]">

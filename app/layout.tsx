@@ -25,7 +25,6 @@ export const metadata: Metadata = {
     template: "%s | FHI Global",
   },
   description: "Discover premium property projects in Dubai from verified developers.",
-  generator: "v0.app",
   manifest: "/site.webmanifest",
   icons: {
     icon: [

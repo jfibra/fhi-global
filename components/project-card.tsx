@@ -1,6 +1,6 @@
 import Link from "next/link"
 import Image from "next/image"
-import { MapPin, ArrowRight, Building2 } from "lucide-react"
+import { CalendarClock, MapPin, ArrowRight, Building2 } from "lucide-react"
 
 export interface ProjectCardData {
   id: string
@@ -9,6 +9,10 @@ export interface ProjectCardData {
   main_image?: string | null
   location?: string | null
   city?: string | null
+  /** Community/sub-area — preferred over the city, which is "Dubai" on 204 of 251 projects. */
+  community?: string | null
+  /** "Q4 2027" — buyers shop off-plan by delivery date. */
+  delivery_quarter?: string | null
   launch_price_from?: number | null
   launch_price_to?: number | null
   currency?: string | null
@@ -40,12 +44,22 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project }: ProjectCardProps) {
   const {
-    name, slug, main_image, location, city,
+    name, slug, main_image, location, city, community, delivery_quarter,
     launch_price_from, currency = "AED", status, is_featured, developers,
   } = project
 
   const s = status ? STATUS_STYLES[status] : null
-  const displayLocation = city || location
+  // Community first: "Dubai" was printed on every card because it is the city
+  // of 204 of 251 projects, so the line carried no information. Fall back to
+  // the freer location text, then the city. The city is appended only when it
+  // adds something the area name does not already say.
+  const area = [community, location].map((v) => v?.trim()).find(Boolean) ?? null
+  const cityName = city?.trim() || null
+  const displayLocation = area
+    ? area.toLowerCase().includes((cityName ?? "").toLowerCase()) || !cityName
+      ? area
+      : `${area}, ${cityName}`
+    : cityName
 
   return (
     <Link
@@ -115,11 +129,22 @@ export function ProjectCard({ project }: ProjectCardProps) {
           {name}
         </h3>
 
-        {/* Location */}
-        {displayLocation && (
-          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[#9ca3af] mb-4">
-            <MapPin className="w-3 h-3 shrink-0 text-[#d6b357]" />
-            <span className="truncate">{displayLocation}</span>
+        {/* Location + handover — the two facts an off-plan buyer scans for
+            before the price. Competing portals put both on the card. */}
+        {(displayLocation || delivery_quarter) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[#9ca3af] mb-4">
+            {displayLocation && (
+              <span className="flex items-center gap-1.5 min-w-0">
+                <MapPin className="w-3 h-3 shrink-0 text-[#d6b357]" />
+                <span className="truncate">{displayLocation}</span>
+              </span>
+            )}
+            {delivery_quarter && (
+              <span className="flex items-center gap-1.5">
+                <CalendarClock className="w-3 h-3 shrink-0 text-[#d6b357]" />
+                <span className="truncate">Handover {delivery_quarter}</span>
+              </span>
+            )}
           </div>
         )}
 

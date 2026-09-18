@@ -125,7 +125,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
 
   const { data: projects } = await supabase
     .from("projects")
-    .select("id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)")
+    .select("id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)")
     .eq("developer_id", developer.id)
     .eq("is_active", true)
     .eq("is_published", true)
@@ -537,7 +537,7 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
   // Property-type pages need an inner join so only projects carrying the
   // type survive; every other page keeps the plain select.
   const baseSelect =
-    "id, name, slug, main_image, location, city, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)"
+    "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)"
   // Widened to string on purpose: supabase-js's type-level parser can't read
   // the conditional embed, and these rows are consumed loosely below anyway.
   const select: string = filter.propertyTypeLike

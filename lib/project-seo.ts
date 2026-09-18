@@ -90,6 +90,13 @@ function clean(value: string | null | undefined): string | null {
   return t ? t : null
 }
 
+/**
+ * Below this, a "price" is a data-entry slip rather than a Dubai property
+ * price — two rows hold 1.6 and 1.46 (millions typed as units), which rendered
+ * on the live page as "AED 1.6".
+ */
+const MIN_CREDIBLE_PRICE = 50_000
+
 /** "AED 2.2M" / "AED 586K" / "AED 950" — the compact style the cards use. */
 export function formatPrice(
   from: number | string | null | undefined,
@@ -228,22 +235,52 @@ export function unitsSummary(p: ProjectSeoInput): { mix: string | null; sizes: s
     mix = "Studios"
   }
 
+  // Only claim a size range when every unit row carries one. With partial
+  // coverage the old code stated the single known size as if it applied to the
+  // whole mix ("studios and 1–3 bedroom units, sized 677 sqft" from one 1BR row).
   let sizeText: string | null = null
   if (sizes.length > 0) {
     const min = Math.min(...sizes)
     const max = Math.max(...sizes)
     const f = (n: number) => Math.round(n).toLocaleString("en-US")
-    sizeText = min === max ? `${f(min)} sqft` : `${f(min)}–${f(max)} sqft`
+    if (sizes.length < units.length) sizeText = `from ${f(min)} sqft`
+    else sizeText = min === max ? `${f(min)} sqft` : `${f(min)}–${f(max)} sqft`
   }
   return { mix, sizes: sizeText }
 }
 
-/** Lowest unit price when the project-level launch price is missing. */
+/**
+ * The advertised "from" price must be a price something is actually sold at.
+ *
+ * launch_price_from disagrees with the unit table on 124 of the 174 projects
+ * that carry both, and on 52 of them it sits more than 50% BELOW the cheapest
+ * unit on the same page — a page that advertises AED 820K over a table whose
+ * cheapest row is AED 1.4M reads as bait to a buyer and as an internal
+ * contradiction to a quality rater. So: implausible headline values are
+ * discarded, and when the unit rows price the project, the headline can never
+ * undercut them.
+ */
+export function priceFromValue(p: ProjectSeoInput): number | null {
+  const head = toNum(p.launch_price_from)
+  const headline = head != null && head >= MIN_CREDIBLE_PRICE ? head : null
+  const units = (p.units ?? []).map((u) => toNum(u.price_from)).filter((n): n is number => n != null && n >= MIN_CREDIBLE_PRICE)
+  if (units.length === 0) return headline
+  const cheapest = Math.min(...units)
+  if (headline == null) return cheapest
+  // More than 10% below the cheapest real unit → the headline is not on sale.
+  return headline < cheapest * 0.9 ? cheapest : Math.min(headline, cheapest)
+}
+
+/** Upper bound, only when it is credible and above the floor. */
+export function priceToValue(p: ProjectSeoInput): number | null {
+  const to = toNum(p.launch_price_to)
+  const from = priceFromValue(p)
+  if (to == null || to < MIN_CREDIBLE_PRICE) return null
+  return from != null && to <= from ? null : to
+}
+
 function priceFrom(p: ProjectSeoInput): string | null {
-  const direct = formatPrice(p.launch_price_from, null, p.currency)
-  if (direct) return direct
-  const unitPrices = (p.units ?? []).map((u) => toNum(u.price_from)).filter((n): n is number => n != null && n > 0)
-  return unitPrices.length ? formatPrice(Math.min(...unitPrices), null, p.currency) : null
+  return formatPrice(priceFromValue(p), null, p.currency)
 }
 
 /**
@@ -335,7 +372,7 @@ export function projectAtAGlance(p: ProjectSeoInput): string[] {
 
   const { mix, sizes } = unitsSummary(p)
   if (mix) {
-    const sized = sizes ? (sizes.includes("–") ? `, with sizes from ${sizes}` : `, sized ${sizes}`) : ""
+    const sized = sizes ? (sizes.startsWith("from") || sizes.includes("–") ? `, with sizes ${sizes.startsWith("from") ? sizes : "from " + sizes}` : `, sized ${sizes}`) : ""
     out.push(`Unit types include ${mix.charAt(0).toLowerCase() + mix.slice(1)}${sized}.`)
   }
 
@@ -408,7 +445,7 @@ export function projectFaqs(p: ProjectSeoInput): Faq[] {
   if (mix) {
     faqs.push({
       q: `What unit types are available at ${name}?`,
-      a: `${name} offers ${mix.charAt(0).toLowerCase() + mix.slice(1)}${sizes ? (sizes.includes("–") ? ` ranging from ${sizes}` : ` of ${sizes}`) : ""}.`,
+      a: `${name} offers ${mix.charAt(0).toLowerCase() + mix.slice(1)}${sizes ? (sizes.startsWith("from") ? ` ${sizes}` : sizes.includes("–") ? ` ranging from ${sizes}` : ` of ${sizes}`) : ""}.`,
     })
   }
   if (dev) {
