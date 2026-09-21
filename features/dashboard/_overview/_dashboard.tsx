@@ -4,7 +4,7 @@ import Link from "next/link"
 import { ReactNode, useEffect, useState } from "react"
 import type { LucideIcon } from "lucide-react"
 import {
-  ArrowUp, BadgeCheck, Building2, FileText, Headphones, Info, LayoutGrid,
+  ArrowRight, ArrowUp, BadgeCheck, Building2, FileText, Headphones, Info, LayoutGrid,
   LifeBuoy, RefreshCw, ShoppingCart, Users, UsersRound, Wallet,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
@@ -87,12 +87,14 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
 }
 
 type QuickAction = { label: string; desc: string; href: string; icon: LucideIcon }
+// Hrefs are relative to the role's dashboard base; hub pages live under their
+// hub's route folder (see components/dashboard/sidebar-config.ts).
 const QUICK_ACTIONS: QuickAction[] = [
-  { label: "Add Developer",        desc: "Invite a partner firm",     href: "/developers", icon: Users       },
-  { label: "Add Project",          desc: "Publish a new launch",      href: "/projects",   icon: Building2   },
-  { label: "Record Your Sale",     desc: "Log a reservation",         href: "/sales",      icon: ShoppingCart },
-  { label: "Create Support Ticket",desc: "Raise an incident",         href: "/support",    icon: LifeBuoy    },
-  { label: "Create Purchase",      desc: "Track procurement spend",   href: "/purchases",  icon: FileText    },
+  { label: "Add Developer",        desc: "Invite a partner firm",     href: "/properties/developers",  icon: Users       },
+  { label: "Add Project",          desc: "Publish a new launch",      href: "/properties/projects",    icon: Building2   },
+  { label: "Record Your Sale",     desc: "Log a reservation",         href: "/sales",                  icon: ShoppingCart },
+  { label: "Create Support Ticket",desc: "Raise an incident",         href: "/communication/support",  icon: LifeBuoy    },
+  { label: "Create Purchase",      desc: "Track procurement spend",   href: "/finance/purchases",      icon: FileText    },
 ]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -509,7 +511,7 @@ export function AdminDashboardContent({
           <SectionLabel index={4} title="Recent Activity Tables" />
 
           {/* Recent Sales */}
-          <TableCard title="Recent Sales" subtitle="10 latest reservations">
+          <TableCard title="Recent Sales" subtitle="10 latest reservations" href={`${base}/sales`}>
             <table className="min-w-full border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-[#f0f2f5]">
@@ -540,7 +542,7 @@ export function AdminDashboardContent({
 
           <div className="grid gap-5 xl:grid-cols-2">
             {/* Support Tickets */}
-            <TableCard title="Recent Support Tickets" subtitle="Open & in-progress">
+            <TableCard title="Recent Support Tickets" subtitle="Open & in-progress" href={`${base}/communication/support`}>
               <table className="min-w-full border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-[#f0f2f5]">
@@ -568,7 +570,7 @@ export function AdminDashboardContent({
             </TableCard>
 
             {/* Purchases */}
-            <TableCard title="Recent Purchases" subtitle="Latest procurement entries">
+            <TableCard title="Recent Purchases" subtitle="Latest procurement entries" href={`${base}/finance/purchases`}>
               <table className="min-w-full border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-[#f0f2f5]">
@@ -733,12 +735,23 @@ function StatusPill({ status }: { status: string }) {
   )
 }
 
-function TableCard({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
+function TableCard({ title, subtitle, href, children }: { title: string; subtitle?: string; href?: string; children: ReactNode }) {
   return (
     <div className="rounded-2xl bg-white border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] overflow-hidden">
-      <div className="px-5 py-4 border-b border-[#f0f2f5]">
-        <h3 className="text-sm font-bold text-[#0d1117]">{title}</h3>
-        {subtitle && <p className="text-xs text-[#9ca3af] mt-0.5">{subtitle}</p>}
+      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[#f0f2f5]">
+        <div className="min-w-0">
+          <h3 className="text-sm font-bold text-[#0d1117]">{title}</h3>
+          {subtitle && <p className="text-xs text-[#9ca3af] mt-0.5">{subtitle}</p>}
+        </div>
+        {href && (
+          <Link
+            href={href}
+            className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-[#001f3f] hover:text-[#b8913f] transition-colors"
+          >
+            View full report
+            <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+          </Link>
+        )}
       </div>
       <div className="overflow-x-auto p-1">{children}</div>
     </div>
