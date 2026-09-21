@@ -6,8 +6,9 @@ import { APP_ROLE_ORDER } from "@/lib/app-roles"
  * Name suggestions for the "Invited by" box on public event registration.
  *
  * Intentionally unauthenticated (attendees are not portal users) and
- * intentionally minimal: it returns display names only — no ids, emails,
- * roles or avatars — for active staff whose names contain the typed text.
+ * intentionally minimal: it returns display names and profile photos only —
+ * no ids, emails or roles — for active staff whose names contain the typed
+ * text. Photos are already public on the site's agent pages.
  * The box stays free text; a name that is not suggested still registers.
  */
 
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   const admin = createAdminSupabase()
   const { data, error } = await admin
     .from("profiles")
-    .select("fullname")
+    .select("fullname, profile_url")
     .in("role", INVITER_ROLES)
     .eq("status", "active")
     .eq("is_deleted", false)
@@ -39,12 +40,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ names: [] })
   }
 
-  const names = Array.from(
-    new Set((data ?? []).map((r) => ((r.fullname as string | null) ?? "").replace(/\s+/g, " ").trim()).filter(Boolean)),
-  ).slice(0, LIMIT)
+  const seen = new Set<string>()
+  const people: { name: string; avatar: string | null }[] = []
+  for (const r of data ?? []) {
+    const name = ((r.fullname as string | null) ?? "").replace(/\s+/g, " ").trim()
+    if (!name || seen.has(name.toLowerCase())) continue
+    seen.add(name.toLowerCase())
+    const avatar = typeof r.profile_url === "string" && /^https?:\/\//.test(r.profile_url.trim()) ? r.profile_url.trim() : null
+    people.push({ name, avatar })
+    if (people.length >= LIMIT) break
+  }
 
   return NextResponse.json(
-    { names },
+    { people },
     { headers: { "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600" } },
   )
 }

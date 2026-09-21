@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import Image from "next/image"
 import { CheckCircle2, Loader2, Mail, MessageCircle, User, UserPlus } from "lucide-react"
 import type { AnswerValue, RegistrationField } from "@/lib/events/fields"
 
@@ -27,7 +28,8 @@ export function EventRegisterForm({
 
   // "Invited by" suggestions: staff names matching what has been typed so far.
   // Purely a convenience — the box is free text and any name goes through.
-  const [suggestions, setSuggestions] = useState<string[]>([])
+  type Inviter = { name: string; avatar: string | null }
+  const [suggestions, setSuggestions] = useState<Inviter[]>([])
   const [suggestOpen, setSuggestOpen] = useState(false)
   const [highlight, setHighlight] = useState(-1)
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -45,12 +47,12 @@ export function EventRegisterForm({
       const seq = ++suggestSeq.current
       try {
         const res = await fetch(`/api/events/inviters?q=${encodeURIComponent(q)}`)
-        const data = (await res.json().catch(() => ({}))) as { names?: string[] }
+        const data = (await res.json().catch(() => ({}))) as { people?: Inviter[] }
         // Ignore a slow reply that arrives after a newer keystroke's request.
         if (seq !== suggestSeq.current) return
-        const names = (data.names ?? []).filter((n) => n.toLowerCase() !== q.toLowerCase())
-        setSuggestions(names)
-        setSuggestOpen(names.length > 0)
+        const people = (data.people ?? []).filter((p) => p.name.toLowerCase() !== q.toLowerCase())
+        setSuggestions(people)
+        setSuggestOpen(people.length > 0)
         setHighlight(-1)
       } catch {
         // Suggestions are optional; a failed lookup just shows none.
@@ -241,7 +243,7 @@ export function EventRegisterForm({
                 setHighlight((h) => (h <= 0 ? suggestions.length - 1 : h - 1))
               } else if (e.key === "Enter" && highlight >= 0) {
                 e.preventDefault()
-                pickInviter(suggestions[highlight])
+                pickInviter(suggestions[highlight].name)
               } else if (e.key === "Escape") {
                 setSuggestOpen(false)
               }
@@ -261,7 +263,7 @@ export function EventRegisterForm({
               role="listbox"
               className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-xl border border-[#e5e7eb] bg-white py-1 shadow-lg"
             >
-              {suggestions.map((name, i) => (
+              {suggestions.map(({ name, avatar }, i) => (
                 <li
                   key={name}
                   role="option"
@@ -272,11 +274,30 @@ export function EventRegisterForm({
                     pickInviter(name)
                   }}
                   onMouseEnter={() => setHighlight(i)}
-                  className={`cursor-pointer px-4 py-2 text-sm ${
+                  className={`flex cursor-pointer items-center gap-3 px-3 py-2 text-sm ${
                     i === highlight ? "bg-[#001f3f]/6 text-[#001f3f]" : "text-[#374151]"
                   }`}
                 >
-                  {name}
+                  {avatar ? (
+                    <Image
+                      src={avatar}
+                      alt=""
+                      width={32}
+                      height={32}
+                      className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-[#d6b357]/40"
+                    />
+                  ) : (
+                    // Initials on navy when there is no photo, so every row has the same shape.
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#001f3f] text-[11px] font-bold text-[#d6b357]">
+                      {name
+                        .split(" ")
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((w) => w[0]?.toUpperCase())
+                        .join("")}
+                    </span>
+                  )}
+                  <span className="truncate">{name}</span>
                 </li>
               ))}
               <li className="px-4 pt-1.5 pb-1 text-[11px] text-[#9ca3af] border-t border-[#f3f4f6] mt-1">
