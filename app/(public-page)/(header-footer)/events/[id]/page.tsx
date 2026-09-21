@@ -13,6 +13,7 @@ import { EventRegisterForm } from "@/components/public/event-register-form"
 import { parseRegistrationFields } from "@/lib/events/fields"
 import { EventPageQr } from "@/components/public/event-page-qr"
 import { EventHeroQr } from "@/components/public/event-hero-qr"
+import { EventShare } from "@/components/public/event-share"
 import { EventViewPing } from "@/components/public/event-view-ping"
 import { ArrowLeft, CalendarDays, ChevronRight, Clock, MapPin, Ticket } from "lucide-react"
 
@@ -159,6 +160,11 @@ export default async function EventDetailPage({ params }: Props) {
           <ArrowLeft className="w-4 h-4" />
           All Events
         </Link>
+        <EventShare
+          slug={event.slug ?? event.id}
+          title={event.title}
+          subtitle={[dateLabel, event.venue].filter(Boolean).join(" · ")}
+        />
         {/* Presented-by plaque — big, gold-ringed, unmistakable */}
         <span
           className="absolute bottom-5 left-4 sm:left-8 z-10 flex items-center gap-3 px-4 py-3 border-2 border-[#d6b357]"
