@@ -160,11 +160,6 @@ export default async function EventDetailPage({ params }: Props) {
           <ArrowLeft className="w-4 h-4" />
           All Events
         </Link>
-        <EventShare
-          slug={event.slug ?? event.id}
-          title={event.title}
-          subtitle={[dateLabel, event.venue].filter(Boolean).join(" · ")}
-        />
         {/* Presented-by plaque — big, gold-ringed, unmistakable */}
         <span
           className="absolute bottom-5 left-4 sm:left-8 z-10 flex items-center gap-3 px-4 py-3 border-2 border-[#d6b357]"
@@ -222,6 +217,11 @@ export default async function EventDetailPage({ params }: Props) {
                   <MapPin className="w-4 h-4 text-[#d6b357]" /> {event.venue}
                 </span>
               )}
+              <EventShare
+                slug={event.slug ?? event.id}
+                title={event.title}
+                subtitle={[dateLabel, event.venue].filter(Boolean).join(" · ")}
+              />
             </div>
 
             {event.description?.trim() && (

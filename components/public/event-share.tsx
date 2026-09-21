@@ -58,12 +58,12 @@ function ChannelButton({
       className="flex flex-col items-center gap-2 group"
     >
       <span
-        className="w-12 h-12 rounded-full flex items-center justify-center text-white transition-transform group-hover:scale-110 group-active:scale-95"
+        className="w-12 h-12 flex items-center justify-center text-white transition-transform group-hover:scale-105 group-active:scale-95"
         style={{ backgroundColor: bg }}
       >
         {children}
       </span>
-      <span className="text-xs font-semibold text-white/85">{label}</span>
+      <span className="text-xs font-semibold text-[#374151]">{label}</span>
     </a>
   )
 }
@@ -157,14 +157,15 @@ export function EventShare({ slug, title, subtitle }: { slug: string; title: str
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="absolute top-4 right-4 z-10 inline-flex items-center gap-2 bg-white/95 px-4 py-2 text-sm font-bold text-[#0f2940] hover:bg-white transition-colors"
+        className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#e5e8ec] text-[#0f2940] text-sm font-semibold hover:border-[#d6b357] hover:text-[#8a6d2a] transition-colors"
       >
-        <Share2 className="w-4 h-4" />
+        <Share2 className="w-4 h-4 text-[#d6b357]" />
         Share
       </button>
 
+      {/* z above the site navbar (z-[900]/z-[1000]) so the modal is never cut by it */}
       {open && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
           <button
             type="button"
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -175,13 +176,13 @@ export function EventShare({ slug, title, subtitle }: { slug: string; title: str
             role="dialog"
             aria-modal="true"
             aria-label="Share this page"
-            className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-[#111527] border border-white/10 shadow-2xl p-6 sm:p-8"
+            className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-white border border-[#e5e8ec] shadow-2xl"
           >
-            {/* Header */}
-            <div className="flex items-start justify-between gap-3 mb-5">
+            {/* Header — navy band, same as the registration card */}
+            <div className="bg-[#001f3f] px-6 py-4 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="font-['Outfit'] text-xl font-bold text-white">Share this page</h3>
-                <p className="text-sm text-white/70 mt-1 leading-snug">{subtitle}</p>
+                <h3 className="font-['Outfit'] text-lg font-bold text-white">Share this page</h3>
+                <p className="text-sm text-white/70 mt-0.5 leading-snug">{subtitle}</p>
               </div>
               <button
                 type="button"
@@ -192,56 +193,58 @@ export function EventShare({ slug, title, subtitle }: { slug: string; title: str
                 <X className="w-5 h-5" />
               </button>
             </div>
+            <div className="h-[3px] bg-[#d6b357]" aria-hidden="true" />
 
-            {/* QR */}
-            <div className="flex flex-col items-center gap-4">
-              <span className="rounded-2xl bg-white p-4 ring-2 ring-[#d6b357]">
-                {url && <QRCodeSVG value={url} size={200} level="M" fgColor="#001f3f" />}
-              </span>
+            <div className="p-6">
+              {/* QR */}
+              <div className="flex flex-col items-center gap-4">
+                <span className="bg-white border-2 border-[#d6b357] p-3">
+                  {url && <QRCodeSVG value={url} size={200} level="M" fgColor="#001f3f" />}
+                </span>
+                <button
+                  type="button"
+                  onClick={downloadQr}
+                  className="inline-flex items-center gap-2 border border-[#001f3f] px-5 py-2.5 text-sm font-bold text-[#001f3f] hover:bg-[#001f3f] hover:text-white transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Download QR (1024px)
+                </button>
+              </div>
+
+              {/* Copy link */}
+              <div className="mt-5 flex items-center gap-2 border border-[#e5e8ec] bg-[#f9fafb] px-4 py-3">
+                <Link2 className="w-4 h-4 shrink-0 text-[#d6b357]" />
+                <input
+                  readOnly
+                  value={url}
+                  onFocus={(e) => e.currentTarget.select()}
+                  aria-label="Event page link"
+                  className="flex-1 min-w-0 bg-transparent text-sm text-[#0f2940] focus:outline-none truncate"
+                />
+                <button
+                  type="button"
+                  onClick={copy}
+                  aria-label={copied ? "Link copied" : "Copy link"}
+                  className="shrink-0 text-[#0f2940] hover:text-[#8a6d2a] transition-colors"
+                >
+                  {copied ? <Check className="w-5 h-5 text-emerald-600" /> : <Copy className="w-5 h-5" />}
+                </button>
+              </div>
+
+              {/* Native share sheet */}
               <button
                 type="button"
-                onClick={downloadQr}
-                className="inline-flex items-center gap-2 rounded-full border border-[#d6b357]/60 px-5 py-2.5 text-sm font-bold text-[#d6b357] hover:bg-[#d6b357]/10 transition-colors"
+                onClick={shareViaApp}
+                className="mt-4 w-full inline-flex items-center justify-center gap-2 bg-[#001f3f] px-5 py-3.5 text-base font-bold text-white hover:bg-[#00356b] active:scale-[0.99] transition-all"
               >
-                <Download className="w-4 h-4" />
-                Download QR (1024px)
+                <Share2 className="w-5 h-5 text-[#d6b357]" />
+                Share via app…
               </button>
-            </div>
 
-            {/* Copy link */}
-            <div className="mt-5 flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-3">
-              <Link2 className="w-4 h-4 shrink-0 text-[#d6b357]" />
-              <input
-                readOnly
-                value={url}
-                onFocus={(e) => e.currentTarget.select()}
-                aria-label="Event page link"
-                className="flex-1 min-w-0 bg-transparent text-sm text-white/90 focus:outline-none truncate"
-              />
-              <button
-                type="button"
-                onClick={copy}
-                aria-label={copied ? "Link copied" : "Copy link"}
-                className="shrink-0 text-[#d6b357] hover:text-white transition-colors"
-              >
-                {copied ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5" />}
-              </button>
-            </div>
-
-            {/* Native share sheet */}
-            <button
-              type="button"
-              onClick={shareViaApp}
-              className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#d6b357] px-5 py-3.5 text-base font-bold text-[#001f3f] hover:bg-[#e0c477] active:scale-[0.99] transition-all"
-            >
-              <Share2 className="w-5 h-5" />
-              Share via app…
-            </button>
-
-            {/* Direct channels */}
-            <p className="mt-6 mb-4 text-center text-xs font-bold uppercase tracking-[0.25em] text-[#d6b357]">
-              Or share directly
-            </p>
+              {/* Direct channels */}
+              <p className="mt-6 mb-4 text-center text-xs font-bold uppercase tracking-[0.25em] text-[#8a6d2a]">
+                Or share directly
+              </p>
             <div className="grid grid-cols-3 gap-y-5">
               <ChannelButton label="Facebook" bg="#1877f2" href={`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`}>
                 <FacebookIcon className="w-5 h-5" />
@@ -261,6 +264,7 @@ export function EventShare({ slug, title, subtitle }: { slug: string; title: str
               <ChannelButton label="Email" bg="#6b7280" href={`mailto:?subject=${encodedText}&body=${encodedUrl}`}>
                 <Mail className="w-5 h-5" />
               </ChannelButton>
+            </div>
             </div>
           </div>
         </div>
