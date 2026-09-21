@@ -534,15 +534,15 @@ export function EventFlyerModal({
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-label="Close" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl border border-[#e8eaed] shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto p-5">
+      <div className="relative bg-white border border-[#e8eaed] shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto p-5">
         <div className="flex items-start justify-between mb-3">
           <h3 className="font-['Outfit'] font-bold text-[#001f3f]">Event flyer</h3>
-          <button type="button" onClick={onClose} className="p-2 -mr-2 -mt-2 rounded-lg text-[#6b7280] hover:bg-[#f5f5f5]" aria-label="Close">
+          <button type="button" onClick={onClose} className="p-2 -mr-2 -mt-2 text-[#6b7280] hover:bg-[#f5f5f5]" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="relative rounded-xl overflow-hidden border border-[#e8eaed] bg-[#0a1220]">
+        <div className="relative overflow-hidden border border-[#e8eaed] bg-[#0a1220]">
           <canvas ref={canvasRef} width={W} height={H} className="w-full h-auto block" />
           {rendering && (
             <div className="absolute inset-0 bg-[#001428]/70 flex items-center justify-center">
@@ -568,7 +568,7 @@ export function EventFlyerModal({
           type="button"
           onClick={download}
           disabled={rendering}
-          className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors disabled:opacity-50"
+          className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors disabled:opacity-50"
         >
           <Download className="w-4 h-4" />
           Download flyer (1080×1920 PNG)
