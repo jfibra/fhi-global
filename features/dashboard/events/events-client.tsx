@@ -601,13 +601,17 @@ export function EventsClient() {
                         >
                           {e.status === "published" ? "Unpublish" : "Publish"}
                         </button>
+                        {/* Labelled, not icon-only: a bare pencil is not obvious
+                            to non-technical staff, and editing is the card's
+                            main action. */}
                         <button
                           type="button"
                           onClick={() => openEdit(e)}
-                          className="p-2 text-[#001f3f] hover:bg-[#001f3f]/10"
-                          aria-label="Edit"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#001f3f]/30 text-[11px] font-bold text-[#001f3f] hover:bg-[#001f3f] hover:text-white transition-colors"
+                          title="Edit this event — details, photo, extra fields"
                         >
-                          <Pencil className="w-4 h-4" />
+                          <Pencil className="w-3.5 h-3.5" />
+                          Edit
                         </button>
                         <button
                           type="button"
