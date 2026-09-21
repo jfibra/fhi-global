@@ -39,6 +39,13 @@ function humanize(s: string) {
   return s.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
 }
 
+// CSS `capitalize` can't fix all-caps source data (it never lowercases), so
+// names are normalized here instead: "HEIDE REGINIO" → "Heide Reginio".
+function titleCaseName(s?: string | null) {
+  if (!s) return null
+  return s.toLowerCase().replace(/\p{L}+/gu, w => w.charAt(0).toUpperCase() + w.slice(1))
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PROJECT_STATUSES = ["pre_launch", "launch", "under_construction", "completed"] as const
@@ -488,7 +495,7 @@ export function AdminDashboardContent({
                 <div key={ticket.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[#f0f2f5] bg-[#f9fafb] px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-[#0d1117] truncate">{ticket.title}</p>
-                    <p className="text-xs text-[#9ca3af]">{ticket.reportedBy} Â· {ticket.assignedTo ?? "Unassigned"}</p>
+                    <p className="text-xs text-[#9ca3af]">{titleCaseName(ticket.reportedBy) ?? "—"} Â· {titleCaseName(ticket.assignedTo) ?? "Unassigned"}</p>
                   </div>
                   <StatusPill status={ticket.status} />
                 </div>
@@ -517,8 +524,8 @@ export function AdminDashboardContent({
                 )}
                 {recentSales.map(sale => (
                   <tr key={sale.id} className="border-b border-[#f0f2f5] hover:bg-[#f9fafb] transition-colors">
-                    <Td>{sale.profiles?.fullname ?? "—"}</Td>
-                    <Td>{[sale.clients?.first_name, sale.clients?.last_name].filter(Boolean).join(" ") || "—"}</Td>
+                    <Td>{titleCaseName(sale.profiles?.fullname) ?? "—"}</Td>
+                    <Td>{titleCaseName([sale.clients?.first_name, sale.clients?.last_name].filter(Boolean).join(" ")) ?? "—"}</Td>
                     <Td>{sale.projects?.name ?? "—"}</Td>
                     <Td>{sale.developers?.name ?? "—"}</Td>
                     <Td>{fmtCurrency(sale.contract_price ?? 0)}</Td>
@@ -549,10 +556,10 @@ export function AdminDashboardContent({
                   {supportTickets.map(ticket => (
                     <tr key={ticket.id} className="border-b border-[#f0f2f5] hover:bg-[#f9fafb] transition-colors">
                       <Td bold truncate>{ticket.title}</Td>
-                      <Td>{ticket.reportedBy}</Td>
+                      <Td>{titleCaseName(ticket.reportedBy) ?? "—"}</Td>
                       <Td>{humanize(ticket.priority)}</Td>
                       <Td><StatusPill status={ticket.status} /></Td>
-                      <Td>{ticket.assignedTo ?? "Unassigned"}</Td>
+                      <Td>{titleCaseName(ticket.assignedTo) ?? "Unassigned"}</Td>
                       <Td>{fmtDate(ticket.createdAt)}</Td>
                     </tr>
                   ))}
@@ -580,7 +587,7 @@ export function AdminDashboardContent({
                       <Td>{p.category}</Td>
                       <Td>{p.taxMonth}</Td>
                       <Td>{fmtCurrency(p.totalAmount)}</Td>
-                      <Td>{p.createdBy}</Td>
+                      <Td>{titleCaseName(p.createdBy) ?? "—"}</Td>
                       <Td>{fmtDate(p.createdAt)}</Td>
                     </tr>
                   ))}
