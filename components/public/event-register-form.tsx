@@ -177,10 +177,10 @@ export function EventRegisterForm({
         )
       })}
 
-      {/* Always asked, always optional — attendees type whoever sent them,
-          which may be an agent, a friend or a company. */}
+      {/* Always on the form, always optional — attendees type whoever sent
+          them, which may be an agent, a friend or a company. */}
       <div className="space-y-1.5">
-        <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Who invited you?</label>
+        <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Invited by</label>
         <div className="relative">
           <UserPlus className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
           <input

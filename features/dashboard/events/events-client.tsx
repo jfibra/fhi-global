@@ -8,9 +8,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, Eye, FileImage, FileSpreadsheet, FileText, ImagePlus, Loader2,
+  CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Eye, FileImage, ImagePlus, Loader2,
   MapPin, Pencil, Plus, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
 } from "lucide-react"
+import { EventExportModal } from "./event-export-modal"
 import { EventFlyerModal } from "./event-flyer-modal"
 import { EventRaffle } from "./event-raffle"
 import { EVENT_BRANDS, eventBrand } from "@/lib/events/brands"
@@ -50,7 +51,7 @@ type Registration = {
   email: string
   whatsapp: string | null
   invitedBy: string | null
-  /** Answers to this event's custom questions, keyed by field key. */
+  /** Answers to this event's extra fields, keyed by field key. */
   answers: Record<string, AnswerValue>
   createdAt: string
 }
@@ -64,7 +65,7 @@ type FormState = {
   venue: string
   status: string
   registrationOpen: boolean
-  /** Extra questions this event's registration form asks. */
+  /** Extra fields this event's registration form asks for. */
   registrationFields: RegistrationField[]
 }
 
@@ -140,7 +141,8 @@ export function EventsClient() {
 
   // Registrations modal
   const [regEvent, setRegEvent] = useState<AdminEvent | null>(null)
-  // The questions this event asks — drives both the extra table columns and
+  const [exportOpen, setExportOpen] = useState(false)
+  // The fields this event asks for — drives both the extra table columns and
   // the export. Read from the event, so a field removed later simply stops
   // being shown while its answers stay in the database.
   const regFields = regEvent?.registrationFields ?? []
@@ -217,7 +219,7 @@ export function EventsClient() {
     setModalOpen(true)
   }
 
-  // ── Custom registration questions ──────────────────────────────────────
+  // ── Custom registration fields ─────────────────────────────────────────
   // Keys address stored answers, so an existing field's key is never changed
   // when its label is edited — renaming "Company" to "Employer" keeps every
   // answer already collected attached to it.
@@ -427,104 +429,6 @@ export function EventsClient() {
     } finally {
       setDeletingRegId(null)
     }
-  }
-
-  /**
-   * Spreadsheet export — the print sheet is a check-in list, so the custom
-   * answers live here instead, one column per question the event asks.
-   */
-  const exportRegistrationsCsv = () => {
-    if (!regEvent || filteredRegs.length === 0) return
-    const cell = (v: string) => `"${v.replace(/"/g, '""')}"`
-    const header = ["Name", "Email", "WhatsApp", "Invited by", ...regFields.map((f) => f.label), "Registered"]
-    const rows = filteredRegs.map((r) => [
-      r.fullName,
-      r.email,
-      r.whatsapp ?? "",
-      r.invitedBy ?? "",
-      ...regFields.map((f) => formatAnswer(r.answers?.[f.key])),
-      new Date(r.createdAt).toLocaleString("en-AE", { timeZone: "Asia/Dubai" }),
-    ])
-    // BOM so Excel reads Arabic and accented names correctly.
-    const csv = "\uFEFF" + [header, ...rows].map((row) => row.map((c) => cell(String(c))).join(",")).join("\r\n")
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }))
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${(regEvent.slug ?? "event").slice(0, 60)}-attendees.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  // Branded print view of the attendee list — the browser's print dialog
-  // offers "Save as PDF" (and direct printing for the venue check-in desk).
-  const exportRegistrationsPdf = () => {
-    if (!regEvent || filteredRegs.length === 0) return
-    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    const w = window.open("", "_blank", "width=900,height=700")
-    if (!w) return
-    const generated = new Date().toLocaleDateString("en-AE", { year: "numeric", month: "long", day: "numeric" })
-    // Compact stamp for the sheet — day + time only, so the column stays
-    // narrow enough to leave room for the signature line.
-    const shortRegistered = (iso: string) => {
-      const d = new Date(iso)
-      if (Number.isNaN(d.getTime())) return "—"
-      return (
-        d.toLocaleDateString("en-AE", { month: "short", day: "numeric", timeZone: "Asia/Dubai" }) +
-        " · " +
-        d.toLocaleTimeString("en-AE", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Dubai" })
-      )
-    }
-    const body = filteredRegs
-      .map(
-        (r, i) => `<tr>
-          <td class="n">${i + 1}</td>
-          <td><strong>${esc(r.fullName)}</strong></td>
-          <td>${esc(r.email)}</td>
-          <td>${esc(r.whatsapp ?? "—")}</td>
-          <td>${esc(r.invitedBy ?? "—")}</td>
-          <td class="reg">${esc(shortRegistered(r.createdAt))}</td>
-          <td class="sig"><span class="line"></span></td>
-        </tr>`,
-      )
-      .join("")
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Attendees — ${esc(regEvent.title)}</title>
-<style>
-  * { box-sizing: border-box; margin: 0; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; padding: 32px; }
-  .band { background: #001f3f; border-bottom: 4px solid #d6b357; border-radius: 12px 12px 0 0; padding: 22px 28px; }
-  .band h1 { color: #ffffff; font-size: 22px; }
-  .band .gold { color: #d6b357; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
-  .meta { display: flex; flex-wrap: wrap; gap: 20px; padding: 14px 28px; background: #f6f8fb; border: 1px solid #e8eaed; border-top: 0; font-size: 12px; color: #4b5563; }
-  .meta strong { color: #001f3f; }
-  table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 12.5px; }
-  th { background: #001f3f; color: #ffffff; text-align: left; padding: 9px 12px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
-  td { padding: 9px 12px; border-bottom: 1px solid #eef0f3; }
-  tr:nth-child(even) td { background: #fafbfc; }
-  .n { color: #9ca3af; width: 34px; }
-  .reg { white-space: nowrap; color: #4b5563; }
-  .sig { width: 150px; }
-  .sig .line { display: block; height: 22px; border-bottom: 1.5px solid #9aa3ae; }
-  .foot { margin-top: 22px; text-align: center; font-size: 11px; color: #9ca3af; }
-  .foot b { color: #b8913f; }
-  @page { margin: 14mm; }
-</style></head><body>
-  <div class="band"><p class="gold">FHI Global · Event Attendees</p><h1>${esc(regEvent.title)}</h1></div>
-  <div class="meta">
-    <span>Event date: <strong>${esc(eventDateLabel(regEvent.eventDate))}</strong></span>
-    ${regEvent.venue ? `<span>Venue: <strong>${esc(regEvent.venue)}</strong></span>` : ""}
-    <span>Total registered: <strong>${filteredRegs.length}</strong></span>
-    <span>Generated: <strong>${esc(generated)}</strong></span>
-    ${regQuery.trim() ? `<span>Filter: <strong>“${esc(regQuery.trim())}”</strong></span>` : ""}
-  </div>
-  <table>
-    <thead><tr><th>#</th><th>Name</th><th>Email</th><th>WhatsApp</th><th>Invited by</th><th>Registered</th><th>Signature</th></tr></thead>
-    <tbody>${body}</tbody>
-  </table>
-  <p class="foot">Generated from the FHI Global dashboard · <b>fhiglobal.ae</b></p>
-</body></html>`)
-    w.document.close()
-    w.focus()
-    setTimeout(() => w.print(), 350)
   }
 
   const inputCls =
@@ -867,17 +771,17 @@ export function EventsClient() {
                 </div>
               </div>
 
-              {/* Extra questions this event asks. Safe to change at any time:
-                  adding one leaves earlier sign-ups blank for it, and removing
-                  one only stops the form asking — answers already collected
-                  stay in the database and in past exports. */}
+              {/* Extra fields this event's form asks for. Safe to change at any
+                  time: adding one leaves earlier sign-ups blank for it, and
+                  removing one only takes it off the form — answers already
+                  collected stay in the database and in past exports. */}
               <div className="border-t border-[#f0f0f0] pt-5">
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div>
-                    <p className={labelCls}>Extra questions</p>
+                    <p className={labelCls}>Extra fields</p>
                     <p className="text-[11px] text-[#9ca3af]">
-                      Asked after name, email and WhatsApp. Editing these is safe once the event is live —
-                      answers already collected are kept.
+                      Shown on the registration form after name, email and WhatsApp. Safe to edit once the
+                      event is live — answers already collected are kept.
                     </p>
                   </div>
                   <button
@@ -886,13 +790,13 @@ export function EventsClient() {
                     disabled={form.registrationFields.length >= MAX_FIELDS}
                     className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 border border-[#e5e5e5] text-xs font-bold text-[#374151] hover:border-[#001f3f] transition-colors disabled:opacity-50"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Add question
+                    <Plus className="w-3.5 h-3.5" /> Add field
                   </button>
                 </div>
 
                 {form.registrationFields.length === 0 ? (
                   <p className="text-[12px] text-[#9ca3af] border border-dashed border-[#e5e5e5] px-4 py-5 text-center">
-                    No extra questions. The form will ask for name, email, WhatsApp and who invited them.
+                    No extra fields. The form asks for name, email, WhatsApp and “Invited by”.
                   </p>
                 ) : (
                   <div className="space-y-2.5">
@@ -902,7 +806,7 @@ export function EventsClient() {
                           <input
                             value={fl.label}
                             onChange={(e) => updateField(i, { label: e.target.value })}
-                            placeholder="Question (e.g. Company name)"
+                            placeholder="Field name (e.g. Gender)"
                             maxLength={80}
                             className={`${inputCls} flex-1 min-w-[180px]`}
                           />
@@ -934,7 +838,7 @@ export function EventsClient() {
                               <ChevronDown className="w-4 h-4" />
                             </button>
                             <button type="button" onClick={() => removeField(i)}
-                              className="p-1.5 text-rose-600 hover:bg-rose-50" aria-label="Remove question" title="Remove question">
+                              className="p-1.5 text-rose-600 hover:bg-rose-50" aria-label="Remove field" title="Remove field">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
@@ -993,6 +897,17 @@ export function EventsClient() {
         />
       )}
 
+      {/* ── Export dialog (sits above the registrations modal) ── */}
+      {regEvent && exportOpen && (
+        <EventExportModal
+          event={{ title: regEvent.title, slug: regEvent.slug, venue: regEvent.venue, eventDateText: eventDateLabel(regEvent.eventDate) }}
+          registrations={filteredRegs}
+          fields={regFields}
+          filterLabel={regQuery.trim() || undefined}
+          onClose={() => setExportOpen(false)}
+        />
+      )}
+
       {/* ── Registrations modal ── */}
       {regEvent && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
@@ -1020,23 +935,13 @@ export function EventsClient() {
                 </button>
                 <button
                   type="button"
-                  onClick={exportRegistrationsPdf}
+                  onClick={() => setExportOpen(true)}
                   disabled={regsLoading || filteredRegs.length === 0}
-                  title="Download attendee list as PDF"
+                  title="Export as PDF or CSV — choose the columns and preview first"
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f]/10 transition-colors disabled:opacity-40"
                 >
-                  <FileText className="w-4 h-4" />
-                  PDF
-                </button>
-                <button
-                  type="button"
-                  onClick={exportRegistrationsCsv}
-                  disabled={regsLoading || filteredRegs.length === 0}
-                  title="Download as a spreadsheet, including answers to this event's questions"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f]/10 transition-colors disabled:opacity-40"
-                >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  CSV
+                  <Download className="w-4 h-4" />
+                  Export
                 </button>
                 <button
                   type="button"
@@ -1054,7 +959,7 @@ export function EventsClient() {
               </div>
             </div>
 
-            {/* Search — filters the table, the PDF export follows it */}
+            {/* Search — filters the table, the export follows it */}
             {!regsLoading && registrations.length > 0 && (
               <div className="relative mb-4">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
