@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { CheckCircle2, Loader2, Mail, MessageCircle, User, UserPlus } from "lucide-react"
 import type { AnswerValue, RegistrationField } from "@/lib/events/fields"
 
@@ -24,6 +24,46 @@ export function EventRegisterForm({
   const [error, setError] = useState<string | null>(null)
 
   const setAnswer = (key: string, value: AnswerValue) => setAnswers((a) => ({ ...a, [key]: value }))
+
+  // "Invited by" suggestions: staff names matching what has been typed so far.
+  // Purely a convenience — the box is free text and any name goes through.
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [suggestOpen, setSuggestOpen] = useState(false)
+  const [highlight, setHighlight] = useState(-1)
+  const suggestTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const suggestSeq = useRef(0)
+
+  const lookupInviters = (value: string) => {
+    clearTimeout(suggestTimer.current)
+    const q = value.trim()
+    if (q.length < 2) {
+      setSuggestions([])
+      setSuggestOpen(false)
+      return
+    }
+    suggestTimer.current = setTimeout(async () => {
+      const seq = ++suggestSeq.current
+      try {
+        const res = await fetch(`/api/events/inviters?q=${encodeURIComponent(q)}`)
+        const data = (await res.json().catch(() => ({}))) as { names?: string[] }
+        // Ignore a slow reply that arrives after a newer keystroke's request.
+        if (seq !== suggestSeq.current) return
+        const names = (data.names ?? []).filter((n) => n.toLowerCase() !== q.toLowerCase())
+        setSuggestions(names)
+        setSuggestOpen(names.length > 0)
+        setHighlight(-1)
+      } catch {
+        // Suggestions are optional; a failed lookup just shows none.
+      }
+    }, 180)
+  }
+  useEffect(() => () => clearTimeout(suggestTimer.current), [])
+
+  const pickInviter = (name: string) => {
+    setInvitedBy(name)
+    setSuggestions([])
+    setSuggestOpen(false)
+  }
 
   const inputCls =
     "w-full pl-11 pr-4 py-3 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all"
@@ -185,11 +225,65 @@ export function EventRegisterForm({
           <UserPlus className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
           <input
             value={invitedBy}
-            onChange={(e) => setInvitedBy(e.target.value)}
+            onChange={(e) => {
+              setInvitedBy(e.target.value)
+              lookupInviters(e.target.value)
+            }}
+            onFocus={() => suggestions.length > 0 && setSuggestOpen(true)}
+            onBlur={() => setSuggestOpen(false)}
+            onKeyDown={(e) => {
+              if (!suggestOpen || suggestions.length === 0) return
+              if (e.key === "ArrowDown") {
+                e.preventDefault()
+                setHighlight((h) => (h + 1) % suggestions.length)
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault()
+                setHighlight((h) => (h <= 0 ? suggestions.length - 1 : h - 1))
+              } else if (e.key === "Enter" && highlight >= 0) {
+                e.preventDefault()
+                pickInviter(suggestions[highlight])
+              } else if (e.key === "Escape") {
+                setSuggestOpen(false)
+              }
+            }}
             placeholder="Name of the person who invited you (optional)"
             maxLength={120}
+            autoComplete="off"
+            role="combobox"
+            aria-expanded={suggestOpen}
+            aria-autocomplete="list"
+            aria-controls="invited-by-suggestions"
             className={inputCls}
           />
+          {suggestOpen && (
+            <ul
+              id="invited-by-suggestions"
+              role="listbox"
+              className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-xl border border-[#e5e7eb] bg-white py-1 shadow-lg"
+            >
+              {suggestions.map((name, i) => (
+                <li
+                  key={name}
+                  role="option"
+                  aria-selected={i === highlight}
+                  // mousedown (not click) so the pick lands before the input's blur closes the list
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    pickInviter(name)
+                  }}
+                  onMouseEnter={() => setHighlight(i)}
+                  className={`cursor-pointer px-4 py-2 text-sm ${
+                    i === highlight ? "bg-[#001f3f]/6 text-[#001f3f]" : "text-[#374151]"
+                  }`}
+                >
+                  {name}
+                </li>
+              ))}
+              <li className="px-4 pt-1.5 pb-1 text-[11px] text-[#9ca3af] border-t border-[#f3f4f6] mt-1">
+                Not listed? Just keep typing the name.
+              </li>
+            </ul>
+          )}
         </div>
       </div>
 
