@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { APP_ROLE_ORDER } from "@/lib/app-roles"
+import { titleCaseName } from "@/lib/public-profile"
 
 /**
  * Name suggestions for the "Invited by" box on public event registration.
@@ -43,7 +44,9 @@ export async function GET(req: NextRequest) {
   const seen = new Set<string>()
   const people: { name: string; avatar: string | null }[] = []
   for (const r of data ?? []) {
-    const name = ((r.fullname as string | null) ?? "").replace(/\s+/g, " ").trim()
+    // Stored names are inconsistent (some ALL CAPS, some double-spaced);
+    // present them the way the public agent pages do.
+    const name = titleCaseName(((r.fullname as string | null) ?? "").replace(/\s+/g, " ").trim())
     if (!name || seen.has(name.toLowerCase())) continue
     seen.add(name.toLowerCase())
     const avatar = typeof r.profile_url === "string" && /^https?:\/\//.test(r.profile_url.trim()) ? r.profile_url.trim() : null
