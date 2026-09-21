@@ -928,7 +928,7 @@ export function EventsClient() {
       {regEvent && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <button type="button" className="absolute inset-0 bg-black/45 backdrop-blur-sm" aria-label="Close" onClick={() => setRegEvent(null)} />
-          <div className="relative bg-white border border-[#e8eaed] shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6">
+          <div className="relative bg-white border border-[#e8eaed] shadow-2xl w-full max-w-5xl max-h-[85vh] overflow-y-auto p-6">
             <div className="flex items-start justify-between mb-4 gap-3">
               <div className="min-w-0">
                 <h3 className="font-['Outfit'] font-bold text-[#001f3f] truncate">{regEvent.title}</h3>
