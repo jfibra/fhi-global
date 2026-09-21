@@ -8,8 +8,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Eye, FileImage, ImagePlus, Loader2,
-  MapPin, Pencil, Plus, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
+  CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Eye, ImagePlus, Loader2,
+  MapPin, Pencil, Plus, QrCode, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
 } from "lucide-react"
 import { EventExportModal } from "./event-export-modal"
 import { EventFlyerModal } from "./event-flyer-modal"
@@ -438,7 +438,7 @@ export function EventsClient() {
   // everyday actions (non-technical staff should never have to guess an
   // icon), a square only for delete, whose red trash is universally read.
   const cardChipBtn =
-    "inline-flex h-9 items-center gap-1.5 whitespace-nowrap px-3 border border-[#e5e5e5] text-[11px] font-bold text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] transition-colors"
+    "inline-flex h-9 flex-1 items-center justify-center gap-1.5 whitespace-nowrap px-2.5 border border-[#e5e5e5] text-[11px] font-bold text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] transition-colors"
   const cardIconBtn =
     "inline-flex h-9 w-9 items-center justify-center border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] transition-colors"
 
@@ -564,21 +564,33 @@ export function EventsClient() {
                         <span className="font-bold text-[#111827]">{e.qrScanCount}</span> QR scans
                       </span>
                     </div>
-                    {/* Card toolbar. Every control is the same 36px height so the
-                        row reads as one set; the count never wraps; and the row
-                        itself wraps onto a second line on narrow cards instead of
-                        squeezing the last button into the card edge. */}
-                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#f0f0f0] pt-3">
-                      <button
-                        type="button"
-                        onClick={() => void openRegistrations(e)}
-                        className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap px-3 border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f] hover:text-white transition-colors"
-                        title="View registrations"
-                      >
-                        <Users className="w-4 h-4" />
-                        {e.registrationCount} registered
-                      </button>
-                      <div className="ml-auto flex items-center gap-1.5">
+                    {/* Card toolbar. Two fixed rows so nothing can ever overflow
+                        the card: the attendee count with Delete kept apart on the
+                        right, then the everyday actions as equal-width chips — a
+                        2×2 block on the ~320px cards of the desktop grid, one row
+                        when the card is wider (container query, not viewport). */}
+                    <div className="@container mt-3 border-t border-[#f0f0f0] pt-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void openRegistrations(e)}
+                          className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap px-3 border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f] hover:text-white transition-colors"
+                          title="View registrations"
+                        >
+                          <Users className="w-4 h-4" />
+                          {e.registrationCount} registered
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(e)}
+                          className={`${cardIconBtn} border-rose-200 text-rose-600 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700`}
+                          aria-label="Delete event"
+                          title="Delete event"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-1.5 @md:flex">
                         {e.status === "published" && (
                           <a
                             href={`/events/${e.slug ?? e.id}`}
@@ -597,16 +609,16 @@ export function EventsClient() {
                           className={cardChipBtn}
                           title="Generate a share-ready flyer with the registration QR"
                         >
-                          <FileImage className="w-3.5 h-3.5" />
+                          <QrCode className="w-3.5 h-3.5" />
                           Flyer
                         </button>
                         <button
                           type="button"
                           onClick={() => void toggleStatus(e)}
-                          className={`inline-flex h-9 items-center px-2.5 border text-[11px] font-bold transition-colors ${
+                          className={`${cardChipBtn} ${
                             e.status === "published"
-                              ? "border-amber-200 text-amber-700 hover:bg-amber-50"
-                              : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                              ? "border-amber-200 text-amber-700 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800"
+                              : "border-emerald-200 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800"
                           }`}
                           title={e.status === "published" ? "Take the event off the public site" : "Publish to the public Events page"}
                         >
@@ -615,20 +627,11 @@ export function EventsClient() {
                         <button
                           type="button"
                           onClick={() => openEdit(e)}
-                          className="inline-flex h-9 items-center gap-1.5 px-3 border border-[#001f3f]/30 text-[11px] font-bold text-[#001f3f] hover:bg-[#001f3f] hover:text-white transition-colors"
+                          className={`${cardChipBtn} border-[#001f3f]/40 text-[#001f3f] hover:bg-[#001f3f] hover:text-white`}
                           title="Edit this event — details, photo, extra fields"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                           Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleDelete(e)}
-                          className={`${cardIconBtn} border-rose-200 text-rose-600 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700`}
-                          aria-label="Delete event"
-                          title="Delete event"
-                        >
-                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
