@@ -434,7 +434,11 @@ export function EventsClient() {
   const inputCls =
     "w-full px-4 py-3 border border-[#e5e5e5] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] transition-colors"
   const labelCls = "block text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-1.5"
-  // Square 36px icon control for the event-card toolbar (view / flyer / delete).
+  // Event-card toolbar controls, all 36px tall: labelled chips for the
+  // everyday actions (non-technical staff should never have to guess an
+  // icon), a square only for delete, whose red trash is universally read.
+  const cardChipBtn =
+    "inline-flex h-9 items-center gap-1.5 whitespace-nowrap px-3 border border-[#e5e5e5] text-[11px] font-bold text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] transition-colors"
   const cardIconBtn =
     "inline-flex h-9 w-9 items-center justify-center border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] transition-colors"
 
@@ -580,21 +584,21 @@ export function EventsClient() {
                             href={`/events/${e.slug ?? e.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={cardIconBtn}
-                            aria-label="View event page"
-                            title="View event page (opens in new tab)"
+                            className={cardChipBtn}
+                            title="Open the public event page in a new tab"
                           >
-                            <ExternalLink className="w-4 h-4" />
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            View
                           </a>
                         )}
                         <button
                           type="button"
                           onClick={() => setFlyerEvent(e)}
-                          className={cardIconBtn}
-                          aria-label="Generate flyer with registration QR"
-                          title="Generate flyer (with registration QR)"
+                          className={cardChipBtn}
+                          title="Generate a share-ready flyer with the registration QR"
                         >
-                          <FileImage className="w-4 h-4" />
+                          <FileImage className="w-3.5 h-3.5" />
+                          Flyer
                         </button>
                         <button
                           type="button"
