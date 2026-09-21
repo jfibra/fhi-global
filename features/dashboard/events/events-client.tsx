@@ -434,6 +434,9 @@ export function EventsClient() {
   const inputCls =
     "w-full px-4 py-3 border border-[#e5e5e5] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] transition-colors"
   const labelCls = "block text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-1.5"
+  // Square 36px icon control for the event-card toolbar (view / flyer / delete).
+  const cardIconBtn =
+    "inline-flex h-9 w-9 items-center justify-center border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] transition-colors"
 
   // The dashboard shell (sidebar + header) is rendered once by
   // app/dashboard/layout.tsx — this page renders only its content.
@@ -557,23 +560,27 @@ export function EventsClient() {
                         <span className="font-bold text-[#111827]">{e.qrScanCount}</span> QR scans
                       </span>
                     </div>
-                    <div className="mt-3 flex items-center justify-between border-t border-[#f0f0f0] pt-3">
+                    {/* Card toolbar. Every control is the same 36px height so the
+                        row reads as one set; the count never wraps; and the row
+                        itself wraps onto a second line on narrow cards instead of
+                        squeezing the last button into the card edge. */}
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#f0f0f0] pt-3">
                       <button
                         type="button"
                         onClick={() => void openRegistrations(e)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f] hover:text-white transition-colors"
+                        className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap px-3 border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f] hover:text-white transition-colors"
                         title="View registrations"
                       >
-                        <Users className="w-3.5 h-3.5" />
+                        <Users className="w-4 h-4" />
                         {e.registrationCount} registered
                       </button>
-                      <div className="flex gap-1">
+                      <div className="ml-auto flex items-center gap-1.5">
                         {e.status === "published" && (
                           <a
                             href={`/events/${e.slug ?? e.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-2 text-[#001f3f] hover:bg-[#001f3f]/10"
+                            className={cardIconBtn}
                             aria-label="View event page"
                             title="View event page (opens in new tab)"
                           >
@@ -583,7 +590,7 @@ export function EventsClient() {
                         <button
                           type="button"
                           onClick={() => setFlyerEvent(e)}
-                          className="p-2 text-[#b8913f] hover:bg-[#d6b357]/15"
+                          className={cardIconBtn}
                           aria-label="Generate flyer with registration QR"
                           title="Generate flyer (with registration QR)"
                         >
@@ -592,22 +599,19 @@ export function EventsClient() {
                         <button
                           type="button"
                           onClick={() => void toggleStatus(e)}
-                          className={`px-2 text-[11px] font-bold ${
+                          className={`inline-flex h-9 items-center px-2.5 border text-[11px] font-bold transition-colors ${
                             e.status === "published"
-                              ? "text-amber-700 hover:bg-amber-50"
-                              : "text-emerald-700 hover:bg-emerald-50"
+                              ? "border-amber-200 text-amber-700 hover:bg-amber-50"
+                              : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                           }`}
-                          title={e.status === "published" ? "Unpublish" : "Publish"}
+                          title={e.status === "published" ? "Take the event off the public site" : "Publish to the public Events page"}
                         >
                           {e.status === "published" ? "Unpublish" : "Publish"}
                         </button>
-                        {/* Labelled, not icon-only: a bare pencil is not obvious
-                            to non-technical staff, and editing is the card's
-                            main action. */}
                         <button
                           type="button"
                           onClick={() => openEdit(e)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#001f3f]/30 text-[11px] font-bold text-[#001f3f] hover:bg-[#001f3f] hover:text-white transition-colors"
+                          className="inline-flex h-9 items-center gap-1.5 px-3 border border-[#001f3f]/30 text-[11px] font-bold text-[#001f3f] hover:bg-[#001f3f] hover:text-white transition-colors"
                           title="Edit this event — details, photo, extra fields"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -616,8 +620,9 @@ export function EventsClient() {
                         <button
                           type="button"
                           onClick={() => void handleDelete(e)}
-                          className="p-2 text-rose-600 hover:bg-rose-50"
-                          aria-label="Delete"
+                          className={`${cardIconBtn} border-rose-200 text-rose-600 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700`}
+                          aria-label="Delete event"
+                          title="Delete event"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
