@@ -10,6 +10,7 @@ import { JsonLd } from "@/components/json-ld"
 import { eventBrand } from "@/lib/events/brands"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
 import { EventRegisterForm } from "@/components/public/event-register-form"
+import { parseRegistrationFields } from "@/lib/events/fields"
 import { EventPageQr } from "@/components/public/event-page-qr"
 import { EventHeroQr } from "@/components/public/event-hero-qr"
 import { EventViewPing } from "@/components/public/event-view-ping"
@@ -46,7 +47,7 @@ async function fetchEvent(idOrSlug: string) {
   const supabase = createPublicSupabaseClient()
   const query = supabase
     .from("events")
-    .select("id, slug, title, description, brand, image_url, event_date, venue, registration_open")
+    .select("id, slug, title, description, brand, image_url, event_date, venue, registration_open, registration_fields")
     .eq("status", "published")
     .is("deleted_at", null)
   const { data, error } = UUID_RE.test(idOrSlug)
@@ -241,7 +242,11 @@ export default async function EventDetailPage({ params }: Props) {
             </div>
             {registrationOpen ? (
               <div className="p-5">
-                <EventRegisterForm eventId={event.id} eventTitle={event.title} />
+                <EventRegisterForm
+                  eventId={event.id}
+                  eventTitle={event.title}
+                  fields={parseRegistrationFields(event.registration_fields)}
+                />
                 <EventPageQr />
               </div>
             ) : (

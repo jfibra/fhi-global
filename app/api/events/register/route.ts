@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { parseRegistrationFields, validateAnswers } from "@/lib/events/fields"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
 import { sendEventRegistrationEmail } from "@/lib/mailer"
 import { SITE_URL } from "@/lib/seo"
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
   const fullName = typeof body.fullName === "string" ? body.fullName.trim().slice(0, 120) : ""
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase().slice(0, 200) : ""
   const whatsapp = typeof body.whatsapp === "string" ? body.whatsapp.trim().slice(0, 40) : ""
+  const invitedBy = typeof body.invitedBy === "string" ? body.invitedBy.trim().slice(0, 120) : ""
 
   if (!UUID_RE.test(eventId)) {
     return NextResponse.json({ error: "Invalid event" }, { status: 400 })
@@ -34,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   const { data: event, error: eventError } = await admin
     .from("events")
-    .select("id, slug, title, venue, status, deleted_at, event_date, registration_open")
+    .select("id, slug, title, venue, status, deleted_at, event_date, registration_open, registration_fields")
     .eq("id", eventId)
     .maybeSingle()
 
@@ -49,11 +51,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Registration for this event has closed" }, { status: 403 })
   }
 
+  // Answers are checked against the event's CURRENT field list, so a field
+  // removed since the page was opened cannot smuggle data through, and a
+  // required one cannot be skipped by posting straight to the API.
+  const fields = parseRegistrationFields(event.registration_fields)
+  const checked = validateAnswers(fields, body.answers)
+  if (!checked.ok) {
+    return NextResponse.json({ error: checked.error }, { status: 400 })
+  }
+
   const { error } = await admin.from("event_registrations").insert({
     event_id: eventId,
     full_name: fullName,
     email,
     whatsapp: whatsapp || null,
+    invited_by: invitedBy || null,
+    answers: checked.answers,
   })
 
   if (error) {

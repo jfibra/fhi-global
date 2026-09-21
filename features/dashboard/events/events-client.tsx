@@ -8,17 +8,28 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  CalendarDays, ChevronLeft, ChevronRight, ExternalLink, Eye, FileImage, FileText, ImagePlus, Loader2,
+  CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, Eye, FileImage, FileSpreadsheet, FileText, ImagePlus, Loader2,
   MapPin, Pencil, Plus, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
 } from "lucide-react"
 import { EventFlyerModal } from "./event-flyer-modal"
 import { EventRaffle } from "./event-raffle"
 import { EVENT_BRANDS, eventBrand } from "@/lib/events/brands"
+import {
+  FIELD_TYPE_LABELS,
+  FIELD_TYPES,
+  MAX_FIELDS,
+  fieldKeyFromLabel,
+  formatAnswer,
+  type AnswerValue,
+  type FieldType,
+  type RegistrationField,
+} from "@/lib/events/fields"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 type AdminEvent = {
   id: string
   slug: string | null
+  registrationFields?: RegistrationField[]
   title: string
   description: string | null
   brand: string
@@ -38,6 +49,9 @@ type Registration = {
   fullName: string
   email: string
   whatsapp: string | null
+  invitedBy: string | null
+  /** Answers to this event's custom questions, keyed by field key. */
+  answers: Record<string, AnswerValue>
   createdAt: string
 }
 
@@ -50,6 +64,8 @@ type FormState = {
   venue: string
   status: string
   registrationOpen: boolean
+  /** Extra questions this event's registration form asks. */
+  registrationFields: RegistrationField[]
 }
 
 const EMPTY_FORM: FormState = {
@@ -61,6 +77,7 @@ const EMPTY_FORM: FormState = {
   venue: "",
   status: "draft",
   registrationOpen: true,
+  registrationFields: [],
 }
 
 // Event times are always Dubai time (GST, UTC+4 — no DST), regardless of the
@@ -123,6 +140,10 @@ export function EventsClient() {
 
   // Registrations modal
   const [regEvent, setRegEvent] = useState<AdminEvent | null>(null)
+  // The questions this event asks — drives both the extra table columns and
+  // the export. Read from the event, so a field removed later simply stops
+  // being shown while its answers stay in the database.
+  const regFields = regEvent?.registrationFields ?? []
   const [registrations, setRegistrations] = useState<Registration[]>([])
   const [regsLoading, setRegsLoading] = useState(false)
 
@@ -190,10 +211,51 @@ export function EventsClient() {
       venue: e.venue ?? "",
       status: e.status,
       registrationOpen: e.registrationOpen,
+      registrationFields: e.registrationFields ?? [],
     })
     setFormError(null)
     setModalOpen(true)
   }
+
+  // ── Custom registration questions ──────────────────────────────────────
+  // Keys address stored answers, so an existing field's key is never changed
+  // when its label is edited — renaming "Company" to "Employer" keeps every
+  // answer already collected attached to it.
+  const addField = () =>
+    setForm((f) =>
+      f.registrationFields.length >= MAX_FIELDS
+        ? f
+        : {
+            ...f,
+            registrationFields: [
+              ...f.registrationFields,
+              { key: `field_${Date.now().toString(36)}`, label: "", type: "text" as FieldType, required: false },
+            ],
+          },
+    )
+  const updateField = (index: number, patch: Partial<RegistrationField>) =>
+    setForm((f) => ({
+      ...f,
+      registrationFields: f.registrationFields.map((fl, i) => {
+        if (i !== index) return fl
+        const next = { ...fl, ...patch }
+        // Give a brand-new field a readable key once it is first labelled.
+        if (patch.label !== undefined && fl.key.startsWith("field_") && patch.label.trim()) {
+          next.key = fieldKeyFromLabel(patch.label, i)
+        }
+        return next
+      }),
+    }))
+  const removeField = (index: number) =>
+    setForm((f) => ({ ...f, registrationFields: f.registrationFields.filter((_, i) => i !== index) }))
+  const moveField = (index: number, dir: -1 | 1) =>
+    setForm((f) => {
+      const to = index + dir
+      if (to < 0 || to >= f.registrationFields.length) return f
+      const next = [...f.registrationFields]
+      ;[next[index], next[to]] = [next[to], next[index]]
+      return { ...f, registrationFields: next }
+    })
 
   const handleUpload = async (file: File | null) => {
     if (!file) return
@@ -232,6 +294,7 @@ export function EventsClient() {
         venue: form.venue,
         status: form.status,
         registration_open: form.registrationOpen,
+        registration_fields: form.registrationFields,
       }
       const res = editing
         ? await fetch(`/api/admin/events/${editing.id}`, {
@@ -366,6 +429,32 @@ export function EventsClient() {
     }
   }
 
+  /**
+   * Spreadsheet export — the print sheet is a check-in list, so the custom
+   * answers live here instead, one column per question the event asks.
+   */
+  const exportRegistrationsCsv = () => {
+    if (!regEvent || filteredRegs.length === 0) return
+    const cell = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const header = ["Name", "Email", "WhatsApp", "Invited by", ...regFields.map((f) => f.label), "Registered"]
+    const rows = filteredRegs.map((r) => [
+      r.fullName,
+      r.email,
+      r.whatsapp ?? "",
+      r.invitedBy ?? "",
+      ...regFields.map((f) => formatAnswer(r.answers?.[f.key])),
+      new Date(r.createdAt).toLocaleString("en-AE", { timeZone: "Asia/Dubai" }),
+    ])
+    // BOM so Excel reads Arabic and accented names correctly.
+    const csv = "\uFEFF" + [header, ...rows].map((row) => row.map((c) => cell(String(c))).join(",")).join("\r\n")
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }))
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${(regEvent.slug ?? "event").slice(0, 60)}-attendees.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // Branded print view of the attendee list — the browser's print dialog
   // offers "Save as PDF" (and direct printing for the venue check-in desk).
   const exportRegistrationsPdf = () => {
@@ -392,6 +481,7 @@ export function EventsClient() {
           <td><strong>${esc(r.fullName)}</strong></td>
           <td>${esc(r.email)}</td>
           <td>${esc(r.whatsapp ?? "—")}</td>
+          <td>${esc(r.invitedBy ?? "—")}</td>
           <td class="reg">${esc(shortRegistered(r.createdAt))}</td>
           <td class="sig"><span class="line"></span></td>
         </tr>`,
@@ -427,7 +517,7 @@ export function EventsClient() {
     ${regQuery.trim() ? `<span>Filter: <strong>“${esc(regQuery.trim())}”</strong></span>` : ""}
   </div>
   <table>
-    <thead><tr><th>#</th><th>Name</th><th>Email</th><th>WhatsApp</th><th>Registered</th><th>Signature</th></tr></thead>
+    <thead><tr><th>#</th><th>Name</th><th>Email</th><th>WhatsApp</th><th>Invited by</th><th>Registered</th><th>Signature</th></tr></thead>
     <tbody>${body}</tbody>
   </table>
   <p class="foot">Generated from the FHI Global dashboard · <b>fhiglobal.ae</b></p>
@@ -777,6 +867,94 @@ export function EventsClient() {
                 </div>
               </div>
 
+              {/* Extra questions this event asks. Safe to change at any time:
+                  adding one leaves earlier sign-ups blank for it, and removing
+                  one only stops the form asking — answers already collected
+                  stay in the database and in past exports. */}
+              <div className="border-t border-[#f0f0f0] pt-5">
+                <div className="flex items-start justify-between gap-4 mb-3">
+                  <div>
+                    <p className={labelCls}>Extra questions</p>
+                    <p className="text-[11px] text-[#9ca3af]">
+                      Asked after name, email and WhatsApp. Editing these is safe once the event is live —
+                      answers already collected are kept.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addField}
+                    disabled={form.registrationFields.length >= MAX_FIELDS}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 border border-[#e5e5e5] text-xs font-bold text-[#374151] hover:border-[#001f3f] transition-colors disabled:opacity-50"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add question
+                  </button>
+                </div>
+
+                {form.registrationFields.length === 0 ? (
+                  <p className="text-[12px] text-[#9ca3af] border border-dashed border-[#e5e5e5] px-4 py-5 text-center">
+                    No extra questions. The form will ask for name, email, WhatsApp and who invited them.
+                  </p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {form.registrationFields.map((fl, i) => (
+                      <div key={fl.key} className="border border-[#e5e5e5] bg-[#fafafa] p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            value={fl.label}
+                            onChange={(e) => updateField(i, { label: e.target.value })}
+                            placeholder="Question (e.g. Company name)"
+                            maxLength={80}
+                            className={`${inputCls} flex-1 min-w-[180px]`}
+                          />
+                          <select
+                            value={fl.type}
+                            onChange={(e) => updateField(i, { type: e.target.value as FieldType })}
+                            className={`${inputCls} w-[136px]`}
+                          >
+                            {FIELD_TYPES.map((t) => (
+                              <option key={t} value={t}>{FIELD_TYPE_LABELS[t]}</option>
+                            ))}
+                          </select>
+                          <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#374151] cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={fl.required}
+                              onChange={(e) => updateField(i, { required: e.target.checked })}
+                              className="h-3.5 w-3.5"
+                            />
+                            Required
+                          </label>
+                          <div className="flex items-center gap-0.5 ml-auto">
+                            <button type="button" onClick={() => moveField(i, -1)} disabled={i === 0}
+                              className="p-1.5 text-[#6b7280] hover:bg-white disabled:opacity-30" aria-label="Move up" title="Move up">
+                              <ChevronUp className="w-4 h-4" />
+                            </button>
+                            <button type="button" onClick={() => moveField(i, 1)} disabled={i === form.registrationFields.length - 1}
+                              className="p-1.5 text-[#6b7280] hover:bg-white disabled:opacity-30" aria-label="Move down" title="Move down">
+                              <ChevronDown className="w-4 h-4" />
+                            </button>
+                            <button type="button" onClick={() => removeField(i)}
+                              className="p-1.5 text-rose-600 hover:bg-rose-50" aria-label="Remove question" title="Remove question">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                        {fl.type === "select" && (
+                          <input
+                            value={(fl.options ?? []).join(", ")}
+                            onChange={(e) =>
+                              updateField(i, { options: e.target.value.split(",").map((o) => o.trim()).filter(Boolean) })
+                            }
+                            placeholder="Choices, separated by commas — e.g. Studio, 1BR, 2BR"
+                            className={`${inputCls} mt-2`}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {formError && (
                 <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{formError}</p>
               )}
@@ -852,6 +1030,16 @@ export function EventsClient() {
                 </button>
                 <button
                   type="button"
+                  onClick={exportRegistrationsCsv}
+                  disabled={regsLoading || filteredRegs.length === 0}
+                  title="Download as a spreadsheet, including answers to this event's questions"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f]/10 transition-colors disabled:opacity-40"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  CSV
+                </button>
+                <button
+                  type="button"
                   onClick={() => setRaffleOpen(true)}
                   disabled={regsLoading || registrations.length === 0}
                   title="Start a live raffle — pick a random winner"
@@ -902,6 +1090,10 @@ export function EventsClient() {
                       <th className="px-3 py-2">Name</th>
                       <th className="px-3 py-2">Email</th>
                       <th className="px-3 py-2">WhatsApp</th>
+                      <th className="px-3 py-2">Invited by</th>
+                      {regFields.map((f) => (
+                        <th key={f.key} className="px-3 py-2">{f.label}</th>
+                      ))}
                       <th className="px-3 py-2">Registered</th>
                       <th className="px-3 py-2" aria-label="Actions" />
                     </tr>
@@ -927,6 +1119,12 @@ export function EventsClient() {
                             "—"
                           )}
                         </td>
+                        <td className="px-3 py-2.5 text-[#374151]">{r.invitedBy || "—"}</td>
+                        {regFields.map((f) => (
+                          <td key={f.key} className="px-3 py-2.5 text-[#374151]">
+                            {formatAnswer(r.answers?.[f.key]) || "—"}
+                          </td>
+                        ))}
                         <td className="px-3 py-2.5 text-[#6b7280] whitespace-nowrap">
                           {registeredLabel(r.createdAt)}
                         </td>

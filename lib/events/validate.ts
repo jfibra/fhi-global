@@ -1,4 +1,5 @@
 import { EVENT_BRANDS } from "@/lib/events/brands"
+import { parseRegistrationFields } from "@/lib/events/fields"
 
 const STATUSES = ["draft", "published", "archived"] as const
 
@@ -21,6 +22,10 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
   }
   // Manual registration toggle; anything but an explicit false means open.
   const registration_open = body.registration_open !== false
+  // Per-event questions. Editable at any time — parseRegistrationFields drops
+  // malformed entries rather than rejecting the whole save, so one bad row in
+  // the builder can never block an event update.
+  const registration_fields = parseRegistrationFields(body.registration_fields)
   return {
     title,
     description: description || null,
@@ -30,5 +35,6 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
     status,
     event_date,
     registration_open,
+    registration_fields,
   }
 }

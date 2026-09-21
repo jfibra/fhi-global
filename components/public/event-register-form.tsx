@@ -1,15 +1,29 @@
 "use client"
 
 import { useState } from "react"
-import { CheckCircle2, Loader2, Mail, MessageCircle, User } from "lucide-react"
+import { CheckCircle2, Loader2, Mail, MessageCircle, User, UserPlus } from "lucide-react"
+import type { AnswerValue, RegistrationField } from "@/lib/events/fields"
 
 /** Public registration form for one event (posts to /api/events/register). */
-export function EventRegisterForm({ eventId, eventTitle }: { eventId: string; eventTitle: string }) {
+export function EventRegisterForm({
+  eventId,
+  eventTitle,
+  fields = [],
+}: {
+  eventId: string
+  eventTitle: string
+  /** Per-event custom questions, in display order (events.registration_fields). */
+  fields?: RegistrationField[]
+}) {
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [whatsapp, setWhatsapp] = useState("")
+  const [invitedBy, setInvitedBy] = useState("")
+  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({})
   const [status, setStatus] = useState<"idle" | "sending" | "done">("idle")
   const [error, setError] = useState<string | null>(null)
+
+  const setAnswer = (key: string, value: AnswerValue) => setAnswers((a) => ({ ...a, [key]: value }))
 
   const inputCls =
     "w-full pl-11 pr-4 py-3 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:bg-white focus:ring-4 focus:ring-[#001f3f]/6 transition-all"
@@ -22,7 +36,7 @@ export function EventRegisterForm({ eventId, eventTitle }: { eventId: string; ev
       const res = await fetch("/api/events/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId, fullName, email, whatsapp }),
+        body: JSON.stringify({ eventId, fullName, email, whatsapp, invitedBy, answers }),
       })
       const data = (await res.json().catch(() => ({}))) as { error?: string }
       if (!res.ok) throw new Error(data.error ?? "Registration failed — please try again")
@@ -94,6 +108,86 @@ export function EventRegisterForm({ eventId, eventTitle }: { eventId: string; ev
             placeholder="+971 50 000 0000"
             maxLength={40}
             autoComplete="tel"
+            className={inputCls}
+          />
+        </div>
+      </div>
+
+      {/* Per-event questions. The API re-validates every answer against the
+          event's current field list, so this is presentation only. */}
+      {fields.map((f) => {
+        const value = answers[f.key]
+        if (f.type === "checkbox") {
+          return (
+            <label key={f.key} className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={value === true}
+                onChange={(e) => setAnswer(f.key, e.target.checked)}
+                required={f.required}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-[#d1d5db] text-[#001f3f] focus:ring-[#001f3f]/30"
+              />
+              <span className="text-sm text-[#374151] leading-snug">
+                {f.label} {f.required && <span className="text-rose-500">*</span>}
+              </span>
+            </label>
+          )
+        }
+        return (
+          <div key={f.key} className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">
+              {f.label} {f.required && "*"}
+            </label>
+            {f.type === "textarea" ? (
+              <textarea
+                value={typeof value === "string" ? value : ""}
+                onChange={(e) => setAnswer(f.key, e.target.value)}
+                placeholder={f.placeholder}
+                required={f.required}
+                rows={3}
+                maxLength={2000}
+                className={`${inputCls} pl-4 resize-y`}
+              />
+            ) : f.type === "select" ? (
+              <select
+                value={typeof value === "string" ? value : ""}
+                onChange={(e) => setAnswer(f.key, e.target.value)}
+                required={f.required}
+                className={`${inputCls} pl-4`}
+              >
+                <option value="">Select…</option>
+                {(f.options ?? []).map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type={f.type === "number" ? "number" : f.type === "date" ? "date" : f.type === "email" ? "email" : f.type === "tel" ? "tel" : "text"}
+                value={typeof value === "string" || typeof value === "number" ? String(value) : ""}
+                onChange={(e) => setAnswer(f.key, e.target.value)}
+                placeholder={f.placeholder}
+                required={f.required}
+                maxLength={500}
+                className={`${inputCls} pl-4`}
+              />
+            )}
+          </div>
+        )
+      })}
+
+      {/* Always asked, always optional — attendees type whoever sent them,
+          which may be an agent, a friend or a company. */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Who invited you?</label>
+        <div className="relative">
+          <UserPlus className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+          <input
+            value={invitedBy}
+            onChange={(e) => setInvitedBy(e.target.value)}
+            placeholder="Name of the person who invited you (optional)"
+            maxLength={120}
             className={inputCls}
           />
         </div>
