@@ -12,7 +12,7 @@
  */
 
 import { useMemo, useState } from "react"
-import { Download, FileSpreadsheet, FileText, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, FileText, X } from "lucide-react"
 import { formatAnswer, type AnswerValue, type RegistrationField } from "@/lib/events/fields"
 
 export type ExportRegistration = {
@@ -37,7 +37,7 @@ type Column = {
   cls?: string
 }
 
-const PREVIEW_ROWS = 6
+const PREVIEW_PAGE = 10
 /** Beyond this many columns a portrait A4 check-in sheet gets cramped. */
 const LANDSCAPE_FROM = 8
 
@@ -91,6 +91,7 @@ export function EventExportModal({
 }) {
   const columns = useMemo(() => buildColumns(fields), [fields])
   const [format, setFormat] = useState<Format>("pdf")
+  const [page, setPage] = useState(1)
   // One selection per format, so switching PDF ↔ CSV never discards choices.
   const [selected, setSelected] = useState<Record<Format, Set<string>>>(() => ({
     pdf: new Set(columns.filter((c) => c.defaultOn.pdf).map((c) => c.id)),
@@ -191,7 +192,12 @@ export function EventExportModal({
     else printPdf()
   }
 
-  const preview = registrations.slice(0, PREVIEW_ROWS)
+  // Paged preview of the whole list, so the admin can check every row before
+  // exporting rather than trusting the first few.
+  const totalPages = Math.max(1, Math.ceil(registrations.length / PREVIEW_PAGE))
+  const safePage = Math.min(page, totalPages)
+  const previewStart = (safePage - 1) * PREVIEW_PAGE
+  const preview = registrations.slice(previewStart, previewStart + PREVIEW_PAGE)
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
@@ -273,9 +279,29 @@ export function EventExportModal({
 
           {/* ── Right: live preview ── */}
           <div className="min-w-0">
-            <p className="block text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-1.5">
-              Preview{registrations.length > PREVIEW_ROWS ? ` · first ${PREVIEW_ROWS} of ${registrations.length}` : ""}
-            </p>
+            <div className="flex items-center justify-between gap-3 mb-1.5">
+              <p className="block text-xs font-bold uppercase tracking-wide text-[#6b7280]">
+                Preview
+                {registrations.length > PREVIEW_PAGE && (
+                  <span className="normal-case tracking-normal font-semibold text-[#9ca3af]">
+                    {" "}· {previewStart + 1}–{Math.min(previewStart + PREVIEW_PAGE, registrations.length)} of {registrations.length}
+                  </span>
+                )}
+              </p>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1 text-xs font-semibold text-[#374151]">
+                  <button type="button" onClick={() => setPage((n) => Math.max(1, n - 1))} disabled={safePage === 1}
+                    className="p-1.5 border border-[#e5e5e5] hover:border-[#001f3f] disabled:opacity-30" aria-label="Previous page">
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="px-2 tabular-nums">{safePage} / {totalPages}</span>
+                  <button type="button" onClick={() => setPage((n) => Math.min(totalPages, n + 1))} disabled={safePage === totalPages}
+                    className="p-1.5 border border-[#e5e5e5] hover:border-[#001f3f] disabled:opacity-30" aria-label="Next page">
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
             {chosen.length === 0 ? (
               <p className="text-[12px] text-[#9ca3af] border border-dashed border-[#e5e5e5] px-4 py-10 text-center">
                 Pick at least one column.
@@ -291,7 +317,9 @@ export function EventExportModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.map((r, i) => (
+                    {preview.map((r, offset) => {
+                      const i = previewStart + offset
+                      return (
                       <tr key={`${r.email}-${i}`} className="border-b border-[#f0f0f0] even:bg-[#fafbfc]">
                         {chosen.map((c) => (
                           <td key={c.id} className={`px-3 py-2 align-top ${c.id === "index" ? "text-[#9ca3af]" : "text-[#374151]"} ${c.id === "name" ? "font-semibold text-[#111827]" : ""} ${c.id === "registered" ? "whitespace-nowrap" : ""}`}>
@@ -303,7 +331,8 @@ export function EventExportModal({
                           </td>
                         ))}
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
