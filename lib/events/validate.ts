@@ -1,5 +1,6 @@
 import { EVENT_BRANDS } from "@/lib/events/brands"
 import { parseRegistrationFields } from "@/lib/events/fields"
+import { parseCertificateSettings } from "@/lib/events/certificate"
 
 const STATUSES = ["draft", "published", "archived"] as const
 
@@ -25,7 +26,11 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
   // Per-event questions. Editable at any time — parseRegistrationFields drops
   // malformed entries rather than rejecting the whole save, so one bad row in
   // the builder can never block an event update.
-  const registration_fields = parseRegistrationFields(body.registration_fields)
+  // jsonb designs are written only when the caller sends them. The PATCH
+  // route spreads this whole object into UPDATE, so a partial payload (the
+  // publish toggle, for instance) must not reset them to empty.
+  const registration_fields = body.registration_fields !== undefined ? parseRegistrationFields(body.registration_fields) : undefined
+  const certificate = body.certificate !== undefined ? parseCertificateSettings(body.certificate) : undefined
   return {
     title,
     description: description || null,
@@ -35,6 +40,7 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
     status,
     event_date,
     registration_open,
-    registration_fields,
+    ...(registration_fields !== undefined ? { registration_fields } : {}),
+    ...(certificate !== undefined ? { certificate } : {}),
   }
 }

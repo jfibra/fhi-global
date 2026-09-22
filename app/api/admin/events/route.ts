@@ -6,6 +6,7 @@ import { canManageEvents } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { sanitizeEventInput } from "@/lib/events/validate"
 import { parseRegistrationFields } from "@/lib/events/fields"
+import { parseCertificateSettings } from "@/lib/events/certificate"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 import { SITE_URL } from "@/lib/seo"
 import { submitToIndexNow } from "@/lib/indexnow"
@@ -27,7 +28,7 @@ export async function GET() {
   const admin = createAdminSupabase()
   const { data, error } = await admin
     .from("events")
-    .select("id, slug, title, description, brand, image_url, event_date, venue, status, registration_open, registration_fields, created_at, view_count, qr_scan_count, event_registrations(count)")
+    .select("id, slug, title, description, brand, image_url, event_date, venue, status, registration_open, registration_fields, certificate, created_at, view_count, qr_scan_count, event_registrations(count)")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
 
@@ -49,6 +50,7 @@ export async function GET() {
       status: (e.status as string) ?? "draft",
       registrationOpen: (e.registration_open as boolean | null) !== false,
       registrationFields: parseRegistrationFields(e.registration_fields),
+      certificate: parseCertificateSettings(e.certificate),
       createdAt: e.created_at as string,
       registrationCount: counts?.[0]?.count ?? 0,
       viewCount: (e.view_count as number | null) ?? 0,

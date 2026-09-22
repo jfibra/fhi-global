@@ -1310,3 +1310,53 @@ export async function sendOwnerDocumentsSubmittedEmail(input: {
     }),
   })
 }
+
+/** Certificate of attendance — the PDF is attached; the body just frames it. */
+export async function sendEventCertificateEmail(input: {
+  to: string
+  fullName: string
+  eventTitle: string
+  dateLabel: string | null
+  venue: string | null
+  heading: string
+  pdf: Buffer
+  filename: string
+}): Promise<void> {
+  const subject = `Your ${input.heading} — ${input.eventTitle}`
+  const rows = [
+    detailRow("Event", input.eventTitle),
+    input.dateLabel ? detailRow("Date", input.dateLabel) : "",
+    input.venue ? detailRow("Venue", input.venue) : "",
+    detailRow("Issued to", input.fullName),
+  ].join("")
+
+  const bodyHtml = `
+        <tr>
+          <td style="padding:36px 40px 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">${esc(input.heading)}</p>
+            <h1 style="margin:0 0 12px;font-size:23px;line-height:1.3;font-weight:700;color:#0d1117;">Thank you for joining us, ${esc(input.fullName)}</h1>
+            <p style="margin:0;font-size:15px;line-height:1.65;color:#4b5563;">
+              Your <strong>${esc(input.heading)}</strong> for <strong>${esc(input.eventTitle)}</strong> is attached to this
+              email as a PDF. Print it, share it, or add it to your profile — and we hope to see you at the next one.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px 34px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafd;border:1px solid #e2e8f2;border-radius:14px;">
+              <tr><td style="padding:16px 20px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+              </td></tr>
+            </table>
+          </td>
+        </tr>`
+
+  await deliver("EventCertificateMailer", {
+    from: fromAddress(),
+    to: input.to,
+    subject,
+    text: `${input.heading} — ${input.eventTitle}\n\nDear ${input.fullName},\n\nThank you for joining us. Your ${input.heading.toLowerCase()} is attached as a PDF.\n${input.dateLabel ? `\nDate: ${input.dateLabel}` : ""}${input.venue ? `\nVenue: ${input.venue}` : ""}\n\nFHI Global Property · fhiglobal.ae`,
+    html: eventEmailShell({ subject, preheader: `Your ${input.heading.toLowerCase()} for ${input.eventTitle} is attached.`, bodyHtml }),
+    attachments: [{ filename: input.filename, content: input.pdf, contentType: "application/pdf" }],
+  })
+}

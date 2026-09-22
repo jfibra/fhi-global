@@ -20,7 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const admin = createAdminSupabase()
   const { data, error } = await admin
     .from("event_registrations")
-    .select("id, full_name, email, whatsapp, invited_by, answers, created_at")
+    .select("id, full_name, email, whatsapp, invited_by, answers, created_at, certificate_sent_at")
     .eq("event_id", id)
     .order("created_at", { ascending: false })
     .limit(1000)
@@ -40,6 +40,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     invitedBy: r.invited_by ? titleCaseName(r.invited_by as string) : null,
     answers: (r.answers as Record<string, string | number | boolean> | null) ?? {},
     createdAt: r.created_at as string,
+    certificateSentAt: (r.certificate_sent_at as string | null) ?? null,
   }))
 
   return NextResponse.json({ registrations })

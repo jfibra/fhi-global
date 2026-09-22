@@ -12,7 +12,7 @@ import { submitToIndexNow } from "@/lib/indexnow"
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 // Fields editors can change via sanitizeEventInput — diffed for the audit trail.
-const EDITABLE = ["title", "description", "brand", "image_url", "venue", "status", "event_date", "registration_open", "registration_fields"] as const
+const EDITABLE = ["title", "description", "brand", "image_url", "venue", "status", "event_date", "registration_open", "registration_fields", "certificate"] as const
 
 type ExistingEvent = Record<(typeof EDITABLE)[number], unknown> & { id: string }
 
@@ -57,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const admin = createAdminSupabase()
   const { data: existing, error: fetchErr } = await admin
     .from("events")
-    .select("id, slug, title, description, brand, image_url, venue, status, event_date, registration_open, registration_fields")
+    .select("id, slug, title, description, brand, image_url, venue, status, event_date, registration_open, registration_fields, certificate")
     .eq("id", id)
     .is("deleted_at", null)
     .maybeSingle<ExistingEvent & { slug: string | null }>()

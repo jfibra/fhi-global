@@ -8,9 +8,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Eye, ImagePlus, Loader2,
+  Award, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Eye, ImagePlus, Loader2,
   MapPin, Pencil, Plus, QrCode, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
 } from "lucide-react"
+import { EventCertificateModal } from "./event-certificate-modal"
 import { EventExportModal } from "./event-export-modal"
 import { EventFlyerModal } from "./event-flyer-modal"
 import { EventRaffle } from "./event-raffle"
@@ -25,12 +26,14 @@ import {
   type FieldType,
   type RegistrationField,
 } from "@/lib/events/fields"
+import type { CertificateSettings } from "@/lib/events/certificate"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 
 type AdminEvent = {
   id: string
   slug: string | null
   registrationFields?: RegistrationField[]
+  certificate?: CertificateSettings
   title: string
   description: string | null
   brand: string
@@ -54,6 +57,7 @@ type Registration = {
   /** Answers to this event's extra fields, keyed by field key. */
   answers: Record<string, AnswerValue>
   createdAt: string
+  certificateSentAt: string | null
 }
 
 type FormState = {
@@ -142,6 +146,7 @@ export function EventsClient() {
   // Registrations modal
   const [regEvent, setRegEvent] = useState<AdminEvent | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
+  const [certOpen, setCertOpen] = useState(false)
   // The fields this event asks for — drives both the extra table columns and
   // the export. Read from the event, so a field removed later simply stops
   // being shown while its answers stay in the database.
@@ -924,6 +929,21 @@ export function EventsClient() {
         />
       )}
 
+      {regEvent && certOpen && (
+        <EventCertificateModal
+          event={{ id: regEvent.id, title: regEvent.title, certificate: regEvent.certificate }}
+          registrations={registrations}
+          onClose={() => setCertOpen(false)}
+          onSaved={(certificate) => {
+            setEvents((prev) => prev.map((x) => (x.id === regEvent.id ? { ...x, certificate } : x)))
+            setRegEvent((cur) => (cur ? { ...cur, certificate } : cur))
+          }}
+          onSent={(registrationId, sentAt) =>
+            setRegistrations((prev) => prev.map((r) => (r.id === registrationId ? { ...r, certificateSentAt: sentAt } : r)))
+          }
+        />
+      )}
+
       {/* ── Registrations modal ── */}
       {regEvent && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
@@ -958,6 +978,16 @@ export function EventsClient() {
                 >
                   <Download className="w-4 h-4" />
                   Export
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCertOpen(true)}
+                  disabled={regsLoading}
+                  title="Design and email certificates of attendance"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#001f3f]/15 bg-[#001f3f]/5 text-[#001f3f] text-xs font-bold hover:bg-[#001f3f]/10 transition-colors disabled:opacity-40"
+                >
+                  <Award className="w-4 h-4" />
+                  Certificates
                 </button>
                 <button
                   type="button"
