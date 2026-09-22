@@ -5,11 +5,13 @@ import { eventBrand } from "@/lib/events/brands"
  * "Scan to get your certificate" poster — a branded PNG drawn on a canvas in
  * the browser (same approach as the flyer): navy stage with gold corner
  * bands, the brand logo, a gold headline, the QR on a white card with the
- * official seal, three steps, and the event details. Two sizes: a 9:16
- * story/screen version and an A4 portrait for printing.
+ * official seal, three steps, and the event details. Three sizes: a 9:16
+ * story/screen version, a 1080×1080 square for a Facebook/Instagram post,
+ * and an A4 portrait for printing. The square drops the headline sub-line
+ * and tightens spacing so everything still fits.
  */
 
-export type PosterSize = "story" | "a4"
+export type PosterSize = "story" | "a4" | "square"
 
 export type PosterInput = {
   url: string
@@ -83,12 +85,15 @@ function gold(ctx: CanvasRenderingContext2D, y0: number, y1: number) {
 /** Renders the poster and returns a PNG data URL. */
 export async function renderCertificateQrPoster(input: PosterInput): Promise<string> {
   const W = input.size === "a4" ? 1240 : 1080
-  const H = input.size === "a4" ? 1754 : 1920
+  const H = input.size === "a4" ? 1754 : input.size === "square" ? 1080 : 1920
   const s = W / 1080 // scale factor for a4 widths
   const canvas = document.createElement("canvas")
   canvas.width = W
   canvas.height = H
   const ctx = canvas.getContext("2d")!
+  // Square: a compact layout — QR left, headline + steps right — because the
+  // vertical stack does not fit in 1080px.
+  if (input.size === "square") return renderSquare(ctx, W, H, input)
   const brand = eventBrand(input.brandKey)
   await document.fonts?.ready
 
@@ -251,4 +256,147 @@ export async function renderCertificateQrPoster(input: PosterInput): Promise<str
   ctx.letterSpacing = "0px"
 
   return canvas.toDataURL("image/png")
+}
+
+async function renderSquare(ctx: CanvasRenderingContext2D, W: number, H: number, input: PosterInput): Promise<string> {
+  const brand = eventBrand(input.brandKey)
+  await document.fonts?.ready
+  // stage
+  const bg = ctx.createRadialGradient(W * 0.3, H * 0.5, 40, W * 0.3, H * 0.5, W)
+  bg.addColorStop(0, "#0b3563")
+  bg.addColorStop(0.55, NAVY)
+  bg.addColorStop(1, NAVY_DEEP)
+  ctx.fillStyle = bg
+  ctx.fillRect(0, 0, W, H)
+  ctx.save()
+  ctx.globalAlpha = 0.06
+  ctx.strokeStyle = GOLD
+  ctx.lineWidth = 2
+  for (let i = 0; i < 36; i++) {
+    const a = (Math.PI * 2 * i) / 36
+    ctx.beginPath()
+    ctx.moveTo(W * 0.3, H * 0.55)
+    ctx.lineTo(W * 0.3 + Math.cos(a) * W, H * 0.55 + Math.sin(a) * W)
+    ctx.stroke()
+  }
+  ctx.restore()
+  const band = (pts: [number, number][], goldPts: [number, number][]) => {
+    ctx.fillStyle = gold(ctx, 0, H)
+    ctx.beginPath()
+    goldPts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)))
+    ctx.closePath()
+    ctx.fill()
+    ctx.fillStyle = "#062b55"
+    ctx.beginPath()
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)))
+    ctx.closePath()
+    ctx.fill()
+  }
+  band([[0, 0], [240, 0], [0, 160]], [[0, 0], [266, 0], [0, 178]])
+  band([[W, H], [W, H - 260], [W - 390, H]], [[W, H], [W, H - 286], [W - 428, H]])
+  ctx.strokeStyle = GOLD
+  ctx.globalAlpha = 0.6
+  ctx.lineWidth = 2
+  ctx.strokeRect(32, 32, W - 64, H - 64)
+  ctx.globalAlpha = 1
+
+  // left: QR card with seal
+  const card = 470
+  const cx = 80
+  const cy = 150
+  ctx.save()
+  ctx.shadowColor = "rgba(0,0,0,0.45)"
+  ctx.shadowBlur = 40
+  ctx.shadowOffsetY = 18
+  ctx.fillStyle = "#fff"
+  rr(ctx, cx, cy, card, card, 24)
+  ctx.fill()
+  ctx.restore()
+  ctx.strokeStyle = GOLD
+  ctx.lineWidth = 5
+  rr(ctx, cx + 12, cy + 12, card - 24, card - 24, 16)
+  ctx.stroke()
+  const qrSize = card - 80
+  const qrUrl = await QRCode.toDataURL(input.url, { width: qrSize * 2, margin: 0, errorCorrectionLevel: "M", color: { dark: NAVY, light: "#ffffff" } })
+  const qr = await loadImage(qrUrl)
+  if (qr) ctx.drawImage(qr, cx + card / 2 - qrSize / 2, cy + 40, qrSize, qrSize)
+  const seal = await loadImage(`/seals/${brand.key}.png`)
+  const sealSize = 210
+  if (seal) ctx.drawImage(seal, cx + card / 2 - sealSize / 2, cy + card - 26, sealSize, sealSize)
+
+  // right: logo, headline, steps, event
+  const rx = 620
+  const rw = W - rx - 70
+  ctx.textAlign = "left"
+  ctx.textBaseline = "alphabetic"
+  let y = 120
+  const logoSrc = brand.key === "fhiglobal" ? "/logos/FHI_Branding_White.png" : brand.logo
+  const logo = await loadImage(logoSrc)
+  if (logo) {
+    const lh = 82
+    const lw = Math.min((logo.width / logo.height) * lh, rw)
+    if (!brand.logoIsWhite && brand.key !== "fhiglobal") {
+      ctx.fillStyle = "#fff"
+      rr(ctx, rx - 16, y - 12, lw + 32, lh + 24, 14)
+      ctx.fill()
+    }
+    ctx.drawImage(logo, rx, y, lw, lh)
+    y += lh + 62
+  }
+  ctx.fillStyle = GOLD_LIGHT
+  ctx.font = `italic 600 34px 'Brush Script MT', 'Segoe Script', cursive`
+  ctx.fillText("Thank you for attending", rx, y)
+  y += 70
+  ctx.font = `900 58px ${FONT}`
+  ctx.fillStyle = gold(ctx, y - 58, y)
+  ctx.fillText("GET YOUR", rx, y)
+  y += 62
+  ctx.fillText("CERTIFICATE", rx, y)
+  y += 40
+  ctx.fillStyle = "rgba(255,255,255,0.85)"
+  ctx.font = `600 20px ${FONT}`
+  ctx.letterSpacing = "6px"
+  ctx.fillText("OF ATTENDANCE", rx, y)
+  ctx.letterSpacing = "0px"
+  y += 74
+  const steps: [string, string][] = [["1", "Scan the code"], ["2", "Type your name"], ["3", "Download your PDF"]]
+  steps.forEach(([n, label]) => {
+    ctx.beginPath()
+    ctx.arc(rx + 22, y, 22, 0, Math.PI * 2)
+    ctx.fillStyle = gold(ctx, y - 22, y + 22)
+    ctx.fill()
+    ctx.fillStyle = NAVY
+    ctx.font = `900 22px ${FONT}`
+    ctx.textAlign = "center"
+    ctx.textBaseline = "middle"
+    ctx.fillText(n, rx + 22, y + 1)
+    ctx.textAlign = "left"
+    ctx.textBaseline = "alphabetic"
+    ctx.fillStyle = IVORY
+    ctx.font = `700 24px ${FONT}`
+    ctx.fillText(label, rx + 62, y + 9)
+    y += 60
+  })
+  y += 30
+  ctx.fillStyle = "#fff"
+  ctx.font = `800 28px ${FONT}`
+  wrapLines(ctx, input.eventTitle, rw, 2).forEach((l) => {
+    ctx.fillText(l, rx, y)
+    y += 36
+  })
+  const details = [input.dateLabel, input.venue].filter(Boolean)
+  ctx.fillStyle = "rgba(255,255,255,0.7)"
+  ctx.font = `500 19px ${FONT}`
+  details.forEach((d) => {
+    ctx.fillText(d as string, rx, y + 2)
+    y += 28
+  })
+  // footer
+  ctx.textAlign = "center"
+  ctx.fillStyle = GOLD
+  ctx.font = `700 17px ${FONT}`
+  ctx.letterSpacing = "5px"
+  ctx.fillText(new URL(input.url).host.replace(/^www\./, "").toUpperCase(), cx + card / 2, H - 60)
+  ctx.letterSpacing = "0px"
+  return ctx.canvas.toDataURL("image/png")
 }

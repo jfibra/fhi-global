@@ -136,7 +136,7 @@ export function EventCertificateModal({
       const url = await renderCertificateQrPoster(posterInput(size))
       const a = document.createElement("a")
       a.href = url
-      a.download = `${event.slug ?? "event"}-certificate-poster-${size === "a4" ? "A4" : "1080x1920"}.png`
+      a.download = `${event.slug ?? "event"}-certificate-poster-${size === "a4" ? "A4" : size === "square" ? "1080x1080" : "1080x1920"}.png`
       a.click()
     } finally {
       setPosterBusy(null)
@@ -335,6 +335,10 @@ export function EventCertificateModal({
               <button type="button" onClick={() => void downloadPoster("story")} disabled={posterBusy !== null}
                 className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00305f] disabled:opacity-50">
                 {posterBusy === "story" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Download for the screen (1080×1920)
+              </button>
+              <button type="button" onClick={() => void downloadPoster("square")} disabled={posterBusy !== null}
+                className="inline-flex items-center justify-center gap-2 px-4 py-3 border border-[#e5e5e5] bg-white text-sm font-bold text-[#374151] hover:border-[#001f3f] disabled:opacity-50">
+                {posterBusy === "square" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Download for Facebook / Instagram (1080×1080)
               </button>
               <button type="button" onClick={() => void downloadPoster("a4")} disabled={posterBusy !== null}
                 className="inline-flex items-center justify-center gap-2 px-4 py-3 border border-[#e5e5e5] bg-white text-sm font-bold text-[#374151] hover:border-[#001f3f] disabled:opacity-50">
