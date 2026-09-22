@@ -11,6 +11,8 @@ import { eventBrand } from "@/lib/events/brands"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
 import { EventRegisterForm } from "@/components/public/event-register-form"
 import { parseRegistrationFields } from "@/lib/events/fields"
+import { parseCertificateSettings } from "@/lib/events/certificate"
+import { Award } from "lucide-react"
 import { EventPageQr } from "@/components/public/event-page-qr"
 import { EventHeroQr } from "@/components/public/event-hero-qr"
 import { EventShare } from "@/components/public/event-share"
@@ -48,7 +50,7 @@ async function fetchEvent(idOrSlug: string) {
   const supabase = createPublicSupabaseClient()
   const query = supabase
     .from("events")
-    .select("id, slug, title, description, brand, image_url, event_date, venue, registration_open, registration_fields")
+    .select("id, slug, title, description, brand, image_url, event_date, venue, registration_open, registration_fields, certificate")
     .eq("status", "published")
     .is("deleted_at", null)
   const { data, error } = UUID_RE.test(idOrSlug)
@@ -89,6 +91,7 @@ export default async function EventDetailPage({ params }: Props) {
 
   const brand = eventBrand(event.brand)
   const registrationOpen = isEventRegistrationOpen(event)
+  const certificatesOpen = parseCertificateSettings(event.certificate).selfService !== "off"
   const d = event.event_date ? new Date(event.event_date) : null
   // Event times are Dubai time (GST) — force the zone; this renders on the
   // server, whose clock is usually UTC.
@@ -275,6 +278,23 @@ export default async function EventDetailPage({ params }: Props) {
             )}
           </aside>
         </div>
+
+        {/* Self-service certificates — shown once the team switches it on after the event */}
+        {certificatesOpen && (
+          <Link
+            href={`/events/${event.slug ?? event.id}/certificate`}
+            className="mt-8 flex flex-col sm:flex-row items-center gap-4 bg-[#001f3f] border-b-4 border-[#d6b357] px-6 py-5 text-white hover:bg-[#00305f] transition-colors"
+          >
+            <span className="w-12 h-12 bg-[#d6b357]/20 border border-[#d6b357]/40 flex items-center justify-center shrink-0">
+              <Award className="w-6 h-6 text-[#d6b357]" />
+            </span>
+            <span className="flex-1 text-center sm:text-left">
+              <span className="block font-['Outfit'] text-lg font-bold leading-tight">Attended? Get your Certificate of Attendance</span>
+              <span className="block text-sm text-white/70 mt-0.5">Enter your details and download your personalised certificate as a PDF.</span>
+            </span>
+            <span className="inline-flex items-center px-5 py-2.5 bg-[#d6b357] text-[#001f3f] text-sm font-bold shrink-0">Get my certificate</span>
+          </Link>
+        )}
       </div>
 
     </div>
