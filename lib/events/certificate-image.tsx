@@ -47,6 +47,8 @@ export type CertificateInput = {
   certificateNo: string
   settings: CertificateSettings
   fonts: CertificateFont[]
+  /** "clean" (default): milled ring, navy field, sunburst and stars. "laurel" adds a wreath. */
+  sealStyle?: "laurel" | "clean"
 }
 
 /** Fetch fonts from the site's own /public/fonts. Cached per process. */
@@ -135,7 +137,7 @@ function Skyline({ left, width, baseline, color }: { left: number; width: number
  * leaves. Type is laid over it as normal text (SVG text has no fonts in the
  * renderer). The seal sits on the navy corner band, so the tails are gold.
  */
-function sealSvg(size: number): string {
+function sealSvg(size: number, style: "laurel" | "clean"): string {
   const c = size / 2
   const R = size / 2 - 22 // medallion radius; the rest is room for the tails
   const P = (deg: number, r: number, side: 1 | -1 = 1) => {
@@ -166,23 +168,29 @@ function sealSvg(size: number): string {
     return `<line x1="${f(p1.x)}" y1="${f(p1.y)}" x2="${f(p2.x)}" y2="${f(p2.y)}"/>`
   }).join("")
 
-  // laurel: two stems with paired leaves, larger at the base, finer toward the top
-  const stemR = R - 60
-  const leafPair = (deg: number, side: 1 | -1, k: number) => {
+  // laurel: one stem per side; single leaves alternate sides of the stem with
+  // clear gaps between them, slightly smaller toward the top
+  const stemR = R - 62
+  const leafAt = (deg: number, side: 1 | -1, k: number, outward: boolean) => {
     const { x, y } = P(deg, stemR, side)
     const tangent = side * deg
-    const L = 24 * k, W = 9 * k
-    const one = (rot: number, op: number) =>
-      `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(rot)})"><path d="M0,0 C${f(L * 0.25)},${f(-W)} ${f(L * 0.7)},${f(-W)} ${f(L)},0 C${f(L * 0.7)},${f(W)} ${f(L * 0.25)},${f(W)} 0,0 Z" fill="url(#leaf)" opacity="${op}"/><path d="M2,0 L${f(L - 3)},0" stroke="${GOLD_DEEP}" stroke-width="1" opacity="0.7"/></g>`
-    return one(tangent - side * 145, 1) + one(tangent - side * 215, 0.92)
+    const L = 20 * k, W = 6.5 * k
+    const rot = tangent - side * (outward ? 140 : 220)
+    return `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(rot)})"><path d="M0,0 C${f(L * 0.3)},${f(-W)} ${f(L * 0.75)},${f(-W)} ${f(L)},0 C${f(L * 0.75)},${f(W)} ${f(L * 0.3)},${f(W)} 0,0 Z" fill="url(#leaf)"/></g>`
   }
   const laurel = [-1, 1]
-    .flatMap((side) => Array.from({ length: 8 }, (_, i) => leafPair(150 - i * 13.5, side as 1 | -1, 1 - i * 0.055)))
+    .flatMap((side) => Array.from({ length: 7 }, (_, i) => leafAt(150 - i * 15, side as 1 | -1, 1 - i * 0.05, i % 2 === 0)))
     .join("")
   const stem = (side: 1 | -1) => {
-    const a = P(152, stemR, side), b = P(52, stemR, side)
-    return `<path d="M ${f(a.x)} ${f(a.y)} A ${f(stemR)} ${f(stemR)} 0 0 ${side === 1 ? 0 : 1} ${f(b.x)} ${f(b.y)}" fill="none" stroke="url(#leaf)" stroke-width="2.5"/>`
+    const a = P(154, stemR, side), b = P(56, stemR, side)
+    return `<path d="M ${f(a.x)} ${f(a.y)} A ${f(stemR)} ${f(stemR)} 0 0 ${side === 1 ? 0 : 1} ${f(b.x)} ${f(b.y)}" fill="none" stroke="url(#leaf)" stroke-width="2"/>`
   }
+  // clean variant: a fine sunburst behind the mark instead of a wreath
+  const rays = Array.from({ length: 48 }, (_, i) => {
+    const a = (360 / 48) * i
+    const p1 = P(a, R - 40), p2 = P(a, R - 62)
+    return `<line x1="${f(p1.x)}" y1="${f(p1.y)}" x2="${f(p2.x)}" y2="${f(p2.y)}"/>`
+  }).join("")
 
   // three small stars at the base of the wreath
   const star = (cx: number, cy: number, r: number) =>
@@ -206,19 +214,19 @@ function sealSvg(size: number): string {
     `<circle cx="${c}" cy="${c}" r="${f(R - 27)}" fill="none" stroke="#fff7e0" stroke-width="1.5" opacity="0.9"/>` +
     `<circle cx="${c}" cy="${c}" r="${f(R - 31)}" fill="url(#field)"/>` +
     `<circle cx="${c}" cy="${c}" r="${f(R - 35)}" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.8"/>` +
-    stem(1) + stem(-1) + laurel + stars +
+    (style === "laurel" ? stem(1) + stem(-1) + laurel + stars : `<g stroke="${GOLD}" stroke-width="1" opacity="0.35">${rays}</g>` + stars) +
     `</svg>`
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 }
 
-function Seal({ mark, year }: { mark: string; year: string }) {
+function Seal({ mark, year, style }: { mark: string; year: string; style: "laurel" | "clean" }) {
   const size = 300
   const R = size / 2 - 22
   return (
     <div style={{ position: "relative", width: size, height: size, display: "flex" }}>
       <div style={{ position: "absolute", left: size / 2 - R + 6, top: size / 2 - R + 10, width: R * 2 - 12, height: R * 2 - 12, borderRadius: R, boxShadow: "0 18px 40px rgba(0,0,0,0.35)" }} />
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={sealSvg(size)} alt="" width={size} height={size} style={{ position: "absolute", left: 0, top: 0 }} />
+      <img src={sealSvg(size, style)} alt="" width={size} height={size} style={{ position: "absolute", left: 0, top: 0 }} />
       <div style={{ position: "absolute", left: 0, top: 0, width: size, height: size, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: GOLD_LIGHT, paddingBottom: 14 }}>
         <div style={{ fontSize: 12, letterSpacing: 4, fontWeight: 700, textTransform: "uppercase", color: "#f3e3b3" }}>Certified</div>
         <div style={{ fontFamily: "Playfair Display", fontWeight: 700, fontSize: mark.length > 3 ? 44 : 60, lineHeight: 1, marginTop: 2, color: "#f7e9c4" }}>{mark}</div>
@@ -319,7 +327,7 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
 
         {/* seal, bottom-right, over the band */}
         <div style={{ position: "absolute", right: 104, bottom: 70, display: "flex" }}>
-          <Seal mark={brand.seal} year={year} />
+          <Seal mark={brand.seal} year={year} style={input.sealStyle ?? "clean"} />
         </div>
       </div>
     ),
