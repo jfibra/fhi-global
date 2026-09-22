@@ -14,7 +14,9 @@ export type CertificateSettings = {
   line: string
   /** Optional one-line note under the event details (e.g. "8 hours · CPD accredited"). */
   note: string
-  /** Up to two signature blocks, left then right. */
+  /** Short brand tagline, bottom-left; "·" or "/" separates lines. */
+  tagline: string
+  /** Up to two signature blocks. */
   signatories: Signatory[]
 }
 
@@ -22,6 +24,7 @@ export const CERTIFICATE_DEFAULTS: CertificateSettings = {
   heading: "Certificate of Attendance",
   line: "for attending",
   note: "",
+  tagline: "People · Opportunities · A Brighter Tomorrow",
   signatories: [],
 }
 
@@ -29,6 +32,7 @@ export const MAX_SIGNATORIES = 2
 const MAX_HEADING = 60
 const MAX_LINE = 80
 const MAX_NOTE = 120
+const MAX_TAGLINE = 120
 const MAX_SIG = 60
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "")
@@ -49,6 +53,7 @@ export function parseCertificateSettings(raw: unknown): CertificateSettings {
     heading: str(r.heading, MAX_HEADING) || CERTIFICATE_DEFAULTS.heading,
     line: str(r.line, MAX_LINE) || CERTIFICATE_DEFAULTS.line,
     note: str(r.note, MAX_NOTE),
+    tagline: r.tagline === "" ? "" : str(r.tagline, MAX_TAGLINE) || CERTIFICATE_DEFAULTS.tagline,
     signatories,
   }
 }

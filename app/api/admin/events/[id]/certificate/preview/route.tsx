@@ -32,12 +32,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const regId = q.get("registrationId")
   const registration = regId && UUID_RE.test(regId) ? await loadCertificateRegistration(admin, id, regId) : null
 
-  const hasOverride = ["heading", "line", "note", "s1n", "s1t", "s2n", "s2t"].some((k) => q.has(k))
+  const hasOverride = ["heading", "line", "note", "tagline", "s1n", "s1t", "s2n", "s2t"].some((k) => q.has(k))
   const settingsOverride = hasOverride
     ? parseCertificateSettings({
         heading: q.get("heading"),
         line: q.get("line"),
         note: q.get("note"),
+        tagline: q.get("tagline") ?? "",
         signatories: [
           { name: q.get("s1n"), title: q.get("s1t") },
           { name: q.get("s2n"), title: q.get("s2t") },
