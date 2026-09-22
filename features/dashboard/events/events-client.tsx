@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  Award, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Eye, ImagePlus, Loader2,
+  Award, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Eye, ImagePlus, Loader2,
   MapPin, Pencil, Plus, QrCode, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
 } from "lucide-react"
 import { EventCertificateModal } from "./event-certificate-modal"
@@ -407,6 +407,33 @@ export function EventsClient() {
       // keep whatever is shown (cached list or empty state)
     } finally {
       if (regOpenIdRef.current === e.id) setRegsLoading(false)
+    }
+  }
+
+  // Per-row certificate sending from the attendee table (same endpoint the
+  // Certificates dialog uses, so the design and logging are identical).
+  const [certSending, setCertSending] = useState<Set<string>>(() => new Set())
+  const sendCertificateFor = async (r: Registration) => {
+    if (!regEvent) return
+    if (r.certificateSentAt && !window.confirm(`${r.fullName} already received a certificate. Send it again?`)) return
+    setCertSending((s) => new Set(s).add(r.id))
+    try {
+      const res = await fetch(`/api/admin/events/${regEvent.id}/certificate/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registrationId: r.id }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { sentAt?: string; error?: string }
+      if (!res.ok || !data.sentAt) throw new Error(data.error ?? "Send failed")
+      setRegistrations((prev) => prev.map((x) => (x.id === r.id ? { ...x, certificateSentAt: data.sentAt! } : x)))
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Could not send the certificate")
+    } finally {
+      setCertSending((s) => {
+        const n = new Set(s)
+        n.delete(r.id)
+        return n
+      })
     }
   }
 
@@ -1046,6 +1073,7 @@ export function EventsClient() {
                         <th key={f.key} className="px-3 py-2">{f.label}</th>
                       ))}
                       <th className="px-3 py-2">Registered</th>
+                      <th className="px-3 py-2">Certificate</th>
                       <th className="px-3 py-2" aria-label="Actions" />
                     </tr>
                   </thead>
@@ -1078,6 +1106,30 @@ export function EventsClient() {
                         ))}
                         <td className="px-3 py-2.5 text-[#6b7280] whitespace-nowrap">
                           {registeredLabel(r.createdAt)}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">
+                          {certSending.has(r.id) ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-[#6b7280]"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending…</span>
+                          ) : r.certificateSentAt ? (
+                            <button
+                              type="button"
+                              onClick={() => void sendCertificateFor(r)}
+                              title="Sent — click to send again"
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              Sent {new Date(r.certificateSentAt).toLocaleDateString("en-AE", { day: "numeric", month: "short", timeZone: "Asia/Dubai" })}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void sendCertificateFor(r)}
+                              title="Email this person their certificate"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-[#001f3f]/30 text-[11px] font-bold text-[#001f3f] hover:bg-[#001f3f] hover:text-white transition-colors"
+                            >
+                              <Award className="w-3.5 h-3.5" /> Send
+                            </button>
+                          )}
                         </td>
                         <td className="px-3 py-2.5 text-right">
                           <button

@@ -23,6 +23,7 @@ export type ExportRegistration = {
   invitedBy: string | null
   answers: Record<string, AnswerValue>
   createdAt: string
+  certificateSentAt?: string | null
 }
 
 type Format = "pdf" | "csv"
@@ -68,6 +69,7 @@ function buildColumns(fields: RegistrationField[]): Column[] {
       defaultOn: { pdf: true, csv: true },
     })),
     { id: "registered", label: "Registered", cell: (r, _i, fmt) => registeredStamp(r.createdAt, fmt), defaultOn: { pdf: true, csv: true }, cls: "reg" },
+    { id: "certificate", label: "Certificate", cell: (r, _i, fmt) => (r.certificateSentAt ? `Sent ${registeredStamp(r.certificateSentAt, fmt)}` : "Not sent"), defaultOn: { pdf: false, csv: true } },
     // Always last: a blank line to sign on at the door.
     { id: "signature", label: "Signature", cell: () => "", defaultOn: { pdf: true, csv: false }, cls: "sig" },
   ]
