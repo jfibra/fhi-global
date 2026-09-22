@@ -8,12 +8,14 @@ export type EventBrand = {
   name: string
   logo: string
   logoIsWhite: boolean
-  /** 2–4 letter mark stamped in the certificate seal. */
+  /** 2–4 letter mark stamped in the certificate seal (used when there is no sealMark image). */
   seal: string
+  /** Optional gold emblem image for the certificate seal and watermark. */
+  sealMark?: string
 }
 
 export const EVENT_BRANDS: EventBrand[] = [
-  { key: "fhiglobal", name: "FHI Global Property", logo: "/logos/FHI_Branding Set_PNG Copies-02.png", logoIsWhite: false, seal: "FHI" },
+  { key: "fhiglobal", name: "FHI Global Property", logo: "/logos/FHI_Branding Set_PNG Copies-02.png", logoIsWhite: false, seal: "FHI", sealMark: "/logos/fhi-mark-gold.png" },
   { key: "filipinohomes", name: "Filipino Homes", logo: "/logos/Filipinohomes-logo-side-left-white.png", logoIsWhite: true, seal: "FH" },
   { key: "homesph", name: "Homes PH", logo: "/logos/homesph-logo.png", logoIsWhite: false, seal: "HPH" },
   { key: "rentph", name: "Rent PH", logo: "/logos/RentPh new colored logo.png", logoIsWhite: false, seal: "RPH" },

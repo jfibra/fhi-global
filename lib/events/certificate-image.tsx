@@ -45,6 +45,8 @@ export type CertificateInput = {
   /** Absolute URL of the brand logo (Satori fetches it). */
   logoSrc: string
   certificateNo: string
+  /** Absolute URL of the brand's gold emblem (seal + watermark); null → text mark. */
+  sealMarkSrc?: string | null
   settings: CertificateSettings
   fonts: CertificateFont[]
   /** "clean" (default): milled ring, navy field, sunburst and stars. "laurel" adds a wreath. */
@@ -219,7 +221,7 @@ function sealSvg(size: number, style: "laurel" | "clean"): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 }
 
-function Seal({ mark, year, style }: { mark: string; year: string; style: "laurel" | "clean" }) {
+function Seal({ mark, markSrc, year, style }: { mark: string; markSrc?: string | null; year: string; style: "laurel" | "clean" }) {
   const size = 300
   const R = size / 2 - 22
   return (
@@ -229,8 +231,13 @@ function Seal({ mark, year, style }: { mark: string; year: string; style: "laure
       <img src={sealSvg(size, style)} alt="" width={size} height={size} style={{ position: "absolute", left: 0, top: 0 }} />
       <div style={{ position: "absolute", left: 0, top: 0, width: size, height: size, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: GOLD_LIGHT, paddingBottom: 14 }}>
         <div style={{ fontSize: 12, letterSpacing: 4, fontWeight: 700, textTransform: "uppercase", color: "#f3e3b3" }}>Certified</div>
-        <div style={{ fontFamily: "Playfair Display", fontWeight: 700, fontSize: mark.length > 3 ? 44 : 60, lineHeight: 1, marginTop: 2, color: "#f7e9c4" }}>{mark}</div>
-        <div style={{ fontSize: 16, letterSpacing: 4, fontWeight: 700, marginTop: 6, color: "#f3e3b3" }}>{year}</div>
+        {markSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={markSrc} alt="" style={{ height: 78, marginTop: 8, objectFit: "contain" }} />
+        ) : (
+          <div style={{ fontFamily: "Playfair Display", fontWeight: 700, fontSize: mark.length > 3 ? 44 : 60, lineHeight: 1, marginTop: 2, color: "#f7e9c4" }}>{mark}</div>
+        )}
+        <div style={{ fontSize: 16, letterSpacing: 4, fontWeight: 700, marginTop: 8, color: "#f3e3b3" }}>{year}</div>
       </div>
     </div>
   )
@@ -255,7 +262,6 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
   const [headWord, ...rest] = settings.heading.split(" ")
   const headTail = rest.join(" ")
   const year = (input.dateLabel?.match(/\d{4}/) ?? [String(new Date().getFullYear())])[0]
-  const taglineLines = settings.tagline.split(/\s*[·/|]\s*/).map((t) => t.trim()).filter(Boolean).slice(0, 3)
 
   return new ImageResponse(
     (
@@ -270,8 +276,19 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
 
         <CornerBands />
 
-        {/* hairline frame */}
-        <div style={{ position: "absolute", top: 34, left: 34, right: 34, bottom: 34, border: `1.5px solid ${GOLD}`, opacity: 0.8 }} />
+        {/* emblem watermark behind the centre */}
+        {input.sealMarkSrc && (
+          <div style={{ position: "absolute", left: 0, right: 0, top: 330, display: "flex", justifyContent: "center" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={input.sealMarkSrc} alt="" style={{ height: 520, opacity: 0.035, objectFit: "contain" }} />
+          </div>
+        )}
+
+        {/* double frame + gold corner ornaments on the two free corners */}
+        <div style={{ position: "absolute", top: 34, left: 34, right: 34, bottom: 34, border: `1.5px solid ${GOLD}`, opacity: 0.85 }} />
+        <div style={{ position: "absolute", top: 46, left: 46, right: 46, bottom: 46, border: `1px solid ${NAVY}`, opacity: 0.12 }} />
+        <div style={{ position: "absolute", top: 58, right: 58, width: 54, height: 54, borderTop: `3px solid ${GOLD}`, borderRight: `3px solid ${GOLD}` }} />
+        <div style={{ position: "absolute", bottom: 58, left: 58, width: 54, height: 54, borderBottom: `3px solid ${GOLD}`, borderLeft: `3px solid ${GOLD}` }} />
 
         {/* logo */}
         <div style={{ position: "absolute", left: 156, top: 98, display: "flex", alignItems: "center", height: 130, padding: brand.logoIsWhite ? "16px 26px" : "0px", background: brand.logoIsWhite ? NAVY : "transparent" }}>
@@ -309,15 +326,6 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
           {settings.note && <div style={{ fontSize: 19, color: GOLD_DEEP, fontWeight: 700, marginTop: 14, letterSpacing: 3, textTransform: "uppercase" }}>{settings.note}</div>}
         </div>
 
-        {/* tagline, bottom-left */}
-        {taglineLines.length > 0 && (
-          <div style={{ position: "absolute", left: 130, bottom: 118, display: "flex", flexDirection: "column" }}>
-            {taglineLines.map((t, i) => (
-              <div key={i} style={{ fontSize: 17, letterSpacing: 5, textTransform: "uppercase", color: GOLD_DEEP, fontWeight: 600, marginTop: i ? 10 : 0 }}>{t}</div>
-            ))}
-          </div>
-        )}
-
         {/* signatures, bottom-centre */}
         {sigs.length > 0 && (
           <div style={{ position: "absolute", left: 400, right: 770, bottom: 92, display: "flex", justifyContent: sigs.length === 2 ? "space-between" : "center" }}>
@@ -327,7 +335,7 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
 
         {/* seal, bottom-right, over the band */}
         <div style={{ position: "absolute", right: 104, bottom: 70, display: "flex" }}>
-          <Seal mark={brand.seal} year={year} style={input.sealStyle ?? "clean"} />
+          <Seal mark={brand.seal} markSrc={input.sealMarkSrc ?? null} year={year} style={input.sealStyle ?? "clean"} />
         </div>
       </div>
     ),

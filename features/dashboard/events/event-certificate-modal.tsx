@@ -44,7 +44,6 @@ export function EventCertificateModal({
   const [heading, setHeading] = useState(saved.heading)
   const [line, setLine] = useState(saved.line)
   const [note, setNote] = useState(saved.note)
-  const [tagline, setTagline] = useState(saved.tagline)
   const [s1n, setS1n] = useState(saved.signatories[0]?.name ?? "")
   const [s1t, setS1t] = useState(saved.signatories[0]?.title ?? "")
   const [s2n, setS2n] = useState(saved.signatories[1]?.name ?? "")
@@ -58,13 +57,12 @@ export function EventCertificateModal({
         heading,
         line,
         note,
-        tagline,
         signatories: [
           { name: s1n, title: s1t },
           { name: s2n, title: s2t },
         ],
       }),
-    [heading, line, note, tagline, s1n, s1t, s2n, s2t],
+    [heading, line, note, s1n, s1t, s2n, s2t],
   )
   const dirty = JSON.stringify(draft) !== JSON.stringify(parseCertificateSettings(saved))
 
@@ -96,14 +94,14 @@ export function EventCertificateModal({
   useEffect(() => {
     clearTimeout(previewTimer.current)
     previewTimer.current = setTimeout(() => {
-      const p = new URLSearchParams({ heading, line, note, tagline, s1n, s1t, s2n, s2t })
+      const p = new URLSearchParams({ heading, line, note, s1n, s1t, s2n, s2t })
       if (previewFor) p.set("registrationId", previewFor)
       p.set("t", String(Date.now()))
       setPreviewLoading(true)
       setPreviewUrl(`/api/admin/events/${event.id}/certificate/preview?${p.toString()}`)
     }, 450)
     return () => clearTimeout(previewTimer.current)
-  }, [event.id, heading, line, note, tagline, s1n, s1t, s2n, s2t, previewFor])
+  }, [event.id, heading, line, note, s1n, s1t, s2n, s2t, previewFor])
 
   // ── recipients ──
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
@@ -202,10 +200,6 @@ export function EventCertificateModal({
             <div>
               <label className={labelCls}>Note (optional)</label>
               <input className={inputCls} value={note} onChange={(e) => setNote(e.target.value)} maxLength={120} placeholder="e.g. 4 hours · Career development" />
-            </div>
-            <div>
-              <label className={labelCls}>Tagline (bottom-left · separates lines)</label>
-              <input className={inputCls} value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={120} placeholder="People · Opportunities · A Brighter Tomorrow" />
             </div>
             <div className="border-t border-[#f0f0f0] pt-3">
               <p className={labelCls}>Signatory 1</p>

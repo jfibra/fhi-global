@@ -71,6 +71,7 @@ export async function buildCertificateInput(opts: {
     brandKey: brand.key,
     // Logo filenames contain spaces; Satori needs a proper URL.
     logoSrc: `${opts.origin}${encodeURI(brand.logo)}`,
+    sealMarkSrc: brand.sealMark ? `${opts.origin}${encodeURI(brand.sealMark)}` : null,
     certificateNo: certificateNumber(registration?.id ?? "00000000-0000-0000-0000-000000000000", event.event_date),
     settings: opts.settingsOverride ?? parseCertificateSettings(event.certificate),
     fonts,
