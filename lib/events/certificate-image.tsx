@@ -44,7 +44,8 @@ export type CertificateInput = {
   brandKey: string
   /** Absolute URL of the brand logo (Satori fetches it). */
   logoSrc: string
-  certificateNo: string
+  /** Shown top-right when present; self-service certificates have none. */
+  certificateNo: string | null
   /** Absolute URL of the brand's gold emblem, used as a faint watermark; null → none. */
   sealMarkSrc?: string | null
   /** Absolute URL of the brand's pre-rendered seal PNG (public/seals/<brand>.png). */
@@ -197,12 +198,14 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
           <img src={input.logoSrc} alt="" style={{ height: brand.logoIsWhite ? 84 : 124, objectFit: "contain" }} />
         </div>
 
-        {/* certificate number */}
-        <div style={{ position: "absolute", right: 130, top: 92, display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-          <div style={{ fontSize: 14, letterSpacing: 5, textTransform: "uppercase", color: MUTED, fontWeight: 600 }}>Certificate No.</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: NAVY, marginTop: 6, letterSpacing: 1 }}>{input.certificateNo}</div>
-          <div style={{ width: 96, height: 2, background: GOLD, marginTop: 10 }} />
-        </div>
+        {/* certificate number — only for certificates tied to a registration */}
+        {input.certificateNo && (
+          <div style={{ position: "absolute", right: 130, top: 92, display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+            <div style={{ fontSize: 14, letterSpacing: 5, textTransform: "uppercase", color: MUTED, fontWeight: 600 }}>Certificate No.</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: NAVY, marginTop: 6, letterSpacing: 1 }}>{input.certificateNo}</div>
+            <div style={{ width: 96, height: 2, background: GOLD, marginTop: 10 }} />
+          </div>
+        )}
 
         {/* centre stack */}
         <div style={{ position: "absolute", left: 0, right: 0, top: 262, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>

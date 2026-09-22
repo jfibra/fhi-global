@@ -73,7 +73,9 @@ export async function buildCertificateInput(opts: {
     logoSrc: `${opts.origin}${encodeURI(brand.logo)}`,
     sealMarkSrc: brand.sealMark ? `${opts.origin}${encodeURI(brand.sealMark)}` : null,
     sealSrc: `${opts.origin}/seals/${brand.key}.png`,
-    certificateNo: certificateNumber(registration?.id ?? "00000000-0000-0000-0000-000000000000", event.event_date),
+    // A number only when the certificate is tied to a real registration; the
+    // self-service (typed-name) path and the sample preview print none.
+    certificateNo: registration && !registration.id.startsWith("00000000-") ? certificateNumber(registration.id, event.event_date) : null,
     settings: opts.settingsOverride ?? parseCertificateSettings(event.certificate),
     fonts,
   }
