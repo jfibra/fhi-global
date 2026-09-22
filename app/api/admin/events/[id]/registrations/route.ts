@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { canManageEvents } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { titleCaseName } from "@/lib/public-profile"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -28,12 +29,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Failed to load registrations" }, { status: 500 })
   }
 
+  // Attendees type their own names, often in ALL CAPS. Present them in proper
+  // case everywhere the admin sees them (table, exports, raffle); the stored
+  // value stays exactly as entered.
   const registrations = (data ?? []).map((r) => ({
     id: r.id as string,
-    fullName: r.full_name as string,
+    fullName: titleCaseName(r.full_name as string),
     email: r.email as string,
     whatsapp: (r.whatsapp as string | null) ?? null,
-    invitedBy: (r.invited_by as string | null) ?? null,
+    invitedBy: r.invited_by ? titleCaseName(r.invited_by as string) : null,
     answers: (r.answers as Record<string, string | number | boolean> | null) ?? {},
     createdAt: r.created_at as string,
   }))

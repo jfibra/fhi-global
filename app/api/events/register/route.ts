@@ -4,6 +4,7 @@ import { parseRegistrationFields, validateAnswers } from "@/lib/events/fields"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
 import { sendEventRegistrationEmail } from "@/lib/mailer"
 import { SITE_URL } from "@/lib/seo"
+import { titleCaseName } from "@/lib/public-profile"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
   try {
     await sendEventRegistrationEmail({
       to: email,
-      fullName,
+      fullName: titleCaseName(fullName),
       eventTitle: (event.title as string) ?? "FHI Global event",
       eventDate: (event.event_date as string | null) ?? null,
       venue: (event.venue as string | null) ?? null,
