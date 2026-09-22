@@ -68,15 +68,71 @@ export async function loadCertificateFonts(origin: string): Promise<CertificateF
   )
 }
 
+type Style = Record<string, string | number>
+
+const IVORY = "#fbf8f1"
+const GOLD_DEEP = "#a98634"
+const GOLD_LIGHT = "#e9d59a"
+
+/** Corner mark inside the frame — keys added only when set (Satori rejects undefined). */
 function Corner({ top, left }: { top: boolean; left: boolean }) {
-  // Satori parses border/position values as strings, so keys must be present
-  // only when set — an `undefined` value throws inside its style parser.
-  const style: Record<string, string | number> = { position: "absolute", width: 64, height: 64 }
-  style[top ? "top" : "bottom"] = 74
-  style[left ? "left" : "right"] = 74
-  style[top ? "borderTop" : "borderBottom"] = `4px solid ${GOLD}`
-  style[left ? "borderLeft" : "borderRight"] = `4px solid ${GOLD}`
+  const style: Style = { position: "absolute", width: 72, height: 72 }
+  style[top ? "top" : "bottom"] = 86
+  style[left ? "left" : "right"] = 86
+  style[top ? "borderTop" : "borderBottom"] = `3px solid ${GOLD_DEEP}`
+  style[left ? "borderLeft" : "borderRight"] = `3px solid ${GOLD_DEEP}`
   return <div style={style} />
+}
+
+/** Gold-foil seal with ribbon tails: brand initials, year, "certified". */
+function Seal({ initials, year }: { initials: string; year: string }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 230, position: "relative" }}>
+      {/* ribbon tails, behind the disc */}
+      <div style={{ position: "absolute", top: 118, left: 62, width: 44, height: 96, background: NAVY, transform: "rotate(18deg)" }} />
+      <div style={{ position: "absolute", top: 118, left: 124, width: 44, height: 96, background: NAVY, transform: "rotate(-18deg)" }} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 176,
+          height: 176,
+          borderRadius: 88,
+          background: `radial-gradient(circle at 38% 32%, ${GOLD_LIGHT} 0%, ${GOLD} 45%, ${GOLD_DEEP} 100%)`,
+          boxShadow: "0 10px 26px rgba(0,0,0,0.18)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 146,
+            height: 146,
+            borderRadius: 73,
+            border: `2px solid ${IVORY}`,
+            color: NAVY,
+          }}
+        >
+          <div style={{ fontSize: 12, letterSpacing: 4, fontWeight: 700, textTransform: "uppercase", opacity: 0.85 }}>Certified</div>
+          <div style={{ fontFamily: "Playfair Display", fontWeight: 700, fontSize: initials.length > 3 ? 34 : 46, lineHeight: 1, marginTop: 4 }}>{initials}</div>
+          <div style={{ fontSize: 15, letterSpacing: 3, fontWeight: 700, marginTop: 6 }}>{year}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Signature({ name, title }: { name: string; title: string }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 430 }}>
+      <div style={{ width: 360, height: 2, background: NAVY }} />
+      <div style={{ fontSize: 25, fontWeight: 700, color: INK, marginTop: 14 }}>{name}</div>
+      {title && <div style={{ fontSize: 19, color: MUTED, marginTop: 4 }}>{title}</div>}
+    </div>
+  )
 }
 
 export function renderCertificate(input: CertificateInput): ImageResponse {
@@ -85,7 +141,12 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
   const sigs = settings.signatories
   const details = [input.dateLabel, input.venue].filter(Boolean).join("   ·   ")
   // Long names shrink rather than wrap: a two-line name breaks the composition.
-  const nameSize = input.attendeeName.length > 30 ? 66 : input.attendeeName.length > 22 ? 78 : 92
+  const nameSize = input.attendeeName.length > 30 ? 74 : input.attendeeName.length > 22 ? 90 : 108
+  // "Certificate of Attendance" → "CERTIFICATE" + "of Attendance"; other headings split on the first space.
+  const [headWord, ...rest] = settings.heading.split(" ")
+  const headTail = rest.join(" ")
+  const initials = brand.seal
+  const year = (input.dateLabel?.match(/\d{4}/) ?? [String(new Date().getFullYear())])[0]
 
   return new ImageResponse(
     (
@@ -95,19 +156,54 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
           height: "100%",
           display: "flex",
           position: "relative",
-          background: "#ffffff",
+          background: `radial-gradient(ellipse at center, #ffffff 0%, ${IVORY} 70%, #f3eddc 100%)`,
           fontFamily: "Outfit",
           color: INK,
         }}
       >
-        {/* frame */}
-        <div style={{ position: "absolute", top: 48, left: 48, right: 48, bottom: 48, border: `2px solid ${GOLD}` }} />
-        <div style={{ position: "absolute", top: 60, left: 60, right: 60, bottom: 60, border: `1px solid ${NAVY}`, opacity: 0.25 }} />
+        {/* double frame */}
+        <div style={{ position: "absolute", top: 40, left: 40, right: 40, bottom: 40, border: `10px solid ${NAVY}` }} />
+        <div style={{ position: "absolute", top: 62, left: 62, right: 62, bottom: 62, border: `2px solid ${GOLD_DEEP}` }} />
         <Corner top left />
         <Corner top left={false} />
         <Corner top={false} left />
         <Corner top={false} left={false} />
 
+        {/* header band */}
+        <div
+          style={{
+            position: "absolute",
+            top: 64,
+            left: 64,
+            right: 64,
+            height: 172,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 96px",
+            background: `linear-gradient(90deg, ${NAVY} 0%, #062b55 100%)`,
+            borderBottom: `4px solid ${GOLD}`,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              height: 96,
+              padding: brand.logoIsWhite ? "0px" : "12px 22px",
+              background: brand.logoIsWhite ? "transparent" : "#ffffff",
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={input.logoSrc} alt="" style={{ height: brand.logoIsWhite ? 74 : 70, objectFit: "contain" }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+            <div style={{ fontSize: 14, letterSpacing: 5, textTransform: "uppercase", color: GOLD, fontWeight: 700 }}>Certificate No.</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: "#ffffff", marginTop: 6, letterSpacing: 1 }}>{input.certificateNo}</div>
+          </div>
+        </div>
+
+        {/* body */}
         <div
           style={{
             display: "flex",
@@ -115,88 +211,53 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
             justifyContent: "space-between",
             width: "100%",
             height: "100%",
-            padding: "112px 150px 108px",
+            padding: "282px 150px 112px",
           }}
         >
-          {/* top: logo + number */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                height: 92,
-                padding: brand.logoIsWhite ? "14px 22px" : "0px",
-                background: brand.logoIsWhite ? NAVY : "transparent",
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={input.logoSrc} alt="" style={{ height: brand.logoIsWhite ? 56 : 84, objectFit: "contain" }} />
+          <div style={{ display: "flex", flex: 1, flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", paddingBottom: 40 }}>
+            <div style={{ fontFamily: "Playfair Display", fontWeight: 700, fontSize: 64, letterSpacing: 14, textTransform: "uppercase", color: NAVY, lineHeight: 1 }}>
+              {headWord}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-              <div style={{ fontSize: 15, letterSpacing: 4, textTransform: "uppercase", color: MUTED, fontWeight: 600 }}>
-                Certificate No.
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: NAVY, marginTop: 4 }}>{input.certificateNo}</div>
+            {headTail && (
+              <div style={{ fontFamily: "Playfair Display", fontStyle: "italic", fontSize: 32, color: GOLD_DEEP, marginTop: 10 }}>{headTail}</div>
+            )}
+            <div style={{ fontSize: 24, letterSpacing: 4, textTransform: "uppercase", color: MUTED, marginTop: 40, fontWeight: 600 }}>
+              This is to certify that
             </div>
-          </div>
-
-          {/* centre */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-            <div style={{ fontSize: 26, letterSpacing: 10, textTransform: "uppercase", color: GOLD, fontWeight: 700 }}>
-              {settings.heading}
-            </div>
-            <div style={{ fontSize: 26, color: MUTED, marginTop: 34 }}>This is to certify that</div>
             <div
               style={{
                 fontFamily: "Playfair Display",
                 fontWeight: 700,
                 fontSize: nameSize,
                 color: NAVY,
-                marginTop: 18,
+                marginTop: 16,
                 lineHeight: 1.1,
-                maxWidth: 1380,
+                maxWidth: 1400,
               }}
             >
               {input.attendeeName}
             </div>
-            <div style={{ width: 180, height: 3, background: GOLD, marginTop: 26 }} />
-            <div style={{ fontFamily: "Playfair Display", fontStyle: "italic", fontSize: 30, color: MUTED, marginTop: 26 }}>
-              {settings.line}
+            {/* gold rule with a diamond */}
+            <div style={{ display: "flex", alignItems: "center", marginTop: 22 }}>
+              <div style={{ width: 200, height: 2, background: GOLD_DEEP }} />
+              <div style={{ width: 12, height: 12, background: GOLD_DEEP, transform: "rotate(45deg)", margin: "0 14px" }} />
+              <div style={{ width: 200, height: 2, background: GOLD_DEEP }} />
             </div>
-            <div style={{ fontSize: 44, fontWeight: 700, color: NAVY, marginTop: 14, maxWidth: 1300, lineHeight: 1.2 }}>
-              {input.eventTitle}
-            </div>
-            {details && <div style={{ fontSize: 24, color: MUTED, marginTop: 18 }}>{details}</div>}
+            <div style={{ fontFamily: "Playfair Display", fontStyle: "italic", fontSize: 30, color: MUTED, marginTop: 22 }}>{settings.line}</div>
+            <div style={{ fontSize: 46, fontWeight: 700, color: NAVY, marginTop: 12, maxWidth: 1320, lineHeight: 1.2 }}>{input.eventTitle}</div>
+            {details && <div style={{ fontSize: 24, color: MUTED, marginTop: 16 }}>{details}</div>}
             {settings.note && (
-              <div style={{ fontSize: 20, color: GOLD, fontWeight: 600, marginTop: 16, letterSpacing: 1 }}>{settings.note}</div>
+              <div style={{ fontSize: 20, color: GOLD_DEEP, fontWeight: 700, marginTop: 14, letterSpacing: 2, textTransform: "uppercase" }}>{settings.note}</div>
             )}
           </div>
 
-          {/* bottom: signatories + brand line */}
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: sigs.length === 2 ? "space-between" : "center" }}>
-            {sigs.map((s, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 420 }}>
-                <div style={{ width: 340, height: 2, background: NAVY, opacity: 0.7 }} />
-                <div style={{ fontSize: 24, fontWeight: 700, color: INK, marginTop: 14 }}>{s.name}</div>
-                {s.title && <div style={{ fontSize: 19, color: MUTED, marginTop: 4 }}>{s.title}</div>}
-              </div>
-            ))}
-            <div
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                bottom: 78,
-                display: "flex",
-                justifyContent: "center",
-                fontSize: 15,
-                letterSpacing: 3,
-                textTransform: "uppercase",
-                color: MUTED,
-              }}
-            >
-              {brand.name} · fhiglobal.ae
+          {/* signatures + seal */}
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", position: "relative" }}>
+            {sigs[0] ? <Signature name={sigs[0].name} title={sigs[0].title} /> : <div style={{ width: 430 }} />}
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", flex: 1 }}>
+              <Seal initials={initials} year={year} />
             </div>
+            {sigs[1] ? <Signature name={sigs[1].name} title={sigs[1].title} /> : <div style={{ width: 430 }} />}
           </div>
         </div>
       </div>
