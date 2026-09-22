@@ -27,14 +27,20 @@ const GOLD_LIGHT = "#f0d890"
 const IVORY = "#fbf8f1"
 const FONT = "Outfit, 'Segoe UI', Arial, sans-serif"
 
+// Logo, seal and QR renders are reused across previews and downloads.
+const imageCache = new Map<string, Promise<HTMLImageElement | null>>()
 function loadImage(src: string): Promise<HTMLImageElement | null> {
-  return new Promise((resolve) => {
+  const hit = imageCache.get(src)
+  if (hit) return hit
+  const p = new Promise<HTMLImageElement | null>((resolve) => {
     const img = new Image()
     img.crossOrigin = "anonymous"
     img.onload = () => resolve(img)
     img.onerror = () => resolve(null)
     img.src = src
   })
+  imageCache.set(src, p)
+  return p
 }
 
 function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {

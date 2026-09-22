@@ -8,9 +8,9 @@
 export type Signatory = { name: string; title: string }
 
 /**
- * Who may fetch their own certificate from the public page (QR at the venue):
- * off — nobody; registered — attendees who enter the email they registered
- * with; open — anyone who types a name (no verification).
+ * Who may fetch their own certificate from the public page (QR at the venue).
+ * The team chose "open" for every event — anyone types a name and downloads —
+ * so there is no admin control; the other modes remain for a future toggle.
  */
 export type SelfService = "off" | "registered" | "open"
 export const SELF_SERVICE_MODES: SelfService[] = ["off", "registered", "open"]
@@ -32,7 +32,7 @@ export const CERTIFICATE_DEFAULTS: CertificateSettings = {
   line: "for attending",
   note: "",
   signatories: [],
-  selfService: "off",
+  selfService: "open",
 }
 
 export const MAX_SIGNATORIES = 2
@@ -60,7 +60,7 @@ export function parseCertificateSettings(raw: unknown): CertificateSettings {
     line: str(r.line, MAX_LINE) || CERTIFICATE_DEFAULTS.line,
     note: str(r.note, MAX_NOTE),
     signatories,
-    selfService: SELF_SERVICE_MODES.includes(r.selfService as SelfService) ? (r.selfService as SelfService) : "off",
+    selfService: SELF_SERVICE_MODES.includes(r.selfService as SelfService) ? (r.selfService as SelfService) : "open",
   }
 }
 

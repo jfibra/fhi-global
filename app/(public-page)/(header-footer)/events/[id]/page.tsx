@@ -91,7 +91,10 @@ export default async function EventDetailPage({ params }: Props) {
 
   const brand = eventBrand(event.brand)
   const registrationOpen = isEventRegistrationOpen(event)
-  const certificatesOpen = parseCertificateSettings(event.certificate).selfService !== "off"
+  // Self-service is always on; the banner appears from the event day onward so
+  // an upcoming event is not advertising certificates before anyone attended.
+  const eventStarted = !event.event_date || new Date(event.event_date).getTime() - 12 * 3600_000 <= Date.now()
+  const certificatesOpen = eventStarted && parseCertificateSettings(event.certificate).selfService !== "off"
   const d = event.event_date ? new Date(event.event_date) : null
   // Event times are Dubai time (GST) — force the zone; this renders on the
   // server, whose clock is usually UTC.
