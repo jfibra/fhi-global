@@ -14,6 +14,7 @@
 import { useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, FileText, X } from "lucide-react"
 import { formatAnswer, type AnswerValue, type RegistrationField } from "@/lib/events/fields"
+import { eventBrand } from "@/lib/events/brands"
 
 export type ExportRegistration = {
   fullName: string
@@ -81,7 +82,7 @@ export function EventExportModal({
   filterLabel,
   onClose,
 }: {
-  event: { title: string; slug: string | null; venue: string | null; eventDateText: string }
+  event: { title: string; slug: string | null; venue: string | null; eventDateText: string; brand: string }
   /** Already filtered by the attendee-list search, so the export matches what is on screen. */
   registrations: ExportRegistration[]
   fields: RegistrationField[]
@@ -132,6 +133,10 @@ export function EventExportModal({
   const printPdf = () => {
     const w = window.open("", "_blank", "width=900,height=700")
     if (!w) return
+    // The sheet carries the event's brand logo. Coloured logos sit on a white
+    // chip so they read on the navy band; white-on-transparent ones sit bare.
+    const brand = eventBrand(event.brand)
+    const logoSrc = `${window.location.origin}${brand.logo}`
     const generated = new Date().toLocaleDateString("en-AE", { year: "numeric", month: "long", day: "numeric" })
     const head = chosen.map((c) => `<th>${esc(c.label)}</th>`).join("")
     const body = registrations
@@ -150,8 +155,11 @@ export function EventExportModal({
 <style>
   * { box-sizing: border-box; margin: 0; }
   body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; padding: 32px; }
-  .band { background: #001f3f; border-bottom: 4px solid #d6b357; border-radius: 12px 12px 0 0; padding: 22px 28px; }
+  .band { background: #001f3f; border-bottom: 4px solid #d6b357; padding: 20px 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
   .band h1 { color: #ffffff; font-size: 22px; }
+  .logo { flex: 0 0 auto; height: 52px; display: flex; align-items: center; }
+  .logo.chip { background: #ffffff; padding: 8px 14px; }
+  .logo img { height: 36px; width: auto; max-width: 220px; object-fit: contain; display: block; }
   .band .gold { color: #d6b357; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
   .meta { display: flex; flex-wrap: wrap; gap: 20px; padding: 14px 28px; background: #f6f8fb; border: 1px solid #e8eaed; border-top: 0; font-size: 12px; color: #4b5563; }
   .meta strong { color: #001f3f; }
@@ -167,7 +175,10 @@ export function EventExportModal({
   .foot b { color: #b8913f; }
   @page { margin: 14mm; ${chosen.length >= LANDSCAPE_FROM ? "size: landscape;" : ""} }
 </style></head><body>
-  <div class="band"><p class="gold">FHI Global · Event Attendees</p><h1>${esc(event.title)}</h1></div>
+  <div class="band">
+    <div><p class="gold">${esc(brand.name)} · Event Attendees</p><h1>${esc(event.title)}</h1></div>
+    <div class="logo${brand.logoIsWhite ? "" : " chip"}"><img src="${logoSrc}" alt="${esc(brand.name)}" /></div>
+  </div>
   <div class="meta">
     <span>Event date: <strong>${esc(event.eventDateText)}</strong></span>
     ${event.venue ? `<span>Venue: <strong>${esc(event.venue)}</strong></span>` : ""}
@@ -183,7 +194,14 @@ export function EventExportModal({
 </body></html>`)
     w.document.close()
     w.focus()
-    setTimeout(() => w.print(), 350)
+    // Print only once the logo has loaded (or failed), so it is never a blank box.
+    const img = w.document.querySelector("img")
+    const go = () => setTimeout(() => w.print(), 250)
+    if (img && !img.complete) {
+      img.addEventListener("load", go, { once: true })
+      img.addEventListener("error", go, { once: true })
+      setTimeout(go, 3000) // safety net if neither event fires
+    } else go()
   }
 
   const download = () => {

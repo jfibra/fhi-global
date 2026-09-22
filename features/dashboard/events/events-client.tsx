@@ -916,7 +916,7 @@ export function EventsClient() {
       {/* ── Export dialog (sits above the registrations modal) ── */}
       {regEvent && exportOpen && (
         <EventExportModal
-          event={{ title: regEvent.title, slug: regEvent.slug, venue: regEvent.venue, eventDateText: eventDateLabel(regEvent.eventDate) }}
+          event={{ title: regEvent.title, slug: regEvent.slug, venue: regEvent.venue, eventDateText: eventDateLabel(regEvent.eventDate), brand: regEvent.brand }}
           registrations={filteredRegs}
           fields={regFields}
           filterLabel={regQuery.trim() || undefined}
