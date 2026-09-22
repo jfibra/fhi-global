@@ -60,8 +60,8 @@ function sealSvg(b) {
   const baseY = C + R - 192
   const engraved = [0.28, 0.42, 0.56, 0.7, 0.84].map((k) => `<circle cx="${C}" cy="${C}" r="${f((R - 160) * k)}" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.14"/>`).join("")
   const centre = b.mark
-    ? `<image href="${dataUri(b.mark)}" x="${C - 96}" y="${C - 120}" width="192" height="192" preserveAspectRatio="xMidYMid meet" filter="url(#emblemGlow)"/>`
-    : `<text x="${C}" y="${C + 8}" text-anchor="middle" dominant-baseline="middle" font-family="Playfair Display" font-weight="700" font-size="${b.text.length > 3 ? 96 : 132}" fill="#f7e9c4" filter="url(#emblemGlow)">${b.text}</text>`
+    ? `<image href="${dataUri(b.mark)}" x="${C - 96}" y="${C - 120}" width="192" height="192" preserveAspectRatio="xMidYMid meet"/>`
+    : `<text x="${C}" y="${C + 8}" text-anchor="middle" dominant-baseline="middle" font-family="Playfair Display" font-weight="700" font-size="${b.text.length > 3 ? 96 : 132}" fill="#f7e9c4">${b.text}</text>`
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">
 <defs>
   <style>
@@ -73,7 +73,7 @@ function sealSvg(b) {
   <radialGradient id="bevel" cx="35%" cy="28%" r="80%"><stop offset="0" stop-color="#fff8e3"/><stop offset="0.45" stop-color="${GOLD}"/><stop offset="1" stop-color="#8a6b22"/></radialGradient>
   <radialGradient id="bezel" cx="65%" cy="70%" r="80%"><stop offset="0" stop-color="#fff2cf"/><stop offset="0.6" stop-color="${GOLD}"/><stop offset="1" stop-color="#7d611d"/></radialGradient>
   <radialGradient id="band" cx="50%" cy="50%" r="60%"><stop offset="0" stop-color="#0d3566"/><stop offset="1" stop-color="${NAVY}"/></radialGradient>
-  <radialGradient id="field" cx="50%" cy="38%" r="72%"><stop offset="0" stop-color="#16437a"/><stop offset="0.7" stop-color="#062648"/><stop offset="1" stop-color="#001430"/></radialGradient>
+  <radialGradient id="field" cx="50%" cy="50%" r="70%"><stop offset="0" stop-color="#0b3060"/><stop offset="1" stop-color="#001a35"/></radialGradient>
   <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff2cf"/><stop offset="0.5" stop-color="${GOLD}"/><stop offset="1" stop-color="${GOLD_DEEP}"/></linearGradient>
   <radialGradient id="pearl" cx="35%" cy="30%" r="70%"><stop offset="0" stop-color="#fffaf0"/><stop offset="0.6" stop-color="#e2c27a"/><stop offset="1" stop-color="${GOLD_DEEP}"/></radialGradient>
   <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.16"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
@@ -109,7 +109,6 @@ ${pearls(R - 122, 96)}
 <circle cx="${C}" cy="${C}" r="${f(R - 160)}" fill="none" stroke="${GOLD}" stroke-width="2" opacity="0.7"/>
 ${engraved}
 <g stroke="${GOLD}" stroke-width="2" opacity="0.16">${ticks(72, R - 164, R - 250)}</g>
-<ellipse cx="${C}" cy="${f(C - 60)}" rx="${f(R - 170)}" ry="${f((R - 170) * 0.55)}" fill="url(#gloss)"/>
 <text font-family="Outfit" font-weight="700" font-size="30" letter-spacing="7" fill="#f6e7bd"><textPath href="#arcTop" startOffset="50%" text-anchor="middle" dominant-baseline="middle">${b.ring}</textPath></text>
 <text font-family="Outfit" font-weight="700" font-size="30" letter-spacing="7" fill="#f6e7bd"><textPath href="#arcBottom" startOffset="50%" text-anchor="middle" dominant-baseline="middle">${b.bottom}</textPath></text>
 ${[90, 270].map((d) => { const { x, y } = P(d, textR); return `<rect x="${f(x - 8)}" y="${f(y - 8)}" width="16" height="16" fill="url(#leaf)" transform="rotate(45 ${f(x)} ${f(y)})"/>` }).join("")}
