@@ -931,7 +931,7 @@ export function EventsClient() {
 
       {regEvent && certOpen && (
         <EventCertificateModal
-          event={{ id: regEvent.id, slug: regEvent.slug, title: regEvent.title, certificate: regEvent.certificate }}
+          event={{ id: regEvent.id, slug: regEvent.slug, title: regEvent.title, brand: regEvent.brand, eventDateText: regEvent.eventDate ? eventDateLabel(regEvent.eventDate) : null, venue: regEvent.venue, certificate: regEvent.certificate }}
           registrations={registrations}
           onClose={() => setCertOpen(false)}
           onSaved={(certificate) => {
