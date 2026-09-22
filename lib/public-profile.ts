@@ -37,8 +37,9 @@ function oneLine(raw: unknown, max: number): string {
  * DISPLAY transform only; the stored value is left exactly as typed, so nothing
  * is lost and an admin still sees what was entered.
  *
- * Word boundaries include hyphens and apostrophes, so "MARY-JANE" and "O'BRIEN"
- * come out as "Mary-Jane" and "O'Brien" rather than "Mary-jane" and "O'brien".
+ * Word boundaries include hyphens, apostrophes, slashes and ampersands, so
+ * "MARY-JANE", "O'BRIEN" and "JOY/AMADO" come out as "Mary-Jane", "O'Brien"
+ * and "Joy/Amado" rather than "Mary-jane", "O'brien" and "Joy/amado".
  */
 export function titleCaseName(raw: string): string {
   return raw
@@ -48,7 +49,7 @@ export function titleCaseName(raw: string): string {
     .replace(/\s+/g, " ")
     .trim()
     .toLocaleLowerCase()
-    .replace(/(^|[\s\-'\u2019])(\p{L})/gu, (_, sep: string, ch: string) => sep + ch.toLocaleUpperCase())
+    .replace(/(^|[\s\-'\u2019/&])(\p{L})/gu, (_, sep: string, ch: string) => sep + ch.toLocaleUpperCase())
 }
 
 // ─── Tagline ──────────────────────────────────────────────────────────────────
