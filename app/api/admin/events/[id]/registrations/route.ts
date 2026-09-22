@@ -74,3 +74,32 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   return NextResponse.json({ ok: true })
 }
+
+/** Edit one registration's "Invited by" (free text; empty clears it). */
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await requireActiveSession()
+  if (!session.ok) return session.response
+  if (!canManageEvents(session.context.profile.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
+  const { id } = await params
+  const body = (await req.json().catch(() => ({}))) as { registrationId?: unknown; invitedBy?: unknown }
+  const registrationId = typeof body.registrationId === "string" ? body.registrationId : ""
+  if (!UUID_RE.test(id) || !UUID_RE.test(registrationId)) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 })
+  }
+  const invitedBy = typeof body.invitedBy === "string" ? body.invitedBy.replace(/\s+/g, " ").trim().slice(0, 120) : ""
+
+  const admin = createAdminSupabase()
+  const { error } = await admin
+    .from("event_registrations")
+    .update({ invited_by: invitedBy || null })
+    .eq("id", registrationId)
+    .eq("event_id", id)
+
+  if (error) {
+    return NextResponse.json({ error: "Failed to update registration" }, { status: 500 })
+  }
+  return NextResponse.json({ ok: true, invitedBy: invitedBy ? titleCaseName(invitedBy) : null })
+}

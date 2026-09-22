@@ -12,6 +12,7 @@ import {
   MapPin, Pencil, Plus, QrCode, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
 } from "lucide-react"
 import { EventCertificateModal } from "./event-certificate-modal"
+import { InlineInviterEdit } from "@/components/dashboard/inline-inviter-edit"
 import { EventExportModal } from "./event-export-modal"
 import { EventFlyerModal } from "./event-flyer-modal"
 import { EventRaffle } from "./event-raffle"
@@ -1098,7 +1099,25 @@ export function EventsClient() {
                             "—"
                           )}
                         </td>
-                        <td className="px-3 py-2.5 text-[#374151]">{r.invitedBy || "—"}</td>
+                        <td className="px-3 py-2.5 text-[#374151]">
+                          <InlineInviterEdit
+                            value={r.invitedBy}
+                            onSave={async (next) => {
+                              if (!regEvent) return
+                              const res = await fetch(`/api/admin/events/${regEvent.id}/registrations`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ registrationId: r.id, invitedBy: next }),
+                              })
+                              const data = (await res.json().catch(() => ({}))) as { invitedBy?: string | null; error?: string }
+                              if (!res.ok) {
+                                window.alert(data.error ?? "Could not save")
+                                return
+                              }
+                              setRegistrations((prev) => prev.map((x) => (x.id === r.id ? { ...x, invitedBy: data.invitedBy ?? null } : x)))
+                            }}
+                          />
+                        </td>
                         {regFields.map((f) => (
                           <td key={f.key} className="px-3 py-2.5 text-[#374151]">
                             {formatAnswer(r.answers?.[f.key]) || "—"}
