@@ -130,72 +130,99 @@ function Skyline({ left, width, baseline, color }: { left: number; width: number
 }
 
 /**
- * The seal as one vector medallion: scalloped rosette edge, gold disc with a
- * highlight, double ring, and a laurel of real leaf shapes. Text is laid over
- * it as normal type (SVG text has no fonts inside the renderer).
+ * Award medallion as one vector: gold ribbon tails, a serrated foil edge, a
+ * coin-milled outer ring, a navy inner field with a laurel of paired gold
+ * leaves. Type is laid over it as normal text (SVG text has no fonts in the
+ * renderer). The seal sits on the navy corner band, so the tails are gold.
  */
 function sealSvg(size: number): string {
   const c = size / 2
-  const R = size / 2
-  const pt = (deg: number, r: number, side: 1 | -1 = 1) => {
+  const R = size / 2 - 22 // medallion radius; the rest is room for the tails
+  const P = (deg: number, r: number, side: 1 | -1 = 1) => {
     const a = (Math.PI * deg) / 180
     return { x: c + side * Math.sin(a) * r, y: c - Math.cos(a) * r }
   }
-  // rosette edge: 44 scallops
-  const scallops = Array.from({ length: 44 }, (_, i) => {
-    const { x, y } = pt((360 / 44) * i, R - 9)
-    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="10" fill="url(#edge)"/>`
-  }).join("")
-  // laurel: 9 leaves per side, each a pointed leaf with a centre vein, angled outward along the stem
-  const leafR = R - 48
-  const leaf = (deg: number, side: 1 | -1) => {
-    const { x, y } = pt(deg, leafR, side)
-    const rot = side * deg - side * 28
-    return (
-      `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${rot.toFixed(1)})">` +
-      `<path d="M-15,0 C-9,-9 6,-10 17,0 C6,10 -9,9 -15,0 Z" fill="#7d611d"/>` +
-      `<path d="M-13,0 L15,0" stroke="${GOLD_LIGHT}" stroke-width="1.2" opacity="0.8"/>` +
-      `</g>`
-    )
+  const f = (n: number) => n.toFixed(1)
+
+  // ribbon tails (drawn first, behind the disc): gold with a navy pin-stripe, V-cut ends
+  const tail = (side: 1 | -1) => {
+    const x0 = c + side * 18, x1 = c + side * 58
+    const yTop = c + R - 30, yEnd = size - 6
+    const pts = `${f(x0)},${f(yTop)} ${f(x1)},${f(yTop)} ${f(x1 + side * 14)},${f(yEnd)} ${f((x0 + x1) / 2 + side * 7)},${f(yEnd - 16)} ${f(x0 + side * 0)},${f(yEnd)}`
+    const stripe = `M ${f((x0 + x1) / 2)} ${f(yTop)} L ${f((x0 + x1) / 2 + side * 7)} ${f(yEnd - 14)}`
+    return `<polygon points="${pts}" fill="url(#ribbon)"/><path d="${stripe}" stroke="${NAVY}" stroke-width="3" opacity="0.7"/>`
   }
-  const leaves = [-1, 1].flatMap((side) => Array.from({ length: 9 }, (_, i) => leaf(46 + i * 13, side as 1 | -1))).join("")
-  const stem = (side: 1 | -1) => {
-    const a = pt(40, leafR, side), b = pt(154, leafR, side)
-    return `<path d="M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${leafR} ${leafR} 0 0 ${side === 1 ? 1 : 0} ${b.x.toFixed(1)} ${b.y.toFixed(1)}" fill="none" stroke="#7d611d" stroke-width="3"/>`
-  }
-  // small star at the base, between the two stems
-  const star = Array.from({ length: 10 }, (_, i) => {
-    const r = i % 2 === 0 ? 9 : 4
-    const { x, y } = pt(i * 36, r)
-    return `${(x).toFixed(1)},${(y + R - 60).toFixed(1)}`
+
+  // serrated foil edge: 96 points alternating two radii
+  const teeth = Array.from({ length: 96 }, (_, i) => {
+    const { x, y } = P((360 / 96) * i, i % 2 === 0 ? R : R - 7)
+    return `${f(x)},${f(y)}`
   }).join(" ")
+
+  // coin milling: 120 fine radial ticks on the outer ring
+  const ticks = Array.from({ length: 120 }, (_, i) => {
+    const a = (360 / 120) * i
+    const p1 = P(a, R - 13), p2 = P(a, R - 24)
+    return `<line x1="${f(p1.x)}" y1="${f(p1.y)}" x2="${f(p2.x)}" y2="${f(p2.y)}"/>`
+  }).join("")
+
+  // laurel: two stems with paired leaves, larger at the base, finer toward the top
+  const stemR = R - 60
+  const leafPair = (deg: number, side: 1 | -1, k: number) => {
+    const { x, y } = P(deg, stemR, side)
+    const tangent = side * deg
+    const L = 24 * k, W = 9 * k
+    const one = (rot: number, op: number) =>
+      `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(rot)})"><path d="M0,0 C${f(L * 0.25)},${f(-W)} ${f(L * 0.7)},${f(-W)} ${f(L)},0 C${f(L * 0.7)},${f(W)} ${f(L * 0.25)},${f(W)} 0,0 Z" fill="url(#leaf)" opacity="${op}"/><path d="M2,0 L${f(L - 3)},0" stroke="${GOLD_DEEP}" stroke-width="1" opacity="0.7"/></g>`
+    return one(tangent - side * 145, 1) + one(tangent - side * 215, 0.92)
+  }
+  const laurel = [-1, 1]
+    .flatMap((side) => Array.from({ length: 8 }, (_, i) => leafPair(150 - i * 13.5, side as 1 | -1, 1 - i * 0.055)))
+    .join("")
+  const stem = (side: 1 | -1) => {
+    const a = P(152, stemR, side), b = P(52, stemR, side)
+    return `<path d="M ${f(a.x)} ${f(a.y)} A ${f(stemR)} ${f(stemR)} 0 0 ${side === 1 ? 0 : 1} ${f(b.x)} ${f(b.y)}" fill="none" stroke="url(#leaf)" stroke-width="2.5"/>`
+  }
+
+  // three small stars at the base of the wreath
+  const star = (cx: number, cy: number, r: number) =>
+    `<polygon points="${Array.from({ length: 10 }, (_, i) => { const rr = i % 2 ? r * 0.45 : r; const a = (Math.PI * (i * 36 - 90)) / 180; return `${f(cx + Math.cos(a) * rr)},${f(cy + Math.sin(a) * rr)}` }).join(" ")}" fill="url(#leaf)"/>`
+  const baseY = c + R - 56
+  const stars = star(c, baseY, 8) + star(c - 22, baseY - 4, 5) + star(c + 22, baseY - 4, 5)
+
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">` +
     `<defs>` +
-    `<radialGradient id="disc" cx="36%" cy="30%" r="75%"><stop offset="0" stop-color="#fbf1d8"/><stop offset="0.3" stop-color="${GOLD_LIGHT}"/><stop offset="0.65" stop-color="${GOLD}"/><stop offset="1" stop-color="${GOLD_DEEP}"/></radialGradient>` +
-    `<linearGradient id="edge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${GOLD_LIGHT}"/><stop offset="1" stop-color="${GOLD_DEEP}"/></linearGradient>` +
+    `<linearGradient id="ribbon" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${GOLD_DEEP}"/><stop offset="0.5" stop-color="${GOLD}"/><stop offset="1" stop-color="${GOLD_DEEP}"/></linearGradient>` +
+    `<linearGradient id="foil" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbf1d8"/><stop offset="0.35" stop-color="${GOLD}"/><stop offset="0.65" stop-color="${GOLD_DEEP}"/><stop offset="1" stop-color="${GOLD}"/></linearGradient>` +
+    `<radialGradient id="ring" cx="35%" cy="28%" r="80%"><stop offset="0" stop-color="#fff6dc"/><stop offset="0.45" stop-color="${GOLD}"/><stop offset="1" stop-color="${GOLD_DEEP}"/></radialGradient>` +
+    `<radialGradient id="field" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#0d3566"/><stop offset="1" stop-color="${NAVY}"/></radialGradient>` +
+    `<linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff2cf"/><stop offset="0.5" stop-color="${GOLD}"/><stop offset="1" stop-color="${GOLD_DEEP}"/></linearGradient>` +
     `</defs>` +
-    scallops +
-    `<circle cx="${c}" cy="${c}" r="${R - 12}" fill="url(#disc)"/>` +
-    `<circle cx="${c}" cy="${c}" r="${R - 22}" fill="none" stroke="#7d611d" stroke-width="1.5" opacity="0.9"/>` +
-    `<circle cx="${c}" cy="${c}" r="${R - 27}" fill="none" stroke="#fff7e0" stroke-width="1.5" opacity="0.9"/>` +
-    stem(1) + stem(-1) + leaves +
-    `<polygon points="${star}" fill="#7d611d"/>` +
+    tail(-1) + tail(1) +
+    `<polygon points="${teeth}" fill="url(#foil)"/>` +
+    `<circle cx="${c}" cy="${c}" r="${f(R - 9)}" fill="url(#ring)"/>` +
+    `<g stroke="${GOLD_DEEP}" stroke-width="1" opacity="0.55">${ticks}</g>` +
+    `<circle cx="${c}" cy="${c}" r="${f(R - 27)}" fill="none" stroke="#fff7e0" stroke-width="1.5" opacity="0.9"/>` +
+    `<circle cx="${c}" cy="${c}" r="${f(R - 31)}" fill="url(#field)"/>` +
+    `<circle cx="${c}" cy="${c}" r="${f(R - 35)}" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.8"/>` +
+    stem(1) + stem(-1) + laurel + stars +
     `</svg>`
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 }
 
 function Seal({ mark, year }: { mark: string; year: string }) {
-  const size = 250
+  const size = 300
+  const R = size / 2 - 22
   return (
     <div style={{ position: "relative", width: size, height: size, display: "flex" }}>
-      <div style={{ position: "absolute", left: 14, top: 14, width: size - 28, height: size - 28, borderRadius: size / 2, boxShadow: "0 16px 36px rgba(0,0,0,0.28)" }} />
+      <div style={{ position: "absolute", left: size / 2 - R + 6, top: size / 2 - R + 10, width: R * 2 - 12, height: R * 2 - 12, borderRadius: R, boxShadow: "0 18px 40px rgba(0,0,0,0.35)" }} />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={sealSvg(size)} alt="" width={size} height={size} style={{ position: "absolute", left: 0, top: 0 }} />
-      <div style={{ position: "absolute", left: 0, top: 0, width: size, height: size, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: NAVY, paddingBottom: 10 }}>
-        <div style={{ fontSize: 12, letterSpacing: 4, fontWeight: 700, textTransform: "uppercase" }}>Certified</div>
-        <div style={{ fontFamily: "Playfair Display", fontWeight: 700, fontSize: mark.length > 3 ? 42 : 58, lineHeight: 1, marginTop: 2 }}>{mark}</div>
-        <div style={{ fontSize: 16, letterSpacing: 3, fontWeight: 700, marginTop: 6 }}>{year}</div>
+      <div style={{ position: "absolute", left: 0, top: 0, width: size, height: size, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: GOLD_LIGHT, paddingBottom: 14 }}>
+        <div style={{ fontSize: 12, letterSpacing: 4, fontWeight: 700, textTransform: "uppercase", color: "#f3e3b3" }}>Certified</div>
+        <div style={{ fontFamily: "Playfair Display", fontWeight: 700, fontSize: mark.length > 3 ? 44 : 60, lineHeight: 1, marginTop: 2, color: "#f7e9c4" }}>{mark}</div>
+        <div style={{ fontSize: 16, letterSpacing: 4, fontWeight: 700, marginTop: 6, color: "#f3e3b3" }}>{year}</div>
       </div>
     </div>
   )
@@ -291,7 +318,7 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
         )}
 
         {/* seal, bottom-right, over the band */}
-        <div style={{ position: "absolute", right: 122, bottom: 96, display: "flex" }}>
+        <div style={{ position: "absolute", right: 104, bottom: 70, display: "flex" }}>
           <Seal mark={brand.seal} year={year} />
         </div>
       </div>
