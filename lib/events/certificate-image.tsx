@@ -45,12 +45,12 @@ export type CertificateInput = {
   /** Absolute URL of the brand logo (Satori fetches it). */
   logoSrc: string
   certificateNo: string
-  /** Absolute URL of the brand's gold emblem (seal + watermark); null → text mark. */
+  /** Absolute URL of the brand's gold emblem, used as a faint watermark; null → none. */
   sealMarkSrc?: string | null
+  /** Absolute URL of the brand's pre-rendered seal PNG (public/seals/<brand>.png). */
+  sealSrc: string
   settings: CertificateSettings
   fonts: CertificateFont[]
-  /** "clean" (default): milled ring, navy field, sunburst and stars. "laurel" adds a wreath. */
-  sealStyle?: "laurel" | "clean"
 }
 
 /** Fetch fonts from the site's own /public/fonts. Cached per process. */
@@ -134,112 +134,14 @@ function Skyline({ left, width, baseline, color }: { left: number; width: number
 }
 
 /**
- * Award medallion as one vector: gold ribbon tails, a serrated foil edge, a
- * coin-milled outer ring, a navy inner field with a laurel of paired gold
- * leaves. Type is laid over it as normal text (SVG text has no fonts in the
- * renderer). The seal sits on the navy corner band, so the tails are gold.
+ * Official seal — a pre-rendered PNG per brand (public/seals/<brand>.png,
+ * built by scripts/render-seals.mjs with headless Chrome so the curved
+ * lettering uses real SVG textPath). Satori only places the image.
  */
-function sealSvg(size: number, style: "laurel" | "clean"): string {
-  const c = size / 2
-  const R = size / 2 - 22 // medallion radius; the rest is room for the tails
-  const P = (deg: number, r: number, side: 1 | -1 = 1) => {
-    const a = (Math.PI * deg) / 180
-    return { x: c + side * Math.sin(a) * r, y: c - Math.cos(a) * r }
-  }
-  const f = (n: number) => n.toFixed(1)
-
-  // ribbon tails (drawn first, behind the disc): gold with a navy pin-stripe, V-cut ends
-  const tail = (side: 1 | -1) => {
-    const x0 = c + side * 18, x1 = c + side * 58
-    const yTop = c + R - 30, yEnd = size - 6
-    const pts = `${f(x0)},${f(yTop)} ${f(x1)},${f(yTop)} ${f(x1 + side * 14)},${f(yEnd)} ${f((x0 + x1) / 2 + side * 7)},${f(yEnd - 16)} ${f(x0 + side * 0)},${f(yEnd)}`
-    const stripe = `M ${f((x0 + x1) / 2)} ${f(yTop)} L ${f((x0 + x1) / 2 + side * 7)} ${f(yEnd - 14)}`
-    return `<polygon points="${pts}" fill="url(#ribbon)"/><path d="${stripe}" stroke="${NAVY}" stroke-width="3" opacity="0.7"/>`
-  }
-
-  // serrated foil edge: 96 points alternating two radii
-  const teeth = Array.from({ length: 96 }, (_, i) => {
-    const { x, y } = P((360 / 96) * i, i % 2 === 0 ? R : R - 7)
-    return `${f(x)},${f(y)}`
-  }).join(" ")
-
-  // coin milling: 120 fine radial ticks on the outer ring
-  const ticks = Array.from({ length: 120 }, (_, i) => {
-    const a = (360 / 120) * i
-    const p1 = P(a, R - 13), p2 = P(a, R - 24)
-    return `<line x1="${f(p1.x)}" y1="${f(p1.y)}" x2="${f(p2.x)}" y2="${f(p2.y)}"/>`
-  }).join("")
-
-  // laurel: one stem per side; single leaves alternate sides of the stem with
-  // clear gaps between them, slightly smaller toward the top
-  const stemR = R - 62
-  const leafAt = (deg: number, side: 1 | -1, k: number, outward: boolean) => {
-    const { x, y } = P(deg, stemR, side)
-    const tangent = side * deg
-    const L = 20 * k, W = 6.5 * k
-    const rot = tangent - side * (outward ? 140 : 220)
-    return `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(rot)})"><path d="M0,0 C${f(L * 0.3)},${f(-W)} ${f(L * 0.75)},${f(-W)} ${f(L)},0 C${f(L * 0.75)},${f(W)} ${f(L * 0.3)},${f(W)} 0,0 Z" fill="url(#leaf)"/></g>`
-  }
-  const laurel = [-1, 1]
-    .flatMap((side) => Array.from({ length: 7 }, (_, i) => leafAt(150 - i * 15, side as 1 | -1, 1 - i * 0.05, i % 2 === 0)))
-    .join("")
-  const stem = (side: 1 | -1) => {
-    const a = P(154, stemR, side), b = P(56, stemR, side)
-    return `<path d="M ${f(a.x)} ${f(a.y)} A ${f(stemR)} ${f(stemR)} 0 0 ${side === 1 ? 0 : 1} ${f(b.x)} ${f(b.y)}" fill="none" stroke="url(#leaf)" stroke-width="2"/>`
-  }
-  // clean variant: a fine sunburst behind the mark instead of a wreath
-  const rays = Array.from({ length: 48 }, (_, i) => {
-    const a = (360 / 48) * i
-    const p1 = P(a, R - 40), p2 = P(a, R - 62)
-    return `<line x1="${f(p1.x)}" y1="${f(p1.y)}" x2="${f(p2.x)}" y2="${f(p2.y)}"/>`
-  }).join("")
-
-  // three small stars at the base of the wreath
-  const star = (cx: number, cy: number, r: number) =>
-    `<polygon points="${Array.from({ length: 10 }, (_, i) => { const rr = i % 2 ? r * 0.45 : r; const a = (Math.PI * (i * 36 - 90)) / 180; return `${f(cx + Math.cos(a) * rr)},${f(cy + Math.sin(a) * rr)}` }).join(" ")}" fill="url(#leaf)"/>`
-  const baseY = c + R - 56
-  const stars = star(c, baseY, 8) + star(c - 22, baseY - 4, 5) + star(c + 22, baseY - 4, 5)
-
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">` +
-    `<defs>` +
-    `<linearGradient id="ribbon" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${GOLD_DEEP}"/><stop offset="0.5" stop-color="${GOLD}"/><stop offset="1" stop-color="${GOLD_DEEP}"/></linearGradient>` +
-    `<linearGradient id="foil" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbf1d8"/><stop offset="0.35" stop-color="${GOLD}"/><stop offset="0.65" stop-color="${GOLD_DEEP}"/><stop offset="1" stop-color="${GOLD}"/></linearGradient>` +
-    `<radialGradient id="ring" cx="35%" cy="28%" r="80%"><stop offset="0" stop-color="#fff6dc"/><stop offset="0.45" stop-color="${GOLD}"/><stop offset="1" stop-color="${GOLD_DEEP}"/></radialGradient>` +
-    `<radialGradient id="field" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#0d3566"/><stop offset="1" stop-color="${NAVY}"/></radialGradient>` +
-    `<linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff2cf"/><stop offset="0.5" stop-color="${GOLD}"/><stop offset="1" stop-color="${GOLD_DEEP}"/></linearGradient>` +
-    `</defs>` +
-    tail(-1) + tail(1) +
-    `<polygon points="${teeth}" fill="url(#foil)"/>` +
-    `<circle cx="${c}" cy="${c}" r="${f(R - 9)}" fill="url(#ring)"/>` +
-    `<g stroke="${GOLD_DEEP}" stroke-width="1" opacity="0.55">${ticks}</g>` +
-    `<circle cx="${c}" cy="${c}" r="${f(R - 27)}" fill="none" stroke="#fff7e0" stroke-width="1.5" opacity="0.9"/>` +
-    `<circle cx="${c}" cy="${c}" r="${f(R - 31)}" fill="url(#field)"/>` +
-    `<circle cx="${c}" cy="${c}" r="${f(R - 35)}" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.8"/>` +
-    (style === "laurel" ? stem(1) + stem(-1) + laurel + stars : `<g stroke="${GOLD}" stroke-width="1" opacity="0.35">${rays}</g>` + stars) +
-    `</svg>`
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
-}
-
-function Seal({ mark, markSrc, year, style }: { mark: string; markSrc?: string | null; year: string; style: "laurel" | "clean" }) {
-  const size = 300
-  const R = size / 2 - 22
+function Seal({ src }: { src: string }) {
   return (
-    <div style={{ position: "relative", width: size, height: size, display: "flex" }}>
-      <div style={{ position: "absolute", left: size / 2 - R + 6, top: size / 2 - R + 10, width: R * 2 - 12, height: R * 2 - 12, borderRadius: R, boxShadow: "0 18px 40px rgba(0,0,0,0.35)" }} />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={sealSvg(size, style)} alt="" width={size} height={size} style={{ position: "absolute", left: 0, top: 0 }} />
-      <div style={{ position: "absolute", left: 0, top: 0, width: size, height: size, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: GOLD_LIGHT, paddingBottom: 14 }}>
-        <div style={{ fontSize: 12, letterSpacing: 4, fontWeight: 700, textTransform: "uppercase", color: "#f3e3b3" }}>Certified</div>
-        {markSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={markSrc} alt="" style={{ height: 78, marginTop: 8, objectFit: "contain" }} />
-        ) : (
-          <div style={{ fontFamily: "Playfair Display", fontWeight: 700, fontSize: mark.length > 3 ? 44 : 60, lineHeight: 1, marginTop: 2, color: "#f7e9c4" }}>{mark}</div>
-        )}
-        <div style={{ fontSize: 16, letterSpacing: 4, fontWeight: 700, marginTop: 8, color: "#f3e3b3" }}>{year}</div>
-      </div>
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt="" width={360} height={360} style={{ width: 360, height: 360 }} />
   )
 }
 
@@ -261,7 +163,6 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
   const nameSize = input.attendeeName.length > 30 ? 74 : input.attendeeName.length > 22 ? 90 : 106
   const [headWord, ...rest] = settings.heading.split(" ")
   const headTail = rest.join(" ")
-  const year = (input.dateLabel?.match(/\d{4}/) ?? [String(new Date().getFullYear())])[0]
 
   return new ImageResponse(
     (
@@ -334,8 +235,8 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
         )}
 
         {/* seal, bottom-right, over the band */}
-        <div style={{ position: "absolute", right: 104, bottom: 70, display: "flex" }}>
-          <Seal mark={brand.seal} markSrc={input.sealMarkSrc ?? null} year={year} style={input.sealStyle ?? "clean"} />
+        <div style={{ position: "absolute", right: 84, bottom: 48, display: "flex" }}>
+          <Seal src={input.sealSrc} />
         </div>
       </div>
     ),
