@@ -129,48 +129,73 @@ function Skyline({ left, width, baseline, color }: { left: number; width: number
   )
 }
 
-/** Laurel wreath as inline SVG (data URI) — smooth leaves, unlike stacked divs. */
-function laurelSvg(size: number, color: string): string {
+/**
+ * The seal as one vector medallion: scalloped rosette edge, gold disc with a
+ * highlight, double ring, and a laurel of real leaf shapes. Text is laid over
+ * it as normal type (SVG text has no fonts inside the renderer).
+ */
+function sealSvg(size: number): string {
   const c = size / 2
-  const r = size / 2 - 22
-  const leaf = (deg: number, side: 1 | -1) => {
+  const R = size / 2
+  const pt = (deg: number, r: number, side: 1 | -1 = 1) => {
     const a = (Math.PI * deg) / 180
-    const x = c + side * Math.sin(a) * r
-    const y = c - Math.cos(a) * r
-    const rot = side * deg
-    return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="15" ry="6" transform="rotate(${rot.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})"/>` +
-      `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="15" ry="6" transform="rotate(${(rot + side * 34).toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})" opacity="0.7"/>`
+    return { x: c + side * Math.sin(a) * r, y: c - Math.cos(a) * r }
   }
-  const arc = (side: 1 | -1) => {
-    const a0 = (Math.PI * 38) / 180, a1 = (Math.PI * 152) / 180
-    const p = (a: number) => `${(c + side * Math.sin(a) * r).toFixed(1)} ${(c - Math.cos(a) * r).toFixed(1)}`
-    return `<path d="M ${p(a0)} A ${r} ${r} 0 0 ${side === 1 ? 1 : 0} ${p(a1)}" fill="none" stroke="${color}" stroke-width="2.5"/>`
+  // rosette edge: 44 scallops
+  const scallops = Array.from({ length: 44 }, (_, i) => {
+    const { x, y } = pt((360 / 44) * i, R - 9)
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="10" fill="url(#edge)"/>`
+  }).join("")
+  // laurel: 9 leaves per side, each a pointed leaf with a centre vein, angled outward along the stem
+  const leafR = R - 48
+  const leaf = (deg: number, side: 1 | -1) => {
+    const { x, y } = pt(deg, leafR, side)
+    const rot = side * deg - side * 28
+    return (
+      `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${rot.toFixed(1)})">` +
+      `<path d="M-15,0 C-9,-9 6,-10 17,0 C6,10 -9,9 -15,0 Z" fill="#7d611d"/>` +
+      `<path d="M-13,0 L15,0" stroke="${GOLD_LIGHT}" stroke-width="1.2" opacity="0.8"/>` +
+      `</g>`
+    )
   }
-  const leaves = [-1, 1].flatMap((side) => Array.from({ length: 8 }, (_, i) => leaf(44 + i * 15, side as 1 | -1)))
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">` +
-    `${arc(1)}${arc(-1)}<g fill="${color}">${leaves.join("")}</g></svg>`
+  const leaves = [-1, 1].flatMap((side) => Array.from({ length: 9 }, (_, i) => leaf(46 + i * 13, side as 1 | -1))).join("")
+  const stem = (side: 1 | -1) => {
+    const a = pt(40, leafR, side), b = pt(154, leafR, side)
+    return `<path d="M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${leafR} ${leafR} 0 0 ${side === 1 ? 1 : 0} ${b.x.toFixed(1)} ${b.y.toFixed(1)}" fill="none" stroke="#7d611d" stroke-width="3"/>`
+  }
+  // small star at the base, between the two stems
+  const star = Array.from({ length: 10 }, (_, i) => {
+    const r = i % 2 === 0 ? 9 : 4
+    const { x, y } = pt(i * 36, r)
+    return `${(x).toFixed(1)},${(y + R - 60).toFixed(1)}`
+  }).join(" ")
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">` +
+    `<defs>` +
+    `<radialGradient id="disc" cx="36%" cy="30%" r="75%"><stop offset="0" stop-color="#fbf1d8"/><stop offset="0.3" stop-color="${GOLD_LIGHT}"/><stop offset="0.65" stop-color="${GOLD}"/><stop offset="1" stop-color="${GOLD_DEEP}"/></radialGradient>` +
+    `<linearGradient id="edge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${GOLD_LIGHT}"/><stop offset="1" stop-color="${GOLD_DEEP}"/></linearGradient>` +
+    `</defs>` +
+    scallops +
+    `<circle cx="${c}" cy="${c}" r="${R - 12}" fill="url(#disc)"/>` +
+    `<circle cx="${c}" cy="${c}" r="${R - 22}" fill="none" stroke="#7d611d" stroke-width="1.5" opacity="0.9"/>` +
+    `<circle cx="${c}" cy="${c}" r="${R - 27}" fill="none" stroke="#fff7e0" stroke-width="1.5" opacity="0.9"/>` +
+    stem(1) + stem(-1) + leaves +
+    `<polygon points="${star}" fill="#7d611d"/>` +
+    `</svg>`
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 }
 
 function Seal({ mark, year }: { mark: string; year: string }) {
-  const R = 118
+  const size = 250
   return (
-    <div style={{ position: "relative", width: R * 2, height: R * 2, display: "flex" }}>
-      <div
-        style={{
-          position: "absolute", left: 0, top: 0, width: R * 2, height: R * 2, borderRadius: R,
-          background: `radial-gradient(circle at 36% 30%, #f7ead0 0%, ${GOLD_LIGHT} 22%, ${GOLD} 58%, ${GOLD_DEEP} 100%)`,
-          boxShadow: "0 14px 34px rgba(0,0,0,0.22)",
-        }}
-      />
-      <div style={{ position: "absolute", left: 12, top: 12, width: R * 2 - 24, height: R * 2 - 24, borderRadius: R - 12, border: "2px solid rgba(255,255,255,0.7)" }} />
+    <div style={{ position: "relative", width: size, height: size, display: "flex" }}>
+      <div style={{ position: "absolute", left: 14, top: 14, width: size - 28, height: size - 28, borderRadius: size / 2, boxShadow: "0 16px 36px rgba(0,0,0,0.28)" }} />
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={laurelSvg(R * 2, "#8a6b22")} alt="" width={R * 2} height={R * 2} style={{ position: "absolute", left: 0, top: 0 }} />
-      <div style={{ position: "absolute", left: 0, top: 0, width: R * 2, height: R * 2, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: NAVY }}>
-        <div style={{ fontSize: 13, letterSpacing: 4, fontWeight: 700, textTransform: "uppercase" }}>Certified</div>
-        <div style={{ fontFamily: "Playfair Display", fontWeight: 700, fontSize: mark.length > 3 ? 44 : 60, lineHeight: 1, marginTop: 4 }}>{mark}</div>
-        <div style={{ fontSize: 17, letterSpacing: 3, fontWeight: 700, marginTop: 8 }}>{year}</div>
-        <div style={{ width: 10, height: 10, background: NAVY, transform: "rotate(45deg)", marginTop: 12, opacity: 0.8 }} />
+      <img src={sealSvg(size)} alt="" width={size} height={size} style={{ position: "absolute", left: 0, top: 0 }} />
+      <div style={{ position: "absolute", left: 0, top: 0, width: size, height: size, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: NAVY, paddingBottom: 10 }}>
+        <div style={{ fontSize: 12, letterSpacing: 4, fontWeight: 700, textTransform: "uppercase" }}>Certified</div>
+        <div style={{ fontFamily: "Playfair Display", fontWeight: 700, fontSize: mark.length > 3 ? 42 : 58, lineHeight: 1, marginTop: 2 }}>{mark}</div>
+        <div style={{ fontSize: 16, letterSpacing: 3, fontWeight: 700, marginTop: 6 }}>{year}</div>
       </div>
     </div>
   )
