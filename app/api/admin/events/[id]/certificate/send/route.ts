@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import sharp from "sharp"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { canManageEvents } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
@@ -44,6 +45,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const input = await buildCertificateInput({ event, registration, origin: req.nextUrl.origin })
     const png = await renderCertificatePng(input)
     const pdf = await certificatePdfFromPng(png, { title: input.settings.heading, attendee: input.attendeeName })
+    // Inline email preview: a third of the pixels, JPEG — ~150 KB instead of ~600 KB.
+    const preview = await sharp(png).resize({ width: 1088 }).jpeg({ quality: 86, mozjpeg: true }).toBuffer()
 
     await sendEventCertificateEmail({
       to: registration.email,
@@ -53,6 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       venue: event.venue,
       heading: input.settings.heading,
       pdf,
+      preview,
       filename: certificateFilename(input.attendeeName, event.slug),
     })
   } catch (e) {

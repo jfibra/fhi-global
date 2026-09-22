@@ -1321,6 +1321,8 @@ export async function sendEventCertificateEmail(input: {
   heading: string
   pdf: Buffer
   filename: string
+  /** Downsized JPEG of the certificate, shown inline at the top of the email. */
+  preview: Buffer
 }): Promise<void> {
   const subject = `Your ${input.heading} — ${input.eventTitle}`
   const rows = [
@@ -1332,12 +1334,18 @@ export async function sendEventCertificateEmail(input: {
 
   const bodyHtml = `
         <tr>
-          <td style="padding:36px 40px 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+          <td style="padding:28px 28px 0;">
+            <img src="cid:certificate-preview" alt="${esc(input.heading)} — ${esc(input.fullName)}" width="544"
+                 style="display:block;width:100%;max-width:544px;height:auto;border:1px solid #e2e8f2;border-radius:6px;box-shadow:0 8px 24px rgba(0,31,63,0.12);">
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px 40px 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
             <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">${esc(input.heading)}</p>
             <h1 style="margin:0 0 12px;font-size:23px;line-height:1.3;font-weight:700;color:#0d1117;">Thank you for joining us, ${esc(input.fullName)}</h1>
             <p style="margin:0;font-size:15px;line-height:1.65;color:#4b5563;">
-              Your <strong>${esc(input.heading)}</strong> for <strong>${esc(input.eventTitle)}</strong> is attached to this
-              email as a PDF. Print it, share it, or add it to your profile — and we hope to see you at the next one.
+              Your <strong>${esc(input.heading)}</strong> for <strong>${esc(input.eventTitle)}</strong> is above, and
+              attached as a print-ready PDF. Print it, share it, or add it to your profile — and we hope to see you at the next one.
             </p>
           </td>
         </tr>
@@ -1357,6 +1365,10 @@ export async function sendEventCertificateEmail(input: {
     subject,
     text: `${input.heading} — ${input.eventTitle}\n\nDear ${input.fullName},\n\nThank you for joining us. Your ${input.heading.toLowerCase()} is attached as a PDF.\n${input.dateLabel ? `\nDate: ${input.dateLabel}` : ""}${input.venue ? `\nVenue: ${input.venue}` : ""}\n\nFHI Global Property · fhiglobal.ae`,
     html: eventEmailShell({ subject, preheader: `Your ${input.heading.toLowerCase()} for ${input.eventTitle} is attached.`, bodyHtml }),
-    attachments: [{ filename: input.filename, content: input.pdf, contentType: "application/pdf" }],
+    attachments: [
+      // Inline preview (referenced by cid, so mail clients show it in the body, not as a file)
+      { filename: "certificate-preview.jpg", content: input.preview, cid: "certificate-preview", contentType: "image/jpeg" },
+      { filename: input.filename, content: input.pdf, contentType: "application/pdf" },
+    ],
   })
 }
