@@ -73,13 +73,29 @@ const GOLD_DEEP = "#a98634"
 const GOLD_LIGHT = "#efdda6"
 const NAVY_DEEP = "#06213f"
 
-/** A navy band with a gold edge, rotated across a corner. */
-function CornerBand({ x, y, w, h, angle, goldOffset }: { x: number; y: number; w: number; h: number; angle: number; goldOffset: number }) {
+/** Corner bands as one full-canvas SVG: exact triangles with a parallel gold edge. */
+function cornerBandsSvg(): string {
+  const W = CERT_WIDTH, H = CERT_HEIGHT
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
+    `<defs>` +
+    `<linearGradient id="n" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${NAVY}"/><stop offset="1" stop-color="${NAVY_DEEP}"/></linearGradient>` +
+    `<linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${GOLD_LIGHT}"/><stop offset="0.5" stop-color="${GOLD}"/><stop offset="1" stop-color="${GOLD_DEEP}"/></linearGradient>` +
+    `</defs>` +
+    // top-left: slim band
+    `<polygon points="300,0 328,0 0,206 0,188" fill="url(#g)"/>` +
+    `<polygon points="0,0 300,0 0,188" fill="url(#n)"/>` +
+    // bottom-right: broad band
+    `<polygon points="960,${H} 926,${H} ${W},612 ${W},640" fill="url(#g)"/>` +
+    `<polygon points="960,${H} ${W},640 ${W},${H}" fill="url(#n)"/>` +
+    `</svg>`
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
+function CornerBands() {
   return (
-    <div style={{ position: "absolute", left: x, top: y, width: w, height: h, display: "flex", transform: `rotate(${angle}deg)` }}>
-      <div style={{ position: "absolute", left: 0, top: 0, width: w, height: h, background: `linear-gradient(90deg, ${NAVY} 0%, ${NAVY_DEEP} 100%)` }} />
-      <div style={{ position: "absolute", left: 0, top: goldOffset, width: w, height: 10, background: `linear-gradient(90deg, ${GOLD_LIGHT} 0%, ${GOLD} 50%, ${GOLD_DEEP} 100%)` }} />
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={cornerBandsSvg()} alt="" width={CERT_WIDTH} height={CERT_HEIGHT} style={{ position: "absolute", left: 0, top: 0 }} />
   )
 }
 
@@ -113,22 +129,31 @@ function Skyline({ left, width, baseline, color }: { left: number; width: number
   )
 }
 
-/** Gold seal with a laurel wreath, brand mark and year. */
+/** Laurel wreath as inline SVG (data URI) — smooth leaves, unlike stacked divs. */
+function laurelSvg(size: number, color: string): string {
+  const c = size / 2
+  const r = size / 2 - 22
+  const leaf = (deg: number, side: 1 | -1) => {
+    const a = (Math.PI * deg) / 180
+    const x = c + side * Math.sin(a) * r
+    const y = c - Math.cos(a) * r
+    const rot = side * deg
+    return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="15" ry="6" transform="rotate(${rot.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})"/>` +
+      `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="15" ry="6" transform="rotate(${(rot + side * 34).toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})" opacity="0.7"/>`
+  }
+  const arc = (side: 1 | -1) => {
+    const a0 = (Math.PI * 38) / 180, a1 = (Math.PI * 152) / 180
+    const p = (a: number) => `${(c + side * Math.sin(a) * r).toFixed(1)} ${(c - Math.cos(a) * r).toFixed(1)}`
+    return `<path d="M ${p(a0)} A ${r} ${r} 0 0 ${side === 1 ? 1 : 0} ${p(a1)}" fill="none" stroke="${color}" stroke-width="2.5"/>`
+  }
+  const leaves = [-1, 1].flatMap((side) => Array.from({ length: 8 }, (_, i) => leaf(44 + i * 15, side as 1 | -1)))
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">` +
+    `${arc(1)}${arc(-1)}<g fill="${color}">${leaves.join("")}</g></svg>`
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
 function Seal({ mark, year }: { mark: string; year: string }) {
   const R = 118
-  const leaves: Array<{ x: number; y: number; rot: number }> = []
-  // Eight leaves per side from upper-left/right (40°) down to the base (150°),
-  // measured clockwise from the top; each leaf lies along the tangent.
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < 8; i++) {
-      const deg = 40 + i * 15.5
-      const a = (Math.PI * deg) / 180
-      const r = R - 30
-      const cx = R + side * Math.sin(a) * r
-      const cy = R - Math.cos(a) * r
-      leaves.push({ x: cx - 14, y: cy - 6, rot: side * deg })
-    }
-  }
   return (
     <div style={{ position: "relative", width: R * 2, height: R * 2, display: "flex" }}>
       <div
@@ -138,10 +163,9 @@ function Seal({ mark, year }: { mark: string; year: string }) {
           boxShadow: "0 14px 34px rgba(0,0,0,0.22)",
         }}
       />
-      <div style={{ position: "absolute", left: 14, top: 14, width: R * 2 - 28, height: R * 2 - 28, borderRadius: R - 14, border: "2px solid rgba(255,255,255,0.75)" }} />
-      {leaves.map((l, i) => (
-        <div key={i} style={{ position: "absolute", left: l.x, top: l.y, width: 28, height: 11, borderRadius: 14, background: "#8a6b22", opacity: 0.9, transform: `rotate(${l.rot}deg)` }} />
-      ))}
+      <div style={{ position: "absolute", left: 12, top: 12, width: R * 2 - 24, height: R * 2 - 24, borderRadius: R - 12, border: "2px solid rgba(255,255,255,0.7)" }} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={laurelSvg(R * 2, "#8a6b22")} alt="" width={R * 2} height={R * 2} style={{ position: "absolute", left: 0, top: 0 }} />
       <div style={{ position: "absolute", left: 0, top: 0, width: R * 2, height: R * 2, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: NAVY }}>
         <div style={{ fontSize: 13, letterSpacing: 4, fontWeight: 700, textTransform: "uppercase" }}>Certified</div>
         <div style={{ fontFamily: "Playfair Display", fontWeight: 700, fontSize: mark.length > 3 ? 44 : 60, lineHeight: 1, marginTop: 4 }}>{mark}</div>
@@ -184,15 +208,13 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
       >
         <Skyline left={470} width={1220} baseline={44} color="rgba(0,31,63,0.065)" />
 
-        {/* corner bands: slim top-left, broad bottom-right */}
-        <CornerBand x={-260} y={-40} w={760} h={120} angle={-32} goldOffset={112} />
-        <CornerBand x={1180} y={830} w={1000} h={560} angle={-32} goldOffset={-12} />
+        <CornerBands />
 
         {/* hairline frame */}
         <div style={{ position: "absolute", top: 34, left: 34, right: 34, bottom: 34, border: `1.5px solid ${GOLD}`, opacity: 0.8 }} />
 
         {/* logo */}
-        <div style={{ position: "absolute", left: 128, top: 82, display: "flex", alignItems: "center", height: 130, padding: brand.logoIsWhite ? "16px 26px" : "0px", background: brand.logoIsWhite ? NAVY : "transparent" }}>
+        <div style={{ position: "absolute", left: 156, top: 98, display: "flex", alignItems: "center", height: 130, padding: brand.logoIsWhite ? "16px 26px" : "0px", background: brand.logoIsWhite ? NAVY : "transparent" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={input.logoSrc} alt="" style={{ height: brand.logoIsWhite ? 84 : 124, objectFit: "contain" }} />
         </div>
@@ -238,7 +260,7 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
 
         {/* signatures, bottom-centre */}
         {sigs.length > 0 && (
-          <div style={{ position: "absolute", left: 430, right: 700, bottom: 92, display: "flex", justifyContent: sigs.length === 2 ? "space-between" : "center" }}>
+          <div style={{ position: "absolute", left: 400, right: 770, bottom: 92, display: "flex", justifyContent: sigs.length === 2 ? "space-between" : "center" }}>
             {sigs.map((sg, i) => <Signature key={i} name={sg.name} title={sg.title} />)}
           </div>
         )}
