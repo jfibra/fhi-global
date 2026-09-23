@@ -59,8 +59,8 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   "purchase-categories": ["super_admin", "admin"],
   "contact-inbox": ["super_admin", "admin"],
   "system-logs": ["super_admin", "admin"],
-  listings: ["super_admin", "admin", "agent", "team_leader", "unit_manager"],
-  "owner-documents": ["super_admin", "admin", "agent", "team_leader", "unit_manager"],
+  listings: ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager"],
+  "owner-documents": ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager"],
   // Content managers + developers get the full editor; studio viewers get read-only.
   projects: ["super_admin", "admin", "developer", "editor", ...ROLES_PROJECT_STUDIO_VIEWERS],
   company: ["developer"],
@@ -80,7 +80,7 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   // Keep in sync with INVITE_GRANTABLE_ROLES in app-roles.ts, which decides what
   // each of these ranks may then set on a recruit. Members are deliberately
   // excluded — they don't recruit.
-  invite: ["super_admin", "admin", "agent", "team_leader", "unit_manager"],
+  invite: ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager"],
 }
 
 export function getDashboardRouteByRole(role?: string | null) {

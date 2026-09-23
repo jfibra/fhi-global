@@ -127,14 +127,19 @@ export function MemberOverview() {
   )
 }
 
-/** Global partner overview — rankings only, plus a welcome card naming their upline. */
+/**
+ * Global partner overview — the agent overview WITHOUT the company leaderboard
+ * (Top Sales / Top Developers are for FHI's own agents), plus a card naming
+ * their Dubai upline.
+ */
 export function GlobalPartnerOverview() {
   const { user, profile } = useAuth()
   const meta = (profile as { metadata?: Record<string, unknown> } | null)?.metadata
   const uplineName = meta && typeof meta.invited_by_name === "string" ? meta.invited_by_name : null
   return (
-    <WithTopSales userId={user?.id}>
+    <div className="space-y-8">
       <GlobalPartnerOverviewCard displayName={profile?.fullname ?? user?.email ?? "Partner"} uplineName={uplineName} />
-    </WithTopSales>
+      <SalesPipelineOverview displayName={profile?.fullname ?? user?.email ?? "User"} userId={user?.id} />
+    </div>
   )
 }

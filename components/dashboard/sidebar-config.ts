@@ -333,9 +333,6 @@ const MEMBER_NAV: RoleNavEntry[] = [
   SUPPORT_TICKETS,
 ]
 
-/** Global partners: rankings on the overview, nothing else but support. */
-const GLOBAL_PARTNER_NAV: RoleNavEntry[] = [OVERVIEW, SUPPORT_TICKETS]
-
 /** One list per role. Exhaustive by construction — see the note at the top. */
 const ROLE_NAV: Record<AppRoleId, RoleNavEntry[]> = {
   super_admin:    ADMIN_NAV,
@@ -348,7 +345,9 @@ const ROLE_NAV: Record<AppRoleId, RoleNavEntry[]> = {
   secretary:      SECRETARY_NAV,
   team_secretary: SECRETARY_NAV,
   member:         MEMBER_NAV,
-  global_partner: GLOBAL_PARTNER_NAV,
+  // Agents abroad: the agent sidebar, verbatim (the leaderboard is an overview
+  // component, not a nav item — see GlobalPartnerOverview).
+  global_partner: salesPipelineNav({ projects: true }),
 }
 
 // ─── Resolution ───────────────────────────────────────────────────────────────

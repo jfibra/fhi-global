@@ -197,7 +197,9 @@ export function canManageDeveloperContent(role: string | null | undefined): bool
  * Sales hierarchy: agents, team leaders, and unit managers share the same pipeline tools
  * (e.g. `/{role}/listings`, `/{role}/sales`, public buy/rent browsing).
  */
-export const ROLES_SALES_PIPELINE: readonly AppRoleId[] = ["agent", "team_leader", "unit_manager"]
+// global_partner is an agent based abroad — same pipeline, same tools; the one
+// thing they never see is the company leaderboard (ROLES_SALES_LEADERBOARD).
+export const ROLES_SALES_PIPELINE: readonly AppRoleId[] = ["agent", "team_leader", "unit_manager", "global_partner"]
 
 export const ROLES_SECRETARY_LIKE: readonly AppRoleId[] = ["secretary", "team_secretary"]
 
@@ -208,6 +210,7 @@ export const ROLES_SALES_REPORTS_ACCESS: readonly AppRoleId[] = [
   "team_leader",
   "unit_manager",
   "agent",
+  "global_partner",
   "secretary",
   "team_secretary",
 ]
@@ -220,6 +223,7 @@ export const ROLES_BUY_RENT_LISTINGS_ACCESS: readonly AppRoleId[] = [
   "super_admin",
   "admin",
   "agent",
+  "global_partner",
   "team_leader",
   "unit_manager",
   "member",
@@ -230,7 +234,7 @@ export function canAccessBuyRentListings(role: string | null | undefined): boole
 }
 
 /** Profiles listed as sales agents. */
-export const ROLES_SALE_AGENT_PROFILES: readonly AppRoleId[] = ["agent", "team_leader", "unit_manager"]
+export const ROLES_SALE_AGENT_PROFILES: readonly AppRoleId[] = ["agent", "team_leader", "unit_manager", "global_partner"]
 
 /** Reporters pool for support tickets (matches previous query). */
 export const ROLES_SUPPORT_REPORTER_POOL: readonly AppRoleId[] = [
@@ -254,7 +258,7 @@ export const ROLES_SUPPORT_PORTAL: readonly AppRoleId[] = [...APP_ROLE_ORDER]
  * marketing artwork and training library. Derived rather than listed so a
  * future role is included by default and only developers stay out.
  */
-export const ROLES_INTERNAL_RESOURCES: readonly AppRoleId[] = APP_ROLE_ORDER.filter((r) => r !== "developer" && r !== "global_partner")
+export const ROLES_INTERNAL_RESOURCES: readonly AppRoleId[] = APP_ROLE_ORDER.filter((r) => r !== "developer")
 
 /**
  * Who may see the company Top Sales leaderboard (per-agent revenue).
@@ -273,7 +277,6 @@ export const ROLES_SALES_LEADERBOARD: readonly AppRoleId[] = [
   "secretary",
   "team_secretary",
   "member",
-  "global_partner",
 ]
 
 /** Developer media/logo upload route (also allows content editors). */
@@ -283,21 +286,21 @@ export const ROLES_ADMIN_OR_DEVELOPER: readonly AppRoleId[] = ["super_admin", "a
 export const ROLES_EVENT_MANAGERS: readonly AppRoleId[] = ["super_admin", "admin", "team_leader", "editor"]
 
 /** Who may use the standalone Reels Maker: admin staff, the sales pipeline, and members. */
-export const ROLES_REELS_MAKER: readonly AppRoleId[] = ["super_admin", "admin", "agent", "team_leader", "unit_manager", "member"]
+export const ROLES_REELS_MAKER: readonly AppRoleId[] = ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager", "member"]
 
 /** Who may use Poster Maker — admin staff + the sales pipeline (it lives in
  *  their Agent Resource hub). Keep in sync with the Agent Resource tiles. */
-export const ROLES_POSTER_MAKER: readonly AppRoleId[] = ["super_admin", "admin", "agent", "team_leader", "unit_manager"]
+export const ROLES_POSTER_MAKER: readonly AppRoleId[] = ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager"]
 
 /**
  * Who gets the read-only Projects browser (no create/edit/publish) purely to
  * open a project's Poster & Reels marketing studios. Content managers and
  * developers have their own full-access variants instead.
  */
-export const ROLES_PROJECT_STUDIO_VIEWERS: readonly AppRoleId[] = ["agent", "team_leader", "unit_manager", "member"]
+export const ROLES_PROJECT_STUDIO_VIEWERS: readonly AppRoleId[] = ["agent", "global_partner", "team_leader", "unit_manager", "member"]
 
 /** Who may use the Website Builder (personal agent-site editor): admin staff + the sales pipeline. */
-export const ROLES_WEBSITE_BUILDER: readonly AppRoleId[] = ["super_admin", "admin", "agent", "team_leader", "unit_manager"]
+export const ROLES_WEBSITE_BUILDER: readonly AppRoleId[] = ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager"]
 
 export function isAdminStaffRole(role: string | null | undefined): boolean {
   return roleInList(role, ROLES_ADMIN_STAFF)
@@ -389,6 +392,7 @@ export const INVITE_GRANTABLE_ROLES: Record<string, readonly AppRoleId[]> = {
   team_leader: TEAM_LEADER_GRANTS,
   unit_manager: ["agent", "member", "global_partner"],
   agent: ["agent", "member", "global_partner"],
+  global_partner: ["member", "global_partner"],
 }
 
 export function invitableRolesFor(role: string | null | undefined): readonly AppRoleId[] {
