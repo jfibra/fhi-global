@@ -80,7 +80,7 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   // Keep in sync with INVITE_GRANTABLE_ROLES in app-roles.ts, which decides what
   // each of these ranks may then set on a recruit. Members are deliberately
   // excluded — they don't recruit.
-  invite: ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager"],
+  invite: ["super_admin", "admin", "agent", "team_leader", "unit_manager"],
 }
 
 export function getDashboardRouteByRole(role?: string | null) {

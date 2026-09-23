@@ -259,7 +259,7 @@ const DEVELOPER_NAV: RoleNavEntry[] = [
  * particular rank gets (team leaders also manage events, per
  * ROLES_EVENT_MANAGERS in app-roles.ts).
  */
-const salesPipelineNav = ({ projects = false, events = false, teamSales = false } = {}): RoleNavEntry[] => [
+const salesPipelineNav = ({ projects = false, events = false, teamSales = false, invite = true } = {}): RoleNavEntry[] => [
   OVERVIEW,
   { icon: ClipboardList, label: "My listings", to: "listings" },
   OWNER_DOCUMENTS,
@@ -267,7 +267,8 @@ const salesPipelineNav = ({ projects = false, events = false, teamSales = false 
   // The read-only projects browser for the Poster/Reels studios — the whole
   // sales ladder has it (see ROLES_PROJECT_STUDIO_VIEWERS).
   ...(projects ? [PROJECTS] : []),
-  INVITE,
+  // Global partners are recruited, they do not recruit — no Invite for them.
+  ...(invite ? [INVITE] : []),
   // Team leaders manage events too (see ROLES_EVENT_MANAGERS).
   ...(events ? [EVENTS] : []),
   SALES_REPORTS,
@@ -347,7 +348,7 @@ const ROLE_NAV: Record<AppRoleId, RoleNavEntry[]> = {
   member:         MEMBER_NAV,
   // Agents abroad: the agent sidebar, verbatim (the leaderboard is an overview
   // component, not a nav item — see GlobalPartnerOverview).
-  global_partner: salesPipelineNav({ projects: true }),
+  global_partner: salesPipelineNav({ projects: true, invite: false }),
 }
 
 // ─── Resolution ───────────────────────────────────────────────────────────────

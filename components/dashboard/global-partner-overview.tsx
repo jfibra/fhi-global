@@ -17,7 +17,7 @@ export function GlobalPartnerOverview({ displayName, uplineName }: { displayName
       <p className="mt-2 max-w-2xl text-sm text-white/80 leading-relaxed">
         You are part of FHI Global Property&apos;s international network
         {uplineName ? <>, invited by <span className="font-semibold text-white">{uplineName}</span> in Dubai</> : null}.
-        Everything an FHI agent uses is yours — projects, listings, leads, sales, marketing tools and your own invite link.
+        Everything an FHI agent uses is yours — projects, listings, leads, sales and the full marketing toolkit.
       </p>
     </div>
   )

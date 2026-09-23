@@ -392,7 +392,8 @@ export const INVITE_GRANTABLE_ROLES: Record<string, readonly AppRoleId[]> = {
   team_leader: TEAM_LEADER_GRANTS,
   unit_manager: ["agent", "member", "global_partner"],
   agent: ["agent", "member", "global_partner"],
-  global_partner: ["member", "global_partner"],
+  // global_partner is deliberately absent: partners are recruited BY a Dubai
+  // agent and do not recruit themselves — no Invite page for them.
 }
 
 export function invitableRolesFor(role: string | null | undefined): readonly AppRoleId[] {
