@@ -508,7 +508,7 @@ export function DeveloperProjectsClient({
               {/* Tab content */}
               <div className="flex-1 overflow-y-auto p-6">
                 {activeTab === "data"           && <ProjectDataTab           project={selected} onJump={(tab) => setActiveTab(tab as TabId)} showToast={showToast} />}
-                {activeTab === "overview"       && <ProjectOverviewTab       project={selected} developers={[]} onSave={handleUpdateProject} showToast={showToast} />}
+                {activeTab === "overview"       && <ProjectOverviewTab       project={selected} developers={[]} onSave={handleUpdateProject} showToast={showToast} showAgentNote={false} />}
                 {activeTab === "units"          && <ProjectUnitsTab          projectId={selected.id} showToast={showToast} />}
                 {activeTab === "images"         && (
                   <ProjectImagesTab

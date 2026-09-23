@@ -13,7 +13,10 @@ import {
   DeveloperLogoCarousel,
   type DeveloperLogoItem,
 } from "@/components/public/developer-logo-carousel";
-import { ProjectCard, type ProjectCardData } from "@/components/project-card";
+import {
+  FeaturedProjectsShowcase,
+  type FeaturedProjectData,
+} from "@/components/public/featured-projects-showcase";
 import {
   Building2,
   TrendingUp,
@@ -329,13 +332,14 @@ export default async function HomePage() {
               </Link>
             </div>
             </Reveal>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {featuredProjects.map((p, i) => (
-                <Reveal key={p.id} delay={(i % 3) * 120}>
-                  <ProjectCard project={p as unknown as ProjectCardData} />
-                </Reveal>
-              ))}
-            </div>
+            {/* One hero pick with room for an FHI note, two picks beside it,
+                the rest in a row beneath — a hierarchy instead of six equal
+                tiles. Every line is a real project column; blanks are omitted. */}
+            <Reveal>
+              <FeaturedProjectsShowcase
+                projects={featuredProjects as unknown as FeaturedProjectData[]}
+              />
+            </Reveal>
           </div>
         </section>
       )}

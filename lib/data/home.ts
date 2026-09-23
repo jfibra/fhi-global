@@ -40,7 +40,7 @@ async function loadHomePageData() {
       supabase
         .from("projects")
         .select(
-          "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, logo_bg, slug)"
+          "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, down_payment_percentage, payment_plan_details, expected_roi, agent_note, developers(name, logo_url, logo_bg, slug)"
         )
         .eq("is_active", true)
         .eq("is_published", true)

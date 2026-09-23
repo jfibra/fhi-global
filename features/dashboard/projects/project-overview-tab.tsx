@@ -59,9 +59,16 @@ interface Props {
   onSave: (fields: Partial<ProjectFormData>) => Promise<void>
   showToast: (variant: "success" | "error", message: string) => void
   readOnly?: boolean
+  /**
+   * The "Why we picked it" line is FHI's voice on the homepage, so only the
+   * staff projects workspace edits it. The developer portal passes false, which
+   * also keeps the key out of that form's save payload so a developer saving
+   * their overview can never blank a note the team wrote.
+   */
+  showAgentNote?: boolean
 }
 
-export function ProjectOverviewTab({ project, developers, onSave, showToast, readOnly = false }: Props) {
+export function ProjectOverviewTab({ project, developers, onSave, showToast, readOnly = false, showAgentNote = true }: Props) {
   const [form, setForm]         = useState<Partial<ProjectFormData>>({})
   // Coordinate lookup: geocodes whatever address parts are already typed.
   // Storing the result is what spares the public project page a per-visitor
@@ -81,6 +88,7 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
       slug:                      project.slug,
       description:               project.description ?? "",
       about_project:             project.about_project ?? "",
+      ...(showAgentNote ? { agent_note: project.agent_note ?? "" } : {}),
       status:                    project.status,
       developer_id:              project.developer_id ?? "",
       location:                  project.location ?? "",
@@ -114,7 +122,7 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
       sales_contact_phone:       project.sales_contact_phone ?? "",
       sales_contact_email:       project.sales_contact_email ?? "",
     })
-  }, [project])
+  }, [project, showAgentNote])
 
   const set = (key: keyof typeof form, value: unknown) =>
     setForm((f) => ({ ...f, [key]: value }))
@@ -386,6 +394,18 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
             ),
           )}
         </div>
+        {showAgentNote && <div className="col-span-2">
+          {field(
+            "Why we picked it",
+            <>
+              {area("agent_note", "e.g. Faces the water, not Sheikh Zayed Road, so it’s quiet at night. Chiller-free building.", 2)}
+              <p className="mt-1.5 text-[11px] text-[#9ca3af]">
+                One or two plain sentences from the team, in your own words. Shown on the homepage
+                when this project is Featured; leave blank and the card simply omits it.
+              </p>
+            </>,
+          )}
+        </div>}
       </div>
     ),
 
@@ -515,6 +535,7 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
         </div>
         {roText("Short Description", project.description)}
         {roText("About Project", project.about_project)}
+        {showAgentNote && roText("Why we picked it", project.agent_note)}
       </div>
     ),
     location: (

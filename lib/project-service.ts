@@ -27,6 +27,8 @@ export type Project = {
   listing_type: ProjectListingType
   description: string | null
   about_project: string | null
+  /** "Why we picked it" — a hand-written FHI line for the homepage featured showcase. */
+  agent_note: string | null
   status: "pre_launch" | "launch" | "under_construction" | "completed"
   developer_id: string | null
   location: string | null
@@ -217,6 +219,7 @@ const NULLABLE_STRING_FIELDS = new Set<keyof ProjectFormData>([
   "developer_id",
   "description",
   "about_project",
+  "agent_note",
   "location",
   "region",
   "community",

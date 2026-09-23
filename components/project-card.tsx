@@ -32,7 +32,7 @@ const STATUS_STYLES: Record<string, { label: string; bg: string; text: string; b
   completed:          { label: "Ready to Move",      bg: "bg-[#0a2647]",  text: "text-white", border: "border-transparent" },
 }
 
-function formatPrice(value: number, currency = "AED"): string {
+export function formatProjectPrice(value: number, currency = "AED"): string {
   if (value >= 1_000_000) return `${currency} ${(value / 1_000_000).toFixed(value % 1_000_000 === 0 ? 0 : 1)}M`
   if (value >= 1_000)     return `${currency} ${(value / 1_000).toFixed(0)}K`
   return `${currency} ${value.toLocaleString()}`
@@ -157,7 +157,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
               <>
                 <span className="text-[10px] font-medium text-[#9ca3af] uppercase tracking-wider">Starting from</span>
                 <p className="font-['Outfit'] font-bold text-[#0d1117] text-base leading-none mt-0.5 group-hover:text-[#001f3f] transition-colors">
-                  {formatPrice(launch_price_from, currency ?? "AED")}
+                  {formatProjectPrice(launch_price_from, currency ?? "AED")}
                 </p>
               </>
             ) : (
