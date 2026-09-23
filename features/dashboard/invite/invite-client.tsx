@@ -11,8 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react"
 import {
   AlertTriangle, Cake, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet,
-  FileText, Loader2, MessageCircle, Phone, QrCode, RefreshCw, Search, Users,
-} from "lucide-react"
+  FileText, Loader2, MessageCircle, Phone, QrCode, RefreshCw, Search, Users, Globe,} from "lucide-react"
 import { roleToLabel } from "@/lib/auth"
 import { ROLE_COLORS, invitableRolesFor, roleInList } from "@/lib/app-roles"
 
@@ -472,8 +471,7 @@ export function InviteClient({
                 view === "partners" ? "bg-[#001f3f] text-white" : "text-[#374151] hover:bg-[#f3f4f6]"
               }`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logos/global_partner.png" alt="" className={`h-4 w-auto ${view === "partners" ? "" : "opacity-80"}`} />
+              <Globe className="w-4 h-4" />
               Global Partners
               <span className={`rounded-full px-1.5 text-[11px] ${view === "partners" ? "bg-[#d6b357] text-[#001f3f]" : "bg-[#f3f4f6]"}`}>{partnerCount}</span>
             </button>
@@ -542,8 +540,10 @@ export function InviteClient({
           {/* ── QR card: Global Partners invite ── */}
           {view === "partners" && (
           <div className="rounded-2xl border border-[#d6b357]/50 bg-[#001f3f] p-6 flex flex-col items-center text-white">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/global_partner.png" alt="FHI Global Partners" className="h-12 w-auto mb-4" />
+            <div className="w-full rounded-xl bg-white px-4 py-3 mb-4 flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logos/global_partner.png" alt="Filipino Homes Global Partners" className="h-16 w-auto" />
+            </div>
             <div className="rounded-2xl border-4 border-[#d6b357] p-4 bg-white">
               {gpInviteUrl ? (
                 <QRCodeSVG value={gpInviteUrl} size={190} level="M" fgColor="#001f3f" />
