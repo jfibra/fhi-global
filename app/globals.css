@@ -272,3 +272,106 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-street-exit, .animate-map-rise, .animate-map-soft { animation: none; opacity: 1; transform: none; }
 }
+
+/* ─── Homepage "We connect serious investors" — choreographed entrance ─────
+   Fired by data-in="true" on an InView wrapper. Every element declares its own
+   delay in --d (or --i for the headline words) so the sequence reads:
+   rule draws → words rise from a mask → gold shimmer sweeps across the golden
+   words → sub-line and CTAs settle → photo wipes open and eases out of a zoom
+   → corner marks slide in. Each fact group repeats a smaller version of this
+   as it scrolls in: divider draws, label fades, items rise, icons trace. */
+.wf { --wf-ease: cubic-bezier(0.16, 1, 0.3, 1); --wf-ease-io: cubic-bezier(0.77, 0, 0.175, 1); }
+
+.wf-rule { transform: scaleX(0); transform-origin: left center; transition: transform 1000ms var(--wf-ease); }
+[data-in="true"] .wf-rule { transform: scaleX(1); }
+
+.wf-word { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.14em; margin-bottom: -0.14em; }
+.wf-word > span {
+  display: inline-block;
+  transform: translateY(108%) rotate(3deg);
+  transform-origin: left bottom;
+  transition: transform 1100ms var(--wf-ease);
+  transition-delay: calc(180ms + var(--i, 0) * 60ms);
+}
+[data-in="true"] .wf-word > span { transform: translateY(0) rotate(0); }
+
+.wf-gold {
+  background: linear-gradient(100deg, #b8913f 0%, #b8913f 38%, #f6e3a8 50%, #b8913f 62%, #b8913f 100%);
+  background-size: 260% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+[data-in="true"] .wf-gold {
+  animation: wf-shimmer 1600ms var(--wf-ease) forwards;
+  animation-delay: calc(1250ms + (var(--i, 0) - 6) * 110ms);
+}
+@keyframes wf-shimmer { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+
+.wf-fade {
+  opacity: 0;
+  transform: translateY(22px);
+  filter: blur(6px);
+  transition: opacity 1000ms var(--wf-ease), transform 1000ms var(--wf-ease), filter 1000ms var(--wf-ease);
+  transition-delay: calc(var(--d, 0ms) + var(--g, 0ms));
+}
+[data-in="true"] .wf-fade { opacity: 1; transform: translateY(0); filter: blur(0); }
+
+.wf-photo { clip-path: inset(100% 0 0 0); transition: clip-path 1500ms var(--wf-ease-io); transition-delay: var(--d, 0ms); }
+[data-in="true"] .wf-photo { clip-path: inset(0 0 0 0); }
+.wf-photo-img { transform: scale(1.22); transition: transform 2600ms var(--wf-ease); transition-delay: var(--d, 0ms); }
+[data-in="true"] .wf-photo-img { transform: scale(1); }
+
+.wf-corner {
+  position: absolute; width: 26px; height: 26px; opacity: 0;
+  border: 2px solid #d6b357;
+  transition: opacity 700ms var(--wf-ease), transform 900ms var(--wf-ease);
+  transition-delay: 1500ms;
+}
+.wf-corner--tl { top: -8px; left: -8px; border-right: 0; border-bottom: 0; transform: translate(10px, 10px); }
+.wf-corner--tr { top: -8px; right: -8px; border-left: 0; border-bottom: 0; transform: translate(-10px, 10px); }
+.wf-corner--bl { bottom: -8px; left: -8px; border-right: 0; border-top: 0; transform: translate(10px, -10px); }
+.wf-corner--br { bottom: -8px; right: -8px; border-left: 0; border-top: 0; transform: translate(-10px, -10px); }
+[data-in="true"] .wf-corner { opacity: 1; transform: translate(0, 0); }
+
+.wf-line { transform: scaleX(0); transform-origin: left center; transition: transform 1300ms var(--wf-ease); transition-delay: var(--g, 0ms); }
+[data-in="true"] .wf-line { transform: scaleX(1); }
+
+/* Icons trace their own strokes: lucide paths are short enough that a 100-unit
+   dash covers every one at a 24-unit viewBox. */
+.wf-icon :is(path, circle, line, polyline, polygon, rect, ellipse) {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  transition: stroke-dashoffset 1500ms var(--wf-ease);
+  transition-delay: calc(var(--d, 0ms) + var(--g, 0ms));
+}
+[data-in="true"] .wf-icon :is(path, circle, line, polyline, polygon, rect, ellipse) { stroke-dashoffset: 0; }
+.wf-icon-ring { transform: scale(0.6); opacity: 0; transition: transform 900ms var(--wf-ease), opacity 600ms var(--wf-ease); transition-delay: calc(var(--d, 0ms) + var(--g, 0ms)); }
+[data-in="true"] .wf-icon-ring { transform: scale(1); opacity: 1; }
+.wf-item:hover .wf-icon-ring { background: rgba(214, 179, 87, 0.12); border-color: #d6b357; transition-delay: 0ms; transition-duration: 300ms; }
+
+/* CTA sheen sweeps once per hover; the text link's gold underline grows from the left. */
+.wf-cta::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.22) 50%, transparent 65%);
+  transform: translateX(-120%);
+  transition: transform 0s;
+}
+.wf-cta:hover::after { transform: translateX(120%); transition: transform 700ms var(--wf-ease); }
+.wf-link::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 2px;
+  background: #d6b357; transform: scaleX(0.35); transform-origin: left center;
+  transition: transform 400ms var(--wf-ease);
+}
+.wf-link:hover::after { transform: scaleX(1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wf-rule, .wf-word > span, .wf-fade, .wf-photo, .wf-photo-img, .wf-corner, .wf-line, .wf-icon-ring,
+  .wf-icon :is(path, circle, line, polyline, polygon, rect, ellipse) {
+    transition: none !important; animation: none !important;
+    opacity: 1 !important; transform: none !important; clip-path: none !important; filter: none !important;
+    stroke-dasharray: none !important; stroke-dashoffset: 0 !important;
+  }
+  .wf-gold { background-position: 0 0; }
+}

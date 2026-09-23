@@ -6,6 +6,7 @@ import { createPageMetadata } from "@/lib/seo";
 import { HeroSection } from "@/components/hero-section";
 import { Reveal } from "@/components/public/reveal";
 import { HomeFaq } from "@/components/public/home-faq";
+import { WhyFhi } from "@/components/public/why-fhi";
 import { faqPageSchema } from "@/lib/faqs";
 import { fhiOrganizationSchema, webSiteSchema } from "@/lib/structured-data";
 import { JsonLd } from "@/components/json-ld";
@@ -23,13 +24,8 @@ import {
   ShieldCheck,
   Star,
   ArrowRight,
-  ChevronRight,
   CheckCircle2,
-  Users,
   Award,
-  Globe,
-  Zap,
-  BadgeCheck,
   MessageCircle,
 } from "lucide-react";
 
@@ -83,39 +79,6 @@ const STATS = [
     label: "RERA Registered",
     value: "100%",
     sub: "fully compliant",
-  },
-];
-
-const WHY_US = [
-  {
-    icon: ShieldCheck,
-    title: "Verified Developers",
-    desc: "Every developer on our platform is vetted, RERA-registered, and financially screened.",
-  },
-  {
-    icon: Award,
-    title: "Premium Listings",
-    desc: "Curated portfolio of the finest residential and investment projects in Dubai.",
-  },
-  {
-    icon: TrendingUp,
-    title: "Strong ROI",
-    desc: "Dubai consistently delivers 6–8% rental yields — among the highest returns globally.",
-  },
-  {
-    icon: Users,
-    title: "Expert Team",
-    desc: "Our multilingual agents guide you end-to-end, from search to handover.",
-  },
-  {
-    icon: Globe,
-    title: "International Reach",
-    desc: "Serving investors from 50+ countries seeking Dubai real estate.",
-  },
-  {
-    icon: Zap,
-    title: "Fast Transactions",
-    desc: "End-to-end support from first viewing to SPA signing — in record time.",
   },
 ];
 
@@ -345,69 +308,9 @@ export default async function HomePage() {
       )}
 
       {/* ----------------------------------------------- */}
-      {/* WHY CHOOSE US                                   */}
+      {/* WHY FHI — "We connect serious investors…"        */}
       {/* ----------------------------------------------- */}
-      {/* Rebuilt to the approved mockup. Gone: the "Why FHI Global" eyebrow and
-          the "Your Trusted Real Estate Partner" headline (the sub-line says it
-          better and one heading beats two), the gold-rimmed navy ellipse behind
-          the cards, the navy icon blocks, the gold top trims and the big rotated
-          watermarks. What's left is the point: an ornament, one statement, and
-          six facts. */}
-      <section className="relative pt-24 pb-24 overflow-hidden">
-        {/* Background — skyline photo, fading to the page before the cards so
-            the lower row sits on plain white like the mockup. */}
-        <div className="absolute inset-0">
-          <Image
-            src="/background/developers.webp"
-            alt=""
-            fill
-            sizes="100vw"
-            className="object-cover object-center"
-            aria-hidden="true"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-white/80 via-white/60 to-[#f7f8fa]" />
-        </div>
-
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header — the mockup's building ornament, then the statement. */}
-          <Reveal>
-          <div className="text-center max-w-3xl mx-auto mb-14">
-            <div className="flex items-center justify-center gap-3 mb-6" aria-hidden="true">
-              <span className="h-px w-20 bg-[#d6b357]/70" />
-              <Building2 className="w-6 h-6 text-[#b8913f]" />
-              <span className="h-px w-20 bg-[#d6b357]/70" />
-            </div>
-            <h2 className="font-['Outfit'] text-3xl md:text-[42px] font-bold tracking-tight text-[#0d1117] leading-[1.15]">
-              We connect serious investors with
-              <br className="hidden sm:block" /> the right developers and projects
-            </h2>
-            <span className="block w-14 h-[3px] bg-[#d6b357] mx-auto mt-6 mb-5" aria-hidden="true" />
-            <p className="text-[#6b7280] text-lg leading-relaxed">
-              Backed by expertise, transparency,
-              <br className="hidden sm:block" /> and a proven track record.
-            </p>
-          </div>
-          </Reveal>
-
-          {/* Six facts — icon beside the text, hairline between them, as drawn. */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {WHY_US.map(({ icon: Icon, title, desc }, i) => (
-              <Reveal key={title} delay={(i % 3) * 120} className="h-full">
-              <div className="group h-full bg-white border border-[#e8eaed] p-6 flex items-start gap-5 transition-shadow duration-300 hover:shadow-[0_14px_40px_-18px_rgba(0,20,40,0.22)]">
-                <Icon className="w-9 h-9 shrink-0 text-[#b8913f]" strokeWidth={1.25} aria-hidden="true" />
-                <div className="min-w-0 border-l border-[#eef0f3] pl-5">
-                  <h3 className="font-['Outfit'] text-[17px] font-bold text-[#0d1117]">
-                    {title}
-                  </h3>
-                  <span className="block w-8 h-[3px] bg-[#d6b357] mt-2 mb-3" aria-hidden="true" />
-                  <p className="text-sm text-[#6b7280] leading-relaxed">{desc}</p>
-                </div>
-              </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
+      <WhyFhi />
 
       {/* ----------------------------------------------- */}
       {/* FAQ                                             */}
