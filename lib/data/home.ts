@@ -32,7 +32,7 @@ async function loadHomePageData() {
     await Promise.all([
       supabase
         .from("developers")
-        .select("id, name, slug, description, logo_url, rating, is_verified")
+        .select("id, name, slug, description, logo_url, logo_bg, rating, is_verified")
         .in("slug", FEATURED_DEVELOPER_SLUGS)
         .eq("is_active", true)
         .is("deleted_at", null)
@@ -40,7 +40,7 @@ async function loadHomePageData() {
       supabase
         .from("projects")
         .select(
-          "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)"
+          "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, logo_bg, slug)"
         )
         .eq("is_active", true)
         .eq("is_published", true)

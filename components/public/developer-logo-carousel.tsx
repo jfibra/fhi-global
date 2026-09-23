@@ -9,6 +9,7 @@ export interface DeveloperLogoItem {
   name: string
   slug: string
   logo_url?: string | null
+  logo_bg?: string | null
 }
 
 interface DeveloperLogoCarouselProps {
@@ -21,6 +22,7 @@ const LogoTile = memo(function LogoTile({ dev }: { dev: DeveloperLogoItem }) {
   return (
     <Link
       href={`/${dev.slug}`}
+      style={dev.logo_bg ? { backgroundColor: dev.logo_bg } : undefined}
       className="group relative flex h-[188px] w-[calc((100%-20px)/2)] shrink-0 items-center justify-center bg-white p-8 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform hover:-translate-y-2 sm:w-[calc((100%-40px)/3)] lg:w-[calc((100%-80px)/5)] after:pointer-events-none after:absolute after:inset-0 after:opacity-0 after:shadow-[0_14px_30px_-10px_rgba(0,31,63,0.35)] after:transition-opacity after:duration-300 hover:after:opacity-100"
     >
       {dev.logo_url ? (

@@ -12,6 +12,8 @@ export interface DeveloperCardData {
   slug: string
   description?: string | null
   logo_url?: string | null
+  /** Baked-in logo background detected at upload (lib/logo-analysis.ts); null = transparent. */
+  logo_bg?: string | null
   rating?: number | null
   is_verified?: boolean | null
   project_count?: number | null
@@ -27,10 +29,13 @@ interface DeveloperCardProps {
 export function DeveloperCard({ developer, variant = "default" }: DeveloperCardProps) {
   // Ratings are deliberately not shown: there is no review system behind the
   // number, so a star score would be an unearned claim about a third party.
-  const { name, slug, description, logo_url, is_verified, project_count } = developer
-  // Logo panel background sampled from the logo image itself, so baked-in
-  // logo backgrounds (e.g. white) fill the panel instead of floating in it.
-  const [logoBg, setLogoBg] = useState<string | null>(null)
+  const { name, slug, description, logo_url, logo_bg, is_verified, project_count } = developer
+  // Logo panel background: the colour detected server-side at upload wins
+  // (deterministic, no CORS); the client sampler only fills in for rows that
+  // predate the column. Either way a baked-in background paints the whole
+  // panel instead of floating as a rectangle inside it.
+  const [sampledBg, setLogoBg] = useState<string | null>(null)
+  const logoBg = logo_bg ?? sampledBg
 
   if (variant === "tile") {
     return (

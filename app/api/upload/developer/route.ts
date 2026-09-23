@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { isAdminOrDeveloperUploadRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminSupabase } from "@/lib/admin-supabase"
+import { detectLogoBackground } from "@/lib/logo-analysis"
 
 // Images arrive already resized + WebP-encoded by the browser
 // (lib/upload/compress-image.ts), so this route just stores what it is given.
@@ -72,7 +74,20 @@ export async function POST(request: NextRequest) {
     )
 
     const publicUrl = `${process.env.S3_PUBLIC_URL}/${key}`
-    return NextResponse.json({ url: publicUrl })
+
+    // Detect the logo's baked-in background so the public cards can paint
+    // their logo panel to match (see developers.logo_bg). Best effort — a
+    // detection failure must never fail the upload.
+    let logoBg: string | null = null
+    if (ext !== "svg" && ext !== "pdf") {
+      try {
+        logoBg = await detectLogoBackground(buffer)
+        await createAdminSupabase().from("developers").update({ logo_bg: logoBg }).eq("slug", developerSlug)
+      } catch (e) {
+        console.error("[developer-upload] logo_bg detection failed:", e instanceof Error ? e.message : e)
+      }
+    }
+    return NextResponse.json({ url: publicUrl, logoBg })
   } catch (err) {
     console.error("[developer-upload]", err)
     // Surface the real reason. This route is admin/super-admin only (checked

@@ -152,7 +152,7 @@ export default async function ProjectDetailPage({ params }: Props) {
     .from("projects")
     .select(`
       *,
-      developers ( id, name, slug, logo_url, website_url, phone, email, description, is_verified ),
+      developers ( id, name, slug, logo_url, logo_bg, website_url, phone, email, description, is_verified ),
       project_images ( id, url, thumb, is_main, rank ),
       project_units ( id, unit_type, bedrooms, bathrooms, size_sqft, price_from, price_to, available_units, is_available ),
       project_amenities ( amenities ( name ) ),
@@ -185,7 +185,7 @@ export default async function ProjectDetailPage({ params }: Props) {
   const images = ((project.project_images ?? []) as {id:number;url:string;thumb:string|null;is_main:boolean|null;rank:number|null}[])
     .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
     .map((img) => ({ id: img.id, image_url: img.url, caption: null, rank: img.rank }))
-  const developer = project.developers as { id:string;name:string;slug:string;logo_url:string|null;website_url:string|null;phone:string|null;email:string|null;description:string|null;is_verified:boolean|null } | null
+  const developer = project.developers as { id:string;name:string;slug:string;logo_url:string|null;logo_bg:string|null;website_url:string|null;phone:string|null;email:string|null;description:string|null;is_verified:boolean|null } | null
 
   // The URL's developer segment must be the project's actual developer. A
   // mismatch 308s to the canonical pair (old links and typos both land right);
@@ -841,7 +841,10 @@ export default async function ProjectDetailPage({ params }: Props) {
           {developer && (
             <SidePanel title="Developer">
               <Link href={`/${developer.slug}`} className="flex items-center gap-4 group">
-                <div className="w-14 h-14 border border-[#e5e8ec] bg-white flex items-center justify-center overflow-hidden shrink-0">
+                <div
+                  className="w-14 h-14 border border-[#e5e8ec] bg-white flex items-center justify-center overflow-hidden shrink-0"
+                  style={developer.logo_bg ? { backgroundColor: developer.logo_bg } : undefined}
+                >
                   {developer.logo_url ? (
                     <Image
                       src={developer.logo_url}

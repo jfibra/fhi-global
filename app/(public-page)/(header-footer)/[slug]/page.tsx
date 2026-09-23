@@ -51,7 +51,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const supabase = createPublicSupabaseClient()
   const { data, error } = await supabase
     .from("developers")
-    .select("name, description, logo_url, address")
+    .select("name, description, logo_url, logo_bg, address")
     .eq("slug", slug)
     .is("deleted_at", null)
     .maybeSingle()
@@ -251,7 +251,10 @@ export default async function DeveloperDetailPage({ params }: Props) {
 
           <div className="mt-5 flex flex-col sm:flex-row items-start gap-6">
             {/* Logo */}
-            <div className="w-32 h-32 md:w-36 md:h-36 bg-white border border-[#d6b357]/50 shadow-[0_12px_32px_-16px_rgba(0,20,40,0.3)] flex items-center justify-center shrink-0 overflow-hidden">
+            <div
+              className="w-32 h-32 md:w-36 md:h-36 bg-white border border-[#d6b357]/50 shadow-[0_12px_32px_-16px_rgba(0,20,40,0.3)] flex items-center justify-center shrink-0 overflow-hidden"
+              style={developer.logo_bg ? { backgroundColor: developer.logo_bg } : undefined}
+            >
               {developer.logo_url ? (
                 <Image
                   src={developer.logo_url}

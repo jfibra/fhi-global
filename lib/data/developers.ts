@@ -13,7 +13,7 @@ async function loadDevelopersDirectory() {
   const [{ data: developers }, { data: projectCoords }] = await Promise.all([
     supabase
       .from("developers")
-      .select("id, name, slug, description, logo_url, rating, is_verified")
+      .select("id, name, slug, description, logo_url, logo_bg, rating, is_verified")
       .eq("is_active", true)
       .is("deleted_at", null)
       .order("name"),
