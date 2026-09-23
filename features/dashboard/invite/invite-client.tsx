@@ -98,6 +98,10 @@ export function InviteClient({
   const [origin, setOrigin] = useState("")
   const [copied, setCopied] = useState(false)
   const downloadRef = useRef<HTMLDivElement>(null)
+  // Global Partners — the same referral, a different landing: recruits abroad
+  // register as global_partner (rankings-only dashboard) under this agent.
+  const [gpCopied, setGpCopied] = useState(false)
+  const gpDownloadRef = useRef<HTMLDivElement>(null)
 
   const [recruits, setRecruits] = useState<Recruit[]>(() => recruitsCache ?? [])
   const [recruitsLoading, setRecruitsLoading] = useState(recruitsCache === null)
@@ -206,6 +210,29 @@ export function InviteClient({
   const waText = encodeURIComponent(
     `Join me on FHI Global — Dubai's premier real estate portal. Create your account here: ${inviteUrl}`,
   )
+
+  const gpInviteUrl = origin ? `${origin}/register?type=global-partner&ref=${userId}` : ""
+  const gpWaText = encodeURIComponent(
+    `Become an FHI Global Partner — earn with Dubai real estate from anywhere. Register under my network here: ${gpInviteUrl}`,
+  )
+  const handleGpCopy = async () => {
+    if (!gpInviteUrl) return
+    try {
+      await navigator.clipboard.writeText(gpInviteUrl)
+      setGpCopied(true)
+      setTimeout(() => setGpCopied(false), 2000)
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+  const handleGpDownload = () => {
+    const canvas = gpDownloadRef.current?.querySelector("canvas")
+    if (!canvas) return
+    const a = document.createElement("a")
+    a.href = canvas.toDataURL("image/png")
+    a.download = "fhi-global-partners-invite-qr.png"
+    a.click()
+  }
 
   // What this user's rank may set on a recruit, mirroring the ladder the two API
   // routes enforce (INVITE_GRANTABLE_ROLES in app-roles.ts): team leaders reach
@@ -414,8 +441,9 @@ export function InviteClient({
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
-          {/* ── QR card (stays in view while the recruits list scrolls) ── */}
-          <div className="bg-white rounded-2xl border border-[#e8eaed] p-6 flex flex-col items-center self-start lg:sticky lg:top-0">
+          <div className="space-y-4 self-start lg:sticky lg:top-0">
+          {/* ── QR card: team invite ── */}
+          <div className="bg-white rounded-2xl border border-[#e8eaed] p-6 flex flex-col items-center">
             <div className="rounded-2xl border-4 border-[#d6b357] p-4 bg-white">
               {inviteUrl ? (
                 <QRCodeSVG value={inviteUrl} size={190} level="M" fgColor="#001f3f" />
@@ -467,6 +495,59 @@ export function InviteClient({
                 {copied ? "Copied!" : "Copy invite link"}
               </button>
             </div>
+          </div>
+
+          {/* ── QR card: Global Partners invite ── */}
+          <div className="rounded-2xl border border-[#d6b357]/50 bg-[#001f3f] p-6 flex flex-col items-center text-white">
+            <p className="self-start text-[10px] font-bold uppercase tracking-[0.2em] text-[#d6b357] mb-3">Global Partners</p>
+            <div className="rounded-2xl border-4 border-[#d6b357] p-4 bg-white">
+              {gpInviteUrl ? (
+                <QRCodeSVG value={gpInviteUrl} size={150} level="M" fgColor="#001f3f" />
+              ) : (
+                <div className="w-[150px] h-[150px] animate-pulse bg-[#f3f4f6] rounded-xl" />
+              )}
+            </div>
+            <p className="mt-4 font-['Outfit'] font-bold text-[#d6b357] text-base text-center">
+              Scan to become an FHI Global Partner
+            </p>
+            <p className="mt-1.5 text-[11px] text-white/70 text-center leading-relaxed">
+              For agents outside the UAE. They register under your network and see the company rankings — Top Sales and Top Developers.
+            </p>
+            <div ref={gpDownloadRef} className="hidden" aria-hidden>
+              {gpInviteUrl && <QRCodeCanvas value={gpInviteUrl} size={1024} level="M" fgColor="#001f3f" marginSize={4} />}
+            </div>
+            <div className="mt-4 w-full space-y-2">
+              <button
+                type="button"
+                onClick={handleGpDownload}
+                disabled={!gpInviteUrl}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors disabled:opacity-40"
+              >
+                <Download className="w-4 h-4" />
+                Download QR
+              </button>
+              <a
+                href={`https://wa.me/?text=${gpWaText}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[#25d366] text-[#7fe3a5] text-sm font-bold hover:bg-[#25d366]/10 transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Share on WhatsApp
+              </a>
+              <button
+                type="button"
+                onClick={() => void handleGpCopy()}
+                disabled={!gpInviteUrl}
+                className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors disabled:opacity-40 ${
+                  gpCopied ? "bg-emerald-500/20 text-emerald-200 border border-emerald-400/40" : "border border-white/25 text-white hover:border-[#d6b357] hover:text-[#d6b357]"
+                }`}
+              >
+                {gpCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {gpCopied ? "Copied!" : "Copy partner link"}
+              </button>
+            </div>
+          </div>
           </div>
 
           {/* ── My recruits ── */}

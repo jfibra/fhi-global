@@ -91,7 +91,7 @@ export function RegisterUI({
   inviteRef = null,
   referrer = null,
 }: {
-  defaultAccountType?: "member" | "developer"
+  defaultAccountType?: "member" | "developer" | "global_partner"
   inviteRef?: string | null
   referrer?: Referrer
 }) {
@@ -177,7 +177,7 @@ export function RegisterUI({
           ) : (
             <>
               <h1 className="font-['Outfit'] text-[26px] font-bold text-[#0d1117] leading-tight mb-4 text-left">
-                {step === "email" ? "Create your account" : "Enter your code"}
+                {step === "email" ? (defaultAccountType === "global_partner" ? "Join as a Global Partner" : "Create your account") : "Enter your code"}
               </h1>
 
               {/* Info box */}
@@ -186,6 +186,8 @@ export function RegisterUI({
                 <p className="text-[13px] text-[#3a5a78] leading-relaxed">
                   {step === "code"
                     ? <>Enter the 6-digit code we sent to <span className="font-semibold">{email}</span>.</>
+                    : referrer && defaultAccountType === "global_partner"
+                      ? <>You&apos;re joining <span className="font-semibold">{referrer.name}</span>&apos;s network as an FHI Global Partner — enter your email and we&apos;ll send you a code.</>
                     : referrer
                       ? <>You&apos;re joining <span className="font-semibold">{referrer.name}</span>&apos;s network — enter your email and we&apos;ll send you a code.</>
                       : "Enter your email and we'll send you a 6-digit code to finish signing up."}

@@ -68,6 +68,13 @@ export const APP_ROLES = {
     tableBadge: { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" },
     shellBadge: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
   },
+  global_partner: {
+    dashboardBasePath: "/globalpartner",
+    adminLabel: "Global Partner",
+    sidebarHexColor: "#b8913f",
+    tableBadge: { bg: "bg-amber-50", text: "text-amber-800", border: "border-amber-200" },
+    shellBadge: "bg-amber-500/20 text-amber-200 border-amber-500/30",
+  },
   editor: {
     dashboardBasePath: "/editor",
     adminLabel: "Editor",
@@ -91,6 +98,7 @@ export const APP_ROLE_ORDER: AppRoleId[] = [
   "secretary",
   "team_secretary",
   "member",
+  "global_partner",
 ]
 
 export function normalizeAppRole(role: string | null | undefined): string {
@@ -246,7 +254,7 @@ export const ROLES_SUPPORT_PORTAL: readonly AppRoleId[] = [...APP_ROLE_ORDER]
  * marketing artwork and training library. Derived rather than listed so a
  * future role is included by default and only developers stay out.
  */
-export const ROLES_INTERNAL_RESOURCES: readonly AppRoleId[] = APP_ROLE_ORDER.filter((r) => r !== "developer")
+export const ROLES_INTERNAL_RESOURCES: readonly AppRoleId[] = APP_ROLE_ORDER.filter((r) => r !== "developer" && r !== "global_partner")
 
 /**
  * Who may see the company Top Sales leaderboard (per-agent revenue).
@@ -265,6 +273,7 @@ export const ROLES_SALES_LEADERBOARD: readonly AppRoleId[] = [
   "secretary",
   "team_secretary",
   "member",
+  "global_partner",
 ]
 
 /** Developer media/logo upload route (also allows content editors). */
@@ -371,15 +380,15 @@ export function canUseWebsiteBuilder(role: string | null | undefined): boolean {
  * Every row is ordered by APP_ROLE_ORDER (senior → junior), which the dropdown
  * renders in and whose last entry is the default a recruit falls back to.
  */
-const TEAM_LEADER_GRANTS: readonly AppRoleId[] = ["unit_manager", "agent", "team_secretary", "member"]
+const TEAM_LEADER_GRANTS: readonly AppRoleId[] = ["unit_manager", "agent", "team_secretary", "member", "global_partner"]
 
 export const INVITE_GRANTABLE_ROLES: Record<string, readonly AppRoleId[]> = {
   // Derived from the team leader's row so the two can't drift apart.
   super_admin: ["team_leader", ...TEAM_LEADER_GRANTS],
   admin: ["team_leader", ...TEAM_LEADER_GRANTS],
   team_leader: TEAM_LEADER_GRANTS,
-  unit_manager: ["agent", "member"],
-  agent: ["agent", "member"],
+  unit_manager: ["agent", "member", "global_partner"],
+  agent: ["agent", "member", "global_partner"],
 }
 
 export function invitableRolesFor(role: string | null | undefined): readonly AppRoleId[] {

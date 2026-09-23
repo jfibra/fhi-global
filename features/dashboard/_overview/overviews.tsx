@@ -6,6 +6,7 @@ import { isAdminStaffRole, normalizeAppRole } from "@/lib/app-roles"
 import { SalesPipelineOverview } from "@/components/dashboard/sales-pipeline-overview"
 import { SecretaryLikeOverview } from "@/components/dashboard/secretary-like-overview"
 import { MemberOverview as MemberOverviewCard } from "@/components/dashboard/member-overview"
+import { GlobalPartnerOverview as GlobalPartnerOverviewCard } from "@/components/dashboard/global-partner-overview"
 import { AdminDashboardContent } from "./_dashboard"
 import { EditorDashboardContent } from "./editor-overview"
 import { TopSalesBoard } from "./top-sales-board"
@@ -122,6 +123,18 @@ export function MemberOverview() {
   return (
     <WithTopSales userId={user?.id}>
       <MemberOverviewCard displayName={profile?.fullname ?? user?.email ?? "User"} />
+    </WithTopSales>
+  )
+}
+
+/** Global partner overview — rankings only, plus a welcome card naming their upline. */
+export function GlobalPartnerOverview() {
+  const { user, profile } = useAuth()
+  const meta = (profile as { metadata?: Record<string, unknown> } | null)?.metadata
+  const uplineName = meta && typeof meta.invited_by_name === "string" ? meta.invited_by_name : null
+  return (
+    <WithTopSales userId={user?.id}>
+      <GlobalPartnerOverviewCard displayName={profile?.fullname ?? user?.email ?? "Partner"} uplineName={uplineName} />
     </WithTopSales>
   )
 }

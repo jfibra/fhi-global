@@ -54,7 +54,8 @@ export default async function RegisterPage({
 }) {
   const sp = await searchParams
   const requestedType = (sp.type ?? sp.role ?? "").toLowerCase()
-  const defaultAccountType = requestedType === "developer" ? "developer" : "member"
+  const defaultAccountType =
+    requestedType === "developer" ? "developer" : requestedType.replace(/-/g, "_") === "global_partner" ? "global_partner" : "member"
   const inviteRef = typeof sp.ref === "string" ? sp.ref : null
 
   // If already logged in, redirect to dashboard

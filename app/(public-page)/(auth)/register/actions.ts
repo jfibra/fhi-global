@@ -18,10 +18,11 @@ export type RegisterOtpResult = { error?: string; ok?: boolean; success?: boolea
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-type AccountType = "member" | "developer"
+type AccountType = "member" | "developer" | "global_partner"
 
 function normalizeAccountType(v: string | null | undefined): AccountType {
-  return String(v ?? "").toLowerCase().trim() === "developer" ? "developer" : "member"
+  const t = String(v ?? "").toLowerCase().trim().replace(/-/g, "_")
+  return t === "developer" ? "developer" : t === "global_partner" ? "global_partner" : "member"
 }
 
 /**
@@ -122,8 +123,10 @@ export async function verifyRegisterOtp(
   if (!challenge) return { error: "This code is no longer valid. Request a new one." }
 
   const accountType = normalizeAccountType(accountTypeRaw)
-  const role = accountType === "developer" ? "developer" : "member"
+  // Global partners register only through an agent's invite link; without a
+  // valid ref they fall back to member like everyone else.
   const ref = String(refRaw ?? "").trim()
+  const role = accountType === "developer" ? "developer" : accountType === "global_partner" && UUID_RE.test(ref) ? "global_partner" : "member"
 
   const check = await checkOtpChallenge(challenge, code)
   if ("error" in check) return { error: check.error }
@@ -166,14 +169,18 @@ export async function verifyRegisterOtp(
   }
 
   let invitedBy: string | null = null
+  let invitedByName: string | null = null
   if (ref && UUID_RE.test(ref)) {
     const { data: inviter } = await admin
       .from("profiles")
-      .select("id")
+      .select("id, fullname")
       .eq("id", ref)
       .eq("is_deleted", false)
       .maybeSingle()
-    if (inviter) invitedBy = ref
+    if (inviter) {
+      invitedBy = ref
+      invitedByName = typeof inviter.fullname === "string" && inviter.fullname.trim() ? inviter.fullname.trim() : null
+    }
   }
 
   // Least privilege: every self-registration lands as-is — member (or
@@ -184,6 +191,7 @@ export async function verifyRegisterOtp(
   const mergedMetadata = {
     ...(current?.metadata ?? {}),
     ...(invitedBy ? { invited_by: invitedBy } : {}),
+    ...(invitedByName ? { invited_by_name: invitedByName } : {}),
   }
 
   const { error: profileError } = await admin
