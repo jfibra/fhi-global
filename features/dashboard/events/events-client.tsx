@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Award, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Eye, ImagePlus, Loader2,
-  MapPin, Pencil, Plus, QrCode, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
+  MapPin, MoreVertical, Pencil, Plus, QrCode, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
 } from "lucide-react"
 import { EventCertificateModal } from "./event-certificate-modal"
 import { InlineInviterEdit } from "@/components/dashboard/inline-inviter-edit"
@@ -177,6 +177,16 @@ export function EventsClient() {
 
   // Registration row being deleted (dummy/test sign-ups cleanup)
   const [deletingRegId, setDeletingRegId] = useState<string | null>(null)
+
+  // Per-row actions menu (kebab) — fixed-position so the table's overflow
+  // container can't clip it; anchored to the button that opened it.
+  const [regMenu, setRegMenu] = useState<{ id: string; x: number; y: number } | null>(null)
+
+  // Edit-registration modal
+  const [editingReg, setEditingReg] = useState<Registration | null>(null)
+  const [regEditForm, setRegEditForm] = useState({ fullName: "", email: "", whatsapp: "", invitedBy: "" })
+  const [regEditSaving, setRegEditSaving] = useState(false)
+  const [regEditError, setRegEditError] = useState<string | null>(null)
 
   useEffect(() => {
     setOrigin(window.location.origin)
@@ -461,6 +471,66 @@ export function EventsClient() {
       // row stays; nothing worse to do here
     } finally {
       setDeletingRegId(null)
+    }
+  }
+
+  const openRegEdit = (r: Registration) => {
+    setEditingReg(r)
+    setRegEditForm({
+      fullName: r.fullName,
+      email: r.email,
+      whatsapp: r.whatsapp ?? "",
+      invitedBy: r.invitedBy ?? "",
+    })
+    setRegEditError(null)
+    setRegMenu(null)
+  }
+
+  const saveRegEdit = async () => {
+    if (!regEvent || !editingReg) return
+    setRegEditSaving(true)
+    setRegEditError(null)
+    try {
+      const res = await fetch(`/api/admin/events/${regEvent.id}/registrations`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          registrationId: editingReg.id,
+          fullName: regEditForm.fullName,
+          email: regEditForm.email,
+          whatsapp: regEditForm.whatsapp,
+          invitedBy: regEditForm.invitedBy,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string
+        fullName?: string
+        email?: string
+        whatsapp?: string | null
+        invitedBy?: string | null
+      }
+      if (!res.ok) {
+        setRegEditError(data.error ?? "Could not save — try again.")
+        return
+      }
+      // All four fields were sent, so the response echoes all four back.
+      const apply = (x: Registration): Registration =>
+        x.id === editingReg.id
+          ? {
+              ...x,
+              fullName: data.fullName ?? x.fullName,
+              email: data.email ?? x.email,
+              whatsapp: data.whatsapp ?? null,
+              invitedBy: data.invitedBy ?? null,
+            }
+          : x
+      setRegistrations((prev) => prev.map(apply))
+      regsCacheRef.current[regEvent.id] = (regsCacheRef.current[regEvent.id] ?? []).map(apply)
+      setEditingReg(null)
+    } catch {
+      setRegEditError("Could not save — check your connection and try again.")
+    } finally {
+      setRegEditSaving(false)
     }
   }
 
@@ -1153,16 +1223,22 @@ export function EventsClient() {
                         <td className="px-3 py-2.5 text-right">
                           <button
                             type="button"
-                            onClick={() => void deleteRegistration(r)}
+                            onClick={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              setRegMenu((prev) =>
+                                prev?.id === r.id ? null : { id: r.id, x: rect.right, y: rect.bottom },
+                              )
+                            }}
                             disabled={deletingRegId === r.id}
-                            className="p-1.5 text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50"
-                            aria-label={`Remove ${r.fullName}`}
-                            title="Remove this registration"
+                            className="p-1.5 text-[#374151] hover:bg-[#f3f4f6] transition-colors disabled:opacity-50"
+                            aria-label={`Actions for ${r.fullName}`}
+                            aria-haspopup="menu"
+                            title="Actions"
                           >
                             {deletingRegId === r.id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
-                              <Trash2 className="w-4 h-4" />
+                              <MoreVertical className="w-4 h-4" />
                             )}
                           </button>
                         </td>
@@ -1205,6 +1281,143 @@ export function EventsClient() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Registration row actions menu (fixed so the table's overflow can't clip it) ── */}
+      {regMenu && (() => {
+        const row = registrations.find((x) => x.id === regMenu.id)
+        if (!row) return null
+        return (
+          <>
+            <button
+              type="button"
+              className="fixed inset-0 z-[89] cursor-default"
+              aria-label="Close menu"
+              onClick={() => setRegMenu(null)}
+            />
+            <div
+              role="menu"
+              className="fixed z-[90] w-40 bg-white border border-[#e5e5e5] shadow-xl py-1"
+              style={{ top: regMenu.y + 4, left: Math.max(8, regMenu.x - 160) }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => openRegEdit(row)}
+                className="w-full flex items-center gap-2 px-3.5 py-2 text-left text-sm font-semibold text-[#374151] hover:bg-[#f9fafb] hover:text-[#001f3f] transition-colors"
+              >
+                <Pencil className="w-4 h-4" /> Edit
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setRegMenu(null)
+                  void deleteRegistration(row)
+                }}
+                className="w-full flex items-center gap-2 px-3.5 py-2 text-left text-sm font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" /> Delete
+              </button>
+            </div>
+          </>
+        )
+      })()}
+
+      {/* ── Edit registration modal ── */}
+      {editingReg && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/45 backdrop-blur-sm"
+            aria-label="Close"
+            onClick={() => setEditingReg(null)}
+          />
+          <div className="relative bg-white border border-[#e8eaed] shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-start justify-between gap-3 mb-5">
+              <div className="min-w-0">
+                <h3 className="font-['Outfit'] font-bold text-[#001f3f]">Edit registration</h3>
+                <p className="text-xs text-[#6b7280] mt-0.5 truncate">
+                  Registered {registeredLabel(editingReg.createdAt)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingReg(null)}
+                aria-label="Close"
+                className="shrink-0 p-1.5 text-[#6b7280] hover:text-[#111827] transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className={labelCls} htmlFor="reg-edit-name">Full name</label>
+                <input
+                  id="reg-edit-name"
+                  value={regEditForm.fullName}
+                  onChange={(e) => setRegEditForm((f) => ({ ...f, fullName: e.target.value }))}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls} htmlFor="reg-edit-email">Email</label>
+                <input
+                  id="reg-edit-email"
+                  type="email"
+                  value={regEditForm.email}
+                  onChange={(e) => setRegEditForm((f) => ({ ...f, email: e.target.value }))}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls} htmlFor="reg-edit-whatsapp">WhatsApp</label>
+                <input
+                  id="reg-edit-whatsapp"
+                  value={regEditForm.whatsapp}
+                  onChange={(e) => setRegEditForm((f) => ({ ...f, whatsapp: e.target.value }))}
+                  placeholder="Optional"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls} htmlFor="reg-edit-invited-by">Invited by</label>
+                <input
+                  id="reg-edit-invited-by"
+                  value={regEditForm.invitedBy}
+                  onChange={(e) => setRegEditForm((f) => ({ ...f, invitedBy: e.target.value }))}
+                  placeholder="Leave empty to clear"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+
+            {regEditError && (
+              <p className="mt-4 text-sm font-semibold text-rose-600" role="alert">{regEditError}</p>
+            )}
+
+            <div className="mt-6 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setEditingReg(null)}
+                disabled={regEditSaving}
+                className="px-4 py-2.5 border border-[#e5e5e5] text-sm font-bold text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveRegEdit()}
+                disabled={regEditSaving || !regEditForm.fullName.trim() || !regEditForm.email.trim()}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#001f3f] text-sm font-bold text-white hover:bg-[#00356b] transition-colors disabled:opacity-50"
+              >
+                {regEditSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save changes
+              </button>
+            </div>
           </div>
         </div>
       )}

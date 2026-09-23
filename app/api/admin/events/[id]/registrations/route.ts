@@ -75,7 +75,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   return NextResponse.json({ ok: true })
 }
 
-/** Edit one registration's "Invited by" (free text; empty clears it). */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/**
+ * Edit one registration's details. Only the fields present in the body change,
+ * so the inline "Invited by" editor (which sends invitedBy alone) and the full
+ * edit form share this handler. Empty invitedBy/whatsapp clear the value.
+ */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await requireActiveSession()
   if (!session.ok) return session.response
@@ -84,22 +90,59 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const { id } = await params
-  const body = (await req.json().catch(() => ({}))) as { registrationId?: unknown; invitedBy?: unknown }
+  const body = (await req.json().catch(() => ({}))) as {
+    registrationId?: unknown
+    invitedBy?: unknown
+    fullName?: unknown
+    email?: unknown
+    whatsapp?: unknown
+  }
   const registrationId = typeof body.registrationId === "string" ? body.registrationId : ""
   if (!UUID_RE.test(id) || !UUID_RE.test(registrationId)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 })
   }
-  const invitedBy = typeof body.invitedBy === "string" ? body.invitedBy.replace(/\s+/g, " ").trim().slice(0, 120) : ""
+
+  const clean = (v: unknown, max: number) =>
+    typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : ""
+
+  const update: Record<string, string | null> = {}
+
+  if ("invitedBy" in body) {
+    update.invited_by = clean(body.invitedBy, 120) || null
+  }
+  if ("fullName" in body) {
+    const fullName = clean(body.fullName, 160)
+    if (!fullName) return NextResponse.json({ error: "Name can't be empty" }, { status: 400 })
+    update.full_name = fullName
+  }
+  if ("email" in body) {
+    const email = clean(body.email, 255).toLowerCase()
+    if (!EMAIL_RE.test(email)) return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 })
+    update.email = email
+  }
+  if ("whatsapp" in body) {
+    update.whatsapp = clean(body.whatsapp, 40) || null
+  }
+
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: "Nothing to update" }, { status: 400 })
+  }
 
   const admin = createAdminSupabase()
   const { error } = await admin
     .from("event_registrations")
-    .update({ invited_by: invitedBy || null })
+    .update(update)
     .eq("id", registrationId)
     .eq("event_id", id)
 
   if (error) {
     return NextResponse.json({ error: "Failed to update registration" }, { status: 500 })
   }
-  return NextResponse.json({ ok: true, invitedBy: invitedBy ? titleCaseName(invitedBy) : null })
+  return NextResponse.json({
+    ok: true,
+    ...(update.invited_by !== undefined ? { invitedBy: update.invited_by ? titleCaseName(update.invited_by) : null } : {}),
+    ...(update.full_name !== undefined ? { fullName: update.full_name } : {}),
+    ...(update.email !== undefined ? { email: update.email } : {}),
+    ...(update.whatsapp !== undefined ? { whatsapp: update.whatsapp } : {}),
+  })
 }
