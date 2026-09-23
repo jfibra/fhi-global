@@ -123,6 +123,16 @@ export function InviteClient({
   const [bdayFrom, setBdayFrom] = useState("")
   const [bdayTo, setBdayTo] = useState("")
 
+  // Two audiences share the page: the team (agents, members, …) and Global
+  // Partners (agents abroad). Each has its own QR and its own recruit list.
+  const [view, setView] = useState<"team" | "partners">("team")
+  const pool = useMemo(
+    () => recruits.filter((r) => (view === "partners" ? r.role === "global_partner" : r.role !== "global_partner")),
+    [recruits, view],
+  )
+  const partnerCount = useMemo(() => recruits.filter((r) => r.role === "global_partner").length, [recruits])
+  const teamCount = recruits.length - partnerCount
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     const month = Number(bdayMonth)
@@ -130,7 +140,7 @@ export function InviteClient({
     const from = Number(bdayFrom) || 1
     const to = Number(bdayTo) || 31
 
-    return recruits.filter((r) => {
+    return pool.filter((r) => {
       if (q && !r.fullname.toLowerCase().includes(q) && !(r.email ?? "").toLowerCase().includes(q)) {
         return false
       }
@@ -140,7 +150,7 @@ export function InviteClient({
       if (!b || b.month !== month) return false
       return b.day >= from && b.day <= to
     })
-  }, [recruits, query, bdayMonth, bdayFrom, bdayTo])
+  }, [pool, query, bdayMonth, bdayFrom, bdayTo])
 
   // Sort by day when a month is chosen — a birthday list is read in date order.
   const visible = useMemo(() => {
@@ -430,19 +440,50 @@ export function InviteClient({
   return (
     <>
       <div className="w-full space-y-6">
-        <div>
-          <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] flex items-center gap-2">
-            <QrCode className="w-6 h-6 text-[#001f3f]" />
-            Invite 
-          </h1>
-          <p className="text-sm text-[#6b7280] mt-1">
-            This QR code is for sharing. Let others scan to connect with you and explore opportunities to join your growing real estate team
-          </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] flex items-center gap-2">
+              <QrCode className="w-6 h-6 text-[#001f3f]" />
+              Invite
+            </h1>
+            <p className="text-sm text-[#6b7280] mt-1">
+              {view === "team"
+                ? "Share your QR so others can join your real estate team — they appear below as your recruits."
+                : "Share the Global Partners QR with agents outside the UAE — they register under your network as FHI Global Partners."}
+            </p>
+          </div>
+          {/* Segmented toggle: which audience the QR and the list are for. */}
+          <div className="inline-flex rounded-xl border border-[#e5e7eb] bg-white p-1 self-start">
+            <button
+              type="button"
+              onClick={() => { setView("team"); setPage(1) }}
+              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
+                view === "team" ? "bg-[#001f3f] text-white" : "text-[#374151] hover:bg-[#f3f4f6]"
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Team
+              <span className={`rounded-full px-1.5 text-[11px] ${view === "team" ? "bg-white/15" : "bg-[#f3f4f6]"}`}>{teamCount}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setView("partners"); setPage(1) }}
+              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
+                view === "partners" ? "bg-[#001f3f] text-white" : "text-[#374151] hover:bg-[#f3f4f6]"
+              }`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logos/global_partner.png" alt="" className={`h-4 w-auto ${view === "partners" ? "" : "opacity-80"}`} />
+              Global Partners
+              <span className={`rounded-full px-1.5 text-[11px] ${view === "partners" ? "bg-[#d6b357] text-[#001f3f]" : "bg-[#f3f4f6]"}`}>{partnerCount}</span>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
           <div className="space-y-4 self-start lg:sticky lg:top-0">
           {/* ── QR card: team invite ── */}
+          {view === "team" && (
           <div className="bg-white rounded-2xl border border-[#e8eaed] p-6 flex flex-col items-center">
             <div className="rounded-2xl border-4 border-[#d6b357] p-4 bg-white">
               {inviteUrl ? (
@@ -496,22 +537,25 @@ export function InviteClient({
               </button>
             </div>
           </div>
+          )}
 
           {/* ── QR card: Global Partners invite ── */}
+          {view === "partners" && (
           <div className="rounded-2xl border border-[#d6b357]/50 bg-[#001f3f] p-6 flex flex-col items-center text-white">
-            <p className="self-start text-[10px] font-bold uppercase tracking-[0.2em] text-[#d6b357] mb-3">Global Partners</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logos/global_partner.png" alt="FHI Global Partners" className="h-12 w-auto mb-4" />
             <div className="rounded-2xl border-4 border-[#d6b357] p-4 bg-white">
               {gpInviteUrl ? (
-                <QRCodeSVG value={gpInviteUrl} size={150} level="M" fgColor="#001f3f" />
+                <QRCodeSVG value={gpInviteUrl} size={190} level="M" fgColor="#001f3f" />
               ) : (
-                <div className="w-[150px] h-[150px] animate-pulse bg-[#f3f4f6] rounded-xl" />
+                <div className="w-[190px] h-[190px] animate-pulse bg-[#f3f4f6] rounded-xl" />
               )}
             </div>
-            <p className="mt-4 font-['Outfit'] font-bold text-[#d6b357] text-base text-center">
+            <p className="mt-4 font-['Outfit'] font-bold text-[#d6b357] text-lg text-center">
               Scan to become an FHI Global Partner
             </p>
             <p className="mt-1.5 text-[11px] text-white/70 text-center leading-relaxed">
-              For agents outside the UAE. They register under your network and see the company rankings — Top Sales and Top Developers.
+              For agents outside the UAE. They register under your network with the full FHI agent toolkit and appear in your Global Partners list.
             </p>
             <div ref={gpDownloadRef} className="hidden" aria-hidden>
               {gpInviteUrl && <QRCodeCanvas value={gpInviteUrl} size={1024} level="M" fgColor="#001f3f" marginSize={4} />}
@@ -548,6 +592,7 @@ export function InviteClient({
               </button>
             </div>
           </div>
+          )}
           </div>
 
           {/* ── My recruits ── */}
@@ -557,7 +602,7 @@ export function InviteClient({
               <div className="flex items-center justify-between gap-2.5 mb-4">
                 <p className="text-xs font-bold uppercase tracking-wide text-[#6b7280] flex items-center gap-2">
                   <Users className="w-4 h-4 text-[#d6b357]" />
-                  My recruits ({recruits.length})
+                  {view === "partners" ? `My Global Partners (${partnerCount})` : `My recruits (${teamCount})`}
                 </p>
                 <button
                   type="button"
@@ -573,7 +618,7 @@ export function InviteClient({
               </div>
 
               {/* ── Search + exports toolbar ── */}
-              {!recruitsLoading && !recruitsError && recruits.length > 0 && (
+              {!recruitsLoading && !recruitsError && pool.length > 0 && (
                 <>
                 <div className="flex flex-col sm:flex-row gap-2 mb-2">
                   <div className="relative flex-1">
@@ -694,9 +739,11 @@ export function InviteClient({
                 <p className="text-sm text-[#9ca3af] py-4">
                   Couldn&apos;t load recruits right now — refresh to try again.
                 </p>
-              ) : recruits.length === 0 ? (
+              ) : pool.length === 0 ? (
                 <p className="text-sm text-[#9ca3af] py-4">
-                  No sign-ups through your link yet — share your QR and they&apos;ll appear here.
+                  {view === "partners"
+                    ? "No Global Partners yet — share the Global Partners QR and they'll appear here once they register."
+                    : "No sign-ups through your link yet — share your QR and they'll appear here."}
                 </p>
               ) : visible.length === 0 ? (
                 <p className="text-sm text-[#9ca3af] py-4">
