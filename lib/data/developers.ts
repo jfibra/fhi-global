@@ -2,7 +2,8 @@ import { unstable_cache } from "next/cache"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 
 /**
- * Cached developers directory (list + project coordinates for the map).
+ * Cached developers directory (list + one row per published project, with
+ * coordinates for the map and the city for per-developer counts and emirates).
  * The /developers page renders dynamically because of its search params, so
  * without this every visit paid two Supabase round-trips; the directory is
  * small (~tens of rows), so we cache it whole and filter in memory.
@@ -19,7 +20,7 @@ async function loadDevelopersDirectory() {
       .order("name"),
     supabase
       .from("projects")
-      .select("developer_id, latitude, longitude")
+      .select("developer_id, latitude, longitude, city")
       .eq("is_active", true)
       .eq("is_published", true)
       .is("deleted_at", null),
@@ -32,7 +33,7 @@ async function loadDevelopersDirectory() {
 }
 
 export function getCachedDevelopersDirectory() {
-  return unstable_cache(loadDevelopersDirectory, ["developers-directory-supabase"], {
+  return unstable_cache(loadDevelopersDirectory, ["developers-directory-supabase-v2"], {
     revalidate: 120,
     tags: ["developers"],
   })()
