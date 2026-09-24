@@ -32,10 +32,18 @@ export function HoldToContinue({
 
   const open = () => {
     // Still inside the browser's user-activation window (the pointer went
-    // down about a second ago), so the new tab is allowed. If a strict popup
-    // blocker refuses anyway, the direct link takes over.
-    const w = window.open(href, "_blank", "noopener,noreferrer")
+    // down about a second ago), so the new tab is allowed. Opened without the
+    // noopener feature on purpose: with it, window.open returns null by
+    // specification even on success, which made every open look blocked. The
+    // opener is severed by hand instead. A genuine refusal returns null and
+    // the direct link takes over.
+    const w = window.open(href, "_blank")
     if (w) {
+      try {
+        w.opener = null
+      } catch {
+        /* cross-origin window: opener is already unreachable */
+      }
       setState("opened")
       onOpened?.()
     } else {

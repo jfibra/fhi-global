@@ -1047,7 +1047,12 @@
 /* ─── Permit verification dialog ───────────────────────────────────────────
    Native <dialog> centred in the top layer; the card scales and rises in,
    the backdrop is navy glass. */
-.pv-dialog { padding: 0; border: 0; background: transparent; max-width: none; max-height: none; overflow: visible; }
+.pv-dialog {
+  /* Centred in the top layer explicitly: the reset stylesheet strips the
+     user-agent dialog styles that would otherwise do this. */
+  position: fixed; inset: 0; margin: auto; width: fit-content; height: fit-content;
+  padding: 0; border: 0; background: transparent; max-width: none; max-height: none; overflow: visible;
+}
 .pv-dialog::backdrop { background: rgba(3, 13, 28, 0.72); backdrop-filter: blur(6px); animation: pv-backdrop 220ms ease-out both; }
 .pv-dialog[open] .pv-card { animation: pv-card 420ms var(--wf-ease) both; }
 @keyframes pv-backdrop { from { opacity: 0; } to { opacity: 1; } }
