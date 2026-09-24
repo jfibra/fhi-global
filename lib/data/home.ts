@@ -28,7 +28,7 @@ const FEATURED_DEVELOPER_SLUGS = [
 async function loadHomePageData() {
   const supabase = createPublicSupabaseClient()
 
-  const [{ data: developers }, { data: featuredProjects }, { data: cityRows }] =
+  const [{ data: developers }, { data: featuredProjects }, { data: cityRows }, { data: wallRows }] =
     await Promise.all([
       supabase
         .from("developers")
@@ -59,17 +59,33 @@ async function loadHomePageData() {
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(4000),
+      // Renders for the collage on the Featured Projects doors: featured
+      // first, then the newest, only rows that actually have a photo.
+      supabase
+        .from("projects")
+        .select("name, main_image")
+        .eq("is_active", true)
+        .eq("is_published", true)
+        .is("deleted_at", null)
+        .not("main_image", "is", null)
+        .neq("main_image", "")
+        .order("is_featured", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(36),
     ])
 
   return {
     developers: developers ?? [],
     featuredProjects: featuredProjects ?? [],
     cityRows: cityRows ?? [],
+    wallImages: ((wallRows ?? []) as { name: string; main_image: string | null }[])
+      .filter((r) => r.main_image)
+      .map((r) => ({ src: r.main_image as string, alt: `${r.name} render` })),
   }
 }
 
 export function getCachedHomePageData() {
-  return unstable_cache(loadHomePageData, ["home-page-supabase"], {
+  return unstable_cache(loadHomePageData, ["home-page-supabase-v2"], {
     revalidate: 120,
     tags: ["home"],
   })()

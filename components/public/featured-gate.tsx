@@ -24,7 +24,17 @@ import { useEffect, useRef } from "react"
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 
-export function FeaturedGate({ count }: { count: number }) {
+type WallImage = { src: string; alt: string }
+
+/** Cycle a short list until the collage has enough tiles to cover the door. */
+function fillWall(list: WallImage[], min: number): WallImage[] {
+  if (list.length === 0) return list
+  const out: WallImage[] = []
+  while (out.length < min) out.push(...list)
+  return out.slice(0, Math.max(min, list.length))
+}
+
+export function FeaturedGate({ count, images = [] }: { count: number; images?: WallImage[] }) {
   const zoneRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
 
@@ -78,6 +88,7 @@ export function FeaturedGate({ count }: { count: number }) {
   }, [])
 
   const label = `${count} hand-picked ${count === 1 ? "development" : "developments"}`
+  const wall = fillWall(images, 42)
 
   return (
     <div ref={zoneRef} className="gate relative h-[170vh] lg:h-[200vh]">
@@ -117,17 +128,31 @@ export function FeaturedGate({ count }: { count: number }) {
         {/* Two panelled doors on hinges at the viewport edges. Each carries the
             full title clipped to its half, so the words split as they swing.
             Surface, lattice and frame are CSS (.gate-door in globals.css). */}
+        {/* Every layer inside a leaf is twice the leaf's width and offset so
+            the two halves line up with the stage exactly (the old 100vw
+            sizing included the scrollbar and split the words a few pixels
+            off). Closed, the leaves read as one wall of real project renders
+            under the title; open, the wall splits with them. */}
         <div className="gate-doors absolute inset-0 z-20" aria-hidden="true">
-          <div className="gate-door gate-door--l absolute inset-y-0 left-0 w-1/2 overflow-hidden">
-            <div className="gate-door-text absolute left-0 top-1/2 w-screen -translate-y-1/2 px-6 text-center">
-              <DoorWords label={label} />
+          {(["l", "r"] as const).map((side) => (
+            <div key={side} className={`gate-door gate-door--${side} absolute inset-y-0 ${side === "l" ? "left-0" : "right-0"} w-1/2 overflow-hidden`}>
+              {wall.length > 0 && (
+                <div className={`gate-wall absolute inset-y-0 w-[200%] ${side === "l" ? "left-0" : "-left-full"}`}>
+                  <div className="gate-wall-grid grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-7">
+                    {wall.map((im, i) => (
+                      <div key={`${side}-${i}`} className="relative aspect-[4/3] overflow-hidden bg-[#0a1f38]">
+                        <Image src={im.src} alt="" fill sizes="(min-width: 1024px) 15vw, 25vw" className="object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="gate-wall-scrim absolute inset-0" />
+                </div>
+              )}
+              <div className={`gate-door-text absolute top-1/2 z-[3] w-[200%] -translate-y-1/2 px-6 text-center ${side === "l" ? "left-0" : "-left-full"}`}>
+                <DoorWords label={label} />
+              </div>
             </div>
-          </div>
-          <div className="gate-door gate-door--r absolute inset-y-0 right-0 w-1/2 overflow-hidden">
-            <div className="gate-door-text absolute -left-[50vw] top-1/2 w-screen -translate-y-1/2 px-6 text-center">
-              <DoorWords label={label} />
-            </div>
-          </div>
+          ))}
           <div className="gate-hint absolute inset-x-0 bottom-8 z-30 flex flex-col items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
             Scroll to open
             <span className="gate-cue-line block h-10 w-px bg-[#d6b357]/60" />

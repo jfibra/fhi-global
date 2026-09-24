@@ -101,7 +101,7 @@ const TRUST = [
 ];
 
 export default async function HomePage() {
-  const { developers, featuredProjects, cityRows } = await getCachedHomePageData();
+  const { developers, featuredProjects, cityRows, wallImages } = await getCachedHomePageData();
 
   const devOptions = (developers ?? []).map((d) => ({
     id: d.id,
@@ -301,7 +301,7 @@ export default async function HomePage() {
           not be overflow-hidden or the sticky stage would not pin. */}
       {featuredProjects && featuredProjects.length > 0 && (
         <section className="relative">
-          <FeaturedGate count={featuredProjects.length} />
+          <FeaturedGate count={featuredProjects.length} images={wallImages ?? []} />
 
           <div className="relative overflow-hidden py-16 md:py-20">
             {/* Faint skyline backdrop — heavy white wash so the cards stay the focus */}

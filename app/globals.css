@@ -534,14 +534,14 @@
 /* Octagon-and-square lattice, one octagon per 96px tile; the squares appear
    where four tiles meet. Drawn in gold at low strength. */
 .gate-door::before {
-  content: ""; position: absolute; inset: 0; opacity: 0.11; pointer-events: none;
+  content: ""; position: absolute; inset: 0; opacity: 0.11; pointer-events: none; z-index: 1;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96' fill='none' stroke='%23d6b357' stroke-width='1'><path d='M28 0.5H68L95.5 28V68L68 95.5H28L0.5 68V28Z'/></svg>");
   background-size: 96px 96px;
   mask-image: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,1) 40%, rgba(0,0,0,1) 60%, rgba(0,0,0,0.35));
 }
 /* The panel frame, inset like a real door's raised panel. */
 .gate-door::after {
-  content: ""; position: absolute; inset: 24px; pointer-events: none;
+  content: ""; position: absolute; inset: 24px; pointer-events: none; z-index: 2;
   border: 1px solid rgba(214, 179, 87, 0.30);
 }
 /* No frame edge on the meeting side: closed, the two leaves read as one
@@ -1058,3 +1058,20 @@
 @keyframes pv-backdrop { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pv-card { from { opacity: 0; transform: translateY(18px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @media (prefers-reduced-motion: reduce) { .pv-dialog::backdrop, .pv-dialog[open] .pv-card { animation: none; } }
+
+/* The collage on the Featured Projects doors: real renders, oversized and
+   tilted a few degrees, drifting slowly (both leaves run the same animation,
+   so the halves stay aligned). The scrim is darkest where the title sits. */
+.gate-wall { z-index: 0; }
+.gate-wall-grid {
+  position: absolute; left: -8%; top: -18%; width: 116%;
+  transform: rotate(-4deg); will-change: transform;
+  animation: gate-drift 60s ease-in-out infinite alternate;
+}
+@keyframes gate-drift { from { transform: rotate(-4deg) translate3d(0, 0, 0); } to { transform: rotate(-4deg) translate3d(-3%, -6%, 0); } }
+.gate-wall-scrim {
+  background:
+    radial-gradient(ellipse 60% 55% at 50% 50%, rgba(6, 24, 46, 0.9) 0%, rgba(6, 24, 46, 0.72) 55%, rgba(6, 24, 46, 0.5) 100%),
+    linear-gradient(180deg, rgba(6, 24, 46, 0.55), rgba(6, 24, 46, 0.15) 30%, rgba(6, 24, 46, 0.15) 70%, rgba(6, 24, 46, 0.7));
+}
+@media (prefers-reduced-motion: reduce) { .gate-wall-grid { animation: none; } }
