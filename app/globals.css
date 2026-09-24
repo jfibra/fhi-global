@@ -870,3 +870,20 @@
   .ft-sky path:not(.ft-sky-fill) { stroke-dashoffset: 0 !important; }
   .ft-sky-fill { opacity: 0.08 !important; }
 }
+
+/* ─── About page ────────────────────────────────────────────────────────────
+   .sl-line: the manifesto's lines take their strength from --o, written by
+   ScrollLines as each one nears the middle of the viewport. .ab-strip: the
+   team photographs drift as one slow loop, pausing on hover. */
+.sl-line { opacity: var(--o, 0.16); transition: opacity 160ms linear; will-change: opacity; }
+.ab-strip { -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
+.ab-track { width: max-content; animation: dv-marquee 60s linear infinite; }
+.ab-strip:hover .ab-track, .ab-strip:focus-within .ab-track { animation-play-state: paused; }
+.ab-frame { opacity: 0; transform: translateY(24px); transition: opacity 700ms var(--wf-ease), transform 900ms var(--wf-ease); transition-delay: calc(300ms + var(--i, 0) * 110ms); }
+[data-in="true"] .ab-frame { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  .sl-line { opacity: 1 !important; }
+  .ab-track { animation: none; }
+  .ab-strip { overflow-x: auto; -webkit-mask-image: none; mask-image: none; }
+  .ab-frame { transition: none; opacity: 1; transform: none; }
+}
