@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import type { SaleRecord, CommissionStatus, ValidationStatus } from "@/lib/sales-service"
 import { toTitleCase } from "./sale-ui"
+import { SalePartnersPanel } from "./sale-partners-panel"
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -95,9 +96,11 @@ function SectionCard({
 export function SaleDetails({
   sale,
   onClose,
+  viewerId,
 }: {
   sale: SaleRecord
   onClose: () => void
+  viewerId?: string
 }) {
   const clientName = sale.clients
     ? `${sale.clients.first_name} ${sale.clients.last_name}`
@@ -150,6 +153,9 @@ export function SaleDetails({
             <SectionCard icon={Briefcase} title="Agent Information">
               <DetailRow label="Agent" value={sale.profiles?.fullname} />
             </SectionCard>
+
+            {/* Shared sale — partners, shares and the signed A2A (nothing for a solo sale). */}
+            <SalePartnersPanel saleId={sale.id} ownerId={sale.agent_id} partners={sale.partners} viewerId={viewerId} contractPrice={sale.contract_price} />
 
             {/* Client */}
             <SectionCard icon={User} title="Client Information">

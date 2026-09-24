@@ -53,6 +53,7 @@ export function ValidationDiscussion({
   validationStatus,
   isAdmin,
   initialTab,
+  readOnly = false,
 }: {
   saleId: string
   currentUserId: string
@@ -60,6 +61,8 @@ export function ValidationDiscussion({
   validationStatus: ValidationStatus
   isAdmin: boolean
   initialTab?: DiscussionTab
+  /** A partner on a shared sale follows the discussion but doesn't post in it. */
+  readOnly?: boolean
 }) {
   const [activeTab, setActiveTab] = useState<DiscussionTab>(initialTab ?? "discussion")
   const [comments, setComments] = useState<SaleValidationComment[]>([])
@@ -195,6 +198,11 @@ export function ValidationDiscussion({
             </div>
           )}
 
+          {readOnly ? (
+            <p className="px-4 py-2.5 rounded-2xl border border-[#f0f2f5] bg-[#f8fafc] text-xs text-[#6b7280]">
+              You&apos;re a partner on this sale — the agent who recorded it handles the validation discussion.
+            </p>
+          ) : (
           <div className="space-y-2">
             <textarea
               value={commentText}
@@ -214,6 +222,7 @@ export function ValidationDiscussion({
               </button>
             </div>
           </div>
+          )}
         </div>
       )}
 

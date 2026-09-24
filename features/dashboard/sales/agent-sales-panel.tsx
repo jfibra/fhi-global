@@ -4,9 +4,9 @@
 // the agent is, their production totals, and every sale they've recorded —
 // across all three sale types — with its own filters.
 
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react"
 import {
-  AlertTriangle, ArrowLeft, ArrowUpDown, Building2, CalendarDays, Handshake,
+  AlertTriangle, ArrowLeft, ArrowUpDown, Building2, CalendarDays, ChevronDown, Handshake,
   KeyRound, Mail, Search, TrendingUp, Wallet, Clock, X, type LucideIcon,
 } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
@@ -38,7 +38,8 @@ import { FilterSelect, type FilterSelectOption } from "@/components/ui/filter-se
 type SortField = "reservation_date" | "contract_price" | "created_at"
 type SortDir = "asc" | "desc"
 import { ROLE_COLORS, ROLE_OPTIONS } from "@/lib/user-service"
-import { formatCompactMoney, formatCurrency, formatDate, StatusBadge } from "./sale-ui"
+import { formatCompactMoney, formatCurrency, formatDate, partnerLine, StatusBadge } from "./sale-ui"
+import { SaleSplitBreakdown } from "./sale-split-breakdown"
 
 type DeveloperOption = { id: string; name: string }
 
@@ -154,6 +155,8 @@ export function AgentSalesPanel({
   onViewSale: (sale: SaleRecord) => void
 }) {
   const [sales, setSales] = useState<SaleRecord[]>([])
+  // A shared sale whose partnership split is opened under its row.
+  const [openSplitId, setOpenSplitId] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loadedKey, setLoadedKey] = useState("")
@@ -452,7 +455,12 @@ export function AgentSalesPanel({
 
       {/* ── Lifetime production — "—" until the brief loads, never fake zeros */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        <Tile icon={Wallet} label="Total contract value" value={brief ? formatCompactMoney(brief.sales.value) : "—"} hint="All sale types" />
+        <Tile
+          icon={Wallet}
+          label="Total contract value"
+          value={brief ? formatCompactMoney(brief.sales.value) : "—"}
+          hint={sales.some((s) => s.partners.length > 0) ? "All sale types · shared sales at their share" : "All sale types"}
+        />
         <Tile icon={TrendingUp} label="Total sales" value={brief ? String(brief.sales.deals) : "—"} hint="Lifetime" />
         <Tile icon={Clock} label="Commission pending" value={brief ? String(brief.sales.pending) : "—"} />
         <Tile icon={TrendingUp} label="Commission released" value={brief ? String(brief.sales.released) : "—"} />
@@ -695,9 +703,10 @@ export function AgentSalesPanel({
               ) : (
                 sales.map((s) => {
                   const Meta = SALE_TYPE_META[s.sale_type]
+                  const shared = partnerLine(s, agentId, "them")
                   return (
+                    <Fragment key={s.id}>
                     <tr
-                      key={s.id}
                       onClick={() => onViewSale(s)}
                       onKeyDown={(e) => {
                         if (e.target !== e.currentTarget) return
@@ -718,6 +727,23 @@ export function AgentSalesPanel({
                       </td>
                       <td className="px-4 py-2.5 font-semibold text-[#0d1117] whitespace-nowrap">
                         {s.clients ? titleCase(`${s.clients.first_name} ${s.clients.last_name}`) : "—"}
+                        {shared && (
+                          <button
+                            type="button"
+                            // Its own control: the row click (open the sale) must not fire too.
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setOpenSplitId((cur) => (cur === s.id ? null : s.id))
+                            }}
+                            aria-expanded={openSplitId === s.id}
+                            title={openSplitId === s.id ? "Hide the partnership split" : "Show each agent's share and amount"}
+                            className="mt-1 flex items-center gap-1 rounded-md text-[10px] font-semibold leading-tight text-[#8a6d2a] hover:underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d6b357]/50"
+                          >
+                            <Handshake className="w-3 h-3 shrink-0" />
+                            {shared}
+                            <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${openSplitId === s.id ? "rotate-180" : ""}`} />
+                          </button>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 text-right font-mono text-sm font-semibold text-[#0d1117] whitespace-nowrap">
                         {formatCurrency(s.contract_price)}
@@ -733,6 +759,20 @@ export function AgentSalesPanel({
                         )}
                       </td>
                     </tr>
+                    {openSplitId === s.id && s.partners.length > 0 && (
+                      <tr className="bg-[#fffdf7]">
+                        <td colSpan={8} className="px-6 pb-4 pt-1 whitespace-normal">
+                          <SaleSplitBreakdown
+                            partners={s.partners}
+                            contractPrice={s.contract_price}
+                            ownerId={s.agent_id}
+                            highlightId={agentId}
+                            highlightLabel="this agent"
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   )
                 })
               )}

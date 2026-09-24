@@ -83,7 +83,7 @@ export function SaleAttachmentsDialog({
   onCountChange: (id: string, count: number) => void
 }) {
   const isAdmin = isAdminStaffRole(currentRole)
-  const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, sale)
+  const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, sale, currentUserId)
   const [attachments, setAttachments] = useState<SaleAttachment[]>([])
   // Which sale's attachments are in `attachments`. Doubles as the loading flag,
   // so nothing has to be set synchronously inside the effect below.
@@ -338,6 +338,9 @@ export function SaleAttachmentsDialog({
                               {att.file_name}
                             </span>
                             <span className="block text-[11px] text-[#9ca3af] mt-0.5 truncate">
+                              {att.category === "partnership_agreement" && (
+                                <span className="mr-1.5 font-bold text-[#8a6d2a]">Signed A2A</span>
+                              )}
                               {att.file_type && <span className="mr-1.5 uppercase">{att.file_type}</span>}
                               {formatDate(att.uploaded_at)}
                               {att.profiles?.fullname && ` · ${att.profiles.fullname}`}

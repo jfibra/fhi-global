@@ -55,12 +55,54 @@ export type AgentOption = {
   fullname: string | null
 }
 
+/** An agent's part in a shared sale — the agreement's "role in the deal". */
+export type SaleDealRole = "lead" | "co_agent"
+
+export const SALE_DEAL_ROLE_LABELS: Record<SaleDealRole, string> = {
+  lead: "Lead Agent",
+  co_agent: "Co-Agent",
+}
+
+/**
+ * One agent on a shared (partnership) sale — a snapshot of what they agreed
+ * when the sale was recorded (migration 055). The recording agent is always
+ * one of them. The database trigger re-validates it and overwrites `name`
+ * with the profile's own, so treat it as authoritative on read.
+ */
+export type SalePartner = {
+  agent_id: string
+  name: string
+  role: SaleDealRole
+  /** Percent of the deal; every agent on a sale totals exactly 100. */
+  share: number
+  brn: string | null
+}
+
+/** Partner agents besides the recording one — three agents on a deal at most. */
+export const MAX_SALE_PARTNERS = 2
+
+/** A partner-search suggestion from /api/sales/partner-agents. */
+export type PartnerAgentOption = {
+  id: string
+  name: string
+  avatar: string | null
+  role_label: string
+  phone: string | null
+}
+
+/**
+ * NULL (every pre-055 row) and "proof" are proof of transaction;
+ * "partnership_agreement" is the signed A2A that proves a shared sale.
+ */
+export type SaleAttachmentCategory = "proof" | "partnership_agreement"
+
 export type SaleAttachment = {
   id: string
   sales_report_id: string
   file_name: string
   file_url: string
   file_type: string | null
+  category: SaleAttachmentCategory | null
   uploaded_by: string | null
   uploaded_at: string
   profiles: { fullname: string | null } | null
@@ -108,6 +150,10 @@ export type SaleRecord = {
   validation_changed_at: string | null
   proof_of_transaction_url: string | null
   remarks: string | null
+  /** Every agent on a shared sale, the owner included; [] for a solo sale. */
+  partners: SalePartner[]
+  /** The agents in `partners` other than agent_id — they may read the sale. */
+  partner_agent_ids: string[]
   created_at: string
   updated_at: string
   created_by: string | null
@@ -209,6 +255,8 @@ type SortDir = "asc" | "desc"
 
 const EDITABLE_REVIEW_STATUSES: ValidationStatus[] = ["invalid_sale", "under_review"]
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 const REQUIRED_FIELDS: Array<{ key: string; valid: (form: SaleFormData) => boolean; message: string }> = [
   // Project sales: developer + project mandatory. Brokerage/rental skip them.
   { key: "developer_id", valid: (form) => form.sale_type !== "project" || Boolean(form.developer_id), message: "Developer is required" },
@@ -262,10 +310,20 @@ export function canEditSaleForRole(role: string | undefined | null, sale: SaleRe
   return isAdminRole(role)
 }
 
-export function canManageSaleAttachmentsForRole(role: string | undefined | null, sale: SaleRecord | null) {
+/**
+ * Pass `currentUserId` wherever it is known: sales-pipeline roles now also see
+ * sales they partner on (read-only), and only the owning agent may touch those
+ * files — RLS rejects a partner's write anyway, this just hides the controls.
+ */
+export function canManageSaleAttachmentsForRole(
+  role: string | undefined | null,
+  sale: SaleRecord | null,
+  currentUserId?: string,
+) {
   if (!sale) return false
   if (isAdminRole(role)) return true
   if (isSecretaryLikeRole(role) && EDITABLE_REVIEW_STATUSES.includes(sale.validation_status)) return true
+  if (currentUserId && sale.agent_id !== currentUserId) return false
   return isAgentScopedRole(role) && EDITABLE_REVIEW_STATUSES.includes(sale.validation_status)
 }
 
@@ -275,6 +333,58 @@ export function validateSaleFormData(form: SaleFormData) {
     if (!field.valid(form)) errors[field.key] = field.message
   }
   return errors
+}
+
+/** Sum of shares, rounded to cents so 33.33 + 33.33 + 33.34 reads as 100. */
+export function totalPartnerShare(partners: SalePartner[]) {
+  return Math.round(partners.reduce((sum, p) => sum + (Number.isFinite(p.share) ? p.share : 0), 0) * 100) / 100
+}
+
+/**
+ * Rules for a shared sale's agents (the owner included). Mirrors the migration
+ * 055 trigger so the agent sees the problem before submitting; the trigger is
+ * still the authority.
+ */
+export function validateSalePartners(partners: SalePartner[], ownerId: string) {
+  const errors: Record<string, string> = {}
+  const others = partners.filter((p) => p.agent_id !== ownerId)
+  if (others.length === 0) {
+    errors.partners = "Add the partner agent you worked this sale with"
+    return errors
+  }
+  if (others.length > MAX_SALE_PARTNERS) {
+    errors.partners = `A sale can have up to ${MAX_SALE_PARTNERS} partner agents`
+  }
+  if (!partners.some((p) => p.agent_id === ownerId)) {
+    errors.partners = "You must be one of the agents on the sale"
+  }
+  if (partners.filter((p) => p.role === "lead").length !== 1) {
+    errors.partner_lead = "Choose exactly one Lead Agent (the client source)"
+  }
+  if (partners.some((p) => !Number.isFinite(p.share) || p.share <= 0 || p.share > 100)) {
+    errors.partner_share = "Every agent needs a share above 0%"
+  } else {
+    const total = totalPartnerShare(partners)
+    if (Math.abs(total - 100) > 0.01) errors.partner_share = `Shares must total 100% — they total ${total}%`
+  }
+  return errors
+}
+
+/** Parse a raw sales_reports.partners value (for pages that select rows directly). */
+export function normalizePartners(raw: unknown): SalePartner[] {
+  if (!Array.isArray(raw)) return []
+  return raw.flatMap((item) => {
+    if (!item || typeof item !== "object") return []
+    const r = item as Record<string, unknown>
+    if (typeof r.agent_id !== "string" || !r.agent_id) return []
+    return [{
+      agent_id: r.agent_id,
+      name: typeof r.name === "string" ? r.name : "",
+      role: r.role === "lead" ? "lead" : "co_agent",
+      share: Number(r.share ?? 0),
+      brn: typeof r.brn === "string" && r.brn.trim() ? r.brn : null,
+    } satisfies SalePartner]
+  })
 }
 
 // ─── Normalizer ───────────────────────────────────────────────────────────────
@@ -363,6 +473,8 @@ function normalizeSale(row: unknown): SaleRecord {
     validation_changed_at: typeof raw.validation_changed_at === "string" ? raw.validation_changed_at : null,
     proof_of_transaction_url: typeof raw.proof_of_transaction_url === "string" ? raw.proof_of_transaction_url : null,
     remarks: typeof raw.remarks === "string" ? raw.remarks : null,
+    partners: normalizePartners(raw.partners),
+    partner_agent_ids: Array.isArray(raw.partner_agent_ids) ? raw.partner_agent_ids.map(String) : [],
     created_at: String(raw.created_at ?? ""),
     updated_at: String(raw.updated_at ?? ""),
     created_by: typeof raw.created_by === "string" ? raw.created_by : null,
@@ -461,6 +573,7 @@ function normalizeAttachment(row: unknown): SaleAttachment {
     file_name: String(raw.file_name ?? ""),
     file_url: String(raw.file_url ?? ""),
     file_type: typeof raw.file_type === "string" ? raw.file_type : null,
+    category: raw.category === "proof" || raw.category === "partnership_agreement" ? raw.category : null,
     uploaded_by: typeof raw.uploaded_by === "string" ? raw.uploaded_by : null,
     uploaded_at: String(raw.uploaded_at ?? ""),
     profiles,
@@ -555,6 +668,13 @@ export async function fetchAgentsForSale(): Promise<{ data: AgentOption[] | null
   }
 }
 
+/** Name suggestions for the partner box on Record Your Sale (never includes you). */
+export async function searchPartnerAgents(q: string, signal?: AbortSignal): Promise<PartnerAgentOption[]> {
+  const res = await fetch(`/api/sales/partner-agents?q=${encodeURIComponent(q.trim())}`, { signal })
+  const json = (await res.json().catch(() => ({}))) as { agents?: PartnerAgentOption[] }
+  return res.ok ? (json.agents ?? []) : []
+}
+
 // ─── Sales CRUD ───────────────────────────────────────────────────────────────
 
 /** Everything that narrows a sales query. Shared by the paged list and the export. */
@@ -606,11 +726,18 @@ async function applySalesFilters<Q extends Narrowable<Q>>(
     currentRole, currentUserId,
   } = opts
 
-  // Agent, team leader, and unit manager can only see their own sales
+  // Sales-pipeline roles see their own sales plus the ones they partner on
+  // (read-only, migration 055). Two .or() filters are ANDed by PostgREST, so
+  // the search below still only ever matches within this set.
   if (isSalesPipelineRole(currentRole) && currentUserId) {
-    query = query.eq("agent_id", currentUserId)
+    query = query.or(`agent_id.eq.${currentUserId},partner_agent_ids.cs.{${currentUserId}}`)
   } else if (agentId) {
-    query = query.eq("agent_id", agentId)
+    // Staff narrowing to one agent (filter / drill-in) — the sales they were on,
+    // recorded or partnered, matching the share-credited tiles (migration 056).
+    // Only a real UUID goes into the .or() grammar; anything else matches nothing.
+    query = UUID_PATTERN.test(agentId)
+      ? query.or(`agent_id.eq.${agentId},partner_agent_ids.cs.{${agentId}}`)
+      : query.eq("agent_id", agentId)
   }
 
   if (saleType) query = query.eq("sale_type", saleType)
@@ -627,7 +754,7 @@ async function applySalesFilters<Q extends Narrowable<Q>>(
   // one .or() alongside the top-level property columns. Sanitize the term first —
   // commas/parens/quotes are .or() grammar and would corrupt the filter. The whole
   // .or() is ANDed with the agent force-scope above, so an agent's search still
-  // only ever matches their own sales.
+  // only ever matches their own (and partnered) sales.
   if (search) {
     const s = sanitizeSearchTerm(search)
     if (s) {
@@ -751,6 +878,8 @@ export type SaleTypeSummary = { dealCount: number; totalValue: number; pendingCo
 // the sales_summary() RPC (server-side SUM; a client-side sum would hit
 // PostgREST's row cap and undercount). Role-scoped identically to fetchSales:
 // sales-pipeline roles are forced to their own agent_id, admins may narrow by agentId.
+// With an agent, a shared sale counts at that agent's share (migration 056);
+// without one it is the whole company, every sale once in full.
 export async function fetchSalesSummary(opts: {
   saleType: SaleType
   agentId?: string
@@ -886,16 +1015,27 @@ export async function fetchSaleById(id: string): Promise<{ data: SaleRecord | nu
   return { data: normalizeSale(data), error: null }
 }
 
+/**
+ * `partners` — for a shared sale, every agent on it including the current user
+ * (see validateSalePartners); omit or pass [] for a solo sale. It is written in
+ * the same insert as the sale, so a shared sale is never saved without them.
+ */
 export async function createSale(
   form: SaleFormData,
   currentUserId: string,
   currentRole: string,
+  partners: SalePartner[] = [],
 ): Promise<{ data: SaleRecord | null; error: string | null }> {
   const supabase = createClient()
 
   const validationErrors = validateSaleFormData(form)
   const firstError = Object.values(validationErrors)[0]
   if (firstError) return { data: null, error: firstError }
+
+  if (partners.length > 0) {
+    const partnerError = Object.values(validateSalePartners(partners, currentUserId))[0]
+    if (partnerError) return { data: null, error: partnerError }
+  }
 
   if (!isAdminStaffRole(currentRole) && !isSalesPipelineRole(currentRole)) {
     return { data: null, error: "You are not allowed to record new sales" }
@@ -950,6 +1090,18 @@ export async function createSale(
     remarks: form.remarks.trim() || null,
     created_by: currentUserId,
     updated_by: currentUserId,
+    // Only sent for a shared sale, so a solo sale's insert is unchanged.
+    ...(partners.length > 0
+      ? {
+          partners: partners.map((p) => ({
+            agent_id: p.agent_id,
+            name: p.name.trim(),
+            role: p.role,
+            share: p.share,
+            brn: p.brn?.trim() || null,
+          })),
+        }
+      : {}),
   }
 
   const { data, error } = await supabase
@@ -973,8 +1125,10 @@ export async function createSale(
     return { data: null, error: error.message }
   }
 
+  const sale = normalizeSale(data)
+
   await logActivity({
-    sales_report_id: String(data.id),
+    sales_report_id: sale.id,
     action_type: "sale_created",
     performed_by: currentUserId,
     performed_role: normalizeRole(currentRole),
@@ -985,10 +1139,11 @@ export async function createSale(
       contract_price: salePayload.contract_price,
       validation_status: salePayload.validation_status,
       commission_status: salePayload.commission_status,
+      ...(sale.partners.length > 0 ? { partners: sale.partners } : {}),
     },
   })
 
-  return { data: normalizeSale(data), error: null }
+  return { data: sale, error: null }
 }
 
 export async function updateSale(
@@ -1228,6 +1383,8 @@ export async function fetchSaleAttachments(saleId: string): Promise<{
 export async function uploadSaleProofFile(
   file: File,
   saleId: string,
+  /** "partnership_agreement" for the signed A2A on a shared sale. */
+  category: SaleAttachmentCategory = "proof",
 ): Promise<{ data: SaleAttachment | null; error: string | null }> {
   try {
     const uploadForm = new FormData()
@@ -1254,6 +1411,8 @@ export async function uploadSaleProofFile(
         file_name: uploadJson.file_name ?? file.name,
         file_url: uploadJson.url,
         file_type: uploadJson.file_type ?? null,
+        // Proof keeps the legacy NULL category, exactly like every older row.
+        ...(category !== "proof" ? { category } : {}),
       }),
     })
     const recordJson = (await recordRes.json()) as { attachment?: unknown; error?: string }
@@ -1286,7 +1445,7 @@ export async function fetchMySalesMissingProof(
       property_type, property_address,
       projects(name),
       clients(first_name,last_name),
-      sales_attachments(id)
+      sales_attachments(id, category)
     `)
     .eq("agent_id", userId)
     .order("created_at", { ascending: false })
@@ -1300,10 +1459,12 @@ export async function fetchMySalesMissingProof(
     return item ? (item as Record<string, unknown>) : null
   }
 
+  // A signed partnership agreement is not proof of transaction.
+  const isProof = (a: unknown) => (a as { category?: string | null }).category !== "partnership_agreement"
   const mapped = (data ?? [])
     .filter((row: unknown) => {
       const att = (row as Record<string, unknown>).sales_attachments
-      return !Array.isArray(att) || att.length === 0
+      return !Array.isArray(att) || !att.some(isProof)
     })
     .map((row: unknown) => {
       const raw = row as Record<string, unknown>

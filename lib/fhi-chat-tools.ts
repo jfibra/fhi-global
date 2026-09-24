@@ -43,6 +43,24 @@ type SaleRow = {
   validation_status: string | null
   reservation_date: string | null
   created_at: string
+  /** Shared sale (migration 055): every agent on it with their share; [] for a solo sale. */
+  partners: unknown
+}
+
+/**
+ * Who a sale counts for, and how much — the same rule as the SQL totals
+ * (migration 056): a solo sale credits its agent in full; a shared sale credits
+ * each agent on it their share of the contract price. Company-level figures
+ * still count every sale once, in full.
+ */
+function saleCredits(s: SaleRow): Array<{ agentId: string; share: number; value: number }> {
+  const price = Number(s.contract_price ?? 0)
+  const shared = (Array.isArray(s.partners) ? s.partners : []).flatMap((p) => {
+    const r = (p ?? {}) as { agent_id?: unknown; share?: unknown }
+    return typeof r.agent_id === "string" ? [{ agentId: r.agent_id, share: Number(r.share) || 0 }] : []
+  })
+  const credits = shared.length ? shared : [{ agentId: String(s.agent_id), share: 100 }]
+  return credits.map((c) => ({ ...c, value: (price * c.share) / 100 }))
 }
 
 const AED = (n: number) => `AED ${Math.round(n).toLocaleString("en-AE")}`
@@ -107,7 +125,7 @@ async function fetchAllSales(admin: Admin): Promise<SaleRow[]> {
   for (let page = 0; page < 10; page++) {
     const { data, error } = await admin
       .from("sales_reports")
-      .select("id, agent_id, developer_id, project_id, contract_price, validation_status, reservation_date, created_at")
+      .select("id, agent_id, developer_id, project_id, contract_price, validation_status, reservation_date, created_at, partners")
       .order("created_at", { ascending: true })
       .range(page * 1000, page * 1000 + 999)
     if (error) throw new Error(error.message)
@@ -120,7 +138,8 @@ async function fetchAllSales(admin: Admin): Promise<SaleRow[]> {
 type Entity = { name: string; image: string | null }
 
 async function nameMaps(admin: Admin, sales: SaleRow[]) {
-  const agentIds = [...new Set(sales.map((s) => s.agent_id))]
+  // Partners too, so a shared sale's other agents resolve to names.
+  const agentIds = [...new Set(sales.flatMap((s) => [s.agent_id, ...saleCredits(s).map((c) => c.agentId)]))]
   const devIds = [...new Set(sales.map((s) => s.developer_id))]
   const projIds = [...new Set(sales.map((s) => s.project_id))]
   const [agents, devs, projs] = await Promise.all([
@@ -232,10 +251,13 @@ async function topAgents(
   }
   const byAgent = new Map<string, { deals: number; value: number }>()
   for (const s of sales) {
-    const t = byAgent.get(s.agent_id) ?? { deals: 0, value: 0 }
-    t.deals += 1
-    t.value += Number(s.contract_price ?? 0)
-    byAgent.set(s.agent_id, t)
+    // A shared sale counts for each agent on it, at their share.
+    for (const c of saleCredits(s)) {
+      const t = byAgent.get(c.agentId) ?? { deals: 0, value: 0 }
+      t.deals += 1
+      t.value += c.value
+      byAgent.set(c.agentId, t)
+    }
   }
   const names = await nameMaps(admin, sales)
   const ranked = [...byAgent.entries()]
@@ -244,7 +266,7 @@ async function topAgents(
     .slice(0, Math.min(args.limit ?? 10, 25))
   return {
     period: { scope, from, to },
-    note: "validated sales only",
+    note: "validated sales only; a shared (partnership) sale counts for each agent on it at their agreed share of the contract price",
     ...(devFilter ? { filtered_to_developer: devFilter } : {}),
     ...(projFilter ? { filtered_to_project: projFilter } : {}),
     leaders: ranked.map((l, i) => ({
@@ -358,10 +380,17 @@ async function topTeams(
   )
   const byTeam = new Map<string, { deals: number; value: number }>()
   for (const s of sales) {
-    for (const tid of teamsOf.get(String(s.agent_id)) ?? []) {
+    // Each team is credited its members' shares of the sale; a deal two
+    // members of the same team shared still counts once for that team.
+    const teamValue = new Map<string, number>()
+    for (const c of saleCredits(s)) {
+      // Set: a duplicate active membership must not credit the same team twice.
+      for (const tid of new Set(teamsOf.get(c.agentId) ?? [])) teamValue.set(tid, (teamValue.get(tid) ?? 0) + c.value)
+    }
+    for (const [tid, value] of teamValue) {
       const t = byTeam.get(tid) ?? { deals: 0, value: 0 }
       t.deals += 1
-      t.value += Number(s.contract_price ?? 0)
+      t.value += value
       byTeam.set(tid, t)
     }
   }
@@ -373,7 +402,7 @@ async function topTeams(
     .slice(0, 10)
   return {
     period: { scope, from, to },
-    note: "teams ranked by their members' validated sales",
+    note: "teams ranked by their members' validated sales; shared sales credit each member's share, and a deal shared inside one team counts once",
     teams_total: (teams ?? []).length,
     leaders: ranked.map((t, i) => ({
       rank: i + 1,
@@ -466,10 +495,13 @@ async function agentSales(admin: Admin, args: { name?: string }) {
     .getUserById(String(agent.id))
     .then((r) => r.data?.user?.email?.trim() ?? null)
     .catch(() => null)
-  const sales = (await fetchAllSales(admin)).filter((s) => s.agent_id === String(agent.id))
+  // Sales they recorded or partnered on; totals count their share of each.
+  const agentId = String(agent.id)
+  const shareOf = (s: SaleRow) => saleCredits(s).find((c) => c.agentId === agentId)
+  const sales = (await fetchAllSales(admin)).filter((s) => shareOf(s))
   const names = await nameMaps(admin, sales)
   const validated = sales.filter((s) => s.validation_status === "validated")
-  const totalValidated = validated.reduce((a, s) => a + Number(s.contract_price ?? 0), 0)
+  const totalValidated = validated.reduce((a, s) => a + (shareOf(s)?.value ?? 0), 0)
   // The FULL record (newest first, sane cap) — an admin asking about one
   // agent expects every sale listed, not a teaser.
   const list = sales.sort((a, b) => businessDate(b).localeCompare(businessDate(a))).slice(0, 30)
@@ -485,14 +517,29 @@ async function agentSales(admin: Admin, args: { name?: string }) {
     },
     other_name_matches: candidates.slice(1).map((m) => m.fullname),
     validated: { count: validated.length, total: AED(totalValidated) },
+    ...(sales.some((s) => saleCredits(s).length > 1)
+      ? { note: "Totals count this agent's share of shared (partnership) sales; each listed sale shows its full contract price." }
+      : {}),
     pending_count: sales.filter((s) => (s.validation_status ?? "pending") === "pending").length,
-    sales: list.map((s) => ({
-      date: businessDate(s),
-      project: names.proj.get(s.project_id)?.name ?? "?",
-      developer: names.dev.get(String(s.developer_id))?.name ?? "?",
-      price: AED(Number(s.contract_price ?? 0)),
-      status: s.validation_status,
-    })),
+    sales: list.map((s) => {
+      const credits = saleCredits(s)
+      const mine = credits.find((c) => c.agentId === agentId)
+      return {
+        date: businessDate(s),
+        project: names.proj.get(s.project_id)?.name ?? "?",
+        developer: names.dev.get(String(s.developer_id))?.name ?? "?",
+        price: AED(Number(s.contract_price ?? 0)),
+        status: s.validation_status,
+        ...(credits.length > 1
+          ? {
+              shared: `${mine?.share ?? 0}% share (${AED(mine?.value ?? 0)}) with ${credits
+                .filter((c) => c.agentId !== agentId)
+                .map((c) => `${names.agent.get(c.agentId)?.name ?? "another agent"} ${c.share}%`)
+                .join(", ")}`,
+            }
+          : {}),
+      }
+    }),
     sales_listed: list.length,
     _cards: [
       {
@@ -565,10 +612,12 @@ async function agentRecruits(
   const validatedByAgent = new Map<string, { deals: number; value: number }>()
   for (const s of await fetchAllSales(admin)) {
     if (s.validation_status !== "validated") continue
-    const t = validatedByAgent.get(s.agent_id) ?? { deals: 0, value: 0 }
-    t.deals += 1
-    t.value += Number(s.contract_price ?? 0)
-    validatedByAgent.set(s.agent_id, t)
+    for (const c of saleCredits(s)) {
+      const t = validatedByAgent.get(c.agentId) ?? { deals: 0, value: 0 }
+      t.deals += 1
+      t.value += c.value
+      validatedByAgent.set(c.agentId, t)
+    }
   }
   const enriched = rows.map((r) => {
     const t = validatedByAgent.get(String(r.id))
@@ -771,6 +820,14 @@ async function recentSales(admin: Admin, args: { limit?: number }) {
     sales: sales.map((s) => ({
       date: businessDate(s),
       agent: names.agent.get(s.agent_id)?.name ?? "?",
+      ...(saleCredits(s).length > 1
+        ? {
+            shared_with: saleCredits(s)
+              .filter((c) => c.agentId !== s.agent_id)
+              .map((c) => `${names.agent.get(c.agentId)?.name ?? "another agent"} ${c.share}%`)
+              .join(", "),
+          }
+        : {}),
       project: names.proj.get(s.project_id)?.name ?? "?",
       developer: names.dev.get(String(s.developer_id))?.name ?? "?",
       price: AED(Number(s.contract_price ?? 0)),
@@ -1567,10 +1624,13 @@ async function congratulateTopAgents(
   )
   const byAgent = new Map<string, { deals: number; value: number }>()
   for (const s of sales) {
-    const t = byAgent.get(s.agent_id) ?? { deals: 0, value: 0 }
-    t.deals += 1
-    t.value += Number(s.contract_price ?? 0)
-    byAgent.set(s.agent_id, t)
+    // A shared sale counts for each agent on it, at their share.
+    for (const c of saleCredits(s)) {
+      const t = byAgent.get(c.agentId) ?? { deals: 0, value: 0 }
+      t.deals += 1
+      t.value += c.value
+      byAgent.set(c.agentId, t)
+    }
   }
   const ranked = [...byAgent.entries()]
     .map(([id, t]) => ({ id, deals: t.deals, value: t.value }))

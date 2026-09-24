@@ -63,6 +63,14 @@ export function exportColumnsFor(saleType: SaleType | null): ExportColumn[] {
   const lead: ExportColumn[] = [
     { header: "Reservation Date", value: (s) => s.reservation_date ?? "" },
     { header: "Agent", value: (s) => s.profiles?.fullname ?? "" },
+    // Shared sales (migration 055): every agent with their role and share.
+    {
+      header: "Partners",
+      value: (s) =>
+        s.partners
+          .map((p) => `${p.name} (${p.role === "lead" ? "Lead" : "Co-Agent"} ${p.share}%)`)
+          .join("; "),
+    },
   ]
 
   const middle: ExportColumn[] =

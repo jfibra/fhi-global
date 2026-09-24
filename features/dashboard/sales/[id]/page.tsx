@@ -18,8 +18,10 @@ import {
 } from "@/lib/app-roles"
 import { useAuth } from "@/context/auth-context"
 import { createClient } from "@/lib/supabase/client"
+import { normalizePartners } from "@/lib/sales-service"
 import { ValidationDiscussion } from "./validation-discussion"
 import { toTitleCase } from "../sale-ui"
+import { SalePartnersPanel } from "../sale-partners-panel"
 
 function formatDate(value: string | null) {
   if (!value) return "—"
@@ -129,8 +131,10 @@ export default function SaleDetailPage() {
           setState("notfound")
           return
         }
-        // Agent, team leader, and unit manager can only view their own sales.
-        if (isSalesPipelineRole(roleValue) && data.agent_id !== profile?.id) {
+        // Sales-pipeline roles view their own sales, plus the ones they are a
+        // partner on (read-only — RLS grants partners SELECT only).
+        const isPartner = Array.isArray(data.partner_agent_ids) && data.partner_agent_ids.includes(profile?.id)
+        if (isSalesPipelineRole(roleValue) && data.agent_id !== profile?.id && !isPartner) {
           router.replace(`${base}/sales`)
           return
         }
@@ -172,6 +176,8 @@ export default function SaleDetailPage() {
     : "—"
 
   const attachmentsCount = Array.isArray(sale.sales_attachments) ? sale.sales_attachments.length : 0
+  const partners = normalizePartners(sale.partners)
+  const viewerIsPartner = Array.isArray(sale.partner_agent_ids) && sale.partner_agent_ids.includes(profile?.id)
   const clientFull = sale.clients as {
     email?: string | null
     phone?: string | null
@@ -211,6 +217,9 @@ export default function SaleDetailPage() {
             <StatusBadge value={sale.validation_status} />
           </div>
         </div>
+
+        {/* Shared sale — partners, shares and the signed A2A (nothing for a solo sale). */}
+        <SalePartnersPanel saleId={sale.id} ownerId={sale.agent_id} partners={partners} viewerId={profile?.id} contractPrice={Number(sale.contract_price)} />
 
         {/* Property */}
         <SectionCard icon={Building2} title="Property Information">
@@ -306,6 +315,7 @@ export default function SaleDetailPage() {
           currentRole={roleValue}
           validationStatus={sale.validation_status}
           isAdmin={isAdmin}
+          readOnly={viewerIsPartner}
         />
       </div>
     </>

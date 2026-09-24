@@ -219,7 +219,8 @@ async function loadSales(admin: Admin, userId: string): Promise<UserOverview["sa
     admin
       .from("sales_reports")
       .select("id, contract_price, sale_type, commission_status, validation_status, reservation_date, created_at, projects(name), developers(name)")
-      .eq("agent_id", userId)
+      // Sales they recorded or partnered on — the totals above credit both (migration 056).
+      .or(`agent_id.eq.${userId},partner_agent_ids.cs.{${userId}}`)
       .order("created_at", { ascending: false })
       .limit(RECENT_LIMIT),
   ])

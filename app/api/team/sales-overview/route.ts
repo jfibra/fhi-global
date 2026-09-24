@@ -265,13 +265,18 @@ export async function GET(req: NextRequest) {
 
   const personal = periodTotals.get(callerId) ?? { deals: 0, value: 0 }
 
-  // Group totals sum EVERY member id (not just the capped leaderboard rows),
-  // so they stay exact for oversized groups. No team AND no recruits → zeros;
+  // Group totals cover EVERY member id (not just the capped leaderboard rows),
+  // so they stay exact for oversized groups. They come from the group's own
+  // series rather than a sum of member rows: a deal two members shared
+  // (migration 056) is one deal for the group, credited the sum of their
+  // shares. Same member set and business-date rule as periodTotals, so for solo
+  // sales this is exactly the old member sum. No team AND no recruits → zeros;
   // the UI shows the group tile/series as absent rather than mislabelling
   // personal sales.
+  const periodMonths = month ? [month] : Array.from({ length: 12 }, (_, i) => i + 1)
   const teamTotals = scope !== "none"
-    ? memberIds.reduce<Totals>((acc, id) => {
-        const t = periodTotals.get(id)
+    ? periodMonths.reduce<Totals>((acc, m) => {
+        const t = teamSeries.get(m)
         return { deals: acc.deals + (t?.deals ?? 0), value: acc.value + (t?.value ?? 0) }
       }, { deals: 0, value: 0 })
     : { deals: 0, value: 0 }

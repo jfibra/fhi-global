@@ -16,6 +16,7 @@ function Portal({ children }: { children: React.ReactNode }) {
 export function SaleActions({
   sale,
   currentRole,
+  currentUserId,
   onView,
   onEdit,
   onAttachments,
@@ -23,6 +24,8 @@ export function SaleActions({
 }: {
   sale: SaleRecord
   currentRole: string
+  /** Partners see a shared sale read-only — only its owner manages the files. */
+  currentUserId?: string
   onView: () => void
   onEdit: () => void
   onAttachments: () => void
@@ -31,7 +34,7 @@ export function SaleActions({
   const isAdmin = isAdminStaffRole(currentRole)
   const canEdit = isAdmin
   const canDelete = isAdmin && Boolean(onDelete)
-  const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, sale)
+  const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, sale, currentUserId)
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)

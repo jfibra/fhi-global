@@ -1,12 +1,13 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowRight,
   ArrowUpDown,
   Building2,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -26,7 +27,7 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react"
-import { formatCurrency, formatDate, StatusBadge, toTitleCase } from "./sale-ui"
+import { formatCurrency, formatDate, partnerLine, StatusBadge, toTitleCase } from "./sale-ui"
 import { AgentSalesPanel } from "./agent-sales-panel"
 import { TopSellerStudio } from "./marketing/top-seller-studio"
 import { TopDeveloperStudio } from "./marketing/top-developer-studio"
@@ -53,7 +54,7 @@ import {
   type DeveloperOption,
   type AgentOption,
 } from "@/lib/sales-service"
-import { isSecretaryLikeRole } from "@/lib/app-roles"
+import { isSalesPipelineRole, isSecretaryLikeRole } from "@/lib/app-roles"
 import { FilterSelect, type FilterSelectOption } from "@/components/ui/filter-select"
 import {
   buildCsv,
@@ -70,6 +71,7 @@ import { SaleAttachmentsDialog } from "./sale-attachments-dialog"
 import { SaleConfirmDialog } from "./sale-confirm-dialog"
 import { SaleFormDialog } from "./sale-form-dialog"
 import { SaleDetails } from "./sale-details"
+import { SaleSplitBreakdown } from "./sale-split-breakdown"
 import { ValidationDiscussion, type DiscussionTab } from "./[id]/validation-discussion"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -326,6 +328,8 @@ export function SalesTable({
   const [showAttachments, setShowAttachments] = useState(false)
   const [attachmentSale, setAttachmentSale] = useState<SaleRecord | null>(null)
   const [discussionTarget, setDiscussionTarget] = useState<{ sale: SaleRecord; tab: DiscussionTab } | null>(null)
+  // A shared sale whose partnership split is opened under its row.
+  const [openSplitId, setOpenSplitId] = useState<string | null>(null)
   // Row click drills into that agent's full sales history (admins only — for
   // an agent every row is their own, so there'd be nothing to drill into).
   // The open drill lives in ?agent= so browser Back returns to the report and
@@ -687,7 +691,34 @@ export function SalesTable({
     columns.push({ key: "ptype", header: "Property Type", tdClassName: "text-[#374151]", cell: (s) => s.property_type ?? "—" })
     columns.push({ key: "paddr", header: "Property Address", tdClassName: "text-[#374151]", cell: (s) => s.property_address ?? "—" })
   }
-  columns.push({ key: "client", header: "Client", tdClassName: "font-semibold text-[#0d1117]", cell: (s) => (s.clients ? toTitleCase(`${s.clients.first_name} ${s.clients.last_name}`) : "—") })
+  columns.push({
+    key: "client", header: "Client", tdClassName: "font-semibold text-[#0d1117]",
+    cell: (s) => {
+      const shared = partnerLine(s, currentUserId)
+      return (
+        <div className="min-w-0">
+          {s.clients ? toTitleCase(`${s.clients.first_name} ${s.clients.last_name}`) : "—"}
+          {shared && (
+            <button
+              type="button"
+              // Its own control: the row click (admin drill-in) must not fire too.
+              onClick={(e) => {
+                e.stopPropagation()
+                setOpenSplitId((cur) => (cur === s.id ? null : s.id))
+              }}
+              aria-expanded={openSplitId === s.id}
+              title={openSplitId === s.id ? "Hide the partnership split" : "Show each agent's share and amount"}
+              className="mt-1 flex items-center gap-1 rounded-md text-[10px] font-semibold leading-tight text-[#8a6d2a] whitespace-nowrap hover:underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d6b357]/50"
+            >
+              <Handshake className="w-3 h-3 shrink-0" />
+              {shared}
+              <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${openSplitId === s.id ? "rotate-180" : ""}`} />
+            </button>
+          )}
+        </div>
+      )
+    },
+  })
   columns.push({ key: "price", header: "Contract Price", sortField: "contract_price", tdClassName: "text-right font-mono text-sm font-semibold text-[#0d1117]", cell: (s) => formatCurrency(s.contract_price) })
   columns.push({ key: "resv", header: "Reservation Date", sortField: "reservation_date", tdClassName: "text-[#374151]", cell: (s) => formatDate(s.reservation_date) })
   columns.push({ key: "comm", header: "Commission", cell: (s) => <StatusBadge value={s.commission_status} type="commission" /> })
@@ -777,6 +808,7 @@ export function SalesTable({
         <SaleActions
           sale={s}
           currentRole={currentRole}
+          currentUserId={currentUserId}
           onView={() => openView(s)}
           onEdit={() => openEdit(s)}
           onAttachments={() => openAttachments(s)}
@@ -801,6 +833,12 @@ export function SalesTable({
       : filtersActive
         ? "matching your filters"
         : undefined
+  // An agent's value tile credits their share of shared sales (migration 056),
+  // so it can read lower than the rows' full contract prices — say so.
+  const valueTileHint =
+    isSalesPipelineRole(currentRole) && sales.some((s) => s.partners.length > 0)
+      ? [tileHint, "shared sales at your share"].filter(Boolean).join(" · ")
+      : tileHint
 
   // Plain-language description of what's in effect, stamped onto the export so
   // a downloaded file can't be mistaken for the full report.
@@ -1000,7 +1038,7 @@ export function SalesTable({
                 label="Total Contract Value"
                 value={tileSummary ? formatCurrency(tileSummary.totalValue) : "—"}
                 icon={Wallet}
-                hint={tileHint}
+                hint={valueTileHint}
               />
               <SummaryTile
                 label="Pending Validation"
@@ -1213,8 +1251,8 @@ export function SalesTable({
                       router.push(`${pathname}?agent=${sale.agent_id}`, { scroll: false })
                     }
                     return (
+                      <Fragment key={sale.id}>
                       <tr
-                        key={sale.id}
                         onClick={drillable ? openDrill : undefined}
                         onKeyDown={drillable ? (e) => {
                           if (e.target !== e.currentTarget) return
@@ -1236,6 +1274,19 @@ export function SalesTable({
                           </td>
                         ))}
                       </tr>
+                      {openSplitId === sale.id && sale.partners.length > 0 && (
+                        <tr className="bg-[#fffdf7]">
+                          <td colSpan={colCount} className="px-6 pb-4 pt-1 whitespace-normal">
+                            <SaleSplitBreakdown
+                              partners={sale.partners}
+                              contractPrice={sale.contract_price}
+                              ownerId={sale.agent_id}
+                              highlightId={currentUserId}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     )
                   })
                 )}
@@ -1296,6 +1347,7 @@ export function SalesTable({
       {showDetails && detailSale && (
         <SaleDetails
           sale={detailSale}
+          viewerId={currentUserId}
           onClose={() => { setShowDetails(false); setDetailSale(null) }}
         />
       )}
@@ -1372,6 +1424,7 @@ export function SalesTable({
               validationStatus={discussionTarget.sale.validation_status}
               isAdmin={isAdminUser}
               initialTab={discussionTarget.tab}
+              readOnly={discussionTarget.sale.partner_agent_ids.includes(currentUserId)}
             />
           </div>
         </div>

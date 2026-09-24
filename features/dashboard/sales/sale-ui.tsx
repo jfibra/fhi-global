@@ -1,6 +1,8 @@
 // Presentation helpers shared by the Sales Reports table and the per-agent
 // drill-in, so both render dates, money and status chips identically.
 
+import type { SaleRecord } from "@/lib/sales-service"
+
 export function formatDate(value: string | null) {
   if (!value) return "—"
   const date = new Date(value)
@@ -31,6 +33,30 @@ export function toTitleCase(value: string | null | undefined) {
     .trim()
     .toLowerCase()
     .replace(/(^|[\s\-'’.&/([])(\p{L})/gu, (_m, sep: string, c: string) => sep + c.toUpperCase())
+}
+
+/**
+ * The line under the client on a shared sale: who else is on it, at what
+ * share. Per-agent totals credit these shares (migration 056), so the
+ * subject's own share is spelled out. `subjectId` is whose point of view the
+ * line takes — the viewer ("your share") or, in a per-agent drill-in, that
+ * agent ("their share"). A partner sees whose sale it is (they read it, they
+ * don't own it); the owner and staff see the partners.
+ */
+export function partnerLine(s: SaleRecord, subjectId: string, subject: "you" | "them" = "you"): string | null {
+  if (s.partners.length === 0) return null
+  const poss = subject === "you" ? "your" : "their"
+  const shareOf = (id: string) => s.partners.find((p) => p.agent_id === id)?.share
+  if (s.agent_id !== subjectId && s.partner_agent_ids.includes(subjectId)) {
+    return `Partner · ${poss} share ${shareOf(subjectId)}% · recorded by ${toTitleCase(s.profiles?.fullname) || "another agent"}`
+  }
+  const others = s.partners
+    .filter((p) => p.agent_id !== s.agent_id)
+    .map((p) => `${toTitleCase(p.name)} ${p.share}%`)
+  if (!others.length) return null
+  return s.agent_id === subjectId
+    ? `Shared with ${others.join(", ")} · ${poss} share ${shareOf(subjectId)}%`
+    : `Shared with ${others.join(", ")}`
 }
 
 /** Compact money for tiles: 4.1M / 940K / 12,500. */

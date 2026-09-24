@@ -3,48 +3,37 @@
 // Agent-to-Agent (A2A) Collaboration Agreement — fill the form, both parties
 // sign on screen, download the branded PDF. Nothing is stored: the agreement
 // is generated in the browser and handed straight to the user, so no client
-// or commercial terms leave the device.
+// or commercial terms leave the device. The form itself lives in ./a2a-form,
+// which Record Your Sale also embeds for a shared sale.
 
-import { type RefObject, useCallback, useMemo, useRef, useState } from "react"
-import { Download, FileSignature, Loader2, Users } from "lucide-react"
-import { type A2AParty, type A2AScope, downloadA2APdf } from "@/lib/a2a-agreement"
-import { SignaturePad } from "./signature-pad"
-
-const SCOPES: Array<{ key: A2AScope; title: string; desc: string }> = [
-  { key: "inventory", title: "Inventory Sharing", desc: "Sharing available property listings for marketing" },
-  { key: "client", title: "Client Sharing", desc: "Introducing prospective buyers/tenants to each other's listings" },
-  { key: "both", title: "Both", desc: "Full collaboration on inventory and client sharing" },
-]
+import { useCallback, useRef, useState } from "react"
+import { Download, FileSignature, Loader2 } from "lucide-react"
+import { type A2AInput, type A2AParty, downloadA2APdf } from "@/lib/a2a-agreement"
+import { A2AFormFields, todayLocal, type A2ARequiredField } from "./a2a-form"
 
 const emptyParty = (): A2AParty => ({
   fullName: "", agency: "", brn: "", phone: "", email: "",
   signatureDataUrl: undefined, signedName: "", signedDate: "",
 })
 
-/** yyyy-mm-dd in local time — toISOString would shift the day in Dubai. */
-function todayLocal(): string {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-/** Fields that block the download until filled in — highlighted on submit. */
-type RequiredField = "partyA.fullName" | "partyB.fullName" | "scope"
+const emptyAgreement = (): A2AInput => ({
+  date: todayLocal(),
+  partyA: emptyParty(),
+  partyB: emptyParty(),
+  scope: "",
+  propertyRef: "",
+  clientName: "",
+  splitA: "50",
+  splitB: "50",
+  noticePeriodDays: "30",
+  validUntil: "",
+})
 
 export function A2AClient() {
-  const [date, setDate] = useState(todayLocal)
-  const [partyA, setPartyA] = useState<A2AParty>(emptyParty)
-  const [partyB, setPartyB] = useState<A2AParty>(emptyParty)
-  const [scope, setScope] = useState<A2AScope | "">("")
-  const [propertyRef, setPropertyRef] = useState("")
-  const [clientName, setClientName] = useState("")
-  const [splitA, setSplitA] = useState("50")
-  const [splitB, setSplitB] = useState("50")
-  const [noticePeriodDays, setNoticePeriodDays] = useState("30")
-  const [validUntil, setValidUntil] = useState("")
+  const [value, setValue] = useState<A2AInput>(emptyAgreement)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<Set<RequiredField>>(() => new Set())
+  const [fieldErrors, setFieldErrors] = useState<Set<A2ARequiredField>>(() => new Set())
 
   // Scroll targets for the required fields, so a failed download jumps the user
   // straight to the first thing that needs filling in.
@@ -52,7 +41,7 @@ export function A2AClient() {
   const partyBNameRef = useRef<HTMLInputElement>(null)
   const scopeRef = useRef<HTMLDivElement>(null)
 
-  const clearFieldError = (key: RequiredField) => {
+  const clearFieldError = (key: A2ARequiredField) => {
     setFieldErrors((prev) => {
       if (!prev.has(key)) return prev
       const next = new Set(prev)
@@ -62,18 +51,9 @@ export function A2AClient() {
     setError(null)
   }
 
-  const splitTotal = useMemo(() => {
-    const a = Number(splitA)
-    const b = Number(splitB)
-    if (!Number.isFinite(a) || !Number.isFinite(b)) return null
-    return a + b
-  }, [splitA, splitB])
-
-  const patchA = (patch: Partial<A2AParty>) => setPartyA((p) => ({ ...p, ...patch }))
-  const patchB = (patch: Partial<A2AParty>) => setPartyB((p) => ({ ...p, ...patch }))
-
   const generate = useCallback(async () => {
-    const invalid = new Set<RequiredField>()
+    const { partyA, partyB, scope, date } = value
+    const invalid = new Set<A2ARequiredField>()
     if (!partyA.fullName.trim()) invalid.add("partyA.fullName")
     if (!partyB.fullName.trim()) invalid.add("partyB.fullName")
     if (!scope) invalid.add("scope")
@@ -107,16 +87,10 @@ export function A2AClient() {
       const stamp = date || todayLocal()
       await downloadA2APdf(
         {
+          ...value,
           date: stamp,
           partyA: { ...partyA, signedDate: partyA.signedDate || stamp },
           partyB: { ...partyB, signedDate: partyB.signedDate || stamp },
-          scope,
-          propertyRef,
-          clientName,
-          splitA,
-          splitB,
-          noticePeriodDays,
-          validUntil,
         },
         `A2A-Agreement-${(partyA.fullName || "party-a").replace(/\s+/g, "-")}-${(partyB.fullName || "party-b").replace(/\s+/g, "-")}.pdf`,
       )
@@ -125,50 +99,7 @@ export function A2AClient() {
     } finally {
       setBusy(false)
     }
-  }, [date, partyA, partyB, scope, propertyRef, clientName, splitA, splitB, noticePeriodDays, validUntil])
-
-  const inputBase = "w-full px-3 py-2.5 border bg-white text-sm text-[#0d1117] placeholder:text-[#9ca3af] focus:outline-none"
-  const inputCls = (invalid?: boolean) =>
-    `${inputBase} ${invalid ? "border-rose-400 focus:border-rose-500" : "border-[#dfe3e8] focus:border-[#001f3f]"}`
-  const input = inputCls()
-  const label = "block text-xs font-bold uppercase tracking-wider text-[#374151] mb-1.5"
-
-  const partyFields = (
-    p: A2AParty,
-    patch: (v: Partial<A2AParty>) => void,
-    name: { ref: RefObject<HTMLInputElement | null>; invalid: boolean; onClear: () => void },
-  ) => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div className="sm:col-span-2">
-        <label className={label}>Full Name *</label>
-        <input
-          ref={name.ref}
-          value={p.fullName}
-          onChange={(e) => {
-            patch({ fullName: e.target.value })
-            name.onClear()
-          }}
-          className={inputCls(name.invalid)}
-        />
-      </div>
-      <div className="sm:col-span-2">
-        <label className={label}>Agency / Brokerage</label>
-        <input value={p.agency} onChange={(e) => patch({ agency: e.target.value })} className={input} />
-      </div>
-      <div>
-        <label className={label}>BRN / ORN No.</label>
-        <input value={p.brn} onChange={(e) => patch({ brn: e.target.value })} className={input} />
-      </div>
-      <div>
-        <label className={label}>Phone</label>
-        <input value={p.phone} onChange={(e) => patch({ phone: e.target.value })} className={input} />
-      </div>
-      <div className="sm:col-span-2">
-        <label className={label}>Email</label>
-        <input type="email" value={p.email} onChange={(e) => patch({ email: e.target.value })} className={input} />
-      </div>
-    </div>
-  )
+  }, [value])
 
   return (
     <div className="space-y-5 pb-12">
@@ -190,162 +121,18 @@ export function A2AClient() {
         <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>
       )}
 
-      {/* Date */}
-      <section className="bg-white border border-[#e8eaed] p-6">
-        <div className="max-w-xs">
-          <label className={label}>Agreement Date</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={input} />
-        </div>
-      </section>
-
-      {/* Parties */}
-      <section className="bg-white border border-[#e8eaed] p-6">
-        <h2 className="font-['Outfit'] text-base font-bold text-[#001f3f] flex items-center gap-2 mb-1">
-          <Users className="w-4 h-4 text-[#d6b357]" /> Party A — Introducing / Listing Agent
-        </h2>
-        <span className="block w-full h-px bg-[#d6b357] mb-5" aria-hidden="true" />
-        {partyFields(partyA, patchA, {
-          ref: partyANameRef,
-          invalid: fieldErrors.has("partyA.fullName"),
-          onClear: () => clearFieldError("partyA.fullName"),
-        })}
-      </section>
-
-      <section className="bg-white border border-[#e8eaed] p-6">
-        <h2 className="font-['Outfit'] text-base font-bold text-[#001f3f] flex items-center gap-2 mb-1">
-          <Users className="w-4 h-4 text-[#d6b357]" /> Party B — Collaborating Agent
-        </h2>
-        <span className="block w-full h-px bg-[#d6b357] mb-5" aria-hidden="true" />
-        {partyFields(partyB, patchB, {
-          ref: partyBNameRef,
-          invalid: fieldErrors.has("partyB.fullName"),
-          onClear: () => clearFieldError("partyB.fullName"),
-        })}
-      </section>
-
-      {/* Scope */}
-      <section className="bg-white border border-[#e8eaed] p-6">
-        <h2 className="font-['Outfit'] text-base font-bold text-[#001f3f] mb-1">Scope of Collaboration</h2>
-        <span className="block w-full h-px bg-[#d6b357] mb-5" aria-hidden="true" />
-        <div ref={scopeRef} className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {SCOPES.map((s) => {
-            const active = scope === s.key
-            return (
-              <button
-                key={s.key}
-                type="button"
-                onClick={() => {
-                  setScope(s.key)
-                  clearFieldError("scope")
-                }}
-                className={`text-left p-4 border transition-colors ${
-                  active
-                    ? "border-[#001f3f] bg-[#f7f9fc]"
-                    : fieldErrors.has("scope")
-                      ? "border-rose-400 hover:border-rose-500"
-                      : "border-[#dfe3e8] hover:border-[#001f3f]"
-                }`}
-              >
-                <span className="flex items-center gap-2.5">
-                  <span className={`w-4 h-4 border shrink-0 flex items-center justify-center ${
-                    active ? "bg-[#001f3f] border-[#001f3f]" : "border-[#c4c9cf]"
-                  }`}>
-                    {active && <span className="w-1.5 h-1.5 bg-white" />}
-                  </span>
-                  <span className="text-sm font-bold text-[#0d1117]">{s.title}</span>
-                </span>
-                <span className="block text-xs text-[#6b7280] leading-relaxed mt-2">{s.desc}</span>
-              </button>
-            )
-          })}
-        </div>
-      </section>
-
-      {/* Reference + split */}
-      <section className="bg-white border border-[#e8eaed] p-6">
-        <h2 className="font-['Outfit'] text-base font-bold text-[#001f3f] mb-1">Property / Client Reference</h2>
-        <span className="block w-full h-px bg-[#d6b357] mb-5" aria-hidden="true" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className={label}>Property / Listing Ref.</label>
-            <input value={propertyRef} onChange={(e) => setPropertyRef(e.target.value)} className={input} />
-          </div>
-          <div>
-            <label className={label}>Client Name (if applicable)</label>
-            <input value={clientName} onChange={(e) => setClientName(e.target.value)} className={input} />
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-white border border-[#e8eaed] p-6">
-        <h2 className="font-['Outfit'] text-base font-bold text-[#001f3f] mb-1">Commission Split Agreement</h2>
-        <span className="block w-full h-px bg-[#d6b357] mb-5" aria-hidden="true" />
-        <p className="text-sm text-[#6b7280] leading-relaxed mb-4">
-          Upon successful closing of a sale or lease resulting from this collaboration, commission
-          earned shall be split between the parties as follows:
-        </p>
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="w-32">
-            <label className={label}>Party A Share %</label>
-            <input type="number" min={0} max={100} value={splitA} onChange={(e) => setSplitA(e.target.value)} className={input} />
-          </div>
-          <div className="w-32">
-            <label className={label}>Party B Share %</label>
-            <input type="number" min={0} max={100} value={splitB} onChange={(e) => setSplitB(e.target.value)} className={input} />
-          </div>
-          {splitTotal !== null && splitTotal !== 100 && (
-            <p className="text-xs font-semibold text-amber-600 pb-3">
-              Shares total {splitTotal}% — usually these add up to 100%.
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* Duration */}
-      <section className="bg-white border border-[#e8eaed] p-6">
-        <h2 className="font-['Outfit'] text-base font-bold text-[#001f3f] mb-1">Duration &amp; Termination</h2>
-        <span className="block w-full h-px bg-[#d6b357] mb-5" aria-hidden="true" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
-          <div>
-            <label className={label}>Notice Period (days)</label>
-            <input type="number" min={0} value={noticePeriodDays} onChange={(e) => setNoticePeriodDays(e.target.value)} className={input} />
-          </div>
-          <div>
-            <label className={label}>Valid Until</label>
-            <input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={input} />
-          </div>
-        </div>
-        <p className="text-xs text-[#9ca3af] leading-relaxed mt-4">
-          Confidentiality, non-circumvention and governing-law clauses are included in the PDF as
-          standard wording.
-        </p>
-      </section>
-
-      {/* Signatures */}
-      <section className="bg-white border border-[#e8eaed] p-6">
-        <h2 className="font-['Outfit'] text-base font-bold text-[#001f3f] mb-1">Signatures</h2>
-        <span className="block w-full h-px bg-[#d6b357] mb-5" aria-hidden="true" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <SignaturePad label="Party A signature" onChange={(v) => patchA({ signatureDataUrl: v ?? undefined })} />
-            <div>
-              <label className={label}>Printed name</label>
-              <input value={partyA.signedName} onChange={(e) => patchA({ signedName: e.target.value })} placeholder={partyA.fullName || "Party A name"} className={input} />
-            </div>
-          </div>
-          <div className="space-y-3">
-            <SignaturePad label="Party B signature" onChange={(v) => patchB({ signatureDataUrl: v ?? undefined })} />
-            <div>
-              <label className={label}>Printed name</label>
-              <input value={partyB.signedName} onChange={(e) => patchB({ signedName: e.target.value })} placeholder={partyB.fullName || "Party B name"} className={input} />
-            </div>
-          </div>
-        </div>
-        <p className="text-xs text-[#9ca3af] leading-relaxed mt-4">
-          Both parties can sign here on a phone or tablet with a finger. Leave a pad blank to print
-          the agreement and sign it by hand instead.
-        </p>
-      </section>
+      <A2AFormFields
+        value={value}
+        onChange={(patch) => setValue((v) => ({ ...v, ...patch }))}
+        onPartyChange={(which, patch) =>
+          setValue((v) =>
+            which === "A" ? { ...v, partyA: { ...v.partyA, ...patch } } : { ...v, partyB: { ...v.partyB, ...patch } },
+          )
+        }
+        fieldErrors={fieldErrors}
+        onClearFieldError={clearFieldError}
+        refs={{ partyAName: partyANameRef, partyBName: partyBNameRef, scope: scopeRef }}
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         <button

@@ -33,6 +33,9 @@ const bodySchema = z.object({
   file_name: z.string().min(1).max(500),
   file_url: z.string().min(1).max(2000),
   file_type: z.string().max(50).nullable().optional(),
+  // Omitted for proof of transaction (legacy NULL); the signed A2A on a
+  // shared sale is recorded as "partnership_agreement" (migration 055).
+  category: z.enum(["partnership_agreement"]).optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -68,7 +71,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
     }
-    const { saleId, file_name, file_url, file_type } = parsed.data
+    const { saleId, file_name, file_url, file_type, category } = parsed.data
 
     if (!UUID_RE.test(saleId)) {
       return NextResponse.json({ error: "Invalid sale id" }, { status: 400 })
@@ -114,9 +117,10 @@ export async function POST(request: NextRequest) {
         file_name,
         file_url,
         file_type: file_type ?? null,
+        ...(category ? { category } : {}),
         uploaded_by: user.id,
       })
-      .select("id, sales_report_id, file_name, file_url, file_type, uploaded_by, uploaded_at")
+      .select("*")
       .single()
 
     if (insertError || !inserted) {
@@ -131,7 +135,7 @@ export async function POST(request: NextRequest) {
       sales_report_id: saleId,
       action_type: "attachment_uploaded",
       field_name: "attachment",
-      new_value: { file_name, file_type: file_type ?? null, file_url },
+      new_value: { file_name, file_type: file_type ?? null, file_url, ...(category ? { category } : {}) },
       performed_by: user.id,
       performed_role: role,
     })

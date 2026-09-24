@@ -140,7 +140,7 @@ export function SaleFormDialog({
 }) {
   const isEdit = Boolean(editSale)
   const canEditCurrentSale = canEditSaleForRole(currentRole, editSale)
-  const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, editSale)
+  const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, editSale, currentUserId)
   const disabled = viewMode || (isEdit && !canEditCurrentSale)
   const isAdmin = isAdminStaffRole(currentRole)
 
