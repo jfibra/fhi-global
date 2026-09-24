@@ -951,3 +951,54 @@
 .nr-wall--on .nr-wall-grid { animation: nr-drift 46s ease-in-out infinite alternate; }
 @keyframes nr-drift { from { transform: rotate(-4deg) translate3d(0, 0, 0); } to { transform: rotate(-4deg) translate3d(-5%, -7%, 0); } }
 @media (prefers-reduced-motion: reduce) { .nr-wall--on .nr-wall-grid { animation: none; } }
+
+/* ─── Contact page ──────────────────────────────────────────────────────────
+   .ct-step: the form's three steps rise in turn as the section enters.
+   .ct-field: floating labels — the label sits in the field and lifts to a
+   small caption when the field is focused or filled (placeholder=" " makes
+   :placeholder-shown usable). .ct-pill: the reason chooser. */
+.ct-step { opacity: 0; transform: translateY(18px); transition: opacity 800ms var(--wf-ease), transform 800ms var(--wf-ease); transition-delay: calc(200ms + var(--d, 0ms)); }
+[data-in="true"] .ct-step { opacity: 1; transform: translateY(0); }
+.ct-legend { display: flex; align-items: center; gap: 12px; font: 700 20px/1.2 var(--font-outfit, "Outfit"), system-ui, sans-serif; color: #0d1117; }
+.ct-num { font-size: 12px; letter-spacing: 0.16em; color: #b8913f; }
+
+.ct-pill {
+  display: inline-flex; align-items: center; cursor: pointer; user-select: none;
+  padding: 10px 16px; border: 1px solid #e5e8ec; background: #fff;
+  font-size: 14px; font-weight: 600; color: #374151;
+  transition: border-color 200ms, background-color 200ms, color 200ms, transform 200ms var(--wf-ease);
+}
+.ct-pill:hover { border-color: #d6b357; color: #0d1117; transform: translateY(-1px); }
+.ct-pill--on { border-color: #0d1117; background: #0d1117; color: #fff; }
+.ct-pill:has(input:focus-visible) { outline: 3px solid #d6b357; outline-offset: 2px; }
+
+.ct-field { position: relative; display: block; }
+.ct-input {
+  width: 100%; border: 0; border-bottom: 1px solid #d7dae0; background: transparent;
+  padding: 26px 0 10px; font-size: 16px; color: #0d1117; outline: none;
+  transition: border-color 200ms;
+}
+.ct-textarea { resize: vertical; min-height: 160px; line-height: 1.6; }
+.ct-field::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: #d6b357; transform: scaleX(0); transform-origin: left center; transition: transform 380ms var(--wf-ease); }
+.ct-field:focus-within::after { transform: scaleX(1); }
+.ct-label {
+  position: absolute; left: 0; top: 24px; pointer-events: none;
+  font-size: 15px; color: #6b7280;
+  transition: top 220ms var(--wf-ease), font-size 220ms var(--wf-ease), color 220ms;
+}
+.ct-input:focus ~ .ct-label, .ct-input:not(:placeholder-shown) ~ .ct-label { top: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #b8913f; }
+.ct-input:not(:placeholder-shown):invalid:not(:focus) { border-bottom-color: #e11d48; }
+
+.ct-submit::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.35) 50%, transparent 65%); transform: translateX(-120%); transition: transform 0s; }
+.ct-submit:hover::after { transform: translateX(120%); transition: transform 700ms var(--wf-ease); }
+
+.ct-success-ring { animation: ct-pop 700ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.ct-success h3, .ct-success p, .ct-success div { animation: ct-rise 800ms var(--wf-ease) both; }
+.ct-success p { animation-delay: 120ms; } .ct-success div { animation-delay: 240ms; }
+@keyframes ct-pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes ct-rise { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ct-step { transition: none; opacity: 1; transform: none; }
+  .ct-success-ring, .ct-success h3, .ct-success p, .ct-success div { animation: none; }
+}

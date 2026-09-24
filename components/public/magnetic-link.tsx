@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useRef } from "react"
+import { useRef, type CSSProperties } from "react"
 
 /**
  * A link that leans a few pixels toward the pointer while it hovers, then
@@ -12,16 +12,23 @@ import { useRef } from "react"
 export function MagneticLink({
   href,
   className = "",
+  style,
   children,
   strength = 0.25,
   ariaLabel,
+  target,
+  rel,
 }: {
   href: string
   className?: string
+  /** Static styles (e.g. entrance-delay variables); the lean is applied on top. */
+  style?: CSSProperties
   children: React.ReactNode
   /** Fraction of the pointer's offset from centre that the button follows. */
   strength?: number
   ariaLabel?: string
+  target?: string
+  rel?: string
 }) {
   const ref = useRef<HTMLAnchorElement>(null)
 
@@ -33,6 +40,7 @@ export function MagneticLink({
     const dy = (e.clientY - (r.top + r.height / 2)) * strength
     el.style.transition = "transform 120ms ease-out"
     el.style.transform = `translate3d(${dx.toFixed(1)}px, ${dy.toFixed(1)}px, 0)`
+    // (The inline `style` prop's other properties are untouched: only transform/transition are written here.)
   }
   const onLeave = () => {
     const el = ref.current
@@ -46,6 +54,9 @@ export function MagneticLink({
       ref={ref}
       href={href}
       className={className}
+      style={style}
+      target={target}
+      rel={rel}
       onPointerMove={onMove}
       onPointerLeave={onLeave}
       aria-label={ariaLabel}
