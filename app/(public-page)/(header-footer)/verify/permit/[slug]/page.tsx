@@ -78,7 +78,7 @@ export default async function VerifyPermitPage({ params }: Props) {
           <ArrowLeft className="h-3.5 w-3.5" /> Back to {project.name}
         </Link>
 
-        <p className="mt-8 inline-flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.3em] text-[#f0d89b]">
+        <p className="mt-8 flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.3em] text-[#f0d89b]">
           <span className="wf-rule h-px w-10 bg-[#d6b357]" aria-hidden="true" />
           <span className="wf-fade" style={{ ["--d" as string]: "200ms" }}>Permit verification</span>
         </p>
