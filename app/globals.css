@@ -1037,3 +1037,9 @@
   .pl-card { transition: none; opacity: 1; transform: none; clip-path: none; }
   .pl-pick:hover { transform: none; }
 }
+
+/* ─── Hold-to-continue (permit verification) ───────────────────────────────
+   --p is the hold progress (0..1) written by the component; the gold fill
+   sweeps across the button and the ring completes as it is held. */
+.htc-fill { width: calc(var(--p, 0) * 100%); opacity: 0.25; transition: width 60ms linear; }
+.htc:active .htc-fill { opacity: 0.35; }

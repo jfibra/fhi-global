@@ -918,21 +918,44 @@ export default async function ProjectDetailPage({ params }: Props) {
               <div className="flex items-start gap-3">
                 <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#b8913f]" />
                 <p className="text-sm leading-relaxed text-[#374151]">
-                  Advertising permit issued by the Dubai Land Department. Scan the code to verify this project with the DLD.
+                  Advertising permit issued by the Dubai Land Department.{" "}
+                  {project.trakheesi_permit_link ? "Tap or scan the code to verify this project with the DLD." : "Scan the code to verify this project with the DLD."}
                 </p>
               </div>
-              <div className="mt-4 border border-[#e5e8ec] bg-white p-3">
-                <div className="relative aspect-square w-full">
-                  <Image
-                    src={project.trakheesi_permit_url}
-                    alt={`Trakheesi permit QR code for ${project.name}`}
-                    fill
-                    unoptimized
-                    sizes="320px"
-                    className="object-contain"
-                  />
-                </div>
-              </div>
+              {(() => {
+                const qr = (
+                  <div className="relative aspect-square w-full">
+                    <Image
+                      src={project.trakheesi_permit_url}
+                      alt={`Trakheesi permit QR code for ${project.name}`}
+                      fill
+                      unoptimized
+                      sizes="320px"
+                      className="object-contain transition-transform duration-500 group-hover:scale-[1.02]"
+                    />
+                  </div>
+                )
+                return project.trakheesi_permit_link ? (
+                  <Link
+                    href={`/verify/permit/${slug}`}
+                    className="group mt-4 block border border-[#e5e8ec] bg-white p-3 transition-colors hover:border-[#d6b357]"
+                    aria-label="Verify this permit with the Dubai Land Department"
+                  >
+                    {qr}
+                  </Link>
+                ) : (
+                  <div className="mt-4 border border-[#e5e8ec] bg-white p-3">{qr}</div>
+                )
+              })()}
+              {project.trakheesi_permit_link && (
+                <Link
+                  href={`/verify/permit/${slug}`}
+                  className="group mt-3 inline-flex w-full items-center justify-center gap-2 bg-[#0d1117] px-5 py-3 text-[14px] font-bold text-white transition-colors hover:bg-[#001f3f]"
+                >
+                  Verify with the DLD
+                  <ArrowLeft className="h-4 w-4 rotate-180 text-[#d6b357] transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              )}
               {project.trakheesi_permit_number && (
                 <dl className="mt-4 border-t border-[#eef0f3] pt-4">
                   <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b8913f]">Permit number</dt>

@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import type { Project, Developer, ProjectFormData } from "@/lib/project-service"
 import { generateProjectSlug } from "@/lib/project-service"
+import { resolvePermitLink, permitHost } from "@/lib/trakheesi-client"
 
 // ─── Inner tab definitions ────────────────────────────────────────────────────
 
@@ -128,6 +129,7 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
       sales_contact_email:       project.sales_contact_email ?? "",
       trakheesi_permit_number:   project.trakheesi_permit_number ?? "",
       trakheesi_permit_url:      project.trakheesi_permit_url ?? "",
+      trakheesi_permit_link:     project.trakheesi_permit_link ?? "",
     })
   }, [project, showAgentNote])
 
@@ -156,6 +158,7 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
   const permitInputRef = useRef<HTMLInputElement>(null)
   const [permitBusy, setPermitBusy] = useState(false)
   const permitUrl = ((form.trakheesi_permit_url as string | undefined) ?? project.trakheesi_permit_url ?? "").trim()
+  const permitLink = ((form.trakheesi_permit_link as string | undefined) ?? project.trakheesi_permit_link ?? "").trim()
 
   const uploadPermit = async (file: File | null) => {
     if (!file) return
@@ -170,8 +173,13 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
       const res = await fetch("/api/upload/project", { method: "POST", body: fd })
       if (!res.ok) throw new Error("upload failed")
       const { url } = (await res.json()) as { url: string }
+      // Read the DLD link out of the code so the public QR can be clicked,
+      // not only scanned. Null is fine: the image still shows.
+      const link = await resolvePermitLink(url)
       set("trakheesi_permit_url", url)
-      await onSave({ trakheesi_permit_url: url })
+      set("trakheesi_permit_link", link ?? "")
+      await onSave({ trakheesi_permit_url: url, trakheesi_permit_link: link })
+      if (link) showToast("success", `Permit stored. It links to ${permitHost(link)}.`)
     } catch {
       showToast("error", "Upload failed. Please try again.")
     } finally {
@@ -183,7 +191,8 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
   const removePermit = async () => {
     setPermitBusy(true)
     set("trakheesi_permit_url", "")
-    await onSave({ trakheesi_permit_url: null })
+    set("trakheesi_permit_link", "")
+    await onSave({ trakheesi_permit_url: null, trakheesi_permit_link: null })
     setPermitBusy(false)
   }
 
@@ -568,6 +577,17 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
               <div className="relative aspect-square w-full overflow-hidden bg-white">
                 <Image src={permitUrl} alt="Trakheesi permit QR code" fill unoptimized className="object-contain" />
               </div>
+              {permitLink ? (
+                <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-snug text-emerald-700">
+                  <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />
+                  Clickable on the public page: links to {permitHost(permitLink)}.
+                </p>
+              ) : (
+                <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-snug text-amber-700">
+                  <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
+                  No Dubai Land Department link could be read from this image. Buyers can still scan it; a sharper upload usually fixes this.
+                </p>
+              )}
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"
@@ -722,9 +742,14 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
         <div className="lg:col-span-2">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9ca3af]">Permit QR code</p>
           {project.trakheesi_permit_url ? (
-            <div className="relative mt-2 aspect-square w-full max-w-[240px] overflow-hidden border border-[#e5e5e5] bg-white p-2">
-              <Image src={project.trakheesi_permit_url} alt="Trakheesi permit QR code" fill unoptimized className="object-contain p-2" />
-            </div>
+            <>
+              <div className="relative mt-2 aspect-square w-full max-w-[240px] overflow-hidden border border-[#e5e5e5] bg-white p-2">
+                <Image src={project.trakheesi_permit_url} alt="Trakheesi permit QR code" fill unoptimized className="object-contain p-2" />
+              </div>
+              <p className="mt-2 text-[11px] text-[#6b7280]">
+                {project.trakheesi_permit_link ? `Links to ${permitHost(project.trakheesi_permit_link)}` : "Scan only (no DLD link read)"}
+              </p>
+            </>
           ) : (
             <p className="mt-1 text-sm text-[#c4c9d0]">Not provided</p>
           )}

@@ -32,6 +32,8 @@ export type Project = {
   /** Trakheesi (DLD advertising permit): QR image URL and permit number. Shown publicly when set. */
   trakheesi_permit_url: string | null
   trakheesi_permit_number: string | null
+  /** The DLD validation URL decoded from the QR; null when unreadable. */
+  trakheesi_permit_link: string | null
   status: "pre_launch" | "launch" | "under_construction" | "completed"
   developer_id: string | null
   location: string | null
@@ -225,6 +227,7 @@ const NULLABLE_STRING_FIELDS = new Set<keyof ProjectFormData>([
   "agent_note",
   "trakheesi_permit_url",
   "trakheesi_permit_number",
+  "trakheesi_permit_link",
   "location",
   "region",
   "community",

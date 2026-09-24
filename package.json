@@ -57,6 +57,7 @@
     "html2canvas": "^1.4.1",
     "imapflow": "^1.6.5",
     "input-otp": "1.4.2",
+    "jsqr": "^1.4.0",
     "lucide-react": "^0.575.0",
     "mailparser": "^3.9.14",
     "next": "^16.1.6",
