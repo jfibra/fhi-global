@@ -39,7 +39,7 @@ import { classifyMedia, isShortLink, mediaLabel } from "@/lib/media-embed"
 import {
   MapPin, Building2, Calendar, Home, Layers, Phone, Mail, ArrowLeft,
   CheckCircle2, Globe, BedDouble, Bath, Maximize2, DollarSign,
-  TrendingUp, Star
+  TrendingUp, Star, ShieldCheck
 } from "lucide-react"
 
 export const revalidate = 120
@@ -907,6 +907,41 @@ export default async function ProjectDetailPage({ params }: Props) {
                   View Developer Profile <ArrowLeft className="w-4 h-4 rotate-180" />
                 </Link>
               </div>
+            </SidePanel>
+          )}
+
+          {/* Trakheesi permit — the Dubai Land Department's advertising permit,
+              the first thing a Dubai buyer checks. Only when the project has
+              one uploaded; other projects show nothing here. */}
+          {project.trakheesi_permit_url && (
+            <SidePanel title="Trakheesi Permit">
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#b8913f]" />
+                <p className="text-sm leading-relaxed text-[#374151]">
+                  Advertising permit issued by the Dubai Land Department. Scan the code to verify this project with the DLD.
+                </p>
+              </div>
+              <div className="mt-4 border border-[#e5e8ec] bg-white p-3">
+                <div className="relative aspect-square w-full">
+                  <Image
+                    src={project.trakheesi_permit_url}
+                    alt={`Trakheesi permit QR code for ${project.name}`}
+                    fill
+                    unoptimized
+                    sizes="320px"
+                    className="object-contain"
+                  />
+                </div>
+              </div>
+              {project.trakheesi_permit_number && (
+                <dl className="mt-4 border-t border-[#eef0f3] pt-4">
+                  <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b8913f]">Permit number</dt>
+                  <dd className="mt-1 font-['Outfit'] text-[17px] font-bold tabular-nums text-[#0d1117]">{project.trakheesi_permit_number}</dd>
+                </dl>
+              )}
+              <p className="mt-3 text-[11px] leading-relaxed text-[#9ca3af]">
+                Trakheesi is the DLD&rsquo;s permit system for real estate advertising in Dubai.
+              </p>
             </SidePanel>
           )}
 

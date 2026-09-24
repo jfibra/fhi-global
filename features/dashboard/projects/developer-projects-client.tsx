@@ -514,6 +514,7 @@ export function DeveloperProjectsClient({
                   <ProjectImagesTab
                     project={selected}
                     showToast={showToast}
+                    onSetPermit={(url: string) => handleUpdateProject({ trakheesi_permit_url: url })}
                     onMainImageChange={(url: string) => {
                       setSelected({ ...selected, main_image: url })
                       setProjects((prev) => prev.map((p) => p.id === selected.id ? { ...p, main_image: url } : p))

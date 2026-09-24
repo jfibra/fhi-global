@@ -1017,7 +1017,7 @@ export function ProjectsClient({
             {activeTab === "data"           && !readOnly && <ProjectDataTab           project={selected} onJump={(tab) => setActiveTab(tab)} showToast={showToast} />}
             {activeTab === "overview"       && <ProjectOverviewTab       project={selected} developers={developers} onSave={handleUpdateProject} showToast={showToast} readOnly={readOnly} />}
             {activeTab === "units"          && <ProjectUnitsTab          projectId={selected.id} showToast={showToast} readOnly={readOnly} />}
-            {activeTab === "images"         && <ProjectImagesTab         project={selected} showToast={showToast} readOnly={readOnly} onMainImageChange={(url: string) => { setSelected({ ...selected, main_image: url }); setProjects((prev) => prev.map((p) => p.id === selected.id ? { ...p, main_image: url } : p)) }} />}
+            {activeTab === "images"         && <ProjectImagesTab         project={selected} showToast={showToast} readOnly={readOnly} onSetPermit={(url: string) => handleUpdateProject({ trakheesi_permit_url: url })} onMainImageChange={(url: string) => { setSelected({ ...selected, main_image: url }); setProjects((prev) => prev.map((p) => p.id === selected.id ? { ...p, main_image: url } : p)) }} />}
             {activeTab === "amenities"      && <ProjectAmenitiesTab      projectId={selected.id} showToast={showToast} readOnly={readOnly} />}
             {activeTab === "property_types" && <ProjectPropertyTypesTab  projectId={selected.id} showToast={showToast} readOnly={readOnly} />}
             {activeTab === "media"          && <ProjectMediaTab          projectId={selected.id} showToast={showToast} readOnly={readOnly} />}

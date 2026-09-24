@@ -29,6 +29,9 @@ export type Project = {
   about_project: string | null
   /** "Why we picked it" — a hand-written FHI line for the homepage featured showcase. */
   agent_note: string | null
+  /** Trakheesi (DLD advertising permit): QR image URL and permit number. Shown publicly when set. */
+  trakheesi_permit_url: string | null
+  trakheesi_permit_number: string | null
   status: "pre_launch" | "launch" | "under_construction" | "completed"
   developer_id: string | null
   location: string | null
@@ -220,6 +223,8 @@ const NULLABLE_STRING_FIELDS = new Set<keyof ProjectFormData>([
   "description",
   "about_project",
   "agent_note",
+  "trakheesi_permit_url",
+  "trakheesi_permit_number",
   "location",
   "region",
   "community",

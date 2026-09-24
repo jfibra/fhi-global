@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import Image from "next/image"
 import {
   Building2,
   CalendarDays,
@@ -9,15 +10,18 @@ import {
   Loader2,
   MapPin,
   Phone,
+  QrCode,
   Save,
   Sparkles,
+  Trash2,
+  Upload,
 } from "lucide-react"
 import type { Project, Developer, ProjectFormData } from "@/lib/project-service"
 import { generateProjectSlug } from "@/lib/project-service"
 
 // ─── Inner tab definitions ────────────────────────────────────────────────────
 
-type InnerTab = "basic" | "location" | "pricing" | "dates" | "building" | "contact"
+type InnerTab = "basic" | "location" | "pricing" | "dates" | "building" | "contact" | "permit"
 
 interface TabDef {
   id: InnerTab
@@ -32,6 +36,7 @@ const INNER_TABS: TabDef[] = [
   { id: "dates",    label: "Dates & Delivery",icon: CalendarDays },
   { id: "building", label: "Building Details",icon: Building2 },
   { id: "contact",  label: "Sales Contact",   icon: Phone },
+  { id: "permit",   label: "Trakheesi Permit", icon: QrCode },
 ]
 
 // ─── Read-only formatters ─────────────────────────────────────────────────────
@@ -121,6 +126,8 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
       ownership_type:            project.ownership_type ?? "",
       sales_contact_phone:       project.sales_contact_phone ?? "",
       sales_contact_email:       project.sales_contact_email ?? "",
+      trakheesi_permit_number:   project.trakheesi_permit_number ?? "",
+      trakheesi_permit_url:      project.trakheesi_permit_url ?? "",
     })
   }, [project, showAgentNote])
 
@@ -140,6 +147,44 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
     await onSave(form)
     setSaving(false)
     showToast("success", "Changes saved")
+  }
+
+  // ─── Trakheesi permit QR ─────────────────────────────────────────────────
+  // Saved the moment it uploads (not on the Save button), so an uploaded
+  // permit is never lost to a forgotten click. Uploaded as-is: re-encoding a
+  // QR code to WebP can soften its edges and stop it scanning.
+  const permitInputRef = useRef<HTMLInputElement>(null)
+  const [permitBusy, setPermitBusy] = useState(false)
+  const permitUrl = ((form.trakheesi_permit_url as string | undefined) ?? project.trakheesi_permit_url ?? "").trim()
+
+  const uploadPermit = async (file: File | null) => {
+    if (!file) return
+    if (!file.type.startsWith("image/")) { showToast("error", "Upload an image of the permit QR code."); return }
+    if (file.size > 8 * 1024 * 1024) { showToast("error", "That image is over 8 MB."); return }
+    setPermitBusy(true)
+    try {
+      const fd = new FormData()
+      fd.append("file", file, file.name)
+      fd.append("developer_slug", (project.developers as { slug?: string | null } | null)?.slug ?? "unknown")
+      fd.append("project_slug", project.slug)
+      const res = await fetch("/api/upload/project", { method: "POST", body: fd })
+      if (!res.ok) throw new Error("upload failed")
+      const { url } = (await res.json()) as { url: string }
+      set("trakheesi_permit_url", url)
+      await onSave({ trakheesi_permit_url: url })
+    } catch {
+      showToast("error", "Upload failed. Please try again.")
+    } finally {
+      setPermitBusy(false)
+      if (permitInputRef.current) permitInputRef.current.value = ""
+    }
+  }
+
+  const removePermit = async () => {
+    setPermitBusy(true)
+    set("trakheesi_permit_url", "")
+    await onSave({ trakheesi_permit_url: null })
+    setPermitBusy(false)
   }
 
   // ─── Shared field helpers ─────────────────────────────────────────────────
@@ -502,6 +547,68 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
         {field("Sales Email", inp("sales_contact_email", "sales@…",  "email"))}
       </div>
     ),
+
+    permit: (
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        <div className="space-y-4 lg:col-span-3">
+          <p className="text-sm leading-relaxed text-[#4b5563]">
+            Trakheesi is the Dubai Land Department&rsquo;s advertising permit. When a project carries one, its QR code
+            and permit number appear in the public project page&rsquo;s sidebar, under the developer, so a buyer can
+            verify the listing with the DLD. Projects without a permit show nothing there.
+          </p>
+          {field("Permit number", inp("trakheesi_permit_number", "As printed on the permit, e.g. 7128 4956 3200 1234"))}
+          <p className="text-[11px] text-[#9ca3af]">
+            The number is stored when you save. The QR image is stored as soon as it uploads.
+          </p>
+        </div>
+        <div className="lg:col-span-2">
+          <p className="mb-1.5 text-xs font-semibold text-[#6b7280]">Permit QR code</p>
+          {permitUrl ? (
+            <div className="rounded-xl border border-[#e5e5e5] bg-white p-3">
+              <div className="relative aspect-square w-full overflow-hidden bg-white">
+                <Image src={permitUrl} alt="Trakheesi permit QR code" fill unoptimized className="object-contain" />
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => permitInputRef.current?.click()}
+                  disabled={permitBusy}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#0f2940] hover:border-[#d6b357] disabled:opacity-50"
+                >
+                  <Upload className="h-3.5 w-3.5" /> Replace
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void removePermit()}
+                  disabled={permitBusy}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-full border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Remove
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => permitInputRef.current?.click()}
+              disabled={permitBusy}
+              className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#e5e5e5] text-[#9ca3af] transition-colors hover:border-[#d6b357] hover:text-[#6b7280] disabled:opacity-50"
+            >
+              {permitBusy ? <Loader2 className="h-8 w-8 animate-spin" /> : <QrCode className="h-8 w-8" />}
+              <span className="text-xs font-semibold">{permitBusy ? "Uploading…" : "Upload the QR image"}</span>
+              <span className="px-6 text-center text-[11px]">PNG or JPG, as issued by the DLD</span>
+            </button>
+          )}
+          <input
+            ref={permitInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => void uploadPermit(e.target.files?.[0] ?? null)}
+          />
+        </div>
+      </div>
+    ),
   }
 
   // ─── Read-only display panels (agents/members) ─────────────────────────────
@@ -607,6 +714,21 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
             <a href={`mailto:${project.sales_contact_email}`} className="text-[#001f3f] hover:underline">{project.sales_contact_email}</a>
           ) : "—",
         )}
+      </div>
+    ),
+    permit: (
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        <div className="lg:col-span-3">{roRow("Permit number", project.trakheesi_permit_number)}</div>
+        <div className="lg:col-span-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9ca3af]">Permit QR code</p>
+          {project.trakheesi_permit_url ? (
+            <div className="relative mt-2 aspect-square w-full max-w-[240px] overflow-hidden border border-[#e5e5e5] bg-white p-2">
+              <Image src={project.trakheesi_permit_url} alt="Trakheesi permit QR code" fill unoptimized className="object-contain p-2" />
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-[#c4c9d0]">Not provided</p>
+          )}
+        </div>
       </div>
     ),
   }

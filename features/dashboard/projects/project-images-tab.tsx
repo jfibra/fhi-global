@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Image from "next/image"
-import { Upload, Trash2, Star } from "lucide-react"
+import { Upload, Trash2, Star , QrCode } from "lucide-react"
 import {
   type ProjectImage,
   fetchProjectImages,
@@ -16,10 +16,14 @@ interface Props {
   project: { id: number; slug: string; developer_id: string | null; developers?: { slug?: string | null } | null }
   showToast: (variant: "success" | "error", message: string) => void
   onMainImageChange: (url: string) => void
+  /** Store a gallery image as the project's Trakheesi permit QR (see the
+   *  Overview tab). The image then leaves the gallery, since a permit is not
+   *  a photo of the project. */
+  onSetPermit?: (url: string) => Promise<void>
   readOnly?: boolean
 }
 
-export function ProjectImagesTab({ project, showToast, onMainImageChange, readOnly = false }: Props) {
+export function ProjectImagesTab({ project, showToast, onMainImageChange, onSetPermit, readOnly = false }: Props) {
   const [images, setImages]       = useState<ProjectImage[]>([])
   const [loading, setLoading]     = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -63,6 +67,15 @@ export function ProjectImagesTab({ project, showToast, onMainImageChange, readOn
       }
     }
     setUploading(false)
+    void load()
+  }
+
+  const handleUseAsPermit = async (img: ProjectImage) => {
+    if (!onSetPermit) return
+    await onSetPermit(img.url)
+    const { error } = await deleteProjectImage(img.id)
+    if (error) { showToast("error", error); return }
+    showToast("success", "Set as the Trakheesi permit and moved out of the gallery.")
     void load()
   }
 
@@ -139,6 +152,12 @@ export function ProjectImagesTab({ project, showToast, onMainImageChange, readOn
                     <button type="button" onClick={() => void handleSetMain(img)} title="Set as main"
                       className="w-8 h-8 bg-[#d6b357] rounded-full flex items-center justify-center text-white hover:bg-[#c4a030] transition-colors">
                       <Star className="w-4 h-4" />
+                    </button>
+                  )}
+                  {onSetPermit && (
+                    <button type="button" onClick={() => void handleUseAsPermit(img)} title="Use as Trakheesi permit"
+                      className="w-8 h-8 bg-[#001f3f] rounded-full flex items-center justify-center text-white hover:bg-[#0a2647] transition-colors">
+                      <QrCode className="w-4 h-4" />
                     </button>
                   )}
                   <button type="button" onClick={() => void handleDelete(img.id)} title="Delete"
