@@ -731,3 +731,64 @@
   .hero-search::after { animation: none !important; }
   .hero-deck-tilt, .hero-card { transition: none; }
 }
+
+/* ─── Project page ──────────────────────────────────────────────────────────
+   .pp-hero: the photo settles out of a zoom under the .wf-* text entrance.
+   .pp-section: each section reveals its children in order as it scrolls in;
+   table rows and gallery tiles stagger within. .pp-plan: the payment plan
+   as a timeline whose track fills and nodes pop. .pp-side: the sidebar slides
+   in. .pp-sticky: the phone action bar. */
+.pp-hero-img { transform: scale(1.12); transition: transform 2400ms var(--wf-ease); }
+[data-in="true"] .pp-hero-img { transform: scale(1); }
+
+.pp-section > * { opacity: 0; transform: translateY(16px); transition: opacity 800ms var(--wf-ease), transform 800ms var(--wf-ease); }
+.pp-section > :nth-child(2) { transition-delay: 120ms; }
+.pp-section > :nth-child(3) { transition-delay: 220ms; }
+.pp-section > :nth-child(4) { transition-delay: 320ms; }
+.pp-section > :nth-child(5) { transition-delay: 420ms; }
+.pp-section > :nth-child(n + 6) { transition-delay: 500ms; }
+[data-in="true"].pp-section > * { opacity: 1; transform: translateY(0); }
+
+.pp-section tbody tr { opacity: 0; transform: translateX(-10px); transition: opacity 600ms var(--wf-ease), transform 600ms var(--wf-ease); }
+.pp-section tbody tr:nth-child(1) { transition-delay: 300ms; }
+.pp-section tbody tr:nth-child(2) { transition-delay: 380ms; }
+.pp-section tbody tr:nth-child(3) { transition-delay: 460ms; }
+.pp-section tbody tr:nth-child(4) { transition-delay: 540ms; }
+.pp-section tbody tr:nth-child(5) { transition-delay: 620ms; }
+.pp-section tbody tr:nth-child(6) { transition-delay: 700ms; }
+.pp-section tbody tr:nth-child(n + 7) { transition-delay: 780ms; }
+[data-in="true"].pp-section tbody tr { opacity: 1; transform: translateX(0); }
+
+.pp-tile { opacity: 0; clip-path: inset(0 0 100% 0); transition: opacity 500ms var(--wf-ease), clip-path 900ms var(--wf-ease-io), border-color 300ms; transition-delay: calc(250ms + var(--d, 0ms)); }
+[data-in="true"] .pp-tile { opacity: 1; clip-path: inset(0 0 0 0); }
+
+.pp-plan-fill { transform: scaleX(0); transform-origin: left center; transition: transform 1400ms var(--wf-ease); transition-delay: 350ms; }
+[data-in="true"] .pp-plan-fill { transform: scaleX(1); }
+.pp-plan-step { opacity: 0; transform: translateY(10px); transition: opacity 700ms var(--wf-ease), transform 700ms var(--wf-ease); transition-delay: var(--d, 0ms); }
+[data-in="true"] .pp-plan-step { opacity: 1; transform: translateY(0); }
+.pp-plan-node { transform: scale(0); transition: transform 550ms cubic-bezier(0.34, 1.56, 0.64, 1); transition-delay: calc(var(--d, 0ms) + 200ms); }
+[data-in="true"] .pp-plan-node { transform: scale(1); }
+
+.pp-side { opacity: 0; transform: translateX(32px); transition: opacity 900ms var(--wf-ease), transform 900ms var(--wf-ease); transition-delay: 300ms; }
+[data-in="true"].pp-side { opacity: 1; transform: translateX(0); }
+
+.pp-lightbox { animation: pp-lightbox-in 260ms var(--wf-ease); }
+@keyframes pp-lightbox-in { from { opacity: 0; } to { opacity: 1; } }
+::view-transition-group(gallery-shot) { animation-duration: 420ms; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+::view-transition-old(gallery-shot), ::view-transition-new(gallery-shot) { height: 100%; width: 100%; object-fit: contain; animation-duration: 420ms; }
+
+.pp-sticky { transform: translateY(110%); transition: transform 420ms var(--wf-ease); }
+.pp-sticky[data-show="true"] { transform: translateY(0); }
+/* The WhatsApp float rides above the phone action bar while it is shown. */
+@media (max-width: 1023px) {
+  .wa-fab { transition: bottom 420ms var(--wf-ease), transform 200ms; }
+  body.has-sticky-bar .wa-fab { bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-hero-img, .pp-section > *, .pp-section tbody tr, .pp-tile, .pp-plan-fill, .pp-plan-step, .pp-plan-node, .pp-side, .pp-sticky {
+    transition: none !important; opacity: 1 !important; transform: none !important; clip-path: none !important;
+  }
+  .pp-sticky[data-show="false"] { transform: translateY(110%) !important; }
+  .pp-lightbox { animation: none; }
+}

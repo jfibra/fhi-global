@@ -29,6 +29,9 @@ import { ProjectGallery } from "@/components/public/project-gallery"
 import { PdfPagePreviews } from "@/components/public/pdf-page-previews"
 import { AmenitiesGrid, NearbyPlaces } from "@/components/public/amenities-grid"
 import { ProjectInquireForm } from "@/components/public/project-inquire-form"
+import { InView } from "@/components/public/in-view"
+import { CountUp } from "@/components/public/count-up"
+import { ProjectStickyBar } from "@/components/public/project-sticky-bar"
 import { ProjectLocationMap } from "@/components/public/project-location-map"
 import { MediaEmbedCard } from "@/components/public/media-embed"
 import { ReadMore } from "@/components/public/read-more"
@@ -401,85 +404,66 @@ export default async function ProjectDetailPage({ params }: Props) {
       <TopBar />
       <Header />
 
-      {/* ── Masthead — light editorial header (approved mockup): navy type
-             on white, gold caps labels with hairline dividers, the photo
-             filling the right half, and the navy stats band anchoring it.
-             On mobile the photo slots in right after the title. */}
-      <section className="relative overflow-hidden bg-white">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10 lg:pr-[46%] lg:min-h-[430px]">
-          <div className="flex items-center gap-3 mb-3">
-            <span className="h-px w-10 bg-[#d6b357]" aria-hidden="true" />
-            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f]">
-              {status.label}
-            </span>
-            {project.is_featured && (
-              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#9ca3af]">Featured</span>
-            )}
-          </div>
-
-          <h1 className="font-['Outfit'] text-3xl md:text-[42px] font-bold text-[#001f3f] leading-[1.08]">
-            {project.name}
-          </h1>
-          {/* What it is, by whom, where — the words a searcher typed, right
-              under the name (the H1 stays the bare project name). */}
-          {subtitle && (
-            <p className="mt-3 text-[15px] font-medium text-[#6b7280]">{subtitle}</p>
-          )}
-
-          {/* The photos — a collage of up to four fills the masthead's right
-              half on desktop, running all the way down past the stats band;
-              on mobile it sits between the title and the facts. */}
-          {/* The first photo carries the view-transition name that the
-              homepage's TransitionLink gives a card photo on click, so the
-              card morphs into it. One element per page may carry the name. */}
+      {/* ── Masthead — cinematic: the main photo fills the screen and settles
+             out of a zoom while the title rises word by word; the facts sit
+             in a glass strip along the bottom, the other photos as a small
+             strip that jumps to the gallery. The photo carries the
+             view-transition name the homepage card morphs into. ── */}
+      <section id="pp-masthead" className="pp-hero wf relative overflow-hidden bg-[#06182e] text-white">
+        <noscript>
+          <style>{`.pp-hero [class*="wf-"], .pp-hero .wf-word > span, .pp-hero [class*="pp-"] { opacity: 1 !important; transform: none !important; filter: none !important; }`}</style>
+        </noscript>
+        <InView className="relative" threshold={0.05} rootMargin="0px">
           <div
-            className="relative mt-6 aspect-[16/10] bg-[#001f3f] lg:absolute lg:inset-y-0 lg:right-0 lg:left-[56%] lg:z-10 lg:mt-0 lg:aspect-auto"
-            {...(mastheadImages.length === 1 ? { "data-vt": "project-hero", style: { viewTransitionName: "project-hero" } } : {})}
+            className="absolute inset-0"
+            {...(mastheadImages.length > 0 ? { "data-vt": "project-hero", style: { viewTransitionName: "project-hero" } } : {})}
           >
-            {mastheadImages.length === 0 ? (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Building2 className="w-14 h-14 text-[#d6b357]/50" />
+            {mastheadImages.length > 0 ? (
+              <div className="pp-hero-img absolute inset-0">
+                <Image src={mastheadImages[0]} alt={project.name} fill priority sizes="100vw" className="object-cover object-center" />
               </div>
-            ) : mastheadImages.length === 1 ? (
-              <Image
-                src={mastheadImages[0]}
-                alt={project.name}
-                fill
-                priority
-                sizes="(min-width: 1024px) 44vw, 100vw"
-                className="object-cover"
-              />
             ) : (
-              <div className={`absolute inset-0 grid grid-cols-2 gap-[3px] bg-white ${mastheadImages.length > 2 ? "grid-rows-2" : ""}`}>
-                {mastheadImages.map((url, i) => (
-                  <div
-                    key={url}
-                    className={`relative overflow-hidden ${mastheadImages.length === 3 && i === 0 ? "row-span-2" : ""}`}
-                    {...(i === 0 ? { "data-vt": "project-hero", style: { viewTransitionName: "project-hero" } } : {})}
-                  >
-                    <Image
-                      src={url}
-                      alt={`${project.name} — photo ${i + 1}`}
-                      fill
-                      priority={i === 0}
-                      sizes="(min-width: 1024px) 22vw, 50vw"
-                      className="object-cover"
-                    />
-                  </div>
-                ))}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Building2 className="h-16 w-16 text-[#d6b357]/40" />
               </div>
             )}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#06182e]/90 via-[#06182e]/40 to-[#06182e]/10" aria-hidden="true" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#06182e] via-[#06182e]/35 to-transparent" aria-hidden="true" />
           </div>
 
-          {/* Fact columns — Developer / Location / Type / Status / Price with
-              hairline dividers. Empty fields drop out, never a dash. */}
-          <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:gap-x-0 sm:gap-y-4">
+          <div className="relative mx-auto flex min-h-[70vh] max-w-[1440px] flex-col justify-end px-4 pb-10 pt-[26vh] sm:px-6 lg:min-h-[78vh] lg:px-8 lg:pb-12">
+            <div className="mb-5 flex items-center gap-3">
+              <span className="wf-rule h-px w-10 bg-[#d6b357]" aria-hidden="true" />
+              <span className="wf-fade inline-flex items-center rounded-full bg-[#d6b357] px-3 py-1 text-[11px] font-bold text-[#001f3f]" style={{ ["--d" as string]: "200ms" }}>
+                {status.label}
+              </span>
+              {project.is_featured && (
+                <span className="wf-fade text-[11px] font-bold uppercase tracking-[0.2em] text-white/70" style={{ ["--d" as string]: "320ms" }}>Featured</span>
+              )}
+            </div>
+
+            <h1 className="max-w-4xl font-['Outfit'] text-[38px] font-bold leading-[1.02] tracking-tight drop-shadow-[0_2px_16px_rgba(0,10,30,0.5)] sm:text-[52px] lg:text-[64px]">
+              {String(project.name).split(" ").map((w: string, i: number) => (
+                <span key={`${w}-${i}`} className="wf-word mr-[0.24em]">
+                  <span style={{ ["--i" as string]: i }}>{w}</span>
+                </span>
+              ))}
+            </h1>
+            {/* What it is, by whom, where — the words a searcher typed, right
+                under the name (the H1 stays the bare project name). */}
+            {subtitle && (
+              <p className="wf-fade mt-4 max-w-2xl text-[15px] text-white/80 sm:text-[17px]" style={{ ["--d" as string]: "700ms" }}>{subtitle}</p>
+            )}
+
+            {/* Fact columns — Developer / Location / Type / Status / Price.
+                Empty fields drop out, never a dash. */}
+            <dl className="wf-fade mt-8 grid max-w-4xl grid-cols-2 gap-y-4 border border-white/15 bg-[#06182e]/55 px-5 py-4 backdrop-blur-md sm:inline-flex sm:flex-wrap sm:divide-x sm:divide-white/15" style={{ ["--d" as string]: "850ms" }}>
             {[
               {
                 label: "Developer",
                 node: developer
                   ? (developer.slug
-                      ? <Link href={`/${developer.slug}`} className="hover:text-[#b8913f] transition-colors">{developer.name}</Link>
+                      ? <Link href={`/${developer.slug}`} className="hover:text-[#f0d89b] transition-colors">{developer.name}</Link>
                       : developer.name)
                   : null,
               },
@@ -490,60 +474,73 @@ export default async function ProjectDetailPage({ params }: Props) {
             ]
               .filter((f) => f.node)
               .map((f) => (
-                <div
-                  key={f.label}
-                  className="sm:max-w-[250px] sm:pr-7 sm:mr-7 sm:border-r sm:border-[#e8eaed] sm:last:mr-0 sm:last:border-0 sm:last:pr-0"
-                >
-                  <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b8913f] mb-1.5">
-                    {f.label}
-                  </dt>
-                  <dd className="text-[15px] font-semibold text-[#001f3f] leading-snug">
-                    {f.node}
-                  </dd>
+                <div key={f.label} className="min-w-0 sm:px-6 sm:first:pl-0 sm:last:pr-0">
+                  <dt className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#d6b357]">{f.label}</dt>
+                  <dd className="text-[15px] font-semibold leading-snug text-white">{f.node}</dd>
                 </div>
               ))}
-          </dl>
+            </dl>
 
-          {/* Share — slim strip of boxed icons. */}
-          <div className="mt-7 flex flex-wrap items-start gap-x-5 gap-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9ca3af] pt-3">Share</p>
-            <SocialShare
-              title={`${project.name} | FHI Global`}
-              text={`Discover ${project.name} on FHI Global.`}
-              variant="bare-light"
-            />
+            <div className="wf-fade mt-6 flex flex-wrap items-start gap-x-5 gap-y-2" style={{ ["--d" as string]: "1000ms" }}>
+              <p className="pt-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">Share</p>
+              <SocialShare
+                title={`${project.name} | FHI Global`}
+                text={`Discover ${project.name} on FHI Global.`}
+                variant="bare"
+              />
+            </div>
+
+            {mastheadImages.length > 1 && (
+              <a
+                href="#gallery"
+                className="wf-fade group absolute bottom-12 right-8 hidden items-center gap-2 lg:flex"
+                style={{ ["--d" as string]: "1150ms" }}
+                aria-label={`See all ${images.length} photos`}
+              >
+                {mastheadImages.slice(1, 4).map((u, i) => (
+                  <span key={u} className="relative block h-16 w-24 overflow-hidden border border-white/30 bg-[#0a1f38] transition-transform duration-300 group-hover:-translate-y-1" style={{ transitionDelay: `${i * 40}ms` }}>
+                    <Image src={u} alt="" fill sizes="96px" className="object-cover" />
+                  </span>
+                ))}
+                <span className="ml-2 text-[11px] font-bold uppercase tracking-[0.16em] text-white/80 transition-colors group-hover:text-[#f0d89b]">
+                  {images.length} photos
+                </span>
+              </a>
+            )}
           </div>
-        </div>
+        </InView>
 
-        {/* ── Quick stats band — inside the masthead so the photo runs all
-               the way down past it; on desktop it only shows left of the
-               photo. Omitted when a project carries no stats. ── */}
+        {/* ── Quick stats band — full width under the masthead; numbers count
+               up as it enters. Omitted when a project carries no stats. ── */}
         {quickStats.length > 0 && (
-        <div className="relative bg-[#001f3f] border-b border-[#d6b357]/25">
-          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:pr-[46%] flex flex-wrap gap-x-10 gap-y-3">
-          {[
-            { icon: Calendar, label: "Completion", value: project.delivery_quarter ?? (project.expected_completion_date ? new Date(project.expected_completion_date).toLocaleDateString("en-AE", { month: "short", year: "numeric" }) : null) },
-            { icon: Home, label: "Total Units", value: project.total_units?.toLocaleString() },
-            { icon: Building2, label: "Buildings", value: project.number_of_buildings?.toString() },
-            { icon: Layers, label: "Floors", value: project.floors?.toString() },
-            { icon: TrendingUp, label: "Expected ROI", value: project.expected_roi ? `${project.expected_roi}%` : null },
-            { icon: Star, label: "Rental Yield", value: project.rental_yield ? `${project.rental_yield}%` : null },
-            { icon: DollarSign, label: "Down Payment", value: project.down_payment_percentage ? `${project.down_payment_percentage}%` : null },
-          ]
-            .filter((s) => s.value)
-            .map(({ icon: Icon, label, value }) => (
-              <div key={label} className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full border-2 border-[#d6b357]/60 bg-[#d6b357]/10 flex items-center justify-center shrink-0">
-                  <Icon className="w-4 h-4 text-[#d6b357]" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-white/60 font-bold uppercase tracking-widest">{label}</p>
-                  <p className="font-['Outfit'] text-base font-bold text-white leading-tight">{value}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+          <InView className="wf relative border-t border-[#d6b357]/25 bg-[#001f3f]" threshold={0.3}>
+            <div className="mx-auto flex max-w-[1440px] flex-wrap gap-x-10 gap-y-4 px-4 py-5 sm:px-6 lg:px-8">
+              {[
+                { icon: Calendar, label: "Completion", text: project.delivery_quarter ?? (project.expected_completion_date ? new Date(project.expected_completion_date).toLocaleDateString("en-AE", { month: "short", year: "numeric" }) : null), num: null as number | null, suffix: "" },
+                { icon: Home, label: "Total Units", text: null, num: project.total_units ?? null, suffix: "" },
+                { icon: Building2, label: "Buildings", text: null, num: project.number_of_buildings ?? null, suffix: "" },
+                { icon: Layers, label: "Floors", text: null, num: project.floors ?? null, suffix: "" },
+                { icon: TrendingUp, label: "Expected ROI", text: project.expected_roi ? `${project.expected_roi}%` : null, num: null, suffix: "" },
+                { icon: Star, label: "Rental Yield", text: project.rental_yield ? `${project.rental_yield}%` : null, num: null, suffix: "" },
+                { icon: DollarSign, label: "Down Payment", text: project.down_payment_percentage ? `${project.down_payment_percentage}%` : null, num: null, suffix: "" },
+              ]
+                .filter((st) => st.text || (st.num !== null && st.num > 0))
+                .map(({ icon: Icon, label, text, num }, i) => (
+                  <div key={label} className="wf-fade flex items-center gap-3" style={{ ["--d" as string]: `${i * 100}ms` }}>
+                    <span className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center">
+                      <span className="absolute inset-0 rounded-full border border-[#d6b357]/55 bg-[#d6b357]/10" aria-hidden="true" />
+                      <Icon className="relative h-[18px] w-[18px] text-[#d6b357]" strokeWidth={1.75} />
+                    </span>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">{label}</p>
+                      <p className="font-['Outfit'] text-base font-bold leading-tight text-white">
+                        {num !== null ? <CountUp value={num} delay={200 + i * 100} duration={1200} /> : text}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </InView>
         )}
       </section>
 
@@ -580,7 +577,7 @@ export default async function ProjectDetailPage({ params }: Props) {
 
           {/* Overview — the composed facts lead (every project gets a real
               overview; ~40 had none), then the developer's own copy. */}
-          <section>
+          <InView as="section" className="pp-section wf" threshold={0.1}>
             <SectionHeading title="Overview" />
             {(() => {
               const body = (
@@ -596,7 +593,7 @@ export default async function ProjectDetailPage({ params }: Props) {
               )
               return collapseOverview ? <ReadMore>{body}</ReadMore> : body
             })()}
-          </section>
+          </InView>
 
           {/* Payment plan — the question buyers of off-plan property ask
               first, and the one every competing page for these projects
@@ -604,18 +601,33 @@ export default async function ProjectDetailPage({ params }: Props) {
               that is not a schedule ("1% monthly", "8 Years Payment Plan")
               keeps its own wording rather than being forced into steps. */}
           {hasPaymentPlan && (
-            <section id="payment-plan" className="scroll-mt-24">
+            <InView as="section" id="payment-plan" className="pp-section wf scroll-mt-24" threshold={0.1}>
               <SectionHeading title="Payment Plan" />
               {paymentPlan.milestones.length > 0 && (
-                <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-                  {paymentPlan.milestones.map((m, i) => (
-                    <div key={`${m.percent}-${m.label}-${i}`} className="border border-[#e5e8ec] bg-white p-4">
-                      <p className="font-['Outfit'] text-2xl font-bold text-[#001f3f] leading-none">{m.percent}%</p>
-                      {m.label && (
-                        <p className="mt-1.5 text-[13px] leading-snug text-[#6b7280]">{m.label}</p>
-                      )}
+                <div className="pp-plan mt-8">
+                  {/* A gold track fills left to right; each milestone's node
+                      pops and its share counts up as the section enters. */}
+                  <div className="relative">
+                    <div className="absolute left-0 right-0 top-[7px] h-[2px] bg-[#e5e8ec]" aria-hidden="true">
+                      <span className="pp-plan-fill block h-full bg-[#d6b357]" />
                     </div>
-                  ))}
+                    <ol
+                      className="relative grid gap-x-4"
+                      style={{ gridTemplateColumns: `repeat(${paymentPlan.milestones.length}, minmax(0, 1fr))` }}
+                    >
+                      {paymentPlan.milestones.map((m, i) => (
+                        <li key={`${m.percent}-${m.label}-${i}`} className="pp-plan-step min-w-0" style={{ ["--d" as string]: `${400 + i * 260}ms` }}>
+                          <span className="pp-plan-node relative block h-4 w-4 rounded-full border-2 border-[#d6b357] bg-white" aria-hidden="true">
+                            <span className="absolute inset-[3px] rounded-full bg-[#d6b357]" />
+                          </span>
+                          <p className="mt-4 font-['Outfit'] text-[26px] font-bold leading-none text-[#001f3f] sm:text-3xl">
+                            <CountUp value={m.percent} delay={500 + i * 260} duration={900} />%
+                          </p>
+                          {m.label && <p className="mt-1.5 text-[13px] leading-snug text-[#6b7280]">{m.label}</p>}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
                 </div>
               )}
               {paymentPlan.note && (
@@ -640,12 +652,12 @@ export default async function ProjectDetailPage({ params }: Props) {
                   </div>
                 )}
               </dl>
-            </section>
+            </InView>
           )}
 
           {/* Features */}
           {features.length > 0 && (
-            <section>
+            <InView as="section" className="pp-section wf" threshold={0.1}>
               <SectionHeading title="Key Features" />
               <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
                 {features.map((f) => (
@@ -655,12 +667,12 @@ export default async function ProjectDetailPage({ params }: Props) {
                   </div>
                 ))}
               </div>
-            </section>
+            </InView>
           )}
 
           {/* Gallery */}
           {images.length > 0 && (
-            <section>
+            <InView as="section" id="gallery" className="pp-section wf scroll-mt-24" threshold={0.1}>
               <SectionHeading
                 title="Gallery"
                 action={
@@ -676,12 +688,12 @@ export default async function ProjectDetailPage({ params }: Props) {
                   location={project.city ?? project.location}
                 />
               </div>
-            </section>
+            </InView>
           )}
 
           {/* Units */}
           {shownUnits.length > 0 && (
-            <section id="units" className="scroll-mt-24">
+            <InView as="section" id="units" className="pp-section wf scroll-mt-24" threshold={0.1}>
               <SectionHeading title="Available Unit Types" />
               <div className="mt-5 overflow-x-auto">
                 <table className="w-full text-sm">
@@ -728,22 +740,22 @@ export default async function ProjectDetailPage({ params }: Props) {
                   </tbody>
                 </table>
               </div>
-            </section>
+            </InView>
           )}
 
           {/* Amenities */}
           {project.project_amenities && project.project_amenities.length > 0 && (
-            <section>
+            <InView as="section" className="pp-section wf" threshold={0.1}>
               <SectionHeading title="Amenities" />
               <div className="mt-5">
                 <AmenitiesGrid amenities={project.project_amenities as any} />
               </div>
-            </section>
+            </InView>
           )}
 
           {/* Location — 3D aerial / satellite / Street View */}
           {mapsApiKey && locationStr && (
-            <section>
+            <InView as="section" className="pp-section wf" threshold={0.1}>
               <SectionHeading title="Location" />
               <div className="mt-5">
                 <ProjectLocationMap
@@ -754,12 +766,12 @@ export default async function ProjectDetailPage({ params }: Props) {
                   lng={project.longitude ? Number(project.longitude) : null}
                 />
               </div>
-            </section>
+            </InView>
           )}
 
           {/* Nearby */}
           {((project.project_points && project.project_points.length > 0) || (project.project_neighbors && project.project_neighbors.length > 0)) && (
-            <section>
+            <InView as="section" className="pp-section wf" threshold={0.1}>
               <SectionHeading title="Nearby Places" />
               <div className="mt-5">
                 <NearbyPlaces
@@ -767,14 +779,14 @@ export default async function ProjectDetailPage({ params }: Props) {
                   neighbors={(project.project_neighbors as any[])?.map((p) => ({ ...p, place_type: p.category }))}
                 />
               </div>
-            </section>
+            </InView>
           )}
 
           {/* Construction Updates — PDFs show their first four pages so a
               visitor sees the progress without opening the file; images keep
               the simple tile. Every item still links to the original. */}
           {constructionUpdates.length > 0 && (
-            <section>
+            <InView as="section" className="pp-section wf" threshold={0.1}>
               <SectionHeading title="Construction Updates" />
               <div className="mt-5 space-y-5">
                 {constructionUpdates.map((u) =>
@@ -799,14 +811,14 @@ export default async function ProjectDetailPage({ params }: Props) {
                   ),
                 )}
               </div>
-            </section>
+            </InView>
           )}
 
           {/* Media — click-to-play tiles: YouTube with its own thumbnail, 360°
               tours behind the project photo, unframeable rows as link tiles.
               A lone item takes the full width so the preview is not a stamp. */}
           {media.length > 0 && (
-            <section>
+            <InView as="section" className="pp-section wf" threshold={0.1}>
               <SectionHeading title="Media & Virtual Tours" />
               <div className={`mt-5 grid grid-cols-1 gap-5 ${media.length > 1 ? "lg:grid-cols-2" : ""}`}>
                 {media.map((m) => (
@@ -819,14 +831,14 @@ export default async function ProjectDetailPage({ params }: Props) {
                   />
                 ))}
               </div>
-            </section>
+            </InView>
           )}
 
           {/* FAQ — visible Q&A mirrored 1:1 in the FAQPage schema above
               (hidden or mismatched FAQ markup reads as spam to Google). Only
               questions the row can actually answer are asked. */}
           {faqs.length > 0 && (
-            <section id="faq" className="scroll-mt-24">
+            <InView as="section" id="faq" className="pp-section wf scroll-mt-24" threshold={0.1}>
               <SectionHeading title="Frequently Asked Questions" />
               <dl className="mt-2 divide-y divide-[#eef0f3]">
                 {faqs.map((f) => (
@@ -836,14 +848,14 @@ export default async function ProjectDetailPage({ params }: Props) {
                   </div>
                 ))}
               </dl>
-            </section>
+            </InView>
           )}
         </div>
 
         {/* ── Right sidebar — headings sit on the page, panels are square.
                Sticky so the developer and enquiry panels stay with the reader
                through a long gallery instead of leaving the column blank. ── */}
-        <div className="space-y-10">
+        <InView className="pp-side wf space-y-10" threshold={0.05}>
           {/* Developer */}
           {developer && (
             <SidePanel title="Developer">
@@ -917,7 +929,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           )}
 
           {/* Inquire Now — lead capture, with direct contact as secondary links */}
-          <SidePanel title="Inquire Now" className="lg:sticky lg:top-24">
+          <SidePanel id="inquire" title="Inquire Now" className="scroll-mt-24 lg:sticky lg:top-24">
             <p className="text-sm text-[#6b7280] leading-relaxed">
               Leave your details and our team will reach out with availability, payment plans and exclusive offers.
             </p>
@@ -941,8 +953,11 @@ export default async function ProjectDetailPage({ params }: Props) {
               </a>
             </div>
           </SidePanel>
-        </div>
+        </InView>
       </div>
+
+      {/* Phone-only action bar once the masthead has scrolled away */}
+      <ProjectStickyBar price={price} phone={project.sales_contact_phone ?? developer?.phone ?? null} />
 
       {/* ── More from the developer + popular searches — engagement for the
              visitor, internal links for the crawler. ── */}
@@ -1053,18 +1068,19 @@ function SectionHeading({ title, action }: { title: string; action?: React.React
     <div>
       <div className="flex items-end justify-between gap-4">
         <h2 className="font-['Outfit'] text-[19px] font-bold uppercase tracking-[0.1em] text-[#0d1117]">
+          <span className="mr-3 inline-block h-[3px] w-6 -translate-y-[3px] bg-[#d6b357]" aria-hidden="true" />
           {title}
         </h2>
         {action}
       </div>
-      <div className="h-px bg-[#e5e8ec] mt-3" />
+      <div className="wf-line mt-3 h-px bg-[#e5e8ec]" />
     </div>
   )
 }
 
-function SidePanel({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
+function SidePanel({ title, children, className = "", id }: { title: string; children: React.ReactNode; className?: string; id?: string }) {
   return (
-    <div className={className}>
+    <div id={id} className={className}>
       <p className="font-['Outfit'] text-[13px] font-bold uppercase tracking-[0.16em] text-[#0d1117] mb-3">
         {title}
       </p>
