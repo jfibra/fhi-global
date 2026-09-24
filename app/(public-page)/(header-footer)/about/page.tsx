@@ -7,7 +7,8 @@ import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { countByEmirate } from "@/lib/emirates"
 import { InView } from "@/components/public/in-view"
-import { CountUp } from "@/components/public/count-up"
+import { NumbersReel, type ReelItem } from "@/components/public/numbers-reel"
+import { JourneyFilm, type FilmStep } from "@/components/public/journey-film"
 import { MagneticLink } from "@/components/public/magnetic-link"
 import { ScrollLines } from "@/components/public/scroll-lines"
 import { ParallaxPhoto } from "@/components/public/parallax-photo"
@@ -44,14 +45,15 @@ const OFFICE = {
   email: "info@fhiglobal.ae",
 }
 
-/** The buying journey, in the order it happens. Each step names only what the
- *  site already does or what Dubai's rules already provide. */
-const JOURNEY = [
-  { title: "Discover", body: "Browse real inventory. Every project carries its price, payment plan and handover date where the developer has published them." },
-  { title: "Shortlist", body: "Talk to one consultant who knows the projects, and get straight answers on location, plan and timing." },
-  { title: "Reserve", body: "Booking deposit and developer paperwork, handled with you. Remotely, if you are not in Dubai." },
-  { title: "Pay", body: "Off-plan instalments follow construction milestones into RERA-regulated escrow, released only as work is certified." },
-  { title: "Handover", body: "Keys in hand, and we are still one message away." },
+/** The buying journey, in the order it happens, each step over one of the
+ *  team's own photographs. Each names only what the site already does or
+ *  what Dubai's rules already provide. */
+const JOURNEY: FilmStep[] = [
+  { title: "Discover", body: "Browse real inventory. Every project carries its price, payment plan and handover date where the developer has published them.", image: PHOTOS.masterplan.url, imageAlt: PHOTOS.masterplan.alt },
+  { title: "Shortlist", body: "Talk to one consultant who knows the projects, and get straight answers on location, plan and timing.", image: PHOTOS.leaders.url, imageAlt: PHOTOS.leaders.alt },
+  { title: "Reserve", body: "Booking deposit and developer paperwork, handled with you. Remotely, if you are not in Dubai.", image: PHOTOS.model.url, imageAlt: PHOTOS.model.alt },
+  { title: "Pay", body: "Off-plan instalments follow construction milestones into RERA-regulated escrow, released only as work is certified.", image: PHOTOS.siteVisit.url, imageAlt: PHOTOS.siteVisit.alt },
+  { title: "Handover", body: "Keys in hand, and we are still one message away.", image: PHOTOS.celebrate.url, imageAlt: PHOTOS.celebrate.alt },
 ]
 
 function Chapter({ numeral, kicker, title, light = false }: { numeral: string; kicker: string; title: React.ReactNode; light?: boolean }) {
@@ -95,13 +97,14 @@ export default async function AboutPage() {
   const developerCount = new Set(projects.map((p) => p.developer_id).filter(Boolean)).size
   const emirateCount = Object.keys(countByEmirate(projects)).length
 
-  const numbers = [
-    { value: projectCount, label: "Live projects", note: "published on this site right now", href: "/projects" },
-    { value: developerCount, label: "Developers", note: "with projects selling through us", href: "/developers" },
-    { value: emirateCount, label: "Emirates", note: "where those projects stand", href: "/projects" },
-    { value: agentCount ?? 0, label: "Agents and team leaders", note: "active, with a page each", href: "/agents" },
-    { value: eventCount ?? 0, label: "Investor events", note: "hosted in Dubai, with more coming", href: "/events" },
+  const numbers: ReelItem[] = [
+    { value: projectCount, label: "Live projects", note: "Published on this site right now, each with its own page, price and payment plan where the developer has released them.", href: "/projects", image: "/background/home.webp", imageAlt: "Dubai skyline at golden hour" },
+    { value: developerCount, label: "Developers", note: "With projects selling through us today. We work with them directly, so the price you see is theirs.", href: "/developers", image: PHOTOS.model.url, imageAlt: PHOTOS.model.alt },
+    { value: emirateCount, label: "Emirates", note: "Where those projects stand. Dubai leads, and the northern emirates and Abu Dhabi are on the map too.", href: "/projects", image: "/background/dubai.webp", imageAlt: "Dubai skyline and marina" },
+    { value: agentCount ?? 0, label: "Agents and team leaders", note: "Active on the platform, each with a page of their own. One of them stays with you from first search to handover.", href: "/agents", image: PHOTOS.team.url, imageAlt: PHOTOS.team.alt },
+    { value: eventCount ?? 0, label: "Investor events", note: "Hosted in Dubai so far, with more coming. Meet the developers and the team in one room.", href: "/events", image: PHOTOS.leaders.url, imageAlt: PHOTOS.leaders.alt },
   ].filter((n) => n.value > 0)
+  numbers.push({ value: 0, label: "Fees charged to buyers", note: "The developer pays our commission. Never you. Consultations, shortlists and site visits cost nothing.", image: PHOTOS.celebrate.url, imageAlt: PHOTOS.celebrate.alt, accent: true })
 
   return (
     <div className="ab wf relative bg-[#fafafa] overflow-x-clip">
@@ -166,65 +169,22 @@ export default async function AboutPage() {
         </InView>
       </section>
 
-      {/* ── Chapter II — the numbers, counted live ── */}
-      <InView as="section" className="pp-section relative mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8 lg:py-32" threshold={0.15}>
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <Chapter numeral="II" kicker="What is on the table" title={<>Numbers you can <span className="text-[#b8913f]">check.</span></>} />
-          <p className="max-w-sm text-[15px] leading-relaxed text-[#6b7280]">
-            Counted from what is published on this site as the page is built. When they change, this page changes.
-          </p>
-        </div>
-        <div className="mt-14 grid grid-cols-1 gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
-          {numbers.map((n, i) => (
-            <Link key={n.label} href={n.href} className="group relative block border-t border-[#e5e8ec] pt-6">
-              <span className="wf-line absolute left-0 top-0 h-[3px] w-14 bg-[#d6b357]" style={{ ["--d" as string]: `${200 + i * 120}ms` }} aria-hidden="true" />
-              <p className="font-['Outfit'] text-[64px] font-bold leading-none tracking-tight text-[#0d1117] sm:text-[76px]">
-                <CountUp value={n.value} delay={300 + i * 150} duration={1500} />
-              </p>
-              <p className="mt-3 font-['Outfit'] text-[19px] font-bold text-[#0d1117] transition-colors group-hover:text-[#b8913f]">{n.label}</p>
-              <p className="mt-1 text-[14px] text-[#6b7280]">{n.note}</p>
-              <ArrowUpRight className="absolute right-0 top-6 h-5 w-5 text-[#d6b357] opacity-0 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:opacity-100" aria-hidden="true" />
-            </Link>
-          ))}
-          <div className="relative block border-t border-[#e5e8ec] pt-6">
-            <span className="wf-line absolute left-0 top-0 h-[3px] w-14 bg-[#d6b357]" style={{ ["--d" as string]: `${200 + numbers.length * 120}ms` }} aria-hidden="true" />
-            <p className="font-['Outfit'] text-[64px] font-bold leading-none tracking-tight text-[#b8913f] sm:text-[76px]">0</p>
-            <p className="mt-3 font-['Outfit'] text-[19px] font-bold text-[#0d1117]">Fees charged to buyers</p>
-            <p className="mt-1 text-[14px] text-[#6b7280]">the developer pays our commission, never you</p>
-          </div>
-        </div>
-      </InView>
+      {/* ── Chapter II — the numbers, as a pinned reel ── */}
+      <NumbersReel
+        items={numbers}
+        numeral="II"
+        kicker="What is on the table"
+        title={<>Numbers you can <span className="text-[#e3c06c]">check.</span></>}
+        intro="Counted from what is published on this site as the page is built. When they change, this page changes."
+      />
 
-      {/* ── Chapter III — the journey, as a timeline that fills ── */}
-      <section className="relative overflow-hidden bg-white py-24 lg:py-32">
-        <div className="absolute inset-0" aria-hidden="true">
-          <Image src="/background/home.webp" alt="" fill sizes="100vw" className="object-cover object-center" />
-          <div className="absolute inset-0 bg-gradient-to-b from-white/97 via-white/92 to-white/97" />
-        </div>
-        <InView className="pp-section relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8" threshold={0.15}>
-          <Chapter numeral="III" kicker="How it works with us" title={<>Five steps, <span className="text-[#b8913f]">one consultant.</span></>} />
-          <div className="pp-plan mt-16">
-            <div className="relative">
-              <div className="absolute left-0 right-0 top-[7px] hidden h-[2px] bg-[#e5e8ec] lg:block" aria-hidden="true">
-                <span className="pp-plan-fill block h-full bg-[#d6b357]" />
-              </div>
-              <ol className="relative grid gap-10 lg:grid-cols-5 lg:gap-6">
-                {JOURNEY.map((s, i) => (
-                  <li key={s.title} className="pp-plan-step relative pl-8 lg:pl-0" style={{ ["--d" as string]: `${400 + i * 260}ms` }}>
-                    <span className="absolute left-0 top-[7px] hidden h-[calc(100%+2.5rem)] w-px bg-[#e5e8ec] last:hidden lg:hidden" aria-hidden="true" />
-                    <span className="pp-plan-node absolute left-0 top-0 block h-4 w-4 rounded-full border-2 border-[#d6b357] bg-white lg:relative" aria-hidden="true">
-                      <span className="absolute inset-[3px] rounded-full bg-[#d6b357]" />
-                    </span>
-                    <p className="mt-0 font-['Outfit'] text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f] lg:mt-5">Step {i + 1}</p>
-                    <p className="mt-1 font-['Outfit'] text-[24px] font-bold leading-tight text-[#0d1117]">{s.title}</p>
-                    <p className="mt-2 max-w-xs text-[14.5px] leading-relaxed text-[#4b5563]">{s.body}</p>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </div>
-        </InView>
-      </section>
+      {/* ── Chapter III — the journey, as a filmstrip ── */}
+      <JourneyFilm
+        steps={JOURNEY}
+        numeral="III"
+        kicker="How it works with us"
+        title={<>Five steps, <span className="text-[#e3c06c]">one consultant.</span></>}
+      />
 
       {/* ── Chapter IV — the people, a strip that drifts ── */}
       <section className="relative overflow-hidden bg-[#06182e] py-24 text-white lg:py-32">
