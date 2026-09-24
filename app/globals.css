@@ -1002,3 +1002,38 @@
   .ct-step { transition: none; opacity: 1; transform: none; }
   .ct-success-ring, .ct-success h3, .ct-success p, .ct-success div { animation: none; }
 }
+
+/* ─── Projects listing ─────────────────────────────────────────────────────
+   .pl-bar: the sticky filter bar deepens its shadow once stuck. .pl-pill:
+   status in buyer language; .pl-pick: quick presets with live counts;
+   .pl-chip: an active filter you can remove. .pl-card: each card wipes and
+   rises as it enters (its own InView). .pl-pager-fill: progress through the
+   pages. */
+.pl-bar { transition: box-shadow 300ms var(--wf-ease), background-color 300ms; }
+.pl-bar[data-stuck="true"] { box-shadow: 0 12px 32px -18px rgba(0, 20, 40, 0.28); }
+
+.pl-pill, .pl-pick, .pl-chip {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  font-size: 12.5px; font-weight: 600; line-height: 1;
+  transition: border-color 200ms, background-color 200ms, color 200ms, transform 200ms var(--wf-ease);
+}
+.pl-pill { padding: 9px 13px; border: 1px solid #e5e8ec; background: #fff; color: #374151; }
+.pl-pill:hover { border-color: #d6b357; color: #0d1117; }
+.pl-pill--on { border-color: #0d1117; background: #0d1117; color: #fff; }
+.pl-pick { padding: 8px 12px; border: 1px solid #e7d9a8; background: #faf7ee; color: #0d1117; }
+.pl-pick:hover { border-color: #d6b357; transform: translateY(-1px); }
+.pl-pick--on { border-color: #b8913f; background: #d6b357; }
+.pl-pick-count { font-family: var(--font-outfit, "Outfit"), system-ui, sans-serif; font-weight: 700; color: #8a6d2b; }
+.pl-pick--on .pl-pick-count { color: #001f3f; }
+.pl-chip { padding: 7px 10px 7px 12px; border: 1px solid #0d1117; background: #0d1117; color: #fff; font-size: 12px; }
+.pl-chip:hover { background: #001f3f; border-color: #001f3f; }
+
+.pl-card { opacity: 0; transform: translateY(22px); clip-path: inset(0 0 14% 0); transition: opacity 700ms var(--wf-ease), transform 900ms var(--wf-ease), clip-path 900ms var(--wf-ease-io); transition-delay: var(--d, 0ms); }
+.pl-card[data-in="true"] { opacity: 1; transform: translateY(0); clip-path: inset(0 0 0 0); }
+
+.pl-pager-fill { transform: scaleX(var(--p, 0)); transform-origin: left center; transition: transform 900ms var(--wf-ease); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pl-card { transition: none; opacity: 1; transform: none; clip-path: none; }
+  .pl-pick:hover { transform: none; }
+}
