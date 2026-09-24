@@ -138,6 +138,26 @@ export function Header() {
   useEffect(() => () => clearTimeout(menuCloseTimer.current), [])
   const [mobileSection, setMobileSection] = useState<string | null>(null)
   const navRef = useRef<HTMLElement | null>(null)
+  // One gold underline glides between menu items instead of each item
+  // growing its own: it rests under the active item and follows the pointer.
+  const itemRefs = useRef(new Map<string, HTMLElement>())
+  const [ind, setInd] = useState<{ left: number; width: number; visible: boolean; ready: boolean }>({ left: 0, width: 0, visible: false, ready: false })
+  const moveIndicatorTo = useCallback((el: HTMLElement | null) => {
+    if (!el) {
+      setInd((cur) => ({ ...cur, visible: false }))
+      return
+    }
+    const w = 20
+    // Measure against the nav, not the item's offsetParent: dropdown triggers
+    // sit inside their own relative wrapper, whose offsetLeft is always 0.
+    const navLeft = navRef.current?.getBoundingClientRect().left ?? 0
+    const r = el.getBoundingClientRect()
+    setInd((cur) => ({ left: r.left - navLeft + r.width / 2 - w / 2, width: w, visible: true, ready: cur.ready }))
+  }, [])
+  const restIndicator = useCallback(() => {
+    const active = navRef.current?.querySelector<HTMLElement>('[data-nav-active="true"]') ?? null
+    moveIndicatorTo(active)
+  }, [moveIndicatorTo])
   const [authReady, setAuthReady]   = useState(false)
   const [session, setSession]       = useState<HeaderSession | null>(null)
   const [authModalOpen, setAuthModalOpen] = useState(false)
@@ -261,6 +281,19 @@ export function Header() {
   // Close mobile menu on route change
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
+  // Park the underline under the active item whenever the route changes; the
+  // first placement is instant, every later one glides.
+  useEffect(() => {
+    // Deferred a tick so layout is settled and the lint rule on synchronous
+    // setState inside effects is respected.
+    const t1 = window.setTimeout(restIndicator, 0)
+    const t2 = window.setTimeout(() => setInd((cur) => ({ ...cur, ready: true })), 60)
+    return () => {
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
+    }
+  }, [pathname, restIndicator])
+
   // Lock body scroll when sidebar open
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : ""
@@ -274,20 +307,27 @@ export function Header() {
         // while a menu is open — an open sidebar or dropdown must not slide
         // away under the user's finger. transform, not height, so the page
         // below never shifts.
-        className={`sticky top-0 z-[900] w-full transition-all duration-300 motion-reduce:transition-none ${
+        // Once scrolled, the bar sticks 28px above the viewport so only its
+        // lower 72px shows: a slimmer, translucent bar with a smaller logo,
+        // with no change to the header's height in the flow (so the page never
+        // jumps at the threshold).
+        className={`sticky z-[900] w-full transition-[top,transform,background-color,box-shadow] duration-300 motion-reduce:transition-none ${
           hiddenByScroll && !mobileOpen && !openMenu && !accountOpen
             ? "-translate-y-full lg:translate-y-0"
             : "translate-y-0"
         } ${
           scrolled
-            ? "bg-[#001f3f]/95 backdrop-blur-xl shadow-[0_4px_32px_rgba(0,31,63,0.35)] border-b border-white/8"
+            ? "bg-[#001f3f]/92 backdrop-blur-xl shadow-[0_4px_32px_rgba(0,31,63,0.35)] border-b border-white/8"
             : "bg-[#001f3f]"
         }`}
+        style={{ top: scrolled ? -28 : 0 }}
       >
-        {/* Gold accent line */}
+        {/* Gold accent line — at the top of the bar, and along its bottom edge
+            once the top has slid out of view. */}
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#d6b357]/60 to-transparent" />
+        <div className={`absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/50 to-transparent transition-opacity duration-300 ${scrolled ? "opacity-100" : "opacity-0"}`} aria-hidden="true" />
 
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10 h-25 flex items-center justify-between">
+        <div className={`max-w-7xl mx-auto px-5 sm:px-8 lg:px-10 h-25 flex items-center justify-between transition-[padding] duration-300 ${scrolled ? "pt-7" : ""}`}>
           {/* Logo */}
           <Link
             href="/"
@@ -305,38 +345,45 @@ export function Header() {
               // Intrinsic ratio is 2.72:1 (2269×835); h-15 renders ~163×60.
               width={163}
               height={60}
-              className="object-contain h-15 w-auto"
+              className={`object-contain w-auto transition-[height] duration-300 ${scrolled ? "h-11" : "h-15"}`}
               priority
             />
           </Link>
 
           {/* Desktop Nav */}
-          <nav ref={navRef} className="hidden lg:flex items-center gap-0.5">
+          <nav ref={navRef} className="hidden lg:flex items-center gap-0.5 relative" onMouseLeave={restIndicator}>
+            {/* The gliding underline */}
+            <span
+              className="hd-ind pointer-events-none absolute bottom-1 h-[2px] rounded-full bg-[#d6b357]"
+              data-ready={ind.ready ? "true" : "false"}
+              style={{ left: ind.left, width: ind.width, opacity: ind.visible ? 1 : 0 }}
+              aria-hidden="true"
+            />
             {NAV_LINKS.map((item) => {
               const { label, href, children } = item
               // A parent counts as active when any of its children is.
               const isActive = children
                 ? children.some((c) => pathname === c.href || pathname.startsWith(`${c.href}/`))
                 : pathname === href || (href !== "/" && pathname.startsWith(href))
-              const underline = (
-                <span
-                  className={`absolute bottom-1 left-1/2 -translate-x-1/2 h-[2px] rounded-full bg-[#d6b357] transition-all duration-300 ${
-                    isActive ? "w-5" : "w-0 group-hover:w-5"
-                  }`}
-                />
-              )
               const tone = isActive ? "text-[#d6b357]" : "text-white/75 hover:text-white"
+              const setItemRef = (el: HTMLElement | null) => {
+                if (el) itemRefs.current.set(label, el)
+                else itemRefs.current.delete(label)
+              }
 
               if (!children) {
                 return (
                   <Link
                     key={href}
                     href={href}
+                    ref={setItemRef}
+                    data-nav-active={isActive ? "true" : "false"}
+                    onMouseEnter={(e) => moveIndicatorTo(e.currentTarget)}
+                    onFocus={(e) => moveIndicatorTo(e.currentTarget)}
                     onClick={() => setOpenMenu(null)}
-                    className={`relative px-5 py-2.5 text-[15px] font-semibold tracking-[0.01em] transition-colors duration-200 group ${tone}`}
+                    className={`relative px-5 py-2.5 text-[15px] font-semibold tracking-[0.01em] transition-colors duration-200 ${tone}`}
                   >
                     {label}
-                    {underline}
                   </Link>
                 )
               }
@@ -353,14 +400,17 @@ export function Header() {
                 >
                   <button
                     type="button"
+                    ref={setItemRef}
+                    data-nav-active={isActive ? "true" : "false"}
                     aria-expanded={open}
                     aria-haspopup="true"
+                    onMouseEnter={(e) => moveIndicatorTo(e.currentTarget)}
+                    onFocus={(e) => moveIndicatorTo(e.currentTarget)}
                     onClick={() => setOpenMenu(open ? null : label)}
-                    className={`relative inline-flex items-center gap-1.5 px-5 py-2.5 text-[15px] font-semibold tracking-[0.01em] transition-colors duration-200 group ${tone}`}
+                    className={`relative inline-flex items-center gap-1.5 px-5 py-2.5 text-[15px] font-semibold tracking-[0.01em] transition-colors duration-200 ${tone}`}
                   >
                     {label}
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
-                    {underline}
                   </button>
 
                   {/* White panel against the navy bar, so the menu reads as a
@@ -375,18 +425,20 @@ export function Header() {
                     // Outer wrapper carries transparent padding instead of a
                     // margin: the visual gap stays, but the pointer never
                     // leaves a hoverable element on the way to the panel.
-                    <div className={`absolute left-0 top-full z-50 pt-1.5 w-[290px] ${open ? "" : "hidden"}`}>
+                    <div className={`hd-menu absolute left-0 top-full z-50 pt-1.5 w-[290px] ${open ? "hd-menu--open" : ""}`} aria-hidden={!open}>
                     <div className="bg-white border border-[#e5e8ec] shadow-[0_24px_60px_-18px_rgba(0,12,26,0.45)]">
-                      <span className="block h-[3px] bg-[#d6b357]" aria-hidden="true" />
+                      <span className="hd-menu-bar block h-[3px] bg-[#d6b357]" aria-hidden="true" />
                       <div className="py-1.5">
-                        {children.map((c) => {
+                        {children.map((c, ci) => {
                           const childActive = pathname === c.href || pathname.startsWith(`${c.href}/`)
                           return (
                             <Link
                               key={c.href}
                               href={c.href}
+                              tabIndex={open ? 0 : -1}
                               onClick={() => setOpenMenu(null)}
-                              className={`group/item relative flex items-start gap-3 px-4 py-2.5 transition-colors ${
+                              style={{ ["--i" as string]: ci }}
+                              className={`hd-menu-item group/item relative flex items-start gap-3 px-4 py-2.5 transition-colors ${
                                 childActive ? "bg-[#faf7ee]" : "hover:bg-[#f6f7f9]"
                               }`}
                             >
@@ -533,9 +585,10 @@ export function Header() {
           // #001f3f, the header navy, rather than the near-black #001428 used
           // by the footer and topbar: the drawer slides out of the header and
           // reads as part of it. Every label stays at AA or better.
-          className={`absolute top-0 right-0 h-full w-[300px] sm:w-[340px] bg-[#001f3f] flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
+          className={`hd-drawer absolute top-0 right-0 h-full w-[300px] sm:w-[340px] bg-[#001f3f] flex flex-col shadow-2xl transition-transform duration-[380ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
             mobileOpen ? "translate-x-0" : "translate-x-full"
           }`}
+          data-open={mobileOpen ? "true" : "false"}
         >
           {/* Gold top accent */}
           <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#d6b357]/60 to-transparent" />
@@ -570,7 +623,7 @@ export function Header() {
 
           {/* Nav Links */}
           <nav className="flex flex-col gap-1 px-4 py-5">
-            {NAV_LINKS.map((item) => {
+            {NAV_LINKS.map((item, ni) => {
               const { label, href, children } = item
               const isActive = children
                 ? children.some((c) => pathname === c.href || pathname.startsWith(`${c.href}/`))
@@ -579,7 +632,7 @@ export function Header() {
               if (children) {
                 const expanded = mobileSection === label
                 return (
-                  <div key={label}>
+                  <div key={label} className="hd-drawer-item" style={{ ["--i" as string]: ni }}>
                     <button
                       type="button"
                       aria-expanded={expanded}
@@ -628,7 +681,8 @@ export function Header() {
                   key={href}
                   href={href}
                   onClick={() => setMobileOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-[15px] font-semibold transition-all duration-200 ${
+                  style={{ ["--i" as string]: ni }}
+                  className={`hd-drawer-item flex items-center gap-3 px-4 py-3.5 rounded-xl text-[15px] font-semibold transition-all duration-200 ${
                     isActive
                       ? "bg-white/10 text-[#d6b357] border border-white/10"
                       : "text-white/70 hover:text-white hover:bg-white/8"
@@ -644,7 +698,7 @@ export function Header() {
           </nav>
 
           {/* CTA / account */}
-          <div className="px-4 pb-4 flex flex-col gap-3">
+          <div className="hd-drawer-item px-4 pb-4 flex flex-col gap-3" style={{ ["--i" as string]: NAV_LINKS.length }}>
             {authReady && session ? (
               <>
                 <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-white/5 border border-white/10">
@@ -702,7 +756,7 @@ export function Header() {
           </div>
 
           {/* Contact Info */}
-          <div className="px-6 py-4 border-t border-white/10">
+          <div className="hd-drawer-item px-6 py-4 border-t border-white/10" style={{ ["--i" as string]: NAV_LINKS.length + 1 }}>
             <p className="text-xs font-semibold uppercase tracking-widest text-white/55 mb-3">Contact Us</p>
             <div className="flex flex-col gap-2.5">
               <a
@@ -727,7 +781,7 @@ export function Header() {
           </div>
 
           {/* Social Media */}
-          <div className="px-6 py-4 border-t border-white/10">
+          <div className="hd-drawer-item px-6 py-4 border-t border-white/10" style={{ ["--i" as string]: NAV_LINKS.length + 2 }}>
             <p className="text-xs font-semibold uppercase tracking-widest text-white/55 mb-3">Follow Us</p>
             <div className="flex items-center gap-2">
               {SOCIAL_LINKS.map(({ label, href, Icon }) => (

@@ -7,6 +7,8 @@ import {
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
 import { SEO_SEARCH_PAGES, SEO_AREA_GUIDES } from "@/lib/seo-pages"
 import { WhatsAppFab } from "@/components/public/whatsapp-fab"
+import { InView } from "@/components/public/in-view"
+import { MagneticLink } from "@/components/public/magnetic-link"
 
 const COMPANY_LINKS = [
   { label: "Contact Us", href: "/contact" },
@@ -56,17 +58,43 @@ const SOCIALS = [
   { label: "Facebook", href: SOCIAL_URLS.facebook, Icon: Facebook },
 ]
 
+/**
+ * A stylised Dubai skyline in one stroke: low towers, the Burj Al Arab sail,
+ * the Burj Khalifa spire at centre, the Dubai Frame, more towers. Drawn by a
+ * single path so it can trace itself in (pathLength=1, stroke-dashoffset).
+ * Decorative: a silhouette, not a map.
+ */
+const SKYLINE_D = [
+  "M0 100 H50 V74 H74 V100 H108 V62 H122 V54 H136 V62 H150 V100 H190 V80 H214 V100 H250 V68 H262 V60 H274 V68 H286 V100 H330",
+  // Burj Al Arab sail
+  "C360 100 372 40 400 30 C412 44 420 70 424 100 H470",
+  // towers
+  "V72 H484 V100 H520 V58 H530 V50 H540 V58 H552 V100 H600 V78 H626 V100",
+  // Burj Khalifa
+  "H672 L684 78 L694 62 L702 48 L708 34 L713 20 L716 6 L719 20 L724 34 L730 48 L738 62 L748 78 L760 100",
+  // towers
+  "H800 V66 H814 V100 H846 V84 H870 V100",
+  // Dubai Frame
+  "H900 V32 H912 V88 H968 V32 H980 V100",
+  // towers to the right
+  "H1020 V70 H1034 V62 H1048 V70 H1062 V100 H1100 V80 H1126 V100 H1160 V56 H1170 V46 H1180 V56 H1190 V100 H1230 V76 H1256 V100 H1300 V64 H1316 V100 H1360 V82 H1386 V100 H1440",
+].join(" ")
+
 export function Footer() {
   const year = new Date().getFullYear()
 
   return (
-    <footer className="relative bg-[#001428] text-white/70">
+    <footer className="ft wf relative bg-[#001428] text-white/70">
+      <noscript>
+        <style>{`.ft [class*="wf-"], .ft .wf-word > span, .ft .ft-sky path, .ft .ft-sky-fill { opacity: 1 !important; transform: none !important; filter: none !important; stroke-dashoffset: 0 !important; }`}</style>
+      </noscript>
+
       {/* ── Popular searches & area guides ───────────────
           The SEO interlinking rail, sitting at the top of the footer so it
           is the first thing seen rather than buried under the columns: every
           public page links to the landing pages in lib/seo-pages.ts plus the
           strongest developer portfolios, so crawlers — and readers — reach
-          them from anywhere on the site. */}
+          them from anywhere on the site. Static on purpose. */}
       <div className="bg-[#f7f8fa] border-t border-[#e8eaed]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
           <div>
@@ -116,11 +144,22 @@ export function Footer() {
         </div>
       </div>
 
-      {/* Gold top rule */}
-      <div className="h-[2px] bg-[#d6b357]" />
+      {/* ── The skyline draws itself across the top of the footer ── */}
+      <InView className="relative overflow-hidden border-t border-[#d6b357]/40" threshold={0.3}>
+        <svg
+          viewBox="0 0 1440 110"
+          preserveAspectRatio="none"
+          className="ft-sky block h-[72px] w-full sm:h-[96px]"
+          aria-hidden="true"
+        >
+          <path d={`${SKYLINE_D} V110 H0 Z`} className="ft-sky-fill" fill="#d6b357" stroke="none" />
+          <path d={SKYLINE_D} pathLength={1} fill="none" stroke="#d6b357" strokeWidth={1.5} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        </svg>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#d6b357]/60 to-transparent" aria-hidden="true" />
+      </InView>
 
       {/* ── Pre-footer CTA band — skyline photo showing through (mockup) ── */}
-      <div className="relative overflow-hidden border-b border-white/[0.06]">
+      <InView className="relative overflow-hidden border-b border-white/[0.06]" threshold={0.3}>
         <div className="absolute inset-0">
           <Image
             src="/background/dubai.webp"
@@ -137,42 +176,45 @@ export function Footer() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
             <div>
-              <p className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.18em] text-[#d6b357] mb-2">
+              <p className="wf-fade flex items-center gap-3 text-xs font-bold uppercase tracking-[0.18em] text-[#d6b357] mb-3">
                 Ready to find your next investment?
-                <span className="h-px w-10 bg-[#d6b357]" aria-hidden="true" />
+                <span className="wf-rule h-px w-10 bg-[#d6b357]" aria-hidden="true" />
               </p>
               <h3 className="font-['Outfit'] text-3xl md:text-4xl font-bold text-white leading-tight">
-                Browse Dubai&apos;s Finest Properties
+                {["Browse", "Dubai’s", "Finest"].map((w, i) => (
+                  <span key={w} className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: i }}>{w}</span></span>
+                ))}
+                <span className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 3 }} className="wf-gold">Properties</span></span>
               </h3>
-              <p className="mt-2.5 text-sm text-white/70 max-w-md leading-relaxed">
+              <p className="wf-fade mt-3 text-sm text-white/70 max-w-md leading-relaxed" style={{ ["--d" as string]: "600ms" }}>
                 Explore off-plan and ready properties from Dubai&apos;s most trusted developers.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
-              <Link
+            <div className="wf-fade flex flex-wrap items-center gap-3 flex-shrink-0" style={{ ["--d" as string]: "750ms" }}>
+              <MagneticLink
                 href="/projects"
-                className="inline-flex items-center gap-2.5 px-7 py-3.5 bg-[#d6b357] text-[#001f3f] text-sm font-bold uppercase tracking-wider hover:bg-[#c8a544] transition-colors"
+                className="group inline-flex items-center gap-2.5 px-7 py-3.5 bg-[#d6b357] text-[#001f3f] text-sm font-bold uppercase tracking-wider hover:bg-[#c8a544] transition-colors"
               >
-                View Projects <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link
+                View Projects <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+              </MagneticLink>
+              <MagneticLink
                 href="/contact"
-                className="inline-flex items-center gap-2.5 px-7 py-3.5 border border-[#d6b357]/60 text-white text-sm font-bold uppercase tracking-wider hover:bg-white/[0.06] transition-colors"
+                className="group inline-flex items-center gap-2.5 px-7 py-3.5 border border-[#d6b357]/60 text-white text-sm font-bold uppercase tracking-wider hover:bg-white/[0.06] transition-colors"
               >
-                Contact Us <ArrowRight className="w-4 h-4" />
-              </Link>
+                Contact Us <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+              </MagneticLink>
             </div>
           </div>
         </div>
-      </div>
+      </InView>
 
-      {/* ── Main footer content ── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-10">
+      {/* ── Main footer content — brand first, then each column in turn ── */}
+      <InView className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-10" threshold={0.2}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-10 lg:gap-0">
 
           {/* Brand column */}
           <div className="lg:col-span-2 space-y-6 lg:pr-10">
-            <Link href="/" className="inline-block">
+            <Link href="/" className="wf-fade inline-block">
               <Image
                 src="/FHI_Branding_White.png"
                 alt="FHI Global"
@@ -182,13 +224,13 @@ export function Footer() {
               />
             </Link>
 
-            <p className="text-sm leading-relaxed text-white/55 max-w-xs">
-              Dubai&apos;s premier real estate portal — connecting investors
+            <p className="wf-fade text-sm leading-relaxed text-white/55 max-w-xs" style={{ ["--d" as string]: "150ms" }}>
+              Dubai&apos;s premier real estate portal, connecting investors
               with the finest developments from the most trusted developers.
             </p>
 
             {/* Contact details */}
-            <div className="space-y-3">
+            <div className="wf-fade space-y-3" style={{ ["--d" as string]: "280ms" }}>
               <a
                 href="tel:+971567428288"
                 className="flex items-center gap-3 text-sm text-white/70 hover:text-[#d6b357] transition-colors duration-200"
@@ -213,7 +255,7 @@ export function Footer() {
             </div>
 
             {/* Social icons */}
-            <div className="flex items-center gap-2.5 pt-1">
+            <div className="wf-fade flex items-center gap-2.5 pt-1" style={{ ["--d" as string]: "400ms" }}>
               {SOCIALS.map(({ label, href, Icon }) => (
                 <Link
                   key={label}
@@ -229,20 +271,21 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Link columns — gold icon headers, hairline dividers (mockup). */}
-          {SECTIONS.map(({ title, Icon, links }) => (
-            <div key={title} className="lg:border-l lg:border-white/10 lg:pl-8">
-              <h4 className="flex items-center gap-2.5 text-xs font-bold uppercase tracking-[0.16em] text-white">
+          {/* Link columns — gold icon headers, hairline dividers that draw in. */}
+          {SECTIONS.map(({ title, Icon, links }, ci) => (
+            <div key={title} className="relative lg:pl-8">
+              <span className="ft-divider hidden lg:block absolute left-0 top-0 bottom-0 w-px bg-white/10" style={{ ["--d" as string]: `${300 + ci * 120}ms` }} aria-hidden="true" />
+              <h4 className="wf-fade flex items-center gap-2.5 text-xs font-bold uppercase tracking-[0.16em] text-white" style={{ ["--d" as string]: `${350 + ci * 120}ms` }}>
                 <Icon className="w-[18px] h-[18px] text-[#d6b357]" />
                 {title}
               </h4>
-              <span className="block w-8 h-[2px] bg-[#d6b357]/70 mt-3 mb-5" aria-hidden="true" />
+              <span className="wf-rule block w-8 h-[2px] bg-[#d6b357]/70 mt-3 mb-5" style={{ ["--d" as string]: `${450 + ci * 120}ms` }} aria-hidden="true" />
               <ul className="space-y-3">
-                {links.map(({ label, href }) => (
-                  <li key={label}>
+                {links.map(({ label, href }, li) => (
+                  <li key={label} className="wf-fade" style={{ ["--d" as string]: `${500 + ci * 120 + li * 50}ms` }}>
                     <Link
                       href={href}
-                      className="text-sm text-white/60 hover:text-[#d6b357] transition-colors duration-200 inline-block"
+                      className="ft-link relative inline-block text-sm text-white/60 hover:text-[#d6b357] transition-colors duration-200"
                     >
                       {label}
                     </Link>
@@ -252,8 +295,7 @@ export function Footer() {
             </div>
           ))}
         </div>
-
-      </div>
+      </InView>
 
       {/* ── Bottom bar ── */}
       <div className="border-t border-white/[0.08]">
