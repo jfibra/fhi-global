@@ -1,4 +1,4 @@
-import Link from "next/link"
+import { TransitionLink } from "@/components/public/transition-link"
 import Image from "next/image"
 import { CalendarClock, MapPin, ArrowRight, Building2 } from "lucide-react"
 
@@ -62,14 +62,14 @@ export function ProjectCard({ project }: ProjectCardProps) {
     : cityName
 
   return (
-    <Link
+    <TransitionLink
       href={developers?.slug ? `/${developers.slug}/${slug}` : `/projects/${slug}`}
       className="group block bg-white border border-[#e5e8ec] overflow-hidden transition-shadow duration-300 hover:shadow-[0_14px_40px_-16px_rgba(0,20,40,0.25)]"
     >
       {/* Image — 16:10 while the card is full-width on a phone, where a 4:3
           render is 267px tall and only 1.7 cards reach the screen; 4:3 again
           from sm up, where cards sit 2-4 across and are far smaller. */}
-      <div className="relative w-full aspect-[16/10] sm:aspect-[4/3] bg-[#f4f6f9] overflow-hidden">
+      <div data-vt-img className="relative w-full aspect-[16/10] sm:aspect-[4/3] bg-[#f4f6f9] overflow-hidden">
         {main_image ? (
           <Image
             src={main_image}
@@ -169,6 +169,6 @@ export function ProjectCard({ project }: ProjectCardProps) {
           </div>
         </div>
       </div>
-    </Link>
+    </TransitionLink>
   )
 }

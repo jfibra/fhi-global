@@ -9,6 +9,8 @@ import { HomeFaq } from "@/components/public/home-faq";
 import { WhyFhi } from "@/components/public/why-fhi";
 import { FeaturedGate } from "@/components/public/featured-gate";
 import { InView } from "@/components/public/in-view";
+import { UaeMap } from "@/components/public/uae-map";
+import { countByEmirate } from "@/lib/emirates";
 import { InvestCta, type CtaStat } from "@/components/public/invest-cta";
 import { faqPageSchema } from "@/lib/faqs";
 import { fhiOrganizationSchema, webSiteSchema } from "@/lib/structured-data";
@@ -102,17 +104,6 @@ const TRUST = [
   },
 ];
 
-/** [emirate, ...substrings of the free-text city column that mean it] */
-const EMIRATE_KEYS: string[][] = [
-  ["Dubai", "dubai"],
-  ["Abu Dhabi", "abu dhabi"],
-  ["Sharjah", "sharjah"],
-  ["Ajman", "ajman"],
-  ["Umm Al Quwain", "umm al quwain", "umm al qaiwain"],
-  ["Ras Al Khaimah", "ras al khaimah", "ras al kaimah", "rak"],
-  ["Fujairah", "fujairah"],
-];
-
 export default async function HomePage() {
   const { developers, featuredProjects, cityRows } = await getCachedHomePageData();
 
@@ -139,20 +130,16 @@ export default async function HomePage() {
     .slice(0, 5)
     .map((d) => ({ label: d.name, href: `/${d.slug}` }));
 
-  // Closing CTA counters — counted from the same published, active rows, so
-  // the numbers move with the catalogue instead of being typed in. The city
-  // column is free text (a typo of Ras Al Khaimah and two Dubai districts sit
-  // in it), so it is folded into emirates rather than counted as-is.
-  const emirates = new Set<string>();
-  for (const row of cityRows) {
-    const city = (row.city ?? "").toLowerCase();
-    const hit = EMIRATE_KEYS.find(([, ...keys]) => keys.some((k) => city.includes(k)));
-    if (hit) emirates.add(hit[0]);
-  }
+  // Live projects per emirate, from the same published, active rows. The
+  // city column is free text (a typo of Ras Al Khaimah and two Dubai
+  // districts sit in it), so lib/emirates folds it into emirates. Feeds the
+  // "Where we build" map and the closing CTA counters.
+  const emirateCounts = countByEmirate(cityRows);
+  const emirateCount = Object.keys(emirateCounts).length;
   const ctaStats: CtaStat[] = [
     { value: cityRows.length, label: "Live projects" },
     { value: developerCounts.size, label: "Developers" },
-    ...(emirates.size >= 2 ? [{ value: emirates.size, label: "Emirates" }] : []),
+    ...(emirateCount >= 2 ? [{ value: emirateCount, label: "Emirates" }] : []),
   ];
 
   // Rotating spotlight in the hero — real featured projects, compact price.
@@ -332,6 +319,11 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      {/* ----------------------------------------------- */}
+      {/* WHERE WE BUILD — the UAE lit by live counts     */}
+      {/* ----------------------------------------------- */}
+      <UaeMap counts={emirateCounts} />
 
       {/* ----------------------------------------------- */}
       {/* WHY FHI — "We connect serious investors…"        */}

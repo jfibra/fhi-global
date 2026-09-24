@@ -602,3 +602,35 @@
   .fp-img, .fp-zoom, .fp-pop, .fp-text { transition: none !important; opacity: 1 !important; transform: none !important; clip-path: none !important; filter: none !important; }
   .gate-door::before { display: none; }
 }
+
+/* ─── Card → project page view transition ──────────────────────────────────
+   TransitionLink names the clicked card's photo "project-hero"; the project
+   masthead's first photo carries the same name. The rest of the page
+   crossfades quickly while the photo travels. */
+::view-transition-old(root),
+::view-transition-new(root) { animation-duration: 320ms; }
+::view-transition-group(project-hero) {
+  animation-duration: 640ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+::view-transition-old(project-hero),
+::view-transition-new(project-hero) {
+  height: 100%; width: 100%; object-fit: cover; overflow: clip;
+  animation-duration: 640ms;
+}
+
+/* ─── "Where we build" map ──────────────────────────────────────────────────
+   Outlines draw via pathLength=1 dashes; fills glow up to --o; the list's
+   bars grow to --w. All fired by the section's InView. */
+.um-path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1600ms var(--wf-ease), stroke 300ms, stroke-width 300ms; transition-delay: var(--d, 0ms), 0ms, 0ms; }
+[data-in="true"] .um-path { stroke-dashoffset: 0; }
+.um-fill { fill-opacity: 0; transition: fill-opacity 1200ms var(--wf-ease); transition-delay: var(--d, 0ms); }
+[data-in="true"] .um-fill { fill-opacity: var(--o, 0.2); transition-delay: 0ms; }
+.um-label { opacity: 0; transform: translateY(6px); transition: opacity 700ms var(--wf-ease), transform 700ms var(--wf-ease); transition-delay: var(--d, 0ms); }
+[data-in="true"] .um-label { opacity: 1; transform: translateY(0); }
+.um-bar { transform: scaleX(0); transform-origin: left center; transition: transform 1200ms var(--wf-ease); transition-delay: var(--d, 0ms); width: var(--w, 0%); }
+[data-in="true"] .um-bar { transform: scaleX(1); }
+@media (prefers-reduced-motion: reduce) {
+  .um-path, .um-fill, .um-label, .um-bar { transition: none !important; opacity: 1 !important; transform: none !important; stroke-dashoffset: 0 !important; }
+  .um-fill { fill-opacity: var(--o, 0.2) !important; }
+}

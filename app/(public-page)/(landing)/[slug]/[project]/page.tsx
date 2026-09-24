@@ -429,7 +429,13 @@ export default async function ProjectDetailPage({ params }: Props) {
           {/* The photos — a collage of up to four fills the masthead's right
               half on desktop, running all the way down past the stats band;
               on mobile it sits between the title and the facts. */}
-          <div className="relative mt-6 aspect-[16/10] bg-[#001f3f] lg:absolute lg:inset-y-0 lg:right-0 lg:left-[56%] lg:z-10 lg:mt-0 lg:aspect-auto">
+          {/* The first photo carries the view-transition name that the
+              homepage's TransitionLink gives a card photo on click, so the
+              card morphs into it. One element per page may carry the name. */}
+          <div
+            className="relative mt-6 aspect-[16/10] bg-[#001f3f] lg:absolute lg:inset-y-0 lg:right-0 lg:left-[56%] lg:z-10 lg:mt-0 lg:aspect-auto"
+            {...(mastheadImages.length === 1 ? { "data-vt": "project-hero", style: { viewTransitionName: "project-hero" } } : {})}
+          >
             {mastheadImages.length === 0 ? (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Building2 className="w-14 h-14 text-[#d6b357]/50" />
@@ -449,6 +455,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                   <div
                     key={url}
                     className={`relative overflow-hidden ${mastheadImages.length === 3 && i === 0 ? "row-span-2" : ""}`}
+                    {...(i === 0 ? { "data-vt": "project-hero", style: { viewTransitionName: "project-hero" } } : {})}
                   >
                     <Image
                       src={url}

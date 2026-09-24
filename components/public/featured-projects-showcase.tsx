@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { TransitionLink } from "@/components/public/transition-link"
 import Image from "next/image"
 import { Building2, MapPin, CalendarClock, WalletCards, ArrowRight } from "lucide-react"
 import { formatProjectPrice, type ProjectCardData } from "@/components/project-card"
@@ -133,8 +134,8 @@ function HeroCard({ p }: { p: FeaturedProjectData }) {
   const pill = statusPill(p.status, p.delivery_quarter)
   const note = p.agent_note?.trim()
   return (
-    <Link href={projectHref(p)} className="group block h-full" style={{ ["--d" as string]: "0ms" }}>
-      <div className="fp-img relative aspect-[16/10] lg:aspect-auto lg:h-[420px] w-full overflow-hidden bg-[#e9edf2]">
+    <TransitionLink href={projectHref(p)} className="group block h-full" style={{ ["--d" as string]: "0ms" }}>
+      <div data-vt-img className="fp-img relative aspect-[16/10] lg:aspect-auto lg:h-[420px] w-full overflow-hidden bg-[#e9edf2]">
         {p.main_image ? (
           <div className="fp-zoom absolute inset-0">
             <Image
@@ -172,15 +173,15 @@ function HeroCard({ p }: { p: FeaturedProjectData }) {
           {note}
         </div>
       )}
-    </Link>
+    </TransitionLink>
   )
 }
 
 function SideCard({ p, index, delay }: { p: FeaturedProjectData; index: number; delay: number }) {
   const pill = statusPill(p.status, p.delivery_quarter)
   return (
-    <Link href={projectHref(p)} className="group block" style={{ ["--d" as string]: `${delay}ms` }}>
-      <div className="fp-img relative aspect-[16/9] w-full overflow-hidden bg-[#e9edf2]">
+    <TransitionLink href={projectHref(p)} className="group block" style={{ ["--d" as string]: `${delay}ms` }}>
+      <div data-vt-img className="fp-img relative aspect-[16/9] w-full overflow-hidden bg-[#e9edf2]">
         {p.main_image ? (
           <div className="fp-zoom absolute inset-0">
             <Image
@@ -212,7 +213,7 @@ function SideCard({ p, index, delay }: { p: FeaturedProjectData; index: number; 
         </div>
         <Price value={p.launch_price_from} currency={p.currency} />
       </div>
-    </Link>
+    </TransitionLink>
   )
 }
 
