@@ -32,6 +32,7 @@ import { ProjectInquireForm } from "@/components/public/project-inquire-form"
 import { InView } from "@/components/public/in-view"
 import { CountUp } from "@/components/public/count-up"
 import { ProjectStickyBar } from "@/components/public/project-sticky-bar"
+import { PermitVerify } from "@/components/public/permit-verify"
 import { ProjectLocationMap } from "@/components/public/project-location-map"
 import { MediaEmbedCard } from "@/components/public/media-embed"
 import { ReadMore } from "@/components/public/read-more"
@@ -922,8 +923,17 @@ export default async function ProjectDetailPage({ params }: Props) {
                   {project.trakheesi_permit_link ? "Tap or scan the code to verify this project with the DLD." : "Scan the code to verify this project with the DLD."}
                 </p>
               </div>
-              {(() => {
-                const qr = (
+              {project.trakheesi_permit_link ? (
+                <PermitVerify
+                  projectName={project.name}
+                  developerName={developer?.name ?? null}
+                  permitUrl={project.trakheesi_permit_url}
+                  permitNumber={project.trakheesi_permit_number ?? null}
+                  link={project.trakheesi_permit_link}
+                  verifyHref={`/verify/permit/${slug}`}
+                />
+              ) : (
+                <div className="mt-4 border border-[#e5e8ec] bg-white p-3">
                   <div className="relative aspect-square w-full">
                     <Image
                       src={project.trakheesi_permit_url}
@@ -931,30 +941,10 @@ export default async function ProjectDetailPage({ params }: Props) {
                       fill
                       unoptimized
                       sizes="320px"
-                      className="object-contain transition-transform duration-500 group-hover:scale-[1.02]"
+                      className="object-contain"
                     />
                   </div>
-                )
-                return project.trakheesi_permit_link ? (
-                  <Link
-                    href={`/verify/permit/${slug}`}
-                    className="group mt-4 block border border-[#e5e8ec] bg-white p-3 transition-colors hover:border-[#d6b357]"
-                    aria-label="Verify this permit with the Dubai Land Department"
-                  >
-                    {qr}
-                  </Link>
-                ) : (
-                  <div className="mt-4 border border-[#e5e8ec] bg-white p-3">{qr}</div>
-                )
-              })()}
-              {project.trakheesi_permit_link && (
-                <Link
-                  href={`/verify/permit/${slug}`}
-                  className="group mt-3 inline-flex w-full items-center justify-center gap-2 bg-[#0d1117] px-5 py-3 text-[14px] font-bold text-white transition-colors hover:bg-[#001f3f]"
-                >
-                  Verify with the DLD
-                  <ArrowLeft className="h-4 w-4 rotate-180 text-[#d6b357] transition-transform group-hover:translate-x-0.5" />
-                </Link>
+                </div>
               )}
               {project.trakheesi_permit_number && (
                 <dl className="mt-4 border-t border-[#eef0f3] pt-4">

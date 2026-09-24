@@ -132,21 +132,14 @@ export default async function VerifyPermitPage({ params }: Props) {
               <div className="mt-6 flex items-start gap-3 border border-[#e5e8ec] bg-[#f7f8fa] p-4">
                 <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[#b8913f]" />
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#6b7280]">You are leaving fhiglobal.ae for</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#6b7280]">Opens in a new tab</p>
                   <p className="mt-1 truncate font-['Outfit'] text-[16px] font-bold text-[#0d1117]">{host}</p>
                   <p className="mt-0.5 text-[12px] text-[#6b7280]">The official Dubai Land Department domain.</p>
                 </div>
               </div>
 
               <div className="mt-6">
-                <HoldToContinue href={link} label="Hold to continue to the DLD" />
-                <p className="mt-3 text-[12px] text-[#6b7280]">
-                  Press and hold for a second to open the Dubai Land Department&rsquo;s validation page in this tab.{" "}
-                  <a href={link} rel="noopener noreferrer" className="font-bold text-[#0d1117] underline-offset-4 hover:text-[#b8913f] hover:underline">
-                    Open the link directly
-                  </a>
-                  .
-                </p>
+                <HoldToContinue href={link} label="Hold to open the DLD page" />
               </div>
             </div>
           </div>

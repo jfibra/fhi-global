@@ -1043,3 +1043,13 @@
    sweeps across the button and the ring completes as it is held. */
 .htc-fill { width: calc(var(--p, 0) * 100%); opacity: 0.25; transition: width 60ms linear; }
 .htc:active .htc-fill { opacity: 0.35; }
+
+/* ─── Permit verification dialog ───────────────────────────────────────────
+   Native <dialog> centred in the top layer; the card scales and rises in,
+   the backdrop is navy glass. */
+.pv-dialog { padding: 0; border: 0; background: transparent; max-width: none; max-height: none; overflow: visible; }
+.pv-dialog::backdrop { background: rgba(3, 13, 28, 0.72); backdrop-filter: blur(6px); animation: pv-backdrop 220ms ease-out both; }
+.pv-dialog[open] .pv-card { animation: pv-card 420ms var(--wf-ease) both; }
+@keyframes pv-backdrop { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pv-card { from { opacity: 0; transform: translateY(18px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .pv-dialog::backdrop, .pv-dialog[open] .pv-card { animation: none; } }
