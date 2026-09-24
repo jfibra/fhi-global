@@ -56,6 +56,7 @@ async function loadHomePageData() {
         .select("city, developers(name, slug)")
         .eq("is_active", true)
         .eq("is_published", true)
+        .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(4000),
     ])

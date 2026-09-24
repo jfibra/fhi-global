@@ -7,6 +7,7 @@ import { HeroSection } from "@/components/hero-section";
 import { Reveal } from "@/components/public/reveal";
 import { HomeFaq } from "@/components/public/home-faq";
 import { WhyFhi } from "@/components/public/why-fhi";
+import { InvestCta, type CtaStat } from "@/components/public/invest-cta";
 import { faqPageSchema } from "@/lib/faqs";
 import { fhiOrganizationSchema, webSiteSchema } from "@/lib/structured-data";
 import { JsonLd } from "@/components/json-ld";
@@ -26,7 +27,6 @@ import {
   ArrowRight,
   CheckCircle2,
   Award,
-  MessageCircle,
 } from "lucide-react";
 
 /** Revalidate homepage data from Supabase (ISR) */
@@ -100,6 +100,17 @@ const TRUST = [
   },
 ];
 
+/** [emirate, ...substrings of the free-text city column that mean it] */
+const EMIRATE_KEYS: string[][] = [
+  ["Dubai", "dubai"],
+  ["Abu Dhabi", "abu dhabi"],
+  ["Sharjah", "sharjah"],
+  ["Ajman", "ajman"],
+  ["Umm Al Quwain", "umm al quwain", "umm al qaiwain"],
+  ["Ras Al Khaimah", "ras al khaimah", "ras al kaimah", "rak"],
+  ["Fujairah", "fujairah"],
+];
+
 export default async function HomePage() {
   const { developers, featuredProjects, cityRows } = await getCachedHomePageData();
 
@@ -125,6 +136,22 @@ export default async function HomePage() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 5)
     .map((d) => ({ label: d.name, href: `/${d.slug}` }));
+
+  // Closing CTA counters — counted from the same published, active rows, so
+  // the numbers move with the catalogue instead of being typed in. The city
+  // column is free text (a typo of Ras Al Khaimah and two Dubai districts sit
+  // in it), so it is folded into emirates rather than counted as-is.
+  const emirates = new Set<string>();
+  for (const row of cityRows) {
+    const city = (row.city ?? "").toLowerCase();
+    const hit = EMIRATE_KEYS.find(([, ...keys]) => keys.some((k) => city.includes(k)));
+    if (hit) emirates.add(hit[0]);
+  }
+  const ctaStats: CtaStat[] = [
+    { value: cityRows.length, label: "Live projects" },
+    { value: developerCounts.size, label: "Developers" },
+    ...(emirates.size >= 2 ? [{ value: emirates.size, label: "Emirates" }] : []),
+  ];
 
   // Rotating spotlight in the hero — real featured projects, compact price.
   const heroStatusLabels: Record<string, string> = {
@@ -320,83 +347,7 @@ export default async function HomePage() {
       {/* ----------------------------------------------- */}
       {/* CALL TO ACTION                                  */}
       {/* ----------------------------------------------- */}
-      {/* Rebuilt to the approved mockup: a split banner. The photo is the
-          section, and a light panel occupies the left with a diagonal seam
-          cutting across it — so the pool and skyline stay fully visible on the
-          right instead of being covered by a centred navy card. */}
-      <section className="relative overflow-hidden">
-        {/* Photo — the whole section */}
-        <div className="absolute inset-0">
-          <Image
-            src="/background/dubai.webp"
-            alt=""
-            fill
-            sizes="100vw"
-            className="object-cover object-center"
-            aria-hidden="true"
-          />
-        </div>
-
-        {/* Light panel with the mockup's diagonal seam. Two layers: an opaque
-            wedge for the copy to sit on, and a softer wedge just past it so the
-            transition into the photo is a gradient rather than a hard line. On
-            mobile the wedge becomes a plain vertical scrim — a diagonal across a
-            narrow screen would cut through the text. */}
-        <div
-          className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-[#f7f8fa] via-[#f7f8fa]/95 to-[#f7f8fa]/0 md:w-[62%] md:bg-[#f7f8fa]/95"
-          style={{ clipPath: "polygon(0 0, 100% 0, 78% 100%, 0 100%)" }}
-          aria-hidden="true"
-        />
-        <div
-          className="hidden md:block absolute inset-y-0 left-0 w-[72%] bg-gradient-to-r from-transparent via-transparent to-[#f7f8fa]/0"
-          style={{ clipPath: "polygon(60% 0, 100% 0, 82% 100%, 42% 100%)", background: "linear-gradient(90deg, rgba(247,248,250,0.85), rgba(247,248,250,0))" }}
-          aria-hidden="true"
-        />
-
-        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-24">
-          <Reveal>
-          <div className="max-w-xl">
-            {/* Badge — solid navy block with the gold label, as drawn. */}
-            <div className="inline-flex items-center gap-2 bg-[#0a2647] px-3.5 py-2 mb-7">
-              <TrendingUp className="w-3.5 h-3.5 text-[#d6b357]" />
-              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#d6b357]">
-                Ready to Invest?
-              </span>
-            </div>
-
-            <h2 className="font-['Outfit'] text-4xl md:text-[52px] font-bold leading-[1.08] tracking-tight">
-              <span className="block text-[#0d1117]">Explore Properties</span>{" "}
-              <span className="block text-[#b8913f]">for Sale in Dubai.</span>
-            </h2>
-
-            <span className="block w-14 h-[3px] bg-[#d6b357] mt-6 mb-6" aria-hidden="true" />
-
-            <p className="text-[#4b5563] text-[16.5px] leading-[1.7] max-w-md">
-              Browse hundreds of premium developments — from off-plan launches
-              to ready-to-move investments in Dubai&apos;s finest communities.
-            </p>
-
-            <div className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <Link
-                href="/projects"
-                className="inline-flex items-center justify-center gap-2.5 bg-[#d6b357] hover:bg-[#c8a544] text-[#001f3f] px-7 py-4 font-bold text-[15px] transition-colors duration-300"
-              >
-                <Building2 className="w-[18px] h-[18px]" />
-                Browse Projects
-                <ArrowRight className="w-[18px] h-[18px]" />
-              </Link>
-              <Link
-                href="/contact"
-                className="inline-flex items-center justify-center gap-2.5 bg-white hover:bg-[#f0f2f5] border border-[#0a2647]/25 text-[#0d1117] px-7 py-4 font-bold text-[15px] transition-colors duration-300"
-              >
-                <MessageCircle className="w-[18px] h-[18px] text-[#b8913f]" />
-                Contact Us
-              </Link>
-            </div>
-          </div>
-          </Reveal>
-        </div>
-      </section>
+      <InvestCta stats={ctaStats} />
 
     </div>
     </>

@@ -375,3 +375,90 @@
   }
   .wf-gold { background-position: 0 0; }
 }
+
+/* ─── Homepage closing CTA — "Explore Properties for Sale in Dubai." ────────
+   Fired by data-in="true" on the InView wrapper. Sequence: slats roll up over
+   the photo (250ms → ~1.7s) while it eases out of a zoom and the horizon glow
+   rises → the gold seam draws → the chip unfolds → a light bar scans the
+   headline into view → rule → copy, buttons, counters. */
+.cta { --cta-ease: cubic-bezier(0.16, 1, 0.3, 1); --cta-ease-io: cubic-bezier(0.77, 0, 0.175, 1); }
+
+.cta-slat {
+  transform: scaleY(1);
+  transform-origin: center top;
+  transition: transform 1000ms var(--cta-ease-io);
+  transition-delay: calc(250ms + var(--i, 0) * 65ms);
+  will-change: transform;
+}
+[data-in="true"] .cta-slat { transform: scaleY(0); }
+
+.cta-photo-img { transform: scale(1.18); transition: transform 2800ms var(--cta-ease); transition-delay: 250ms; }
+[data-in="true"] .cta-photo-img { transform: scale(1); }
+
+.cta-sun {
+  background: radial-gradient(closest-side, rgba(255, 214, 130, 0.85), rgba(255, 190, 90, 0.35) 45%, rgba(255, 170, 60, 0) 100%);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transform: translateY(35%);
+  transition: opacity 1800ms var(--cta-ease), transform 2200ms var(--cta-ease);
+  transition-delay: 1000ms;
+}
+[data-in="true"] .cta-sun { opacity: 0.8; transform: translateY(0); }
+
+.cta-seam { clip-path: inset(0 0 100% 0); transition: clip-path 1500ms var(--cta-ease-io); transition-delay: 900ms; }
+[data-in="true"] .cta-seam { clip-path: inset(0 0 0 0); }
+
+.cta-chip { transform: scaleX(0); transform-origin: left center; transition: transform 700ms var(--cta-ease); transition-delay: 400ms; }
+.cta-chip > * { opacity: 0; transition: opacity 500ms var(--cta-ease); transition-delay: 950ms; }
+[data-in="true"] .cta-chip { transform: scaleX(1); }
+[data-in="true"] .cta-chip > * { opacity: 1; }
+
+/* Headline: revealed left→right by a clip that follows the scanning bar. */
+.cta-wipe { clip-path: inset(-12% 100% -12% 0); transition: clip-path 1500ms var(--cta-ease-io); transition-delay: 600ms; }
+[data-in="true"] .cta-wipe { clip-path: inset(-12% 0 -12% 0); }
+.cta-scan {
+  position: absolute; top: -4%; bottom: -4%; left: 0; width: 3px;
+  background: linear-gradient(to bottom, rgba(214, 179, 87, 0), #f6e3a8 30%, #f6e3a8 70%, rgba(214, 179, 87, 0));
+  box-shadow: 0 0 22px 4px rgba(214, 179, 87, 0.55);
+  opacity: 0;
+}
+[data-in="true"] .cta-scan { animation: cta-scan 1500ms var(--cta-ease-io) 600ms forwards; }
+@keyframes cta-scan {
+  0%   { left: 0;    opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+.cta-gold {
+  background: linear-gradient(100deg, #b8913f 0%, #d6b357 45%, #f6e3a8 55%, #d6b357 65%, #b8913f 100%);
+  background-size: 220% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+[data-in="true"] .cta-gold { animation: cta-shimmer 1800ms var(--cta-ease) 2000ms forwards; }
+@keyframes cta-shimmer { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+
+.cta-rule { transform: scaleX(0); transform-origin: left center; transition: transform 900ms var(--cta-ease); transition-delay: 1400ms; }
+[data-in="true"] .cta-rule { transform: scaleX(1); }
+
+.cta-fade {
+  opacity: 0;
+  transform: translateY(22px);
+  filter: blur(6px);
+  transition: opacity 1000ms var(--cta-ease), transform 1000ms var(--cta-ease), filter 1000ms var(--cta-ease);
+  transition-delay: var(--d, 0ms);
+}
+[data-in="true"] .cta-fade { opacity: 1; transform: translateY(0); filter: blur(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cta-slat { display: none; }
+  .cta-photo-img, .cta-sun, .cta-seam, .cta-chip, .cta-chip > *, .cta-wipe, .cta-rule, .cta-fade, .cta-gold {
+    transition: none !important; animation: none !important;
+    opacity: 1 !important; transform: none !important; clip-path: none !important; filter: none !important;
+  }
+  .cta-sun { opacity: 0.8 !important; }
+  .cta-scan { display: none; }
+  .cta-gold { background-position: 0 0; }
+}
