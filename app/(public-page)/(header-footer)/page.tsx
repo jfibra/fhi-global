@@ -7,6 +7,7 @@ import { HeroSection } from "@/components/hero-section";
 import { Reveal } from "@/components/public/reveal";
 import { HomeFaq } from "@/components/public/home-faq";
 import { WhyFhi } from "@/components/public/why-fhi";
+import { FeaturedGate } from "@/components/public/featured-gate";
 import { InvestCta, type CtaStat } from "@/components/public/invest-cta";
 import { faqPageSchema } from "@/lib/faqs";
 import { fhiOrganizationSchema, webSiteSchema } from "@/lib/structured-data";
@@ -193,7 +194,10 @@ export default async function HomePage() {
     {/* Pairs with the FAQ section below — this is what lets Google expand the
         answers underneath our search result. */}
     <JsonLd schema={faqPageSchema()} />
-    <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
+    {/* overflow-x-clip, not -hidden: hidden makes this div a scroll container
+        and position: sticky inside it (the Featured Projects gate) stops
+        pinning to the viewport. clip trims the same overflow without that. */}
+    <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-clip">
       {/* Ambient blobs */}
       <div className="fixed top-[-10%] left-[-10%] w-[700px] h-[700px] rounded-full opacity-30 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(200,245,255)_0%,rgba(255,255,255,0)_70%)]" />
       <div className="fixed bottom-0 right-[-5%] w-[600px] h-[600px] rounded-full opacity-25 blur-[120px] -z-10 bg-[radial-gradient(circle,rgb(250,240,210)_0%,rgba(255,255,255,0)_70%)]" />
@@ -281,55 +285,51 @@ export default async function HomePage() {
       {/* ----------------------------------------------- */}
       {/* FEATURED PROJECTS                               */}
       {/* ----------------------------------------------- */}
+      {/* The section opens behind two navy doors: a full-screen stage pinned
+          while the reader scrolls through it, the doors sliding apart onto
+          the skyline and the section title, then the cards. The section must
+          not be overflow-hidden or the sticky stage would not pin. */}
       {featuredProjects && featuredProjects.length > 0 && (
-        <section className="relative py-24 overflow-hidden">
-          {/* Faint skyline backdrop — heavy white wash so the cards stay the focus */}
-          <div className="absolute inset-0">
-            <Image
-              src="/background/home.webp"
-              alt=""
-              fill
-              sizes="100vw"
-              className="object-cover object-center"
-              aria-hidden="true"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/85 to-white/92" />
-          </div>
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <Reveal>
-            <div className="flex items-end justify-between mb-14">
-              <div>
-                <div className="inline-flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-[#0d1117] mb-5"><span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true"></span>
-                  Hand-Picked Selection
-                </div>
-                <h2 className="font-['Outfit'] text-4xl md:text-5xl font-bold tracking-tight">
-                  <span className="text-[#0d1117]">Featured Off-Plan</span>{" "}
-                  <span className="text-[#b8913f]">Projects in Dubai</span>
-                </h2>
-                <p className="text-[#4b5563] text-base leading-relaxed mt-4 max-w-xl">
-                  A curated selection of Dubai&apos;s most sought-after developments,
-                  hand-picked by our team for quality, location, and returns.
-                </p>
-              </div>
-              <Link
-                href="/projects"
-                className="hidden sm:inline-flex items-center gap-2 text-sm font-bold text-[#0d1117] hover:text-[#b8913f] transition-colors shrink-0"
-              >
-                Browse All Projects
-                <span className="w-8 h-8 bg-[#d6b357] flex items-center justify-center">
-                  <ArrowRight className="w-4 h-4 text-[#001f3f]" />
-                </span>
-              </Link>
-            </div>
-            </Reveal>
-            {/* One hero pick with room for an FHI note, two picks beside it,
-                the rest in a row beneath — a hierarchy instead of six equal
-                tiles. Every line is a real project column; blanks are omitted. */}
-            <Reveal>
-              <FeaturedProjectsShowcase
-                projects={featuredProjects as unknown as FeaturedProjectData[]}
+        <section className="relative">
+          <FeaturedGate count={featuredProjects.length} />
+
+          <div className="relative overflow-hidden py-16 md:py-20">
+            {/* Faint skyline backdrop — heavy white wash so the cards stay the focus */}
+            <div className="absolute inset-0">
+              <Image
+                src="/background/home.webp"
+                alt=""
+                fill
+                sizes="100vw"
+                className="object-cover object-center"
+                aria-hidden="true"
               />
-            </Reveal>
+              <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/85 to-white/92" />
+            </div>
+            <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <Reveal>
+                <div className="mb-10 flex items-center justify-between gap-6">
+                  <p className="inline-flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-[#0d1117]">
+                    <span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true"></span>
+                    {featuredProjects.length} featured {featuredProjects.length === 1 ? "project" : "projects"}
+                  </p>
+                  <Link
+                    href="/projects"
+                    className="hidden sm:inline-flex items-center gap-2 text-sm font-bold text-[#0d1117] hover:text-[#b8913f] transition-colors shrink-0"
+                  >
+                    Browse All Projects
+                    <span className="w-8 h-8 bg-[#d6b357] flex items-center justify-center">
+                      <ArrowRight className="w-4 h-4 text-[#001f3f]" />
+                    </span>
+                  </Link>
+                </div>
+              </Reveal>
+              <Reveal>
+                <FeaturedProjectsShowcase
+                  projects={featuredProjects as unknown as FeaturedProjectData[]}
+                />
+              </Reveal>
+            </div>
           </div>
         </section>
       )}

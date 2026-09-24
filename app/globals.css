@@ -517,3 +517,28 @@
   .faq-row[open] .faq-plus svg { transform: rotate(45deg) !important; }
   .faq-row[open] .faq-underline { transform: scaleX(1) !important; }
 }
+
+/* ─── Featured Projects gate — doors driven by scroll progress ──────────────
+   --p is raw progress through the zone, --d the eased door opening, --s the
+   eased title rise; all written by components/public/featured-gate.tsx on an
+   animation frame. Nothing here has a duration: the scroll is the timeline. */
+.gate-door { will-change: transform; }
+.gate-door--l { transform: translate3d(calc(var(--d, 0) * -100%), 0, 0); }
+.gate-door--r { transform: translate3d(calc(var(--d, 0) * 100%), 0, 0); }
+.gate-stage[data-open="true"] .gate-doors { visibility: hidden; }
+.gate-hint { opacity: calc(1 - var(--d, 0) * 3); }
+.gate-scene-img { transform: scale(calc(1.14 - var(--d, 0) * 0.14)); }
+.gate-title {
+  opacity: var(--s, 0);
+  transform: translateY(calc((1 - var(--s, 0)) * 36px));
+}
+.gate-cue { opacity: calc(1 - clamp(0, (var(--p, 0) - 0.82) / 0.18, 1)); }
+.gate-cue-line { transform-origin: top center; animation: gate-cue 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+@keyframes gate-cue {
+  0%   { transform: scaleY(0); opacity: 0; }
+  30%  { opacity: 1; }
+  100% { transform: scaleY(1); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gate-cue-line { animation: none; }
+}
