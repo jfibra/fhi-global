@@ -2,6 +2,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { Building2, MapPin, CalendarClock, WalletCards, ArrowRight } from "lucide-react"
 import { formatProjectPrice, type ProjectCardData } from "@/components/project-card"
+import { InView } from "@/components/public/in-view"
 
 /**
  * Homepage "Featured Projects" showcase: one hero pick with room to breathe,
@@ -132,28 +133,30 @@ function HeroCard({ p }: { p: FeaturedProjectData }) {
   const pill = statusPill(p.status, p.delivery_quarter)
   const note = p.agent_note?.trim()
   return (
-    <Link href={projectHref(p)} className="group block h-full">
-      <div className="relative aspect-[16/10] lg:aspect-auto lg:h-[420px] w-full overflow-hidden bg-[#e9edf2]">
+    <Link href={projectHref(p)} className="group block h-full" style={{ ["--d" as string]: "0ms" }}>
+      <div className="fp-img relative aspect-[16/10] lg:aspect-auto lg:h-[420px] w-full overflow-hidden bg-[#e9edf2]">
         {p.main_image ? (
-          <Image
-            src={p.main_image}
-            alt={p.name}
-            fill
-            priority
-            sizes="(max-width: 1024px) 100vw, 66vw"
-            className="object-cover transition-transform duration-700 group-hover:scale-[1.04]"
-          />
+          <div className="fp-zoom absolute inset-0">
+            <Image
+              src={p.main_image}
+              alt={p.name}
+              fill
+              priority
+              sizes="(max-width: 1024px) 100vw, 66vw"
+              className="object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+            />
+          </div>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-[#c0c8d4]">
             <Building2 className="h-14 w-14" />
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
-        {pill && <div className="absolute left-4 top-4"><Pill>{pill}</Pill></div>}
-        <div className="absolute bottom-4 left-4"><DeveloperChip p={p} /></div>
+        {pill && <div className="fp-pop absolute left-4 top-4"><Pill>{pill}</Pill></div>}
+        <div className="fp-text absolute bottom-4 left-4"><DeveloperChip p={p} /></div>
       </div>
 
-      <div className="mt-5 flex items-start justify-between gap-6">
+      <div className="fp-text mt-5 flex items-start justify-between gap-6">
         <div className="min-w-0">
           <h3 className="font-['Outfit'] text-2xl md:text-[28px] font-bold leading-tight text-[#0d1117] group-hover:text-[#001f3f] transition-colors">
             {p.name}
@@ -164,7 +167,7 @@ function HeroCard({ p }: { p: FeaturedProjectData }) {
       </div>
 
       {note && (
-        <div className="mt-4 bg-[#f7f8fa] border border-[#eef0f3] px-5 py-4 text-[15px] leading-relaxed text-[#1f2937]">
+        <div className="fp-text mt-4 bg-[#f7f8fa] border border-[#eef0f3] px-5 py-4 text-[15px] leading-relaxed text-[#1f2937]">
           <span className="font-bold text-[#0d1117]">FHI note: </span>
           {note}
         </div>
@@ -173,29 +176,31 @@ function HeroCard({ p }: { p: FeaturedProjectData }) {
   )
 }
 
-function SideCard({ p, index }: { p: FeaturedProjectData; index: number }) {
+function SideCard({ p, index, delay }: { p: FeaturedProjectData; index: number; delay: number }) {
   const pill = statusPill(p.status, p.delivery_quarter)
   return (
-    <Link href={projectHref(p)} className="group block">
-      <div className="relative aspect-[16/9] w-full overflow-hidden bg-[#e9edf2]">
+    <Link href={projectHref(p)} className="group block" style={{ ["--d" as string]: `${delay}ms` }}>
+      <div className="fp-img relative aspect-[16/9] w-full overflow-hidden bg-[#e9edf2]">
         {p.main_image ? (
-          <Image
-            src={p.main_image}
-            alt={p.name}
-            fill
-            priority={index < 2}
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            className="object-cover transition-transform duration-700 group-hover:scale-[1.04]"
-          />
+          <div className="fp-zoom absolute inset-0">
+            <Image
+              src={p.main_image}
+              alt={p.name}
+              fill
+              priority={index < 2}
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              className="object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+            />
+          </div>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-[#c0c8d4]">
             <Building2 className="h-10 w-10" />
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
-        {pill && <div className="absolute left-3 top-3"><Pill>{pill}</Pill></div>}
+        {pill && <div className="fp-pop absolute left-3 top-3"><Pill>{pill}</Pill></div>}
       </div>
-      <div className="mt-3 flex items-start justify-between gap-4">
+      <div className="fp-text mt-3 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h3 className="font-['Outfit'] text-lg font-bold leading-snug text-[#0d1117] line-clamp-1 group-hover:text-[#001f3f] transition-colors">
             {p.name}
@@ -218,22 +223,24 @@ export function FeaturedProjectsShowcase({ projects }: { projects: FeaturedProje
   const more = rest.slice(2)
 
   return (
-    <div>
-      <div className="grid grid-cols-1 gap-10 lg:grid-cols-3 lg:gap-8">
+    <div className="wf">
+      {/* Each row fires its own entrance as it scrolls in: the hero first,
+          the side cards 220ms apart behind it. */}
+      <InView className="grid grid-cols-1 gap-10 lg:grid-cols-3 lg:gap-8" threshold={0.15}>
         <div className="lg:col-span-2">
           <HeroCard p={hero} />
         </div>
         {side.length > 0 && (
           <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-1 lg:gap-8">
-            {side.map((p, i) => <SideCard key={p.id} p={p} index={i} />)}
+            {side.map((p, i) => <SideCard key={p.id} p={p} index={i} delay={260 + i * 220} />)}
           </div>
         )}
-      </div>
+      </InView>
 
       {more.length > 0 && (
-        <div className="mt-12 grid grid-cols-1 gap-10 border-t border-[#e8eaed] pt-12 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
-          {more.map((p) => <SideCard key={p.id} p={p} index={9} />)}
-        </div>
+        <InView className="mt-12 grid grid-cols-1 gap-10 border-t border-[#e8eaed] pt-12 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8" threshold={0.15}>
+          {more.map((p, i) => <SideCard key={p.id} p={p} index={9} delay={i * 180} />)}
+        </InView>
       )}
 
       <Link

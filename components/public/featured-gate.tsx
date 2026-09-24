@@ -10,8 +10,8 @@ import { useEffect, useRef } from "react"
  * scrolls through it. The stage shows the skyline with the section's title
  * over it, covered by two navy doors that carry the words "Featured
  * Projects" split down the middle. Scroll progress through the zone drives
- * everything: the doors slide apart, the skyline settles out of a zoom, and
- * the title beneath rises into place. Once the doors are fully open the
+ * everything: the doors swing open on hinges at the viewport edges, the
+ * skyline settles out of a zoom, and the title beneath rises into place. Once the doors are fully open the
  * stage unpins and the cards follow.
  *
  * Progress is written to CSS custom properties on an animation frame, so
@@ -114,18 +114,19 @@ export function FeaturedGate({ count }: { count: number }) {
         </div>
 
         {/* ── Doors ──────────────────────────────────────────────── */}
+        {/* Two panelled doors on hinges at the viewport edges. Each carries the
+            full title clipped to its half, so the words split as they swing.
+            Surface, lattice and frame are CSS (.gate-door in globals.css). */}
         <div className="gate-doors absolute inset-0 z-20" aria-hidden="true">
-          <div className="gate-door gate-door--l absolute inset-y-0 left-0 w-1/2 overflow-hidden bg-[#06182e]">
+          <div className="gate-door gate-door--l absolute inset-y-0 left-0 w-1/2 overflow-hidden">
             <div className="gate-door-text absolute left-0 top-1/2 w-screen -translate-y-1/2 px-6 text-center">
               <DoorWords label={label} />
             </div>
-            <span className="absolute inset-y-0 right-0 w-[2px] bg-[#d6b357]" />
           </div>
-          <div className="gate-door gate-door--r absolute inset-y-0 right-0 w-1/2 overflow-hidden bg-[#06182e]">
+          <div className="gate-door gate-door--r absolute inset-y-0 right-0 w-1/2 overflow-hidden">
             <div className="gate-door-text absolute -left-[50vw] top-1/2 w-screen -translate-y-1/2 px-6 text-center">
               <DoorWords label={label} />
             </div>
-            <span className="absolute inset-y-0 left-0 w-[2px] bg-[#d6b357]" />
           </div>
           <div className="gate-hint absolute inset-x-0 bottom-8 z-30 flex flex-col items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#d6b357]">
             Scroll to open

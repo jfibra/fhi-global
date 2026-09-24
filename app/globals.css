@@ -522,9 +522,49 @@
    --p is raw progress through the zone, --d the eased door opening, --s the
    eased title rise; all written by components/public/featured-gate.tsx on an
    animation frame. Nothing here has a duration: the scroll is the timeline. */
-.gate-door { will-change: transform; }
-.gate-door--l { transform: translate3d(calc(var(--d, 0) * -100%), 0, 0); }
-.gate-door--r { transform: translate3d(calc(var(--d, 0) * 100%), 0, 0); }
+.gate-doors { perspective: 1500px; perspective-origin: 50% 50%; }
+.gate-door {
+  will-change: transform;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(214, 179, 87, 0.10), rgba(214, 179, 87, 0) 60%),
+    linear-gradient(180deg, #0b2444 0%, #06182e 100%);
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+/* Octagon-and-square lattice, one octagon per 96px tile; the squares appear
+   where four tiles meet. Drawn in gold at low strength. */
+.gate-door::before {
+  content: ""; position: absolute; inset: 0; opacity: 0.11; pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96' fill='none' stroke='%23d6b357' stroke-width='1'><path d='M28 0.5H68L95.5 28V68L68 95.5H28L0.5 68V28Z'/></svg>");
+  background-size: 96px 96px;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,1) 40%, rgba(0,0,0,1) 60%, rgba(0,0,0,0.35));
+}
+/* The panel frame, inset like a real door's raised panel. */
+.gate-door::after {
+  content: ""; position: absolute; inset: 24px; pointer-events: none;
+  border: 1px solid rgba(214, 179, 87, 0.30);
+}
+/* No frame edge on the meeting side: closed, the two leaves read as one
+   panel; open, the frame splits with them. */
+.gate-door--l::after { right: 0; border-right: 0; }
+.gate-door--r::after { left: 0; border-left: 0; }
+@media (min-width: 1024px) {
+  .gate-door::after { inset: 40px; }
+  .gate-door--l::after { right: 0; }
+  .gate-door--r::after { left: 0; }
+}
+/* Hinged at the outer edges; the inner edges swing away into the scene, and
+   a shadow deepens along them as the gap opens. */
+.gate-door--l {
+  transform-origin: left center;
+  transform: rotateY(calc(var(--d, 0) * 100deg));
+  box-shadow: 12px 0 60px rgba(0, 0, 0, calc(0.55 * var(--d, 0)));
+}
+.gate-door--r {
+  transform-origin: right center;
+  transform: rotateY(calc(var(--d, 0) * -100deg));
+  box-shadow: -12px 0 60px rgba(0, 0, 0, calc(0.55 * var(--d, 0)));
+}
 .gate-stage[data-open="true"] .gate-doors { visibility: hidden; }
 .gate-hint { opacity: calc(1 - var(--d, 0) * 3); }
 .gate-scene-img { transform: scale(calc(1.14 - var(--d, 0) * 0.14)); }
@@ -541,4 +581,24 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .gate-cue-line { animation: none; }
+}
+
+/* ─── Featured Projects cards — entrance after the doors ────────────────────
+   Each card sets --d; its photo wipes open and settles out of a zoom, the
+   status pill pops in, and the text rises. Rows fire via InView. */
+.fp-img { clip-path: inset(100% 0 0 0); transition: clip-path 1200ms var(--wf-ease-io); transition-delay: var(--d, 0ms); }
+[data-in="true"] .fp-img { clip-path: inset(0 0 0 0); }
+.fp-zoom { transform: scale(1.16); transition: transform 2200ms var(--wf-ease); transition-delay: var(--d, 0ms); will-change: transform; }
+[data-in="true"] .fp-zoom { transform: scale(1); }
+.fp-pop { opacity: 0; transform: translateY(-10px) scale(0.92); transition: opacity 500ms var(--wf-ease), transform 700ms var(--wf-ease); transition-delay: calc(var(--d, 0ms) + 650ms); }
+[data-in="true"] .fp-pop { opacity: 1; transform: translateY(0) scale(1); }
+.fp-text {
+  opacity: 0; transform: translateY(18px); filter: blur(6px);
+  transition: opacity 900ms var(--wf-ease), transform 900ms var(--wf-ease), filter 900ms var(--wf-ease);
+  transition-delay: calc(var(--d, 0ms) + 450ms);
+}
+[data-in="true"] .fp-text { opacity: 1; transform: translateY(0); filter: blur(0); }
+@media (prefers-reduced-motion: reduce) {
+  .fp-img, .fp-zoom, .fp-pop, .fp-text { transition: none !important; opacity: 1 !important; transform: none !important; clip-path: none !important; filter: none !important; }
+  .gate-door::before { display: none; }
 }

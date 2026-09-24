@@ -8,6 +8,7 @@ import { Reveal } from "@/components/public/reveal";
 import { HomeFaq } from "@/components/public/home-faq";
 import { WhyFhi } from "@/components/public/why-fhi";
 import { FeaturedGate } from "@/components/public/featured-gate";
+import { InView } from "@/components/public/in-view";
 import { InvestCta, type CtaStat } from "@/components/public/invest-cta";
 import { faqPageSchema } from "@/lib/faqs";
 import { fhiOrganizationSchema, webSiteSchema } from "@/lib/structured-data";
@@ -307,8 +308,8 @@ export default async function HomePage() {
               <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/85 to-white/92" />
             </div>
             <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <Reveal>
-                <div className="mb-10 flex items-center justify-between gap-6">
+              <InView className="wf">
+                <div className="wf-fade mb-10 flex items-center justify-between gap-6">
                   <p className="inline-flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-[#0d1117]">
                     <span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true"></span>
                     {featuredProjects.length} featured {featuredProjects.length === 1 ? "project" : "projects"}
@@ -323,12 +324,10 @@ export default async function HomePage() {
                     </span>
                   </Link>
                 </div>
-              </Reveal>
-              <Reveal>
-                <FeaturedProjectsShowcase
-                  projects={featuredProjects as unknown as FeaturedProjectData[]}
-                />
-              </Reveal>
+              </InView>
+              <FeaturedProjectsShowcase
+                projects={featuredProjects as unknown as FeaturedProjectData[]}
+              />
             </div>
           </div>
         </section>
