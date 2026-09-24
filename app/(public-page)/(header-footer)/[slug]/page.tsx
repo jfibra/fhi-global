@@ -6,6 +6,9 @@ import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata, truncateDescription } from "@/lib/seo"
 import { ProjectCard, type ProjectCardData } from "@/components/project-card"
 import { Reveal } from "@/components/public/reveal"
+import { InView } from "@/components/public/in-view"
+import { CountUp } from "@/components/public/count-up"
+import { countByEmirate } from "@/lib/emirates"
 import { SOCIAL_URLS } from "@/lib/social"
 import { getSeoPage, NON_UAE_CITIES, SEO_PAGES, type SeoPage, type SeoPageFilter } from "@/lib/seo-pages"
 import { ContactForm } from "../contact/contact-form"
@@ -154,6 +157,19 @@ export default async function DeveloperDetailPage({ params }: Props) {
     .map((p) => ({ ...p, main_image: p.main_image?.trim() || galleryFallback.get(p.id) || null }))
     .filter((p) => p.main_image)
 
+  // Hero counters — live projects, distinct communities and emirates, all
+  // from this developer's published rows.
+  const liveCount = (projects ?? []).length
+  const communityCount = new Set(
+    (projects ?? []).map((p) => (p.community ?? p.location ?? "").trim().toLowerCase()).filter(Boolean),
+  ).size
+  const emirateCount = Object.keys(countByEmirate(projects ?? [])).length
+  const heroStats = [
+    { value: liveCount, label: liveCount === 1 ? "Live project" : "Live projects" },
+    { value: communityCount, label: communityCount === 1 ? "Community" : "Communities" },
+    { value: emirateCount, label: emirateCount === 1 ? "Emirate" : "Emirates" },
+  ].filter((st) => st.value > 0)
+
   // Published agent listings under this developer's projects (the "on the
   // market right now" view — bridges the projects catalog to buy/rent).
   type DevListing = {
@@ -240,20 +256,21 @@ export default async function DeveloperDetailPage({ params }: Props) {
           <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-white/70 to-transparent" />
         </div>
 
-        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-8">
+        <InView className="wf relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-8" threshold={0.05} rootMargin="0px">
           {/* Back */}
           <Link
             href="/developers"
-            className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#0d1117] hover:text-[#b8913f] transition-colors"
+            className="wf-fade inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#0d1117] hover:text-[#b8913f] transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> All Developers
           </Link>
 
           <div className="mt-5 flex flex-col sm:flex-row items-start gap-6">
-            {/* Logo */}
+            {/* Logo — the box the homepage tile's logo morphs into. */}
             <div
-              className="w-32 h-32 md:w-36 md:h-36 bg-white border border-[#d6b357]/50 shadow-[0_12px_32px_-16px_rgba(0,20,40,0.3)] flex items-center justify-center shrink-0 overflow-hidden"
-              style={developer.logo_bg ? { backgroundColor: developer.logo_bg } : undefined}
+              data-vt="developer-logo"
+              className="wf-fade w-32 h-32 md:w-36 md:h-36 bg-white border border-[#d6b357]/50 shadow-[0_12px_32px_-16px_rgba(0,20,40,0.3)] flex items-center justify-center shrink-0 overflow-hidden"
+              style={{ viewTransitionName: "developer-logo", ["--d" as string]: "100ms", ...(developer.logo_bg ? { backgroundColor: developer.logo_bg } : {}) }}
             >
               {developer.logo_url ? (
                 <Image
@@ -271,22 +288,36 @@ export default async function DeveloperDetailPage({ params }: Props) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="font-['Outfit'] text-3xl md:text-[40px] font-bold text-[#001f3f] leading-[1.08]">
-                  {developer.name}
+                  {String(developer.name).split(" ").map((w: string, i: number) => (
+                    <span key={`${w}-${i}`} className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: i }}>{w}</span></span>
+                  ))}
                 </h1>
                 {developer.is_verified && (
-                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-white/85 border border-[#d6b357] text-[#b8913f] text-xs font-bold uppercase tracking-wider">
+                  <span className="wf-fade inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-white/85 border border-[#d6b357] text-[#b8913f] text-xs font-bold uppercase tracking-wider" style={{ ["--d" as string]: "600ms" }}>
                     <CheckCircle2 className="w-3.5 h-3.5" /> Verified
                   </span>
                 )}
               </div>
-              <span className="block w-12 h-1 bg-[#d6b357] mt-3 mb-3" aria-hidden="true" />
-              <p className="text-[15px] text-[#374151] max-w-2xl mb-2">
+              <span className="wf-rule block w-12 h-1 bg-[#d6b357] mt-3 mb-3" aria-hidden="true" />
+              <p className="wf-fade text-[15px] text-[#374151] max-w-2xl mb-2" style={{ ["--d" as string]: "700ms" }}>
                 New Dubai launches, price drops and open houses — first.
               </p>
               {developer.address && (
-                <div className="flex items-start gap-2 text-sm text-[#4b5563] max-w-xl">
+                <div className="wf-fade flex items-start gap-2 text-sm text-[#4b5563] max-w-xl" style={{ ["--d" as string]: "800ms" }}>
                   <MapPin className="w-4 h-4 text-[#b8913f] shrink-0 mt-0.5" /> {developer.address}
                 </div>
+              )}
+              {heroStats.length > 0 && (
+                <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-3">
+                  {heroStats.map((st, i) => (
+                    <div key={st.label} className="wf-fade" style={{ ["--d" as string]: `${900 + i * 120}ms` }}>
+                      <dd className="font-['Outfit'] text-[28px] font-bold leading-none text-[#001f3f]">
+                        <CountUp value={st.value} delay={1000 + i * 120} duration={1100} />
+                      </dd>
+                      <dt className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#b8913f]">{st.label}</dt>
+                    </div>
+                  ))}
+                </dl>
               )}
             </div>
           </div>
@@ -295,11 +326,12 @@ export default async function DeveloperDetailPage({ params }: Props) {
               title, subline, arrow. Square everything. */}
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <a
+              style={{ ["--d" as string]: "1100ms" }}
               href={SOCIAL_URLS.facebook}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Follow FHI Global on Facebook"
-              className="group flex items-center gap-4 px-5 py-4 bg-white border border-[#e5e8ec] shadow-[0_14px_36px_-20px_rgba(0,20,40,0.4)] hover:border-[#d6b357]/60 transition-colors"
+              className="wf-fade group flex items-center gap-4 px-5 py-4 bg-white border border-[#e5e8ec] shadow-[0_14px_36px_-20px_rgba(0,20,40,0.4)] hover:border-[#d6b357]/60 transition-colors"
             >
               <span className="w-11 h-11 bg-[#1877F2] flex items-center justify-center shrink-0">
                 <Facebook className="w-5 h-5 text-white fill-current" />
@@ -311,9 +343,10 @@ export default async function DeveloperDetailPage({ params }: Props) {
               <ArrowLeft className="w-5 h-5 rotate-180 text-[#001f3f] shrink-0 transition-transform group-hover:translate-x-1" />
             </a>
             <a
+              style={{ ["--d" as string]: "1250ms" }}
               href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Enquiry — ${developer.name}`)}`}
               aria-label={`Email FHI Global about ${developer.name}`}
-              className="group flex items-center gap-4 px-5 py-4 bg-white border border-[#e5e8ec] shadow-[0_14px_36px_-20px_rgba(0,20,40,0.4)] hover:border-[#d6b357]/60 transition-colors"
+              className="wf-fade group flex items-center gap-4 px-5 py-4 bg-white border border-[#e5e8ec] shadow-[0_14px_36px_-20px_rgba(0,20,40,0.4)] hover:border-[#d6b357]/60 transition-colors"
             >
               <span className="w-11 h-11 bg-[#d6b357] flex items-center justify-center shrink-0">
                 <Mail className="w-5 h-5 text-white" />
@@ -325,7 +358,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
               <ArrowLeft className="w-5 h-5 rotate-180 text-[#001f3f] shrink-0 transition-transform group-hover:translate-x-1" />
             </a>
           </div>
-        </div>
+        </InView>
       </section>
 
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">

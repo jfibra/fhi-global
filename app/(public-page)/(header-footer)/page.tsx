@@ -4,7 +4,6 @@ import Link from "next/link";
 import { getCachedHomePageData } from "@/lib/data/home";
 import { createPageMetadata } from "@/lib/seo";
 import { HeroSection } from "@/components/hero-section";
-import { Reveal } from "@/components/public/reveal";
 import { HomeFaq } from "@/components/public/home-faq";
 import { WhyFhi } from "@/components/public/why-fhi";
 import { FeaturedGate } from "@/components/public/featured-gate";
@@ -15,10 +14,7 @@ import { InvestCta, type CtaStat } from "@/components/public/invest-cta";
 import { faqPageSchema } from "@/lib/faqs";
 import { fhiOrganizationSchema, webSiteSchema } from "@/lib/structured-data";
 import { JsonLd } from "@/components/json-ld";
-import {
-  DeveloperLogoCarousel,
-  type DeveloperLogoItem,
-} from "@/components/public/developer-logo-carousel";
+import { DeveloperMarquee, type DeveloperTileItem } from "@/components/public/developer-marquee";
 import {
   FeaturedProjectsShowcase,
   type FeaturedProjectData,
@@ -245,39 +241,54 @@ export default async function HomePage() {
             <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/75" />
           </div>
 
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Section header */}
-            <Reveal>
-            <div className="mb-10 max-w-2xl">
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f]">Our Partners</p>
-              <h2 className="font-['Outfit'] text-3xl md:text-[42px] font-bold tracking-tight leading-[1.12] mt-3">
-                <span className="text-[#0d1117]">Trusted Developers,</span>
-                <br />
-                <span className="text-[#0d1117]">Building </span>
-                <span className="text-[#b8913f]">Dubai&rsquo;s Future</span>
-              </h2>
-              <p className="text-[15.5px] leading-relaxed text-[#4b5563] mt-4">
-                We collaborate with the UAE&rsquo;s most trusted and innovative real estate
-                developers to bring you exceptional properties and investment opportunities.
-              </p>
+          <InView className="wf relative" threshold={0.2}>
+            <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                <div className="max-w-2xl">
+                  <p className="wf-fade inline-flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f]">
+                    <span className="w-6 h-[3px] bg-[#d6b357]" aria-hidden="true" />
+                    Our Partners
+                  </p>
+                  <h2 className="font-['Outfit'] text-3xl md:text-[42px] font-bold tracking-tight leading-[1.12] mt-3">
+                    <span className="block text-[#0d1117]">
+                      {["Trusted", "Developers,"].map((w, i) => (
+                        <span key={w} className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: i }}>{w}</span></span>
+                      ))}
+                    </span>
+                    <span className="block">
+                      <span className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 2 }} className="text-[#0d1117]">Building</span></span>
+                      {["Dubai\u2019s", "Future"].map((w, i) => (
+                        <span key={w} className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 3 + i }} className="wf-gold">{w}</span></span>
+                      ))}
+                    </span>
+                  </h2>
+                  <p className="wf-fade text-[15.5px] leading-relaxed text-[#4b5563] mt-4" style={{ ["--d" as string]: "600ms" }}>
+                    We collaborate with the UAE&rsquo;s most trusted and innovative real estate
+                    developers to bring you exceptional properties and investment opportunities.
+                  </p>
+                </div>
+                <Link
+                  href="/developers"
+                  className="wf-fade hidden sm:inline-flex items-center gap-2 text-sm font-bold text-[#0d1117] hover:text-[#b8913f] transition-colors shrink-0"
+                  style={{ ["--d" as string]: "800ms" }}
+                >
+                  All developers
+                  <span className="w-8 h-8 bg-[#d6b357] flex items-center justify-center">
+                    <ArrowRight className="w-4 h-4 text-[#001f3f]" />
+                  </span>
+                </Link>
+              </div>
             </div>
-            </Reveal>
 
-            <Reveal>
-              <DeveloperLogoCarousel
-                developers={developers as DeveloperLogoItem[]}
-              />
-            </Reveal>
-
-          </div>
-
-          {/* Navy sweep with gold trim along the bottom edge (mockup) */}
-          {/* <div className="absolute bottom-0 left-0 right-0 pointer-events-none" aria-hidden="true">
-            <svg viewBox="0 0 1440 110" preserveAspectRatio="none" className="block w-full h-[70px] sm:h-[90px]">
-              <path d="M0,110 L0,58 C420,100 980,4 1440,44 L1440,110 Z" fill="#d6b357" />
-              <path d="M0,110 L0,72 C420,112 980,20 1440,58 L1440,110 Z" fill="#001f3f" />
-            </svg>
-          </div> */}
+            {/* Full-bleed marquee; tiles carry live project counts and morph
+                into the developer page's logo on click. */}
+            <DeveloperMarquee
+              developers={(developers as DeveloperTileItem[]).map((d) => ({
+                ...d,
+                projectCount: developerCounts.get(d.slug)?.count ?? 0,
+              }))}
+            />
+          </InView>
         </section>
       )}
 

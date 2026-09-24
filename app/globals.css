@@ -792,3 +792,36 @@
   .pp-sticky[data-show="false"] { transform: translateY(110%) !important; }
   .pp-lightbox { animation: none; }
 }
+
+/* ─── Trusted Developers marquee ────────────────────────────────────────────
+   Tiles flip in from the left on entry (.dv-tile, --i stagger), then the
+   track drifts left forever, pausing on hover. The inner .dv-tile-in lifts
+   and tilts toward the pointer (--tx/--ty from the component). */
+.dv-strip { -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); }
+.dv-track { width: max-content; animation: dv-marquee var(--dur, 40s) linear infinite; }
+.dv-strip:hover .dv-track, .dv-strip:focus-within .dv-track { animation-play-state: paused; }
+@keyframes dv-marquee { to { transform: translateX(calc(-50% - 10px)); } }
+
+.dv-tile { perspective: 900px; opacity: 0; transform: translateX(28px); transition: opacity 600ms var(--wf-ease), transform 900ms var(--wf-ease); transition-delay: calc(var(--i, 0) * 90ms); }
+.dv-tile-in { transform-origin: left center; transform: rotateY(65deg); transition: transform 900ms var(--wf-ease), box-shadow 400ms var(--wf-ease), border-color 300ms; transition-delay: calc(var(--i, 0) * 90ms); will-change: transform; }
+[data-in="true"] .dv-tile { opacity: 1; transform: translateX(0); }
+[data-in="true"] .dv-tile-in {
+  transform-origin: center center;
+  transform: translateY(calc(var(--lift, 0) * -1px)) rotateX(calc(var(--ty, 0) * -5deg)) rotateY(calc(var(--tx, 0) * 6deg));
+  transition-delay: 0ms;
+  transition-duration: 500ms;
+}
+.dv-tile:hover .dv-tile-in, .dv-tile:focus-visible .dv-tile-in { --lift: 8; box-shadow: 0 22px 44px -18px rgba(0, 31, 63, 0.45); border-color: rgba(214, 179, 87, 0.6); }
+.dv-tile-line { transform: scaleX(0); transform-origin: left center; transition: transform 500ms var(--wf-ease); }
+.dv-tile:hover .dv-tile-line, .dv-tile:focus-visible .dv-tile-line { transform: scaleX(1); }
+.dv-tile-bar { transform: translateY(100%); transition: transform 420ms var(--wf-ease); }
+.dv-tile:hover .dv-tile-bar, .dv-tile:focus-visible .dv-tile-bar { transform: translateY(0); }
+
+::view-transition-group(developer-logo) { animation-duration: 600ms; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+::view-transition-old(developer-logo), ::view-transition-new(developer-logo) { height: 100%; width: 100%; object-fit: contain; animation-duration: 600ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dv-track { animation: none; }
+  .dv-strip { overflow-x: auto; -webkit-mask-image: none; mask-image: none; }
+  .dv-tile, .dv-tile-in { transition: none !important; opacity: 1 !important; transform: none !important; }
+}
