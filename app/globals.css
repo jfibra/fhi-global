@@ -939,3 +939,15 @@
   .jf-frame-img { transform: none !important; filter: none !important; }
   .jf-frame-bar { transform: scaleX(1) !important; }
 }
+
+/* Evidence walls behind the reel's figures: oversized, tilted a little, and
+   drifting diagonally while their slide is active. */
+.nr-wall { overflow: hidden; }
+.nr-wall-grid {
+  position: absolute; left: -12%; top: -14%; width: 128%;
+  transform: rotate(-4deg) translate3d(0, 0, 0);
+  will-change: transform;
+}
+.nr-wall--on .nr-wall-grid { animation: nr-drift 46s ease-in-out infinite alternate; }
+@keyframes nr-drift { from { transform: rotate(-4deg) translate3d(0, 0, 0); } to { transform: rotate(-4deg) translate3d(-5%, -7%, 0); } }
+@media (prefers-reduced-motion: reduce) { .nr-wall--on .nr-wall-grid { animation: none; } }

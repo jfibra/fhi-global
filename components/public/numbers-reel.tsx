@@ -4,14 +4,24 @@ import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { ArrowUpRight } from "lucide-react"
+import { UAE_EMIRATES, UAE_VIEWBOX } from "@/lib/uae-emirates"
+
+/** What stands behind a figure: the evidence for it. */
+export type ReelBackdrop =
+  | { kind: "photo"; src: string; alt: string }
+  /** A drifting wall of real images: project renders, agent portraits. */
+  | { kind: "mosaic"; images: { src: string; alt: string }[]; shape?: "landscape" | "square" | "portrait" }
+  /** A drifting wall of logos on their own tiles. */
+  | { kind: "logos"; logos: { src: string; alt: string; bg?: string | null }[] }
+  /** The emirates, lit by count. */
+  | { kind: "map"; counts: Record<string, number> }
 
 export type ReelItem = {
   value: number
   label: string
   note: string
   href?: string
-  image: string
-  imageAlt: string
+  backdrop: ReelBackdrop
   /** Set the figure in gold (for the one that is a promise, not a count). */
   accent?: boolean
 }
@@ -19,18 +29,90 @@ export type ReelItem = {
 /**
  * A documentary statistics sequence. A zone several viewports tall pins a
  * full-screen stage; scrolling through it moves from one figure to the next.
- * Each figure fills the screen in huge type over its own photograph, counting
- * up as its slide arrives, with a caption and a link to where the reader can
- * check it. A rail of chapters on the left tracks the position and jumps on
- * click; a gold line along the bottom fills with progress.
+ * Each figure fills the screen in huge type over the evidence for it: a
+ * drifting wall of the real project renders, the real developer logos, the
+ * emirates lit by count, the agents' own portraits. The figure counts up as
+ * its slide arrives. A rail of chapters on the left tracks the position and
+ * jumps on click; a gold line along the bottom fills with progress.
  *
  * Progress is written on an animation frame to CSS variables and to the
  * number text; React state changes only when the active slide changes.
  * Reduced-motion readers get the slides stacked and every figure complete.
  */
+/** Cycle a short list until the wall has enough tiles to cover the stage. */
+function fill<T>(list: T[], min: number): T[] {
+  if (list.length === 0) return list
+  const out: T[] = []
+  while (out.length < min) out.push(...list)
+  return out
+}
+
 const easeOut = (t: number) => 1 - Math.pow(1 - t, 4)
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 const fmt = (n: number) => Math.round(n).toLocaleString("en-US")
+
+function Backdrop({ b, active, first }: { b: ReelBackdrop; active: boolean; first: boolean }) {
+  if (b.kind === "photo") {
+    return (
+      <div className="nr-slide-img absolute inset-0">
+        <Image src={b.src} alt={b.alt} fill sizes="100vw" className="object-cover object-center" priority={first} />
+      </div>
+    )
+  }
+  if (b.kind === "map") {
+    const max = Math.max(1, ...Object.values(b.counts))
+    return (
+      <div className="nr-slide-img absolute inset-0">
+        <svg viewBox={UAE_VIEWBOX} preserveAspectRatio="xMidYMid slice" className="absolute inset-y-0 right-0 h-full w-full lg:left-[22%] lg:w-auto" aria-hidden="true">
+          <defs>
+            <filter id="nr-map-glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="8" />
+            </filter>
+          </defs>
+          {UAE_EMIRATES.map((p) => {
+            const c = b.counts[p.code] ?? 0
+            const lit = c > 0
+            const o = lit ? 0.22 + 0.65 * Math.pow(c / max, 0.6) : 0.05
+            return (
+              <g key={p.code}>
+                {lit && <path d={p.d} fill="#d6b357" fillOpacity={o * 0.8} filter="url(#nr-map-glow)" />}
+                <path d={p.d} fill="#d6b357" fillOpacity={o} stroke="#f0d89b" strokeOpacity={lit ? 0.9 : 0.35} strokeWidth={1.2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              </g>
+            )
+          })}
+        </svg>
+      </div>
+    )
+  }
+  if (b.kind === "logos") {
+    return (
+      <div className={`nr-wall absolute inset-0 ${active ? "nr-wall--on" : ""}`}>
+        <div className="nr-wall-grid grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-8">
+          {fill(b.logos, 56).map((l, i) => (
+            <div key={`${l.src}-${i}`} className="flex aspect-[4/3] items-center justify-center bg-white p-4" style={l.bg ? { backgroundColor: l.bg } : undefined}>
+              <Image src={l.src} alt={l.alt} width={160} height={80} unoptimized={l.src.toLowerCase().includes(".svg")} className="max-h-[70%] w-auto max-w-[80%] object-contain" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+  const shape = b.shape ?? "landscape"
+  const cols = shape === "square" ? "grid-cols-5 sm:grid-cols-7 lg:grid-cols-9" : shape === "portrait" ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-6" : "grid-cols-3 sm:grid-cols-4 lg:grid-cols-6"
+  const ratio = shape === "square" ? "aspect-square" : shape === "portrait" ? "aspect-[3/4]" : "aspect-[4/3]"
+  const min = shape === "square" ? 72 : shape === "portrait" ? 30 : 42
+  return (
+    <div className={`nr-wall absolute inset-0 ${active ? "nr-wall--on" : ""}`}>
+      <div className={`nr-wall-grid grid gap-2 ${cols}`}>
+        {fill(b.images, min).map((im, i) => (
+          <div key={`${im.src}-${i}`} className={`relative overflow-hidden bg-[#0a1f38] ${ratio}`}>
+            <Image src={im.src} alt={im.alt} fill sizes={shape === "square" ? "160px" : "260px"} className="object-cover" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export function NumbersReel({
   items,
@@ -123,15 +205,14 @@ export function NumbersReel({
       </noscript>
 
       <div ref={stageRef} className="nr-stage sticky top-0 h-screen overflow-hidden bg-[#06182e] text-white">
-        {/* Slides: photo, scrim, and the figure */}
+        {/* Slides: the evidence, the scrim, and the figure */}
         {items.map((it, i) => {
           const state = i === active ? "active" : i < active ? "past" : "next"
+          const wall = it.backdrop.kind !== "photo"
           return (
             <div key={it.label} className="nr-slide absolute inset-0" data-state={state} aria-hidden={i !== active}>
-              <div className="nr-slide-img absolute inset-0">
-                <Image src={it.image} alt={it.imageAlt} fill sizes="100vw" className="object-cover object-center" priority={i === 0} />
-              </div>
-              <div className="absolute inset-0 bg-gradient-to-r from-[#06182e]/95 via-[#06182e]/70 to-[#06182e]/35" aria-hidden="true" />
+              <Backdrop b={it.backdrop} active={i === active} first={i === 0} />
+              <div className={`absolute inset-0 bg-gradient-to-r ${wall ? "from-[#06182e]/97 via-[#06182e]/80 to-[#06182e]/45" : "from-[#06182e]/95 via-[#06182e]/70 to-[#06182e]/35"}`} aria-hidden="true" />
               <div className="absolute inset-0 bg-gradient-to-t from-[#06182e] via-[#06182e]/20 to-[#06182e]/60" aria-hidden="true" />
 
               <div className="relative mx-auto flex h-full max-w-[1440px] flex-col justify-center px-4 sm:px-6 lg:px-8 lg:pl-[26rem]">

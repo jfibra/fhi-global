@@ -7,7 +7,7 @@ import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { countByEmirate } from "@/lib/emirates"
 import { InView } from "@/components/public/in-view"
-import { NumbersReel, type ReelItem } from "@/components/public/numbers-reel"
+import { NumbersReel, type ReelItem, type ReelBackdrop } from "@/components/public/numbers-reel"
 import { JourneyFilm, type FilmStep } from "@/components/public/journey-film"
 import { MagneticLink } from "@/components/public/magnetic-link"
 import { ScrollLines } from "@/components/public/scroll-lines"
@@ -86,25 +86,70 @@ function Words({ text, start, className }: { text: string; start: number; classN
 export default async function AboutPage() {
   const supabase = createPublicSupabaseClient()
   const admin = createAdminSupabase()
-  const [{ data: rows }, { count: eventCount }, { count: photoCount }, { count: agentCount }] = await Promise.all([
-    supabase.from("projects").select("city, developer_id").eq("is_active", true).eq("is_published", true).is("deleted_at", null).limit(4000),
-    supabase.from("events").select("id", { count: "exact", head: true }).eq("status", "published"),
+  // Counts and the evidence for each: the renders, logos, portraits and
+  // covers that stand behind the figures in the reel.
+  const [{ data: rows }, { data: eventRows, count: eventCount }, { count: photoCount }, { count: agentCount }, { data: agentRows }, { data: devRows }] = await Promise.all([
+    supabase.from("projects").select("name, city, developer_id, main_image, is_featured").eq("is_active", true).eq("is_published", true).is("deleted_at", null).order("is_featured", { ascending: false }).order("created_at", { ascending: false }).limit(4000),
+    supabase.from("events").select("title, image_url", { count: "exact" }).eq("status", "published").is("deleted_at", null).order("event_date", { ascending: false }).limit(12),
     supabase.from("gallery_photos").select("id", { count: "exact", head: true }).eq("album_id", ALBUM_ID),
     admin.from("profiles").select("id", { count: "exact", head: true }).in("role", ["agent", "team_leader"]).eq("status", "active"),
+    admin.from("profiles").select("fullname, profile_url").in("role", ["agent", "team_leader"]).eq("status", "active").not("profile_url", "is", null).order("fullname", { ascending: true }).limit(36),
+    supabase.from("developers").select("name, logo_url, logo_bg").eq("is_active", true).is("deleted_at", null).not("logo_url", "is", null).order("name").limit(32),
   ])
-  const projects = (rows ?? []) as { city: string | null; developer_id: string | null }[]
+  const projects = (rows ?? []) as { name: string; city: string | null; developer_id: string | null; main_image: string | null; is_featured: boolean | null }[]
   const projectCount = projects.length
   const developerCount = new Set(projects.map((p) => p.developer_id).filter(Boolean)).size
-  const emirateCount = Object.keys(countByEmirate(projects)).length
+  const emirateCounts = countByEmirate(projects)
+  const emirateCount = Object.keys(emirateCounts).length
 
+  const projectWall = projects
+    .filter((p) => p.main_image?.trim())
+    .slice(0, 30)
+    .map((p) => ({ src: p.main_image as string, alt: `${p.name} render` }))
+  const logoWall = ((devRows ?? []) as { name: string; logo_url: string | null; logo_bg: string | null }[])
+    .filter((d) => d.logo_url)
+    .map((d) => ({ src: d.logo_url as string, alt: `${d.name} logo`, bg: d.logo_bg }))
+  const agentWall = ((agentRows ?? []) as { fullname: string | null; profile_url: string | null }[])
+    .filter((a) => a.profile_url)
+    .map((a) => ({ src: a.profile_url as string, alt: a.fullname ? `${a.fullname}, FHI Global agent` : "FHI Global agent" }))
+  const eventWall = ((eventRows ?? []) as { title: string; image_url: string | null }[])
+    .filter((e) => e.image_url)
+    .map((e) => ({ src: e.image_url as string, alt: `${e.title} event` }))
+
+  const bd = (b: ReelBackdrop): ReelBackdrop => b
+  const teamPhoto = { kind: "photo" as const, src: PHOTOS.team.url, alt: PHOTOS.team.alt }
   const numbers: ReelItem[] = [
-    { value: projectCount, label: "Live projects", note: "Published on this site right now, each with its own page, price and payment plan where the developer has released them.", href: "/projects", image: "/background/home.webp", imageAlt: "Dubai skyline at golden hour" },
-    { value: developerCount, label: "Developers", note: "With projects selling through us today. We work with them directly, so the price you see is theirs.", href: "/developers", image: PHOTOS.model.url, imageAlt: PHOTOS.model.alt },
-    { value: emirateCount, label: "Emirates", note: "Where those projects stand. Dubai leads, and the northern emirates and Abu Dhabi are on the map too.", href: "/projects", image: "/background/dubai.webp", imageAlt: "Dubai skyline and marina" },
-    { value: agentCount ?? 0, label: "Agents and team leaders", note: "Active on the platform, each with a page of their own. One of them stays with you from first search to handover.", href: "/agents", image: PHOTOS.team.url, imageAlt: PHOTOS.team.alt },
-    { value: eventCount ?? 0, label: "Investor events", note: "Hosted in Dubai so far, with more coming. Meet the developers and the team in one room.", href: "/events", image: PHOTOS.leaders.url, imageAlt: PHOTOS.leaders.alt },
+    {
+      value: projectCount, label: "Live projects", href: "/projects",
+      note: "Published on this site right now, each with its own page, price and payment plan where the developer has released them.",
+      backdrop: bd(projectWall.length >= 12 ? { kind: "mosaic" as const, images: projectWall } : { kind: "photo" as const, src: "/background/home.webp", alt: "Dubai skyline at golden hour" }),
+    },
+    {
+      value: developerCount, label: "Developers", href: "/developers",
+      note: "With projects selling through us today. We work with them directly, so the price you see is theirs.",
+      backdrop: bd(logoWall.length >= 8 ? { kind: "logos" as const, logos: logoWall } : { kind: "photo" as const, src: PHOTOS.model.url, alt: PHOTOS.model.alt }),
+    },
+    {
+      value: emirateCount, label: "Emirates", href: "/projects",
+      note: "Where those projects stand. Dubai leads, and the northern emirates and Abu Dhabi are on the map too.",
+      backdrop: bd({ kind: "map" as const, counts: emirateCounts }),
+    },
+    {
+      value: agentCount ?? 0, label: "Agents and team leaders", href: "/agents",
+      note: "Active on the platform, each with a page of their own. One of them stays with you from first search to handover.",
+      backdrop: bd(agentWall.length >= 12 ? { kind: "mosaic" as const, images: agentWall, shape: "square" } : teamPhoto),
+    },
+    {
+      value: eventCount ?? 0, label: "Investor events", href: "/events",
+      note: "Hosted in Dubai so far, with more coming. Meet the developers and the team in one room.",
+      backdrop: bd(eventWall.length >= 3 ? { kind: "mosaic" as const, images: eventWall, shape: "portrait" as const } : { kind: "photo" as const, src: PHOTOS.leaders.url, alt: PHOTOS.leaders.alt }),
+    },
   ].filter((n) => n.value > 0)
-  numbers.push({ value: 0, label: "Fees charged to buyers", note: "The developer pays our commission. Never you. Consultations, shortlists and site visits cost nothing.", image: PHOTOS.celebrate.url, imageAlt: PHOTOS.celebrate.alt, accent: true })
+  numbers.push({
+    value: 0, label: "Fees charged to buyers", accent: true,
+    note: "The developer pays our commission. Never you. Consultations, shortlists and site visits cost nothing.",
+    backdrop: bd({ kind: "photo" as const, src: PHOTOS.celebrate.url, alt: PHOTOS.celebrate.alt }),
+  })
 
   return (
     <div className="ab wf relative bg-[#fafafa] overflow-x-clip">
