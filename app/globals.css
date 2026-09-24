@@ -462,3 +462,58 @@
   .cta-scan { display: none; }
   .cta-gold { background-position: 0 0; }
 }
+
+/* ─── Homepage FAQ — a ruled ledger ────────────────────────────────────────
+   Reuses the .wf-* rail choreography (rule, masked words, shimmer, fades)
+   via the `wf` class on the section. The list: hairlines rule the page top
+   to bottom first, then each question writes itself in beneath its line. */
+.faq { interpolate-size: allow-keywords; }
+
+.faq-row::before,
+.faq-list::after {
+  content: ""; position: absolute; left: 0; right: 0; height: 1px; background: #e8eaed;
+  transform: scaleX(0); transform-origin: left center;
+  transition: transform 900ms var(--wf-ease);
+}
+.faq-row::before { top: 0; transition-delay: calc(120ms + var(--i, 0) * 90ms); }
+.faq-list::after { bottom: 0; transition-delay: calc(120ms + var(--n, 8) * 90ms); }
+[data-in="true"] .faq-row::before,
+[data-in="true"] .faq-list::after { transform: scaleX(1); }
+
+.faq-q {
+  opacity: 0; transform: translateX(-14px);
+  transition: opacity 700ms var(--wf-ease), transform 700ms var(--wf-ease), background-color 300ms;
+  transition-delay: calc(420ms + var(--i, 0) * 90ms), calc(420ms + var(--i, 0) * 90ms), 0ms;
+}
+[data-in="true"] .faq-q { opacity: 1; transform: translateX(0); }
+
+/* Open state: tinted row, gold question, an underline that grows, plus → cross. */
+.faq-row { transition: background-color 400ms var(--wf-ease); }
+.faq-row[open] { background: #f7f8fa; }
+.faq-row:not([open]) .faq-q:hover .faq-title { color: #001f3f; }
+.faq-row[open] .faq-title { color: #b8913f; }
+.faq-underline { transform: scaleX(0); transform-origin: left center; transition: transform 500ms var(--wf-ease); }
+.faq-row[open] .faq-underline { transform: scaleX(1); }
+.faq-row[open] .faq-plus { background: #d6b357; border-color: #d6b357; color: #001f3f; }
+.faq-row[open] .faq-plus svg { transform: rotate(45deg); }
+.faq-q:hover .faq-plus { border-color: #d6b357; }
+
+/* Answer: height animates where ::details-content is supported; the text
+   eases up beneath it either way. */
+.faq-row::details-content {
+  height: 0; overflow: clip;
+  transition: height 480ms var(--wf-ease), content-visibility 480ms allow-discrete;
+}
+.faq-row[open]::details-content { height: auto; }
+.faq-a { opacity: 0; transform: translateY(8px); transition: opacity 400ms var(--wf-ease) 120ms, transform 400ms var(--wf-ease) 120ms; }
+.faq-row[open] .faq-a { opacity: 1; transform: translateY(0); }
+
+.faq-q:focus-visible { outline: 3px solid #d6b357; outline-offset: -3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .faq-row::before, .faq-list::after, .faq-q, .faq-a, .faq-underline, .faq-plus svg, .faq-row::details-content {
+    transition: none !important; opacity: 1 !important; transform: none !important;
+  }
+  .faq-row[open] .faq-plus svg { transform: rotate(45deg) !important; }
+  .faq-row[open] .faq-underline { transform: scaleX(1) !important; }
+}
