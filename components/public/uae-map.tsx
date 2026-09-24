@@ -98,7 +98,28 @@ function Label({ code, cx, cy, name, count, dim }: { code: string; cx: number; c
   )
 }
 
-export function UaeMap({ counts }: { counts: Record<string, number> }) {
+export function UaeMap({
+  counts,
+  eyebrow = "Where we build",
+  titleTop = "Projects across",
+  intro,
+  linkParams,
+  hideEmpty = false,
+}: {
+  counts: Record<string, number>
+  /** Small gold label above the heading. */
+  eyebrow?: string
+  /** First line of the heading; the second is always "N emirates." */
+  titleTop?: string
+  /** Paragraph under the heading; the default explains the site-wide count. */
+  intro?: string
+  /** Extra query parameters for each emirate row's link, e.g. { developer: id };
+   *  the row always adds its own `city`. Plain data, since this is a client component. */
+  linkParams?: Record<string, string>
+  /** Leave emirates with no projects out of the list (the map still draws them). */
+  hideEmpty?: boolean
+}) {
+  const hrefFor = (cityParam: string) => `/projects?${new URLSearchParams({ ...(linkParams ?? {}), city: cityParam }).toString()}`
   const [active, setActive] = useState<string | null>(null)
   const tiltRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -141,7 +162,9 @@ export function UaeMap({ counts }: { counts: Record<string, number> }) {
 
   const max = Math.max(1, ...Object.values(counts))
   const lit = EMIRATES.filter((e) => (counts[e.code] ?? 0) > 0)
-  const rows = [...EMIRATES].sort((a, b) => (counts[b.code] ?? 0) - (counts[a.code] ?? 0))
+  const rows = [...EMIRATES]
+    .filter((e) => !hideEmpty || (counts[e.code] ?? 0) > 0)
+    .sort((a, b) => (counts[b.code] ?? 0) - (counts[a.code] ?? 0))
   const total = Object.values(counts).reduce((n, c) => n + c, 0)
   const rank = (code: string) => rows.findIndex((e) => e.code === code)
 
@@ -167,15 +190,14 @@ export function UaeMap({ counts }: { counts: Record<string, number> }) {
           <div className="lg:col-span-5">
             <p className="wf-fade inline-flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-[#d6b357]">
               <span className="h-[3px] w-6 bg-[#d6b357]" aria-hidden="true" />
-              Where we build
+              {eyebrow}
             </p>
             <h2 className="mt-5 font-['Outfit'] text-[38px] font-bold leading-[1.05] tracking-tight sm:text-[48px]">
-              <span className="wf-word block"><span style={{ ["--i" as string]: 0 }}>Projects across</span></span>
-              <span className="wf-word block"><span style={{ ["--i" as string]: 1 }} className="wf-gold">{lit.length} emirates.</span></span>
+              <span className="wf-word block"><span style={{ ["--i" as string]: 0 }}>{titleTop}</span></span>
+              <span className="wf-word block"><span style={{ ["--i" as string]: 1 }} className="wf-gold">{lit.length} {lit.length === 1 ? "emirate" : "emirates"}.</span></span>
             </h2>
             <p className="wf-fade mt-6 max-w-md text-[15px] leading-relaxed text-white/70" style={{ ["--d" as string]: "500ms" }}>
-              {total.toLocaleString("en-US")} live projects, counted from the listings published on this site.
-              The taller the block, the more we have selling there. Choose an emirate to see them.
+              {intro ?? `${total.toLocaleString("en-US")} live projects, counted from the listings published on this site. The taller the block, the more we have selling there. Choose an emirate to see them.`}
             </p>
 
             <ul className="mt-10 border-t border-white/10">
@@ -206,7 +228,7 @@ export function UaeMap({ counts }: { counts: Record<string, number> }) {
                 return (
                   <li key={e.code} onMouseEnter={() => setActive(e.code)} onMouseLeave={() => setActive(null)}>
                     {count > 0 ? (
-                      <Link href={`/projects?city=${encodeURIComponent(e.cityParam)}`} className={`${cls} group`} style={style} onFocus={() => setActive(e.code)} onBlur={() => setActive(null)}>
+                      <Link href={hrefFor(e.cityParam)} className={`${cls} group`} style={style} onFocus={() => setActive(e.code)} onBlur={() => setActive(null)}>
                         {inner}
                       </Link>
                     ) : (
