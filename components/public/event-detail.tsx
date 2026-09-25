@@ -8,7 +8,7 @@ import { EventRegisterForm } from "@/components/public/event-register-form"
 import { EventPageQr } from "@/components/public/event-page-qr"
 import { EventHeroQr } from "@/components/public/event-hero-qr"
 import { EventShare } from "@/components/public/event-share"
-import { EventVideoButton } from "@/components/public/event-video-button"
+import { EventVideo } from "@/components/public/event-video"
 import { isPlayableVideoUrl } from "@/lib/video-embed"
 
 /** The public columns an event page needs. */
@@ -162,9 +162,6 @@ export function EventDetail({
                   <MapPin className="w-4 h-4 text-[#d6b357]" /> {event.venue}
                 </span>
               )}
-              {event.video_url && isPlayableVideoUrl(event.video_url) && (
-                <EventVideoButton url={event.video_url} title={`${event.title} — video`} />
-              )}
               <EventShare
                 slug={event.slug ?? event.id}
                 path={sharePath}
@@ -172,6 +169,10 @@ export function EventDetail({
                 subtitle={[dateLabel, event.venue].filter(Boolean).join(" · ")}
               />
             </div>
+
+            {event.video_url && isPlayableVideoUrl(event.video_url) && (
+              <EventVideo url={event.video_url} title={`${event.title} — video`} poster={event.image_url} />
+            )}
 
             {event.description?.trim() && (
               <p className="text-[#374151] leading-relaxed whitespace-pre-wrap">{event.description.trim()}</p>

@@ -15,7 +15,16 @@
 // needsSize: Facebook's plugin sizes its player from the iframe dimensions AT
 // LOAD TIME — mount it only after the modal box is measured, with explicit
 // width/height params, or the video renders tiny at the top until a refresh.
-export type VideoEmbed = { src: string; portrait?: boolean; cropTop?: number; aspect?: number; zoom?: number; needsSize?: boolean }
+// thumbs: the video's own poster frames, best first — YouTube only (the other
+// platforms have no token-free thumbnail, so callers bring their own image).
+export type VideoEmbed = { src: string; portrait?: boolean; cropTop?: number; aspect?: number; zoom?: number; needsSize?: boolean; thumbs?: string[] }
+
+// maxresdefault is sharp but exists only for HD uploads; hqdefault exists for
+// every video.
+function youtubeThumbs(id: string): string[] | undefined {
+  if (!/^[\w-]{6,}$/.test(id)) return undefined
+  return [`https://i.ytimg.com/vi/${id}/maxresdefault.jpg`, `https://i.ytimg.com/vi/${id}/hqdefault.jpg`]
+}
 
 export function toEmbed(url: string): VideoEmbed | null {
   try {
@@ -23,13 +32,13 @@ export function toEmbed(url: string): VideoEmbed | null {
     const host = u.hostname.replace(/^www\./, "")
     const seg = u.pathname.split("/").filter(Boolean)
     if (host === "youtu.be" && seg[0]) {
-      return { src: `https://www.youtube-nocookie.com/embed/${seg[0]}?autoplay=1` }
+      return { src: `https://www.youtube-nocookie.com/embed/${seg[0]}?autoplay=1`, thumbs: youtubeThumbs(seg[0]) }
     }
     if (host.endsWith("youtube.com")) {
       const v = u.searchParams.get("v")
-      if (u.pathname === "/watch" && v) return { src: `https://www.youtube-nocookie.com/embed/${v}?autoplay=1` }
+      if (u.pathname === "/watch" && v) return { src: `https://www.youtube-nocookie.com/embed/${v}?autoplay=1`, thumbs: youtubeThumbs(v) }
       if ((seg[0] === "shorts" || seg[0] === "embed" || seg[0] === "live") && seg[1]) {
-        return { src: `https://www.youtube-nocookie.com/embed/${seg[1]}?autoplay=1`, portrait: seg[0] === "shorts" }
+        return { src: `https://www.youtube-nocookie.com/embed/${seg[1]}?autoplay=1`, portrait: seg[0] === "shorts", thumbs: youtubeThumbs(seg[1]) }
       }
     }
     if (host === "vimeo.com" && seg[0] && /^\d+$/.test(seg[0])) {
