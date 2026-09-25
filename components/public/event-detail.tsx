@@ -1,10 +1,9 @@
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Award, CalendarDays, ChevronRight, Clock, MapPin, Ticket } from "lucide-react"
+import { ArrowLeft, CalendarDays, ChevronRight, Clock, MapPin, Ticket } from "lucide-react"
 import { eventBrand } from "@/lib/events/brands"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
 import { parseRegistrationFields } from "@/lib/events/fields"
-import { parseCertificateSettings } from "@/lib/events/certificate"
 import { EventRegisterForm } from "@/components/public/event-register-form"
 import { EventPageQr } from "@/components/public/event-page-qr"
 import { EventHeroQr } from "@/components/public/event-hero-qr"
@@ -26,8 +25,10 @@ export type PublicEvent = {
 }
 
 /**
- * The public event page body — poster hero, details, the registration card
- * (#register is the QR landing anchor) and the certificate banner. Shared by
+ * The public event page body — poster hero, details and the registration card
+ * (#register is the QR landing anchor). No certificate banner: the public page
+ * shouldn't invite anyone to claim one — attendees get to the certificate page
+ * from the venue QR poster in the dashboard's certificate section. Shared by
  * the company page (/events/<slug>) and an agent's own event on their website
  * (/website/<site>/events/<slug>, migration 057), which differ only in where
  * "back", the breadcrumb and "more events" point and which URL is shared.
@@ -50,10 +51,6 @@ export function EventDetail({
 }) {
   const brand = eventBrand(event.brand ?? "fhiglobal")
   const registrationOpen = isEventRegistrationOpen(event)
-  // Self-service is always on; the banner appears from the event day onward so
-  // an upcoming event is not advertising certificates before anyone attended.
-  const eventStarted = !event.event_date || new Date(event.event_date).getTime() - 12 * 3600_000 <= Date.now()
-  const certificatesOpen = eventStarted && parseCertificateSettings(event.certificate).selfService !== "off"
   const d = event.event_date ? new Date(event.event_date) : null
   // Event times are Dubai time (GST) — force the zone; this renders on the
   // server, whose clock is usually UTC.
@@ -221,22 +218,6 @@ export function EventDetail({
           </aside>
         </div>
 
-        {/* Self-service certificates — shown once the team switches it on after the event */}
-        {certificatesOpen && (
-          <Link
-            href={`/events/${event.slug ?? event.id}/certificate`}
-            className="mt-8 flex flex-col sm:flex-row items-center gap-4 bg-[#001f3f] border-b-4 border-[#d6b357] px-6 py-5 text-white hover:bg-[#00305f] transition-colors"
-          >
-            <span className="w-12 h-12 bg-[#d6b357]/20 border border-[#d6b357]/40 flex items-center justify-center shrink-0">
-              <Award className="w-6 h-6 text-[#d6b357]" />
-            </span>
-            <span className="flex-1 text-center sm:text-left">
-              <span className="block font-['Outfit'] text-lg font-bold leading-tight">Attended? Get your Certificate of Attendance</span>
-              <span className="block text-sm text-white/70 mt-0.5">Enter your details and download your personalised certificate as a PDF.</span>
-            </span>
-            <span className="inline-flex items-center px-5 py-2.5 bg-[#d6b357] text-[#001f3f] text-sm font-bold shrink-0">Get my certificate</span>
-          </Link>
-        )}
       </div>
     </>
   )
