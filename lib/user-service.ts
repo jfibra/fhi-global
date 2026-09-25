@@ -124,6 +124,7 @@ export const COUNTRY_CODES: CountryDialOption[] = [
   { value: "+880", dial: "+880", country: "Bangladesh" },
   { value: "+94", dial: "+94", country: "Sri Lanka" },
   { value: "+44", dial: "+44", country: "United Kingdom" },
+  { value: "+49", dial: "+49", country: "Germany" },
   { value: "+1", dial: "+1", country: "United States" },
   { value: "+1-CA", dial: "+1 (CA)", country: "Canada" },
   { value: "+61", dial: "+61", country: "Australia" },
