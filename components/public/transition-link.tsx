@@ -45,16 +45,29 @@ export function TransitionLink({
 
     e.preventDefault()
     const img = e.currentTarget.querySelector<HTMLElement>(imageSelector)
+    // A view-transition name must be unique on the page, or the browser skips
+    // the whole transition. On a project page the masthead already carries
+    // "project-hero" (cards elsewhere land on it), so a card clicked there —
+    // More from, Nearby — would duplicate it: the masthead lends the name to
+    // the card until the new page is in.
+    const holders = img ? [...document.querySelectorAll<HTMLElement>(`[data-vt="${name}"]`)].filter((el) => el !== img) : []
+    const held = holders.map((el) => el.style.viewTransitionName)
+    for (const el of holders) el.style.viewTransitionName = "none"
     if (img) img.style.viewTransitionName = name
+    const handBack = () => {
+      if (img) img.style.viewTransitionName = ""
+      holders.forEach((el, i) => { el.style.viewTransitionName = held[i] })
+    }
     const targetPath = new URL(href, window.location.origin).pathname
 
     const transition = doc.startViewTransition(async () => {
       router.push(href)
       await waitFor(() => window.location.pathname === targetPath && !!document.querySelector(`[data-vt="${name}"]`), 1500)
+      // Before the new state is captured, so a masthead React kept across
+      // the navigation is named again for the morph.
+      handBack()
     })
-    transition.finished.finally(() => {
-      if (img) img.style.viewTransitionName = ""
-    })
+    transition.finished.finally(handBack)
   }
 
   return (
