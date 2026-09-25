@@ -12,7 +12,7 @@ import { submitToIndexNow } from "@/lib/indexnow"
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 // Fields editors can change via sanitizeEventInput — diffed for the audit trail.
-const EDITABLE = ["title", "description", "brand", "image_url", "venue", "status", "event_date", "registration_open", "registration_fields", "certificate"] as const
+const EDITABLE = ["title", "description", "brand", "image_url", "venue", "status", "event_date", "registration_open", "registration_fields", "certificate", "video_url"] as const
 
 type ExistingEvent = Record<(typeof EDITABLE)[number], unknown> & { id: string }
 
@@ -57,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const admin = createAdminSupabase()
   let existingQuery = admin
     .from("events")
-    .select("id, slug, agent_id, title, description, brand, image_url, venue, status, event_date, registration_open, registration_fields, certificate")
+    .select("id, slug, agent_id, title, description, brand, image_url, venue, status, event_date, registration_open, registration_fields, certificate, video_url")
     .eq("id", id)
     .is("deleted_at", null)
   if (g.scope.kind === "own") existingQuery = existingQuery.eq("agent_id", g.scope.agentId)
@@ -80,6 +80,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const newValues: Record<string, unknown> = {}
   const changedKeys: string[] = []
   for (const key of EDITABLE) {
+    // Fields a partial save didn't send (e.g. the publish toggle) weren't changed.
+    if (!(key in input)) continue
     const before = existing[key] ?? null
     const after = input[key] ?? null
     if (!sameValue(key, before, after)) {

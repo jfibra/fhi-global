@@ -30,7 +30,7 @@ export async function GET() {
   const admin = createAdminSupabase()
   let query = admin
     .from("events")
-    .select("id, slug, title, description, brand, image_url, event_date, venue, status, registration_open, registration_fields, certificate, created_at, view_count, qr_scan_count, agent_id, owner:profiles!events_agent_id_fkey(fullname), event_registrations(count)")
+    .select("id, slug, title, description, brand, image_url, video_url, event_date, venue, status, registration_open, registration_fields, certificate, created_at, view_count, qr_scan_count, agent_id, owner:profiles!events_agent_id_fkey(fullname), event_registrations(count)")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
   if (access.scope.kind === "own") query = query.eq("agent_id", access.scope.agentId)
@@ -57,6 +57,7 @@ export async function GET() {
       description: (e.description as string | null) ?? null,
       brand: (e.brand as string) ?? "fhiglobal",
       imageUrl: (e.image_url as string | null) ?? null,
+      videoUrl: (e.video_url as string | null) ?? null,
       eventDate: (e.event_date as string | null) ?? null,
       venue: (e.venue as string | null) ?? null,
       status: (e.status as string) ?? "draft",

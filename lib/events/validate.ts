@@ -1,6 +1,7 @@
 import { EVENT_BRANDS } from "@/lib/events/brands"
 import { parseRegistrationFields } from "@/lib/events/fields"
 import { parseCertificateSettings } from "@/lib/events/certificate"
+import { isPlayableVideoUrl } from "@/lib/video-embed"
 
 const STATUSES = ["draft", "published", "archived"] as const
 
@@ -31,6 +32,11 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
   // publish toggle, for instance) must not reset them to empty.
   const registration_fields = body.registration_fields !== undefined ? parseRegistrationFields(body.registration_fields) : undefined
   const certificate = body.certificate !== undefined ? parseCertificateSettings(body.certificate) : undefined
+  // Optional video LINK (YouTube, Facebook, Drive, .mp4…) — videos are never
+  // uploaded. Same only-when-sent rule; a link no page can play is dropped
+  // rather than saved as a broken player.
+  const rawVideo = typeof body.video_url === "string" ? body.video_url.trim().slice(0, 1000) : ""
+  const video_url = body.video_url !== undefined ? (rawVideo && isPlayableVideoUrl(rawVideo) ? rawVideo : null) : undefined
   return {
     title,
     description: description || null,
@@ -42,5 +48,6 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
     registration_open,
     ...(registration_fields !== undefined ? { registration_fields } : {}),
     ...(certificate !== undefined ? { certificate } : {}),
+    ...(video_url !== undefined ? { video_url } : {}),
   }
 }

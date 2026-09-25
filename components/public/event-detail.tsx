@@ -8,6 +8,8 @@ import { EventRegisterForm } from "@/components/public/event-register-form"
 import { EventPageQr } from "@/components/public/event-page-qr"
 import { EventHeroQr } from "@/components/public/event-hero-qr"
 import { EventShare } from "@/components/public/event-share"
+import { EventVideoButton } from "@/components/public/event-video-button"
+import { isPlayableVideoUrl } from "@/lib/video-embed"
 
 /** The public columns an event page needs. */
 export type PublicEvent = {
@@ -17,6 +19,8 @@ export type PublicEvent = {
   description: string | null
   brand: string | null
   image_url: string | null
+  /** Optional video LINK (lib/video-embed.ts) — played on click, never uploaded. */
+  video_url?: string | null
   event_date: string | null
   venue: string | null
   registration_open: boolean | null
@@ -157,6 +161,9 @@ export function EventDetail({
                 <span className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#e5e8ec] text-[#0f2940] text-sm font-semibold">
                   <MapPin className="w-4 h-4 text-[#d6b357]" /> {event.venue}
                 </span>
+              )}
+              {event.video_url && isPlayableVideoUrl(event.video_url) && (
+                <EventVideoButton url={event.video_url} title={`${event.title} — video`} />
               )}
               <EventShare
                 slug={event.slug ?? event.id}

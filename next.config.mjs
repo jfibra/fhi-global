@@ -78,7 +78,7 @@ const CSP = [
   // readers), video players (agent-website heroes + project media tiles),
   // and the virtual-tour providers from lib/embed-hosts.json (project media
   // tiles). Google sign-in uses a full-page redirect, not a frame.
-  `frame-src ${EBOOK_PDF_HOST}${S3_FRAME_HOST ? ` ${S3_FRAME_HOST}` : ""} https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://www.facebook.com https://www.instagram.com https://www.tiktok.com ${TOUR_FRAME_HOSTS}`,
+  `frame-src ${EBOOK_PDF_HOST}${S3_FRAME_HOST ? ` ${S3_FRAME_HOST}` : ""} https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://www.facebook.com https://www.instagram.com https://www.tiktok.com https://drive.google.com ${TOUR_FRAME_HOSTS}`,
   // Prevent this app from being embedded in iframes elsewhere
   `frame-ancestors 'none'`,
 

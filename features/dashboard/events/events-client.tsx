@@ -37,6 +37,7 @@ import {
 } from "@/lib/events/fields"
 import type { CertificateSettings } from "@/lib/events/certificate"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
+import { isPlayableVideoUrl } from "@/lib/video-embed"
 
 type AdminEvent = {
   id: string
@@ -47,6 +48,8 @@ type AdminEvent = {
   description: string | null
   brand: string
   imageUrl: string | null
+  /** Optional video LINK — played on the event page, never uploaded. */
+  videoUrl: string | null
   eventDate: string | null
   venue: string | null
   status: string
@@ -79,6 +82,8 @@ type FormState = {
   description: string
   brand: string
   imageUrl: string
+  /** YouTube / Facebook / Drive / .mp4 link — optional. */
+  videoUrl: string
   eventDate: string // datetime-local value
   venue: string
   status: string
@@ -92,6 +97,7 @@ const EMPTY_FORM: FormState = {
   description: "",
   brand: "fhiglobal",
   imageUrl: "",
+  videoUrl: "",
   eventDate: "",
   venue: "",
   status: "draft",
@@ -248,6 +254,7 @@ export function EventsClient({
       description: e.description ?? "",
       brand: e.brand,
       imageUrl: e.imageUrl ?? "",
+      videoUrl: e.videoUrl ?? "",
       eventDate: toDubaiInput(e.eventDate),
       venue: e.venue ?? "",
       status: e.status,
@@ -331,6 +338,7 @@ export function EventsClient({
         description: form.description,
         brand: form.brand,
         image_url: form.imageUrl,
+        video_url: form.videoUrl.trim(),
         event_date: form.eventDate ? fromDubaiInput(form.eventDate) : "",
         venue: form.venue,
         status: form.status,
@@ -863,6 +871,31 @@ export function EventsClient({
                   placeholder="What's happening, who should come, what to expect…"
                   maxLength={5000}
                 />
+              </div>
+
+              {/* A video LINK, never an upload — uploaded videos are heavy to store and slow to play. */}
+              <div>
+                <label className={labelCls}>Video link (optional)</label>
+                <input
+                  className={inputCls}
+                  type="url"
+                  value={form.videoUrl}
+                  onChange={(e) => setForm((f) => ({ ...f, videoUrl: e.target.value }))}
+                  placeholder="https://www.youtube.com/watch?v=…"
+                  maxLength={1000}
+                />
+                {form.videoUrl.trim() && !isPlayableVideoUrl(form.videoUrl.trim()) ? (
+                  <p className="mt-1.5 text-xs font-semibold text-rose-600">
+                    This link can&apos;t be played. Use a YouTube, Facebook, Instagram, TikTok, Vimeo or Google Drive
+                    video link.
+                  </p>
+                ) : (
+                  <p className="mt-1.5 text-xs text-[#9ca3af]">
+                    Paste a YouTube or Facebook video link straight from the address bar — Instagram, TikTok, Vimeo and
+                    Google Drive (shared &ldquo;Anyone with the link&rdquo;) work too. Visitors get a &ldquo;Watch
+                    video&rdquo; button on the event page.
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

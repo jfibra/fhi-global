@@ -41,7 +41,7 @@ async function fetchEvent(idOrSlug: string) {
   const supabase = createPublicSupabaseClient()
   const query = supabase
     .from("events")
-    .select("id, slug, title, description, brand, image_url, event_date, venue, registration_open, registration_fields, certificate, agent_id")
+    .select("id, slug, title, description, brand, image_url, video_url, event_date, venue, registration_open, registration_fields, certificate, agent_id")
     .eq("status", "published")
     .is("deleted_at", null)
   const { data, error } = UUID_RE.test(idOrSlug)
