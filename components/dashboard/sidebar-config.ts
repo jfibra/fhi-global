@@ -261,6 +261,8 @@ const DEVELOPER_NAV: RoleNavEntry[] = [
  */
 const salesPipelineNav = ({ projects = false, teamSales = false, invite = true } = {}): RoleNavEntry[] => [
   OVERVIEW,
+  // Their Website Builder site — open/copy the link, or the prompt to build one.
+  { icon: Globe, label: "My Website", to: "my-website" },
   { icon: ClipboardList, label: "My listings", to: "listings" },
   OWNER_DOCUMENTS,
   MY_EMAILS,

@@ -56,6 +56,8 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   // Admin staff manage every event; Website Builder users only their own
   // (keep in sync with ROLES_EVENT_MANAGERS + ROLES_EVENT_OWNERS in app-roles.ts).
   events: ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager"],
+  // Their own Website Builder site's link (the sidebar's "My Website").
+  "my-website": ["agent", "global_partner", "team_leader", "unit_manager"],
   "tax-entities": ["super_admin", "admin"],
   purchases: ["super_admin", "admin"],
   "purchase-categories": ["super_admin", "admin"],
