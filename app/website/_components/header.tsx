@@ -10,11 +10,11 @@ import { ChevronDown, Menu, MessageCircle, X } from "lucide-react"
 import { BRAND_GRADIENT, BRAND_TO, GOLD, GOLD_GRADIENT, NAV_LINKS, SAMPLE_DATA, type WebsiteData } from "../_data"
 import { buildContactChannels } from "./contact-channels"
 
-/** The nav, plus "Events" after Featured when the agent has published events. */
-function navLinks(showEvents: boolean) {
-  if (!showEvents) return NAV_LINKS
-  const links = [...NAV_LINKS]
-  links.splice(links.findIndex((l) => l.href === "#featured") + 1, 0, { label: "Events", href: "#events" })
+/** The nav, plus "Events" after Featured when the agent has published events,
+ *  and "Reviews" only when the site has reviews to show. */
+function navLinks(showEvents: boolean, showReviews: boolean) {
+  const links = showReviews ? [...NAV_LINKS] : NAV_LINKS.filter((l) => l.href !== "#reviews")
+  if (showEvents) links.splice(links.findIndex((l) => l.href === "#featured") + 1, 0, { label: "Events", href: "#events" })
   return links
 }
 
@@ -62,17 +62,20 @@ export function SiteHeader({
   sticky = true,
   data = SAMPLE_DATA,
   showEvents = false,
+  showReviews = true,
   basePath,
 }: {
   sticky?: boolean
   data?: WebsiteData
   /** Add an "Events" link (the site has published events, migration 057). */
   showEvents?: boolean
+  /** Keep the "Reviews" link — false when the site has no approved reviews. */
+  showReviews?: boolean
   /** On a sub-page (an event page): section links go back to the site root. */
   basePath?: string
 }) {
   const [open, setOpen] = useState(false)
-  const links = navLinks(showEvents)
+  const links = navLinks(showEvents, showReviews)
   const hrefFor = (href: string) => (basePath && href.startsWith("#") ? `${basePath}${href}` : href)
   // No scroll-spy on a sub-page: none of the sections are on it.
   const activeHref = useActiveAnchor(basePath ? "" : links.map((l) => l.href).filter((h) => h.startsWith("#")).join("|"))

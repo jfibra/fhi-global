@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { fetchListingCards, fetchProjectCards } from "@/lib/website-builder-service"
-import { SAMPLE_DATA, themeVars, type WebsiteData } from "../_data"
+import { SAMPLE_DATA, TEST_REVIEWS, themeVars, type WebsiteData } from "../_data"
 import { SiteHeader } from "../_components/header"
 import { SiteFooter } from "../_components/footer"
 import { HeroSection } from "../_components/sections/hero"
@@ -57,7 +57,7 @@ export default async function WebsiteSamplePage() {
       <StatsBandSection />
       <ServiceAreasSection />
       <GallerySection />
-      <TestimonialsSection />
+      <TestimonialsSection testimonials={TEST_REVIEWS} />
       <SiteFooter />
     </div>
   )

@@ -13,11 +13,14 @@ import {
   ArrowDown, ArrowUp, Check, ExternalLink, ImagePlus, Loader2, Palette, Plus, RotateCcw, Save, Search, Trash2,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
+import { createClient } from "@/lib/supabase/client"
+import { getDashboardRouteByRole } from "@/lib/auth"
+import { loadAgentWebsiteReviews } from "@/lib/website-reviews"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 import { normalizeSocialUrl, readSocialLinks } from "@/lib/public-profile"
 import {
-  BAND_STAT_ICON_FALLBACK, DEFAULT_THEME, GALLERY_CATEGORIES, HERO_STAT_ICON_FALLBACK, SAMPLE_DATA, STAT_ICONS, TEST_AREAS, TEST_GALLERY_AWARDS, TEST_GALLERY_CERTIFICATES, TEST_GALLERY_EVENTS, TEST_REVIEWS, themeVars,
-  type GalleryCategory, type Project, type Property, type StatIconKey, type WebsiteData,
+  BAND_STAT_ICON_FALLBACK, DEFAULT_THEME, GALLERY_CATEGORIES, HERO_STAT_ICON_FALLBACK, SAMPLE_DATA, STAT_ICONS, TEST_AREAS, TEST_GALLERY_AWARDS, TEST_GALLERY_CERTIFICATES, TEST_GALLERY_EVENTS, themeVars,
+  type GalleryCategory, type Project, type Property, type StatIconKey, type Testimonial, type WebsiteData,
 } from "@/app/website/_data"
 import { SiteHeader } from "@/app/website/_components/header"
 import { SiteFooter } from "@/app/website/_components/footer"
@@ -431,10 +434,13 @@ const SPY_ANCHORS = ["home", "about", "projects", "properties", "stats", "areas"
 
 function LivePreview({
   data,
+  reviews,
   target,
   onSectionInView,
 }: {
   data: WebsiteData
+  /** The agent's approved client reviews — none hides the section, as on the live site. */
+  reviews: Testimonial[]
   target: PreviewTarget | null
   /** Fires with the anchor id of the section currently at the top of the preview. */
   onSectionInView?: (anchor: string) => void
@@ -502,14 +508,14 @@ function LivePreview({
     <div ref={setOuterEl} className="h-full overflow-y-auto overflow-x-hidden bg-[#dfe4ea]">
       <div style={{ height: innerH * scale }} className="relative">
         <div ref={setInnerEl} style={{ width: VIRTUAL_WIDTH, transform: `scale(${scale})`, transformOrigin: "top left", ...themeVars(data.theme) }}>
-          <SiteHeader sticky={false} data={data} />
+          <SiteHeader sticky={false} data={data} showReviews={reviews.length > 0} />
           <HeroSection data={data} />
           <AboutSection data={data} />
           <FeaturedSection data={data} />
           <StatsBandSection data={data} />
           <ServiceAreasSection data={data} />
           <GallerySection data={data} />
-          <TestimonialsSection />
+          <TestimonialsSection testimonials={reviews} />
           <SiteFooter data={data} />
         </div>
       </div>
@@ -592,7 +598,7 @@ const ANCHOR_TO_SECTION: Record<string, FormSectionId> = {
 
 export function WebsiteBuilderClient() {
   const mounted = useMounted()
-  const { user, profile } = useAuth()
+  const { user, profile, role } = useAuth()
 
   // Contact fields + socials seed from the logged-in profile (still fully
   // editable). Socials come from the digital-business-card links
@@ -624,6 +630,15 @@ export function WebsiteBuilderClient() {
   // state would overwrite the very draft we are about to read.
   const [draftReady, setDraftReady] = useState(false)
   const userId = user?.id ?? null
+  // This account's approved client reviews (lib/website-reviews.ts), shown
+  // exactly as the live site shows them; RLS limits the read to own rows.
+  const [reviews, setReviews] = useState<Testimonial[]>([])
+  useEffect(() => {
+    if (!userId) return
+    let live = true
+    void loadAgentWebsiteReviews(createClient(), userId).then((r) => { if (live) setReviews(r) })
+    return () => { live = false }
+  }, [userId])
   const [activeSection, setActiveSection] = useState<FormSectionId>("agent")
   const [activeGalleryCat, setActiveGalleryCat] = useState<GalleryCategory>("Event Photos")
   // Cache-buster for the link-share (OG) preview image.
@@ -1338,16 +1353,23 @@ export function WebsiteBuilderClient() {
           {activeSection === "reviews" && (
             <>
               <p className="text-[12px] leading-relaxed text-[#6b7280]">
-                Reviews are fixed test samples for now and are displayed on every site — real client reviews will be automated later. They can&apos;t be edited.
+                Your reviews come from clients who fill in your{" "}
+                <a href={`${getDashboardRouteByRole(role)}/feedback`} className="font-bold text-[#001f3f] underline">Customer Feedback</a>{" "}
+                link. Once an admin approves a review it shows here and on your website — first name and
+                last initial only. Until then the Reviews section and its menu link stay hidden.
               </p>
-              <div className="space-y-2.5">
-                {TEST_REVIEWS.map((t, i) => (
-                  <div key={i} className="border border-[#e2e6ea] bg-[#fafbfc] p-3">
-                    <p className="text-[12.5px] leading-relaxed text-[#374151]">&ldquo;{t.quote}&rdquo;</p>
-                    <p className="mt-1.5 text-[11.5px] font-bold text-[#0d1117]">{t.name} <span className="font-medium text-[#9aa0aa]">— {t.where}</span></p>
-                  </div>
-                ))}
-              </div>
+              {reviews.length === 0 ? (
+                <p className="border border-dashed border-[#e2e6ea] bg-[#fafbfc] p-3 text-[12px] text-[#6b7280]">No approved reviews yet.</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {reviews.map((t, i) => (
+                    <div key={i} className="border border-[#e2e6ea] bg-[#fafbfc] p-3">
+                      <p className="text-[12.5px] leading-relaxed text-[#374151]">&ldquo;{t.quote}&rdquo;</p>
+                      <p className="mt-1.5 text-[11.5px] font-bold text-[#0d1117]">{t.name} <span className="font-medium text-[#9aa0aa]">— {t.where}</span></p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
 
@@ -1426,7 +1448,7 @@ export function WebsiteBuilderClient() {
 
       {/* ── Live preview ── */}
       <div className="min-w-0 flex-1">
-        <LivePreview data={data} target={previewTarget} onSectionInView={handleSectionInView} />
+        <LivePreview data={data} reviews={reviews} target={previewTarget} onSectionInView={handleSectionInView} />
       </div>
     </div>
   )

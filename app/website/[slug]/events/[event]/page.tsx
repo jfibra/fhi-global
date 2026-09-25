@@ -13,6 +13,7 @@ import { titleCaseName } from "@/lib/public-profile"
 import { themeVars } from "../../../_data"
 import { SiteHeader } from "../../../_components/header"
 import { SiteFooter } from "../../../_components/footer"
+import { loadAgentWebsiteReviews } from "@/lib/website-reviews"
 
 // An agent's own event (migration 057) on their website: the site's header,
 // footer and theme around the same event page body, registration form,
@@ -81,6 +82,8 @@ export default async function AgentEventPage({ params, searchParams }: Props) {
   const home = `/website/${site.slug}`
   const host = titleCaseName(data.agent.name?.replace(/\s+/g, " ").trim() ?? "") || "Agent"
   const path = eventPublicPath(event, site.slug)
+  // The site's "Reviews" link only exists when it has approved reviews.
+  const hasReviews = (await loadAgentWebsiteReviews(createAdminSupabase(), site.agentId, 1)).length > 0
 
   return (
     <div style={themeVars(data.theme)}>
@@ -105,7 +108,7 @@ export default async function AgentEventPage({ params, searchParams }: Props) {
           ]),
         ]}
       />
-      <SiteHeader data={data} showEvents basePath={home} />
+      <SiteHeader data={data} showEvents showReviews={hasReviews} basePath={home} />
       <main className="relative bg-[#fafafa] font-sans overflow-x-hidden">
         <EventViewPing eventId={event.id} />
         <EventDetail

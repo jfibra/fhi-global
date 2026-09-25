@@ -2,16 +2,15 @@
 
 // Client testimonials — 3 visible, auto-advancing one card at a time and
 // sliding back to the start after the last position; dot indicators below.
+// Agent sites pass their approved client reviews (lib/website-reviews.ts);
+// with none, the section is not rendered.
 
 import { useEffect, useState } from "react"
-import { GOLD, NAVY, TEST_REVIEWS } from "../../_data"
+import { GOLD, NAVY, type Testimonial } from "../../_data"
 import { TestimonialCard } from "../cards"
 import { FancyEyebrow } from "../ui"
 
-export function TestimonialsSection() {
-  // Fixed test reviews for every site — agents can't add or edit reviews
-  // (real ones will be automated later); this is display-only.
-  const testimonials = TEST_REVIEWS
+export function TestimonialsSection({ testimonials }: { testimonials: Testimonial[] }) {
   // 3 cards per view on sm+ screens, 1 on phones — the slide step and dot
   // count both depend on it, so it's tracked from the same breakpoint the
   // card widths use (sm:w-1/3).
@@ -42,7 +41,7 @@ export function TestimonialsSection() {
       </h2>
       <div className="mt-10 overflow-hidden">
         <div
-          className="flex transition-transform duration-700 ease-out"
+          className={`flex transition-transform duration-700 ease-out ${testimonials.length < perView ? "justify-center" : ""}`}
           style={{ transform: `translateX(-${Math.min(reviewIdx, positions - 1) * (100 / perView)}%)` }}
         >
           {testimonials.map((t, i) => (

@@ -16,6 +16,7 @@ import { GallerySection } from "../_components/sections/gallery"
 import { TestimonialsSection } from "../_components/sections/what-my-clients-say"
 import { EventsSection } from "../_components/sections/events"
 import { loadAgentWebsiteEvents } from "@/lib/events/website-events"
+import { loadAgentWebsiteReviews } from "@/lib/website-reviews"
 
 // A published agent site from the Website Builder. Always fresh — agents
 // expect a save in the editor to show up on their public link immediately.
@@ -62,14 +63,17 @@ export default async function AgentWebsitePage({ params }: Props) {
   // An address the site had before (migration 058) → its current one, for good.
   if (site.slug !== slug) permanentRedirect(`/website/${site.slug}`)
   const data = site.data
-  // The agent's own published events (migration 057) — the section and its
-  // nav link only appear once there is at least one.
-  const events = await loadAgentWebsiteEvents(createAdminSupabase(), site.agentId)
+  // The agent's own published events (migration 057) and approved client
+  // reviews — each section and its nav link only appear once there is one.
+  const [events, reviews] = await Promise.all([
+    loadAgentWebsiteEvents(createAdminSupabase(), site.agentId),
+    loadAgentWebsiteReviews(createAdminSupabase(), site.agentId),
+  ])
   const hasEvents = events.upcoming.length + events.past.length > 0
 
   return (
     <div style={themeVars(data.theme)}>
-      <SiteHeader data={data} showEvents={hasEvents} />
+      <SiteHeader data={data} showEvents={hasEvents} showReviews={reviews.length > 0} />
       <HeroSection data={data} />
       <AboutSection data={data} qrValue={`${SITE_URL}/website/${site.slug}`} />
       <FeaturedSection data={data} />
@@ -77,7 +81,7 @@ export default async function AgentWebsitePage({ params }: Props) {
       <StatsBandSection data={data} />
       <ServiceAreasSection data={data} />
       <GallerySection data={data} />
-      <TestimonialsSection />
+      <TestimonialsSection testimonials={reviews} />
       <SiteFooter data={data} />
     </div>
   )

@@ -249,10 +249,11 @@ export const TEST_AREAS: Area[] = [
   { image: IMG.skylineB, label: "Sample 6" },
 ]
 
-export type Testimonial = { quote: string; name: string; where: string }
+/** rating: stars out of 5; absent = 5 (the sample content). */
+export type Testimonial = { quote: string; name: string; where: string; rating?: number }
 
-// Fixed test reviews — the builder can only show or hide these (no editing);
-// real client reviews will be automated later.
+// Sample reviews for the /website/sample design page only. Agent sites show
+// their own approved client feedback instead (lib/website-reviews.ts).
 export const TEST_REVIEWS: Testimonial[] = [
   { quote: "Exceptional service from start to finish — deep market knowledge made the entire process seamless. (Test review)", name: "Test Client 1", where: "Dubai Marina" },
   { quote: "Professional, responsive, and always had our best interests at heart. Highly recommended. (Test review)", name: "Test Client 2", where: "Abu Dhabi, UAE" },

@@ -127,7 +127,7 @@ export function PropertyCard({ property: p }: { property: Property }) {
 export function TestimonialCard({ testimonial: t }: { testimonial: Testimonial }) {
   return (
     <div className="h-full border border-[#e8e5dc] bg-white p-6">
-      <Stars />
+      <Stars value={t.rating} />
       <p className="mt-4 text-[13px] leading-relaxed text-[#3d4451]">&ldquo;{t.quote}&rdquo;</p>
       <div className="mt-5 flex items-center gap-3">
         <span className="flex h-9 w-9 items-center justify-center rounded-full text-[12px] font-bold text-white" style={{ backgroundColor: NAVY }}>

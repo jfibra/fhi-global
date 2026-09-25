@@ -57,11 +57,12 @@ export function MessengerIcon({ className, style }: { className?: string; style?
   )
 }
 
-export function Stars() {
+/** `value` of 5 stars filled, the rest outlined. */
+export function Stars({ value = 5 }: { value?: number }) {
   return (
-    <span className="flex gap-0.5">
+    <span className="flex gap-0.5" role="img" aria-label={`${value} out of 5 stars`}>
       {Array.from({ length: 5 }).map((_, i) => (
-        <Star key={i} className="h-3.5 w-3.5" style={{ color: GOLD, fill: GOLD }} />
+        <Star key={i} className="h-3.5 w-3.5" style={i < value ? { color: GOLD, fill: GOLD } : { color: "#d8d3c4" }} />
       ))}
     </span>
   )
