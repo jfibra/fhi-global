@@ -225,7 +225,7 @@ export function FeaturedProjectsShowcase({ projects }: { projects: FeaturedProje
 
   return (
     <div className="wf">
-      {/* Each row fires its own entrance as it scrolls in: the hero first,
+      {/* The hero row fires its entrance as it scrolls in: the hero first,
           the side cards 220ms apart behind it. */}
       <InView className="grid grid-cols-1 gap-10 lg:grid-cols-3 lg:gap-8" threshold={0.15}>
         <div className="lg:col-span-2">
@@ -238,10 +238,19 @@ export function FeaturedProjectsShowcase({ projects }: { projects: FeaturedProje
         )}
       </InView>
 
+      {/* One trigger per card, staggered within a row. A single trigger
+          around the whole list (a developer page carries 40-60 projects) is
+          taller than the screen can ever show 15% of, so it never fired and
+          the cards stayed hidden — and a list-wide stagger made card 40 wait
+          seven seconds. */}
       {more.length > 0 && (
-        <InView className="mt-12 grid grid-cols-1 gap-10 border-t border-[#e8eaed] pt-12 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8" threshold={0.15}>
-          {more.map((p, i) => <SideCard key={p.id} p={p} index={9} delay={i * 180} />)}
-        </InView>
+        <div className="mt-12 grid grid-cols-1 gap-10 border-t border-[#e8eaed] pt-12 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+          {more.map((p, i) => (
+            <InView key={p.id} threshold={0.15}>
+              <SideCard p={p} index={9} delay={(i % 3) * 180} />
+            </InView>
+          ))}
+        </div>
       )}
 
       <Link
