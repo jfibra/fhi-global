@@ -368,6 +368,25 @@ const MOCKUPS: Record<string, React.ReactNode> = {
       </span>
     </span>
   ),
+  // A client review card: five gold stars, two lines of text, the approve tick.
+  "customer-feedback": (
+    <span className="relative block">
+      <span className="flex h-[42px] w-[70px] flex-col justify-center gap-1 rounded-[4px] border border-[#dfe4ea] bg-white px-1.5 shadow-md">
+        <span className="flex gap-[3px]">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <span key={i} className="h-1.5 w-1.5 rotate-45 bg-[#d6b357]" />
+          ))}
+        </span>
+        <span className="h-[3px] w-12 rounded bg-[#aab3bf]" />
+        <span className="h-[3px] w-8 rounded bg-[#c8d4de]" />
+      </span>
+      <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#15803d] shadow-sm">
+        <svg viewBox="0 0 10 10" className="h-2.5 w-2.5">
+          <path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+    </span>
+  ),
   // A stack of marketing artworks with a gold download badge.
   materials: (
     <span className="relative block h-[50px] w-[70px]">

@@ -211,6 +211,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
     items: [
       { icon: Inbox, label: "Contact Inbox", to: "contact-inbox", description: "Enquiries sent from the public site.", mock: "contact-inbox" },
       { ...SUPPORT_TICKETS,                                        description: "Tickets raised by agents and clients.", mock: "support-tickets" },
+      { ...FEEDBACK,                                               description: "Client reviews of advisors — approve the ones shown on their websites.", mock: "customer-feedback" },
     ],
   },
   // Marketing artwork + training PDFs, grouped under one hub (same as the sales roles).
