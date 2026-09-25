@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { after } from "next/server"
 import { revalidatePath } from "next/cache"
-import { requireActiveSession } from "@/lib/auth-guard"
-import { canManageEvents } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { agentWebsite, requireEventAccess } from "@/lib/events/access"
+import { eventPublicPath } from "@/lib/events/paths"
 import { sanitizeEventInput } from "@/lib/events/validate"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 import { SITE_URL } from "@/lib/seo"
@@ -22,14 +22,14 @@ function actorFrom(ctx: { userId: string; email: string | null; profile: { role:
   return { id: ctx.userId, name: ctx.profile.fullname ?? ctx.email ?? null, role: ctx.profile.role }
 }
 
+// Admin staff act on any event; a Website Builder user only on their own
+// (migration 057) — anyone else's event answers 404, as if it didn't exist.
 async function guard() {
-  const session = await requireActiveSession()
-  if (!session.ok) return { ok: false as const, response: session.response }
-  if (!canManageEvents(session.context.profile.role)) {
-    return { ok: false as const, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
-  }
-  return { ok: true as const, context: session.context }
+  const access = await requireEventAccess()
+  if (!access.ok) return { ok: false as const, response: access.response }
+  return { ok: true as const, context: access.context, scope: access.scope }
 }
+
 
 // Timestamps come back from Postgres as "+00:00" and from input as ".000Z" —
 // compare instants, not strings, so unchanged dates don't produce diff noise.
@@ -40,7 +40,7 @@ function sameValue(key: string, before: unknown, after: unknown): boolean {
   return (before ?? null) === (after ?? null)
 }
 
-/** Update an event — admin only. */
+/** Update an event — admin staff, or the agent who owns it. */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const g = await guard()
   if (!g.ok) return g.response
@@ -55,12 +55,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const admin = createAdminSupabase()
-  const { data: existing, error: fetchErr } = await admin
+  let existingQuery = admin
     .from("events")
-    .select("id, slug, title, description, brand, image_url, venue, status, event_date, registration_open, registration_fields, certificate")
+    .select("id, slug, agent_id, title, description, brand, image_url, venue, status, event_date, registration_open, registration_fields, certificate")
     .eq("id", id)
     .is("deleted_at", null)
-    .maybeSingle<ExistingEvent & { slug: string | null }>()
+  if (g.scope.kind === "own") existingQuery = existingQuery.eq("agent_id", g.scope.agentId)
+  const { data: existing, error: fetchErr } = await existingQuery.maybeSingle<ExistingEvent & { slug: string | null; agent_id: string | null }>()
 
   if (fetchErr) return NextResponse.json({ error: "Failed to update event" }, { status: 500 })
   if (!existing) return NextResponse.json({ error: "Event not found" }, { status: 404 })
@@ -107,8 +108,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // Purge the public page immediately (a draft flip must not serve stale for
   // up to `revalidate` seconds) and, when live, ping IndexNow after response.
-  const publicPath = `/events/${existing.slug ?? id}`
+  // An agent's event lives on their website; its old /events/<slug> page only
+  // forwards there, so purge both.
+  const site = existing.agent_id ? await agentWebsite(admin, existing.agent_id) : null
+  const publicPath = eventPublicPath(existing, site?.isPublished ? site.slug : null)
   revalidatePath(publicPath)
+  if (publicPath !== `/events/${existing.slug ?? id}`) revalidatePath(`/events/${existing.slug ?? id}`)
   if (input.status === "published") {
     const loc = `${SITE_URL.replace(/\/$/, "")}${publicPath}`
     after(() => submitToIndexNow([loc]))
@@ -117,7 +122,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json({ ok: true })
 }
 
-/** Soft-delete an event — admin only. */
+/** Soft-delete an event — admin staff, or the agent who owns it. */
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const g = await guard()
   if (!g.ok) return g.response
@@ -126,12 +131,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "Invalid event id" }, { status: 400 })
 
   const admin = createAdminSupabase()
-  const { data: existing, error: fetchErr } = await admin
+  let existingQuery = admin
     .from("events")
     .select("id, title")
     .eq("id", id)
     .is("deleted_at", null)
-    .maybeSingle<{ id: string; title: string }>()
+  if (g.scope.kind === "own") existingQuery = existingQuery.eq("agent_id", g.scope.agentId)
+  const { data: existing, error: fetchErr } = await existingQuery.maybeSingle<{ id: string; title: string }>()
 
   if (fetchErr) return NextResponse.json({ error: "Failed to delete event" }, { status: 500 })
   if (!existing) return NextResponse.json({ error: "Event not found" }, { status: 404 })

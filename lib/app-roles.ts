@@ -282,8 +282,22 @@ export const ROLES_SALES_LEADERBOARD: readonly AppRoleId[] = [
 /** Developer media/logo upload route (also allows content editors). */
 export const ROLES_ADMIN_OR_DEVELOPER: readonly AppRoleId[] = ["super_admin", "admin", "developer", "editor"]
 
-/** Who may manage events (create, edit, registrations, raffle): admin staff, team leaders, editors. */
-export const ROLES_EVENT_MANAGERS: readonly AppRoleId[] = ["super_admin", "admin", "team_leader", "editor"]
+/**
+ * Who may manage EVERY event (create company events, edit, publish,
+ * registrations, raffle, certificates — including agents' own events): admin
+ * staff only. Team leaders (July 2026) and editors used to have this; it was
+ * withdrawn on 2026-09-25 by management's decision — registrations hold
+ * attendees' personal details.
+ */
+export const ROLES_EVENT_MANAGERS: readonly AppRoleId[] = ["super_admin", "admin"]
+
+/**
+ * Who may run their OWN events, shown on their Website Builder site (migration
+ * 057): every Website Builder user outside admin staff. They only ever see and
+ * manage events they own, and need a website before they can create one.
+ * Keep in sync with ROLES_WEBSITE_BUILDER.
+ */
+export const ROLES_EVENT_OWNERS: readonly AppRoleId[] = ["agent", "global_partner", "team_leader", "unit_manager"]
 
 /** Who may use the standalone Reels Maker: admin staff, the sales pipeline, and members. */
 export const ROLES_REELS_MAKER: readonly AppRoleId[] = ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager", "member"]
@@ -338,8 +352,19 @@ export function isAdminOrDeveloperUploadRole(role: string | null | undefined): b
   return roleInList(role, ROLES_ADMIN_OR_DEVELOPER)
 }
 
+/** Every event, company and agents' (admin staff). */
 export function canManageEvents(role: string | null | undefined): boolean {
   return roleInList(role, ROLES_EVENT_MANAGERS)
+}
+
+/** Only their own events, on their own website (see ROLES_EVENT_OWNERS). */
+export function canManageOwnEvents(role: string | null | undefined): boolean {
+  return roleInList(role, ROLES_EVENT_OWNERS)
+}
+
+/** The dashboard Events area at all — admins for everything, owners for theirs. */
+export function canUseEventsArea(role: string | null | undefined): boolean {
+  return canManageEvents(role) || canManageOwnEvents(role)
 }
 
 export function canUseReelsMaker(role: string | null | undefined): boolean {

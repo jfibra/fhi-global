@@ -3,13 +3,14 @@
 import Link from "next/link"
 import { ReactNode, useEffect, useState } from "react"
 import type { LucideIcon } from "lucide-react"
-import { Building2, CalendarDays, FolderOpen } from "lucide-react"
+import { Building2, FolderOpen } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { categoryMeta, eventColor, humanizeEvent, relativeTime } from "@/components/dashboard/system-logs/log-meta"
 
-// Editor landing dashboard: content KPIs (developers / projects / events),
-// quick actions into the editor pages, recent content, and the editor's own
+// Editor landing dashboard: content KPIs (developers / projects), quick
+// actions into the editor pages, recent content, and the editor's own
 // contribution stats + activity feed (self-scoped via /api/editor/activity).
+// No events: event management is admin-only (ROLES_EVENT_MANAGERS).
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
@@ -36,7 +37,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   launch:             { bg: "bg-purple-50",  text: "text-purple-700"  },
   under_construction: { bg: "bg-orange-50",  text: "text-orange-700"  },
   completed:          { bg: "bg-emerald-50", text: "text-emerald-700" },
-  // event statuses
+  // other statuses
   draft:              { bg: "bg-amber-50",   text: "text-amber-700"   },
   published:          { bg: "bg-emerald-50", text: "text-emerald-700" },
   archived:           { bg: "bg-slate-100",  text: "text-slate-600"   },
@@ -46,7 +47,6 @@ type QuickAction = { label: string; desc: string; href: string; icon: LucideIcon
 const QUICK_ACTIONS: QuickAction[] = [
   { label: "Add Developer", desc: "Register a partner firm",  href: "/editor/developers", icon: Building2    },
   { label: "Add Project",   desc: "Publish a new launch",     href: "/editor/projects",   icon: FolderOpen   },
-  { label: "Create Event",  desc: "Announce a new event",     href: "/editor/events",     icon: CalendarDays },
 ]
 
 // ─── Data loading ─────────────────────────────────────────────────────────────
@@ -59,14 +59,6 @@ function safeCount(res: { count: number | null; error: unknown }) {
 function safeRows<T>(res: { data: T | null; error: unknown }): NonNullable<T> {
   if (res.error || !res.data) return [] as unknown as NonNullable<T>
   return res.data
-}
-
-type EventRow = {
-  id: string
-  title: string
-  eventDate: string | null
-  status: string
-  registrationCount: number
 }
 
 type ActivityStats = {
@@ -90,17 +82,6 @@ const EMPTY_STATS: ActivityStats = {
   allTimeTotal: 0,
 }
 
-async function fetchEvents(): Promise<EventRow[]> {
-  try {
-    const res = await fetch("/api/admin/events", { cache: "no-store" })
-    if (!res.ok) return []
-    const json = (await res.json()) as { events?: EventRow[] }
-    return json.events ?? []
-  } catch {
-    return []
-  }
-}
-
 async function fetchActivity(): Promise<{ stats: ActivityStats; feed: ActivityItem[] }> {
   try {
     const res = await fetch("/api/editor/activity?limit=15", { cache: "no-store" })
@@ -121,7 +102,6 @@ async function loadEditorDashboard() {
     totalProjectsRes,
     publishedProjectsRes,
     recentProjectsRes,
-    events,
     activity,
   ] = await Promise.all([
     supabase.from("developers").select("id", { count: "exact", head: true }).eq("is_active", true).is("deleted_at", null),
@@ -134,7 +114,6 @@ async function loadEditorDashboard() {
       .is("deleted_at", null)
       .order("updated_at", { ascending: false })
       .limit(5),
-    fetchEvents(),
     fetchActivity(),
   ])
 
@@ -151,29 +130,17 @@ async function loadEditorDashboard() {
     updatedAt: row.updated_at ? String(row.updated_at) : null,
   }))
 
-  const now = Date.now()
-  const totalEvents = events.length
-  const publishedEvents = events.filter(e => e.status === "published").length
-  const draftEvents = events.filter(e => e.status === "draft").length
-  const upcomingEvents = events.filter(
-    e => e.status === "published" && e.eventDate && new Date(e.eventDate).getTime() >= now,
-  ).length
-  const recentEvents = events.slice(0, 5)
-
   const kpiCards = [
     { label: "Active Developers",  value: fmtNumber(activeDevelopers),  detail: `${fmtNumber(totalDevelopers)} total` },
     { label: "Total Projects",     value: fmtNumber(totalProjects),     detail: "All projects"                        },
     { label: "Published Projects", value: fmtNumber(publishedProjects), detail: `${fmtNumber(Math.max(0, totalProjects - publishedProjects))} drafts` },
-    { label: "Upcoming Events",    value: fmtNumber(upcomingEvents),    detail: `${fmtNumber(totalEvents)} total`     },
   ]
 
   const miniCards = [
     { label: "Draft Projects", value: fmtNumber(Math.max(0, totalProjects - publishedProjects)), detail: "Not yet published" },
-    { label: "Published Events", value: fmtNumber(publishedEvents), detail: "Live on the site" },
-    { label: "Draft Events", value: fmtNumber(draftEvents), detail: "Awaiting publish" },
   ]
 
-  return { kpiCards, miniCards, recentProjects, recentEvents, stats: activity.stats, feed: activity.feed }
+  return { kpiCards, miniCards, recentProjects, stats: activity.stats, feed: activity.feed }
 }
 
 type EditorDashboardData = Awaited<ReturnType<typeof loadEditorDashboard>>
@@ -183,8 +150,8 @@ type EditorDashboardData = Awaited<ReturnType<typeof loadEditorDashboard>>
 function EditorDashboardSkeleton() {
   return (
     <div className="space-y-4 pb-12">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="h-32 rounded-2xl bg-black/5 animate-pulse" />
         ))}
       </div>
@@ -208,7 +175,7 @@ export function EditorDashboardContent({ userId, userName }: { userId: string; u
 
   if (!data) return <EditorDashboardSkeleton />
 
-  const { kpiCards, miniCards, recentProjects, recentEvents, stats, feed } = data
+  const { kpiCards, miniCards, recentProjects, stats, feed } = data
 
   const contributionCards = [
     { label: "Created This Month", value: fmtNumber(stats.month.created), detail: "New content items" },
@@ -217,7 +184,7 @@ export function EditorDashboardContent({ userId, userName }: { userId: string; u
     {
       label: "Total Actions",
       value: fmtNumber(stats.allTimeTotal),
-      detail: `${fmtNumber(stats.byCategory.developers ?? 0)} developers · ${fmtNumber(stats.byCategory.projects ?? 0)} projects · ${fmtNumber(stats.byCategory.events ?? 0)} events this month`,
+      detail: `${fmtNumber(stats.byCategory.developers ?? 0)} developers · ${fmtNumber(stats.byCategory.projects ?? 0)} projects this month`,
     },
   ]
 
@@ -227,7 +194,7 @@ export function EditorDashboardContent({ userId, userName }: { userId: string; u
       {/* ── Section 1: Content KPIs ── */}
       <section>
         <SectionLabel title="Content at a Glance" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {kpiCards.map(card => (
             <KpiCard key={card.label} {...card} />
           ))}
@@ -242,7 +209,7 @@ export function EditorDashboardContent({ userId, userName }: { userId: string; u
       {/* ── Section 2: Quick actions ── */}
       <section>
         <SectionLabel title="Quick Actions" />
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           {QUICK_ACTIONS.map(action => (
             <ActionCard key={action.label} action={action} />
           ))}
@@ -252,7 +219,7 @@ export function EditorDashboardContent({ userId, userName }: { userId: string; u
       {/* ── Section 3: Recent content ── */}
       <section>
         <SectionLabel title="Recent Content" />
-        <div className="grid gap-5 xl:grid-cols-2">
+        <div className="grid gap-5">
           <TableCard title="Recently Updated Projects" subtitle="5 latest changes">
             <table className="min-w-full border-collapse text-left text-sm">
               <thead>
@@ -278,30 +245,6 @@ export function EditorDashboardContent({ userId, userName }: { userId: string; u
             </table>
           </TableCard>
 
-          <TableCard title="Recent Events" subtitle="5 latest events">
-            <table className="min-w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-[#f0f2f5]">
-                  {["Event", "Date", "Status", "Registrations"].map(h => (
-                    <Th key={h}>{h}</Th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {recentEvents.length === 0 && (
-                  <tr><td colSpan={4} className="px-3 py-4 text-sm text-[#6b7280]">No events yet.</td></tr>
-                )}
-                {recentEvents.map(e => (
-                  <tr key={e.id} className="border-b border-[#f0f2f5] hover:bg-[#f9fafb] transition-colors">
-                    <Td bold truncate>{e.title}</Td>
-                    <Td>{fmtDate(e.eventDate)}</Td>
-                    <Td><StatusPill status={e.status} /></Td>
-                    <Td>{fmtNumber(e.registrationCount)}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableCard>
         </div>
       </section>
 

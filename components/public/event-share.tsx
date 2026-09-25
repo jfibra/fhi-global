@@ -82,11 +82,22 @@ function useOrigin(): string {
   )
 }
 
-export function EventShare({ slug, title, subtitle }: { slug: string; title: string; subtitle: string }) {
+export function EventShare({
+  slug,
+  title,
+  subtitle,
+  path,
+}: {
+  slug: string
+  title: string
+  subtitle: string
+  /** Page to share — defaults to the company page; an agent's event passes its website path. */
+  path?: string
+}) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const origin = useOrigin()
-  const url = origin ? `${origin}/events/${slug}` : ""
+  const url = origin ? `${origin}${path ?? `/events/${slug}`}` : ""
 
   // Lock page scroll and close on Escape while the modal is up.
   useEffect(() => {

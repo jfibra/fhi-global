@@ -6,7 +6,7 @@ import {
   todayISO,
   type SitemapIndexEntry,
 } from "@/lib/sitemap-helpers"
-import { countNewsShards, countSection, SUPABASE_PER_PAGE } from "@/lib/sitemap-sections"
+import { countNewsShards, countSection, fetchAgentEventPaths, SUPABASE_PER_PAGE } from "@/lib/sitemap-sections"
 import { newsConfigured } from "@/lib/news-service"
 
 /**
@@ -32,13 +32,14 @@ function appendPaginated(
 }
 
 export async function GET() {
-  const [projects, developers, listings, events, gallery, newsShards] = await Promise.all([
+  const [projects, developers, listings, events, gallery, newsShards, agentEvents] = await Promise.all([
     countSection("projects"),
     countSection("developers"),
     countSection("listings"),
     countSection("events"),
     countSection("gallery"),
     countNewsShards(),
+    fetchAgentEventPaths(),
   ])
 
   const degraded =
@@ -47,7 +48,8 @@ export async function GET() {
     listings === null ||
     events === null ||
     gallery === null ||
-    newsShards === null
+    newsShards === null ||
+    agentEvents === null
 
   const shards = (count: number | null) =>
     count === null ? null : Math.ceil(count / SUPABASE_PER_PAGE)
@@ -59,7 +61,15 @@ export async function GET() {
   appendPaginated(sitemaps, "sitemap-projects", shards(projects), lastmod)
   appendPaginated(sitemaps, "sitemap-developers", shards(developers), lastmod)
   appendPaginated(sitemaps, "sitemap-listings", shards(listings), lastmod)
-  appendPaginated(sitemaps, "sitemap-events", shards(events), lastmod)
+  // Agents' own events (057) ride on events shard 1, so it must exist even
+  // when there are no company events.
+  const eventShards = shards(events)
+  appendPaginated(
+    sitemaps,
+    "sitemap-events",
+    eventShards === null ? null : Math.max(eventShards, agentEvents?.length ? 1 : 0),
+    lastmod,
+  )
   appendPaginated(sitemaps, "sitemap-gallery", shards(gallery), lastmod)
   appendPaginated(sitemaps, "sitemap-news", newsShards, lastmod)
   // Google News sitemap only exists meaningfully when the news feature is on.

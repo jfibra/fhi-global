@@ -42,6 +42,15 @@ type FlyerEvent = {
   imageUrl: string | null
   eventDate: string | null
   venue: string | null
+  /** Where the event lives — /events/<slug>, or an agent's website (migration 057). */
+  publicPath?: string
+}
+
+/** The event's page, and the short address printed in the flyer's footer pill. */
+function flyerTarget(event: FlyerEvent) {
+  const path = event.publicPath ?? `/events/${event.slug ?? event.id}`
+  const site = path.match(/^\/website\/([^/]+)/)
+  return { path, label: site ? `fhiglobal.ae/website/${site[1]}` : "fhiglobal.ae/events" }
 }
 
 function proxied(url: string) {
@@ -498,9 +507,15 @@ export function EventFlyerModal({
       ctx.fillStyle = goldGradient(ctx, FREE_Y - 28, FREE_Y + 6)
       ctx.fillText("F R E E   R E G I S T R A T I O N", W / 2, FREE_Y)
 
-      // Footer gold pill: globe + site
-      ctx.font = `900 27px ${F}`
-      const site = "fhiglobal.ae/events"
+      // Footer gold pill: globe + site (an agent's website address can be
+      // long — shrink the type until the pill fits the flyer).
+      const site = flyerTarget(event).label
+      let siteSize = 27
+      ctx.font = `900 ${siteSize}px ${F}`
+      while (ctx.measureText(site).width + 118 > W - 120 && siteSize > 16) {
+        siteSize -= 1
+        ctx.font = `900 ${siteSize}px ${F}`
+      }
       const siteW = ctx.measureText(site).width
       const pillW = siteW + 118
       ctx.fillStyle = goldGradient(ctx, PILL_Y, PILL_Y + PILL_H)
@@ -555,7 +570,7 @@ export function EventFlyerModal({
         <div ref={qrRef} className="hidden" aria-hidden>
           {origin && (
             <QRCodeCanvas
-              value={`${origin}/events/${event.slug ?? event.id}?src=qr#register`}
+              value={`${origin}${flyerTarget(event).path}?src=qr#register`}
               size={512}
               level="M"
               fgColor="#001f3f"

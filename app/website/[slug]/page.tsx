@@ -1,6 +1,6 @@
 import { cache } from "react"
 import type { Metadata } from "next"
-import { notFound } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { loadSiteBySlug } from "@/lib/website-builder-service"
 import { SITE_URL } from "@/lib/seo"
@@ -14,6 +14,8 @@ import { StatsBandSection } from "../_components/sections/stats"
 import { ServiceAreasSection } from "../_components/sections/service-areas"
 import { GallerySection } from "../_components/sections/gallery"
 import { TestimonialsSection } from "../_components/sections/what-my-clients-say"
+import { EventsSection } from "../_components/sections/events"
+import { loadAgentWebsiteEvents } from "@/lib/events/website-events"
 
 // A published agent site from the Website Builder. Always fresh — agents
 // expect a save in the editor to show up on their public link immediately.
@@ -57,14 +59,21 @@ export default async function AgentWebsitePage({ params }: Props) {
   const { slug } = await params
   const site = await getSite(slug)
   if (!site) notFound()
+  // An address the site had before (migration 058) → its current one, for good.
+  if (site.slug !== slug) permanentRedirect(`/website/${site.slug}`)
   const data = site.data
+  // The agent's own published events (migration 057) — the section and its
+  // nav link only appear once there is at least one.
+  const events = await loadAgentWebsiteEvents(createAdminSupabase(), site.agentId)
+  const hasEvents = events.upcoming.length + events.past.length > 0
 
   return (
     <div style={themeVars(data.theme)}>
-      <SiteHeader data={data} />
+      <SiteHeader data={data} showEvents={hasEvents} />
       <HeroSection data={data} />
       <AboutSection data={data} qrValue={`${SITE_URL}/website/${site.slug}`} />
       <FeaturedSection data={data} />
+      <EventsSection siteSlug={site.slug} upcoming={events.upcoming} past={events.past} />
       <StatsBandSection data={data} />
       <ServiceAreasSection data={data} />
       <GallerySection data={data} />

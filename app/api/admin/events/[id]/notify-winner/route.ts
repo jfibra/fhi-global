@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireActiveSession } from "@/lib/auth-guard"
-import { canManageEvents } from "@/lib/app-roles"
+import { canAccessEvent, eventNotFound, requireEventAccess } from "@/lib/events/access"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { sendRaffleWinnerEmail } from "@/lib/mailer"
 
@@ -12,13 +11,12 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
  * draws never email real people.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireActiveSession()
-  if (!session.ok) return session.response
-  if (!canManageEvents(session.context.profile.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-  }
+  const access = await requireEventAccess()
+  if (!access.ok) return access.response
 
   const { id } = await params
+  // Admin staff: any event; an agent: only their own (migration 057).
+  if (!(await canAccessEvent(createAdminSupabase(), id, access.scope))) return eventNotFound()
   const body = (await req.json().catch(() => ({}))) as { registrationId?: unknown; prize?: unknown }
   const registrationId = typeof body.registrationId === "string" ? body.registrationId : ""
   const prize = typeof body.prize === "string" ? body.prize.trim().slice(0, 80) : ""

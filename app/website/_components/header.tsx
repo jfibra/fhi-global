@@ -10,25 +10,32 @@ import { ChevronDown, Menu, MessageCircle, X } from "lucide-react"
 import { BRAND_GRADIENT, BRAND_TO, GOLD, GOLD_GRADIENT, NAV_LINKS, SAMPLE_DATA, type WebsiteData } from "../_data"
 import { buildContactChannels } from "./contact-channels"
 
-/** In-page anchors the nav can point at, in page order. */
-const ANCHOR_HREFS = NAV_LINKS.map((l) => l.href).filter((h) => h.startsWith("#"))
+/** The nav, plus "Events" after Featured when the agent has published events. */
+function navLinks(showEvents: boolean) {
+  if (!showEvents) return NAV_LINKS
+  const links = [...NAV_LINKS]
+  links.splice(links.findIndex((l) => l.href === "#featured") + 1, 0, { label: "Events", href: "#events" })
+  return links
+}
 
 /** Scroll-spy: the nav link whose section is currently under the header.
  *  A section counts as current once its top has scrolled past the header
- *  band; the last such section wins. Falls back to the first anchor (#home). */
-function useActiveAnchor(offset = 96) {
-  const [active, setActive] = useState<string>(ANCHOR_HREFS[0] ?? "#home")
+ *  band; the last such section wins. Falls back to the first anchor (#home).
+ *  `anchorKey` is the in-page anchors joined by "|" (stable across renders). */
+function useActiveAnchor(anchorKey: string, offset = 96) {
+  const [active, setActive] = useState<string>(anchorKey.split("|")[0] ?? "")
   useEffect(() => {
+    const anchors = anchorKey ? anchorKey.split("|") : []
     let raf = 0
     const update = () => {
       raf = 0
       // Sections in PAGE order (nav order differs — e.g. About precedes
       // Featured on the page), each with its current top edge.
-      const tops = ANCHOR_HREFS.flatMap((href) => {
+      const tops = anchors.flatMap((href) => {
         const el = document.getElementById(href.slice(1))
         return el ? [{ href, top: el.getBoundingClientRect().top }] : []
       }).sort((a, b) => a.top - b.top)
-      let current = tops[0]?.href ?? ANCHOR_HREFS[0] ?? "#home"
+      let current = tops[0]?.href ?? anchors[0] ?? ""
       for (const t of tops) if (t.top <= offset) current = t.href
       // Pinned to the bottom: the last section is in view even if its top
       // never reaches the header band on short pages.
@@ -47,13 +54,28 @@ function useActiveAnchor(offset = 96) {
       window.removeEventListener("hashchange", onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [offset])
+  }, [anchorKey, offset])
   return active
 }
 
-export function SiteHeader({ sticky = true, data = SAMPLE_DATA }: { sticky?: boolean; data?: WebsiteData }) {
+export function SiteHeader({
+  sticky = true,
+  data = SAMPLE_DATA,
+  showEvents = false,
+  basePath,
+}: {
+  sticky?: boolean
+  data?: WebsiteData
+  /** Add an "Events" link (the site has published events, migration 057). */
+  showEvents?: boolean
+  /** On a sub-page (an event page): section links go back to the site root. */
+  basePath?: string
+}) {
   const [open, setOpen] = useState(false)
-  const activeHref = useActiveAnchor()
+  const links = navLinks(showEvents)
+  const hrefFor = (href: string) => (basePath && href.startsWith("#") ? `${basePath}${href}` : href)
+  // No scroll-spy on a sub-page: none of the sections are on it.
+  const activeHref = useActiveAnchor(basePath ? "" : links.map((l) => l.href).filter((h) => h.startsWith("#")).join("|"))
   // Contact Me — same dropdown channels as the About section.
   const [contactOpen, setContactOpen] = useState(false)
   const contactChannels = buildContactChannels(data)
@@ -87,14 +109,14 @@ export function SiteHeader({ sticky = true, data = SAMPLE_DATA }: { sticky?: boo
         </Link>
 
         <nav className="ml-auto hidden items-center gap-7 lg:flex">
-          {NAV_LINKS.map(({ label, href }) => {
+          {links.map(({ label, href }) => {
             // Active = the section currently under the header (scroll-spy);
             // external links (e.g. FHI Global Homepage) are never active.
             const active = href === activeHref
             return (
               <a
                 key={label}
-                href={href}
+                href={hrefFor(href)}
                 className={`relative cursor-pointer text-[13.5px] font-semibold transition-colors ${
                   active ? "" : "text-white/75 hover:text-white"
                 }`}
@@ -148,12 +170,12 @@ export function SiteHeader({ sticky = true, data = SAMPLE_DATA }: { sticky?: boo
       {/* Mobile menu panel */}
       {open && (
         <nav className="border-t border-white/10 px-5 pb-6 pt-2 lg:hidden" style={{ backgroundColor: BRAND_TO }}>
-          {NAV_LINKS.map(({ label, href }) => {
+          {links.map(({ label, href }) => {
             const active = href === activeHref
             return (
               <a
                 key={label}
-                href={href}
+                href={hrefFor(href)}
                 onClick={() => setOpen(false)}
                 className={`block border-b border-white/5 py-3 text-[14px] font-semibold ${
                   active ? "" : "text-white/80"

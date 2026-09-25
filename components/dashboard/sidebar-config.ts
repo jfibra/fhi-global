@@ -237,7 +237,6 @@ const EDITOR_NAV: RoleNavEntry[] = [
   OVERVIEW,
   { icon: Building2, label: "Developers", to: "developers" },
   PROJECTS,
-  EVENTS,
   MATERIALS,
   EBOOKS,
 ]
@@ -255,11 +254,12 @@ const DEVELOPER_NAV: RoleNavEntry[] = [
 ]
 
 /**
- * agent / team_leader / unit_manager — identical apart from the extras a
- * particular rank gets (team leaders also manage events, per
- * ROLES_EVENT_MANAGERS in app-roles.ts).
+ * agent / team_leader / unit_manager / global_partner — identical apart from
+ * the extras a particular rank gets. Events is here for all of them, scoped to
+ * their OWN events on their website (ROLES_EVENT_OWNERS in app-roles.ts; admin
+ * staff manage every event from their own nav).
  */
-const salesPipelineNav = ({ projects = false, events = false, teamSales = false, invite = true } = {}): RoleNavEntry[] => [
+const salesPipelineNav = ({ projects = false, teamSales = false, invite = true } = {}): RoleNavEntry[] => [
   OVERVIEW,
   { icon: ClipboardList, label: "My listings", to: "listings" },
   OWNER_DOCUMENTS,
@@ -269,8 +269,8 @@ const salesPipelineNav = ({ projects = false, events = false, teamSales = false,
   ...(projects ? [PROJECTS] : []),
   // Global partners are recruited, they do not recruit — no Invite for them.
   ...(invite ? [INVITE] : []),
-  // Team leaders manage events too (see ROLES_EVENT_MANAGERS).
-  ...(events ? [EVENTS] : []),
+  // Their own events, published on their website (migration 057).
+  EVENTS,
   SALES_REPORTS,
   // Team leaders / unit managers see their whole team's production
   // (keep in sync with "team-sales" in SUB_PATH_ROLES, lib/auth.ts).
@@ -340,7 +340,7 @@ const ROLE_NAV: Record<AppRoleId, RoleNavEntry[]> = {
   admin:          ADMIN_NAV,
   editor:         EDITOR_NAV,
   developer:      DEVELOPER_NAV,
-  team_leader:    salesPipelineNav({ projects: true, events: true, teamSales: true }),
+  team_leader:    salesPipelineNav({ projects: true, teamSales: true }),
   unit_manager:   salesPipelineNav({ projects: true, teamSales: true }),
   agent:          salesPipelineNav({ projects: true }),
   secretary:      SECRETARY_NAV,

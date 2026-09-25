@@ -1,6 +1,7 @@
 import "server-only"
 
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
+import { eventPublicPath } from "@/lib/events/paths"
 import { fetchArticlesList, isIndexableNewsArticle, newsConfigured, toManilaIso } from "@/lib/news-service"
 
 /**
@@ -54,8 +55,11 @@ function sectionFilters(section: SupabaseSection): Array<["eq" | "is", string, u
     case "developers":
       return [["eq", "is_active", true], ["is", "deleted_at", null]]
     case "listings":
-    case "events":
       return [["eq", "status", "published"], ["is", "deleted_at", null]]
+    case "events":
+      // Company events only: an agent's own event (057) lives on their
+      // website, and its /events/<slug> URL only forwards there.
+      return [["eq", "status", "published"], ["is", "deleted_at", null], ["is", "agent_id", null]]
     case "gallery":
       // gallery_albums has no deleted_at or status columns (migration 038) —
       // is_published is the whole publish state.
@@ -100,6 +104,43 @@ export async function fetchSectionPage(
       .range(from, from + SUPABASE_PER_PAGE - 1)
     if (error || !data) return null
     return data as unknown as SectionRow[]
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Agents' own published events (migration 057), as their website URLs — the
+ * events section above is company events only. Only events whose agent has a
+ * published site are listed (that's where they live). Null on a failed read.
+ */
+export async function fetchAgentEventPaths(): Promise<Array<{ path: string; updated_at: string | null }> | null> {
+  try {
+    const supabase = createPublicSupabaseClient()
+    const { data: events, error } = await supabase
+      .from("events")
+      .select("id, slug, agent_id, updated_at")
+      .eq("status", "published")
+      .is("deleted_at", null)
+      .not("agent_id", "is", null)
+      .order("id", { ascending: true })
+      .limit(SUPABASE_PER_PAGE)
+    if (error || !events) return null
+    const agentIds = [...new Set(events.map((e) => String(e.agent_id)))]
+    if (agentIds.length === 0) return []
+    const { data: sites, error: siteError } = await supabase
+      .from("website_builder")
+      .select("agent_id, slug")
+      .in("agent_id", agentIds)
+      .eq("is_published", true)
+    if (siteError || !sites) return null
+    const siteBy = new Map(sites.map((s) => [String(s.agent_id), String(s.slug)]))
+    return events.flatMap((e) => {
+      const site = siteBy.get(String(e.agent_id))
+      return site
+        ? [{ path: eventPublicPath({ id: String(e.id), slug: (e.slug as string | null) ?? null }, site), updated_at: (e.updated_at as string | null) ?? null }]
+        : []
+    })
   } catch {
     return null
   }

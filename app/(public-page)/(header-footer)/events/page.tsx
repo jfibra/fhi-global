@@ -69,6 +69,8 @@ export default async function EventsPage() {
     .select("id, slug, title, description, brand, image_url, event_date, venue, registration_open")
     .eq("status", "published")
     .is("deleted_at", null)
+    // Company events only — an agent's own event lives on their website (057).
+    .is("agent_id", null)
     .order("event_date", { ascending: true, nullsFirst: false })
 
   const { upcoming, past } = splitByDate((events ?? []) as EventRow[])

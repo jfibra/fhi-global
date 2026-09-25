@@ -196,7 +196,14 @@ export function eventSchema(event: {
   imageUrl?: string | null
   eventDate?: string | null
   venue?: string | null
+  /** Who runs it — FHI Global unless given. An agent's own event (migration
+   *  057) names the agent, linked to their website. */
+  organizer?: { name: string; path: string } | null
+  /** ISO country of the venue — the UAE for company events; pass null when it
+   *  isn't known (agents also run events abroad), so none is claimed. */
+  country?: string | null
 }): Record<string, unknown> {
+  const country = event.country === undefined ? "AE" : event.country
   return {
     "@context": "https://schema.org",
     "@type": "Event",
@@ -209,10 +216,12 @@ export function eventSchema(event: {
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
     location: {
       "@type": "Place",
-      name: event.venue || "Dubai, UAE",
-      address: { "@type": "PostalAddress", addressCountry: "AE" },
+      name: event.venue || (country === "AE" ? "Dubai, UAE" : "To be announced"),
+      ...(country ? { address: { "@type": "PostalAddress", addressCountry: country } } : {}),
     },
-    organizer: { "@type": "Organization", name: "FHI Global", url: SITE_URL },
+    organizer: event.organizer
+      ? { "@type": "Person", name: event.organizer.name, url: absoluteUrl(event.organizer.path) }
+      : { "@type": "Organization", name: "FHI Global", url: SITE_URL },
   }
 }
 

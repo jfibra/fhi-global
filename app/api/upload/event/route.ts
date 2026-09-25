@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
-import { requireActiveSession } from "@/lib/auth-guard"
-import { canManageEvents } from "@/lib/app-roles"
+import { requireEventAccess } from "@/lib/events/access"
 
 // Images arrive already resized + WebP-encoded by the browser
 // (lib/upload/compress-image.ts), so this route just stores what it is given.
@@ -15,13 +14,9 @@ const s3 = new S3Client({
 })
 
 export async function POST(req: NextRequest) {
-  const session = await requireActiveSession()
-  if (!session.ok) {
-    return session.response
-  }
-  if (!canManageEvents(session.context.profile.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-  }
+  // Admin staff, or a Website Builder user uploading their own event's poster.
+  const access = await requireEventAccess()
+  if (!access.ok) return access.response
 
   const bucket = process.env.S3_BUCKET_NAME
   const publicUrl = process.env.S3_PUBLIC_URL

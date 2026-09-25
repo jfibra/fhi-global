@@ -90,7 +90,7 @@ export default async function AboutPage() {
   // covers that stand behind the figures in the reel.
   const [{ data: rows }, { data: eventRows, count: eventCount }, { count: photoCount }, { count: agentCount }, { data: agentRows }, { data: devRows }] = await Promise.all([
     supabase.from("projects").select("name, city, developer_id, main_image, is_featured").eq("is_active", true).eq("is_published", true).is("deleted_at", null).order("is_featured", { ascending: false }).order("created_at", { ascending: false }).limit(4000),
-    supabase.from("events").select("title, image_url", { count: "exact" }).eq("status", "published").is("deleted_at", null).order("event_date", { ascending: false }).limit(12),
+    supabase.from("events").select("title, image_url", { count: "exact" }).eq("status", "published").is("deleted_at", null).is("agent_id", null).order("event_date", { ascending: false }).limit(12),
     supabase.from("gallery_photos").select("id", { count: "exact", head: true }).eq("album_id", ALBUM_ID),
     admin.from("profiles").select("id", { count: "exact", head: true }).in("role", ["agent", "team_leader"]).eq("status", "active"),
     admin.from("profiles").select("fullname, profile_url").in("role", ["agent", "team_leader"]).eq("status", "active").not("profile_url", "is", null).order("fullname", { ascending: true }).limit(36),

@@ -1,21 +1,29 @@
 "use client"
 
 /**
- * Admin event manager: create/edit branded events (logo, photo, date, venue),
- * publish them to the public /events section, generate a branded flyer with
- * the registration QR baked in (links to /events/<id>), and view who registered.
+ * Event manager: create/edit branded events (logo, photo, date, venue),
+ * publish them, generate a branded flyer with the registration QR baked in,
+ * and view who registered. Two scopes (migration 057):
+ *   · all — admin staff: every event. Company events publish to /events;
+ *     agents' own events are labelled with whose website they're on.
+ *   · own — Website Builder users: only their own events, which publish to
+ *     their website. No website yet → a "create your website first" prompt;
+ *     otherwise a guide to where the events go, with the link + QR to share.
+ * Every event carries its publicPath, so View, the flyer QR and sharing all
+ * point at the right page.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Award, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Eye, ImagePlus, Loader2,
-  MapPin, MoreVertical, Pencil, Plus, QrCode, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
+  Globe, MapPin, MoreVertical, Pencil, Plus, QrCode, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
 } from "lucide-react"
 import { EventCertificateModal } from "./event-certificate-modal"
 import { InlineInviterEdit } from "@/components/dashboard/inline-inviter-edit"
 import { EventExportModal } from "./event-export-modal"
 import { EventFlyerModal } from "./event-flyer-modal"
 import { EventRaffle } from "./event-raffle"
+import { CreateWebsiteFirst, EventsWebsiteGuide } from "./events-website-guide"
 import { EVENT_BRANDS, eventBrand } from "@/lib/events/brands"
 import {
   FIELD_TYPE_LABELS,
@@ -47,6 +55,11 @@ type AdminEvent = {
   registrationCount: number
   viewCount: number
   qrScanCount: number
+  /** null = company event (/events); otherwise the agent whose website it's on. */
+  agentId: string | null
+  ownerName: string | null
+  /** The public page — /events/<slug> or the owner's website. */
+  publicPath: string
 }
 
 type Registration = {
@@ -127,7 +140,17 @@ function eventDateLabel(iso: string | null): string {
     " · " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dubai" }) + " GST"
 }
 
-export function EventsClient() {
+export function EventsClient({
+  scope,
+  website = null,
+  websiteBuilderHref = "",
+}: {
+  scope: "all" | "own"
+  /** "own" only: the agent's website, or null when they haven't built one. */
+  website?: { slug: string; isPublished: boolean } | null
+  websiteBuilderHref?: string
+}) {
+  const own = scope === "own"
   const [events, setEvents] = useState<AdminEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -554,13 +577,25 @@ export function EventsClient() {
           <div>
             <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] flex items-center gap-2">
               <CalendarDays className="w-6 h-6 text-[#001f3f]" />
-              Events
+              {own ? "My Events" : "Events"}
             </h1>
             <p className="text-sm text-[#6b7280] mt-1">
-              Create branded events, generate a share-ready flyer with its registration QR, and see
-              who signed up. Published events appear on the public Events page.
+              {own ? (
+                <>
+                  Create events for your clients, share a flyer with its registration QR, and see who signed
+                  up. Published events appear on <strong className="text-[#374151]">your website</strong>.
+                </>
+              ) : (
+                <>
+                  Create branded events, generate a share-ready flyer with its registration QR, and see
+                  who signed up. Company events appear on the public Events page; agents&apos; own events
+                  appear on their websites.
+                </>
+              )}
             </p>
           </div>
+          {/* No website yet → nothing to publish to; the prompt below replaces the tools. */}
+          {!(own && !website) && (
           <div className="flex gap-2">
             <button
               type="button"
@@ -579,19 +614,33 @@ export function EventsClient() {
               New event
             </button>
           </div>
+          )}
         </div>
+
+        {/* An agent's events publish to their website: build it first, or see where they go. */}
+        {own && !website && <CreateWebsiteFirst websiteBuilderHref={websiteBuilderHref} />}
+        {own && website && (
+          <EventsWebsiteGuide
+            siteSlug={website.slug}
+            isPublished={website.isPublished}
+            origin={origin}
+            websiteBuilderHref={websiteBuilderHref}
+          />
+        )}
 
         {error && (
           <div className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
         )}
 
-        {loading ? (
+        {own && !website ? null : loading ? (
           <div className="border border-[#e8eaed] bg-white p-12 text-center text-sm text-[#9ca3af]">
             Loading events…
           </div>
         ) : events.length === 0 ? (
           <div className="border border-[#e8eaed] bg-white p-12 text-center">
-            <p className="text-[#6b7280] mb-4">No events yet.</p>
+            <p className="text-[#6b7280] mb-4">
+              {own ? "You haven't created an event yet — publish one and it appears on your website." : "No events yet."}
+            </p>
             <button type="button" onClick={openCreate} className="text-sm font-semibold text-[#001f3f] hover:underline">
               Create your first event
             </button>
@@ -649,6 +698,18 @@ export function EventsClient() {
                     </span>
                   </div>
                   <div className="p-4">
+                    {/* Where it shows — admins see company and agents' events side by side */}
+                    {!own && (
+                      <p
+                        className={`mb-1.5 inline-flex max-w-full items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                          e.agentId ? "bg-[#d6b357]/15 text-[#8a6d2a]" : "bg-[#001f3f]/5 text-[#001f3f]"
+                        }`}
+                        title={e.agentId ? "An agent's own event, shown on their website" : "Company event, shown on fhiglobal.ae/events"}
+                      >
+                        <Globe className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{e.agentId ? `${e.ownerName ?? "Agent"}'s website` : "Company · /events"}</span>
+                      </p>
+                    )}
                     <h3 className="font-['Outfit'] font-bold text-[#111827] truncate">{e.title}</h3>
                     <p className="text-xs text-[#6b7280] mt-1">{eventDateLabel(e.eventDate)}</p>
                     {e.venue && (
@@ -696,11 +757,11 @@ export function EventsClient() {
                       <div className="mt-2 grid grid-cols-2 gap-1.5 @md:flex">
                         {e.status === "published" && (
                           <a
-                            href={`/events/${e.slug ?? e.id}`}
+                            href={e.publicPath}
                             target="_blank"
                             rel="noopener noreferrer"
                             className={cardChipBtn}
-                            title="Open the public event page in a new tab"
+                            title={e.agentId ? "Open the event on the website in a new tab" : "Open the public event page in a new tab"}
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                             View

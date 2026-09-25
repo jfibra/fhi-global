@@ -242,8 +242,24 @@ export function slugify(input: string): string {
     .slice(0, 80)
 }
 
-/** base, base-2, base-3, … — the first slug not already taken. Pass the own
- *  row's id when re-minting so a site's current slug doesn't count as taken. */
+/**
+ * A site address from a person's name — "MICHELLE Q. GUINTO" → "michelle-guinto".
+ * Single-letter initials are dropped (shorter, and what people actually type);
+ * a name made only of initials keeps them.
+ */
+export function nameSlug(name: string): string {
+  const words = slugify(name).split("-").filter(Boolean)
+  const kept = words.filter((w) => w.length > 1)
+  return (kept.length ? kept : words).join("-").slice(0, 60).replace(/-+$/, "")
+}
+
+/** A slug the /website/[slug] route accepts — anything else can't be one. */
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+
+/** base, base-2, base-3, … — the first slug not already taken, counting every
+ *  site's current slug AND its previous ones (migration 058), so an old
+ *  address never gets handed to someone else. Pass the own row's id when
+ *  re-minting so a site's current slug doesn't count as taken. */
 async function ensureUniqueSlug(admin: SupabaseClient, base: string, excludeId?: string): Promise<string> {
   const clean = slugify(base) || "agent-site"
   let query = admin
@@ -251,8 +267,14 @@ async function ensureUniqueSlug(admin: SupabaseClient, base: string, excludeId?:
     .select("slug")
     .or(`slug.eq.${clean},slug.like.${clean}-%`)
   if (excludeId) query = query.neq("id", excludeId)
-  const { data } = await query
-  const taken = new Set((data ?? []).map((r) => r.slug as string))
+  const [{ data }, { data: previous }] = await Promise.all([
+    query,
+    admin.from("website_builder").select("previous_slugs"),
+  ])
+  const taken = new Set([
+    ...(data ?? []).map((r) => r.slug as string),
+    ...(previous ?? []).flatMap((r) => (Array.isArray(r.previous_slugs) ? (r.previous_slugs as string[]) : [])),
+  ])
   if (!taken.has(clean)) return clean
   for (let n = 2; ; n++) {
     const candidate = `${clean}-${n}`
@@ -286,6 +308,24 @@ const statsFromDb = (raw: unknown): EditableStat[] =>
 /** The title column mirrors the hero headline, flattened to one line. */
 function titleFromHero(data: WebsiteData): string {
   return `${data.hero.headline.replace(/\s+/g, " ").trim()} ${data.hero.headlineAccent.trim()}`.trim()
+}
+
+/**
+ * What a NEW site's address is made from (migration 058): the agent's name on
+ * the site, else their profile name, else the headline. Never the template's
+ * sample name.
+ */
+async function siteSlugBase(admin: SupabaseClient, agentId: string, data: WebsiteData, title: string): Promise<string> {
+  const onSite = data.agent.name?.trim() ?? ""
+  const fromSite = onSite && onSite !== SAMPLE_DATA.agent.name ? nameSlug(onSite) : ""
+  if (fromSite) return fromSite
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("fullname, fname, lname")
+    .eq("id", agentId)
+    .maybeSingle()
+  const fromProfile = nameSlug(profile?.fullname || [profile?.fname, profile?.lname].filter(Boolean).join(" ") || "")
+  return fromProfile || slugify(title) || "agent-site"
 }
 
 export type SavedSite = { websiteId: string; slug: string }
@@ -331,14 +371,10 @@ export async function saveSite(
 
   if (existing) {
     websiteId = existing.id as string
-    // The slug follows the title: when the headline changes, a new slug is
-    // minted from it (unique against everyone else's; re-saving the same
-    // title keeps the current slug, including its -2/-3 suffix).
+    // The address is stable (migration 058): minted once from the agent's
+    // name and never re-minted when the headline changes — it used to, which
+    // silently broke every shared link, printed QR and event link (057).
     slug = existing.slug as string
-    const base = slugify(title) || "agent-site"
-    if (slug !== base && !new RegExp(`^${base}-\\d+$`).test(slug)) {
-      slug = await ensureUniqueSlug(admin, title, websiteId)
-    }
 
     const { data: heroRow } = await admin
       .from("hero_section")
@@ -428,7 +464,7 @@ export async function saveSite(
       .single()
     if (aboutError) throw new Error("Failed to save about")
 
-    slug = await ensureUniqueSlug(admin, title)
+    slug = await ensureUniqueSlug(admin, await siteSlugBase(admin, agentId, data, title))
     const { data: siteRow, error: siteError } = await admin
       .from("website_builder")
       .insert({
@@ -524,19 +560,38 @@ export async function saveSite(
 
 // ─── Load ─────────────────────────────────────────────────────────────────────
 
-export type LoadedSite = { websiteId: string; slug: string; title: string; data: WebsiteData }
+export type LoadedSite = {
+  websiteId: string
+  /** The site owner — whose own events (migration 057) the site lists. */
+  agentId: string
+  slug: string
+  title: string
+  data: WebsiteData
+}
 
 async function loadSite(
   admin: SupabaseClient,
   by: { agentId?: string; slug?: string },
 ): Promise<LoadedSite | null> {
-  let query = admin.from("website_builder").select("*")
-  if (by.agentId) query = query.eq("agent_id", by.agentId)
-  else if (by.slug) query = query.eq("slug", by.slug).eq("is_published", true)
-  else return null
-
-  const { data: site, error } = await query.maybeSingle()
-  if (error || !site) return null
+  let site: Record<string, unknown> | null = null
+  if (by.agentId) {
+    const { data, error } = await admin.from("website_builder").select("*").eq("agent_id", by.agentId).maybeSingle()
+    if (error) return null
+    site = data
+  } else if (by.slug) {
+    // The current slug, or one the site had before (migration 058) — the
+    // returned site carries its CURRENT slug, and pages redirect to it.
+    if (!SLUG_RE.test(by.slug)) return null
+    const { data, error } = await admin
+      .from("website_builder")
+      .select("*")
+      .or(`slug.eq.${by.slug},previous_slugs.cs.{${by.slug}}`)
+      .eq("is_published", true)
+      .limit(2)
+    if (error) return null
+    site = (data ?? []).find((r) => r.slug === by.slug) ?? data?.[0] ?? null
+  }
+  if (!site) return null
 
   const websiteId = site.id as string
   const data = structuredClone(SAMPLE_DATA)
@@ -624,7 +679,7 @@ async function loadSite(
     data.gallery[cat] = photos.filter((p): p is string => typeof p === "string" && !!p)
   }
 
-  return { websiteId, slug: site.slug as string, title: site.title as string, data }
+  return { websiteId, agentId: site.agent_id as string, slug: site.slug as string, title: site.title as string, data }
 }
 
 export const loadSiteByAgent = (admin: SupabaseClient, agentId: string) => loadSite(admin, { agentId })
