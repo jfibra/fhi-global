@@ -201,6 +201,11 @@ export function canManageDeveloperContent(role: string | null | undefined): bool
 // thing they never see is the company leaderboard (ROLES_SALES_LEADERBOARD).
 export const ROLES_SALES_PIPELINE: readonly AppRoleId[] = ["agent", "team_leader", "unit_manager", "global_partner"]
 
+/** Agent Resource → Buyers Link (migration 060): the sales ladder plus admin
+ *  staff, who have the same Agent Resource hub. Also who a /b/<code> page may
+ *  belong to — a link dies with its owner's access. */
+export const ROLES_BUYER_LINK_OWNERS: readonly AppRoleId[] = [...ROLES_SALES_PIPELINE, "super_admin", "admin"]
+
 export const ROLES_SECRETARY_LIKE: readonly AppRoleId[] = ["secretary", "team_secretary"]
 
 /** `/{role}/sales`, sale detail, and sale file uploads (view / assist with paperwork, not encode new sales). */
@@ -330,6 +335,10 @@ export function isDeveloperRole(role: string | null | undefined): boolean {
 
 export function isSalesPipelineRole(role: string | null | undefined): boolean {
   return roleInList(role, ROLES_SALES_PIPELINE)
+}
+
+export function canUseBuyerLinks(role: string | null | undefined): boolean {
+  return roleInList(role, ROLES_BUYER_LINK_OWNERS)
 }
 
 export function isSecretaryLikeRole(role: string | null | undefined): boolean {

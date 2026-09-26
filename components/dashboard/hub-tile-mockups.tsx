@@ -368,6 +368,22 @@ const MOCKUPS: Record<string, React.ReactNode> = {
       </span>
     </span>
   ),
+  // A Buyers Link page on a phone: project photo, two form lines, gold send button.
+  "buyers-link": (
+    <span className="relative block">
+      <span className="flex h-[50px] w-[34px] flex-col gap-[3px] overflow-hidden rounded-[5px] border-2 border-[#001f3f] bg-white p-[3px] shadow-md">
+        <span className="h-3.5 shrink-0 rounded-[1px] bg-gradient-to-br from-[#9fc2dd] to-[#1d4166]" />
+        <span className="h-[3px] w-full rounded bg-[#c8d4de]" />
+        <span className="h-[3px] w-full rounded bg-[#c8d4de]" />
+        <span className="mt-auto h-1.5 w-full rounded-[1px] bg-[#d6b357]" />
+      </span>
+      <span className="absolute -right-5 top-2.5 flex h-4 w-6 items-center justify-center rounded-full bg-[#001f3f] shadow-sm">
+        <svg viewBox="0 0 14 8" className="h-2 w-3.5">
+          <path d="M5.5 1.2H4a2.8 2.8 0 000 5.6h1.5M8.5 1.2H10a2.8 2.8 0 010 5.6H8.5M4.8 4h4.4" fill="none" stroke="#d6b357" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      </span>
+    </span>
+  ),
   // A client review card: five gold stars, two lines of text, the approve tick.
   "customer-feedback": (
     <span className="relative block">

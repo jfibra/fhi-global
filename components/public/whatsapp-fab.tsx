@@ -1,13 +1,18 @@
 "use client"
 
+import { usePathname } from "next/navigation"
 import { gaEvent } from "@/lib/ga"
 
 /**
  * Floating WhatsApp button — the standard Dubai real-estate conversion
  * element. Rendered from the public Footer so it appears on every public
  * page and never inside the dashboards. Clicks report a GA4 lead event.
+ * Not on a Buyers Link (/b/<code>): that client belongs to the agent who sent
+ * it, and the page carries the agent's own WhatsApp buttons.
  */
 export function WhatsAppFab() {
+  const pathname = usePathname()
+  if (pathname?.startsWith("/b/")) return null
   const text = encodeURIComponent("Hi! I'm interested in a property with FHI Global.")
   return (
     <a

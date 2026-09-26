@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library,
-  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles,
+  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -131,6 +131,8 @@ const SALES_REPORTS: NavEntry = { icon: TrendingUp, label: "Sales Reports", to: 
 const SUPPORT_TICKETS: NavEntry = { icon: LifeBuoy, label: "Support Tickets", to: "support" }
 const FEEDBACK: NavEntry = { icon: Star, label: "Customer Feedback", to: "feedback" }
 const A2A_AGREEMENT: NavEntry = { icon: Handshake, label: "A2A Agreement", to: "a2a-agreement" }
+// Projects picked for a client, one link to send, their details back (migration 060).
+const BUYERS_LINK: NavEntry = { icon: Link2, label: "Buyers Link", to: "buyers-link" }
 // Personal company mailbox (profiles.mailbox_address) — compose + own Sent.
 const MY_EMAILS: NavEntry = { icon: Mail, label: "Emails", to: "leads", requiresMailbox: true }
 // Shared marketing artwork. Open to every role, so it appears in all lists and
@@ -202,6 +204,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { icon: Presentation, label: "Meeting Poster", to: "meeting-poster", description: "Event posters with your choice of speakers.", mock: "meeting-poster" },
       { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website.", mock: "website-builder" },
       { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement.", mock: "a2a-agreement" },
+      { ...BUYERS_LINK,     description: "Send clients hand-picked projects — their details come straight to you.", mock: "buyers-link" },
     ],
   },
   {
@@ -294,6 +297,7 @@ const salesPipelineNav = ({ projects = false, teamSales = false, invite = true }
       { ...POSTER_MAKER,    description: "Flyers and posters from any listing or project.", mock: "poster-maker" },
       { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website.", mock: "website-builder" },
       { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement.", mock: "a2a-agreement" },
+      { ...BUYERS_LINK,     description: "Send clients hand-picked projects — their details come straight to you.", mock: "buyers-link" },
     ],
   },
   // Marketing artwork + training PDFs, grouped under one hub.
