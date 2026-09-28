@@ -35,7 +35,7 @@ export interface DldFilterField {
   options?: DldOption[]
   /** Which gateway lookup command feeds a `lookup` field. */
   lookup?: DldLookupName
-  /** Initial value. Dates accept "today" / "yesterday" / "-30d". */
+  /** Initial value. Dates accept "today" / "yesterday" / "year-start" / "month-start" / "-30d". */
   defaultValue?: string
   placeholder?: string
 }
@@ -134,8 +134,8 @@ export const DLD_DATASETS: Record<DldCommand, DldDataset> = {
     label: "Transactions",
     description: "Registered sales, mortgages and gifts.",
     filters: [
-      { param: "P_FROM_DATE", label: "From Date", kind: "date", required: true, defaultValue: "yesterday" },
-      { param: "P_TO_DATE", label: "To Date", kind: "date", required: true, defaultValue: "today" },
+      { param: "P_FROM_DATE", label: "From Date", kind: "date", required: true },
+      { param: "P_TO_DATE", label: "To Date", kind: "date", required: true },
       {
         param: "P_GROUP_ID",
         label: "Transaction Type",
@@ -197,8 +197,11 @@ export const DLD_DATASETS: Record<DldCommand, DldDataset> = {
           { value: "2", label: "End Date" },
         ],
       },
-      { param: "P_FROM_DATE", label: "From Date", kind: "date", required: true, defaultValue: "yesterday" },
-      { param: "P_TO_DATE", label: "To Date", kind: "date", required: true, defaultValue: "today" },
+      // Ejari volume is huge (~550k contracts since April 2026): the gateway
+      // 504s on a full-year window before it can answer, so keep ranges to a
+      // few months unless the area/usage filters narrow it.
+      { param: "P_FROM_DATE", label: "From Date", kind: "date", required: true },
+      { param: "P_TO_DATE", label: "To Date", kind: "date", required: true },
       FREE_HOLD,
       {
         param: "P_VERSION",
@@ -267,8 +270,8 @@ export const DLD_DATASETS: Record<DldCommand, DldDataset> = {
           { value: "4", label: "Completion Date" },
         ],
       },
-      { param: "P_FROM_DATE", label: "From Date", kind: "date", required: true, defaultValue: "-30d" },
-      { param: "P_TO_DATE", label: "To Date", kind: "date", required: true, defaultValue: "today" },
+      { param: "P_FROM_DATE", label: "From Date", kind: "date", required: true },
+      { param: "P_TO_DATE", label: "To Date", kind: "date", required: true },
       AREA,
       ZONE,
       {
@@ -323,8 +326,8 @@ export const DLD_DATASETS: Record<DldCommand, DldDataset> = {
     label: "Valuations",
     description: "Property valuation procedures.",
     filters: [
-      { param: "P_FROM_DATE", label: "From Date", kind: "date", required: true, defaultValue: "-30d" },
-      { param: "P_TO_DATE", label: "To Date", kind: "date", required: true, defaultValue: "today" },
+      { param: "P_FROM_DATE", label: "From Date", kind: "date", required: true },
+      { param: "P_TO_DATE", label: "To Date", kind: "date", required: true },
       AREA,
       { param: "P_PROP_TYPE_ID", label: "Property Type", kind: "select", options: PROPERTY_TYPES },
     ],
@@ -401,6 +404,8 @@ export const DLD_DATASETS: Record<DldCommand, DldDataset> = {
     filters: [
       AREA,
       ZONE,
+      // Deliberately blank: any date range on this dataset returned zero rows
+      // from the gateway (probed 2026-09-28), while blank dates list everything.
       { param: "P_FROM_DATE", label: "From Date", kind: "date" },
       { param: "P_TO_DATE", label: "To Date", kind: "date" },
       FREE_HOLD,
@@ -525,8 +530,10 @@ export const DLD_DATASETS: Record<DldCommand, DldDataset> = {
     description: "Registered developers.",
     filters: [
       { param: "P_NAME", label: "Developer Name", kind: "text", placeholder: "e.g. Emaar" },
-      { param: "P_FROM_DATE", label: "From Date", kind: "date" },
-      { param: "P_TO_DATE", label: "To Date", kind: "date" },
+      // Required here although optional on the DLD form: the gateway returns
+      // nothing for this dataset without a date range.
+      { param: "P_FROM_DATE", label: "From Date", kind: "date", required: true },
+      { param: "P_TO_DATE", label: "To Date", kind: "date", required: true },
     ],
     defaultSort: "DEVELOPER_NUMBER_ASC",
     sortable: ["DEVELOPER_NUMBER", "DEVELOPER_EN", "REGISTRATION_DATE", "LICENSE_EXPIRY_DATE"],
@@ -558,10 +565,75 @@ export type DldRow = Record<string, string | number | null>
 /** What `/api/admin/dld/{command}` returns. */
 export interface DldQueryResponse {
   rows: DldRow[]
-  /** Total matching rows as reported by the gateway (`TOTAL` on each row). */
+  /**
+   * Total matching rows — as reported by the gateway (`TOTAL` on each row), or,
+   * when a column search is active, the number of scanned rows that matched.
+   */
   total: number
   skip: number
   take: number
+  /** Present when a column search ran. */
+  search?: DldSearchInfo
+}
+
+/**
+ * How a column search was carried out. The gateway has no "contains" filter,
+ * so the proxy pulls the filtered result set in aligned chunks of
+ * DLD_SEARCH_CHUNK rows (cached in Postgres, see lib/dld-cache.ts) and
+ * matches on the chosen column itself.
+ *
+ * - `contains`: `%term%` over the first `scanLimit` rows in the table's sort
+ *   order. `truncated` means the gateway has more rows than were scanned; the
+ *   UI offers to raise the limit by DLD_SEARCH_SCAN_STEP.
+ * - `exact`: the term was a whole number and the column is sortable, so the
+ *   proxy sorted by that column and jumped straight to it (binary search over
+ *   chunks). Covers the whole result set — never truncated.
+ */
+export interface DldSearchInfo {
+  column: string
+  term: string
+  mode: "contains" | "exact"
+  /** Rows actually tested. */
+  scanned: number
+  /** The gateway's own total for the underlying filters. */
+  available: number
+  truncated: boolean
+  /** The cap this request scanned up to (contains mode). */
+  scanLimit: number
+  /** Chunks served from the cache vs pulled from the gateway. */
+  cacheHits: number
+  cacheMisses: number
+}
+
+/** Request keys for the column search — never forwarded to the gateway. */
+export const DLD_SEARCH_COLUMN_KEY = "SEARCH_COLUMN"
+export const DLD_SEARCH_TERM_KEY = "SEARCH_TERM"
+/** Optional: how many rows a contains-scan may cover (multiple of the step). */
+export const DLD_SEARCH_SCAN_ROWS_KEY = "SEARCH_SCAN_ROWS"
+export const DLD_SEARCH_TERM_MAX = 80
+
+/** Rows per gateway call / cache entry. The gateway answers in ~3–4s whatever
+ *  the size, so bigger is cheaper — 1,000 keeps each JSONB row ~1MB. */
+export const DLD_SEARCH_CHUNK = 1000
+/** A contains-scan covers this many rows by default … */
+export const DLD_SEARCH_SCAN_STEP = 5000
+/** … and the UI can raise it, step by step, up to this. */
+export const DLD_SEARCH_SCAN_MAX = 50_000
+
+/** A column search may target any displayed column. */
+export function isSearchableColumn(dataset: DldDataset, key: string): boolean {
+  return dataset.columns.some((c) => c.key === key)
+}
+
+/** Case-insensitive `%term%` on one cell. Numbers are matched on their digits. */
+export function cellContains(value: string | number | null | undefined, needle: string): boolean {
+  if (value === null || value === undefined) return false
+  return String(value).toLowerCase().includes(needle)
+}
+
+/** A whole number on a sortable column → the exact (sort-aware) lookup path. */
+export function isExactLookup(dataset: DldDataset, column: string, term: string): boolean {
+  return /^\d{1,15}$/.test(term) && dataset.sortable.includes(column)
 }
 
 export interface DldLookupResponse {
@@ -598,28 +670,163 @@ export function isoToDldDate(iso: string): string {
   return `${m[2]}/${m[3]}/${m[1]}`
 }
 
-/** Resolve a filter's `defaultValue` token into a concrete input value. */
+/**
+ * A filter's initial input value. Date filters start empty — the tabs that
+ * need a range wait for the user to pick one (their fields are `required`).
+ * Note the gateway only holds the current calendar year: probed 2026-09-28,
+ * every dataset's earliest row is early January and 2025 returns nothing.
+ */
 export function resolveDefault(field: DldFilterField): string {
-  const raw = field.defaultValue ?? ""
-  if (field.kind !== "date") return raw
-  const today = new Date()
-  const iso = (d: Date) => {
-    const y = d.getFullYear()
-    const mo = String(d.getMonth() + 1).padStart(2, "0")
-    const da = String(d.getDate()).padStart(2, "0")
-    return `${y}-${mo}-${da}`
+  return field.kind === "date" ? "" : (field.defaultValue ?? "")
+}
+
+/** Required filters the user has not filled in yet. */
+export function missingRequired(dataset: DldDataset, values: Record<string, string>): DldFilterField[] {
+  return dataset.filters.filter((f) => f.required && !(values[f.param] ?? "").trim())
+}
+
+// ─── Charts ──────────────────────────────────────────────────────────────────
+
+/**
+ * The DLD Property Price Index (`/open-data/property-price-idx`): 20 series —
+ * residential (general/flats/villas) and commercial (general/hospitality/hotel
+ * apartment/hotel rooms/offices/shops/shops & offices) — each annual and
+ * quarterly from 2020, with the index value plus QoQ and YoY change.
+ */
+export const DLD_PRICE_INDEX_COMMAND = "property-price-idx"
+
+export interface DldPriceIndexPoint {
+  /** "2024" or "2024.3" (year.quarter) as the gateway labels it. */
+  x: string
+  actual: number | null
+  qoq: number | null
+  yoy: number | null
+}
+
+export interface DldPriceIndexSeries {
+  category: string
+  categoryCode: string
+  subCategory: string
+  subCategoryCode: string
+  period: "Annual" | "Quarterly"
+  points: DldPriceIndexPoint[]
+}
+
+export interface DldPriceIndexResponse {
+  series: DldPriceIndexSeries[]
+  fromCache: boolean
+}
+
+/**
+ * What the breakdown charts aggregate for a dataset. Rows are pulled in date
+ * order (sorted by `dateKey`), so a capped pull covers a contiguous prefix of
+ * the range — the response reports the dates actually covered.
+ */
+export interface DldChartSpec {
+  command: DldCommand
+  /** Row field holding the date the daily series buckets on. */
+  dateKey: string
+  /** Sort key the gateway accepts for that date (`{key}_ASC`). */
+  dateSort: string
+  /** Row field summed per day / per category (AED). Absent → counts only. */
+  valueKey?: string
+  valueLabel?: string
+  /** Categorical fields to break the rows down by (label = column label). */
+  breakdowns: string[]
+  /** "Top N" field, e.g. area or developer, ranked by count. */
+  topKey: string
+}
+
+export const DLD_CHART_SPECS: Partial<Record<DldCommand, DldChartSpec>> = {
+  transactions: {
+    command: "transactions",
+    dateKey: "INSTANCE_DATE",
+    dateSort: "INSTANCE_DATE",
+    valueKey: "TRANS_VALUE",
+    valueLabel: "Transaction value (AED)",
+    breakdowns: ["GROUP_EN", "USAGE_EN", "IS_OFFPLAN_EN", "PROP_TYPE_EN", "IS_FREE_HOLD_EN"],
+    topKey: "AREA_EN",
+  },
+  rents: {
+    command: "rents",
+    dateKey: "REGISTRATION_DATE",
+    dateSort: "REGISTRATION_DATE",
+    valueKey: "ANNUAL_AMOUNT",
+    valueLabel: "Annual rent (AED)",
+    breakdowns: ["USAGE_EN", "PROP_SUB_TYPE_EN", "VERSION_EN", "IS_FREE_HOLD_EN"],
+    topKey: "AREA_EN",
+  },
+  projects: {
+    command: "projects",
+    dateKey: "START_DATE",
+    dateSort: "START_DATE",
+    valueKey: "PROJECT_VALUE",
+    valueLabel: "Project value (AED)",
+    breakdowns: ["PROJECT_STATUS", "PRJ_TYPE_EN", "AREA_EN"],
+    topKey: "DEVELOPER_EN",
+  },
+  valuations: {
+    command: "valuations",
+    dateKey: "INSTANCE_DATE",
+    dateSort: "INSTANCE_DATE",
+    valueKey: "PROPERTY_TOTAL_VALUE",
+    valueLabel: "Valuation (AED)",
+    breakdowns: ["PROPERTY_TYPE_EN", "PROP_SUB_TYPE_EN", "ROW_STATUS_CODE"],
+    topKey: "AREA_EN",
+  },
+}
+
+/**
+ * Breakdowns are aggregated one batch of chunks per request and merged on
+ * the client, so there is no cap on how much of a range the charts cover —
+ * only on how long one request takes (~10 gateway calls cold, ~12–25s).
+ */
+export const DLD_CHART_BATCH_CHUNKS = 10
+/** The first batch is small so a cold load paints within a few seconds. */
+export const DLD_CHART_FIRST_BATCH_CHUNKS = 2
+export const DLD_CHART_TOP_N = 10
+
+export interface DldChartBucket {
+  label: string
+  count: number
+  /** Sum of `valueKey` (AED) for the bucket, when the spec has one. */
+  value: number
+}
+
+export interface DldChartDay {
+  /** ISO yyyy-mm-dd. */
+  date: string
+  count: number
+  value: number
+}
+
+/**
+ * Aggregates for ONE batch of chunks (`chunkFrom` … `chunkTo` - 1). Every
+ * part is mergeable by summing per key, so the client accumulates batches
+ * until `done`. `top` carries every bucket (not just the top N) for the same
+ * reason — a top-10 of a partial batch would not merge correctly.
+ */
+export interface DldBreakdownResponse {
+  command: DldCommand
+  daily: DldChartDay[]
+  /** Keyed by breakdown field; buckets sorted by count desc. */
+  breakdowns: Record<string, DldChartBucket[]>
+  top: DldChartBucket[]
+  totals: { count: number; value: number }
+  coverage: {
+    /** Rows in this batch. */
+    rows: number
+    /** The gateway's total for the filters. */
+    available: number
+    chunkFrom: number
+    /** Exclusive. Pass as the next request's `chunkFrom`. */
+    chunkTo: number
+    /** True when this batch reached the end of the result set. */
+    done: boolean
+    /** First/last `dateKey` among this batch's rows (ISO date), null when empty. */
+    from: string | null
+    to: string | null
+    cacheHits: number
+    cacheMisses: number
   }
-  if (raw === "today") return iso(today)
-  if (raw === "yesterday") {
-    const d = new Date(today)
-    d.setDate(d.getDate() - 1)
-    return iso(d)
-  }
-  const rel = /^-(\d+)d$/.exec(raw)
-  if (rel) {
-    const d = new Date(today)
-    d.setDate(d.getDate() - Number(rel[1]))
-    return iso(d)
-  }
-  return ""
 }

@@ -12,13 +12,23 @@
 // page load and shared across tabs.
 
 import { useEffect, useMemo, useState } from "react"
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Loader2, RefreshCw, Search } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, BarChart3, CalendarRange, ChevronLeft, ChevronRight, Loader2, RefreshCw, Search, X } from "lucide-react"
 import { FilterSelect, type FilterSelectOption } from "@/components/ui/filter-select"
+import { MarketCharts, RefreshButton } from "./market-charts"
+import { cacheDelete, cacheGet, cacheSet } from "./client-cache"
 import {
   DLD_DATASETS,
   DLD_DEFAULT_TAKE,
+  DLD_SEARCH_CHUNK,
+  DLD_SEARCH_COLUMN_KEY,
+  DLD_SEARCH_SCAN_MAX,
+  DLD_SEARCH_SCAN_ROWS_KEY,
+  DLD_SEARCH_SCAN_STEP,
+  DLD_SEARCH_TERM_KEY,
+  DLD_SEARCH_TERM_MAX,
   DLD_TAB_ORDER,
   isoToDldDate,
+  missingRequired,
   resolveDefault,
   type DldColumn,
   type DldCommand,
@@ -29,6 +39,7 @@ import {
   type DldOption,
   type DldQueryResponse,
   type DldRow,
+  type DldSearchInfo,
 } from "@/lib/dld-open-data"
 
 const INPUT_CLS =
@@ -38,10 +49,27 @@ const PAGE_SIZES = [10, 25, 50, 100]
 
 type Lookups = Partial<Record<DldLookupName, DldOption[]>>
 
-function tabFromHash(): DldCommand {
-  if (typeof window === "undefined") return "transactions"
+/** A dataset tab's remembered view (see DatasetPanel). */
+type TableMemo = {
+  values: Record<string, string>
+  applied: Record<string, string>
+  sort: string
+  page: number
+  pageSize: number
+  searchColumn: string
+  searchTerm: string
+  appliedSearch: { column: string; term: string; scanRows: number } | null
+}
+
+/** The nine DLD datasets plus the Market Charts tab. */
+type TabKey = DldCommand | "charts"
+const CHARTS_TAB: TabKey = "charts"
+
+/** Market Charts is the landing tab; a dataset opens only via its hash. */
+function tabFromHash(): TabKey {
+  if (typeof window === "undefined") return CHARTS_TAB
   const h = window.location.hash.replace("#", "")
-  return (DLD_TAB_ORDER as readonly string[]).includes(h) ? (h as DldCommand) : "transactions"
+  return (DLD_TAB_ORDER as readonly string[]).includes(h) ? (h as DldCommand) : CHARTS_TAB
 }
 
 function initialValues(dataset: DldDataset): Record<string, string> {
@@ -95,7 +123,7 @@ function isNumericFormat(col: DldColumn): boolean {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function RealEstateDataClient() {
-  const [tab, setTab] = useState<DldCommand>("transactions")
+  const [tab, setTab] = useState<TabKey>(CHARTS_TAB)
   const [lookups, setLookups] = useState<Lookups>({})
   const [lookupErrors, setLookupErrors] = useState<Partial<Record<DldLookupName, string>>>({})
 
@@ -130,7 +158,7 @@ export function RealEstateDataClient() {
     }
   }, [])
 
-  const selectTab = (key: DldCommand) => {
+  const selectTab = (key: TabKey) => {
     setTab(key)
     if (typeof window !== "undefined") window.history.replaceState(null, "", `#${key}`)
   }
@@ -147,8 +175,8 @@ export function RealEstateDataClient() {
       {/* Tab bar */}
       <div className="mb-6 -mx-1 overflow-x-auto">
         <div className="mx-1 inline-flex min-w-full gap-1 p-1 rounded-2xl bg-[#eef1f5] border border-[#e8eaed]">
-          {DLD_TAB_ORDER.map((key) => {
-            const ds = DLD_DATASETS[key]
+          {[CHARTS_TAB, ...DLD_TAB_ORDER].map((key) => {
+            const label = key === CHARTS_TAB ? "Market Charts" : DLD_DATASETS[key as DldCommand].label
             return (
               <button
                 key={key}
@@ -158,15 +186,26 @@ export function RealEstateDataClient() {
                   tab === key ? "bg-white text-[#001f3f] shadow-sm" : "text-[#6b7280] hover:text-[#001f3f]"
                 }`}
               >
-                {ds.label}
+                {key === CHARTS_TAB ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <BarChart3 className="w-4 h-4" />
+                    {label}
+                  </span>
+                ) : (
+                  label
+                )}
               </button>
             )
           })}
         </div>
       </div>
 
-      {/* Keyed on the tab so each dataset gets fresh form + table state. */}
-      <DatasetPanel key={tab} dataset={DLD_DATASETS[tab]} lookups={lookups} lookupErrors={lookupErrors} />
+      {tab === CHARTS_TAB ? (
+        <MarketCharts />
+      ) : (
+        // Keyed on the tab so each dataset gets fresh form + table state.
+        <DatasetPanel key={tab} dataset={DLD_DATASETS[tab as DldCommand]} lookups={lookups} lookupErrors={lookupErrors} />
+      )}
     </>
   )
 }
@@ -182,28 +221,67 @@ function DatasetPanel({
   lookups: Lookups
   lookupErrors: Partial<Record<DldLookupName, string>>
 }) {
-  const [values, setValues] = useState<Record<string, string>>(() => initialValues(dataset))
+  // Where this tab was left last time (30-minute client cache): the form,
+  // the applied filters/search/sort/page — so coming back shows the same view.
+  const stateKey = `table:${dataset.command}:state`
+  const [memo] = useState(() => cacheGet<TableMemo>(stateKey)?.data ?? null)
+
+  const [values, setValues] = useState<Record<string, string>>(() => memo?.values ?? initialValues(dataset))
   // The filters the current table was loaded with — editing the form does not
   // refetch until "Search" is pressed, matching the DLD site.
-  const [applied, setApplied] = useState<Record<string, string>>(() => initialValues(dataset))
-  const [sort, setSort] = useState(dataset.defaultSort)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(DLD_DEFAULT_TAKE)
+  const [applied, setApplied] = useState<Record<string, string>>(() => memo?.applied ?? initialValues(dataset))
+  const [sort, setSort] = useState(memo?.sort ?? dataset.defaultSort)
+  const [page, setPage] = useState(memo?.page ?? 1)
+  const [pageSize, setPageSize] = useState(memo?.pageSize ?? DLD_DEFAULT_TAKE)
 
-  // One "query key" per (filters, sort, page, pageSize, retry attempt). The
-  // table is loading whenever the last result was produced for a different
-  // key — derived, so the effect never calls setState synchronously.
-  const [attempt, setAttempt] = useState(0)
-  const queryKey = useMemo(
-    () => JSON.stringify({ applied, sort, page, pageSize, attempt }),
-    [applied, sort, page, pageSize, attempt],
-  )
-  const [result, setResult] = useState<{ key: string; rows: DldRow[]; total: number; error: string | null } | null>(null)
+  // Column search ("contains", like SQL `%term%`): pick a column, type a term.
+  // Draft state is what's in the box; `appliedSearch` is what the table shows.
+  // Defaults to the first text column (e.g. "Developer" for projects).
+  const defaultSearchColumn = (dataset.columns.find((c) => !c.format) ?? dataset.columns[0]).key
+  const [searchColumn, setSearchColumn] = useState(memo?.searchColumn ?? defaultSearchColumn)
+  const [searchTerm, setSearchTerm] = useState(memo?.searchTerm ?? "")
+  // `scanRows` is how far a contains-search may read (raised by "Search the
+  // next 5,000 rows"); the exact number lookup ignores it.
+  const [appliedSearch, setAppliedSearch] = useState<{ column: string; term: string; scanRows: number } | null>(memo?.appliedSearch ?? null)
 
   useEffect(() => {
+    cacheSet<TableMemo>(stateKey, { values, applied, sort, page, pageSize, searchColumn, searchTerm, appliedSearch })
+  }, [stateKey, values, applied, sort, page, pageSize, searchColumn, searchTerm, appliedSearch])
+
+  // One "query key" per (filters, search, sort, page, pageSize). The result
+  // for a key is cached client-side; `attempt` (Retry / Refresh) forces a
+  // refetch of the same key. The table is loading whenever nothing is on hand
+  // for the current key — derived, so the effect never calls setState synchronously.
+  const [attempt, setAttempt] = useState(0)
+  const queryKey = useMemo(
+    () => JSON.stringify({ applied, appliedSearch, sort, page, pageSize }),
+    [applied, appliedSearch, sort, page, pageSize],
+  )
+  const resultKey = `table:${dataset.command}:${queryKey}`
+  type Loaded = { rows: DldRow[]; total: number; error: string | null; search: DldSearchInfo | null }
+  const [fetched, setFetched] = useState<(Loaded & { key: string; attempt: number; at: number }) | null>(null)
+
+  // Tabs with required filters (the date ranges) don't load until the user
+  // has filled them in and pressed Search — there is no default range.
+  const awaitingRequired = missingRequired(dataset, applied).length > 0
+
+  // What's on screen: this attempt's fetch, else the cached copy of this key.
+  // `attempt` is a deliberate dependency: Retry/Refresh delete the cached
+  // copy first, and this must re-read (and miss) rather than keep the old one.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const cached = useMemo(() => cacheGet<Loaded>(resultKey), [resultKey, attempt])
+  const result: (Loaded & { at: number }) | null =
+    fetched && fetched.key === queryKey && fetched.attempt === attempt
+      ? fetched
+      : cached
+        ? { ...cached.data, at: cached.at }
+        : null
+
+  useEffect(() => {
+    if (awaitingRequired || result) return
     let cancelled = false
     void (async () => {
-      let next: { rows: DldRow[]; total: number; error: string | null }
+      let next: Loaded
       try {
         const res = await fetch(`/api/admin/dld/${dataset.command}`, {
           method: "POST",
@@ -213,35 +291,74 @@ function DatasetPanel({
             P_TAKE: String(pageSize),
             P_SKIP: String((page - 1) * pageSize),
             P_SORT: sort,
+            // Retry/Refresh re-pull search chunks from DLD instead of the server cache.
+            refresh: attempt > 0 ? "1" : "",
+            ...(appliedSearch
+              ? {
+                  [DLD_SEARCH_COLUMN_KEY]: appliedSearch.column,
+                  [DLD_SEARCH_TERM_KEY]: appliedSearch.term,
+                  [DLD_SEARCH_SCAN_ROWS_KEY]: String(appliedSearch.scanRows),
+                }
+              : {}),
           }),
         })
         const json = (await res.json()) as DldQueryResponse & { error?: string }
         next = res.ok
-          ? { rows: json.rows ?? [], total: json.total ?? 0, error: null }
-          : { rows: [], total: 0, error: json.error || "Request failed." }
+          ? { rows: json.rows ?? [], total: json.total ?? 0, error: null, search: json.search ?? null }
+          : { rows: [], total: 0, error: json.error || "Request failed.", search: null }
       } catch {
-        next = { rows: [], total: 0, error: "Could not load data. Check your connection and try again." }
+        next = { rows: [], total: 0, error: "Could not load data. Check your connection and try again.", search: null }
       }
-      if (!cancelled) setResult({ key: queryKey, ...next })
+      if (cancelled) return
+      // Errors are not cached — the next visit should try again.
+      const at = next.error ? Date.now() : cacheSet(resultKey, next).at
+      setFetched({ key: queryKey, attempt, at, ...next })
     })()
     return () => {
       cancelled = true
     }
     // queryKey encodes every input above; listing it alone keeps one fetch per change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryKey, dataset])
+  }, [queryKey, attempt, dataset, awaitingRequired, !!result])
 
-  const loading = result?.key !== queryKey
+  const loading = !awaitingRequired && !result
   const rows = result?.rows ?? []
   const total = result?.total ?? 0
   const error = result?.error ?? null
-  const retry = () => setAttempt((a) => a + 1)
+  const searchInfo = result?.search ?? null
+  const updatedAt = result && !result.error ? result.at : null
+  // Retry (after an error) and Refresh both drop the cached copy and refetch.
+  const retry = () => {
+    cacheDelete(resultKey)
+    setAttempt((a) => a + 1)
+  }
 
-  const missingRequired = dataset.filters.filter((f) => f.required && !(values[f.param] ?? "").trim())
+  const applySearch = () => {
+    const term = searchTerm.trim()
+    const next = term ? { column: searchColumn, term, scanRows: DLD_SEARCH_SCAN_STEP } : null
+    if (JSON.stringify(next) === JSON.stringify(appliedSearch)) return
+    setPage(1)
+    setAppliedSearch(next)
+  }
+  const searchFurther = () => {
+    if (!appliedSearch) return
+    setPage(1)
+    setAppliedSearch({ ...appliedSearch, scanRows: Math.min(DLD_SEARCH_SCAN_MAX, appliedSearch.scanRows + DLD_SEARCH_SCAN_STEP) })
+  }
+  const clearSearch = () => {
+    setSearchTerm("")
+    if (appliedSearch) {
+      setPage(1)
+      setAppliedSearch(null)
+    }
+  }
+  const searchColumnLabel = dataset.columns.find((c) => c.key === searchColumn)?.label ?? searchColumn
+
+  const missingNow = missingRequired(dataset, values)
 
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    if (missingRequired.length) return
+    if (missingNow.length) return
     setPage(1)
     setApplied(values)
   }
@@ -251,6 +368,9 @@ function DatasetPanel({
     setValues(fresh)
     setApplied(fresh)
     setSort(dataset.defaultSort)
+    setSearchColumn(defaultSearchColumn)
+    setSearchTerm("")
+    setAppliedSearch(null)
     setPage(1)
   }
 
@@ -287,7 +407,7 @@ function DatasetPanel({
         <div className="mt-5 flex flex-wrap items-center gap-2.5">
           <button
             type="submit"
-            disabled={loading || missingRequired.length > 0}
+            disabled={loading || missingNow.length > 0}
             className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#0a2e57] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
@@ -301,9 +421,9 @@ function DatasetPanel({
             <RefreshCw className="w-4 h-4" />
             Reset
           </button>
-          {missingRequired.length > 0 && (
-            <span className="text-xs text-rose-600">
-              {missingRequired.map((f) => f.label).join(", ")} required.
+          {missingNow.length > 0 && (
+            <span className="text-xs text-[#6b7280]">
+              {missingNow.map((f) => f.label).join(" and ")} required.
             </span>
           )}
         </div>
@@ -311,6 +431,97 @@ function DatasetPanel({
 
       {/* Results */}
       <div className="bg-white rounded-2xl border border-[#e8eaed] overflow-hidden">
+        {/* Column search — SQL-style "contains" on one column of the loaded results. */}
+        <div className="flex flex-wrap items-center gap-2 px-5 py-3.5 border-b border-[#f0f2f5] bg-[#fafbfc]">
+          <span className="text-xs font-semibold uppercase tracking-wide text-[#6b7280] mr-1">Search in</span>
+          <FilterSelect
+            value={searchColumn}
+            onValueChange={setSearchColumn}
+            options={dataset.columns.map((c) => ({ value: c.key, label: c.label }))}
+            ariaLabel="Column to search"
+            className="h-9 rounded-xl py-0 max-w-[220px]"
+            searchPlaceholder="Search columns…"
+          />
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  applySearch()
+                }
+              }}
+              placeholder={`Contains… e.g. "emaar" in ${searchColumnLabel}`}
+              maxLength={DLD_SEARCH_TERM_MAX}
+              aria-label={`Search ${searchColumnLabel}`}
+              className="w-full h-9 pl-9 pr-9 rounded-xl border border-[#e5e7eb] bg-white text-sm text-[#0f2940] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5"
+            />
+            {(searchTerm || appliedSearch) && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-[#9ca3af] hover:text-[#0f2940] hover:bg-[#eef1f5]"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={applySearch}
+            disabled={loading || !searchTerm.trim()}
+            className="inline-flex items-center gap-2 h-9 px-4 rounded-xl bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#0a2e57] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Find
+          </button>
+          {appliedSearch && (
+            <div className="basis-full flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#6b7280]">
+              {loading || !searchInfo ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Searching &ldquo;{appliedSearch.term}&rdquo;
+                  {appliedSearch.scanRows > DLD_SEARCH_SCAN_STEP && <> in the first {money.format(appliedSearch.scanRows)} rows</>}
+                  …
+                </span>
+              ) : (
+                <>
+                  <span>
+                    {money.format(total)} match{total === 1 ? "" : "es"} for &ldquo;{appliedSearch.term}&rdquo; in{" "}
+                    {dataset.columns.find((c) => c.key === appliedSearch.column)?.label ?? appliedSearch.column}
+                    {searchInfo.mode === "exact" ? (
+                      <> · exact number lookup across all {money.format(searchInfo.available)} rows</>
+                    ) : searchInfo.truncated ? (
+                      <span className="text-amber-700">
+                        {" "}
+                        · searched the first {money.format(searchInfo.scanned)} of {money.format(searchInfo.available)} rows
+                      </span>
+                    ) : (
+                      <> · searched all {money.format(searchInfo.scanned)} rows</>
+                    )}
+                    {searchInfo.cacheHits > 0 && <span className="text-[#9ca3af]"> · {money.format(searchInfo.cacheHits * DLD_SEARCH_CHUNK)} rows from cache</span>}
+                  </span>
+                  {searchInfo.mode === "contains" && searchInfo.truncated && (
+                    appliedSearch.scanRows < DLD_SEARCH_SCAN_MAX ? (
+                      <button
+                        type="button"
+                        onClick={searchFurther}
+                        className="inline-flex items-center h-7 px-2.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 font-semibold hover:bg-amber-100"
+                      >
+                        Search the next {money.format(Math.min(DLD_SEARCH_SCAN_STEP, searchInfo.available - searchInfo.scanned))} rows
+                      </button>
+                    ) : (
+                      <span className="text-amber-700">Scan limit reached — narrow the filters above to search the rest.</span>
+                    )
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-[#f0f2f5]">
           <div className="text-sm text-[#374151]">
             <span className="font-semibold text-[#0d1117]">{dataset.label}</span>
@@ -321,11 +532,14 @@ function DatasetPanel({
               <span>
                 Showing {money.format(from)}–{money.format(to)} of {money.format(total)}
               </span>
+            ) : awaitingRequired ? (
+              <span className="text-[#9ca3af]">Waiting for a date range</span>
             ) : (
               <span className="text-[#9ca3af]">No results</span>
             )}
           </div>
-          <div className="flex items-center gap-2 text-xs text-[#6b7280]">
+          <div className="flex items-center gap-3 text-xs text-[#6b7280]">
+            {!awaitingRequired && <RefreshButton onClick={retry} loading={loading} updatedAt={updatedAt} />}
             <span>Rows per page</span>
             <select
               value={pageSize}
@@ -405,7 +619,16 @@ function DatasetPanel({
               ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={dataset.columns.length} className="px-4 py-12 text-center text-sm text-[#9ca3af]">
-                    {error ? "Nothing to show." : "No records match these filters."}
+                    {awaitingRequired ? (
+                      <span className="inline-flex items-center gap-2">
+                        <CalendarRange className="w-4 h-4" />
+                        Pick a date range above and press Search.
+                      </span>
+                    ) : error ? (
+                      "Nothing to show."
+                    ) : (
+                      "No records match these filters."
+                    )}
                   </td>
                 </tr>
               ) : (
