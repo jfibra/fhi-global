@@ -252,16 +252,10 @@ function createLayer(
 export function ProjectsMap({
   apiKey,
   projects,
-  unpinned,
-  listHref,
 }: {
   apiKey: string
   /** The filtered catalogue with coordinates, in the listing's order. */
   projects: MapProject[]
-  /** Filtered projects with no coordinates: in the list view only. */
-  unpinned: number
-  /** The same filters in list view. */
-  listHref: string
 }) {
   const mapEl = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
@@ -551,11 +545,6 @@ export function ProjectsMap({
             <h2 className="font-['Outfit'] text-[20px] font-bold text-[#0d1117]">
               {list.length} {list.length === 1 ? "project" : "projects"} {inView ? "in this map area" : "on the map"}
             </h2>
-          )}
-          {unpinned > 0 && (
-            <Link href={listHref} className="text-[12.5px] text-[#6b7280] underline-offset-4 hover:text-[#001f3f] hover:underline">
-              +{unpinned} without a map pin, in list view
-            </Link>
           )}
         </div>
 

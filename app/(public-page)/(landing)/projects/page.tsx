@@ -267,7 +267,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
       </Suspense>
 
       {view === "map" ? (
-        <ProjectsMap apiKey={mapsKey} projects={mapProjects} unpinned={mapRows.length - mapProjects.length} listHref={viewHref(sp, "list")} />
+        <ProjectsMap apiKey={mapsKey} projects={mapProjects} />
       ) : (
       /* Content */
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -393,18 +393,6 @@ function toMapProject(p: MapRow): MapProject | null {
     developerLogoBg: dev?.logo_bg?.trim() || null,
     status: p.status,
   }
-}
-
-/** The same filters in the list or map view (never a page number). */
-function viewHref(sp: SpValues, view: "list" | "map"): string {
-  const p = new URLSearchParams()
-  for (const k of FILTER_KEYS) {
-    const v = sp[k]
-    if (typeof v === "string" && v) p.set(k, v)
-  }
-  if (view === "map") p.set("view", "map")
-  const qs = p.toString()
-  return qs ? `/projects?${qs}` : "/projects"
 }
 
 /** "Showing 25 to 48 of 273". */
