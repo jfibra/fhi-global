@@ -295,6 +295,12 @@ export function ProjectsMap({
 
   const mapBoxRef = useRef<HTMLDivElement>(null)
   const glideToken = useRef(0)
+  /** Zoom level a "projects at this spot" list was opened at; zooming or dragging away returns to the map area. */
+  const spotAt = useRef<number | null>(null)
+  const closeSpot = useCallback(() => {
+    spotAt.current = null
+    setSpot(null)
+  }, [])
 
   /**
    * Fly the camera to a point like Bayut does: out until the target is on
@@ -397,6 +403,7 @@ export function ProjectsMap({
         const target = indexRef.current.getClusterExpansionZoom(it.id)
         if (target > MAP_MAX_ZOOM) {
           // One spot, several projects: list them rather than zoom forever.
+          spotAt.current = Math.round(map.getZoom() ?? 0)
           setSpot(it.leaves)
           setSelected(null)
           setLimit(BATCH)
@@ -428,6 +435,9 @@ export function ProjectsMap({
       const ne = b.getNorthEast()
       const sw = b.getSouthWest()
       const z = Math.round(map.getZoom() ?? 8)
+      // The spot list belongs to the zoom it was opened at: zoom in or out
+      // and the list follows the map again.
+      if (spotAt.current != null && z !== spotAt.current) closeSpot()
       const keys = new Map<number, string>()
       const items: Item[] = idx.getClusters([sw.lng(), sw.lat(), ne.lng(), ne.lat()], z).map((f) => {
         const [lng, lat] = f.geometry.coordinates
@@ -455,6 +465,7 @@ export function ProjectsMap({
       map.addListener("idle", recluster),
       map.addListener("dragstart", () => {
         glideToken.current++ // the user took over: stop any flight
+        if (spotAt.current != null) closeSpot()
         setMoved(true)
       }),
       map.addListener("click", () => setSelected(null)),
@@ -466,7 +477,7 @@ export function ProjectsMap({
       layerRef.current = null
       mapRef.current = null
     }
-  }, [ready, glideTo])
+  }, [ready, glideTo, closeSpot])
 
   // New data (a filter changed, or the map just appeared): fresh markers,
   // cleared selection, and the view fitted to the results.
@@ -476,14 +487,14 @@ export function ProjectsMap({
     if (!ready) return
     layerRef.current?.setItems([])
     const t = window.setTimeout(() => {
-      setSpot(null)
+      closeSpot()
       setSelected(null)
       setHover(null)
       fitAll()
       reclusterRef.current()
     }, 0)
     return () => window.clearTimeout(t)
-  }, [index, projects, ready, fitAll])
+  }, [index, projects, ready, fitAll, closeSpot])
 
   // Hover from either side lights the marker (or the cluster holding it).
   useEffect(() => {
@@ -532,7 +543,7 @@ export function ProjectsMap({
               <h2 className="font-['Outfit'] text-[20px] font-bold text-[#0d1117]">
                 {spot.length} projects at this spot
               </h2>
-              <button type="button" onClick={() => setSpot(null)} className="text-[13px] font-bold text-[#001f3f] underline-offset-4 hover:text-[#b8913f] hover:underline">
+              <button type="button" onClick={closeSpot} className="text-[13px] font-bold text-[#001f3f] underline-offset-4 hover:text-[#b8913f] hover:underline">
                 Back to the map area
               </button>
             </>
