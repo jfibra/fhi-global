@@ -4,7 +4,8 @@ import Link from "next/link"
 import { ArrowRight, ArrowUpRight, Mail, MapPin, Phone, Play } from "lucide-react"
 import { createPageMetadata, absoluteUrl } from "@/lib/seo"
 import { JsonLd } from "@/components/json-ld"
-import { FilmTrigger, HeroLoop, ScreeningRoom, type Film } from "@/components/public/film-player"
+import { FilmLines, FilmTrigger, HeroLoop, ScreeningRoom, StoryRow, type Film, type FilmLine } from "@/components/public/film-player"
+import { AGENT_STORIES, FILM_BASE, LANDLORD_STORIES } from "@/lib/films"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { countByEmirate } from "@/lib/emirates"
@@ -35,7 +36,6 @@ const ALBUM_ID = "21d46277-db66-409b-8cce-32b159ab6214"
 // (1080p + 720p H.264, faststart) and served from our S3 with a one-year
 // cache; the names carry a version so a re-edit can never show a stale copy.
 // The Arabic AVP is deliberately not on the site.
-const FILM_BASE = `${(process.env.S3_PUBLIC_URL?.trim() || "https://filipinohomes123.s3.ap-southeast-1.amazonaws.com").replace(/\/$/, "")}/FHI_GLOBAL/videos/about`
 const FILMS = {
   avp: {
     id: "fhi-global-avp",
@@ -56,6 +56,14 @@ const FILMS = {
     ratio: 1920 / 816,
   },
 } satisfies Record<string, Film>
+/** Lines spoken in the AVP, with the second each one starts (read off the film's own subtitles). */
+const FILM_LINES: FilmLine[] = [
+  { at: 6.8, text: "To every Filipino watching this, I want you to remember this moment.", who: "Anthony Leuterio", role: "President and CEO" },
+  { at: 79.4, text: "He built belief. Belief that a Filipino from the province could compete anywhere in the world.", who: "May Antonette Leuterio", role: "Chief Operating Officer" },
+  { at: 151.6, text: "If one Filipino can rise, we all can.", who: "The team", role: "In the film" },
+  { at: 177.6, text: "We are FHI Global Property Dubai, and together we are proof that the Filipino can.", who: "Anthony Leuterio", role: "President and CEO" },
+]
+
 /** A silent 12 s cut of the AVP (skyline, the team, the website, the hall) behind the screening room. */
 const FILM_LOOP = `${FILM_BASE}/fhi-global-avp-loop-v1.mp4`
 /** Another silent 12 s cut (the flag, Deira's creek, Burj Khalifa, the team) behind the opening; 540p for phones. */
@@ -283,6 +291,26 @@ export default async function AboutPage() {
       {/* ── The screening room — the AVP behind its title, the Dubai event beside it ── */}
       <ScreeningRoom main={FILMS.avp} teaser={FILM_LOOP} second={FILMS.event} />
 
+      {/* ── Lines from the film — each chip opens the cinema at that second ── */}
+      <InView as="section" className="pp-section relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-24" threshold={0.15}>
+        <div className="mb-10 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="inline-flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.26em] text-[#b8913f]">
+              <span className="wf-rule h-px w-10 bg-[#d6b357]" aria-hidden="true" />
+              <span className="wf-fade" style={{ ["--d" as string]: "150ms" }}>Lines from the film</span>
+            </p>
+            <h2 className="mt-4 font-['Outfit'] text-[34px] font-bold leading-[1.06] tracking-tight text-[#0d1117] sm:text-[44px]">
+              <Words text="In their" start={0} />
+              <Words text="own words." start={2} className="wf-gold" />
+            </h2>
+          </div>
+          <p className="wf-fade max-w-sm text-[15px] leading-relaxed text-[#6b7280]" style={{ ["--d" as string]: "400ms" }}>
+            Tap a time to watch that moment.
+          </p>
+        </div>
+        <FilmLines film={FILMS.avp} lines={FILM_LINES} />
+      </InView>
+
       {/* ── Chapter II — the numbers, as a pinned reel ── */}
       <NumbersReel
         items={numbers}
@@ -350,11 +378,25 @@ export default async function AboutPage() {
         </InView>
       </section>
 
-      {/* ── Chapter V — on the ground in Dubai ── */}
+      {/* ── Chapter V — agents and landlords, in their own films ── */}
+      <InView as="section" className="pp-section relative mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8 lg:py-32" threshold={0.1}>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <Chapter numeral="V" kicker="Real people, on camera" title={<>Their stories, <span className="text-[#b8913f]">told by them.</span></>} />
+          <p className="wf-fade max-w-sm text-[15px] leading-relaxed text-[#6b7280]" style={{ ["--d" as string]: "400ms" }}>
+            Three of our agents and four of the owners we work for, each in a short film.
+          </p>
+        </div>
+        <div className="mt-12">
+          <StoryRow label="Our agents" stories={AGENT_STORIES} cols={3} />
+          <StoryRow label="Our landlords" stories={LANDLORD_STORIES} cols={4} />
+        </div>
+      </InView>
+
+      {/* ── Chapter VI — on the ground in Dubai ── */}
       <InView as="section" className="pp-section relative mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8 lg:py-32" threshold={0.15}>
         <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-16">
           <div className="lg:col-span-6">
-            <Chapter numeral="V" kicker="Where to find us" title={<>Deira, Dubai. <span className="text-[#b8913f]">Come and see us.</span></>} />
+            <Chapter numeral="VI" kicker="Where to find us" title={<>Deira, Dubai. <span className="text-[#b8913f]">Come and see us.</span></>} />
             <p className="mt-6 max-w-lg text-[16px] leading-[1.8] text-[#374151]">
               We are a Dubai office, not a call centre. If you are in the city, drop in. If you are not, the same team answers the phone and the email below.
             </p>

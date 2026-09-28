@@ -10,8 +10,9 @@
 import { useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowUpRight, Globe, MessageCircle, Phone, Search, Star, UserRound, Users } from "lucide-react"
+import { ArrowUpRight, Globe, MessageCircle, Phone, Play, Search, Star, UserRound, Users } from "lucide-react"
 import { InView } from "@/components/public/in-view"
+import { FilmTrigger, type Film } from "@/components/public/film-player"
 
 export type PublicAgent = {
   id: string
@@ -26,6 +27,8 @@ export type PublicAgent = {
   website: string | null
   /** Approved client reviews only. */
   rating: { average: number; count: number } | null
+  /** The agent's own story film (FHI Stories), when one was made. */
+  story?: Film | null
 }
 
 const initials = (name: string) =>
@@ -144,6 +147,7 @@ export function AgentsGrid({ agents }: { agents: PublicAgent[] }) {
                 >
                   {/* Portrait → the agent's public profile. object-top because
                       headshots crop badly from the centre. */}
+                  <div className="relative">
                   <Link href={`/business-card/${a.id}`} aria-label={`${a.name}: view profile`} className="relative block aspect-[4/5] overflow-hidden bg-[#0b2a4d]">
                     {a.photo ? (
                       <Image
@@ -175,6 +179,14 @@ export function AgentsGrid({ agents }: { agents: PublicAgent[] }) {
                       View profile <ArrowUpRight className="h-3.5 w-3.5 text-[#d6b357]" />
                     </span>
                   </Link>
+                  {a.story && (
+                    <FilmTrigger film={a.story} className="ag-story" ariaLabel={`Watch ${a.name}'s story, ${a.story.duration}`}>
+                      <Play className="h-3 w-3 fill-current" />
+                      My story
+                      <span className="opacity-70">{a.story.duration}</span>
+                    </FilmTrigger>
+                  )}
+                  </div>
 
                   <div className="flex flex-1 flex-col p-3 sm:p-4">
                     <h3 className="line-clamp-2 font-['Outfit'] text-[14px] font-bold leading-snug text-[#0d1117] transition-colors group-hover:text-[#8a6d2b] sm:text-[15px]">

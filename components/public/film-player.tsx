@@ -44,6 +44,7 @@ export function FilmTrigger({
   children,
   ariaLabel,
   style,
+  startAt = 0,
 }: {
   film: Film
   className?: string
@@ -51,6 +52,8 @@ export function FilmTrigger({
   ariaLabel?: string
   /** Entrance-delay variables for the site's .wf-* choreography. */
   style?: React.CSSProperties
+  /** Open the film at this second (a quote's moment). */
+  startAt?: number
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -69,6 +72,14 @@ export function FilmTrigger({
     if (!d || !v) return
     if (!v.getAttribute("src")) v.src = pickSource(film)
     v.preload = "auto"
+    if (startAt > 0) {
+      // The seek needs the file's index; with faststart that's the first few KB.
+      const seek = () => {
+        v.currentTime = startAt
+      }
+      if (v.readyState >= 1) seek()
+      else v.addEventListener("loadedmetadata", seek, { once: true })
+    }
     d.showModal()
     document.documentElement.classList.add("film-open")
     // Inside the tap: iOS allows sound only for play() started by the gesture.
@@ -83,8 +94,8 @@ export function FilmTrigger({
         /* stays in the dialog */
       }
     }
-    gaEvent("play_film", { film: film.id })
-  }, [film])
+    gaEvent("play_film", { film: film.id, at: startAt })
+  }, [film, startAt])
 
   const closeFilm = useCallback(() => {
     const v = videoRef.current
@@ -299,5 +310,68 @@ export function HeroLoop({ hd, sd, className = "" }: { hd: string; sd: string; c
       className={`pp-hero-loop absolute inset-0 h-full w-full object-cover ${className}`}
       onPlaying={(e) => e.currentTarget.classList.add("is-on")}
     />
+  )
+}
+
+export type FilmLine = { at: number; text: string; who: string; role?: string }
+const stamp = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`
+
+/** Lines spoken in the film, each with a chip that opens the cinema at that exact moment. */
+export function FilmLines({ film, lines }: { film: Film; lines: FilmLine[] }) {
+  return (
+    <div className="grid gap-5 sm:grid-cols-2">
+      {lines.map((l, i) => (
+        <figure key={l.at} className="wf-fade relative flex flex-col border border-[#e5e8ec] bg-white p-6 sm:p-7" style={{ ["--d" as string]: `${150 + i * 120}ms` }}>
+          <span className="font-['Outfit'] text-[56px] font-bold leading-none text-[#d6b357]" aria-hidden="true">&ldquo;</span>
+          <blockquote className="-mt-4 font-['Outfit'] text-[20px] font-bold leading-[1.3] text-[#0d1117] sm:text-[22px]">{l.text}</blockquote>
+          <figcaption className="mt-5 flex flex-wrap items-end justify-between gap-3">
+            <span>
+              <span className="block text-[13.5px] font-bold text-[#0d1117]">{l.who}</span>
+              {l.role && <span className="block text-[12px] text-[#6b7280]">{l.role}</span>}
+            </span>
+            <FilmTrigger
+              film={film}
+              startAt={l.at}
+              className="group inline-flex items-center gap-2 border border-[#e5e8ec] px-3 py-2 text-[12.5px] font-bold text-[#0d1117] transition-colors hover:border-[#d6b357] hover:bg-[#d6b357]/10"
+              ariaLabel={`Play the film from ${stamp(l.at)}`}
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0d1117] text-[#d6b357] transition-colors group-hover:bg-[#d6b357] group-hover:text-[#001f3f]">
+                <Play className="ml-px h-3 w-3 fill-current" />
+              </span>
+              {stamp(l.at)}
+            </FilmTrigger>
+          </figcaption>
+        </figure>
+      ))}
+    </div>
+  )
+}
+
+export type Story = Film & { name: string; role: string }
+
+/** A row of story films: the poster, a play badge, who it is and how long. Scrolls sideways on phones. */
+export function StoryRow({ label, stories, cols }: { label: string; stories: Story[]; cols: 3 | 4 }) {
+  return (
+    <div className="mt-10 first:mt-0">
+      <p className="wf-fade mb-4 text-[11px] font-bold uppercase tracking-[0.26em] text-[#b8913f]">{label}</p>
+      <ul className={`-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:overflow-visible sm:px-0 ${cols === 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
+        {stories.map((st, i) => (
+          <li key={st.id} className="w-[78vw] max-w-[320px] shrink-0 snap-start sm:w-auto sm:max-w-none">
+            <FilmTrigger film={st} className="wf-fade group block w-full text-left" style={{ ["--d" as string]: `${120 + i * 110}ms` }} ariaLabel={`Play ${st.title}, ${st.duration}`}>
+              <span className="relative block aspect-[16/9] overflow-hidden bg-[#0b2a4d]">
+                <Image src={st.poster} alt="" fill sizes="(max-width: 640px) 78vw, 320px" className="object-cover transition-transform duration-700 group-hover:scale-[1.05]" />
+                <span className="absolute inset-0 bg-gradient-to-t from-[#06182e]/80 via-transparent to-transparent" aria-hidden="true" />
+                <span className="absolute left-3 top-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-[#06182e]/60 text-white backdrop-blur transition-colors group-hover:border-[#d6b357] group-hover:bg-[#d6b357] group-hover:text-[#001f3f]">
+                  <Play className="ml-0.5 h-4 w-4 fill-current" />
+                </span>
+                <span className="absolute bottom-3 right-3 text-[12px] font-semibold text-white/80">{st.duration}</span>
+              </span>
+              <span className="mt-3 block font-['Outfit'] text-[17px] font-bold leading-snug text-[#0d1117] transition-colors group-hover:text-[#8a6d2b]">{st.name}</span>
+              <span className="block text-[12.5px] text-[#6b7280]">{st.role}</span>
+            </FilmTrigger>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }

@@ -11,6 +11,7 @@ import { InView } from "@/components/public/in-view"
 import { CountUp } from "@/components/public/count-up"
 import { MagneticLink } from "@/components/public/magnetic-link"
 import { AgentWall, type WallPerson } from "@/components/public/agent-wall"
+import { STORY_BY_AGENT } from "@/lib/films"
 
 export const revalidate = 300
 
@@ -101,6 +102,7 @@ async function fetchRoster(): Promise<Roster> {
         whatsapp: contact(meta, "whatsapp"),
         website: siteOf.get(String(p.id)) ?? null,
         rating: s?.length ? { average: s.reduce((a, b) => a + b, 0) / s.length, count: s.length } : null,
+        story: STORY_BY_AGENT[String(p.id)] ?? null,
       }
     })
     // An unnamed card helps nobody find anyone.
