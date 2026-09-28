@@ -88,24 +88,28 @@ export function stripArtifacts(row: DldRow): DldRow {
 /**
  * Primary key for a transaction. TRANSACTION_NUMBER alone is not unique — a
  * 1,000-row sample held only 997 distinct values, because one transaction can
- * span several properties or parties. Hashing the identifying fields keeps
- * those sibling rows distinct while making a re-ingest of the same window an
- * exact no-op.
+ * span several properties or parties. Hashing keeps those sibling rows
+ * distinct while making a re-ingest of the same window an exact no-op.
+ *
+ * The hash covers EVERY field except the paging artifacts, rather than a
+ * hand-picked subset. An earlier version listed the fields it thought
+ * identifying and lost rows to the one it had not thought of: transaction
+ * 43-187-2026 is six separate parking bays, identical in every listed field
+ * and differing only in PARKING, so four of the six vanished. Hashing the
+ * whole row removes the judgement call — any genuine difference yields a
+ * different key, and only byte-identical rows collapse.
+ *
+ * Keys are sorted so the digest does not depend on property order. If the
+ * gateway ever adds a column, existing rows re-key and re-insert; that is the
+ * intended behaviour, since a schema change warrants a re-archive.
  */
 export function transactionHash(row: DldRow): string {
-  const parts = [
-    row.TRANSACTION_NUMBER,
-    row.INSTANCE_DATE,
-    row.AREA_EN,
-    row.PROJECT_EN,
-    row.PROCEDURE_EN,
-    row.TRANS_VALUE,
-    row.ACTUAL_AREA,
-    row.PROCEDURE_AREA,
-    row.ROOMS_EN,
-    row.PROP_SB_TYPE_EN,
-  ]
-  return createHash("sha256").update(parts.map((p) => (p ?? "")).join("|")).digest("hex")
+  const clean = stripArtifacts(row)
+  const canonical = Object.keys(clean)
+    .sort()
+    .map((k) => `${k}=${clean[k] ?? ""}`)
+    .join("|")
+  return createHash("sha256").update(canonical).digest("hex")
 }
 
 export interface ArchiveRow {
