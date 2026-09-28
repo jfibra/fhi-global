@@ -248,3 +248,56 @@ export function ScreeningRoom({ main, teaser, second }: { main: Film; teaser: st
     </section>
   )
 }
+
+/**
+ * A silent loop behind the About page's opening photo. It is the first
+ * thing on screen, so it must never slow the page: the photo paints first,
+ * the loop is fetched only after the window's load event (fonts, hero image
+ * and scripts are done by then), fades in once it actually plays, pauses
+ * when scrolled away, and phones get the smaller file. Skipped entirely on
+ * data-saver and reduced motion.
+ */
+export function HeroLoop({ hd, sd, className = "" }: { hd: string; sd: string; className?: string }) {
+  const ref = useRef<HTMLVideoElement>(null)
+
+  useEffect(() => {
+    const v = ref.current
+    if (!v) return
+    const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || conn?.saveData || /(^|-)2g/.test(conn?.effectiveType ?? "")) return
+    let started = false
+    const start = () => {
+      if (started) return
+      started = true
+      v.src = window.innerWidth < 768 ? sd : hd
+      void v.play().catch(() => {})
+    }
+    const t = window.setTimeout(start, 4000) // the load event never fires on a stalled page; don't wait forever
+    if (document.readyState === "complete") start()
+    else window.addEventListener("load", start, { once: true })
+    const io = new IntersectionObserver(([e]) => {
+      if (!started) return
+      if (e.isIntersecting) void v.play().catch(() => {})
+      else v.pause()
+    })
+    io.observe(v)
+    return () => {
+      window.clearTimeout(t)
+      window.removeEventListener("load", start)
+      io.disconnect()
+    }
+  }, [hd, sd])
+
+  return (
+    <video
+      ref={ref}
+      muted
+      loop
+      playsInline
+      preload="none"
+      aria-hidden="true"
+      className={`pp-hero-loop absolute inset-0 h-full w-full object-cover ${className}`}
+      onPlaying={(e) => e.currentTarget.classList.add("is-on")}
+    />
+  )
+}

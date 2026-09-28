@@ -4,7 +4,7 @@ import Link from "next/link"
 import { ArrowRight, ArrowUpRight, Mail, MapPin, Phone, Play } from "lucide-react"
 import { createPageMetadata, absoluteUrl } from "@/lib/seo"
 import { JsonLd } from "@/components/json-ld"
-import { FilmTrigger, ScreeningRoom, type Film } from "@/components/public/film-player"
+import { FilmTrigger, HeroLoop, ScreeningRoom, type Film } from "@/components/public/film-player"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { countByEmirate } from "@/lib/emirates"
@@ -58,6 +58,8 @@ const FILMS = {
 } satisfies Record<string, Film>
 /** A silent 12 s cut of the AVP (skyline, the team, the website, the hall) behind the screening room. */
 const FILM_LOOP = `${FILM_BASE}/fhi-global-avp-loop-v1.mp4`
+/** Another silent 12 s cut (the flag, Deira's creek, Burj Khalifa, the team) behind the opening; 540p for phones. */
+const HERO_LOOP = { hd: `${FILM_BASE}/fhi-global-avp-hero-loop-720-v1.mp4`, sd: `${FILM_BASE}/fhi-global-avp-hero-loop-540-v1.mp4` }
 
 /** Google's video rich results: what the film is, its poster, length and file. */
 const filmSchema = (f: Film, description: string, seconds: number) => ({
@@ -213,6 +215,7 @@ export default async function AboutPage() {
           <div className="absolute inset-0" aria-hidden="true">
             <div className="pp-hero-img absolute inset-0">
               <Image src={PHOTOS.team.url} alt={PHOTOS.team.alt} fill priority sizes="100vw" className="object-cover object-[70%_50%]" />
+              <HeroLoop hd={HERO_LOOP.hd} sd={HERO_LOOP.sd} className="object-[70%_50%]" />
             </div>
             <div className="absolute inset-0 bg-gradient-to-r from-[#06182e]/95 via-[#06182e]/65 to-[#06182e]/15" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#06182e] via-[#06182e]/25 to-transparent" />

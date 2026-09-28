@@ -1267,8 +1267,8 @@ html.film-open { overflow: hidden; }
 .film-close:hover { border-color: #d6b357; color: #d6b357; }
 .film-close:focus-visible { outline: 2px solid #d6b357; outline-offset: 2px; }
 
-.sr-loop { opacity: 0; transition: opacity 1400ms var(--wf-ease); }
-.sr-loop.is-on { opacity: 1; }
+.sr-loop, .pp-hero-loop { opacity: 0; transition: opacity 1600ms var(--wf-ease); }
+.sr-loop.is-on, .pp-hero-loop.is-on { opacity: 1; }
 .sr-play-ring::after {
   content: ""; position: absolute; inset: -7px; border-radius: 999px; border: 1px solid rgba(214, 179, 87, 0.65);
   animation: sr-breathe 2.6s var(--wf-ease) infinite; pointer-events: none;
@@ -1277,5 +1277,5 @@ html.film-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .film-dialog[open], .film-dialog[open] .film-stage { animation: none; }
   .sr-play-ring::after { animation: none; opacity: 0.6; }
-  .sr-loop { transition: none; }
+  .sr-loop, .pp-hero-loop { transition: none; }
 }
