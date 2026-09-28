@@ -10,7 +10,8 @@ import { JsonLd } from "@/components/json-ld"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { ProjectCard, type ProjectCardData } from "@/components/project-card"
+import { ProjectCard, formatProjectPrice, type ProjectCardData } from "@/components/project-card"
+import { ProjectsMap, type MapProject } from "@/components/public/projects-map"
 import { ProjectFilters, type QuickPick } from "@/components/public/project-filters"
 import { InView } from "@/components/public/in-view"
 import { CountUp } from "@/components/public/count-up"
@@ -33,6 +34,8 @@ type SpValues = {
   price_min?: string
   price_max?: string
   page?: string
+  /** "map" opens the Bayut-style map view. */
+  view?: string
 }
 
 type SearchParams = Promise<SpValues>
@@ -59,8 +62,18 @@ function pageHref(sp: SpValues, page: number): string {
 }
 
 export async function generateMetadata({ searchParams }: { searchParams: SearchParams }): Promise<Metadata> {
-  const { page } = await searchParams
+  const { page, view } = await searchParams
   const pageNum = parsePage(page)
+  // The map is another way of looking at the same catalogue: kept out of the
+  // index (follow stays on) with the grid as its canonical.
+  if (view === "map") {
+    return createPageMetadata({
+      title: "Real Estate Projects in Dubai on the Map",
+      description: "Browse premium off-plan and ready residential projects from top Dubai developers on the map.",
+      pathname: "/projects",
+      robots: { index: false, follow: true },
+    })
+  }
   // Self-canonical per page: canonicalizing everything to page 1 would orphan
   // every project card beyond the first 24 from the crawl graph.
   return createPageMetadata({
@@ -117,39 +130,62 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
   const hasPriceMax = Number.isFinite(priceMax)
 
   const { devOptions, uniqueCities, stats } = await getProjectFacets()
+  const view = sp.view === "map" ? "map" : "list"
 
-  // Fetch one page of projects (+ the exact total for the pager).
-  let query = supabase
-    .from("projects")
-    .select(
-      "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)",
-      { count: "exact" },
-    )
-    .eq("is_active", true)
-    .eq("is_published", true)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-
-  if (featured === "true") query = query.eq("is_featured", true)
-  if (q) query = query.ilike("name", `%${q}%`)
-  if (developer) query = query.eq("developer_id", developer)
-  // "off_plan" is the buyer's word, not a database value: everything that
-  // has not completed.
-  if (status === "off_plan") query = query.neq("status", "completed")
-  else if (status) query = query.eq("status", status)
-  if (city) query = query.eq("city", city)
-  if (hasPriceMin && priceMin !== null) query = query.gte("launch_price_from", priceMin)
-  if (hasPriceMax && priceMax !== null) query = query.lte("launch_price_from", priceMax)
+  /** The published catalogue with the page's filters applied — the grid and the map read the same rows. */
+  const filtered = (columns: string, count?: "exact") => {
+    let query = supabase
+      .from("projects")
+      .select(columns, count ? { count } : undefined)
+      .eq("is_active", true)
+      .eq("is_published", true)
+      .is("deleted_at", null)
+    if (featured === "true") query = query.eq("is_featured", true)
+    if (q) query = query.ilike("name", `%${q}%`)
+    if (developer) query = query.eq("developer_id", developer)
+    // "off_plan" is the buyer's word, not a database value: everything that
+    // has not completed.
+    if (status === "off_plan") query = query.neq("status", "completed")
+    else if (status) query = query.eq("status", status)
+    if (city) query = query.eq("city", city)
+    if (hasPriceMin && priceMin !== null) query = query.gte("launch_price_from", priceMin)
+    if (hasPriceMax && priceMax !== null) query = query.lte("launch_price_from", priceMax)
+    return query
+  }
 
   const from = (pageNum - 1) * PAGE_SIZE
-  const { data: projects, count, error } = await query.range(from, from + PAGE_SIZE - 1)
+  // Grid: one page of projects (+ the exact total for the pager). Map: every
+  // filtered project, light columns only, with its coordinates.
+  const [{ data: projects, count, error }, mapResult] = await Promise.all([
+    view === "list"
+      ? filtered(
+          "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)",
+          "exact",
+        )
+          .order("created_at", { ascending: false })
+          .range(from, from + PAGE_SIZE - 1)
+      : Promise.resolve({ data: [] as unknown[], count: 0, error: null }),
+    view === "map"
+      ? filtered("id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, currency, status, latitude, longitude, developers(name, slug)")
+          .order("is_featured", { ascending: false })
+          .order("created_at", { ascending: false })
+          .limit(1000)
+      : Promise.resolve({ data: [] as unknown[], error: null }),
+  ])
 
+  // A page past the end comes back from PostgREST as PGRST103 ("range not
+  // satisfiable"), not as an empty page: that's the 404 below, not a failure.
+  const outOfRange = (error as { code?: string } | null)?.code === "PGRST103"
   // Transient failure → 5xx; a query error must not read as "empty page"
   // and 404 the archive (ISR would cache it).
-  if (error) throw new Error("Failed to load projects")
+  if ((error && !outOfRange) || mapResult.error) throw new Error("Failed to load projects")
 
-  const total = count ?? 0
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const gridProjects = (projects ?? []) as unknown as ProjectCardData[]
+  const mapRows = (mapResult.data ?? []) as unknown as MapRow[]
+  const mapProjects = mapRows.map(toMapProject).filter((m): m is MapProject => m !== null)
+  const total = view === "map" ? mapRows.length : count ?? 0
+  const totalPages = view === "map" ? 1 : Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const mapsKey = process.env.GOOGLE_MAPS_API_KEY?.trim() || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || ""
   const anyFilter = Boolean(q || developer || status || city || featured === "true" || hasPriceMin || hasPriceMax)
   const pick = (label: string, count: number, params: Record<string, string>): QuickPick => ({ label, count, params })
   const picks: QuickPick[] = [
@@ -159,7 +195,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
   ].filter((p) => p.count > 0)
   const headline = featured === "true" ? "Featured Projects" : status === "completed" ? "Ready-to-Move Homes" : status === "off_plan" ? "Off-Plan Projects" : "Property Projects"
   // Out-of-range pages 404 rather than serving an empty shell that indexes.
-  if (pageNum > 1 && (projects ?? []).length === 0) notFound()
+  if (view === "list" && pageNum > 1 && (outOfRange || gridProjects.length === 0)) notFound()
 
   return (
     <div className="pl wf relative min-h-screen bg-[#fafafa] font-sans overflow-x-clip">
@@ -172,7 +208,10 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
 
       {/* Masthead — short, because the visitor came for the grid, but with
           the site's entrance: the rule draws, the title rises word by word,
-          and the catalogue's real counts count up beside it. */}
+          and the catalogue's real counts count up beside it. The map view
+          skips it: the map wants the height. */}
+      {view === "map" && <h1 className="sr-only">Property projects on the map</h1>}
+      {view === "list" && (
       <section className="relative overflow-hidden bg-[#06182e] text-white">
         <div className="absolute inset-0" aria-hidden="true">
           <Image src="/background/dubai.webp" alt="" fill priority sizes="100vw" className="object-cover object-center" />
@@ -212,6 +251,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
         </InView>
         <div className="relative h-[3px] bg-[#d6b357]" />
       </section>
+      )}
 
       {/* Filter bar — sticks under the slim header on wide screens */}
       <Suspense>
@@ -222,16 +262,20 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
           page={pageNum}
           totalPages={totalPages}
           picks={picks}
+          view={view}
         />
       </Suspense>
 
-      {/* Content */}
+      {view === "map" ? (
+        <ProjectsMap apiKey={mapsKey} projects={mapProjects} unpinned={mapRows.length - mapProjects.length} listHref={viewHref(sp, "list")} />
+      ) : (
+      /* Content */
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {projects && projects.length > 0 ? (
+        {gridProjects.length > 0 ? (
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {projects.map((p, i) => (
+            {gridProjects.map((p, i) => (
               <InView key={p.id} className="pl-card" threshold={0.12} style={{ ["--d" as string]: `${(i % 4) * 90}ms` }}>
-                <ProjectCard project={p as unknown as ProjectCardData} />
+                <ProjectCard project={p} />
               </InView>
             ))}
           </div>
@@ -264,7 +308,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
             <div className="mx-auto max-w-2xl">
               <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.16em] text-[#6b7280]">
                 <span>Page {pageNum} of {totalPages}</span>
-                <span>{fmtRange(from, projects?.length ?? 0, total)}</span>
+                <span>{fmtRange(from, gridProjects.length, total)}</span>
               </div>
               <div className="mt-2 h-[2px] w-full bg-[#e5e8ec]">
                 <span className="pl-pager-fill block h-full bg-[#d6b357]" style={{ ["--p" as string]: (pageNum / totalPages).toFixed(3) }} />
@@ -301,10 +345,64 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
           </InView>
         )}
       </section>
+      )}
 
       <Footer />
     </div>
   )
+}
+
+type MapRow = {
+  id: string
+  name: string
+  slug: string
+  main_image: string | null
+  location: string | null
+  city: string | null
+  community: string | null
+  delivery_quarter: string | null
+  launch_price_from: number | string | null
+  currency: string | null
+  status: string | null
+  latitude: number | string | null
+  longitude: number | string | null
+  developers: { name: string; slug: string | null } | null
+}
+
+/** A map pin for a project, or null without usable coordinates (anything outside the UAE is a data slip, not a pin). */
+function toMapProject(p: MapRow): MapProject | null {
+  const lat = Number(p.latitude)
+  const lng = Number(p.longitude)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < 22 || lat > 27 || lng < 51 || lng > 57) return null
+  const price = p.launch_price_from != null && Number(p.launch_price_from) > 0 ? formatProjectPrice(Number(p.launch_price_from), p.currency ?? "AED") : null
+  // Same order as the grid's cards: community, then the free location, then the city.
+  const area = [p.community, p.location].map((v) => v?.trim()).find(Boolean) ?? p.city?.trim() ?? null
+  const dev = p.developers
+  return {
+    id: String(p.id),
+    name: p.name,
+    href: dev?.slug ? `/${dev.slug}/${p.slug}` : `/projects/${p.slug}`,
+    image: p.main_image?.trim() || null,
+    lat,
+    lng,
+    price,
+    handover: p.delivery_quarter?.trim() || null,
+    area,
+    developer: dev?.name ?? null,
+    status: p.status,
+  }
+}
+
+/** The same filters in the list or map view (never a page number). */
+function viewHref(sp: SpValues, view: "list" | "map"): string {
+  const p = new URLSearchParams()
+  for (const k of FILTER_KEYS) {
+    const v = sp[k]
+    if (typeof v === "string" && v) p.set(k, v)
+  }
+  if (view === "map") p.set("view", "map")
+  const qs = p.toString()
+  return qs ? `/projects?${qs}` : "/projects"
 }
 
 /** "Showing 25 to 48 of 273". */

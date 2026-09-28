@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Search, SlidersHorizontal, X } from "lucide-react"
+import { LayoutGrid, Map as MapIcon, Search, SlidersHorizontal, X } from "lucide-react"
 
 type FilterOption = { value: string; label: string }
 
@@ -18,6 +18,8 @@ type ProjectFiltersProps = {
   page: number
   totalPages: number
   picks: QuickPick[]
+  /** List (the paged grid) or map (/projects?view=map). */
+  view?: "list" | "map"
 }
 
 /**
@@ -52,7 +54,7 @@ const fmtAed = (n: number) => (n >= 1_000_000 ? `AED ${(n / 1_000_000).toFixed(n
  * picks with live counts; and, when anything is active, the chips that undo
  * each filter one at a time.
  */
-export function ProjectFilters({ developers, cities, total, page, totalPages, picks }: ProjectFiltersProps) {
+export function ProjectFilters({ developers, cities, total, page, totalPages, picks, view = "list" }: ProjectFiltersProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -117,7 +119,17 @@ export function ProjectFilters({ developers, cities, total, page, totalPages, pi
   const pickHref = (p: QuickPick) => {
     const params = new URLSearchParams()
     for (const [k, v] of Object.entries(p.params)) params.set(k, v)
+    if (view === "map") params.set("view", "map")
     return `${pathname}?${params.toString()}`
+  }
+  /** The same filters in the other view; the page number never carries over. */
+  const viewHref = (v: "list" | "map") => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("page")
+    if (v === "map") params.set("view", "map")
+    else params.delete("view")
+    const qs = params.toString()
+    return qs ? `${pathname}?${qs}` : pathname
   }
 
   const field =
@@ -126,7 +138,7 @@ export function ProjectFilters({ developers, cities, total, page, totalPages, pi
   return (
     <>
       <div ref={sentinelRef} className="h-px w-full" aria-hidden="true" />
-      <div className="pl-bar lg:sticky lg:top-[72px] z-[40] border-b border-[#e8eaed] bg-white/85 backdrop-blur-xl" data-stuck={stuck ? "true" : "false"}>
+      <div className={`pl-bar z-[40] border-b border-[#e8eaed] bg-white/85 backdrop-blur-xl ${view === "list" ? "lg:sticky lg:top-[72px]" : "relative"}`} data-stuck={stuck ? "true" : "false"}>
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
           {/* Row 1: search, developer, city, count */}
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
@@ -145,23 +157,40 @@ export function ProjectFilters({ developers, cities, total, page, totalPages, pi
                 className={`${field} py-2.5 pl-9 pr-4`}
               />
             </div>
-            <select value={developer} onChange={(e) => updateParams({ developer: e.target.value })} aria-label="Developer" className={`${field} cursor-pointer appearance-none px-3.5 py-2.5 lg:w-52`}>
-              <option value="">All developers</option>
-              {developers.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-            </select>
-            <select value={city} onChange={(e) => updateParams({ city: e.target.value })} aria-label="City" className={`${field} cursor-pointer appearance-none px-3.5 py-2.5 lg:w-44`}>
-              <option value="">All cities</option>
-              {cities.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-            <p className="shrink-0 text-[13px] text-[#6b7280] lg:pl-3" aria-live="polite">
-              <span className="font-['Outfit'] text-[15px] font-bold text-[#0d1117]">{fmtCount(total)}</span> {total === 1 ? "project" : "projects"}
-              {totalPages > 1 && <span className="text-[#9ca3af]"> · page {page} of {totalPages}</span>}
-            </p>
+            {/* On a phone's map view the two selects share a row, so the map starts higher. */}
+            <div className={view === "map" ? "grid grid-cols-2 gap-2 lg:contents" : "contents"}>
+              <select value={developer} onChange={(e) => updateParams({ developer: e.target.value })} aria-label="Developer" className={`${field} cursor-pointer appearance-none px-3.5 py-2.5 lg:w-52`}>
+                <option value="">All developers</option>
+                {developers.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+              </select>
+              <select value={city} onChange={(e) => updateParams({ city: e.target.value })} aria-label="City" className={`${field} cursor-pointer appearance-none px-3.5 py-2.5 lg:w-44`}>
+                <option value="">All cities</option>
+                {cities.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+            <div className="flex shrink-0 items-center justify-between gap-3 lg:pl-3">
+              <p className="text-[13px] text-[#6b7280]" aria-live="polite">
+                <span className="font-['Outfit'] text-[15px] font-bold text-[#0d1117]">{fmtCount(total)}</span> {total === 1 ? "project" : "projects"}
+                {view === "list" && totalPages > 1 && <span className="text-[#9ca3af]"> · page {page} of {totalPages}</span>}
+              </p>
+              <div role="group" aria-label="View" className="inline-flex border border-[#e5e8ec] bg-white p-0.5">
+                <Link href={viewHref("list")} scroll={false} aria-current={view === "list" ? "page" : undefined} className={`pl-view ${view === "list" ? "pl-view--on" : ""}`}>
+                  <LayoutGrid className="h-4 w-4" /> List
+                </Link>
+                <Link href={viewHref("map")} scroll={false} aria-current={view === "map" ? "page" : undefined} className={`pl-view ${view === "map" ? "pl-view--on" : ""}`}>
+                  <MapIcon className="h-4 w-4" /> Map
+                </Link>
+              </div>
+            </div>
           </div>
 
           {/* Row 2: status pills, then quick picks on the right */}
           <div className="mt-2.5 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div role="group" aria-label="Status" className="flex flex-wrap gap-1.5">
+            <div
+              role="group"
+              aria-label="Status"
+              className={`flex gap-1.5 ${view === "map" ? "-mx-4 flex-nowrap overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0" : "flex-wrap"}`}
+            >
               {STATUS_PILLS.map((s) => {
                 const on = status === s.value
                 return (
@@ -178,7 +207,7 @@ export function ProjectFilters({ developers, cities, total, page, totalPages, pi
               })}
             </div>
             {picks.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className={`flex-wrap items-center gap-1.5 ${view === "map" ? "hidden lg:flex" : "flex"}`}>
                 <span className="hidden text-[10px] font-bold uppercase tracking-[0.16em] text-[#9ca3af] sm:inline">Quick picks</span>
                 {picks.map((p) => {
                   const on = isPickActive(p)
@@ -209,7 +238,7 @@ export function ProjectFilters({ developers, cities, total, page, totalPages, pi
                   <X className="h-3 w-3 text-[#b8913f] transition-transform group-hover:rotate-90" />
                 </button>
               ))}
-              <Link href={pathname} scroll={false} className="ml-1 text-[12px] font-bold text-[#0d1117] underline-offset-4 hover:text-[#b8913f] hover:underline">
+              <Link href={view === "map" ? `${pathname}?view=map` : pathname} scroll={false} className="ml-1 text-[12px] font-bold text-[#0d1117] underline-offset-4 hover:text-[#b8913f] hover:underline">
                 Clear all
               </Link>
             </div>
