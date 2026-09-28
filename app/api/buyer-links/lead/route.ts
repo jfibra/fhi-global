@@ -4,15 +4,17 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import { allowRequest, clientIp } from "@/lib/rate-limit"
 import { canUseBuyerLinks } from "@/lib/app-roles"
 import { COUNTRY_CODES } from "@/lib/user-service"
-import { BUDGET_OPTIONS, BUYER_LINK_CODE_RE, BUYER_LINK_MAX_PROJECTS, CONTACT_TIME_OPTIONS } from "@/lib/buyer-links"
+import {
+  BUDGET_OPTIONS, BUYER_LINK_CODE_RE, BUYER_QUESTIONS, CONTACT_TIME_OPTIONS, REQUIRED_QUESTIONS, parseProfile,
+} from "@/lib/buyer-links"
 
 /**
- * A client's details from a Buyers Link page (/b/<code>, migration 060).
+ * A client's brief from a Buyers Link page (/b/<code>, migrations 060–061).
  * Public by design: Zod-validated, honeypot-guarded, per-IP rate-limited, and
  * inserted on the service role (the table has no client write path). The
- * owning agent is read from the link, never from the request; the ticked
- * projects are narrowed to the link's own. The agent sees it on their Buyers
- * Link page (no email for now).
+ * owning agent is read from the link, never from the request. The brief's
+ * answers are narrowed to the known option keys (parseProfile). The agent
+ * sees it on their Buyers Link page.
  */
 
 export const runtime = "nodejs"
@@ -28,10 +30,10 @@ const LeadSchema = z.object({
   whatsappCode: z.string().refine((v) => DIAL_CODES.has(v), "Pick a valid country code."),
   whatsapp: z.string().trim().regex(/^[0-9 ()-]{4,20}$/, "Please enter a valid WhatsApp number."),
   email: z.string().trim().max(320).optional().default("").refine((v) => !v || EMAIL_RE.test(v), "Please enter a valid email."),
-  budget: z.string().optional().default("").refine((v) => !v || BUDGETS.has(v), "Pick a budget from the list."),
+  budget: z.string().refine((v) => BUDGETS.has(v), "Pick your budget."),
   contactTime: z.string().optional().default("").refine((v) => !v || CONTACT_TIMES.has(v), "Pick a time from the list."),
   message: z.string().trim().max(2000, "Keep the message under 2,000 characters.").optional().default(""),
-  projectIds: z.array(z.number().int().positive()).max(BUYER_LINK_MAX_PROJECTS).optional().default([]),
+  profile: z.unknown().optional(),
   website: z.string().optional().default(""), // honeypot — humans leave this empty
 })
 
@@ -54,12 +56,18 @@ export async function POST(req: NextRequest) {
   // Bots fill the hidden field; pretend it worked and keep nothing.
   if (data.website) return NextResponse.json({ ok: true })
 
+  const profile = parseProfile(data.profile)
+  const missing = REQUIRED_QUESTIONS.find((k) => !profile[k])
+  if (missing) {
+    return NextResponse.json({ error: `Please answer “${BUYER_QUESTIONS[missing].label}”` }, { status: 400 })
+  }
+
   const admin = createAdminSupabase()
   const { data: link } = await admin
     .from("buyer_links")
-    .select("id, agent_id, title, project_ids, is_active")
+    .select("id, agent_id, is_active")
     .eq("code", data.code)
-    .maybeSingle<{ id: string; agent_id: string; title: string; project_ids: number[]; is_active: boolean }>()
+    .maybeSingle<{ id: string; agent_id: string; is_active: boolean }>()
   const { data: agent } = link
     ? await admin
         .from("profiles")
@@ -71,10 +79,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "This link is no longer active." }, { status: 404 })
   }
 
-  const offered = new Set(link.project_ids)
-  const ticked = data.projectIds.filter((id) => offered.has(id))
-  const projectIds = ticked.length > 0 ? ticked : link.project_ids
-
   const { error } = await admin.from("buyer_link_leads").insert({
     link_id: link.id,
     agent_id: link.agent_id,
@@ -82,10 +86,10 @@ export async function POST(req: NextRequest) {
     whatsapp_code: data.whatsappCode,
     whatsapp: data.whatsapp,
     email: data.email || null,
-    budget: data.budget || null,
+    budget: data.budget,
     contact_time: data.contactTime || null,
     message: data.message || null,
-    project_ids: projectIds,
+    profile,
     ip_address: clientIp(req.headers),
     user_agent: req.headers.get("user-agent"),
   })

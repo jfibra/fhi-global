@@ -1075,3 +1075,21 @@
     linear-gradient(180deg, rgba(6, 24, 46, 0.55), rgba(6, 24, 46, 0.15) 30%, rgba(6, 24, 46, 0.15) 70%, rgba(6, 24, 46, 0.7));
 }
 @media (prefers-reduced-motion: reduce) { .gate-wall-grid { animation: none; } }
+
+/* ─── Buyers Link brief (/b/<code>) ─────────────────────────────────────────
+   .bq-opt: an answer as a square pill, filled navy when chosen. .bq-step:
+   each step eases in when it replaces the last. */
+.bq-opt {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 11px 16px; border: 1px solid #e5e8ec; background: #fff;
+  font-size: 14px; font-weight: 600; line-height: 1.2; color: #374151;
+  transition: border-color 180ms, background-color 180ms, color 180ms, transform 180ms var(--wf-ease);
+}
+.bq-opt:hover { border-color: #d6b357; color: #0d1117; }
+.bq-opt:active { transform: scale(0.98); }
+.bq-opt--on { border-color: #0d1117; background: #0d1117; color: #fff; }
+.bq-opt--on svg { color: #d6b357; }
+.bq-opt:focus-visible { outline: 3px solid #d6b357; outline-offset: 2px; }
+.bq-step { animation: bq-step 420ms var(--wf-ease) both; }
+@keyframes bq-step { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .bq-step { animation: none; } }
