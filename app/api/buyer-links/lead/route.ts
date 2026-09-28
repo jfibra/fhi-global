@@ -5,16 +5,18 @@ import { allowRequest, clientIp } from "@/lib/rate-limit"
 import { canUseBuyerLinks } from "@/lib/app-roles"
 import { COUNTRY_CODES } from "@/lib/user-service"
 import {
-  BUDGET_OPTIONS, BUYER_LINK_CODE_RE, BUYER_QUESTIONS, CONTACT_TIME_OPTIONS, REQUIRED_QUESTIONS, parseProfile,
+  BUDGET_OPTIONS, BUYER_LINK_CODE_RE, BUYER_QUESTIONS, CONTACT_TIME_OPTIONS, REQUIRED_QUESTIONS, SELLER_QUESTIONS,
+  SELLER_REQUIRED, parseProfile, parseSellerProfile, type BriefProfile,
 } from "@/lib/buyer-links"
 
 /**
- * A client's brief from a Buyers Link page (/b/<code>, migrations 060–061).
- * Public by design: Zod-validated, honeypot-guarded, per-IP rate-limited, and
- * inserted on the service role (the table has no client write path). The
- * owning agent is read from the link, never from the request. The brief's
- * answers are narrowed to the known option keys (parseProfile). The agent
- * sees it on their Buyers Link page.
+ * A client's brief from a Buyers Link page: a buyer's (/b/<code>) or a
+ * seller's (/s/<code>), migrations 060–062. Public by design: Zod-validated,
+ * honeypot-guarded, per-IP rate-limited, and inserted on the service role
+ * (the table has no client write path). The owning agent is read from the
+ * link, never from the request. The answers are narrowed to the known option
+ * keys (parseProfile / parseSellerProfile). The agent sees it on their Buyers
+ * Link page.
  */
 
 export const runtime = "nodejs"
@@ -25,12 +27,14 @@ const BUDGETS = new Set<string>(BUDGET_OPTIONS.map((o) => o.value))
 const CONTACT_TIMES = new Set<string>(CONTACT_TIME_OPTIONS.map((o) => o.value))
 
 const LeadSchema = z.object({
+  kind: z.enum(["buyer", "seller"]).optional().default("buyer"),
   code: z.string().regex(BUYER_LINK_CODE_RE, "This link is not valid."),
   name: z.string().trim().min(1, "Please enter your name.").max(200),
   whatsappCode: z.string().refine((v) => DIAL_CODES.has(v), "Pick a valid country code."),
   whatsapp: z.string().trim().regex(/^[0-9 ()-]{4,20}$/, "Please enter a valid WhatsApp number."),
   email: z.string().trim().max(320).optional().default("").refine((v) => !v || EMAIL_RE.test(v), "Please enter a valid email."),
-  budget: z.string().refine((v) => BUDGETS.has(v), "Pick your budget."),
+  // Buyers only; a seller's price is in their profile.
+  budget: z.string().optional().default(""),
   contactTime: z.string().optional().default("").refine((v) => !v || CONTACT_TIMES.has(v), "Pick a time from the list."),
   message: z.string().trim().max(2000, "Keep the message under 2,000 characters.").optional().default(""),
   profile: z.unknown().optional(),
@@ -56,10 +60,25 @@ export async function POST(req: NextRequest) {
   // Bots fill the hidden field; pretend it worked and keep nothing.
   if (data.website) return NextResponse.json({ ok: true })
 
-  const profile = parseProfile(data.profile)
-  const missing = REQUIRED_QUESTIONS.find((k) => !profile[k])
-  if (missing) {
-    return NextResponse.json({ error: `Please answer “${BUYER_QUESTIONS[missing].label}”` }, { status: 400 })
+  let profile: BriefProfile
+  if (data.kind === "seller") {
+    const seller = parseSellerProfile(data.profile)
+    const missing = SELLER_REQUIRED.find((k) => !seller[k])
+    if (missing) {
+      return NextResponse.json({ error: `Please answer “${SELLER_QUESTIONS[missing].label}”` }, { status: 400 })
+    }
+    if (!seller.area && !seller.area_other) {
+      return NextResponse.json({ error: "Please tell us where the property is." }, { status: 400 })
+    }
+    profile = seller
+  } else {
+    if (!BUDGETS.has(data.budget)) return NextResponse.json({ error: "Pick your budget." }, { status: 400 })
+    const buyer = parseProfile(data.profile)
+    const missing = REQUIRED_QUESTIONS.find((k) => !buyer[k])
+    if (missing) {
+      return NextResponse.json({ error: `Please answer “${BUYER_QUESTIONS[missing].label}”` }, { status: 400 })
+    }
+    profile = buyer
   }
 
   const admin = createAdminSupabase()
@@ -86,9 +105,10 @@ export async function POST(req: NextRequest) {
     whatsapp_code: data.whatsappCode,
     whatsapp: data.whatsapp,
     email: data.email || null,
-    budget: data.budget,
+    budget: data.kind === "buyer" ? data.budget : null,
     contact_time: data.contactTime || null,
     message: data.message || null,
+    kind: data.kind,
     profile,
     ip_address: clientIp(req.headers),
     user_agent: req.headers.get("user-agent"),

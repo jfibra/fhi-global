@@ -204,7 +204,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { icon: Presentation, label: "Meeting Poster", to: "meeting-poster", description: "Event posters with your choice of speakers.", mock: "meeting-poster" },
       { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website.", mock: "website-builder" },
       { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement.", mock: "a2a-agreement" },
-      { ...BUYERS_LINK,     description: "Your one link for buyers — their property brief comes straight to you.", mock: "buyers-link" },
+      { ...BUYERS_LINK,     description: "Links for buyers and sellers — their brief comes straight to you.", mock: "buyers-link" },
     ],
   },
   {
@@ -297,7 +297,7 @@ const salesPipelineNav = ({ projects = false, teamSales = false, invite = true }
       { ...POSTER_MAKER,    description: "Flyers and posters from any listing or project.", mock: "poster-maker" },
       { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website.", mock: "website-builder" },
       { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement.", mock: "a2a-agreement" },
-      { ...BUYERS_LINK,     description: "Your one link for buyers — their property brief comes straight to you.", mock: "buyers-link" },
+      { ...BUYERS_LINK,     description: "Links for buyers and sellers — their brief comes straight to you.", mock: "buyers-link" },
     ],
   },
   // Marketing artwork + training PDFs, grouped under one hub.
