@@ -1,8 +1,7 @@
 import type { Metadata } from "next"
 import Image from "next/image"
-import Link from "next/link"
-import { ArrowDown, Globe, MessageCircle, UserRound } from "lucide-react"
-import { AgentsGrid, TitleCard, type PublicAgent } from "./agents-grid"
+import { ArrowDown, MessageCircle } from "lucide-react"
+import { AgentsGrid, type PublicAgent } from "./agents-grid"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { createPageMetadata } from "@/lib/seo"
 import { titleCaseName } from "@/lib/public-profile"
@@ -137,11 +136,9 @@ function Words({ text, start = 0, gold = false }: { text: string; start?: number
 
 export default async function AgentsPage() {
   const { agents, wall, liveProjects } = await fetchRoster()
-  const leaders = agents.filter((a) => a.leader)
   const faces = wall.slice(0, 7)
   const stats = [
     { value: agents.length, label: "Property advisors" },
-    { value: leaders.length, label: "Team leaders" },
     { value: liveProjects, label: "Live projects to show you" },
   ].filter((s) => s.value > 0)
 
@@ -160,7 +157,8 @@ export default async function AgentsPage() {
 
       {/* ── Masthead: the cast wall ──────────────────────────────────────
           Real portraits drift behind the headline; a spotlight names one
-          face at a time. Counts are the live roster and project rows. */}
+          face at a time. Counts are the live roster and project rows. (No
+          team-leaders chapter for now: two of the three accounts are demos.) */}
       <section className="relative isolate flex min-h-[640px] overflow-hidden bg-[#06182e] text-white lg:min-h-[min(88vh,860px)]">
         {wall.length >= 6 ? (
           <AgentWall people={wall} />
@@ -219,97 +217,6 @@ export default async function AgentsPage() {
         </InView>
         <div className="absolute inset-x-0 bottom-0 z-10 h-[3px] bg-[#d6b357]" aria-hidden="true" />
       </section>
-
-      {/* ── Team leaders ─────────────────────────────────────────────── */}
-      {leaders.length > 0 && (
-        <section className="relative bg-white">
-          <InView className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28" threshold={0.12}>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="inline-flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.26em] text-[#b8913f]">
-                  <span className="wf-rule h-px w-10 bg-[#d6b357]" aria-hidden="true" />
-                  <span className="wf-fade" style={{ ["--d" as string]: "150ms" }}>Leadership</span>
-                </p>
-                <h2 className="mt-4 font-['Outfit'] text-[36px] font-bold leading-[1.05] tracking-tight text-[#0d1117] sm:text-[46px]">
-                  <Words text="The team" />
-                  <Words text="leaders" start={2} gold />
-                </h2>
-              </div>
-              <p className="wf-fade max-w-sm text-[15px] leading-relaxed text-[#6b7280]" style={{ ["--d" as string]: "400ms" }}>
-                They lead FHI Global&rsquo;s sales teams in Dubai. Reach any of them directly.
-              </p>
-            </div>
-
-            <div className={`mt-14 grid gap-x-8 gap-y-14 sm:grid-cols-2 ${leaders.length >= 3 ? "lg:grid-cols-3" : ""}`}>
-              {leaders.map((a, i) => {
-                const d = 250 + i * 200
-                const wa = a.whatsapp?.replace(/[^\d]/g, "")
-                return (
-                  <article key={a.id} className="group">
-                    <div className="relative">
-                      {(["tl", "tr", "bl", "br"] as const).map((c) => (
-                        <span key={c} className={`wf-corner wf-corner--${c}`} style={{ ["--d" as string]: `${d + 700}ms` }} aria-hidden="true" />
-                      ))}
-                      <Link
-                        href={`/business-card/${a.id}`}
-                        aria-label={`${a.name}, team leader: view profile`}
-                        className="wf-photo relative block aspect-[4/5] overflow-hidden bg-[#0b2a4d]"
-                        style={{ ["--d" as string]: `${d}ms` }}
-                      >
-                        {a.photo ? (
-                          <Image
-                            src={a.photo}
-                            alt={a.name}
-                            fill
-                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                            className="wf-photo-img object-cover object-top transition-transform duration-700 group-hover:scale-[1.03]"
-                            style={{ ["--d" as string]: `${d}ms` }}
-                          />
-                        ) : (
-                          <TitleCard name={a.name} size="lg" />
-                        )}
-                        <span className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#06182e]/70 to-transparent" aria-hidden="true" />
-                        <span className="absolute bottom-4 left-4 bg-[#d6b357] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#001f3f]">
-                          Team leader
-                        </span>
-                      </Link>
-                    </div>
-                    <h3 className="wf-fade mt-7 font-['Outfit'] text-[26px] font-bold leading-tight text-[#0d1117]" style={{ ["--d" as string]: `${d + 450}ms` }}>
-                      {a.name}
-                    </h3>
-                    <div className="wf-fade mt-4 flex flex-wrap gap-2" style={{ ["--d" as string]: `${d + 550}ms` }}>
-                      {wa && (
-                        <a
-                          href={`https://wa.me/${wa}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 bg-[#25d366] px-4 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-[#1fb857]"
-                        >
-                          <MessageCircle className="h-4 w-4" /> WhatsApp
-                        </a>
-                      )}
-                      <Link
-                        href={`/business-card/${a.id}`}
-                        className="inline-flex items-center gap-2 border border-[#e5e8ec] px-4 py-2.5 text-[13px] font-bold text-[#374151] transition-colors hover:border-[#d6b357] hover:text-[#8a6d2b]"
-                      >
-                        <UserRound className="h-4 w-4" /> Profile
-                      </Link>
-                      {a.website && (
-                        <Link
-                          href={`/website/${a.website}`}
-                          className="inline-flex items-center gap-2 border border-[#e5e8ec] px-4 py-2.5 text-[13px] font-bold text-[#374151] transition-colors hover:border-[#d6b357] hover:text-[#8a6d2b]"
-                        >
-                          <Globe className="h-4 w-4" /> Website
-                        </Link>
-                      )}
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          </InView>
-        </section>
-      )}
 
       {/* ── The directory ────────────────────────────────────────────── */}
       <section id="directory" className="scroll-mt-20">
