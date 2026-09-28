@@ -63,6 +63,7 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   "purchase-categories": ["super_admin", "admin"],
   "contact-inbox": ["super_admin", "admin"],
   "system-logs": ["super_admin", "admin"],
+  "real-estate-data": ["super_admin", "admin"],
   listings: ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager"],
   "owner-documents": ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager"],
   // Content managers + developers get the full editor; studio viewers get read-only.

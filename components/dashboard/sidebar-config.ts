@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library,
-  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2,
+  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -191,6 +191,9 @@ const ADMIN_NAV: RoleNavEntry[] = [
   // (sales pipeline, secretaries) already reaches it in one click.
   SALES_REPORTS,
   EVENTS,
+  // Dubai Land Department open data (transactions, rents, projects, …), proxied
+  // through /api/admin/dld. Admin staff only — see SUB_PATH_ROLES in lib/auth.ts.
+  { icon: Database, label: "Real Estate Data (DLD)", to: "real-estate-data" },
   {
     group: "Agent Resource",
     to: "agent-resource",
