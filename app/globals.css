@@ -1093,3 +1093,62 @@
 .bq-step { animation: bq-step 420ms var(--wf-ease) both; }
 @keyframes bq-step { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .bq-step { animation: none; } }
+
+/* ─── Agents page (/agents) ─────────────────────────────────────────────────
+   .ag-wall: the masthead's cast wall. Columns of the team's own portraits
+   drift in alternate directions (.ag-col, --dur, negative delays offset the
+   phases); the doubled column loops at -50% with no seam because every tile
+   carries its own bottom margin. .ag-tile[data-lit] is the spotlight face,
+   in full colour with its caption.
+   .ag-card: directory cards. The portrait develops like a darkroom print as
+   the card enters (grey, dark and soft → sharp colour, --i staggers a row),
+   then lifts on hover with a "View profile" veil. */
+.ag-col { animation: ag-drift-up var(--dur, 80s) linear infinite; will-change: transform; }
+.ag-col--down { animation-name: ag-drift-down; }
+.ag-wall[data-paused="true"] .ag-col { animation-play-state: paused; }
+@keyframes ag-drift-up { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, -50%, 0); } }
+@keyframes ag-drift-down { from { transform: translate3d(0, -50%, 0); } to { transform: translate3d(0, 0, 0); } }
+.ag-tile { position: relative; aspect-ratio: 4 / 5; margin: 0 0 12px; overflow: hidden; background: #0b2a4d; }
+.ag-tile img { filter: grayscale(1) brightness(0.8) contrast(1.08); transform: scale(1.03); transition: filter 1100ms var(--wf-ease), transform 1400ms var(--wf-ease); }
+.ag-tile::before { content: ""; position: absolute; inset: 0; z-index: 1; background: #123a66; mix-blend-mode: multiply; opacity: 0.62; transition: opacity 900ms var(--wf-ease); pointer-events: none; }
+.ag-tile::after { content: ""; position: absolute; inset: 0; z-index: 2; box-shadow: inset 0 0 0 0 rgba(214, 179, 87, 0); transition: box-shadow 800ms var(--wf-ease); pointer-events: none; }
+.ag-tile[data-lit="true"]::before { opacity: 0; }
+.ag-tile[data-lit="true"] img { filter: none; transform: scale(1.07); }
+.ag-tile[data-lit="true"]::after { box-shadow: inset 0 0 0 2px rgba(214, 179, 87, 0.95); }
+.ag-tile-cap { position: absolute; z-index: 3; inset: auto 0 0 0; padding: 28px 10px 9px; background: linear-gradient(to top, rgba(6, 24, 46, 0.95), rgba(6, 24, 46, 0)); opacity: 0; transform: translateY(10px); transition: opacity 700ms var(--wf-ease), transform 800ms var(--wf-ease); }
+.ag-tile[data-lit="true"] .ag-tile-cap { opacity: 1; transform: translateY(0); transition-delay: 250ms; }
+
+.ag-card { transition: box-shadow 450ms var(--wf-ease), transform 450ms var(--wf-ease), border-color 300ms; }
+.ag-card-img { filter: grayscale(1) brightness(0.35) blur(6px); transform: scale(1.1); transition: filter 1400ms var(--wf-ease), transform 1700ms var(--wf-ease); transition-delay: calc(var(--i, 0) * 90ms); }
+.ag-card[data-in="true"] .ag-card-img { filter: none; transform: scale(1); }
+.ag-card-veil {
+  position: absolute; inset: auto 0 0 0; display: flex; align-items: center; gap: 6px;
+  padding: 30px 12px 11px; font-size: 12px; font-weight: 700; color: #fff;
+  background: linear-gradient(to top, rgba(6, 24, 46, 0.9), rgba(6, 24, 46, 0));
+  opacity: 0; transform: translateY(12px); transition: opacity 400ms var(--wf-ease), transform 500ms var(--wf-ease);
+}
+@media (hover: hover) {
+  .ag-card:hover { transform: translateY(-4px); border-color: rgba(214, 179, 87, 0.55); box-shadow: 0 24px 50px -26px rgba(0, 31, 63, 0.5); }
+  .ag-card[data-in="true"]:hover .ag-card-img { transform: scale(1.05); transition-delay: 0ms; transition-duration: 1400ms, 900ms; }
+  .ag-card:hover .ag-card-veil { opacity: 1; transform: translateY(0); }
+}
+.ag-act {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; min-width: 36px; padding: 0 10px;
+  border: 1px solid #e5e8ec; color: #4b5563; font-size: 12px; font-weight: 700; transition: border-color 200ms, color 200ms, background-color 200ms;
+}
+.ag-act:hover { border-color: #d6b357; color: #8a6d2b; }
+.ag-act--wa { border-color: #25d366; background: #25d366; color: #fff; }
+.ag-act--wa:hover { border-color: #1fb857; background: #1fb857; color: #fff; }
+.ag-letter {
+  flex-shrink: 0; min-width: 32px; height: 32px; padding: 0 9px; border: 1px solid transparent;
+  font-family: "Outfit", sans-serif; font-size: 13px; font-weight: 700; color: #6b7280; transition: color 180ms, border-color 180ms, background-color 180ms;
+}
+.ag-letter:hover { color: #0d1117; border-color: #e5e8ec; }
+.ag-letter--on { background: #0d1117; color: #fff; }
+.ag-letter--on:hover { color: #fff; }
+.ag-letter:focus-visible { outline: 2px solid #d6b357; outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) {
+  .ag-col { animation: none; }
+  .ag-tile img, .ag-tile-cap, .ag-card, .ag-card-img, .ag-card-veil { transition: none; }
+  .ag-card-img { filter: none; transform: none; }
+}
