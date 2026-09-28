@@ -1,7 +1,8 @@
-// Buyers Link (migrations 060–062): every agent has ONE permanent link code
-// with two public pages. /b/<code> is the buyer's four-step brief (details,
-// buying profile, preferences, financials); /s/<code> is the seller's (details,
-// the property, status and price, plans). Both land on that agent's Buyers
+// Buyers Link (migrations 060–063): every agent has ONE permanent link with a
+// readable, name-based address and two public pages. /buy-with/<slug> is the
+// buyer's four-step brief (details, buying profile, preferences, financials);
+// /sell-with/<slug> is the seller's (details, the property, status and price,
+// plans). The old /b/<code> and /s/<code> addresses redirect to them. Both land on that agent's Buyers
 // Link page. Shared by the dashboard page, the public pages and the API
 // routes, so the question lists, their validation and their labels have one
 // definition. Nothing here is server-only.
@@ -437,16 +438,21 @@ export const formatAed = (digits: string | undefined): string | null =>
 export const formatSqft = (digits: string | undefined): string | null =>
   digits && /^\d+$/.test(digits) ? `${Number(digits).toLocaleString("en-US")} sq ft` : null
 
-/** Link codes: 8 characters from an alphabet with no look-alikes (0/o, 1/l/i). */
+/** Link codes: 8 characters from an alphabet with no look-alikes (0/o, 1/l/i). The link's internal id. */
 export const BUYER_LINK_CODE_RE = /^[23456789abcdefghjkmnpqrstuvwxyz]{8}$/
+/** A link's readable address (migration 063), e.g. "juliecor-repompo". */
+export const BRIEF_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
-export const buyerLinkPath = (code: string) => `/b/${code}`
-export const sellerLinkPath = (code: string) => `/s/${code}`
+/** The public pages, by the link's readable address. */
+export const buyerLinkPath = (slug: string) => `/buy-with/${slug}`
+export const sellerLinkPath = (slug: string) => `/sell-with/${slug}`
 
 export type BuyerLink = {
   id: string
   agent_id: string
   code: string
+  /** The readable address, minted once from the agent's name (migration 063). */
+  slug: string | null
   is_active: boolean
   created_at: string
 }
@@ -469,7 +475,7 @@ export type BuyerLead = {
   created_at: string
 }
 
-export const BUYER_LINK_COLUMNS = "id, agent_id, code, is_active, created_at"
+export const BUYER_LINK_COLUMNS = "id, agent_id, code, slug, is_active, created_at"
 export const BUYER_LEAD_COLUMNS =
   "id, link_id, agent_id, name, whatsapp_code, whatsapp, email, budget, contact_time, message, kind, profile, created_at"
 

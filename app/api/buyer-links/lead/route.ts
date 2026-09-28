@@ -10,8 +10,9 @@ import {
 } from "@/lib/buyer-links"
 
 /**
- * A client's brief from a Buyers Link page: a buyer's (/b/<code>) or a
- * seller's (/s/<code>), migrations 060–062. Public by design: Zod-validated,
+ * A client's brief from a Buyers Link page: a buyer's (/buy-with/<name>) or a
+ * seller's (/sell-with/<name>), migrations 060–063. The form sends the link's
+ * internal code, not its readable address. Public by design: Zod-validated,
  * honeypot-guarded, per-IP rate-limited, and inserted on the service role
  * (the table has no client write path). The owning agent is read from the
  * link, never from the request. The answers are narrowed to the known option

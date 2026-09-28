@@ -202,7 +202,7 @@ export function canManageDeveloperContent(role: string | null | undefined): bool
 export const ROLES_SALES_PIPELINE: readonly AppRoleId[] = ["agent", "team_leader", "unit_manager", "global_partner"]
 
 /** Agent Resource → Buyers Link (migration 060): the sales ladder plus admin
- *  staff, who have the same Agent Resource hub. Also who a /b/<code> page may
+ *  staff, who have the same Agent Resource hub. Also who a Buyers or Sellers Link page may
  *  belong to — a link dies with its owner's access. */
 export const ROLES_BUYER_LINK_OWNERS: readonly AppRoleId[] = [...ROLES_SALES_PIPELINE, "super_admin", "admin"]
 

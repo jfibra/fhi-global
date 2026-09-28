@@ -7,12 +7,15 @@ import { gaEvent } from "@/lib/ga"
  * Floating WhatsApp button — the standard Dubai real-estate conversion
  * element. Rendered from the public Footer so it appears on every public
  * page and never inside the dashboards. Clicks report a GA4 lead event.
- * Not on a Buyers or Sellers Link (/b/<code>, /s/<code>): that client belongs to the agent who sent
+ * Not on a Buyers or Sellers Link (/buy-with/<name>, /sell-with/<name>, and
+ * the old /b/ and /s/ addresses): that client belongs to the agent who sent
  * it, and the page carries the agent's own WhatsApp buttons.
  */
+const AGENT_PAGES = ["/buy-with/", "/sell-with/", "/b/", "/s/"]
+
 export function WhatsAppFab() {
   const pathname = usePathname()
-  if (pathname?.startsWith("/b/") || pathname?.startsWith("/s/")) return null
+  if (pathname && AGENT_PAGES.some((p) => pathname.startsWith(p))) return null
   const text = encodeURIComponent("Hi! I'm interested in a property with FHI Global.")
   return (
     <a

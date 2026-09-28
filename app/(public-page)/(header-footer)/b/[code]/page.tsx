@@ -1,64 +1,18 @@
-import type { Metadata } from "next"
-import { notFound } from "next/navigation"
-import { ShieldCheck } from "lucide-react"
-import { createPageMetadata } from "@/lib/seo"
-import { loadBriefLink } from "@/lib/buyer-link-page"
-import { BriefMasthead } from "@/components/public/brief-masthead"
-import { BuyerLeadForm } from "./buyer-lead-form"
+import { redirectOldLink } from "@/lib/buyer-link-page"
 
-// An agent's Buyers Link for buyers (migrations 060–062): one permanent page
-// per agent where a client answers a four-step brief that goes straight to
-// that agent. The same code at /s/<code> is the agent's Sellers Link.
-// Private (never indexed) and always fresh, so a deactivated agent's link
-// stops at once.
+// The old Buyers Link address (/b/<code>, before migration 063). Links already
+// shared and QR codes already printed keep working: a permanent (308) redirect
+// to the readable /buy-with/<name> page, minting that address if needed.
 
 export const dynamic = "force-dynamic"
 
-type Props = { params: Promise<{ code: string }> }
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export default async function OldBuyerLink({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ code: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   const { code } = await params
-  const data = await loadBriefLink(code)
-  if (!data) return { title: "Link not found", robots: { index: false, follow: false } }
-  // The WhatsApp preview the client sees when the agent sends the link.
-  return createPageMetadata({
-    title: `Find your property in Dubai with ${data.agent.name}`,
-    description: `Answer four quick questions and ${data.agent.firstName} will send you options that fit.`,
-    pathname: `/b/${code}`,
-    robots: { index: false, follow: false },
-  })
-}
-
-export default async function BuyerLinkPage({ params }: Props) {
-  const { code } = await params
-  const data = await loadBriefLink(code)
-  if (!data) notFound()
-  const { link, agent } = data
-
-  return (
-    <div className="min-h-screen bg-[#f5f6f8]">
-      <BriefMasthead
-        agent={agent}
-        eyebrow="Your property brief"
-        title={`Tell ${agent.firstName} what you’re`}
-        gold="looking for."
-        intro={`Four quick steps, about two minutes. ${agent.firstName} will come back to you on WhatsApp with options that fit.`}
-      />
-
-      <div className="relative mx-auto -mt-14 max-w-3xl px-4 pb-16 sm:px-6">
-        {!link.is_active ? (
-          <div className="border border-[#e8eaed] bg-white p-8 text-center">
-            <p className="font-['Outfit'] text-2xl font-bold text-[#0d1117]">This page is no longer available</p>
-            <p className="mt-2 text-[15px] leading-relaxed text-[#6b7280]">Send {agent.firstName} a message directly instead.</p>
-          </div>
-        ) : (
-          <BuyerLeadForm code={link.code} agentFirstName={agent.firstName} agentWhatsapp={agent.whatsapp || null} />
-        )}
-        <p className="mt-5 flex items-center justify-center gap-2 text-center text-[12.5px] text-[#6b7280]">
-          <ShieldCheck className="h-4 w-4 text-[#b8913f]" />
-          Your answers go only to {agent.name} at FHI Global.
-        </p>
-      </div>
-    </div>
-  )
+  return redirectOldLink(code, "buyer", await searchParams)
 }

@@ -1,15 +1,15 @@
 "use client"
 
-// Agent Resource → Buyers Link (migrations 060–062). Every agent has ONE
-// permanent link code, created the first time they open this page, with two
-// public pages: /b/<code> for buyers and /s/<code> for owners who want to
-// sell. Each client answers a four-step brief that lands here. Laid out like
+// Agent Resource → Buyers Link (migrations 060–063). Every agent has ONE
+// permanent link, created the first time they open this page, with a
+// readable address from their name and two public pages: /buy-with/<name>
+// for buyers and /sell-with/<name> for owners who want to sell. Each client answers a four-step brief that lands here. Laid out like
 // Invite: a Buyers / Sellers toggle, the QR card on the left, the clients
 // that view brought in on the right. The link comes from the idempotent
 // POST /api/buyer-links; briefs are read under RLS, so an agent only ever
 // sees their own.
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react"
 import {
   Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, ExternalLink, FileSpreadsheet, FileText, House, Link2,
@@ -127,7 +127,9 @@ type View = "buyers" | "sellers"
 type Filter = { any: string; aria: string; options: Choice[]; get: (l: BuyerLead) => string | null }
 type ViewConfig = {
   kind: BriefKind
-  path: (code: string) => string
+  /** The public page by the link's readable address; `legacy` by its code, until the address exists. */
+  path: (slug: string) => string
+  legacy: (code: string) => string
   intro: string
   qrTitle: string
   qrNote: string | null
@@ -152,6 +154,7 @@ const VIEWS: Record<View, ViewConfig> = {
   buyers: {
     kind: "buyer",
     path: buyerLinkPath,
+    legacy: (code) => `/b/${code}`,
     intro:
       "Your one link for every buyer. Send it or show the QR. Your client answers four quick steps about what they want, and their brief lands here.",
     qrTitle: "Scan to send your brief",
@@ -210,6 +213,7 @@ const VIEWS: Record<View, ViewConfig> = {
   sellers: {
     kind: "seller",
     path: sellerLinkPath,
+    legacy: (code) => `/s/${code}`,
     intro:
       "Your link for owners who want to sell. Send it or show the QR. They answer four quick steps about their property, and it lands here.",
     qrTitle: "Scan to sell your property",
@@ -363,7 +367,7 @@ export default function BuyersLinkPage() {
 
   const agentName = titleCaseName(profile?.fullname ?? "")
   const agentFirst = agentName.split(" ")[0] || "your advisor"
-  const url = link && origin ? `${origin}${cfg.path(link.code)}` : ""
+  const url = link && origin ? `${origin}${link.slug ? cfg.path(link.slug) : cfg.legacy(link.code)}` : ""
   const dark = view === "sellers"
 
   const switchView = (v: View) => {
@@ -552,12 +556,25 @@ export default function BuyersLinkPage() {
             ) : (
               url && (
                 <p
-                  className={`mt-3 w-full select-all truncate rounded-lg px-3 py-2 text-center font-mono text-[11.5px] ${
+                  className={`mt-3 w-full select-all break-words rounded-lg px-3 py-2 text-center font-mono text-[11.5px] leading-relaxed ${
                     dark ? "bg-white/10 text-white/85" : "bg-[#f4f6f9] text-[#374151]"
                   }`}
                   title={url}
                 >
-                  {url.replace(/^https?:\/\//, "")}
+                  {/* Line breaks only after a slash, so the agent's name stays whole. */}
+                  {url
+                    .replace(/^https?:\/\//, "")
+                    .split("/")
+                    .map((part, i, all) => (
+                      <Fragment key={i}>
+                        {part}
+                        {i < all.length - 1 && (
+                          <>
+                            /<wbr />
+                          </>
+                        )}
+                      </Fragment>
+                    ))}
                 </p>
               )
             )}
