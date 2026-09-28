@@ -1,8 +1,10 @@
 import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowRight, ArrowUpRight, Mail, MapPin, Phone } from "lucide-react"
-import { createPageMetadata } from "@/lib/seo"
+import { ArrowRight, ArrowUpRight, Mail, MapPin, Phone, Play } from "lucide-react"
+import { createPageMetadata, absoluteUrl } from "@/lib/seo"
+import { JsonLd } from "@/components/json-ld"
+import { FilmTrigger, ScreeningRoom, type Film } from "@/components/public/film-player"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { countByEmirate } from "@/lib/emirates"
@@ -29,6 +31,48 @@ export const metadata: Metadata = createPageMetadata({
 const GALLERY_BASE =
   "https://filipinohomes123.s3.ap-southeast-1.amazonaws.com/FHI_GLOBAL/gallery/fhi-global-dubai-event/web"
 const ALBUM_ID = "21d46277-db66-409b-8cce-32b159ab6214"
+// FHI's own films, web-encoded from the masters in the boss's Drive folder
+// (1080p + 720p H.264, faststart) and served from our S3 with a one-year
+// cache; the names carry a version so a re-edit can never show a stale copy.
+// The Arabic AVP is deliberately not on the site.
+const FILM_BASE = `${(process.env.S3_PUBLIC_URL?.trim() || "https://filipinohomes123.s3.ap-southeast-1.amazonaws.com").replace(/\/$/, "")}/FHI_GLOBAL/videos/about`
+const FILMS = {
+  avp: {
+    id: "fhi-global-avp",
+    title: "FHI Global — the film",
+    duration: "3:12",
+    poster: `${FILM_BASE}/fhi-global-avp-poster-v1.jpg`,
+    hd: `${FILM_BASE}/fhi-global-avp-1080-v1.mp4`,
+    sd: `${FILM_BASE}/fhi-global-avp-720-v1.mp4`,
+    ratio: 16 / 9,
+  },
+  event: {
+    id: "fhi-dubai-event",
+    title: "FHI Dubai Event",
+    duration: "2:14",
+    poster: `${FILM_BASE}/fhi-dubai-event-poster-v1.jpg`,
+    hd: `${FILM_BASE}/fhi-dubai-event-1080-v1.mp4`,
+    sd: `${FILM_BASE}/fhi-dubai-event-720-v1.mp4`,
+    ratio: 1920 / 816,
+  },
+} satisfies Record<string, Film>
+/** A silent 12 s cut of the AVP (skyline, the team, the website, the hall) behind the screening room. */
+const FILM_LOOP = `${FILM_BASE}/fhi-global-avp-loop-v1.mp4`
+
+/** Google's video rich results: what the film is, its poster, length and file. */
+const filmSchema = (f: Film, description: string, seconds: number) => ({
+  "@context": "https://schema.org",
+  "@type": "VideoObject",
+  name: f.title,
+  description,
+  thumbnailUrl: [f.poster],
+  uploadDate: "2026-09-28",
+  duration: `PT${Math.floor(seconds / 60)}M${seconds % 60}S`,
+  contentUrl: f.hd,
+  embedUrl: absoluteUrl("/about"),
+  publisher: { "@type": "Organization", name: "FHI Global Property Dubai" },
+})
+
 const PHOTOS = {
   team: { url: `${GALLERY_BASE}/0ec466a7-dsc04617.jpg`, alt: "The FHI Global team on a Dubai rooftop" },
   leaders: { url: `${GALLERY_BASE}/c7c6af0d-dsc03609-edit.jpg`, alt: "FHI Global leadership at the Dubai Fountain, Downtown Dubai" },
@@ -156,6 +200,12 @@ export default async function AboutPage() {
       <noscript>
         <style>{`.ab [class*="wf-"], .ab .wf-word > span, .ab [class*="pp-"], .ab .sl-line { opacity: 1 !important; transform: none !important; filter: none !important; }`}</style>
       </noscript>
+      <JsonLd
+        schema={[
+          filmSchema(FILMS.avp, "FHI Global Property Dubai's film: the team, the founder and the Dubai office, in three minutes.", 193),
+          filmSchema(FILMS.event, "The FHI Global team together at its Dubai event.", 134),
+        ]}
+      />
 
       {/* ── Opening — the whole team, full-bleed, under the first sentence ── */}
       <section className="pp-hero relative overflow-hidden bg-[#06182e] text-white">
@@ -191,6 +241,19 @@ export default async function AboutPage() {
               <MagneticLink href="/contact" className="inline-flex items-center justify-center gap-2.5 border border-white/35 px-7 py-4 text-[15px] font-bold text-white backdrop-blur-sm transition-colors hover:border-white/70 hover:bg-white/10">
                 Talk to us
               </MagneticLink>
+              <FilmTrigger
+                film={FILMS.avp}
+                className="group inline-flex items-center justify-center gap-3 self-start py-1 text-left sm:ml-3 sm:self-auto"
+                ariaLabel={`Watch the film: ${FILMS.avp.title}, ${FILMS.avp.duration}`}
+              >
+                <span className="sr-play-ring relative flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border border-[#d6b357] text-[#d6b357] transition-colors group-hover:bg-[#d6b357] group-hover:text-[#001f3f]">
+                  <Play className="ml-0.5 h-[18px] w-[18px] fill-current" />
+                </span>
+                <span>
+                  <span className="block text-[15px] font-bold text-white">Watch the film</span>
+                  <span className="block text-[11px] font-semibold uppercase tracking-[0.2em] text-[#d6b357]">{FILMS.avp.duration}</span>
+                </span>
+              </FilmTrigger>
             </div>
           </div>
         </InView>
@@ -213,6 +276,9 @@ export default async function AboutPage() {
           />
         </InView>
       </section>
+
+      {/* ── The screening room — the AVP behind its title, the Dubai event beside it ── */}
+      <ScreeningRoom main={FILMS.avp} teaser={FILM_LOOP} second={FILMS.event} />
 
       {/* ── Chapter II — the numbers, as a pinned reel ── */}
       <NumbersReel

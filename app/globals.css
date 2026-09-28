@@ -1234,3 +1234,48 @@
   .pm-cl, .pm-pin, .pm-popup, .pm-li { animation: none; }
   .pm-skeleton { animation: none; }
 }
+
+/* ─── Films on the About page (components/public/film-player.tsx) ───────────
+   .film-dialog: a full-screen cinema in the top layer (native <dialog>,
+   centred explicitly because the reset strips the UA styles); the stage
+   keeps the film's own ratio (--r) inside the viewport. .sr: the screening
+   room band — its silent loop fades in over the poster once it plays, and a
+   slow ring breathes around the gold play button. */
+html.film-open { overflow: hidden; }
+.film-dialog {
+  position: fixed; inset: 0; margin: auto; width: 100vw; height: 100dvh; max-width: none; max-height: none;
+  padding: 0; border: 0; background: #02070f; color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+}
+.film-dialog:not([open]) { display: none; }
+.film-dialog::backdrop { background: rgba(2, 7, 15, 0.94); }
+.film-dialog[open] { animation: film-in 380ms var(--wf-ease) both; }
+@keyframes film-in { from { opacity: 0; } to { opacity: 1; } }
+.film-stage {
+  width: min(94vw, calc((100dvh - 128px) * var(--r, 1.7778))); aspect-ratio: var(--r, 1.7778);
+  background: #000; box-shadow: 0 40px 120px -40px rgba(0, 0, 0, 0.9);
+}
+.film-dialog[open] .film-stage { animation: film-stage-in 520ms var(--wf-ease) both; }
+@keyframes film-stage-in { from { opacity: 0; transform: scale(0.965); } to { opacity: 1; transform: scale(1); } }
+.film-stage video { display: block; width: 100%; height: 100%; }
+.film-caption { display: flex; align-items: baseline; gap: 14px; width: min(94vw, calc((100dvh - 128px) * var(--r, 1.7778))); }
+.film-close {
+  position: absolute; top: 16px; right: 16px; display: flex; height: 44px; width: 44px; align-items: center; justify-content: center;
+  border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.06); color: #fff;
+  transition: border-color 180ms, color 180ms, background-color 180ms;
+}
+.film-close:hover { border-color: #d6b357; color: #d6b357; }
+.film-close:focus-visible { outline: 2px solid #d6b357; outline-offset: 2px; }
+
+.sr-loop { opacity: 0; transition: opacity 1400ms var(--wf-ease); }
+.sr-loop.is-on { opacity: 1; }
+.sr-play-ring::after {
+  content: ""; position: absolute; inset: -7px; border-radius: 999px; border: 1px solid rgba(214, 179, 87, 0.65);
+  animation: sr-breathe 2.6s var(--wf-ease) infinite; pointer-events: none;
+}
+@keyframes sr-breathe { 0% { transform: scale(0.92); opacity: 0.9; } 100% { transform: scale(1.32); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .film-dialog[open], .film-dialog[open] .film-stage { animation: none; }
+  .sr-play-ring::after { animation: none; opacity: 0.6; }
+  .sr-loop { transition: none; }
+}

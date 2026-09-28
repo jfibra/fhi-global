@@ -66,7 +66,8 @@ const CSP = [
   `connect-src 'self' ${SUPABASE_CONNECT} https://${VERCEL_VITALS} https://${VERCEL_SCRIPTS} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.googleapis.com https://${CF_INSIGHTS_API} https://*.google-analytics.com https://www.googletagmanager.com`,
 
   // Camera / microphone captured media (face-verify & ID-capture steps)
-  `media-src 'self' blob:`,
+  // + FHI's films on S3 (About page), streamed as web-optimised MP4
+  `media-src 'self' blob: https://*.amazonaws.com https://*.cloudfront.net`,
 
   // Web workers (Next.js may spawn them in dev)
   `worker-src 'self' blob:`,
