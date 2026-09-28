@@ -6,7 +6,7 @@ import Script from "next/script"
 import Image from "next/image"
 import Link from "next/link"
 import Supercluster from "supercluster"
-import { ArrowUpRight, CalendarClock, Layers, LocateFixed, MapPin, Minus, Plus, X } from "lucide-react"
+import { ArrowUpRight, Building2, CalendarClock, Crosshair, Layers, LocateFixed, MapPin, Minus, Plus, X } from "lucide-react"
 
 /**
  * /projects?view=map — Bayut-style split view. The list on the left follows
@@ -34,6 +34,9 @@ export type MapProject = {
   handover: string | null
   area: string | null
   developer: string | null
+  developerLogo: string | null
+  /** Background baked into the logo, detected at upload (developers.logo_bg). */
+  developerLogoBg: string | null
   status: string | null
 }
 
@@ -52,6 +55,8 @@ type Layer = {
 /** Clusters stay clustered up to here, so points on one spot never split; the map itself stops at MAP_MAX_ZOOM. */
 const CLUSTER_MAX_ZOOM = 21
 const MAP_MAX_ZOOM = 18
+/** Where "Show on map" lands: close enough to read the community. */
+const PROJECT_ZOOM = 15
 const BATCH = 20
 const UAE = { lat: 24.9, lng: 55.2 }
 
@@ -288,6 +293,63 @@ export function ProjectsMap({
   const projectsRef = useRef(projects)
   const reclusterRef = useRef<() => void>(() => {})
 
+  const mapBoxRef = useRef<HTMLDivElement>(null)
+  const glideToken = useRef(0)
+
+  /**
+   * Fly the camera to a point like Bayut does: out until the target is on
+   * screen (so the pan can glide instead of jump), across, then in one level
+   * at a time — each step is Google's own animated zoom. A newer glide, or
+   * the user grabbing the map, cancels the one in flight.
+   */
+  const glideTo = useCallback(async (target: { lat: number; lng: number }, zoomTo: number) => {
+    const map = mapRef.current
+    if (!map) return false
+    const token = ++glideToken.current
+    const alive = () => token === glideToken.current && mapRef.current === map
+    const settle = () =>
+      new Promise<void>((resolve) => {
+        const l = google.maps.event.addListenerOnce(map, "idle", () => resolve())
+        window.setTimeout(() => {
+          l.remove()
+          resolve()
+        }, 650)
+      })
+    const pt = new google.maps.LatLng(target.lat, target.lng)
+    for (let n = 0; n < 8 && alive(); n++) {
+      if (map.getBounds()?.contains(pt) || (map.getZoom() ?? 8) <= 7) break
+      map.setZoom((map.getZoom() ?? 8) - 1)
+      await settle()
+    }
+    if (!alive()) return false
+    map.panTo(pt)
+    await settle()
+    for (let n = 0; n < 14 && alive(); n++) {
+      const z = map.getZoom() ?? 8
+      if (z >= zoomTo) break
+      map.setZoom(z + 1)
+      await settle()
+    }
+    return alive()
+  }, [])
+
+  /** From the list: bring the map into view on a phone, fly to the project, open its card. */
+  const showOnMap = useCallback(
+    async (i: number) => {
+      const p = projectsRef.current[i]
+      if (!p || !mapRef.current) return
+      if (window.innerWidth < 1024) {
+        mapBoxRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+        await new Promise((r) => window.setTimeout(r, 450))
+      }
+      setSelected(null)
+      setMoved(true)
+      const arrived = await glideTo({ lat: p.lat, lng: p.lng }, Math.max(PROJECT_ZOOM, Math.round(mapRef.current?.getZoom() ?? 0)))
+      if (arrived) setSelected(i)
+    },
+    [glideTo],
+  )
+
   // The Maps script is shared with /buy, /rent and /developers: next/script
   // dedupes by src, so when it's already loaded onLoad never fires again.
   useEffect(() => {
@@ -341,9 +403,8 @@ export function ProjectsMap({
           map.panTo({ lat: it.lat, lng: it.lng })
           return
         }
-        map.panTo({ lat: it.lat, lng: it.lng })
-        map.setZoom(Math.min(target, MAP_MAX_ZOOM))
         setMoved(true)
+        void glideTo({ lat: it.lat, lng: it.lng }, Math.min(target, MAP_MAX_ZOOM))
       },
       point: (i) => {
         const p = projectsRef.current[i]
@@ -392,7 +453,10 @@ export function ProjectsMap({
 
     const listeners = [
       map.addListener("idle", recluster),
-      map.addListener("dragstart", () => setMoved(true)),
+      map.addListener("dragstart", () => {
+        glideToken.current++ // the user took over: stop any flight
+        setMoved(true)
+      }),
       map.addListener("click", () => setSelected(null)),
     ]
 
@@ -402,7 +466,7 @@ export function ProjectsMap({
       layerRef.current = null
       mapRef.current = null
     }
-  }, [ready])
+  }, [ready, glideTo])
 
   // New data (a filter changed, or the map just appeared): fresh markers,
   // cleared selection, and the view fitted to the results.
@@ -500,18 +564,24 @@ export function ProjectsMap({
               const p = projects[i]
               const on = hover === i || selected === i
               return (
-                <li key={p.id} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
-                  <article className={`pm-card group flex gap-3.5 border bg-white p-2.5 sm:gap-4 ${on ? "pm-card--on" : "border-[#e5e8ec]"}`}>
-                    <Link href={p.href} className="relative block h-[112px] w-[128px] shrink-0 overflow-hidden bg-[#eef1f5] sm:h-[124px] sm:w-[168px]">
+                <li
+                  key={p.id}
+                  className="pm-li"
+                  style={{ ["--n" as string]: Math.min(n, 8) }}
+                  onMouseEnter={() => setHover(i)}
+                  onMouseLeave={() => setHover(null)}
+                >
+                  <article className={`pm-card group relative flex gap-3.5 border bg-white p-2.5 sm:gap-4 ${on ? "pm-card--on" : "border-[#e5e8ec]"}`}>
+                    <Link href={p.href} className="relative block h-[128px] w-[124px] shrink-0 overflow-hidden bg-[#eef1f5] sm:h-[140px] sm:w-[176px]">
                       {p.image ? (
                         <Image
                           src={p.image}
                           alt={p.name}
                           fill
-                          sizes="168px"
+                          sizes="176px"
                           loading={n < 3 ? "eager" : "lazy"}
                           fetchPriority={n < 2 ? "high" : "auto"}
-                          className="object-cover transition-transform duration-500 group-hover:scale-[1.06]"
+                          className="object-cover transition-transform duration-700 group-hover:scale-[1.06]"
                         />
                       ) : (
                         <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold uppercase tracking-[0.14em] text-[#9ca3af]">No image</span>
@@ -521,16 +591,27 @@ export function ProjectsMap({
                       )}
                     </Link>
                     <div className="flex min-w-0 flex-1 flex-col py-0.5">
-                      <h3 className="line-clamp-1 font-['Outfit'] text-[16px] font-bold leading-snug text-[#0d1117] sm:text-[17px]">
-                        <Link href={p.href} className="hover:text-[#8a6d2b]">{p.name}</Link>
-                      </h3>
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="line-clamp-1 font-['Outfit'] text-[16px] font-bold leading-snug text-[#0d1117] sm:text-[17px]">
+                          <Link href={p.href} className="transition-colors hover:text-[#8a6d2b]">{p.name}</Link>
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => void showOnMap(i)}
+                          className="pm-show"
+                          aria-label={`Show ${p.name} on the map`}
+                          title="Show on map"
+                        >
+                          <Crosshair className="h-4 w-4" />
+                        </button>
+                      </div>
                       {p.area && (
                         <p className="mt-0.5 flex items-center gap-1 text-[12.5px] text-[#6b7280]">
                           <MapPin className="h-3.5 w-3.5 shrink-0 text-[#b8913f]" />
                           <span className="truncate">{p.area}</span>
                         </p>
                       )}
-                      <div className="mt-auto grid grid-cols-2 gap-px bg-[#e8eaed]">
+                      <div className="mt-2 grid grid-cols-2 gap-px bg-[#e8eaed]">
                         <div className="bg-[#f6f7f9] px-2.5 py-1.5">
                           <p className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-[#9ca3af]">From</p>
                           <p className="truncate font-['Outfit'] text-[14px] font-bold text-[#0d1117]">{p.price ?? "On request"}</p>
@@ -540,7 +621,30 @@ export function ProjectsMap({
                           <p className="truncate font-['Outfit'] text-[14px] font-bold text-[#0d1117]">{p.handover ?? "—"}</p>
                         </div>
                       </div>
-                      {p.developer && <p className="mt-1.5 truncate text-[11.5px] font-semibold text-[#8a6d2b]">{p.developer}</p>}
+                      {p.developer && (
+                        <div className="mt-auto flex items-center gap-2 pt-2">
+                          <span
+                            className="flex h-8 min-w-[44px] max-w-[96px] shrink-0 items-center justify-center border border-[#eceef1] px-1.5"
+                            style={{ backgroundColor: p.developerLogoBg ?? "#ffffff" }}
+                          >
+                            {p.developerLogo ? (
+                              <Image
+                                src={p.developerLogo}
+                                // SVG bypasses the optimizer (which rejects it).
+                                unoptimized={p.developerLogo.toLowerCase().includes(".svg")}
+                                alt={`${p.developer} logo`}
+                                width={88}
+                                height={26}
+                                className="h-[22px] w-auto max-w-[84px] object-contain"
+                                style={{ width: "auto" }}
+                              />
+                            ) : (
+                              <Building2 className="h-4 w-4 text-[#001f3f]/50" />
+                            )}
+                          </span>
+                          <span className="truncate text-[12px] font-semibold text-[#4b5563]">{p.developer}</span>
+                        </div>
+                      )}
                     </div>
                   </article>
                 </li>
@@ -560,7 +664,10 @@ export function ProjectsMap({
       </section>
 
       {/* ── The map: pinned beside the list on wide screens ── */}
-      <div className="relative order-1 h-[62svh] min-h-[380px] bg-[#eef0f2] lg:sticky lg:top-[72px] lg:order-none lg:h-[calc(100dvh-72px)]">
+      <div
+        ref={mapBoxRef}
+        className="relative order-1 h-[62svh] min-h-[380px] scroll-mt-20 bg-[#eef0f2] lg:sticky lg:top-[72px] lg:order-none lg:h-[calc(100dvh-72px)]"
+      >
         {!apiKey.trim() || failed ? (
           <div className="flex h-full items-center justify-center p-8 text-center text-[14px] text-[#6b7280]">
             The map couldn&apos;t load right now. The list still shows every project.

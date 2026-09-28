@@ -1201,7 +1201,16 @@
 @keyframes pm-card-in { from { opacity: 0; translate: 0 10px; } to { opacity: 1; translate: 0 0; } }
 .pm-popup--row { left: 12px; right: 64px; top: 12px; bottom: auto; width: auto; transform: none; }
 
-.pm-card { transition: border-color 200ms, box-shadow 250ms var(--wf-ease); }
+.pm-card { transition: border-color 200ms, box-shadow 250ms var(--wf-ease), transform 250ms var(--wf-ease); }
+/* Cards that join the list as the map moves ease in; the ones that stay put don't re-run it. */
+.pm-li { animation: pm-li-in 380ms var(--wf-ease) both; animation-delay: calc(var(--n, 0) * 35ms); }
+@keyframes pm-li-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.pm-show {
+  display: flex; height: 32px; width: 32px; flex-shrink: 0; align-items: center; justify-content: center;
+  border: 1px solid #e5e8ec; color: #6b7280; background: #fff; transition: border-color 180ms, color 180ms, background-color 180ms;
+}
+.pm-show:hover { border-color: #0b2a4d; background: #0b2a4d; color: #d6b357; }
+.pm-card--on .pm-show { border-color: #d6b357; color: #8a6d2b; }
 .pm-card:hover, .pm-card--on { border-color: rgba(214, 179, 87, 0.8); box-shadow: 0 16px 36px -22px rgba(0, 31, 63, 0.5); }
 
 .pm-ctl {
@@ -1222,6 +1231,6 @@
 .pl-view--on { background: #0d1117; color: #fff; }
 .pl-view--on:hover { color: #fff; }
 @media (prefers-reduced-motion: reduce) {
-  .pm-cl, .pm-pin, .pm-popup { animation: none; }
+  .pm-cl, .pm-pin, .pm-popup, .pm-li { animation: none; }
   .pm-skeleton { animation: none; }
 }

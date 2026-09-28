@@ -166,7 +166,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
           .range(from, from + PAGE_SIZE - 1)
       : Promise.resolve({ data: [] as unknown[], count: 0, error: null }),
     view === "map"
-      ? filtered("id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, currency, status, latitude, longitude, developers(name, slug)")
+      ? filtered("id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, currency, status, latitude, longitude, developers(name, slug, logo_url, logo_bg)")
           .order("is_featured", { ascending: false })
           .order("created_at", { ascending: false })
           .limit(1000)
@@ -366,7 +366,7 @@ type MapRow = {
   status: string | null
   latitude: number | string | null
   longitude: number | string | null
-  developers: { name: string; slug: string | null } | null
+  developers: { name: string; slug: string | null; logo_url: string | null; logo_bg: string | null } | null
 }
 
 /** A map pin for a project, or null without usable coordinates (anything outside the UAE is a data slip, not a pin). */
@@ -389,6 +389,8 @@ function toMapProject(p: MapRow): MapProject | null {
     handover: p.delivery_quarter?.trim() || null,
     area,
     developer: dev?.name ?? null,
+    developerLogo: dev?.logo_url?.trim() || null,
+    developerLogoBg: dev?.logo_bg?.trim() || null,
     status: p.status,
   }
 }
