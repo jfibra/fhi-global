@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { ArrowDown, ArrowUp, ArrowUpDown, BarChart3, CalendarRange, ChevronLeft, ChevronRight, Loader2, RefreshCw, Search, X } from "lucide-react"
 import { FilterSelect, type FilterSelectOption } from "@/components/ui/filter-select"
-import { MarketCharts, RefreshButton } from "./market-charts"
+import { MarketCharts, RefreshButton, TabSummary } from "./market-charts"
 import { cacheDelete, cacheGet, cacheSet } from "./client-cache"
 import {
   DLD_DATASETS,
@@ -428,6 +428,9 @@ function DatasetPanel({
           )}
         </div>
       </form>
+
+      {/* Fast summary for the applied filters — exact counts, no full pull. */}
+      <TabSummary dataset={dataset} applied={applied} ready={!awaitingRequired} />
 
       {/* Results */}
       <div className="bg-white rounded-2xl border border-[#e8eaed] overflow-hidden">

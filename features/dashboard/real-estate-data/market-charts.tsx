@@ -27,14 +27,16 @@ import {
   YAxis,
 } from "recharts"
 import { FilterSelect } from "@/components/ui/filter-select"
-import { agoLabel, cacheGet, cacheSet } from "./client-cache"
+import { agoLabel, cacheDelete, cacheGet, cacheSet } from "./client-cache"
 import {
   DLD_CHART_BATCH_CHUNKS,
   DLD_CHART_FIRST_BATCH_CHUNKS,
   DLD_CHART_LATEST_N,
   DLD_CHART_SPECS,
   DLD_CHART_TOP_N,
+  DLD_CHUNK_SECONDS_ESTIMATE,
   DLD_DATASETS,
+  DLD_SUMMARY_AUTO_EXACT_MAX,
   SQFT_PER_SQM,
   isoToDldDate,
   missingRequired,
@@ -47,6 +49,7 @@ import {
   type DldPriceIndexResponse,
   type DldPriceIndexSeries,
   type DldRow,
+  type DldSummaryResponse,
 } from "@/lib/dld-open-data"
 
 // Validated categorical slots (dataviz reference palette, light mode).
@@ -406,7 +409,10 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "up
 
 // ─── 2. Dataset breakdowns ───────────────────────────────────────────────────
 
-const CHARTABLE = (Object.keys(DLD_CHART_SPECS) as DldCommand[]).map((c) => ({ value: c, label: DLD_DATASETS[c].label }))
+// The Breakdowns form only exposes date fields, so it lists the date-filtered datasets.
+const CHARTABLE = (Object.keys(DLD_CHART_SPECS) as DldCommand[])
+  .filter((c) => DLD_DATASETS[c].filters.some((f) => f.kind === "date" && f.required))
+  .map((c) => ({ value: c, label: DLD_DATASETS[c].label }))
 
 type Tally = Record<string, { count: number; value: number }>
 
@@ -435,23 +441,37 @@ const addTo = (m: Tally, label: string, b: { count: number; value: number }) => 
   m[label] = { count: cur.count + b.count, value: cur.value + b.value }
 }
 
+/**
+ * Pure: returns a new Accum and never touches `acc`. It runs inside a state
+ * updater, which React (in development) invokes twice with the same input to
+ * catch exactly this — an in-place merge would count every batch two times.
+ */
 function mergeBatch(acc: Accum | null, res: DldBreakdownResponse): Accum {
-  const next: Accum = acc ?? {
-    command: res.command,
-    daily: {},
-    breakdowns: {},
-    top: {},
-    count: 0,
-    value: 0,
-    available: res.coverage.available,
-    chunkTo: 0,
-    done: false,
-    from: null,
-    to: null,
-    cacheHits: 0,
-    kpi: null,
-    latest: [],
-  }
+  const next: Accum = acc
+    ? {
+        ...acc,
+        daily: { ...acc.daily },
+        breakdowns: Object.fromEntries(Object.entries(acc.breakdowns).map(([k, m]) => [k, { ...m }])),
+        top: { ...acc.top },
+        kpi: acc.kpi ? { ...acc.kpi, locations: { ...acc.kpi.locations } } : null,
+        latest: [...acc.latest],
+      }
+    : {
+        command: res.command,
+        daily: {},
+        breakdowns: {},
+        top: {},
+        count: 0,
+        value: 0,
+        available: res.coverage.available,
+        chunkTo: 0,
+        done: false,
+        from: null,
+        to: null,
+        cacheHits: 0,
+        kpi: null,
+        latest: [],
+      }
   for (const d of res.daily) addTo(next.daily, d.date, d)
   for (const [k, buckets] of Object.entries(res.breakdowns)) {
     next.breakdowns[k] ??= {}
@@ -468,12 +488,14 @@ function mergeBatch(acc: Accum | null, res: DldBreakdownResponse): Accum {
   if (res.coverage.to && (!next.to || res.coverage.to > next.to)) next.to = res.coverage.to
   if (res.kpi) {
     const k = next.kpi ?? { count: 0, valueSum: 0, valueWithAreaSum: 0, areaSqmSum: 0, locations: {} }
-    k.count += res.kpi.count
-    k.valueSum += res.kpi.valueSum
-    k.valueWithAreaSum += res.kpi.valueWithAreaSum
-    k.areaSqmSum += res.kpi.areaSqmSum
     for (const b of res.kpi.locations) addTo(k.locations, b.label, b)
-    next.kpi = k
+    next.kpi = {
+      ...k,
+      count: k.count + res.kpi.count,
+      valueSum: k.valueSum + res.kpi.valueSum,
+      valueWithAreaSum: k.valueWithAreaSum + res.kpi.valueWithAreaSum,
+      areaSqmSum: k.areaSqmSum + res.kpi.areaSqmSum,
+    }
   }
   if (res.latest?.length) {
     // Batches arrive in date order, so the new batch's rows are the newest.
@@ -990,10 +1012,12 @@ function BreakdownSection() {
           </CoverageLine>
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            <ChartCard title="Rows per day" subtitle={`Count of ${appliedDataset.label.toLowerCase()} by ${colLabel(appliedSpec.dateKey).toLowerCase()}`} table={{ head: ["Day", "Rows"], rows: daily.map((d) => [longDate(d.date), d.count]) }}>
-              {!acc ? <Skeleton /> : <DailyChart data={daily} dataKey="count" color={C.blue} format={(v) => int.format(v)} label="Rows" />}
-            </ChartCard>
-            {appliedSpec.valueKey && (
+            {appliedSpec.dateKey && (
+              <ChartCard title="Rows per day" subtitle={`Count of ${appliedDataset.label.toLowerCase()} by ${colLabel(appliedSpec.dateKey).toLowerCase()}`} table={{ head: ["Day", "Rows"], rows: daily.map((d) => [longDate(d.date), d.count]) }}>
+                {!acc ? <Skeleton /> : <DailyChart data={daily} dataKey="count" color={C.blue} format={(v) => int.format(v)} label="Rows" />}
+              </ChartCard>
+            )}
+            {appliedSpec.dateKey && appliedSpec.valueKey && (
               <ChartCard title={`${appliedSpec.valueLabel?.replace(" (AED)", "")} per day`} subtitle="Sum in AED" table={{ head: ["Day", "AED"], rows: daily.map((d) => [longDate(d.date), int.format(d.value)]) }}>
                 {!acc ? <Skeleton /> : <DailyChart data={daily} dataKey="value" color={C.aqua} format={(v) => `AED ${compact.format(v)}`} label={appliedSpec.valueLabel ?? "Value"} />}
               </ChartCard>
@@ -1019,18 +1043,20 @@ function DailyChart({
   color,
   format,
   label,
+  height = 240,
 }: {
   data: DldBreakdownResponse["daily"]
   dataKey: "count" | "value"
   color: string
   format: (v: number) => string
   label: string
+  height?: number
 }) {
-  if (data.length === 0) return <Empty />
+  if (data.length === 0) return <Empty height={height} />
   // A handful of days reads better as bars; a long run as a line.
   const asLine = data.length > 31
   return (
-    <ResponsiveContainer width="100%" height={240}>
+    <ResponsiveContainer width="100%" height={height}>
       {asLine ? (
         <LineChart data={data} margin={{ top: 12, right: 12, bottom: 0, left: -8 }}>
           <CartesianGrid vertical={false} stroke={C.grid} />
@@ -1052,9 +1078,9 @@ function DailyChart({
   )
 }
 
-function RankChart({ buckets, hasValue }: { buckets: DldChartBucket[]; hasValue: boolean }) {
+function RankChart({ buckets, hasValue, rowHeight = 30 }: { buckets: DldChartBucket[]; hasValue: boolean; rowHeight?: number }) {
   if (buckets.length === 0) return <Empty />
-  const h = Math.max(200, buckets.length * 30)
+  const h = Math.max(160, buckets.length * rowHeight)
   return (
     <ResponsiveContainer width="100%" height={h}>
       <BarChart data={buckets} layout="vertical" margin={{ top: 4, right: 48, bottom: 4, left: 8 }} barCategoryGap="30%">
@@ -1105,6 +1131,226 @@ function ShareBars({ buckets, total }: { buckets: DldChartBucket[]; total: numbe
   )
 }
 
-function Empty() {
-  return <div className="h-[200px] flex items-center justify-center text-sm text-[#9ca3af]">No rows in this range.</div>
+function Empty({ height = 200 }: { height?: number }) {
+  return (
+    <div className="flex items-center justify-center text-sm text-[#9ca3af]" style={{ height }}>
+      No rows for these filters.
+    </div>
+  )
+}
+
+// ─── Per-tab summary strip ───────────────────────────────────────────────────
+
+/**
+ * The fast summary above each dataset table: exact total and category counts
+ * from the gateway's own totals, plus headline figures from the newest 1,000
+ * rows. One request, a few seconds cold, instant from the client cache.
+ */
+export function TabSummary({
+  dataset,
+  applied,
+  ready,
+}: {
+  dataset: DldDataset
+  applied: Record<string, string>
+  /** False while the tab is waiting for its required filters. */
+  ready: boolean
+}) {
+  const spec = DLD_CHART_SPECS[dataset.command]
+  const key = `summary:${dataset.command}:${JSON.stringify(applied)}`
+  const [attempt, setAttempt] = useState(0)
+  const [fetched, setFetched] = useState<{ key: string; attempt: number; res: DldSummaryResponse | null; error: string | null; at: number } | null>(null)
+
+  // `attempt` is deliberate: Refresh deletes the cached copy first and this must re-read (and miss).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const cached = useMemo(() => cacheGet<DldSummaryResponse>(key), [key, attempt])
+  const shown = fetched && fetched.key === key && fetched.attempt === attempt ? fetched : cached ? { res: cached.data, error: null, at: cached.at } : null
+
+  useEffect(() => {
+    if (!ready || shown) return
+    let cancelled = false
+    void (async () => {
+      const body: Record<string, string> = { kind: "summary", command: dataset.command, refresh: attempt > 0 ? "1" : "" }
+      for (const f of dataset.filters) body[f.param] = f.kind === "date" ? isoToDldDate(applied[f.param] ?? "") : (applied[f.param] ?? "")
+      let res: DldSummaryResponse | null = null
+      let error: string | null = null
+      try {
+        const r = await fetch("/api/admin/dld/charts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+        const json = (await r.json()) as DldSummaryResponse & { error?: string }
+        if (r.ok) res = json
+        else error = json.error || "Request failed."
+      } catch {
+        error = "Could not load the summary."
+      }
+      if (cancelled) return
+      const at = res ? cacheSet(key, res).at : Date.now()
+      setFetched({ key, attempt, res, error, at })
+    })()
+    return () => {
+      cancelled = true
+    }
+    // key encodes dataset + applied; `shown` gates on cache.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, attempt, ready, !!shown])
+
+  const loading = ready && !shown
+  const res = shown?.res ?? null
+  const colLabel = (k: string) => dataset.columns.find((c) => c.key === k)?.label ?? k
+  const valueName = spec.valueLabel?.replace(" (AED)", "").replace(" (sqm)", "") ?? "Value"
+  const valueUnit = spec.valueLabel?.includes("(sqm)") ? " sqm" : spec.valueLabel?.includes("(AED)") ? " AED" : ""
+
+  // Exact figures: the same batched pull Market Charts does, in the background.
+  // Starts by itself for result sets up to DLD_SUMMARY_AUTO_EXACT_MAX rows;
+  // larger ones wait for the button (which states the estimated time).
+  const autoExact = !!res && res.total > 0 && res.total <= DLD_SUMMARY_AUTO_EXACT_MAX
+  const [manualExact, setManualExact] = useState(false)
+  const wantExact = ready && !!res && (autoExact || manualExact) ? { command: dataset.command, values: applied } : null
+  const exact = useBatchJob(`summary:exact:${dataset.command}`, wantExact, true)
+  const acc = exact.acc
+  const exactDone = !!acc?.done
+  const exactMinutes = res ? Math.max(1, Math.round((Math.ceil(res.total / 1000) * DLD_CHUNK_SECONDS_ESTIMATE) / 60)) : 0
+
+  // What the headline tiles show: exact when the full pull finished, else the sample.
+  const exactAvg = acc && acc.count > 0 ? (acc.kpi ? (acc.kpi.count > 0 ? acc.kpi.valueSum / acc.kpi.count : null) : acc.value / acc.count) : null
+  const exactPerSqft = acc?.kpi && acc.kpi.areaSqmSum > 0 ? acc.kpi.valueWithAreaSum / (acc.kpi.areaSqmSum * SQFT_PER_SQM) : null
+  const exactTop = useMemo(() => (acc ? toBuckets(acc.top).slice(0, 5) : []), [acc])
+  const useExact = exactDone
+  const avg = useExact ? exactAvg : (res?.sample?.avgValue ?? null)
+  const perSqft = useExact ? exactPerSqft : (res?.sample?.perSqft ?? null)
+  const top = useExact ? exactTop : (res?.sample?.top ?? [])
+  const topTotal = useExact ? (acc?.count ?? 0) : (res?.sample?.rows ?? 0)
+  const mark = useExact ? "" : "◦ "
+
+  const refresh = () => {
+    cacheDelete(key)
+    setAttempt((a) => a + 1)
+    if (wantExact) exact.refresh()
+  }
+
+  if (!ready) return null
+
+  return (
+    <div className="bg-white rounded-2xl border border-[#e8eaed] p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-[15px] font-semibold text-[#0d1117]">Summary for these filters</h3>
+          <p className="text-xs text-[#6b7280] mt-0.5">
+            {res ? (
+              useExact ? (
+                <>All figures cover all {int.format(res.total)} rows in your filters.</>
+              ) : (
+                <>
+                  Total and split counts cover all {int.format(res.total)} rows in your filters.
+                  {res.sample && (
+                    <>
+                      {" "}
+                      Figures marked ◦ use only the newest {int.format(res.sample.rows)} of them
+                      {res.sample.from && res.sample.to
+                        ? res.sample.from === res.sample.to
+                          ? `, all from ${longDate(res.sample.from)}`
+                          : `, from ${longDate(res.sample.from)} to ${longDate(res.sample.to)}`
+                        : ""}
+                      .
+                    </>
+                  )}
+                </>
+              )
+            ) : (
+              "Total and split counts cover every row in your filters. Figures marked ◦ use only the newest rows."
+            )}
+          </p>
+          {res && res.total > 0 && !useExact && (
+            <p className="text-xs mt-1">
+              {wantExact ? (
+                exact.error ? (
+                  <span className="text-rose-700">
+                    Exact figures failed.{" "}
+                    <button type="button" onClick={exact.resume} className="font-semibold underline underline-offset-2">
+                      Retry
+                    </button>
+                  </span>
+                ) : exact.stopped ? (
+                  <span className="text-amber-700">
+                    Exact figures stopped at {int.format(acc?.count ?? 0)} rows.{" "}
+                    <button type="button" onClick={exact.resume} className="font-semibold underline underline-offset-2">
+                      Continue
+                    </button>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-[#374151]">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Working out exact figures in the background: {int.format(acc?.count ?? 0)} of {int.format(res.total)} rows
+                    {acc && acc.cacheHits > 0 && <span className="text-[#9ca3af]">· from cache</span>}
+                    <button type="button" onClick={exact.stop} className="ml-1 font-semibold underline underline-offset-2">
+                      Stop
+                    </button>
+                  </span>
+                )
+              ) : (
+                <span className="text-[#374151]">
+                  {int.format(res.total)} rows is a lot to pull for exact averages.{" "}
+                  <button type="button" onClick={() => setManualExact(true)} className="font-semibold text-[#001f3f] underline underline-offset-2">
+                    Compute exact figures anyway
+                  </button>{" "}
+                  <span className="text-[#9ca3af]">(about {exactMinutes} min the first time, seconds once cached)</span>
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+        <RefreshButton onClick={refresh} loading={loading} updatedAt={shown?.res ? shown.at : null} />
+      </div>
+
+      {shown?.error && <div className="mb-4"><ErrorBox message={shown.error} onRetry={refresh} /></div>}
+
+      {/* Tiles */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <MiniStat label="Total rows" value={res ? int.format(res.total) : null} />
+        {spec.valueKey && <MiniStat label={`${mark}Average ${spec.kpi ? "sale price" : valueName.toLowerCase()}`} value={res ? (avg != null ? `${int.format(Math.round(avg))}${valueUnit}` : "—") : null} />}
+        {spec.kpi && <MiniStat label={`${mark}Sale price per sqft`} value={res ? (perSqft != null ? `${int.format(Math.round(perSqft))} AED` : "—") : null} />}
+        <MiniStat label={`${mark}Busiest ${colLabel(spec.topKey).toLowerCase()}`} value={res ? (top[0] ? top[0].label : "—") : null} hint={top[0] ? `${int.format(top[0].count)} of ${int.format(topTotal)}` : undefined} />
+      </div>
+
+      {/* Exact splits + sample top-5 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-5">
+        {(res?.splits ?? (loading ? Array.from({ length: 3 }, () => null) : [])).map((sp, i) =>
+          sp ? (
+            <div key={sp.param}>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-[#6b7280] mb-2">By {sp.label.replace(/\?$/, "").toLowerCase()}</h4>
+              <ShareBars buckets={sp.buckets} total={res?.total ?? 0} />
+            </div>
+          ) : (
+            <Skeleton key={i} h={110} />
+          ),
+        )}
+        {res && top.length > 0 && (
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-[#6b7280] mb-2">
+              {mark}Top {colLabel(spec.topKey).toLowerCase()}{useExact ? "" : " in the newest rows"}
+            </h4>
+            <ShareBars buckets={top} total={topTotal} />
+          </div>
+        )}
+        {res && res.splits.length === 0 && !res.sample && <p className="text-sm text-[#9ca3af]">Nothing to summarise for these filters.</p>}
+      </div>
+    </div>
+  )
+}
+
+function MiniStat({ label, value, hint }: { label: string; value: string | null; hint?: string }) {
+  return (
+    <div className="rounded-xl bg-[#f8fafc] border border-[#f0f2f5] px-4 py-3">
+      <div className="text-[11px] uppercase tracking-wide text-[#6b7280] truncate" title={label}>
+        {label}
+      </div>
+      {value === null ? (
+        <div className="mt-1.5 h-6 w-24 rounded bg-[#eef1f5] animate-pulse" />
+      ) : (
+        <div className="mt-1 text-lg font-bold tabular-nums text-[#0d1117] truncate" title={value}>
+          {value}
+        </div>
+      )}
+      {hint && <div className="text-[11px] text-[#9ca3af]">{hint}</div>}
+    </div>
+  )
 }

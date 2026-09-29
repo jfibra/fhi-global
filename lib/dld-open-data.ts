@@ -724,10 +724,10 @@ export interface DldPriceIndexResponse {
  */
 export interface DldChartSpec {
   command: DldCommand
-  /** Row field holding the date the daily series buckets on. */
-  dateKey: string
-  /** Sort key the gateway accepts for that date (`{key}_ASC`). */
-  dateSort: string
+  /** Row field holding the date the daily series buckets on. Absent → no daily chart. */
+  dateKey?: string
+  /** Sort key the gateway accepts for that date (`{key}_ASC`); absent → the dataset's default sort. */
+  dateSort?: string
   /** Row field summed per day / per category (AED). Absent → counts only. */
   valueKey?: string
   valueLabel?: string
@@ -752,7 +752,7 @@ export interface DldChartSpec {
   }
 }
 
-export const DLD_CHART_SPECS: Partial<Record<DldCommand, DldChartSpec>> = {
+export const DLD_CHART_SPECS: Record<DldCommand, DldChartSpec> = {
   transactions: {
     command: "transactions",
     dateKey: "INSTANCE_DATE",
@@ -808,6 +808,42 @@ export const DLD_CHART_SPECS: Partial<Record<DldCommand, DldChartSpec>> = {
     breakdowns: ["PROPERTY_TYPE_EN", "PROP_SUB_TYPE_EN", "ROW_STATUS_CODE"],
     topKey: "AREA_EN",
   },
+  // The registry datasets have no date filter; their charts are splits only.
+  lands: {
+    command: "lands",
+    valueKey: "ACTUAL_AREA",
+    valueLabel: "Land size (sqm)",
+    breakdowns: ["LAND_TYPE_EN", "ZONE_EN", "IS_FREE_HOLD_EN", "IS_OFFPLAN_EN"],
+    topKey: "AREA_EN",
+  },
+  buildings: {
+    command: "buildings",
+    dateKey: "CREATION_DATE",
+    dateSort: "CREATION_DATE",
+    breakdowns: ["PROP_SUB_TYPE_EN", "ZONE_EN", "IS_FREE_HOLD_EN", "IS_OFFPLAN_EN"],
+    topKey: "AREA_EN",
+  },
+  units: {
+    command: "units",
+    dateKey: "CREATION_DATE",
+    dateSort: "CREATION_DATE",
+    breakdowns: ["PROP_SUB_TYPE_EN", "ZONE_EN", "IS_FREE_HOLD_EN", "IS_OFFPLAN_EN"],
+    topKey: "AREA_EN",
+  },
+  brokers: {
+    command: "brokers",
+    dateKey: "LICENSE_START_DATE",
+    dateSort: "LICENSE_START_DATE",
+    breakdowns: ["GENDER_EN"],
+    topKey: "REAL_ESTATE_EN",
+  },
+  developers: {
+    command: "developers",
+    dateKey: "REGISTRATION_DATE",
+    dateSort: "REGISTRATION_DATE",
+    breakdowns: ["LICENSE_SOURCE_EN", "LICENSE_TYPE_EN"],
+    topKey: "LEGAL_STATUS_EN",
+  },
 }
 
 /**
@@ -837,6 +873,46 @@ export interface DldChartDay {
   count: number
   value: number
 }
+
+/**
+ * The fast per-tab summary (`kind: "summary"` on the charts route).
+ *
+ * No full pull: `total` and every split count come from the gateway's own
+ * TOTAL on one-row requests (one per option of each select filter still set
+ * to "All"), run in parallel; the headline figures come from the newest
+ * DLD_SUMMARY_SAMPLE rows only, and say so.
+ */
+export interface DldSummaryResponse {
+  command: DldCommand
+  total: number
+  splits: Array<{ param: string; label: string; buckets: DldChartBucket[] }>
+  sample: {
+    rows: number
+    /** Column the sample is ordered by (newest first), or null for registry sets. */
+    dateKey: string | null
+    from: string | null
+    to: string | null
+    /** Average of the spec's value field over the sample, when it has one. */
+    avgValue: number | null
+    /** Transactions only: AED per sqft over the sample's sales. */
+    perSqft: number | null
+    /** Top entries of the spec's `topKey` within the sample. */
+    top: DldChartBucket[]
+  } | null
+  cacheHits: number
+  cacheMisses: number
+}
+
+/** Rows the summary's headline figures are computed from (one gateway page). */
+export const DLD_SUMMARY_SAMPLE = 1000
+/**
+ * Up to this many rows the summary completes its exact figures on its own
+ * (≈30 gateway calls cold, about a minute; seconds from cache). Above it,
+ * the user starts the full pull deliberately.
+ */
+export const DLD_SUMMARY_AUTO_EXACT_MAX = 30_000
+/** Rough cold cost per 1,000-row chunk with 4 in flight — for the estimate. */
+export const DLD_CHUNK_SECONDS_ESTIMATE = 1.2
 
 /** Mergeable sums behind the headline tiles (all rows matching `kpi.filter`). */
 export interface DldKpiSums {
