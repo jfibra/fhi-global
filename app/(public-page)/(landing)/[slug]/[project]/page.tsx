@@ -134,6 +134,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     imageUrl: ogImage || data.main_image,
+    // The card's size, so Facebook draws it on the FIRST share of a link
+    // (without it the crawler fetches the image afterwards and the first
+    // post goes out with no picture).
+    imageWidth: 1200,
+    imageHeight: 630,
     pathname: `/${devSlug}/${slug}`,
     keywords,
     openGraphTitle: data.name,
