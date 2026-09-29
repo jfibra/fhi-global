@@ -11,6 +11,7 @@ import {
   type NewsArticle,
 } from "@/lib/news-service"
 import { NewsletterSignup } from "@/components/news/newsletter-signup"
+import { NewsTicker } from "@/components/public/news-ticker"
 import { ArrowRight, Clock, TrendingUp } from "lucide-react"
 
 export const revalidate = 300
@@ -278,27 +279,10 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
       </section>
 
       {/* ── LIVE STRIP ────────────────────────────────────────────────────
-          One headline, not a marquee of six — the mockup leads with the most
-          recent story and sends the rest to the list below. */}
-      {latest && (
-        <div className="bg-white border-b border-[#e8eaed]">
-          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-4">
-            <span className="shrink-0 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#c0392b]">
-              <span className="w-2 h-2 rounded-full bg-[#c0392b]" aria-hidden="true" />
-              Live
-            </span>
-            <Link
-              href={`/news/${latest.slug}`}
-              className="min-w-0 flex-1 truncate text-sm text-[#0d1117] hover:text-[#b8913f] transition-colors"
-            >
-              {latest.title}
-            </Link>
-            {latest.date && (
-              <span className="hidden sm:block shrink-0 text-xs text-[#9ca3af]">{fmt(latest.date)}</span>
-            )}
-          </div>
-        </div>
-      )}
+          The six newest headlines, one at a time, changing every few seconds
+          (the boss: the headline should change). The first is in the server
+          HTML; the rest slide in on the client — see NewsTicker. */}
+      {latest && <NewsTicker items={all.slice(0, 6).map((a) => ({ slug: a.slug, title: a.title, date: a.date }))} />}
 
       {/* ── CATEGORY TABS ─────────────────────────────────────────────────
           Underlined tabs rather than bordered chips. Same links, same
