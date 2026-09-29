@@ -82,6 +82,7 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   // artwork or training library.
   materials: [...ROLES_INTERNAL_RESOURCES],
   ebooks: [...ROLES_INTERNAL_RESOURCES],
+  videos: [...ROLES_INTERNAL_RESOURCES],
   // Keep in sync with INVITE_GRANTABLE_ROLES in app-roles.ts, which decides what
   // each of these ranks may then set on a recruit. Members are deliberately
   // excluded — they don't recruit.

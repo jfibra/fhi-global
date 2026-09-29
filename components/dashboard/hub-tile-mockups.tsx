@@ -437,6 +437,29 @@ const MOCKUPS: Record<string, React.ReactNode> = {
       </span>
     </span>
   ),
+  // A widescreen frame: a gold play button over a skyline, a progress bar.
+  videos: (
+    <span className="relative block h-[46px] w-[70px]">
+      <span className="absolute left-2 top-1.5 h-10 w-[62px] rounded-[4px] bg-[#12365a] shadow-sm" />
+      <span className="relative flex h-10 w-[62px] flex-col overflow-hidden rounded-[4px] bg-[#001f3f] shadow-md">
+        <span className="relative flex-1">
+          <span className="absolute bottom-0 left-1.5 h-3 w-1.5 bg-[#1d4166]" />
+          <span className="absolute bottom-0 left-4 h-5 w-1.5 bg-[#163a5f]" />
+          <span className="absolute bottom-0 left-[26px] h-4 w-1.5 bg-[#1d4166]" />
+          <span className="absolute bottom-0 right-2 h-2.5 w-2 bg-[#163a5f]" />
+          <span className="absolute left-1/2 top-1/2 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#d6b357]">
+            <svg viewBox="0 0 6 6" className="ml-px h-2 w-2">
+              <path d="M1 0.5L5.5 3 1 5.5z" fill="#001f3f" />
+            </svg>
+          </span>
+        </span>
+        <span className="flex h-1.5 items-center gap-0.5 px-1">
+          <span className="h-[2px] w-5 rounded bg-[#d6b357]" />
+          <span className="h-[2px] flex-1 rounded bg-white/25" />
+        </span>
+      </span>
+    </span>
+  ),
   // A hardcover book with spine, gold title, and a bookmark ribbon.
   ebooks: (
     <span className="relative block h-[50px] w-[64px]">

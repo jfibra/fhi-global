@@ -5,7 +5,7 @@ import { ArrowRight, ArrowUpRight, Mail, MapPin, Phone, Play } from "lucide-reac
 import { createPageMetadata, absoluteUrl } from "@/lib/seo"
 import { JsonLd } from "@/components/json-ld"
 import { FilmLines, FilmTrigger, HeroLoop, ScreeningRoom, StoryRow, type Film, type FilmLine } from "@/components/public/film-player"
-import { AGENT_STORIES, FILM_BASE, LANDLORD_STORIES } from "@/lib/films"
+import { AGENT_STORIES, COMPANY_FILMS, FILM_BASE, LANDLORD_STORIES } from "@/lib/films"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { countByEmirate } from "@/lib/emirates"
@@ -36,26 +36,7 @@ const ALBUM_ID = "21d46277-db66-409b-8cce-32b159ab6214"
 // (1080p + 720p H.264, faststart) and served from our S3 with a one-year
 // cache; the names carry a version so a re-edit can never show a stale copy.
 // The Arabic AVP is deliberately not on the site.
-const FILMS = {
-  avp: {
-    id: "fhi-global-avp",
-    title: "FHI Global — the film",
-    duration: "3:12",
-    poster: `${FILM_BASE}/fhi-global-avp-poster-v1.jpg`,
-    hd: `${FILM_BASE}/fhi-global-avp-1080-v1.mp4`,
-    sd: `${FILM_BASE}/fhi-global-avp-720-v1.mp4`,
-    ratio: 16 / 9,
-  },
-  event: {
-    id: "fhi-dubai-event",
-    title: "FHI Dubai Event",
-    duration: "2:14",
-    poster: `${FILM_BASE}/fhi-dubai-event-poster-v1.jpg`,
-    hd: `${FILM_BASE}/fhi-dubai-event-1080-v1.mp4`,
-    sd: `${FILM_BASE}/fhi-dubai-event-720-v1.mp4`,
-    ratio: 1920 / 816,
-  },
-} satisfies Record<string, Film>
+const FILMS = COMPANY_FILMS
 /** Lines spoken in the AVP, with the second each one starts (read off the film's own subtitles). */
 const FILM_LINES: FilmLine[] = [
   { at: 6.8, text: "To every Filipino watching this, I want you to remember this moment.", who: "Anthony Leuterio", role: "President and CEO" },

@@ -4,7 +4,7 @@ import {
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
-  Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library,
+  Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library, MonitorPlay,
   Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database,
 } from "lucide-react"
 import {
@@ -140,6 +140,8 @@ const MY_EMAILS: NavEntry = { icon: Mail, label: "Emails", to: "leads", requires
 const MATERIALS: NavEntry = { icon: FolderDown, label: "Materials", to: "materials" }
 // Training PDFs, also open to every role — likewise absent from SUB_PATH_ROLES.
 const EBOOKS: NavEntry = { icon: Library, label: "Ebooks", to: "ebooks" }
+// FHI's own films to watch and download (lib/films.ts), open to the same roles.
+const VIDEOS: NavEntry = { icon: MonitorPlay, label: "Videos", to: "videos" }
 // Owner document intake (NOC / Trakheesi) — sales pipeline + admin. Access is
 // gated by SUB_PATH_ROLES["owner-documents"] in lib/auth.ts.
 const OWNER_DOCUMENTS: NavEntry = { icon: FileSignature, label: "Owner Documents", to: "owner-documents" }
@@ -228,6 +230,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
     items: [
       { ...MATERIALS, description: "Branded marketing artwork to download and share.", mock: "materials" },
       { ...EBOOKS,    description: "Training guides and reference PDFs.", mock: "ebooks" },
+      { ...VIDEOS,    description: "FHI's films to watch, download and share.", mock: "videos" },
     ],
   },
   { icon: ScrollText, label: "Activity Logs", to: "system-logs" },
@@ -246,6 +249,7 @@ const EDITOR_NAV: RoleNavEntry[] = [
   PROJECTS,
   MATERIALS,
   EBOOKS,
+  VIDEOS,
 ]
 
 /** External developer partners — their own company and projects only. */
@@ -254,7 +258,7 @@ const DEVELOPER_NAV: RoleNavEntry[] = [
   { icon: Briefcase, label: "Company Info",  to: "company"  },
   { icon: Layers,    label: "My Projects",   to: "projects" },
   { icon: Images,    label: "Media / Files", to: "media"    },
-  // No MATERIALS / EBOOKS here: those are internal-only (see
+  // No MATERIALS / EBOOKS / VIDEOS here: those are internal-only (see
   // ROLES_INTERNAL_RESOURCES in app-roles.ts), and developers are external
   // partner accounts.
   SUPPORT_TICKETS,
@@ -311,6 +315,7 @@ const salesPipelineNav = ({ projects = false, teamSales = false, invite = true }
     items: [
       { ...MATERIALS, description: "Branded marketing artwork to download and share.", mock: "materials" },
       { ...EBOOKS,    description: "Training guides and reference PDFs.", mock: "ebooks" },
+      { ...VIDEOS,    description: "FHI's films to watch, download and share.", mock: "videos" },
     ],
   },
 ]
@@ -324,6 +329,7 @@ const SECRETARY_NAV: RoleNavEntry[] = [
   DIGITAL_CARD,
   MATERIALS,
   EBOOKS,
+  VIDEOS,
 ]
 
 /** Signed-up public users: browse, plus the self-serve tools. */
@@ -339,6 +345,7 @@ const MEMBER_NAV: RoleNavEntry[] = [
   PROJECTS,
   MATERIALS,
   EBOOKS,
+  VIDEOS,
   // No "Profile" entry — the account card's dropdown already links to
   // {base}/profile as "Profile Settings" (see SidebarAccount in shell.tsx).
   SUPPORT_TICKETS,

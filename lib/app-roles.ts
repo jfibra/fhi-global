@@ -258,7 +258,7 @@ export const ROLES_SUPPORT_INTERNAL_ASSIGNEES: readonly AppRoleId[] = ["admin", 
 export const ROLES_SUPPORT_PORTAL: readonly AppRoleId[] = [...APP_ROLE_ORDER]
 
 /**
- * Internal shared resources — Materials and Ebooks. Everyone except
+ * Internal shared resources — Materials, Ebooks and Videos. Everyone except
  * `developer`: those are external partner accounts, and this is our own
  * marketing artwork and training library. Derived rather than listed so a
  * future role is included by default and only developers stay out.
