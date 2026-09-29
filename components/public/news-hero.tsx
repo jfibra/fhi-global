@@ -61,8 +61,10 @@ export function NewsHero({ stories }: { stories: HeroStory[] }) {
       onFocus={() => setHeld(true)}
       onBlur={() => setHeld(false)}
     >
-      {/* The pictures: every story's photo is in place, only the current one shows. */}
-      <div className="absolute inset-y-0 right-0 w-full lg:w-[58%]" aria-hidden="true">
+      {/* The pictures: every story's photo is in place, only the current one
+          shows. Clipped, so the drift never pushes a photo past the gradient
+          into the white — that read as a hard line beside the picture. */}
+      <div className="absolute inset-y-0 right-0 w-full lg:w-[58%] overflow-hidden" aria-hidden="true">
         {n === 0 ? (
           <Image src="/background/dubai.webp" alt="" fill sizes="(max-width: 1024px) 100vw, 58vw" priority className="object-cover object-center" />
         ) : (
