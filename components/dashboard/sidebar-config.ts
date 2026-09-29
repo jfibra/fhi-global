@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library, MonitorPlay,
-  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database,
+  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -164,6 +164,8 @@ const ADMIN_NAV: RoleNavEntry[] = [
     items: [
       { icon: Users, label: "Account Directory", to: "users", description: "Every account, their role and status." },
       { ...INVITE,                                            description: "Invite links for onboarding new accounts." },
+      // Who is waiting for approval, who recruits most, and each recruiter's downline.
+      { icon: UserPlus, label: "Recruitment", to: "recruitment", description: "Accounts waiting for approval, top recruiters and their downlines." },
     ],
   },
   { icon: Network, label: "Teams", to: "teams" },

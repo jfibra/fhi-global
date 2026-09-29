@@ -172,6 +172,7 @@ async function loadAdminDashboard(roleValue: string, userId: string) {
 
   const [
     profilesCountRes,
+    pendingAccountsRes,
     developersCountRes,
     totalProjectsRes,
     publishedProjectsRes,
@@ -196,6 +197,8 @@ async function loadAdminDashboard(roleValue: string, userId: string) {
     clientsThisMonthRes,
   ] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_deleted", false),
+    // Accounts still waiting for approval — the Recruitment page lists them.
+    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_deleted", false).eq("status", "pending"),
     supabase.from("developers").select("id", { count: "exact", head: true }).eq("is_active", true).is("deleted_at", null),
     supabase.from("projects").select("id", { count: "exact", head: true }).is("deleted_at", null),
     supabase.from("projects").select("id", { count: "exact", head: true }).eq("is_published", true).is("deleted_at", null),
@@ -274,6 +277,7 @@ async function loadAdminDashboard(roleValue: string, userId: string) {
   const totalPurchases   = safeCount(purchasesCountRes)
   const openTickets      = safeCount(openTicketsRes)
   const activeTeams      = safeCount(activeTeamsRes)
+  const pendingAccounts  = safeCount(pendingAccountsRes)
   const pendingValidations = safeCount(pendingValidationRes)
   const pendingCommissions = safeCount(pendingCommissionRes)
 
@@ -393,6 +397,7 @@ async function loadAdminDashboard(roleValue: string, userId: string) {
   ]
 
   const opsCards = [
+    { label: "Waiting for Approval",  value: fmtNumber(pendingAccounts),    detail: "New accounts to activate — see Recruitment" },
     { label: "Pending Validations",  value: fmtNumber(pendingValidations), detail: "Needs admin review"  },
     { label: "Pending Commissions",  value: fmtNumber(pendingCommissions), detail: "Awaiting payout"     },
     { label: "Active Teams",         value: fmtNumber(activeTeams),        detail: "Currently active"    },
