@@ -114,8 +114,11 @@ export const EMPTY_CONTACT: Contact = { name: "", whatsappCode: "+971", whatsapp
 export function checkContact(c: Contact): Record<string, string> {
   const e: Record<string, string> = {}
   if (!c.name.trim()) e.name = "Please enter your name."
-  if (!/^[0-9 ()-]{4,20}$/.test(c.whatsapp.trim())) e.whatsapp = "Please enter a valid WhatsApp number."
-  if (c.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email.trim())) e.email = "Please enter a valid email."
+  if (!/^[0-9 ()-]{4,20}$/.test(c.whatsapp.trim())) e.whatsapp = "Please enter a valid WhatsApp or Viber number."
+  // Email is required (2026-09-29): the agent needs a second channel that
+  // works even when the number turns out to be wrong.
+  if (!c.email.trim()) e.email = "Please enter your email."
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email.trim())) e.email = "Please enter a valid email."
   return e
 }
 
@@ -136,12 +139,12 @@ export function ContactFields({
         <FieldError>{errors.name}</FieldError>
       </div>
       <div className="sm:col-span-2">
-        <label htmlFor="bq-wa" className={briefLabelCls}>WhatsApp number <span className="text-[#b8913f]">*</span></label>
+        <label htmlFor="bq-wa" className={briefLabelCls}>WhatsApp / Viber number <span className="text-[#b8913f]">*</span></label>
         <div className="flex gap-2">
           <PhoneCountrySelect
             value={value.whatsappCode}
             onChange={(v) => onChange({ whatsappCode: v })}
-            ariaLabel="WhatsApp country code"
+            ariaLabel="WhatsApp / Viber country code"
             className="rounded-none border-[#e5e7eb] bg-[#f9fafb] px-3 py-3 focus:ring-[#001f3f]/6"
           />
           <input
@@ -158,8 +161,8 @@ export function ContactFields({
         <FieldError>{errors.whatsapp}</FieldError>
       </div>
       <div>
-        <label htmlFor="bq-email" className={briefLabelCls}>Email <Optional /></label>
-        <input id="bq-email" type="email" value={value.email} onChange={(e) => onChange({ email: e.target.value })} maxLength={320} autoComplete="email" className={briefInputCls} />
+        <label htmlFor="bq-email" className={briefLabelCls}>Email <span className="text-[#b8913f]">*</span></label>
+        <input id="bq-email" type="email" value={value.email} onChange={(e) => onChange({ email: e.target.value })} maxLength={320} autoComplete="email" required className={briefInputCls} />
         <FieldError>{errors.email}</FieldError>
       </div>
       <div>

@@ -33,7 +33,8 @@ const LeadSchema = z.object({
   name: z.string().trim().min(1, "Please enter your name.").max(200),
   whatsappCode: z.string().refine((v) => DIAL_CODES.has(v), "Pick a valid country code."),
   whatsapp: z.string().trim().regex(/^[0-9 ()-]{4,20}$/, "Please enter a valid WhatsApp number."),
-  email: z.string().trim().max(320).optional().default("").refine((v) => !v || EMAIL_RE.test(v), "Please enter a valid email."),
+  // Required since 2026-09-29 (a second channel besides the number).
+  email: z.string().trim().min(1, "Please enter your email.").max(320).refine((v) => EMAIL_RE.test(v), "Please enter a valid email."),
   // Buyers only; a seller's price is in their profile.
   budget: z.string().optional().default(""),
   contactTime: z.string().optional().default("").refine((v) => !v || CONTACT_TIMES.has(v), "Pick a time from the list."),

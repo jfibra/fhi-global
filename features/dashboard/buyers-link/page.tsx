@@ -45,7 +45,7 @@ const txt = (l: BuyerLead, k: string): string => {
 const rowOf = (label: string, value: string | null | undefined): Row | null => (value ? { label, value } : null)
 const rows = (list: (Row | null)[]) => list.filter((r): r is Row => r !== null)
 const contactRows = (l: BuyerLead) => [
-  rowOf("WhatsApp", `${l.whatsapp_code} ${l.whatsapp}`),
+  rowOf("WhatsApp / Viber", `${l.whatsapp_code} ${l.whatsapp}`),
   rowOf("Email", l.email),
   rowOf("Nationality", txt(l, "nationality")),
 ]
