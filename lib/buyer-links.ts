@@ -11,12 +11,31 @@ export type Choice = { value: string; label: string }
 const opts = (pairs: [string, string][]): Choice[] => pairs.map(([value, label]) => ({ value, label }))
 
 export const BUDGET_OPTIONS = opts([
-  ["under_1m", "Under AED 1M"],
-  ["1m_2m", "AED 1M – 2M"],
-  ["2m_5m", "AED 2M – 5M"],
+  ["under_500k", "Under AED 500K"],
+  ["500k_1m", "AED 500K – 1M"],
+  ["1m_1_5m", "AED 1M – 1.5M"],
+  ["1_5m_3m", "AED 1.5M – 3M"],
+  ["3m_5m", "AED 3M – 5M"],
   ["5m_10m", "AED 5M – 10M"],
   ["10m_plus", "AED 10M+"],
 ])
+
+/** The ranges briefs used before the low end was split (2026-09-29); old leads still read as sent. */
+const LEGACY_BUDGET_LABELS: Record<string, string> = { under_1m: "Under AED 1M", "1m_2m": "AED 1M – 2M", "2m_5m": "AED 2M – 5M" }
+
+/** The bottom of each range in AED, for the lead grade. */
+const BUDGET_FLOOR: Record<string, number> = {
+  under_500k: 0,
+  "500k_1m": 500_000,
+  "1m_1_5m": 1_000_000,
+  "1_5m_3m": 1_500_000,
+  "3m_5m": 3_000_000,
+  "5m_10m": 5_000_000,
+  "10m_plus": 10_000_000,
+  under_1m: 0,
+  "1m_2m": 1_000_000,
+  "2m_5m": 2_000_000,
+}
 
 export const CONTACT_TIME_OPTIONS = opts([
   ["morning", "Morning"],
@@ -25,7 +44,7 @@ export const CONTACT_TIME_OPTIONS = opts([
 ])
 
 export const budgetLabel = (value: string | null | undefined): string | null =>
-  BUDGET_OPTIONS.find((o) => o.value === value)?.label ?? null
+  BUDGET_OPTIONS.find((o) => o.value === value)?.label ?? LEGACY_BUDGET_LABELS[value ?? ""] ?? null
 export const contactTimeLabel = (value: string | null | undefined): string | null =>
   CONTACT_TIME_OPTIONS.find((o) => o.value === value)?.label ?? null
 
@@ -87,13 +106,32 @@ export const BUYER_QUESTIONS = {
     label: "Where do you live now?",
     short: "Lives",
     multi: false,
-    options: opts([["uae", "In the UAE"], ["abroad", "Outside the UAE"]]),
+    options: opts([["uae", "In the UAE"], ["ph", "In the Philippines"], ["abroad", "Somewhere else"]]),
+  },
+  contact_channel: {
+    label: "How should we reach you?",
+    short: "Reach by",
+    multi: false,
+    options: opts([["whatsapp", "WhatsApp"], ["viber", "Viber"], ["messenger", "Messenger"], ["call", "Phone call"], ["email", "Email"]]),
   },
   buying_for: {
     label: "Who are you buying for?",
     short: "Buying for",
     multi: false,
     options: opts([["myself", "Myself"], ["family", "My family"], ["investment", "As an investment"], ["company", "A company"]]),
+  },
+  goal: {
+    label: "What matters most to you?",
+    short: "Goal",
+    multi: false,
+    options: opts([
+      ["rental_income", "Rental income"],
+      ["appreciation", "Long-term growth in value"],
+      ["both", "Both income and growth"],
+      ["home", "A home for me or my family"],
+      ["residency", "Residency or the Golden Visa"],
+      ["not_sure", "Not sure yet"],
+    ]),
   },
   buying_with: {
     label: "Are you buying alone?",
@@ -188,6 +226,18 @@ export const BUYER_QUESTIONS = {
     multi: false,
     options: opts([["yes", "Yes"], ["tell_me", "Tell me more"], ["no", "No"]]),
   },
+  readiness: {
+    label: "How ready are you to go ahead?",
+    short: "Readiness",
+    multi: false,
+    options: opts([
+      ["reserve", "Ready to reserve"],
+      ["serious", "Seriously considering"],
+      ["family", "Need to talk to family or partners"],
+      ["info", "Need more information first"],
+      ["exploring", "Only exploring"],
+    ]),
+  },
 } satisfies Record<string, Question>
 
 export type QuestionKey = keyof typeof BUYER_QUESTIONS
@@ -200,14 +250,14 @@ export type BuyerProfile = Partial<Record<QuestionKey, string | string[]>> & {
 
 /** The four steps, in order, with the choice questions each one asks. */
 export const BUYER_STEPS: { id: "details" | "profile" | "preferences" | "financials"; title: string; keys: QuestionKey[] }[] = [
-  { id: "details", title: "Your details", keys: ["residence"] },
-  { id: "profile", title: "Buying profile", keys: ["buying_for", "buying_with", "buy_timeline", "move_in"] },
+  { id: "details", title: "Your details", keys: ["residence", "contact_channel"] },
+  { id: "profile", title: "Buying profile", keys: ["buying_for", "goal", "buying_with", "buy_timeline", "move_in"] },
   { id: "preferences", title: "Preferences", keys: ["property_types", "bedrooms", "completion", "areas", "must_haves"] },
-  { id: "financials", title: "Financials", keys: ["payment", "mortgage_status", "down_payment", "golden_visa"] },
+  { id: "financials", title: "Financials", keys: ["payment", "mortgage_status", "down_payment", "golden_visa", "readiness"] },
 ]
 
 /** Choice questions the client must answer (budget is required too). */
-export const REQUIRED_QUESTIONS: QuestionKey[] = ["buying_for", "buy_timeline", "payment"]
+export const REQUIRED_QUESTIONS: QuestionKey[] = ["buying_for", "buy_timeline", "payment", "readiness"]
 
 /**
  * Keep only known keys and known option values; cap the free text. Used by
@@ -223,6 +273,45 @@ export function parseProfile(raw: unknown): BuyerProfile {
 /** "Apartment, Villa" for a stored answer, or null when unanswered. */
 export function answerLabel(key: QuestionKey, value: string | string[] | undefined): string | null {
   return labelFor(BUYER_QUESTIONS[key], value)
+}
+
+// ─── The lead grade ──────────────────────────────────────────────────────────
+
+export type LeadGrade = "priority" | "qualified" | "nurture" | "info"
+
+export const LEAD_GRADES: Record<LeadGrade, { label: string; bg: string; text: string; why: string }> = {
+  priority: { label: "Priority", bg: "#dcfce7", text: "#166534", why: "AED 1M or more, buying within 6 months, funds in place, ready to go ahead" },
+  qualified: { label: "Qualified", bg: "#dbeafe", text: "#1e40af", why: "AED 500K or more, buying within a year, not only exploring" },
+  nurture: { label: "Nurture", bg: "#fef3c7", text: "#92400e", why: "Interested, but the budget, timing or funds aren't there yet" },
+  info: { label: "Information", bg: "#f3f4f6", text: "#4b5563", why: "Only exploring for now" },
+}
+
+export const GRADE_OPTIONS = opts([["priority", "Priority"], ["qualified", "Qualified"], ["nurture", "Nurture"], ["info", "Information"]])
+
+/**
+ * A buyer's grade from their answers, so the agent knows who to call first.
+ * Plain rules, not a model: Priority = AED 1M+, buying within 6 months, funds
+ * in place (cash, a payment plan, or a mortgage pre-approved or in progress)
+ * and ready to go ahead; Qualified = AED 500K+, within a year, not only
+ * exploring; Information = only exploring; anything else Nurture. Readiness
+ * was added later, so a brief without it is graded on the rest.
+ */
+export function leadGrade(lead: { budget: string | null; profile?: BriefProfile | null }): LeadGrade {
+  const p = lead.profile ?? {}
+  const s = (k: string) => (typeof p[k] === "string" ? (p[k] as string) : "")
+  const budget = BUDGET_FLOOR[lead.budget ?? ""] ?? 0
+  const t = s("buy_timeline")
+  const r = s("readiness")
+  const pay = s("payment")
+  const ms = s("mortgage_status")
+  const soon = t === "asap" || t === "1_3m" || t === "3_6m"
+  const withinYear = soon || t === "6_12m"
+  const keen = !r || r === "reserve" || r === "serious"
+  const funds = pay === "cash" || pay === "payment_plan" || (pay === "mortgage" && (ms === "approved" || ms === "in_progress"))
+  if (r === "exploring" || (t === "exploring" && r === "info")) return "info"
+  if (budget >= 1_000_000 && soon && keen && funds) return "priority"
+  if (budget >= 500_000 && withinYear && r !== "exploring") return "qualified"
+  return "nurture"
 }
 
 // ─── The seller's brief (/s/<code>) ──────────────────────────────────────────

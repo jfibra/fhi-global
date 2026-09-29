@@ -20,9 +20,9 @@ import { canUseBuyerLinks } from "@/lib/app-roles"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { titleCaseName } from "@/lib/public-profile"
 import {
-  BUDGET_OPTIONS, BUYER_QUESTIONS, BUYER_STEPS, SELLER_QUESTIONS, answerLabel, budgetLabel, buyerLinkPath, contactTimeLabel,
-  formatAed, formatSqft, sellerAnswerLabel, sellerLinkPath, waDigits,
-  type BriefKind, type BuyerLead, type BuyerLink, type Choice, type QuestionKey, type SellerQuestionKey,
+  BUDGET_OPTIONS, BUYER_QUESTIONS, BUYER_STEPS, GRADE_OPTIONS, LEAD_GRADES, SELLER_QUESTIONS, answerLabel, budgetLabel, buyerLinkPath,
+  contactTimeLabel, formatAed, formatSqft, leadGrade, sellerAnswerLabel, sellerLinkPath, waDigits,
+  type BriefKind, type BuyerLead, type BuyerLink, type Choice, type LeadGrade, type QuestionKey, type SellerQuestionKey,
 } from "@/lib/buyer-links"
 import { fetchMyBuyerLeads, fetchMyBuyerLink } from "@/lib/buyer-link-service"
 
@@ -138,7 +138,9 @@ type ViewConfig = {
   how: string[]
   list: string
   empty: { title: string; body: string }
-  filters: [Filter, Filter]
+  filters: Filter[]
+  /** Buyers only: the grade from the answers, shown as a chip and a filter. */
+  grade?: (l: BuyerLead) => LeadGrade
   subline: (l: BuyerLead) => string
   cols: (l: BuyerLead) => Col[]
   sections: (l: BuyerLead) => Section[]
@@ -166,13 +168,16 @@ const VIEWS: Record<View, ViewConfig> = {
       "Send your link on WhatsApp, or let a client scan the QR.",
       "They answer four quick steps: details, buying profile, preferences and financials.",
       "Their brief lands in My buyers, ready for you to reply on WhatsApp.",
+      "Each brief gets a grade from its answers — Priority, Qualified, Nurture or Information — so you know who to call first.",
     ],
     list: "My buyers",
     empty: { title: "No briefs yet", body: "Share your link or QR with a client. When they send their brief, they’ll appear here." },
     filters: [
       { any: "Any budget", aria: "Filter by budget", options: BUDGET_OPTIONS, get: (l) => l.budget },
       { any: "Any timeline", aria: "Filter by when they plan to buy", options: BUYER_QUESTIONS.buy_timeline.options, get: (l) => txt(l, "buy_timeline") },
+      { any: "Any grade", aria: "Filter by lead grade", options: GRADE_OPTIONS, get: (l) => leadGrade(l) },
     ],
+    grade: leadGrade,
     subline: (l) => [buyerAnswer(l, "buying_for"), fmtDate(l.created_at)].filter(Boolean).join(" · "),
     cols: (l) => [
       { label: "Budget", value: budgetLabel(l.budget) ?? "", full: budgetLabel(l.budget) ?? "", w: "w-[92px]" },
@@ -191,6 +196,7 @@ const VIEWS: Record<View, ViewConfig> = {
       { header: "Nationality", get: (l) => txt(l, "nationality") },
       { header: "Best time", get: (l) => contactTimeLabel(l.contact_time) ?? "" },
       { header: "Budget", get: (l) => budgetLabel(l.budget) ?? "" },
+      { header: "Grade", get: (l) => LEAD_GRADES[leadGrade(l)].label },
       ...BUYER_STEPS.flatMap((s) => s.keys).map((k) => ({ header: BUYER_QUESTIONS[k].short, get: (l: BuyerLead) => buyerAnswer(l, k) })),
       { header: "Message", get: (l) => l.message ?? "" },
     ],
@@ -313,7 +319,7 @@ export default function BuyersLinkPage() {
 
   const [view, setView] = useState<View>("buyers")
   const [query, setQuery] = useState("")
-  const [filters, setFilters] = useState<Record<View, [string, string]>>({ buyers: ["", ""], sellers: ["", ""] })
+  const [filters, setFilters] = useState<Record<View, string[]>>({ buyers: ["", "", ""], sellers: ["", ""] })
   const [page, setPage] = useState(1)
   const [openId, setOpenId] = useState<string | null>(null)
 
@@ -363,7 +369,7 @@ export default function BuyersLinkPage() {
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const pageItems = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-  const filtering = !!(query.trim() || picked[0] || picked[1])
+  const filtering = !!(query.trim() || picked.some(Boolean))
 
   const agentName = titleCaseName(profile?.fullname ?? "")
   const agentFirst = agentName.split(" ")[0] || "your advisor"
@@ -377,13 +383,13 @@ export default function BuyersLinkPage() {
     setOpenId(null)
     setCopied(false)
   }
-  const setFilter = (i: 0 | 1, value: string) => {
-    setFilters((f) => ({ ...f, [view]: (i === 0 ? [value, f[view][1]] : [f[view][0], value]) as [string, string] }))
+  const setFilter = (i: number, value: string) => {
+    setFilters((f) => ({ ...f, [view]: f[view].map((v, j) => (j === i ? value : v)) }))
     setPage(1)
   }
   const clearFilters = () => {
     setQuery("")
-    setFilters((f) => ({ ...f, [view]: ["", ""] }))
+    setFilters((f) => ({ ...f, [view]: f[view].map(() => "") }))
     setPage(1)
   }
 
@@ -706,7 +712,7 @@ export default function BuyersLinkPage() {
                   <select
                     key={f.aria}
                     value={picked[i]}
-                    onChange={(e) => setFilter(i as 0 | 1, e.target.value)}
+                    onChange={(e) => setFilter(i, e.target.value)}
                     aria-label={f.aria}
                     className={`${selectCls} min-w-[130px] flex-1 xl:flex-none`}
                   >
@@ -768,6 +774,7 @@ export default function BuyersLinkPage() {
                 const wa = waDigits(l.whatsapp_code, l.whatsapp)
                 const isNew = loadedAt - new Date(l.created_at).getTime() < NEW_FOR_MS
                 const cols = cfg.cols(l)
+                const grade = cfg.grade ? LEAD_GRADES[cfg.grade(l)] : null
                 return (
                   <li key={l.id} className="py-3">
                     <div className="flex items-center gap-3">
@@ -785,6 +792,15 @@ export default function BuyersLinkPage() {
                           {isNew && (
                             <span className="shrink-0 rounded-full bg-[#d6b357]/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#8a6d2b]">
                               New
+                            </span>
+                          )}
+                          {grade && (
+                            <span
+                              title={`${grade.label}: ${grade.why}`}
+                              className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                              style={{ backgroundColor: grade.bg, color: grade.text }}
+                            >
+                              {grade.label}
                             </span>
                           )}
                         </p>

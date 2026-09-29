@@ -68,6 +68,7 @@ export function BuyerLeadForm({
     if (i === 3) {
       if (!budget) e.budget = "Please choose your budget."
       if (!answers.payment) e.payment = "Please choose one."
+      if (!answers.readiness) e.readiness = "Please choose one."
     }
     return e
   }
@@ -175,6 +176,7 @@ export function BuyerLeadForm({
                 }}
               />
               {q("residence")}
+              {q("contact_channel")}
               <Question label="Best time to reach you">
                 <Pills name="Best time to reach you" options={CONTACT_TIME_OPTIONS} value={contactTime} multi={false} onChange={(v) => setContactTime(v as string | undefined)} />
               </Question>
@@ -185,6 +187,7 @@ export function BuyerLeadForm({
             <>
               <StepIntro title="Buying profile" sub="Who the home is for, and when." />
               {q("buying_for", true)}
+              {q("goal")}
               {q("buying_with")}
               {q("buy_timeline", true)}
               {q("move_in")}
@@ -231,6 +234,7 @@ export function BuyerLeadForm({
               {answers.payment === "mortgage" && q("mortgage_status")}
               {q("down_payment")}
               {q("golden_visa", false, "Property worth AED 2M or more can qualify for the 10-year visa.")}
+              {q("readiness", true, "If the right property comes up.")}
               <div>
                 <label htmlFor="bq-msg" className={briefLabelCls}>
                   Anything else {agentFirstName} should know? <span className="font-normal text-[#9ca3af]">optional</span>
