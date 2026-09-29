@@ -684,7 +684,7 @@ const shiftDays = (d: Date, n: number) => {
 function salesWindows(preset: SalesPresetKey): { current: { from: string; to: string }; previous: { from: string; to: string } | null } {
   const today = new Date()
   const yearStart = new Date(today.getFullYear(), 0, 1)
-  const p = SALES_PRESETS.find((x) => x.key === preset) ?? SALES_PRESETS[1]
+  const p = SALES_PRESETS.find((x) => x.key === preset) ?? SALES_PRESETS[0]
   if (p.days === 0) return { current: { from: isoOf(yearStart), to: isoOf(today) }, previous: null }
   const from = shiftDays(today, -(p.days - 1))
   const prevTo = shiftDays(from, -1)
@@ -713,7 +713,7 @@ function kpisOf(acc: Accum | null): Kpis | null {
 const delta = (cur: number | null, prev: number | null) => (cur === null || prev === null || prev === 0 ? null : ((cur - prev) / prev) * 100)
 
 function SalesOverviewSection() {
-  const [preset, setPreset] = useState<SalesPresetKey>(() => cacheGet<SalesPresetKey>(SALES_PRESET_CACHE_KEY)?.data ?? "30d")
+  const [preset, setPreset] = useState<SalesPresetKey>(() => cacheGet<SalesPresetKey>(SALES_PRESET_CACHE_KEY)?.data ?? "7d")
   const windows = useMemo(() => salesWindows(preset), [preset])
   const cur = useBatchJob(`charts:sales:current:${preset}`, txJob(windows.current), true)
   const prev = useBatchJob(`charts:sales:previous:${preset}`, windows.previous ? txJob(windows.previous) : null, true)
