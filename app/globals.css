@@ -1087,7 +1087,7 @@
 }
 .bq-opt:hover { border-color: #d6b357; color: #0d1117; }
 .bq-opt:active { transform: scale(0.98); }
-.bq-opt--on { border-color: #0d1117; background: #0d1117; color: #fff; }
+.bq-opt--on { border-color: #001f3f; background: #001f3f; color: #fff; }
 .bq-opt--on svg { color: #d6b357; }
 .bq-opt:focus-visible { outline: 3px solid #d6b357; outline-offset: 2px; }
 .bq-step { animation: bq-step 420ms var(--wf-ease) both; }
