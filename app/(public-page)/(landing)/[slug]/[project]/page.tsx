@@ -482,13 +482,8 @@ export default async function ProjectDetailPage({ params }: Props) {
               ))}
             </dl>
 
-            <div className="wf-fade mt-6 flex flex-wrap items-start gap-x-5 gap-y-2" style={{ ["--d" as string]: "1000ms" }}>
-              <p className="pt-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">Share</p>
-              <SocialShare
-                title={`${project.name} | FHI Global`}
-                text={`Discover ${project.name} on FHI Global.`}
-                variant="bare"
-              />
+            <div className="wf-fade mt-6" style={{ ["--d" as string]: "1000ms" }}>
+              <SocialShare title={`${project.name} | FHI Global`} text={`Discover ${project.name} on FHI Global.`} />
             </div>
 
             {mastheadImages.length > 1 && (
