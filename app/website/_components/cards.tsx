@@ -5,21 +5,23 @@ import Link from "next/link"
 import { BadgeCheck, Bath, BedDouble, Heart, MapPin, Maximize, Share2 } from "lucide-react"
 import { GOLD, GOLD_SOFT, GOLD_TINT, INK, NAVY, type Project, type Property, type Testimonial } from "../_data"
 import { DeveloperLogoTile } from "./developer-logo"
+import { ShareProject, type ProjectShare } from "./share-project"
 import { Stars } from "./ui"
 
 /** Developer-style project card matching the reference mock: square card,
  *  black text-only status chip over the photo, frosted
  *  developer bar along the photo's bottom edge, serif title, location, and
  *  the starting price. */
-export function ProjectCard({ project: p }: { project: Project }) {
+export function ProjectCard({ project: p, share }: { project: Project; share?: ProjectShare | null }) {
   // Real projects link to their main-site page (like the /projects cards);
-  // placeholder cards stay inert.
-  const Wrapper = p.href ? Link : "div"
-  const wrapperProps = p.href ? { href: p.href } : {}
+  // placeholder cards stay inert. The title's link stretches over the whole
+  // card, so the share button can sit on top of it (a button inside a link
+  // would be invalid, and tapping it opened the project). The SHARED link is
+  // the project on the agent's site (share.url), with the agent's number.
+  const href = p.href
   return (
-    <Wrapper
-      {...(wrapperProps as { href: string })}
-      className="group flex h-full flex-col overflow-hidden border border-[#e8e5dc] bg-white shadow-[0_2px_10px_-4px_rgba(13,27,46,0.12)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_48px_-16px_rgba(13,27,46,0.32)]"
+    <article
+      className="group relative flex h-full flex-col overflow-hidden border border-[#e8e5dc] bg-white shadow-[0_2px_10px_-4px_rgba(13,27,46,0.12)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_48px_-16px_rgba(13,27,46,0.32)]"
     >
       {/* Photo */}
       <div className="relative aspect-[5/4] overflow-hidden">
@@ -58,7 +60,15 @@ export function ProjectCard({ project: p }: { project: Project }) {
 
       {/* Body */}
       <div className="flex flex-1 flex-col px-5 pt-5 pb-5">
-        <h3 className="truncate font-serif text-[22px] font-bold leading-tight tracking-tight" style={{ color: NAVY }}>{p.title}</h3>
+        <h3 className="truncate font-serif text-[22px] font-bold leading-tight tracking-tight" style={{ color: NAVY }}>
+          {href ? (
+            <Link href={href} className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-4 focus-visible:after:ring-[var(--wb-gold-a60)]">
+              {p.title}
+            </Link>
+          ) : (
+            p.title
+          )}
+        </h3>
         <p className="mt-2.5 flex items-center gap-2 text-[13px] text-[#6b7280]">
           <MapPin className="h-4 w-4 shrink-0" style={{ color: GOLD }} />
           <span className="truncate">{p.location}</span>
@@ -73,7 +83,7 @@ export function ProjectCard({ project: p }: { project: Project }) {
             </p>
           </div>
           <span className="flex shrink-0 items-center gap-2">
-            {[Heart, Share2].map((Icon, i) => (
+            {(share ? [Heart] : [Heart, Share2]).map((Icon, i) => (
               <span
                 key={i}
                 aria-hidden
@@ -83,10 +93,11 @@ export function ProjectCard({ project: p }: { project: Project }) {
                 <Icon className="h-[17px] w-[17px] transition-colors duration-300 group-hover/action:text-white" strokeWidth={1.9} style={{ color: GOLD }} />
               </span>
             ))}
+            {share && <ShareProject share={share} />}
           </span>
         </div>
       </div>
-    </Wrapper>
+    </article>
   )
 }
 

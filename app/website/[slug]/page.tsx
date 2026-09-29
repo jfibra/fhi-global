@@ -17,6 +17,7 @@ import { TestimonialsSection } from "../_components/sections/what-my-clients-say
 import { EventsSection } from "../_components/sections/events"
 import { loadAgentWebsiteEvents } from "@/lib/events/website-events"
 import { loadAgentWebsiteReviews } from "@/lib/website-reviews"
+import { loadShareContact } from "@/lib/website-project-share"
 
 // A published agent site from the Website Builder. Always fresh — agents
 // expect a save in the editor to show up on their public link immediately.
@@ -65,9 +66,10 @@ export default async function AgentWebsitePage({ params }: Props) {
   const data = site.data
   // The agent's own published events (migration 057) and approved client
   // reviews — each section and its nav link only appear once there is one.
-  const [events, reviews] = await Promise.all([
+  const [events, reviews, contact] = await Promise.all([
     loadAgentWebsiteEvents(createAdminSupabase(), site.agentId),
     loadAgentWebsiteReviews(createAdminSupabase(), site.agentId),
+    loadShareContact(createAdminSupabase(), site.agentId, data.agent, data.about.portrait),
   ])
   const hasEvents = events.upcoming.length + events.past.length > 0
 
@@ -76,7 +78,7 @@ export default async function AgentWebsitePage({ params }: Props) {
       <SiteHeader data={data} showEvents={hasEvents} showReviews={reviews.length > 0} />
       <HeroSection data={data} />
       <AboutSection data={data} qrValue={`${SITE_URL}/website/${site.slug}`} />
-      <FeaturedSection data={data} />
+      <FeaturedSection data={data} share={{ siteSlug: site.slug, contact }} />
       <EventsSection siteSlug={site.slug} upcoming={events.upcoming} past={events.past} />
       <StatsBandSection data={data} />
       <ServiceAreasSection data={data} />

@@ -4,10 +4,19 @@
 // with both empty the whole section disappears.
 
 import { ArrowRight } from "lucide-react"
+import { SITE_URL } from "@/lib/seo"
+import { agentProjectPath, projectSlugFromHref, shareCopy, type ShareContact } from "@/lib/website-project-share"
 import { GOLD, IMG, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
 import { ProjectCard, PropertyCard } from "../cards"
 
-export function FeaturedSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
+export function FeaturedSection({
+  data = SAMPLE_DATA,
+  share,
+}: {
+  data?: WebsiteData
+  /** On a published site: project cards open, and share, the project on this site with the agent's number. */
+  share?: { siteSlug: string; contact: ShareContact }
+}) {
   const hasProjects = data.projects.length > 0
   const hasProperties = data.properties.length > 0
   if (!hasProjects && !hasProperties) return null
@@ -32,9 +41,14 @@ export function FeaturedSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) 
             </span>
           </div>
           <div className="mt-7 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {data.projects.map((p, i) => (
-              <ProjectCard key={`${p.title}-${i}`} project={p} />
-            ))}
+            {data.projects.map((p, i) => {
+              const slug = share && p.href ? projectSlugFromHref(p.href) : null
+              const shareData =
+                share && slug
+                  ? { url: `${SITE_URL.replace(/\/$/, "")}${agentProjectPath(share.siteSlug, slug)}`, ...shareCopy(p, share.contact) }
+                  : null
+              return <ProjectCard key={`${p.title}-${i}`} project={p} share={shareData} />
+            })}
           </div>
         </div>
       )}
