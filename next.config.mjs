@@ -173,11 +173,29 @@ const PRIVATE_NOINDEX_HEADERS = SECURITY_HEADERS.map((header) => {
   return header
 })
 
+// sharp's Linux build (sharp-linux-x64) links libvips at load time, and file
+// tracing cannot see a dynamic-linker dependency, so Vercel's functions shipped
+// without libvips-cpp.so and every route that imports sharp died on load with
+// "Could not load the sharp module using the linux-x64 runtime" (Next bundles
+// the libs only for its own, older sharp). Listed here for each route that
+// imports sharp — directly or through lib/trakheesi, lib/logo-analysis,
+// lib/materials. Keys match as fragments of the route path (picomatch
+// `contains`), so no `[param]` brackets, which picomatch would read as a set.
+const SHARP_LINUX_LIBS = ["./node_modules/@img/sharp-linux-x64/**/*", "./node_modules/@img/sharp-libvips-linux-x64/**/*"]
+
 const nextConfig = {
   // Debug escape hatch: lets a second `next dev` run from this directory
   // without fighting the primary one over .next/dev/lock. Inert unless the
   // env var is set.
   ...(process.env.NEXT_DEBUG_DIST_DIR ? { distDir: process.env.NEXT_DEBUG_DIST_DIR } : {}),
+  outputFileTracingIncludes: {
+    "/api/admin/projects/permit-link": SHARP_LINUX_LIBS,
+    "/verify/permit/": SHARP_LINUX_LIBS,
+    "/api/upload/developer": SHARP_LINUX_LIBS,
+    "/certificate/send": SHARP_LINUX_LIBS,
+    "/materials": SHARP_LINUX_LIBS,
+    "/projects/*/opengraph-image": SHARP_LINUX_LIBS,
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
