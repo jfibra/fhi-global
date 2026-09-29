@@ -103,12 +103,15 @@ const TRUST = [
 ];
 
 export default async function HomePage() {
-  // The newest property stories for the Latest News rail under the hero —
+  // The newest property stories for the Latest News carousel under the hero —
   // loaded beside the catalogue data and capped at four seconds, so a slow
   // news upstream never holds the homepage; an outage simply leaves it out.
+  // Cached for five minutes, the same as /news, so a new article reaches the
+  // homepage within about five minutes of publishing (the page itself
+  // rebuilds every two).
   const [{ developers, featuredProjects, cityRows, wallImages }, { articles: fetchedNews }] = await Promise.all([
     getCachedHomePageData(),
-    fetchArticlesList({ page: 1, perPage: 8 }, { signal: AbortSignal.timeout(4000), revalidate: 600 }),
+    fetchArticlesList({ page: 1, perPage: 8 }, { signal: AbortSignal.timeout(4000), revalidate: 300 }),
   ]);
   const seenNews = new Set<string>();
   const news: NewsArticle[] = fetchedNews.filter((a) => (seenNews.has(a.id) ? false : (seenNews.add(a.id), true)));
