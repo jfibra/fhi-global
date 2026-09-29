@@ -11,7 +11,7 @@ import { loadAgentWebsiteEvents } from "@/lib/events/website-events"
 import { loadAgentWebsiteReviews } from "@/lib/website-reviews"
 import { SITE_URL } from "@/lib/seo"
 import { formatPrice, parsePaymentPlan, priceFromValue, projectSubtitle, type ProjectSeoInput } from "@/lib/project-seo"
-import { agentProjectPath, loadShareContact, shareCopy } from "@/lib/website-project-share"
+import { agentProjectPath, loadShareContact, shareCopy, withDialableNumbers } from "@/lib/website-project-share"
 import { ProjectGallery } from "@/components/public/project-gallery"
 import { ReadMore } from "@/components/public/read-more"
 import { InView } from "@/components/public/in-view"
@@ -211,16 +211,8 @@ export default async function AgentProjectPage({ params }: Props) {
   ])
   if (!project || !contact) notFound()
 
-  // The header's Contact Me menu dials what the site stores, which is usually
-  // missing its country code; on this page it gets the dialable numbers.
-  const data = {
-    ...site.data,
-    agent: {
-      ...site.data.agent,
-      phone: contact.phone ? `+${contact.phone}` : site.data.agent.phone,
-      whatsapp: contact.whatsapp ? `+${contact.whatsapp}` : site.data.agent.whatsapp,
-    },
-  }
+  // The header's Contact Me menu dials the agent's numbers with their country code.
+  const data = withDialableNumbers(site.data, contact)
   const home = `/website/${site.slug}`
   const f = facts(project)
   const dev = project.developers

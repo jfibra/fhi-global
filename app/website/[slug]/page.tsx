@@ -17,7 +17,7 @@ import { TestimonialsSection } from "../_components/sections/what-my-clients-say
 import { EventsSection } from "../_components/sections/events"
 import { loadAgentWebsiteEvents } from "@/lib/events/website-events"
 import { loadAgentWebsiteReviews } from "@/lib/website-reviews"
-import { loadShareContact } from "@/lib/website-project-share"
+import { loadShareContact, withDialableNumbers } from "@/lib/website-project-share"
 
 // A published agent site from the Website Builder. Always fresh — agents
 // expect a save in the editor to show up on their public link immediately.
@@ -63,15 +63,17 @@ export default async function AgentWebsitePage({ params }: Props) {
   if (!site) notFound()
   // An address the site had before (migration 058) → its current one, for good.
   if (site.slug !== slug) permanentRedirect(`/website/${site.slug}`)
-  const data = site.data
   // The agent's own published events (migration 057) and approved client
   // reviews — each section and its nav link only appear once there is one.
   const [events, reviews, contact] = await Promise.all([
     loadAgentWebsiteEvents(createAdminSupabase(), site.agentId),
     loadAgentWebsiteReviews(createAdminSupabase(), site.agentId),
-    loadShareContact(createAdminSupabase(), site.agentId, data.agent, data.about.portrait),
+    loadShareContact(createAdminSupabase(), site.agentId, site.data.agent, site.data.about.portrait),
   ])
   const hasEvents = events.upcoming.length + events.past.length > 0
+  // Contact Me (header) and the About channels dial the agent's numbers WITH
+  // their country code — the site stores them as typed, usually without it.
+  const data = withDialableNumbers(site.data, contact)
 
   return (
     <div style={themeVars(data.theme)}>

@@ -63,6 +63,23 @@ export async function loadShareContact(
   }
 }
 
+/**
+ * The site's data with the agent's numbers made dialable: the header's Contact
+ * Me menu and the About channels build wa.me/tel: links straight from
+ * agent.phone / agent.whatsapp, which the Website Builder stores without a
+ * country code. Nothing displays these as text on the pages that use this.
+ */
+export function withDialableNumbers<T extends { agent: { phone: string; whatsapp: string } }>(data: T, contact: ShareContact): T {
+  return {
+    ...data,
+    agent: {
+      ...data.agent,
+      phone: contact.phone ? `+${contact.phone}` : data.agent.phone,
+      whatsapp: contact.whatsapp ? `+${contact.whatsapp}` : data.agent.whatsapp,
+    },
+  }
+}
+
 /** "azizi-grand" from a main-site project href ("/azizi-developments/azizi-grand" or "/projects/azizi-grand"). */
 export const projectSlugFromHref = (href?: string | null): string | null =>
   href?.split("?")[0].split("/").filter(Boolean).pop() ?? null

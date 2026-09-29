@@ -14,6 +14,7 @@ import { themeVars } from "../../../_data"
 import { SiteHeader } from "../../../_components/header"
 import { SiteFooter } from "../../../_components/footer"
 import { loadAgentWebsiteReviews } from "@/lib/website-reviews"
+import { loadShareContact, withDialableNumbers } from "@/lib/website-project-share"
 
 // An agent's own event (migration 057) on their website: the site's header,
 // footer and theme around the same event page body, registration form,
@@ -78,12 +79,17 @@ export default async function AgentEventPage({ params, searchParams }: Props) {
   const event = await getEvent(site.agentId, key)
   if (!event) notFound()
 
-  const data = site.data
   const home = `/website/${site.slug}`
-  const host = titleCaseName(data.agent.name?.replace(/\s+/g, " ").trim() ?? "") || "Agent"
   const path = eventPublicPath(event, site.slug)
-  // The site's "Reviews" link only exists when it has approved reviews.
-  const hasReviews = (await loadAgentWebsiteReviews(createAdminSupabase(), site.agentId, 1)).length > 0
+  // The site's "Reviews" link only exists when it has approved reviews; the
+  // header's Contact Me dials the agent's numbers with their country code.
+  const [reviews, contact] = await Promise.all([
+    loadAgentWebsiteReviews(createAdminSupabase(), site.agentId, 1),
+    loadShareContact(createAdminSupabase(), site.agentId, site.data.agent, site.data.about.portrait),
+  ])
+  const hasReviews = reviews.length > 0
+  const data = withDialableNumbers(site.data, contact)
+  const host = titleCaseName(data.agent.name?.replace(/\s+/g, " ").trim() ?? "") || "Agent"
 
   return (
     <div style={themeVars(data.theme)}>
