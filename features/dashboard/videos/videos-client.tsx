@@ -10,17 +10,24 @@ import { useMemo, useState } from "react"
 import Image from "next/image"
 import { Download, MonitorPlay, Play } from "lucide-react"
 import { FilmTrigger } from "@/components/public/film-player"
-import type { LibraryVideo, VideoCategory } from "@/lib/films"
+import type { LibraryVideo, VideoCategory, VideoLanguage } from "@/lib/films"
 
 const ALL = "All"
 const ORDER: VideoCategory[] = ["Company", "Agent stories", "Landlords"]
+const LANGS: VideoLanguage[] = ["English", "Arabic"]
 const mb = (bytes: number) => `${Math.round(bytes / 1048576)} MB`
 const downloadHref = (v: LibraryVideo, q: "hd" | "sd") => `/api/library/videos/download?id=${encodeURIComponent(v.film.id)}&q=${q}`
 
 export function VideosClient({ videos }: { videos: LibraryVideo[] }) {
   const [tab, setTab] = useState<string>(ALL)
-  const categories = useMemo(() => [ALL, ...ORDER.filter((c) => videos.some((v) => v.category === c))], [videos])
-  const shown = tab === ALL ? videos : videos.filter((v) => v.category === tab)
+  const [lang, setLang] = useState<string>(ALL)
+  const langs = useMemo(() => LANGS.filter((l) => videos.some((v) => v.lang === l)), [videos])
+  const inLang = useMemo(() => (lang === ALL ? videos : videos.filter((v) => v.lang === lang)), [videos, lang])
+  // Only the categories this language has (Arabic has no landlord films); a tab
+  // left empty by a language switch falls back to All.
+  const categories = useMemo(() => [ALL, ...ORDER.filter((c) => inLang.some((v) => v.category === c))], [inLang])
+  const activeTab = categories.includes(tab) ? tab : ALL
+  const shown = activeTab === ALL ? inLang : inLang.filter((v) => v.category === activeTab)
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -39,11 +46,12 @@ export function VideosClient({ videos }: { videos: LibraryVideo[] }) {
         )}
       </div>
 
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       {categories.length > 2 && (
         <div className="flex flex-wrap gap-2">
           {categories.map((c) => {
-            const active = c === tab
-            const count = c === ALL ? videos.length : videos.filter((v) => v.category === c).length
+            const active = c === activeTab
+            const count = c === ALL ? inLang.length : inLang.filter((v) => v.category === c).length
             return (
               <button
                 key={c}
@@ -61,6 +69,25 @@ export function VideosClient({ videos }: { videos: LibraryVideo[] }) {
           })}
         </div>
       )}
+      {/* Language: agents with Arabic-speaking clients can show only the Arabic versions. */}
+      {langs.length > 1 && (
+        <div role="group" aria-label="Language" className="inline-flex self-start rounded-lg bg-[#f3f4f6] p-1">
+          {[ALL, ...langs].map((l) => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => setLang(l)}
+              aria-pressed={l === lang}
+              className={`rounded-md px-3 py-1.5 text-[13px] font-semibold transition-colors ${
+                l === lang ? "bg-white text-[#001f3f] shadow-sm" : "text-[#6b7280] hover:text-[#0d1117]"
+              }`}
+            >
+              {l === ALL ? "All languages" : l === "Arabic" ? <>Arabic · <bdi lang="ar" dir="rtl">عربي</bdi></> : l}
+            </button>
+          ))}
+        </div>
+      )}
+      </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
         {shown.map((v) => (
@@ -68,7 +95,7 @@ export function VideosClient({ videos }: { videos: LibraryVideo[] }) {
             <FilmTrigger
               film={v.film}
               className="group relative block aspect-[16/9] w-full overflow-hidden bg-[#0b2a4d] text-left focus:outline-none focus-visible:ring-4 focus-visible:ring-[#001f3f]/20"
-              ariaLabel={`Watch ${v.name}, ${v.film.duration}`}
+              ariaLabel={`Watch ${v.name}${v.lang === "Arabic" ? " (Arabic)" : ""}, ${v.film.duration}`}
             >
               <Image src={v.film.poster} alt="" fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.04]" />
               <span className="absolute inset-0 bg-gradient-to-t from-[#06182e]/70 via-transparent to-transparent" aria-hidden="true" />
@@ -78,6 +105,11 @@ export function VideosClient({ videos }: { videos: LibraryVideo[] }) {
               <span className="absolute left-3 top-3 rounded-md bg-[#06182e]/70 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white backdrop-blur">
                 {v.category}
               </span>
+              {v.lang === "Arabic" && (
+                <span className="absolute right-3 top-3 rounded-md bg-[#d6b357] px-2 py-1 text-[11px] font-bold text-[#001f3f]">
+                  Arabic · <bdi lang="ar" dir="rtl">عربي</bdi>
+                </span>
+              )}
               <span className="absolute bottom-3 right-3 rounded-md bg-[#06182e]/70 px-2 py-0.5 text-[12px] font-semibold text-white backdrop-blur">
                 {v.film.duration}
               </span>
@@ -90,7 +122,7 @@ export function VideosClient({ videos }: { videos: LibraryVideo[] }) {
                 <a
                   href={downloadHref(v, "hd")}
                   className="inline-flex flex-col items-center justify-center rounded-lg bg-[#001f3f] px-3 py-2 text-center text-white transition-colors hover:bg-[#00356b]"
-                  aria-label={`Download ${v.name} in HD, ${mb(v.bytes.hd)}`}
+                  aria-label={`Download ${v.name}${v.lang === "Arabic" ? " (Arabic)" : ""} in HD, ${mb(v.bytes.hd)}`}
                 >
                   <span className="inline-flex items-center gap-1.5 text-[13px] font-bold">
                     <Download className="h-3.5 w-3.5 text-[#d6b357]" /> Download HD
@@ -100,7 +132,7 @@ export function VideosClient({ videos }: { videos: LibraryVideo[] }) {
                 <a
                   href={downloadHref(v, "sd")}
                   className="inline-flex flex-col items-center justify-center rounded-lg border border-[#e5e7eb] px-3 py-2 text-center text-[#374151] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]"
-                  aria-label={`Download ${v.name}, smaller file for WhatsApp, ${mb(v.bytes.sd)}`}
+                  aria-label={`Download ${v.name}${v.lang === "Arabic" ? " (Arabic)" : ""}, smaller file for WhatsApp, ${mb(v.bytes.sd)}`}
                 >
                   <span className="inline-flex items-center gap-1.5 text-[13px] font-bold">
                     <Download className="h-3.5 w-3.5" /> For WhatsApp

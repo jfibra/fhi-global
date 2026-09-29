@@ -3,8 +3,9 @@ import type { Film, Story } from "@/components/public/film-player"
 // FHI's own films, served from our S3 as web-encoded MP4 (1080p + 720p,
 // H.264, faststart) with a one-year cache; every name carries a version so a
 // re-edit can never show a stale copy. The masters live in the boss's Drive
-// folder "EDITED VIDEOS"; only the English versions are on the site.
-// One catalogue for the public About page and the dashboard Library → Videos.
+// folder "EDITED VIDEOS". One catalogue for the public About page (English
+// only) and the dashboard Library → Videos (also the Arabic versions and the
+// Azizi Roadshow, which stay off the public site).
 
 /** Where the files sit in the bucket. */
 export const FILM_PREFIX = "FHI_GLOBAL/videos/about"
@@ -58,10 +59,12 @@ export const STORY_BY_AGENT: Record<string, Story> = {
 // ─── Dashboard: Library → Videos ─────────────────────────────────────────────
 
 export type VideoCategory = "Company" | "Agent stories" | "Landlords"
+export type VideoLanguage = "English" | "Arabic"
 
 export type LibraryVideo = {
   film: Film
   category: VideoCategory
+  lang: VideoLanguage
   name: string
   subtitle: string
   /** Download file name stem, e.g. "FHI-Global-Film" → FHI-Global-Film-1080p.mp4. */
@@ -80,15 +83,36 @@ const BYTES: Record<string, { hd: number; sd: number }> = {
   "landlords-maribel-donabel": { hd: 53794378, sd: 21702647 },
   "landlords-mirasol": { hd: 58833662, sd: 23428129 },
   "landlords-peter-ryen": { hd: 67001567, sd: 25530403 },
+  "fhi-azizi-roadshow": { hd: 29427834, sd: 13999184 },
+  "story-cris-gudia-ar": { hd: 54824895, sd: 23772286 },
+  "story-guinto-couple-ar": { hd: 123586049, sd: 52799189 },
+  "story-hector-cabrieto-ar": { hd: 53880193, sd: 23869376 },
+  "fhi-global-avp-ar": { hd: 83690552, sd: 34679596 },
 }
 
 const ascii = (s: string) => s.normalize("NFKD").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
 
+/** Library-only films: the Arabic versions (same edits as the English ones) and the Azizi Roadshow. */
+const ARABIC = {
+  avp: film("fhi-global-avp-ar", "fhi-global-avp-ar", "FHI Global — the film (Arabic)", "3:11"),
+  "story-cris-gudia": film("fhi-story-cris-gudia-ar", "story-cris-gudia-ar", "Cris Gudia's story (Arabic)", "2:21"),
+  "story-guinto-couple": film("fhi-story-guinto-couple-ar", "story-guinto-couple-ar", "The Guinto couple's story (Arabic)", "5:17"),
+  "story-hector-cabrieto": film("fhi-story-hector-cabrieto-ar", "story-hector-cabrieto-ar", "Hector Cabrieto's story (Arabic)", "2:25"),
+} satisfies Record<string, Film>
+const ROADSHOW = film("fhi-azizi-roadshow", "fhi-azizi-roadshow", "FHI Dubai and Azizi Roadshow", "0:52")
+
+/** Each Arabic version sits right after its English one. */
 export const LIBRARY_VIDEOS: LibraryVideo[] = [
-  { film: COMPANY_FILMS.avp, category: "Company", name: "FHI Global — the film", subtitle: "Company film", file: "FHI-Global-Film", bytes: BYTES["fhi-global-avp"] },
-  { film: COMPANY_FILMS.event, category: "Company", name: "FHI Dubai Event", subtitle: "Company event", file: "FHI-Dubai-Event", bytes: BYTES["fhi-dubai-event"] },
-  ...AGENT_STORIES.map((st) => ({ film: st, category: "Agent stories" as const, name: st.name, subtitle: st.role, file: `FHI-Story-${ascii(st.name)}`, bytes: BYTES[st.id] })),
-  ...LANDLORD_STORIES.map((st) => ({ film: st, category: "Landlords" as const, name: st.name, subtitle: st.role, file: `FHI-Landlords-${ascii(st.name)}`, bytes: BYTES[st.id] })),
+  { film: COMPANY_FILMS.avp, category: "Company", lang: "English", name: "FHI Global — the film", subtitle: "Company film", file: "FHI-Global-Film", bytes: BYTES["fhi-global-avp"] },
+  { film: ARABIC.avp, category: "Company", lang: "Arabic", name: "FHI Global — the film", subtitle: "Company film", file: "FHI-Global-Film-Arabic", bytes: BYTES["fhi-global-avp-ar"] },
+  { film: COMPANY_FILMS.event, category: "Company", lang: "English", name: "FHI Dubai Event", subtitle: "Company event", file: "FHI-Dubai-Event", bytes: BYTES["fhi-dubai-event"] },
+  { film: ROADSHOW, category: "Company", lang: "English", name: "FHI Dubai and Azizi Roadshow", subtitle: "Roadshow in the Philippines", file: "FHI-Azizi-Roadshow", bytes: BYTES["fhi-azizi-roadshow"] },
+  ...AGENT_STORIES.flatMap((st) => {
+    const en: LibraryVideo = { film: st, category: "Agent stories", lang: "English", name: st.name, subtitle: st.role, file: `FHI-Story-${ascii(st.name)}`, bytes: BYTES[st.id] }
+    const arFilm = ARABIC[st.id as keyof typeof ARABIC]
+    return arFilm ? [en, { ...en, film: arFilm, lang: "Arabic" as const, file: `${en.file}-Arabic`, bytes: BYTES[arFilm.id] }] : [en]
+  }),
+  ...LANDLORD_STORIES.map((st) => ({ film: st, category: "Landlords" as const, lang: "English" as const, name: st.name, subtitle: st.role, file: `FHI-Landlords-${ascii(st.name)}`, bytes: BYTES[st.id] })),
 ]
 
 /** "78 MB" */
