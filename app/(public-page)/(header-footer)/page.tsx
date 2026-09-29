@@ -15,6 +15,9 @@ import { faqPageSchema } from "@/lib/faqs";
 import { fhiOrganizationSchema, webSiteSchema } from "@/lib/structured-data";
 import { JsonLd } from "@/components/json-ld";
 import { DeveloperMarquee, type DeveloperTileItem } from "@/components/public/developer-marquee";
+import { NewsTicker } from "@/components/public/news-ticker";
+import { HomeNews } from "@/components/public/home-news";
+import { fetchArticlesList, type NewsArticle } from "@/lib/news-service";
 import {
   FeaturedProjectsShowcase,
   type FeaturedProjectData,
@@ -101,7 +104,16 @@ const TRUST = [
 ];
 
 export default async function HomePage() {
-  const { developers, featuredProjects, cityRows, wallImages } = await getCachedHomePageData();
+  // The newest property stories feed the headline strip under the hero and
+  // the Latest News section — loaded beside the catalogue data and capped at
+  // four seconds, so a slow news upstream never holds the homepage; an
+  // outage simply leaves both out.
+  const [{ developers, featuredProjects, cityRows, wallImages }, { articles: fetchedNews }] = await Promise.all([
+    getCachedHomePageData(),
+    fetchArticlesList({ page: 1, perPage: 6 }, { signal: AbortSignal.timeout(4000), revalidate: 600 }),
+  ]);
+  const seenNews = new Set<string>();
+  const news: NewsArticle[] = fetchedNews.filter((a) => (seenNews.has(a.id) ? false : (seenNews.add(a.id), true)));
 
   const devOptions = (developers ?? []).map((d) => ({
     id: d.id,
@@ -198,6 +210,13 @@ export default async function HomePage() {
           "Dubai · United Arab Emirates",
         ]}
       />
+
+      {/* ----------------------------------------------- */}
+      {/* HEADLINES — the newest stories, one at a time   */}
+      {/* ----------------------------------------------- */}
+      {/* The same strip as /news: the site's most-visited page shows that the
+          market — and the site — moves every day. */}
+      {news.length > 1 && <NewsTicker items={news.map((a) => ({ slug: a.slug, title: a.title, date: a.date }))} />}
 
       {/* ----------------------------------------------- */}
       {/* STATS BANNER                                    */}
@@ -346,6 +365,14 @@ export default async function HomePage() {
       {/* WHERE WE BUILD — the UAE lit by live counts     */}
       {/* ----------------------------------------------- */}
       <UaeMap counts={emirateCounts} />
+
+      {/* ----------------------------------------------- */}
+      {/* LATEST NEWS — a lead story and three more        */}
+      {/* ----------------------------------------------- */}
+      {/* Between the map (where the projects are) and Why FHI (why us): the
+          market context that leads into the expertise claim. Company funnel
+          above it — developers, then projects — stays untouched. */}
+      <HomeNews items={news.slice(0, 4).map((a) => ({ slug: a.slug, title: a.title, excerpt: a.excerpt, img: a.img, date: a.date, badge: a.badge }))} />
 
       {/* ----------------------------------------------- */}
       {/* WHY FHI — "We connect serious investors…"        */}
