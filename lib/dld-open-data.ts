@@ -735,6 +735,21 @@ export interface DldChartSpec {
   breakdowns: string[]
   /** "Top N" field, e.g. area or developer, ranked by count. */
   topKey: string
+  /**
+   * Headline figures over a subset of rows (e.g. sales only): count, average
+   * price and price per sqft, a location ranking, and the latest rows for a
+   * history table. Only Transactions has this today.
+   */
+  kpi?: {
+    filterKey: string
+    filterValue: string
+    /** Row field with the size in sqm (price-per-sqft uses it). */
+    areaKey: string
+    /** Row field for the location ranking. */
+    locationKey: string
+    /** Fields kept on the "latest" rows sent to the client. */
+    latestKeys: string[]
+  }
 }
 
 export const DLD_CHART_SPECS: Partial<Record<DldCommand, DldChartSpec>> = {
@@ -746,6 +761,25 @@ export const DLD_CHART_SPECS: Partial<Record<DldCommand, DldChartSpec>> = {
     valueLabel: "Transaction value (AED)",
     breakdowns: ["GROUP_EN", "USAGE_EN", "IS_OFFPLAN_EN", "PROP_TYPE_EN", "IS_FREE_HOLD_EN"],
     topKey: "AREA_EN",
+    kpi: {
+      filterKey: "GROUP_EN",
+      filterValue: "Sales",
+      areaKey: "PROCEDURE_AREA",
+      locationKey: "AREA_EN",
+      latestKeys: [
+        "TRANSACTION_NUMBER",
+        "INSTANCE_DATE",
+        "PROJECT_EN",
+        "AREA_EN",
+        "TRANS_VALUE",
+        "PROP_SB_TYPE_EN",
+        "PROP_TYPE_EN",
+        "ROOMS_EN",
+        "PROCEDURE_AREA",
+        "IS_OFFPLAN_EN",
+        "PROCEDURE_EN",
+      ],
+    },
   },
   rents: {
     command: "rents",
@@ -785,6 +819,10 @@ export const DLD_CHART_BATCH_CHUNKS = 10
 /** The first batch is small so a cold load paints within a few seconds. */
 export const DLD_CHART_FIRST_BATCH_CHUNKS = 2
 export const DLD_CHART_TOP_N = 10
+/** Latest rows kept for the sales-history table. */
+export const DLD_CHART_LATEST_N = 25
+/** DLD sizes are sqm; the Bayut-style figures are per sqft. */
+export const SQFT_PER_SQM = 10.7639
 
 export interface DldChartBucket {
   label: string
@@ -800,6 +838,19 @@ export interface DldChartDay {
   value: number
 }
 
+/** Mergeable sums behind the headline tiles (all rows matching `kpi.filter`). */
+export interface DldKpiSums {
+  count: number
+  /** Sum of the value field over all matching rows. */
+  valueSum: number
+  /** Sum of the value field over rows that also have a size > 0 … */
+  valueWithAreaSum: number
+  /** … and the sum of those sizes (sqm), for price per sqft. */
+  areaSqmSum: number
+  /** Location ranking over the matching rows (every bucket, mergeable). */
+  locations: DldChartBucket[]
+}
+
 /**
  * Aggregates for ONE batch of chunks (`chunkFrom` … `chunkTo` - 1). Every
  * part is mergeable by summing per key, so the client accumulates batches
@@ -813,6 +864,10 @@ export interface DldBreakdownResponse {
   breakdowns: Record<string, DldChartBucket[]>
   top: DldChartBucket[]
   totals: { count: number; value: number }
+  /** Present when the spec has `kpi` — sums over the filtered rows in this batch. */
+  kpi?: DldKpiSums
+  /** Latest filtered rows in this batch (trimmed to `kpi.latestKeys`), newest first. */
+  latest?: DldRow[]
   coverage: {
     /** Rows in this batch. */
     rows: number

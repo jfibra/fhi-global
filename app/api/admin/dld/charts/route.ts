@@ -3,12 +3,14 @@ import { requireRole } from "@/lib/auth-guard"
 import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import {
   DLD_CHART_BATCH_CHUNKS,
+  DLD_CHART_LATEST_N,
   DLD_CHART_SPECS,
   DLD_DATASETS,
   DLD_PRICE_INDEX_COMMAND,
   isDldCommand,
   type DldBreakdownResponse,
   type DldChartBucket,
+  type DldKpiSums,
   type DldPriceIndexResponse,
   type DldPriceIndexSeries,
   type DldRow,
@@ -144,9 +146,28 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
     m.set(label, cur)
   }
 
+  // KPI subset (e.g. sales only): sums for the tiles, a location ranking, and
+  // the newest rows for the history table.
+  const kpiSpec = spec.kpi
+  const kpiLocations = new Map<string, { count: number; value: number }>()
+  const kpi: DldKpiSums = { count: 0, valueSum: 0, valueWithAreaSum: 0, areaSqmSum: 0, locations: [] }
+  const latestPool: DldRow[] = []
+
   for (const row of rows) {
     const value = spec.valueKey ? (num(row[spec.valueKey]) ?? 0) : 0
     totalValue += value
+
+    if (kpiSpec && labelOf(row[kpiSpec.filterKey]) === kpiSpec.filterValue) {
+      kpi.count += 1
+      kpi.valueSum += value
+      const area = num(row[kpiSpec.areaKey]) ?? 0
+      if (area > 0 && value > 0) {
+        kpi.valueWithAreaSum += value
+        kpi.areaSqmSum += area
+      }
+      bump(kpiLocations, labelOf(row[kpiSpec.locationKey]), value)
+      latestPool.push(row)
+    }
 
     const day = isoDay(row[spec.dateKey])
     if (day) {
@@ -163,6 +184,18 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
       .map(([label, v]) => ({ label, count: v.count, value: Math.round(v.value) }))
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
 
+  let latest: DldRow[] | undefined
+  if (kpiSpec) {
+    kpi.locations = toBuckets(kpiLocations)
+    kpi.valueSum = Math.round(kpi.valueSum)
+    kpi.valueWithAreaSum = Math.round(kpi.valueWithAreaSum)
+    // Rows arrive in ascending date order — the newest are at the end.
+    latest = latestPool
+      .slice(-DLD_CHART_LATEST_N)
+      .reverse()
+      .map((row) => Object.fromEntries(kpiSpec.latestKeys.map((k) => [k, row[k] ?? null])) as DldRow)
+  }
+
   const response: DldBreakdownResponse = {
     command,
     daily: [...daily.entries()]
@@ -171,6 +204,7 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
     breakdowns: Object.fromEntries(spec.breakdowns.map((k) => [k, toBuckets(breakdowns[k])])),
     top: toBuckets(top),
     totals: { count: rows.length, value: Math.round(totalValue) },
+    ...(kpiSpec ? { kpi, latest } : {}),
     coverage: {
       rows: rows.length,
       available,
