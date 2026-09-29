@@ -4,6 +4,7 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import { parseName } from "@/lib/parse-name"
 import { pickSafePostLoginRedirect } from "@/lib/auth"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
+import { inviterAutoApproves } from "@/lib/auto-approve"
 
 // Completes Google sign-in AFTER the client established the Supabase session.
 // Runs as the newly-signed-in user (cookie session) and — only on the first
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
   // Least privilege: a brand-new account stays member + pending (the DB
   // defaults); a role/status an admin already assigned is kept as-is.
   const finalRole = profile.role?.trim() || "member"
-  const finalStatus = profile.status?.trim() || "pending"
+  let finalStatus = profile.status?.trim() || "pending"
 
   const googleName = typeof user.user_metadata?.name === "string" ? user.user_metadata.name : null
   const parsed = parseName(googleName)
@@ -102,6 +103,9 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
     if (inviter) invitedBy = refRaw
   }
+  // A pre-approved inviter's recruits (the CEO's link) start active — only a
+  // brand-new, still-pending account; a status an admin set is never touched.
+  if (invitedBy && finalStatus === "pending" && (await inviterAutoApproves(admin, invitedBy))) finalStatus = "active"
 
   const nextMetadata = {
     ...metadata,

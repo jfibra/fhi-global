@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
+import { inviterAutoApproves } from "@/lib/auto-approve"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -61,12 +62,15 @@ export async function POST(req: NextRequest) {
         .maybeSingle()
       if (inviter) invitedBy = refRaw
     }
+    // A pre-approved inviter's recruits (the CEO's link) start active — see lib/auto-approve.ts.
+    const autoApproved = invitedBy ? await inviterAutoApproves(supabase, invitedBy) : false
+    const status = autoApproved ? "active" : "pending"
 
     await supabase
       .from("profiles")
       .update({
         role,
-        status: "pending",
+        status,
         ...(invitedBy ? { metadata: { invited_by: invitedBy } } : {}),
       })
       .eq("id", userId)
@@ -80,7 +84,9 @@ export async function POST(req: NextRequest) {
       subjectType: "profiles",
       subjectId: userId,
       subjectLabel: `${firstName} ${lastName}`.trim(),
-      description: `Self-registered as ${role} (pending approval)`,
+      description: autoApproved
+        ? `Self-registered as ${role} (auto-approved — invited by a pre-approved inviter)`
+        : `Self-registered as ${role} (pending approval)`,
       ...ctx,
     })
 

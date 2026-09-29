@@ -62,6 +62,12 @@ export type UpdateUserPayload = {
   facebook?: string
   license_number?: string
   /**
+   * Admin-only: accounts registering through this person's invite link start
+   * active instead of pending (metadata.auto_approve_recruits — the CEO's
+   * link; see lib/auto-approve.ts).
+   */
+  auto_approve_recruits?: boolean
+  /**
    * Who referred/invited this user — the referrer's profile UUID, stored as
    * `metadata.invited_by` (same field the invite link stamps at registration;
    * see app/api/register/route.ts). Empty string / null clears the referrer.

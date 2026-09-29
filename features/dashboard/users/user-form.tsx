@@ -84,6 +84,7 @@ export function UserForm({
       whatsapp_country_code:s("whatsapp_country_code") || "+971",
       whatsapp_number:      s("whatsapp_number"),
       invited_by:           s("invited_by") || null,
+      auto_approve_recruits: m.auto_approve_recruits === true,
     }
   })
 
@@ -419,6 +420,23 @@ export function UserForm({
                 registered directly instead of through an agent&apos;s invite link — they
                 then appear under that agent&apos;s <span className="font-semibold">My Recruits</span>.
               </p>
+
+              {/* Pre-approved inviter (the CEO): their recruits skip the approval queue. */}
+              <label className="mt-4 flex items-start gap-3 rounded-xl border border-[#e8eaed] bg-[#f9fafb] px-4 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={edit.auto_approve_recruits === true}
+                  onChange={(e) => setEdit((p) => ({ ...p, auto_approve_recruits: e.target.checked }))}
+                  className="mt-0.5 h-4 w-4 accent-[#001f3f]"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-[#0d1117]">Auto-approve this person&apos;s recruits</span>
+                  <span className="block text-[11px] text-[#9ca3af] mt-0.5">
+                    Accounts that register through their invite link start <span className="font-semibold">active</span> instead of
+                    waiting for approval. Meant for the CEO&apos;s link — give it sparingly.
+                  </span>
+                </span>
+              </label>
             </div>
           )}
           </fieldset>

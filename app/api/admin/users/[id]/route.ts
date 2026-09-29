@@ -123,13 +123,16 @@ export async function PATCH(
   const hasDeveloperLink = body.developer_id !== undefined
   const hasRoleUpdate = body.role !== undefined
   const hasInvitedBy = body.invited_by !== undefined
+  // Admin-only flag: this person's recruits skip approval (lib/auto-approve.ts).
+  const hasAutoApprove = body.auto_approve_recruits !== undefined
+  let autoApproveChanged: { before: boolean; after: boolean } | null = null
 
   // Referrer change is tracked for the audit trail (set inside the block below).
   let referrerBefore: string | null = null
   let referrerAfter: string | null = null
   let referrerChanged = false
 
-  if (hasMeta || hasDeveloperLink || hasRoleUpdate || hasInvitedBy) {
+  if (hasMeta || hasDeveloperLink || hasRoleUpdate || hasInvitedBy || hasAutoApprove) {
     const { data: current } = await admin
       .from("profiles")
       .select("metadata, role")
@@ -212,6 +215,13 @@ export async function PATCH(
       }
     }
 
+    if (hasAutoApprove) {
+      const before = nextMetadata.auto_approve_recruits === true
+      const after = body.auto_approve_recruits === true
+      if (before !== after) autoApproveChanged = { before, after }
+      nextMetadata.auto_approve_recruits = after
+    }
+
     profileUpdate.metadata = nextMetadata
   }
 
@@ -273,6 +283,25 @@ export async function PATCH(
       oldValues: { invited_by: referrerBefore },
       newValues: { invited_by: referrerAfter },
       changedKeys: ["invited_by"],
+      ...ctx,
+    })
+  }
+
+  if (autoApproveChanged) {
+    await logAuditEvent({
+      category: "user_management",
+      event: "updated",
+      source: "dashboard",
+      actor,
+      subjectType: "profiles",
+      subjectId: id,
+      subjectLabel,
+      description: autoApproveChanged.after
+        ? "Recruits through this person's invite link are now auto-approved"
+        : "Recruits through this person's invite link now wait for approval again",
+      oldValues: { auto_approve_recruits: autoApproveChanged.before },
+      newValues: { auto_approve_recruits: autoApproveChanged.after },
+      changedKeys: ["auto_approve_recruits"],
       ...ctx,
     })
   }
