@@ -183,6 +183,9 @@ export const BUYER_QUESTIONS = {
       ["creek_harbour", "Dubai Creek Harbour"],
       ["dubai_south", "Dubai South"],
       ["ranches", "Arabian Ranches"],
+      // Landmarks buyers ask for by name (added 2026-09-29 on the boss's request).
+      ["disneyland", "Near Disneyland"],
+      ["airport", "Near Dubai Airport"],
       ["open", "Open to suggestions"],
     ]),
   },
@@ -339,7 +342,8 @@ export const SELLER_QUESTIONS = {
     label: "Where is it?",
     short: "Area",
     multi: false,
-    options: BUYER_QUESTIONS.areas.options.filter((o) => o.value !== "open"),
+    // Places, not preferences: the buyer-only answers stay out of "Where is it?".
+    options: BUYER_QUESTIONS.areas.options.filter((o) => !["open", "disneyland", "airport"].includes(o.value)),
   },
   bedrooms: {
     label: "Bedrooms",
