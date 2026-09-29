@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { loadSiteBySlug } from "@/lib/website-builder-service"
-import { formatPrice } from "@/lib/project-seo"
+import { formatPrice, priceFromValue } from "@/lib/project-seo"
 import { loadShareContact } from "@/lib/website-project-share"
 import { loadOgFonts, OG_SIZE } from "../../../_components/og-hero"
 
@@ -59,7 +59,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     loadSiteBySlug(admin, slug),
     createPublicSupabaseClient()
       .from("projects")
-      .select("name, status, main_image, city, location, community, launch_price_from, currency, delivery_quarter, developers ( name )")
+      .select("name, status, main_image, city, location, community, launch_price_from, currency, delivery_quarter, developers ( name ), project_units ( unit_type, bedrooms, size_sqft, price_from )")
       .eq("slug", key)
       .eq("is_published", true)
       .is("deleted_at", null)
@@ -74,6 +74,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
         currency: string | null
         delivery_quarter: string | null
         developers: { name: string } | null
+        project_units: { unit_type: string | null; bedrooms: number | null; size_sqft: number | null; price_from: number | null }[] | null
       }>(),
   ])
 
@@ -81,7 +82,9 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const [photo, face] = await Promise.all([picture(p?.main_image, 1200, 630), picture(contact?.portrait, 176, 176)])
 
   const name = p?.name ?? "FHI Global project"
-  const from = p ? formatPrice(p.launch_price_from, null, p.currency) : null
+  // Same price rule as the page (and so the og:title): a headline price the
+  // unit table contradicts gives way to the cheapest credible unit.
+  const from = p ? formatPrice(priceFromValue({ name: p.name, status: p.status, launch_price_from: p.launch_price_from, currency: p.currency, units: p.project_units ?? [] }), null, p.currency) : null
   const where = [p?.community, p?.location].map((v) => v?.trim()).find(Boolean) ?? p?.city?.trim() ?? ""
   const line = [from ? `From ${from}` : null, p?.delivery_quarter ? `Handover ${p.delivery_quarter}` : null].filter(Boolean).join("   ·   ")
   const status = p?.status ? STATUS[p.status] ?? "" : ""
