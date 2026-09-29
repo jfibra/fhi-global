@@ -108,7 +108,7 @@ export default async function HomePage() {
   // news upstream never holds the homepage; an outage simply leaves it out.
   const [{ developers, featuredProjects, cityRows, wallImages }, { articles: fetchedNews }] = await Promise.all([
     getCachedHomePageData(),
-    fetchArticlesList({ page: 1, perPage: 6 }, { signal: AbortSignal.timeout(4000), revalidate: 600 }),
+    fetchArticlesList({ page: 1, perPage: 8 }, { signal: AbortSignal.timeout(4000), revalidate: 600 }),
   ]);
   const seenNews = new Set<string>();
   const news: NewsArticle[] = fetchedNews.filter((a) => (seenNews.has(a.id) ? false : (seenNews.add(a.id), true)));
@@ -210,12 +210,12 @@ export default async function HomePage() {
       />
 
       {/* ----------------------------------------------- */}
-      {/* LATEST NEWS — four stories, pictures and titles  */}
+      {/* LATEST NEWS — a carousel of pictures and titles  */}
       {/* ----------------------------------------------- */}
       {/* Right under the hero, where every visitor sees it (a one-line
           headline strip here went unnoticed): the market — and the site —
           moves every day. Compact, so developers → projects follow closely. */}
-      <HomeNews items={news.slice(0, 4).map((a) => ({ slug: a.slug, title: a.title, excerpt: a.excerpt, img: a.img, date: a.date, badge: a.badge }))} />
+      <HomeNews items={news.slice(0, 8).map((a) => ({ slug: a.slug, title: a.title, excerpt: a.excerpt, img: a.img, date: a.date, badge: a.badge }))} />
 
       {/* ----------------------------------------------- */}
       {/* STATS BANNER                                    */}
