@@ -2,10 +2,12 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { ImageResponse } from "next/og"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { ogPicture } from "@/lib/og-picture"
 
 export const runtime = "nodejs"
 
-// Fallback background when a project has no main_image. Read off disk and
+// Fallback background when a project has no main_image (or it can't be
+// drawn — see lib/og-picture.ts). Read off disk and
 // memoized as a data URL (satori can't fetch relative URLs) — same trick as
 // app/og/business-card's logoDataUrl. Replaces the legacy Supabase JPG, whose
 // host now answers HTTP 402.
@@ -42,7 +44,9 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
   // [0] access made the developer name silently vanish from every card.
   const developerName = (data?.developers as unknown as { name?: string | null } | null)?.name
   const subtitle = [developerName, data?.city ?? data?.location].filter(Boolean).join(" • ")
-  const image = data?.main_image ?? (await defaultBackground())
+  // The renders on S3 are AVIF/WebP, which Satori draws as nothing — this
+  // resizes them to the card as JPEG.
+  const image = (await ogPicture(data?.main_image, 1200, 630)) ?? (await defaultBackground())
 
   return new ImageResponse(
     (
@@ -70,11 +74,17 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
             inset: 0,
           }}
         />
+        {/* Scrim under the text. Explicit box + backgroundImage: Satori has no
+            `inset` shorthand, so this div used to have no size and never drew. */}
         <div
           style={{
             position: "absolute",
-            inset: 0,
-            background: "linear-gradient(180deg, rgba(0,20,40,0.2) 0%, rgba(0,20,40,0.85) 100%)",
+            top: 0,
+            left: 0,
+            width: 1200,
+            height: 630,
+            display: "flex",
+            backgroundImage: "linear-gradient(180deg, rgba(0,20,40,0.2) 0%, rgba(0,20,40,0.85) 100%)",
           }}
         />
         <div

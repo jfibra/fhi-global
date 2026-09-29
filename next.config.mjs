@@ -195,6 +195,7 @@ const nextConfig = {
     "/certificate/send": SHARP_LINUX_LIBS,
     "/materials": SHARP_LINUX_LIBS,
     "/projects/*/opengraph-image": SHARP_LINUX_LIBS,
+    "/og/project/": SHARP_LINUX_LIBS,
   },
   typescript: {
     ignoreBuildErrors: true,

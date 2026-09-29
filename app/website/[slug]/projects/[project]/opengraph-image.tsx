@@ -4,16 +4,17 @@ import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { loadSiteBySlug } from "@/lib/website-builder-service"
 import { formatPrice, priceFromValue } from "@/lib/project-seo"
 import { loadShareContact } from "@/lib/website-project-share"
+import { ogPicture } from "@/lib/og-picture"
 import { loadOgFonts, OG_SIZE } from "../../../_components/og-hero"
 
 // The link preview for a project shared from an agent's website — what a
 // Facebook / WhatsApp / Messenger post shows: the project photo, its name,
 // price and handover, and a strip with the agent's photo, name and NUMBER, so
 // the lead calls the agent straight from the feed. Rendered by next/og
-// (Satori: flexbox only, explicit styles). Photos go through sharp to JPEG
-// first — the project renders are WebP, which Satori can't draw. sharp is
-// loaded on demand inside a try: the page imports this module for its
-// metadata, so a sharp that fails to load must cost the photo, never the page.
+// (Satori: flexbox only, explicit styles). Photos go through ogPicture
+// (lib/og-picture.ts): the AVIF/WebP renders become JPEG Satori can draw, and
+// a sharp that fails to load costs the photo, never the page (which imports
+// this module for its metadata).
 
 export const runtime = "nodejs"
 export const alt = "Project shared by an FHI Global property advisor"
@@ -25,31 +26,6 @@ const STATUS: Record<string, string> = {
   launch: "LAUNCHING NOW",
   under_construction: "UNDER CONSTRUCTION",
   completed: "READY TO MOVE IN",
-}
-
-/**
- * A remote image as a data URI Satori can draw: resized to the box as JPEG
- * when sharp is available; otherwise the file as-is if it's already JPEG or
- * PNG (most portraits are); otherwise null and the card goes without it.
- */
-async function picture(url: string | null | undefined, width: number, height: number): Promise<string | null> {
-  if (!url) return null
-  try {
-    const res = await fetch(url, { cache: "force-cache" })
-    if (!res.ok) return null
-    const type = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase()
-    const buf = Buffer.from(await res.arrayBuffer())
-    try {
-      const { default: sharp } = await import("sharp")
-      const out = await sharp(buf).resize(width, height, { fit: "cover", position: "attention" }).jpeg({ quality: 82 }).toBuffer()
-      return `data:image/jpeg;base64,${out.toString("base64")}`
-    } catch {
-      const passthrough = type === "image/jpeg" || type === "image/png" || /\.(jpe?g|png)(\?|$)/i.test(url)
-      return passthrough && buf.length < 4_000_000 ? `data:${type || "image/jpeg"};base64,${buf.toString("base64")}` : null
-    }
-  } catch {
-    return null
-  }
 }
 
 export default async function Image({ params }: { params: Promise<{ slug: string; project: string }> }) {
@@ -79,7 +55,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   ])
 
   const contact = site ? await loadShareContact(admin, site.agentId, site.data.agent, site.data.about.portrait) : null
-  const [photo, face] = await Promise.all([picture(p?.main_image, 1200, 630), picture(contact?.portrait, 176, 176)])
+  const [photo, face] = await Promise.all([ogPicture(p?.main_image, 1200, 630), ogPicture(contact?.portrait, 176, 176)])
 
   const name = p?.name ?? "FHI Global project"
   // Same price rule as the page (and so the og:title): a headline price the
