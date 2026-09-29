@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react"
 import { InView } from "@/components/public/in-view"
+import { ShareNews } from "@/components/public/share-news"
 
 /**
  * Homepage "Latest news", right under the hero: the newest stories as
@@ -161,9 +162,11 @@ export function HomeNews({ items }: { items: HomeNewsItem[] }) {
             {items.map((item, i) => (
               <article
                 key={item.slug}
-                className="wf-fade group w-[76vw] shrink-0 snap-start sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-4.5rem)/4)]"
+                className="wf-fade group relative w-[76vw] shrink-0 snap-start sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-4.5rem)/4)]"
                 style={{ ["--d" as string]: `${120 + Math.min(i, 3) * 110}ms` }}
               >
+                {/* Over the photo, beside the card's link — a tap here never opens the story. */}
+                <ShareNews slug={item.slug} title={item.title} className="absolute right-3 top-3 z-10" />
                 <Link href={`/news/${item.slug}`} className="block">
                   <span className="relative block aspect-[16/10] overflow-hidden bg-[#eef1f5]">
                     <Image

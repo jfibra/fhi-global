@@ -40,6 +40,7 @@ export function SharePanel({
   text,
   heading = "Share this project",
   className = "",
+  position = "absolute",
   onPick,
 }: {
   url: string
@@ -50,6 +51,8 @@ export function SharePanel({
   heading?: string
   /** Where the card sits relative to its `relative` parent, e.g. "bottom-full left-0 mb-3". */
   className?: string
+  /** "fixed" for a card rendered in a portal (e.g. from inside a scrolling carousel that would clip it). */
+  position?: "absolute" | "fixed"
   /** A channel was used (its key, or "copy" / "email"); the caller tracks it and closes. */
   onPick: (method: string) => void
 }) {
@@ -80,7 +83,7 @@ export function SharePanel({
     <div
       role="menu"
       aria-label={heading}
-      className={`absolute z-30 w-[300px] rounded-2xl border border-[#e8e5dc] bg-white p-3 text-[#001f3f] shadow-[0_24px_60px_-20px_rgba(0,20,40,0.6)] ${className}`}
+      className={`${position} z-30 w-[300px] rounded-2xl border border-[#e8e5dc] bg-white p-3 text-[#001f3f] shadow-[0_24px_60px_-20px_rgba(0,20,40,0.6)] ${className}`}
       onClick={(e) => e.stopPropagation()}
     >
       <p className="px-2 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#8a919c]">{heading}</p>
