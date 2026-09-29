@@ -20,6 +20,19 @@ async function defaultBackground(): Promise<string> {
   return ogDefaultDataUrl
 }
 
+// The white FHI Global Property mark (same file as the business and listing
+// cards), memoized the same way; 2269x835, drawn header-sized so "Global Property" stays legible once Facebook shrinks the card.
+const LOGO_H = 80
+const LOGO_W = Math.round((LOGO_H * 2269) / 835)
+let logoDataUrl: string | null = null
+async function logo(): Promise<string> {
+  if (!logoDataUrl) {
+    const buf = await readFile(path.join(process.cwd(), "public", "FHI_Branding_White.png"))
+    logoDataUrl = `data:image/png;base64,${buf.toString("base64")}`
+  }
+  return logoDataUrl
+}
+
 // Without this header ImageResponse defaults to a YEAR of immutable caching —
 // scrapers would keep a stale card forever after the project's image or name
 // changes. 5 minutes matches app/og/business-card. (Being a fresh Response per
@@ -46,7 +59,7 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
   const subtitle = [developerName, data?.city ?? data?.location].filter(Boolean).join(" • ")
   // The renders on S3 are AVIF/WebP, which Satori draws as nothing — this
   // resizes them to the card as JPEG.
-  const image = (await ogPicture(data?.main_image, 1200, 630)) ?? (await defaultBackground())
+  const [image, mark] = await Promise.all([ogPicture(data?.main_image, 1200, 630).then((p) => p ?? defaultBackground()), logo()])
 
   return new ImageResponse(
     (
@@ -98,7 +111,7 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
             gap: 10,
           }}
         >
-          <div style={{ fontSize: 22, color: "#d6b357", fontWeight: 700 }}>FHI Global • Project</div>
+          <img src={mark} alt="FHI Global" width={LOGO_W} height={LOGO_H} style={{ width: LOGO_W, height: LOGO_H, objectFit: "contain", marginBottom: 6 }} />
           <div style={{ fontSize: 56, lineHeight: 1.05, fontWeight: 800, maxWidth: "90%" }}>{title}</div>
           <div style={{ fontSize: 28, opacity: 0.9 }}>{subtitle || "Dubai Real Estate"}</div>
         </div>
