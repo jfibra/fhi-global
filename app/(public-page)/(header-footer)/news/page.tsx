@@ -12,7 +12,8 @@ import {
 } from "@/lib/news-service"
 import { NewsletterSignup } from "@/components/news/newsletter-signup"
 import { NewsTicker } from "@/components/public/news-ticker"
-import { ArrowRight, Clock, TrendingUp } from "lucide-react"
+import { NewsHero } from "@/components/public/news-hero"
+import { ArrowRight, TrendingUp } from "lucide-react"
 
 export const revalidate = 300
 
@@ -200,12 +201,15 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
   }
 
   // ── Slicing ──────────────────────────────────────────────────────────────
-  // One featured story (page 1 only), the rest as rows, and the five most
-  // recent as the sidebar's Trending list. `all` is newest-first upstream.
+  // Page 1: the five newest lead the masthead slider, the next six run in the
+  // Live strip, and the rows start after the slider's five so nothing shows
+  // twice above the fold (the sidebar's Trending recaps the top five). Deeper
+  // pages are plain rows. `all` is newest-first upstream.
   const isFirstPage = pageNum === 1
   const latest = isFirstPage ? all[0] ?? null : null
-  const featured = isFirstPage ? all[0] ?? null : null
-  const listItems = isFirstPage ? all.slice(1) : all
+  const heroStories = isFirstPage ? all.slice(0, 5) : []
+  const tickerItems = isFirstPage ? (all.length > 6 ? all.slice(5, 11) : all.slice(0, 6)) : []
+  const listItems = isFirstPage ? all.slice(heroStories.length) : all
   const trending = all.slice(0, Math.min(5, all.length))
 
   // CollectionPage + ItemList structured data for the news hub.
@@ -239,50 +243,16 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
       )}
 
       {/* ── MASTHEAD ──────────────────────────────────────────────────────
-          Light split banner: copy on the left, skyline fading in from the
-          right. Replaces the navy slab the section used to open on. */}
-      <section className="relative bg-white overflow-hidden border-b border-[#e8eaed]">
-        <div className="absolute inset-y-0 right-0 w-full lg:w-[58%]">
-          <Image
-            src="/background/dubai.webp"
-            alt=""
-            fill
-            sizes="(max-width: 1024px) 100vw, 58vw"
-            priority
-            className="object-cover object-center"
-            aria-hidden="true"
-          />
-          {/* Fade the photo into the page so the headline never sits on busy pixels */}
-          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-white/10 lg:from-white lg:via-white/70 lg:to-transparent" />
-        </div>
-
-        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-14 lg:py-16">
-          <div className="max-w-xl">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f]">Property Insights</p>
-            <h1 className="font-['Outfit'] text-3xl md:text-[42px] font-bold text-[#0d1117] leading-[1.12] tracking-tight mt-3">
-              Dubai Real Estate News &amp; Market Intelligence
-            </h1>
-            <p className="mt-4 text-[15.5px] leading-relaxed text-[#4b5563] max-w-lg">
-              Stay informed with the latest market trends, expert analysis, developer
-              updates and investment opportunities in Dubai.
-            </p>
-            {latest && (
-              <Link
-                href={`/news/${latest.slug}`}
-                className="mt-7 inline-flex items-center gap-2.5 bg-[#0a2647] hover:bg-[#001f3f] text-white px-6 py-3.5 text-[15px] font-bold transition-colors"
-              >
-                Explore Latest Articles <ArrowRight className="w-[18px] h-[18px]" />
-              </Link>
-            )}
-          </div>
-        </div>
-      </section>
+          A story slider on page 1: the five newest articles, pictures and
+          headlines taking turns (the boss: pictures that change, like a
+          news site). Deeper pages get the plain masthead. */}
+      <NewsHero stories={heroStories.map((a) => ({ slug: a.slug, title: a.title, excerpt: a.excerpt, img: a.img, date: a.date, badge: a.badge }))} />
 
       {/* ── LIVE STRIP ────────────────────────────────────────────────────
           The six newest headlines, one at a time, changing every few seconds
           (the boss: the headline should change). The first is in the server
           HTML; the rest slide in on the client — see NewsTicker. */}
-      {latest && <NewsTicker items={all.slice(0, 6).map((a) => ({ slug: a.slug, title: a.title, date: a.date }))} />}
+      {latest && <NewsTicker items={tickerItems.map((a) => ({ slug: a.slug, title: a.title, date: a.date }))} />}
 
       {/* ── CATEGORY TABS ─────────────────────────────────────────────────
           Underlined tabs rather than bordered chips. Same links, same
@@ -334,46 +304,6 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
 
           {/* ════ MAIN ════ */}
           <main className="lg:col-span-8 space-y-10">
-
-            {/* Featured — image left, story right */}
-            {featured && (
-              <article className="group bg-white border border-[#e8eaed] grid grid-cols-1 sm:grid-cols-2">
-                <Link href={`/news/${featured.slug}`} className="relative block aspect-[4/3] sm:aspect-auto sm:min-h-[300px] overflow-hidden bg-[#eef1f5]">
-                  <Image
-                    src={featured.img}
-                    alt={featured.title}
-                    fill
-                    sizes="(max-width: 640px) 100vw, 33vw"
-                    className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                  />
-                  <span className="absolute top-4 left-4 bg-[#0a2647] text-white text-[11px] font-bold uppercase tracking-[0.12em] px-3 py-1.5">
-                    Featured
-                  </span>
-                </Link>
-                <div className="p-6 sm:p-7 flex flex-col">
-                  <Kicker item={featured} />
-                  <Link href={`/news/${featured.slug}`} className="mt-2">
-                    <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117] leading-snug group-hover:text-[#b8913f] transition-colors line-clamp-3">
-                      {featured.title}
-                    </h2>
-                  </Link>
-                  {featured.excerpt && (
-                    <p className="mt-3 text-sm text-[#6b7280] leading-relaxed line-clamp-3">{featured.excerpt}</p>
-                  )}
-                  {featured.date && (
-                    <p className="mt-5 pt-4 border-t border-[#eef0f3] inline-flex items-center gap-2 text-xs text-[#9ca3af]">
-                      <Clock className="w-3.5 h-3.5" /> {fmt(featured.date)}
-                    </p>
-                  )}
-                  <Link
-                    href={`/news/${featured.slug}`}
-                    className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#0d1117] hover:text-[#b8913f] transition-colors self-start"
-                  >
-                    Read Full Article <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </article>
-            )}
 
             {/* Latest Articles — one column of wide rows */}
             {listItems.length > 0 && (

@@ -1287,3 +1287,12 @@ html.film-open { overflow: hidden; }
   .sr-play-ring::after { animation: none; opacity: 0.6; }
   .sr-loop, .pp-hero-loop { transition: none; }
 }
+
+/* ─── News masthead slider (components/public/news-hero.tsx) ────────────────
+   .nh-swap: the story text eases in when the story changes. .nh-drift: the
+   photo on screen drifts a touch larger while it is showing. */
+.nh-swap { animation: nh-swap 560ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes nh-swap { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.nh-drift { animation: nh-drift 7000ms linear both; }
+@keyframes nh-drift { from { transform: scale(1); } to { transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .nh-swap, .nh-drift { animation: none; } }
