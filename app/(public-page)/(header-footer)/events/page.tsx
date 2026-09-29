@@ -5,7 +5,7 @@ import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
 import { eventBrand } from "@/lib/events/brands"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
-import { CalendarDays, ChevronRight, Clock, MapPin, Star } from "lucide-react"
+import { CalendarDays, ChevronRight, Clock, MapPin, Star, UserRound } from "lucide-react"
 
 export const revalidate = 120
 
@@ -27,6 +27,8 @@ type EventRow = {
   event_date: string | null
   venue: string | null
   registration_open: boolean | null
+  /** null = company event; otherwise an agent's own event an admin picked for this page (067). */
+  agent_id: string | null
 }
 
 function dateParts(
@@ -62,18 +64,41 @@ function splitByDate(all: EventRow[]): { upcoming: EventRow[]; past: EventRow[] 
   }
 }
 
+/**
+ * agent_id → the host's name from their published website, so a picked
+ * agent's event says whose it is. An agent without a published site has no
+ * entry (the card then just carries the brand, like a company event).
+ */
+async function hostNames(events: EventRow[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  const ids = [...new Set(events.map((e) => e.agent_id).filter((id): id is string => !!id))]
+  if (ids.length === 0) return out
+  const { data } = await createPublicSupabaseClient()
+    .from("website_builder")
+    .select("agent_id, contact")
+    .in("agent_id", ids)
+    .eq("is_published", true)
+  for (const row of data ?? []) {
+    const name = (row.contact as { name?: unknown } | null)?.name
+    if (typeof name === "string" && name.trim()) out.set(String(row.agent_id), name.trim())
+  }
+  return out
+}
+
 export default async function EventsPage() {
   const supabase = createPublicSupabaseClient()
   const { data: events } = await supabase
     .from("events")
-    .select("id, slug, title, description, brand, image_url, event_date, venue, registration_open")
+    .select("id, slug, title, description, brand, image_url, event_date, venue, registration_open, agent_id")
     .eq("status", "published")
     .is("deleted_at", null)
-    // Company events only — an agent's own event lives on their website (057).
-    .is("agent_id", null)
+    // Company events, plus the agents' own events (057) an admin picked for
+    // this page (show_on_main, 067). The rest stay on their agent's website.
+    .or("agent_id.is.null,show_on_main.eq.true")
     .order("event_date", { ascending: true, nullsFirst: false })
 
   const { upcoming, past } = splitByDate((events ?? []) as EventRow[])
+  const hosts = await hostNames((events ?? []) as EventRow[])
 
   return (
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
@@ -135,7 +160,7 @@ export default async function EventsPage() {
                 <SectionHeading>Upcoming events</SectionHeading>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {upcoming.map((e) => (
-                    <EventCard key={e.id} event={e} />
+                    <EventCard key={e.id} event={e} host={e.agent_id ? hosts.get(e.agent_id) : undefined} />
                   ))}
                 </div>
               </>
@@ -148,7 +173,7 @@ export default async function EventsPage() {
                 </SectionHeading>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {past.map((e) => (
-                    <EventCard key={e.id} event={e} past />
+                    <EventCard key={e.id} event={e} host={e.agent_id ? hosts.get(e.agent_id) : undefined} past />
                   ))}
                 </div>
               </>
@@ -177,7 +202,7 @@ function SectionHeading({ children, className }: { children: React.ReactNode; cl
  * section heading already says which is which, and dimming them made the
  * page look dead. `past` only suppresses the "Register now" call to action.
  */
-function EventCard({ event: e, past = false }: { event: EventRow; past?: boolean }) {
+function EventCard({ event: e, host, past = false }: { event: EventRow; /** The agent hosting it, for a picked agent's event. */ host?: string; past?: boolean }) {
   const brand = eventBrand(e.brand)
   const dp = dateParts(e.event_date)
   return (
@@ -233,6 +258,12 @@ function EventCard({ event: e, past = false }: { event: EventRow; past?: boolean
         <span className="block w-10 h-[2px] bg-[#d6b357] my-3.5" aria-hidden="true" />
 
         <div className="space-y-2.5">
+          {host && (
+            <p className="flex items-start gap-2.5 text-xs text-[#5f6368]">
+              <UserRound className="w-4 h-4 text-[#d6b357] shrink-0 mt-px" />
+              <span className="font-medium">Hosted by {host}</span>
+            </p>
+          )}
           {dp && (
             <p className="flex items-start gap-2.5 text-xs text-[#5f6368]">
               <Clock className="w-4 h-4 text-[#d6b357] shrink-0 mt-px" />

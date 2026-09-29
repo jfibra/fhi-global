@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
+  Check,
   Award, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Eye, ImagePlus, Loader2,
   Globe, MapPin, MoreVertical, Pencil, Plus, QrCode, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
 } from "lucide-react"
@@ -61,6 +62,8 @@ type AdminEvent = {
   /** null = company event (/events); otherwise the agent whose website it's on. */
   agentId: string | null
   ownerName: string | null
+  /** Admin pick (migration 067): an agent's event also listed on fhiglobal.ae/events. */
+  showOnMain: boolean
   /** The public page — /events/<slug> or the owner's website. */
   publicPath: string
 }
@@ -417,6 +420,29 @@ export function EventsClient({
     }
   }
 
+  // Admin staff only: list an agent's event on fhiglobal.ae/events too, or take
+  // it off again. Nothing else on the event changes; the API ignores this
+  // field from owners.
+  const toggleShowOnMain = async (e: AdminEvent) => {
+    const showOnMain = !e.showOnMain
+    const res = await fetch(`/api/admin/events/${e.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: e.title,
+        description: e.description ?? "",
+        brand: e.brand,
+        image_url: e.imageUrl ?? "",
+        event_date: e.eventDate ?? "",
+        venue: e.venue ?? "",
+        status: e.status,
+        registration_open: e.registrationOpen,
+        show_on_main: showOnMain,
+      }),
+    })
+    if (res.ok) setEvents((prev) => prev.map((x) => (x.id === e.id ? { ...x, showOnMain } : x)))
+  }
+
   // Attendee lists already loaded this session — reopening an event shows
   // them instantly while a fresh copy loads in the background.
   const regsCacheRef = useRef<Record<string, Registration[]>>({})
@@ -717,6 +743,27 @@ export function EventsClient({
                         <Globe className="h-3 w-3 shrink-0" />
                         <span className="truncate">{e.agentId ? `${e.ownerName ?? "Agent"}'s website` : "Company · /events"}</span>
                       </p>
+                    )}
+                    {/* The admin's pick: an agent's event on the main Events page too (067). */}
+                    {!own && e.agentId && (
+                      <button
+                        type="button"
+                        onClick={() => void toggleShowOnMain(e)}
+                        aria-pressed={e.showOnMain}
+                        className={`mb-1.5 ml-1.5 inline-flex max-w-full items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                          e.showOnMain
+                            ? "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100"
+                            : "border border-dashed border-[#d1d5db] text-[#6b7280] hover:border-[#001f3f] hover:text-[#001f3f]"
+                        }`}
+                        title={
+                          e.showOnMain
+                            ? "Also listed on fhiglobal.ae/events — click to take it off the main page"
+                            : "Only on the agent's website — click to list it on fhiglobal.ae/events too"
+                        }
+                      >
+                        {e.showOnMain ? <Check className="h-3 w-3 shrink-0" /> : <Plus className="h-3 w-3 shrink-0" />}
+                        <span className="truncate">{e.showOnMain ? "On fhiglobal.ae" : "Add to fhiglobal.ae"}</span>
+                      </button>
                     )}
                     <h3 className="font-['Outfit'] font-bold text-[#111827] truncate">{e.title}</h3>
                     <p className="text-xs text-[#6b7280] mt-1">{eventDateLabel(e.eventDate)}</p>

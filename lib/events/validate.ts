@@ -37,6 +37,9 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
   // rather than saved as a broken player.
   const rawVideo = typeof body.video_url === "string" ? body.video_url.trim().slice(0, 1000) : ""
   const video_url = body.video_url !== undefined ? (rawVideo && isPlayableVideoUrl(rawVideo) ? rawVideo : null) : undefined
+  // Admin pick (migration 067): an agent's event also listed on /events. Only
+  // when sent; the PATCH route drops it for owners.
+  const show_on_main = body.show_on_main !== undefined ? body.show_on_main === true : undefined
   return {
     title,
     description: description || null,
@@ -49,5 +52,6 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
     ...(registration_fields !== undefined ? { registration_fields } : {}),
     ...(certificate !== undefined ? { certificate } : {}),
     ...(video_url !== undefined ? { video_url } : {}),
+    ...(show_on_main !== undefined ? { show_on_main } : {}),
   }
 }

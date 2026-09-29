@@ -12,7 +12,7 @@ import { submitToIndexNow } from "@/lib/indexnow"
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 // Fields editors can change via sanitizeEventInput — diffed for the audit trail.
-const EDITABLE = ["title", "description", "brand", "image_url", "venue", "status", "event_date", "registration_open", "registration_fields", "certificate", "video_url"] as const
+const EDITABLE = ["title", "description", "brand", "image_url", "venue", "status", "event_date", "registration_open", "registration_fields", "certificate", "video_url", "show_on_main"] as const
 
 type ExistingEvent = Record<(typeof EDITABLE)[number], unknown> & { id: string }
 
@@ -53,11 +53,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!input.title) {
     return NextResponse.json({ error: "Title is required" }, { status: 400 })
   }
+  // Only admin staff decide what the main /events page lists (migration 067).
+  if (g.scope.kind === "own") delete input.show_on_main
 
   const admin = createAdminSupabase()
   let existingQuery = admin
     .from("events")
-    .select("id, slug, agent_id, title, description, brand, image_url, venue, status, event_date, registration_open, registration_fields, certificate, video_url")
+    .select("id, slug, agent_id, title, description, brand, image_url, venue, status, event_date, registration_open, registration_fields, certificate, video_url, show_on_main")
     .eq("id", id)
     .is("deleted_at", null)
   if (g.scope.kind === "own") existingQuery = existingQuery.eq("agent_id", g.scope.agentId)
@@ -116,6 +118,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const publicPath = eventPublicPath(existing, site?.isPublished ? site.slug : null)
   revalidatePath(publicPath)
   if (publicPath !== `/events/${existing.slug ?? id}`) revalidatePath(`/events/${existing.slug ?? id}`)
+  // The list page decides by status and show_on_main — both may have just changed.
+  revalidatePath("/events")
   if (input.status === "published") {
     const loc = `${SITE_URL.replace(/\/$/, "")}${publicPath}`
     after(() => submitToIndexNow([loc]))

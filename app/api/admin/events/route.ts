@@ -30,7 +30,7 @@ export async function GET() {
   const admin = createAdminSupabase()
   let query = admin
     .from("events")
-    .select("id, slug, title, description, brand, image_url, video_url, event_date, venue, status, registration_open, registration_fields, certificate, created_at, view_count, qr_scan_count, agent_id, owner:profiles!events_agent_id_fkey(fullname), event_registrations(count)")
+    .select("id, slug, title, description, brand, image_url, video_url, event_date, venue, status, registration_open, registration_fields, certificate, created_at, view_count, qr_scan_count, agent_id, show_on_main, owner:profiles!events_agent_id_fkey(fullname), event_registrations(count)")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
   if (access.scope.kind === "own") query = query.eq("agent_id", access.scope.agentId)
@@ -71,6 +71,8 @@ export async function GET() {
       /** null = company event on /events; otherwise the agent it belongs to. */
       agentId,
       ownerName: agentId ? (owner?.fullname ?? null) : null,
+      /** Admin pick (067): an agent's event also listed on fhiglobal.ae/events. */
+      showOnMain: (e.show_on_main as boolean | null) === true,
       publicPath: eventPublicPath(
         { id: e.id as string, slug: (e.slug as string | null) ?? null },
         agentId ? siteByAgent.get(agentId) : null,
