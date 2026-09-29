@@ -561,6 +561,8 @@ export type BuyerLead = {
   kind: BriefKind
   /** A buyer's or a seller's answers, per `kind`. */
   profile: BriefProfile
+  /** Only from the admin API (/api/admin/buyer-leads): whose link the brief came through. */
+  agent?: { id: string; name: string } | null
   created_at: string
 }
 

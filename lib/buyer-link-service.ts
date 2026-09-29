@@ -31,3 +31,15 @@ export async function fetchMyBuyerLeads(agentId: string): Promise<{ leads: Buyer
     return { leads: [], error: (error as Error).message }
   }
 }
+
+/** Admin staff: every agent's briefs, each with its agent (GET /api/admin/buyer-leads). */
+export async function fetchAllBuyerLeads(): Promise<{ leads: BuyerLead[]; error: string | null }> {
+  try {
+    const res = await fetch("/api/admin/buyer-leads")
+    const json = (await res.json().catch(() => ({}))) as { leads?: BuyerLead[]; error?: string }
+    if (!res.ok || !json.leads) return { leads: [], error: json.error ?? `Request failed (${res.status}).` }
+    return { leads: json.leads, error: null }
+  } catch (error) {
+    return { leads: [], error: (error as Error).message }
+  }
+}

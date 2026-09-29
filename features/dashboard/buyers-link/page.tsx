@@ -16,7 +16,7 @@ import {
   Loader2, MessageCircle, RefreshCw, Search, Users,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
-import { canUseBuyerLinks } from "@/lib/app-roles"
+import { canUseBuyerLinks, isAdminStaffRole } from "@/lib/app-roles"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { titleCaseName } from "@/lib/public-profile"
 import {
@@ -24,7 +24,7 @@ import {
   contactTimeLabel, formatAed, formatSqft, leadGrade, sellerAnswerLabel, sellerLinkPath, waDigits,
   type BriefKind, type BuyerLead, type BuyerLink, type Choice, type LeadGrade, type QuestionKey, type SellerQuestionKey,
 } from "@/lib/buyer-links"
-import { fetchMyBuyerLeads, fetchMyBuyerLink } from "@/lib/buyer-link-service"
+import { fetchAllBuyerLeads, fetchMyBuyerLeads, fetchMyBuyerLink } from "@/lib/buyer-link-service"
 
 const PAGE_SIZE = 10
 /** A brief this recent gets a "New" badge. */
@@ -300,9 +300,12 @@ const VIEWS: Record<View, ViewConfig> = {
   },
 }
 
-export default function BuyersLinkPage() {
+export default function BuyersLinkPage({ scope = "agent" }: { scope?: "agent" | "admin" }) {
+  // "admin" (Communication → Buyer Leads): every agent's briefs, read-only —
+  // no link or QR of their own; an Agent column, filter and totals instead.
+  const admin = scope === "admin"
   const { user, profile, role } = useAuth()
-  const allowed = useRequireAllowed(canUseBuyerLinks(role))
+  const allowed = useRequireAllowed(admin ? isAdminStaffRole(role) : canUseBuyerLinks(role))
   const userId = user?.id ?? null
 
   const [origin, setOrigin] = useState("")
@@ -319,18 +322,22 @@ export default function BuyersLinkPage() {
 
   const [view, setView] = useState<View>("buyers")
   const [query, setQuery] = useState("")
-  const [filters, setFilters] = useState<Record<View, string[]>>({ buyers: ["", "", ""], sellers: ["", ""] })
+  // One slot per filter, plus the admin's Agent filter in front (unused for agents).
+  const [filters, setFilters] = useState<Record<View, string[]>>({ buyers: ["", "", "", ""], sellers: ["", "", ""] })
   const [page, setPage] = useState(1)
   const [openId, setOpenId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!allowed || !userId) return
     let live = true
-    void Promise.all([fetchMyBuyerLink(), fetchMyBuyerLeads(userId)]).then(([mine, briefs]) => {
+    const load = admin
+      ? fetchAllBuyerLeads().then((briefs) => ({ mine: null, briefs }))
+      : Promise.all([fetchMyBuyerLink(), fetchMyBuyerLeads(userId)]).then(([mine, briefs]) => ({ mine, briefs }))
+    void load.then(({ mine, briefs }) => {
       if (!live) return
       setOrigin(window.location.origin)
-      setLink(mine.link)
-      setLinkError(mine.error)
+      setLink(mine?.link ?? null)
+      setLinkError(mine?.error ?? null)
       setLeads(briefs.leads)
       setLeadsError(briefs.error)
       setLoadedAt(Date.now())
@@ -338,7 +345,7 @@ export default function BuyersLinkPage() {
     return () => {
       live = false
     }
-  }, [allowed, userId, reloadKey])
+  }, [allowed, userId, reloadKey, admin])
 
   const cfg = VIEWS[view]
   const all = useMemo(() => leads ?? [], [leads])
@@ -347,22 +354,47 @@ export default function BuyersLinkPage() {
     return { buyers: all.length - sellers, sellers }
   }, [all])
   const pool = useMemo(() => all.filter((l) => (l.kind ?? "buyer") === cfg.kind), [all, cfg])
+  // Admin: whose link each brief came through — a filter, a column, a search field, a total.
+  const ownerName = (l: BuyerLead) => l.agent?.name ?? ""
+  const agentOptions = useMemo<Choice[]>(() => {
+    const seen = new Map<string, string>()
+    for (const l of all) if (l.agent && !seen.has(l.agent.id)) seen.set(l.agent.id, l.agent.name)
+    return [...seen].map(([value, label]) => ({ value, label })).sort((x, y) => x.label.localeCompare(y.label))
+  }, [all])
+  const activeFilters = useMemo<Filter[]>(
+    () => (admin ? [{ any: "Any agent", aria: "Filter by agent", options: agentOptions, get: (l) => l.agent_id }, ...cfg.filters] : cfg.filters),
+    [admin, agentOptions, cfg],
+  )
+  const stats = useMemo(() => {
+    // Measured from when the list was loaded (state), so the memo stays pure.
+    const weekAgo = loadedAt - 7 * 24 * 60 * 60 * 1000
+    const grade = cfg.grade
+    return [
+      { label: cfg.kind === "seller" ? "Seller briefs" : "Buyer briefs", value: pool.length },
+      { label: "This week", value: pool.filter((l) => new Date(l.created_at).getTime() >= weekAgo).length },
+      grade
+        ? { label: "Priority", value: pool.filter((l) => grade(l) === "priority").length }
+        : { label: "Want a valuation", value: pool.filter((l) => txt(l, "valuation") === "yes").length },
+      { label: "Agents", value: new Set(pool.map((l) => l.agent_id)).size },
+    ]
+  }, [pool, cfg, loadedAt])
   const picked = filters[view]
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     const digits = q.replace(/\D/g, "")
     return pool.filter((l) => {
-      if (cfg.filters.some((f, i) => picked[i] && f.get(l) !== picked[i])) return false
+      if (activeFilters.some((f, i) => picked[i] && f.get(l) !== picked[i])) return false
       if (!q) return true
       return (
         l.name.toLowerCase().includes(q) ||
         (l.email ?? "").toLowerCase().includes(q) ||
         txt(l, "nationality").toLowerCase().includes(q) ||
+        ownerName(l).toLowerCase().includes(q) ||
         cfg.searchText(l).toLowerCase().includes(q) ||
         (digits.length >= 3 && `${l.whatsapp_code}${l.whatsapp}`.replace(/\D/g, "").includes(digits))
       )
     })
-  }, [pool, query, picked, cfg])
+  }, [pool, query, picked, cfg, activeFilters])
 
   if (!allowed) return null
 
@@ -417,7 +449,7 @@ export default function BuyersLinkPage() {
   const refresh = async () => {
     if (!userId) return
     setRefreshing(true)
-    const briefs = await fetchMyBuyerLeads(userId)
+    const briefs = admin ? await fetchAllBuyerLeads() : await fetchMyBuyerLeads(userId)
     setLeads(briefs.leads)
     setLeadsError(briefs.error)
     setLoadedAt(Date.now())
@@ -426,13 +458,18 @@ export default function BuyersLinkPage() {
 
   // ── Exports: the whole filtered list, not just the visible page ──
 
+  const csvCols = admin ? [{ header: "Agent", get: ownerName }, ...cfg.csv] : cfg.csv
+  const pdfHeads = admin ? ["Agent", ...cfg.pdf.heads] : cfg.pdf.heads
+  const pdfCells = (l: BuyerLead) => (admin ? [ownerName(l), ...cfg.pdf.cells(l)] : cfg.pdf.cells(l))
+  const pdfTitle = admin ? (view === "sellers" ? "Seller Leads" : "Buyer Leads") : cfg.pdf.title
+
   const exportExcel = () => {
-    const table = [cfg.csv.map((c) => c.header), ...visible.map((l) => cfg.csv.map((c) => c.get(l)))]
+    const table = [csvCols.map((c) => c.header), ...visible.map((l) => csvCols.map((c) => c.get(l)))]
     // BOM so Excel opens UTF-8 names (ñ, Arabic, …) correctly.
     const csv = "﻿" + table.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n")
     const a = document.createElement("a")
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }))
-    a.download = `${cfg.csvName}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `${admin ? `all-${view}` : cfg.csvName}-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(a.href)
   }
@@ -447,11 +484,11 @@ export default function BuyersLinkPage() {
         (l, i) => `<tr>
           <td class="n">${i + 1}</td>
           <td><strong>${esc(l.name)}</strong><br><span class="sub">${esc(`${l.whatsapp_code} ${l.whatsapp}`)}${l.email ? ` · ${esc(l.email)}` : ""}</span></td>
-          ${cfg.pdf.cells(l).map((c) => `<td>${esc(c || "—")}</td>`).join("")}
+          ${pdfCells(l).map((c) => `<td>${esc(c || "—")}</td>`).join("")}
         </tr>`,
       )
       .join("")
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(cfg.pdf.title)} — ${esc(agentName)}</title>
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(pdfTitle)} — ${esc(agentName)}</title>
 <style>
   * { box-sizing: border-box; margin: 0; }
   body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; padding: 32px; }
@@ -470,14 +507,14 @@ export default function BuyersLinkPage() {
   .foot b { color: #b8913f; }
   @page { size: landscape; margin: 12mm; }
 </style></head><body>
-  <div class="band"><p class="gold">${esc(cfg.pdf.band)}</p><h1>${esc(cfg.pdf.title)}</h1></div>
+  <div class="band"><p class="gold">${esc(cfg.pdf.band)}</p><h1>${esc(pdfTitle)}</h1></div>
   <div class="meta">
-    <span>Agent: <strong>${esc(agentName)}</strong></span>
+    <span>${admin ? "Prepared by" : "Agent"}: <strong>${esc(agentName)}</strong></span>
     <span>Generated: <strong>${esc(generated)}</strong></span>
     <span>${view === "sellers" ? "Sellers" : "Buyers"}: <strong>${visible.length}</strong></span>
   </div>
   <table>
-    <thead><tr><th>#</th><th>${view === "sellers" ? "Owner" : "Client"}</th>${cfg.pdf.heads.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead>
+    <thead><tr><th>#</th><th>${view === "sellers" ? "Owner" : "Client"}</th>${pdfHeads.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead>
     <tbody>${body}</tbody>
   </table>
   <p class="foot">Generated from the FHI Global dashboard · <b>fhiglobal.ae</b></p>
@@ -519,9 +556,11 @@ export default function BuyersLinkPage() {
         <div>
           <h1 className="flex items-center gap-2 font-['Outfit'] text-2xl font-bold text-[#0d1117]">
             <Link2 className="h-6 w-6 text-[#001f3f]" />
-            Buyers Link
+            {admin ? "Buyer Leads" : "Buyers Link"}
           </h1>
-          <p className="mt-1 max-w-3xl text-sm text-[#6b7280]">{cfg.intro}</p>
+          <p className="mt-1 max-w-3xl text-sm text-[#6b7280]">
+            {admin ? "Every agent's Buyers Link briefs in one place, read-only. Each lead stays with the agent whose link it came through." : cfg.intro}
+          </p>
         </div>
         {/* Segmented toggle: which link the QR and the list are for. */}
         <div className="inline-flex shrink-0 self-start rounded-xl border border-[#e5e7eb] bg-white p-1">
@@ -530,146 +569,161 @@ export default function BuyersLinkPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[280px_1fr]">
-        {/* ── Left: the QR card ── */}
-        <div className="space-y-4 self-start lg:sticky lg:top-0">
-          <div
-            className={`flex flex-col items-center rounded-2xl border p-6 ${
-              dark ? "border-[#d6b357]/50 bg-[#001f3f] text-white" : "border-[#e8eaed] bg-white"
-            }`}
-          >
-            <div className="rounded-2xl border-4 border-[#d6b357] bg-white p-4">
-              {url ? (
-                <QRCodeSVG value={url} size={190} level="M" fgColor="#001f3f" />
-              ) : (
-                <div className={`h-[190px] w-[190px] rounded-xl bg-[#f3f4f6] ${linkError ? "" : "animate-pulse"}`} />
-              )}
-            </div>
-            <p className={`mt-4 text-center font-['Outfit'] text-lg font-bold ${dark ? "text-[#d6b357]" : "text-[#001f3f]"}`}>{cfg.qrTitle}</p>
-            {cfg.qrNote && <p className="mt-1.5 text-center text-[11px] leading-relaxed text-white/70">{cfg.qrNote}</p>}
-
-            {linkError ? (
-              <div className="mt-3 w-full text-center">
-                <p className={`text-xs ${dark ? "text-rose-300" : "text-rose-600"}`}>Couldn&apos;t load your link. {linkError}</p>
-                <button
-                  type="button"
-                  onClick={() => setReloadKey((k) => k + 1)}
-                  className={`mt-2 text-xs font-bold underline ${dark ? "text-white" : "text-[#001f3f]"}`}
-                >
-                  Try again
-                </button>
+      <div className={admin ? "grid grid-cols-1 gap-6" : "grid grid-cols-1 items-start gap-6 lg:grid-cols-[280px_1fr]"}>
+        {/* ── Left: the QR card (agents only) ── */}
+        {!admin && (
+          <div className="space-y-4 self-start lg:sticky lg:top-0">
+            <div
+              className={`flex flex-col items-center rounded-2xl border p-6 ${
+                dark ? "border-[#d6b357]/50 bg-[#001f3f] text-white" : "border-[#e8eaed] bg-white"
+              }`}
+            >
+              <div className="rounded-2xl border-4 border-[#d6b357] bg-white p-4">
+                {url ? (
+                  <QRCodeSVG value={url} size={190} level="M" fgColor="#001f3f" />
+                ) : (
+                  <div className={`h-[190px] w-[190px] rounded-xl bg-[#f3f4f6] ${linkError ? "" : "animate-pulse"}`} />
+                )}
               </div>
-            ) : (
-              url && (
-                <p
-                  className={`mt-3 w-full select-all break-words rounded-lg px-3 py-2 text-center font-mono text-[11.5px] leading-relaxed ${
-                    dark ? "bg-white/10 text-white/85" : "bg-[#f4f6f9] text-[#374151]"
-                  }`}
-                  title={url}
-                >
-                  {/* Line breaks only after a slash, so the agent's name stays whole. */}
-                  {url
-                    .replace(/^https?:\/\//, "")
-                    .split("/")
-                    .map((part, i, all) => (
-                      <Fragment key={i}>
-                        {part}
-                        {i < all.length - 1 && (
-                          <>
-                            /<wbr />
-                          </>
-                        )}
-                      </Fragment>
-                    ))}
+              <p className={`mt-4 text-center font-['Outfit'] text-lg font-bold ${dark ? "text-[#d6b357]" : "text-[#001f3f]"}`}>{cfg.qrTitle}</p>
+              {cfg.qrNote && <p className="mt-1.5 text-center text-[11px] leading-relaxed text-white/70">{cfg.qrNote}</p>}
+
+              {linkError ? (
+                <div className="mt-3 w-full text-center">
+                  <p className={`text-xs ${dark ? "text-rose-300" : "text-rose-600"}`}>Couldn&apos;t load your link. {linkError}</p>
+                  <button
+                    type="button"
+                    onClick={() => setReloadKey((k) => k + 1)}
+                    className={`mt-2 text-xs font-bold underline ${dark ? "text-white" : "text-[#001f3f]"}`}
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : (
+                url && (
+                  <p
+                    className={`mt-3 w-full select-all break-words rounded-lg px-3 py-2 text-center font-mono text-[11.5px] leading-relaxed ${
+                      dark ? "bg-white/10 text-white/85" : "bg-[#f4f6f9] text-[#374151]"
+                    }`}
+                    title={url}
+                  >
+                    {/* Line breaks only after a slash, so the agent's name stays whole. */}
+                    {url
+                      .replace(/^https?:\/\//, "")
+                      .split("/")
+                      .map((part, i, all) => (
+                        <Fragment key={i}>
+                          {part}
+                          {i < all.length - 1 && (
+                            <>
+                              /<wbr />
+                            </>
+                          )}
+                        </Fragment>
+                      ))}
+                  </p>
+                )
+              )}
+              {link && !link.is_active && (
+                <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-center text-[11.5px] font-semibold text-amber-800">
+                  This link is switched off, so clients can&apos;t send a brief. Ask an admin to turn it back on.
                 </p>
-              )
-            )}
-            {link && !link.is_active && (
-              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-center text-[11.5px] font-semibold text-amber-800">
-                This link is switched off, so clients can&apos;t send a brief. Ask an admin to turn it back on.
-              </p>
-            )}
+              )}
 
-            {/* Hidden high-resolution canvas used for the PNG download. */}
-            <div ref={downloadRef} className="hidden" aria-hidden>
-              {url && <QRCodeCanvas value={url} size={1024} level="M" fgColor="#001f3f" marginSize={4} />}
-            </div>
+              {/* Hidden high-resolution canvas used for the PNG download. */}
+              <div ref={downloadRef} className="hidden" aria-hidden>
+                {url && <QRCodeCanvas value={url} size={1024} level="M" fgColor="#001f3f" marginSize={4} />}
+              </div>
 
-            <div className="mt-5 w-full space-y-2">
-              <button
-                type="button"
-                onClick={downloadQr}
-                disabled={!url}
-                className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 ${
-                  dark ? "bg-[#d6b357] text-[#001f3f] hover:bg-[#c8a544]" : "bg-[#001f3f] text-white hover:bg-[#00356b]"
-                }`}
-              >
-                <Download className="h-4 w-4" />
-                Download QR
-              </button>
-              <a
-                href={url ? `https://wa.me/?text=${encodeURIComponent(cfg.share(url))}` : undefined}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-disabled={!url}
-                className={`inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#25d366] px-4 py-3 text-sm font-bold transition-colors hover:bg-[#25d366]/10 ${
-                  dark ? "text-[#7fe3a5]" : "text-[#128c4b]"
-                } ${url ? "" : "pointer-events-none opacity-40"}`}
-              >
-                <MessageCircle className="h-4 w-4" />
-                Share on WhatsApp
-              </a>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="mt-5 w-full space-y-2">
                 <button
                   type="button"
-                  onClick={() => void copy()}
+                  onClick={downloadQr}
                   disabled={!url}
-                  className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-3 text-sm font-bold transition-colors disabled:opacity-40 ${
-                    copied
-                      ? dark
-                        ? "border border-emerald-400/40 bg-emerald-500/20 text-emerald-200"
-                        : "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                      : dark
-                        ? "border border-white/25 text-white hover:border-[#d6b357] hover:text-[#d6b357]"
-                        : "border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f]"
+                  className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 ${
+                    dark ? "bg-[#d6b357] text-[#001f3f] hover:bg-[#c8a544]" : "bg-[#001f3f] text-white hover:bg-[#00356b]"
                   }`}
                 >
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  {copied ? "Copied!" : "Copy"}
+                  <Download className="h-4 w-4" />
+                  Download QR
                 </button>
                 <a
-                  href={url || undefined}
+                  href={url ? `https://wa.me/?text=${encodeURIComponent(cfg.share(url))}` : undefined}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-disabled={!url}
-                  className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border px-3 py-3 text-sm font-bold transition-colors ${
-                    dark
-                      ? "border-white/25 text-white hover:border-[#d6b357] hover:text-[#d6b357]"
-                      : "border-[#e5e5e5] text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f]"
+                  className={`inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#25d366] px-4 py-3 text-sm font-bold transition-colors hover:bg-[#25d366]/10 ${
+                    dark ? "text-[#7fe3a5]" : "text-[#128c4b]"
                   } ${url ? "" : "pointer-events-none opacity-40"}`}
                 >
-                  <ExternalLink className="h-4 w-4" />
-                  Preview
+                  <MessageCircle className="h-4 w-4" />
+                  Share on WhatsApp
                 </a>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void copy()}
+                    disabled={!url}
+                    className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-3 text-sm font-bold transition-colors disabled:opacity-40 ${
+                      copied
+                        ? dark
+                          ? "border border-emerald-400/40 bg-emerald-500/20 text-emerald-200"
+                          : "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : dark
+                          ? "border border-white/25 text-white hover:border-[#d6b357] hover:text-[#d6b357]"
+                          : "border border-[#e5e5e5] text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f]"
+                    }`}
+                  >
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copied ? "Copied!" : "Copy"}
+                  </button>
+                  <a
+                    href={url || undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-disabled={!url}
+                    className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border px-3 py-3 text-sm font-bold transition-colors ${
+                      dark
+                        ? "border-white/25 text-white hover:border-[#d6b357] hover:text-[#d6b357]"
+                        : "border-[#e5e5e5] text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f]"
+                    } ${url ? "" : "pointer-events-none opacity-40"}`}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Preview
+                  </a>
+                </div>
               </div>
+            </div>
+
+            {/* ── How it works ── */}
+            <div className="rounded-2xl border border-[#e8eaed] bg-white p-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#b8913f]">How it works</p>
+              <ol className="mt-3 space-y-3">
+                {cfg.how.map((t, i) => (
+                  <li key={i} className="flex gap-3 text-[13px] leading-snug text-[#374151]">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#001f3f] text-[11px] font-bold text-[#d6b357]">
+                      {i + 1}
+                    </span>
+                    {t}
+                  </li>
+                ))}
+              </ol>
             </div>
           </div>
 
-          {/* ── How it works ── */}
-          <div className="rounded-2xl border border-[#e8eaed] bg-white p-5">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#b8913f]">How it works</p>
-            <ol className="mt-3 space-y-3">
-              {cfg.how.map((t, i) => (
-                <li key={i} className="flex gap-3 text-[13px] leading-snug text-[#374151]">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#001f3f] text-[11px] font-bold text-[#d6b357]">
-                    {i + 1}
-                  </span>
-                  {t}
-                </li>
-              ))}
-            </ol>
+        )}
+
+        {/* ── Admin: the numbers behind this view's list ── */}
+        {admin && (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {stats.map((s) => (
+              <div key={s.label} className="rounded-2xl border border-[#e8eaed] bg-white px-4 py-3">
+                <p className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-[#b8913f]">{s.label}</p>
+                <p className="mt-1 font-['Outfit'] text-2xl font-bold text-[#0d1117]">{leads ? s.value : "—"}</p>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
 
         {/* ── Right: the clients this view's link brought in ── */}
         <div className="@container min-w-0 rounded-2xl border border-[#e8eaed] bg-white p-5">
@@ -708,7 +762,7 @@ export default function BuyersLinkPage() {
                 />
               </div>
               <div className="flex flex-wrap gap-2">
-                {cfg.filters.map((f, i) => (
+                {activeFilters.map((f, i) => (
                   <select
                     key={f.aria}
                     value={picked[i]}
@@ -773,7 +827,7 @@ export default function BuyersLinkPage() {
                 const first = l.name.trim().split(/\s+/)[0]
                 const wa = waDigits(l.whatsapp_code, l.whatsapp)
                 const isNew = loadedAt - new Date(l.created_at).getTime() < NEW_FOR_MS
-                const cols = cfg.cols(l)
+                const cols = admin ? [{ label: "Agent", value: ownerName(l), full: ownerName(l), w: "w-[132px]" }, ...cfg.cols(l)] : cfg.cols(l)
                 const grade = cfg.grade ? LEAD_GRADES[cfg.grade(l)] : null
                 return (
                   <li key={l.id} className="py-3">
@@ -814,7 +868,7 @@ export default function BuyersLinkPage() {
                           </div>
                         ))}
                       </div>
-                      {wa && (
+                      {wa && !admin && (
                         <a
                           href={`https://wa.me/${wa}?text=${encodeURIComponent(cfg.hello(first, agentFirst))}`}
                           target="_blank"

@@ -218,6 +218,8 @@ const ADMIN_NAV: RoleNavEntry[] = [
     icon: MessagesSquare,
     items: [
       { icon: Inbox, label: "Contact Inbox", to: "contact-inbox", description: "Enquiries sent from the public site.", mock: "contact-inbox" },
+      // Every agent's Buyers Link briefs, read-only (the agent's own page is under Agent Resource).
+      { icon: Link2, label: "Buyer Leads", to: "buyer-leads", description: "Every agent's Buyers Link briefs, graded — read-only.", mock: "buyers-link" },
       { ...SUPPORT_TICKETS,                                        description: "Tickets raised by agents and clients.", mock: "support-tickets" },
       { ...FEEDBACK,                                               description: "Client reviews of advisors — approve the ones shown on their websites.", mock: "customer-feedback" },
     ],
