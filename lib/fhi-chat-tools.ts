@@ -508,8 +508,9 @@ async function agentNetwork(admin: Admin, args: { name?: string; from_date?: str
   const from = (args.from_date ?? "").trim() || null
   const to = (args.to_date ?? "").trim() || null
   const sold = new Map<string, { deals: number; value: number }>()
-  for (const s of await fetchAllSales(admin)) {
-    if (s.validation_status !== "validated" || !inRange(s, from, to)) continue
+  const allSales = await fetchAllSales(admin)
+  const validSales = allSales.filter((s) => s.validation_status === "validated" && inRange(s, from, to))
+  for (const s of validSales) {
     for (const c of saleCredits(s)) {
       const t = sold.get(c.agentId) ?? { deals: 0, value: 0 }
       t.deals += 1
@@ -547,6 +548,36 @@ async function agentNetwork(admin: Admin, args: { name?: string; from_date?: str
   const direct = (children.get(root.id) ?? []).map((c) => ({ ...c, branch: branchSize(c.id), branchSales: branchSales(c.id) })).sort((a, b) => b.branchSales.value - a.branchSales.value || b.branch - a.branch)
   const rootProfile = byId.get(root.id)
 
+  // The deals themselves — "which projects did the network sell": one line per
+  // credited network member, newest first, named through the same maps the
+  // sales tools use.
+  const levelOf = new Map(nodes.map((n) => [n.p.id, n]))
+  const names = await nameMaps(admin, validSales)
+  const networkDeals = validSales
+    .flatMap((s) => saleCredits(s).filter((c) => levelOf.has(c.agentId)).map((c) => ({ s, c })))
+    .sort((a, b) => businessDate(b.s).localeCompare(businessDate(a.s)))
+    .map(({ s, c }) => {
+      const n = levelOf.get(c.agentId) as Node
+      return {
+        date: businessDate(s),
+        agent: n.p.fullname,
+        level: n.level,
+        recruited_by: n.via,
+        project: names.proj.get(Number(s.project_id))?.name ?? null,
+        developer: names.dev.get(String(s.developer_id))?.name ?? null,
+        credited: AED(c.value),
+        ...(c.share !== 100 ? { share: `${c.share}% of ${AED(Number(s.contract_price ?? 0))}` } : {}),
+      }
+    })
+  const byProject = new Map<string, { deals: number; value: number }>()
+  for (const d of networkDeals) {
+    const k = d.project ?? "Other"
+    const t = byProject.get(k) ?? { deals: 0, value: 0 }
+    t.deals += 1
+    t.value += Number(String(d.credited).replace(/[^0-9]/g, ""))
+    byProject.set(k, t)
+  }
+
   return {
     person: root.fullname,
     other_name_matches: candidates.slice(1).map((m) => m.fullname),
@@ -566,6 +597,9 @@ async function agentNetwork(admin: Admin, args: { name?: string; from_date?: str
       people_under_them: c.branch,
       branch_validated_sales: { deals: c.branchSales.deals, total: AED(c.branchSales.value) },
     })),
+    network_deals_by_project: [...byProject].sort((a, b) => b[1].value - a[1].value).map(([project, t]) => ({ project, deals: t.deals, total: AED(t.value) })),
+    network_deals: networkDeals.slice(0, 40),
+    network_deals_listed: Math.min(40, networkDeals.length),
     top_sellers_in_network: sellers.slice(0, 15).map((n) => ({
       name: n.p.fullname, level: n.level, recruited_by: n.via, role: n.p.role,
       deals: sold.get(n.p.id)?.deals ?? 0, total: AED(sold.get(n.p.id)?.value ?? 0),
@@ -2275,7 +2309,7 @@ export const FHI_CHAT_TOOLS = [
     function: {
       name: "agent_network",
       description:
-        "The WHOLE NETWORK (downline, all levels) of ONE SPECIFIC PERSON: their recruits, their recruits' recruits and so on — how many per level, statuses, and the VALIDATED sales of everyone in the network combined, plus each direct recruit's branch (branch size and branch sales) and the top sellers in the network with their level. Use for 'whole network', 'downline', 'all levels', 'everyone under X', 'how much did X's network/team sell all in all'. For DIRECT recruits only use agent_recruits. Requires the person's name.",
+        "The WHOLE NETWORK (downline, all levels) of ONE SPECIFIC PERSON: their recruits, their recruits' recruits and so on — how many per level, statuses, the VALIDATED sales of everyone in the network combined, each direct recruit's branch (branch size and branch sales), the top sellers with their level, the network's deals grouped by project, and the deals themselves (date, agent, level, project, developer, credited amount). Use for 'whole network', 'downline', 'all levels', 'everyone under X', 'how much did X's network/team sell all in all'. For DIRECT recruits only use agent_recruits. Requires the person's name.",
       parameters: {
         type: "object",
         properties: {
