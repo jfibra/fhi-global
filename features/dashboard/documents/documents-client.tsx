@@ -316,7 +316,7 @@ export function DocumentsClient() {
       )}
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+        <div className="grid grid-cols-4 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="aspect-[2/3] w-full animate-pulse rounded-lg bg-[#eef1f5]" />
           ))}
@@ -328,7 +328,7 @@ export function DocumentsClient() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+        <div className="grid grid-cols-4 gap-4">
           {shown.map((doc) => (
             <article key={doc.id} className="flex flex-col">
               <button
@@ -347,7 +347,7 @@ export function DocumentsClient() {
                   <FileTile fileName={doc.file_name} />
                 )}
                 <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-[#001f3f]/85 px-2.5 py-2 transition-opacity duration-200 group-hover:opacity-0">
-                  <span className="line-clamp-2 text-xs font-semibold leading-snug text-white">{doc.title}</span>
+                  <span className="block truncate text-xs font-semibold text-white">{doc.title}</span>
                 </span>
                 {/* Hover: the full (untruncated) title, centered over a full-card
                     dark overlay — replaces the bottom bar rather than sitting on
