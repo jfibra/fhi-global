@@ -9,6 +9,7 @@
 // exactly as stored — no on-the-fly optimizer work for hundreds of photos.
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { createPortal } from "react-dom"
 import { ChevronLeft, ChevronRight, X } from "lucide-react"
 
 export type GalleryPhoto = {
@@ -171,13 +172,13 @@ export function AlbumGrid({ photos, albumTitle }: { photos: GalleryPhoto[]; albu
         ))}
       </div>
 
-      {/* ── Lightbox ── */}
-      {open !== null && visible[open] && (
+      {/* ── Lightbox — portalled to <body>, above the site navbar (z-[1000]), which used to cover Close ── */}
+      {open !== null && visible[open] && createPortal(
         <div
           role="dialog"
           aria-modal="true"
           aria-label={`${albumTitle} — photo ${open + 1} of ${visible.length}`}
-          className="fixed inset-0 z-[100] bg-[#000c18]/95 flex items-center justify-center"
+          className="fixed inset-0 z-[1100] bg-[#000c18]/95 flex items-center justify-center"
           onClick={() => setOpen(null)}
         >
           <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-4 sm:px-6 py-4">
@@ -223,7 +224,8 @@ export function AlbumGrid({ photos, albumTitle }: { photos: GalleryPhoto[]; albu
           >
             <ChevronRight className="w-6 h-6" />
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   )

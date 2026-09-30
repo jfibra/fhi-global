@@ -31,7 +31,7 @@ export function VideoModal({ url, title = "Video", onClose }: { url: string; tit
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4"
+      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/85 p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"

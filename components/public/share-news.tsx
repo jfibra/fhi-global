@@ -55,7 +55,7 @@ export function ShareNews({ slug, title, className = "" }: { slug: string; title
       </button>
       {open &&
         createPortal(
-          <div className="fixed inset-0 z-[90]" role="dialog" aria-modal="true" aria-label="Share this story">
+          <div className="fixed inset-0 z-[1100]" role="dialog" aria-modal="true" aria-label="Share this story">
             <button type="button" aria-label="Close" onClick={() => setOpen(false)} className="absolute inset-0 bg-[#06182e]/45 backdrop-blur-[2px]" />
             <SharePanel
               url={url}
