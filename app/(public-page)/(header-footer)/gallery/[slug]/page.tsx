@@ -32,13 +32,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   })
 }
 
-function dateLabel(iso: string | null): string | null {
-  if (!iso) return null
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return null
-  return d.toLocaleDateString("en-AE", { year: "numeric", month: "long", day: "numeric" })
-}
-
 export default async function AlbumPage({ params }: Props) {
   const { slug } = await params
   const supabase = createPublicSupabaseClient()
@@ -62,7 +55,6 @@ export default async function AlbumPage({ params }: Props) {
     .limit(1000)
 
   const rows = (photos ?? []) as GalleryPhoto[]
-  const date = dateLabel(album.event_date)
 
   return (
     <div className="min-h-screen bg-[#fafafa]">
@@ -91,7 +83,6 @@ export default async function AlbumPage({ params }: Props) {
           <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:gap-x-0 sm:gap-y-4">
             {[
               { label: "Photos", value: rows.length.toLocaleString() },
-              ...(date ? [{ label: "Event Date", value: date }] : []),
             ].map((f) => (
               <div
                 key={f.label}
