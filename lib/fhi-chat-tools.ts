@@ -8,6 +8,7 @@ import { SITE_URL } from "@/lib/seo"
 import { DESIGNS as CARD_DESIGNS, isDesignId as isCardDesignId } from "@/features/business-card/card-render"
 import { sendAdminDirectEmail, sendCongratsEmail } from "@/lib/mailer"
 import { renderTopSellerCertificatePng } from "@/lib/congrats-poster"
+import { formatPrice, handoverLabel, isOffPlan, parsePaymentPlan, priceFromValue, priceToValue, statusLabel, unitsSummary, type ProjectSeoInput } from "@/lib/project-seo"
 import { BUYER_LEAD_COLUMNS, LEAD_GRADES, answerLabel, budgetLabel, leadGrade, sellerAnswerLabel, waDigits, type BuyerLead, type LeadGrade } from "@/lib/buyer-links"
 
 /**
@@ -2435,6 +2436,368 @@ async function leadsOverview(admin: Admin, args: LeadsArgs) {
   return out
 }
 
+// ─── Project knowledge: find projects by what a buyer wants; one project in depth ───
+
+type ProjectRow = {
+  id: number
+  name: string
+  slug: string
+  status: string | null
+  city: string | null
+  region: string | null
+  community: string | null
+  sub_community: string | null
+  location: string | null
+  launch_price_from: number | string | null
+  launch_price_to: number | string | null
+  currency: string | null
+  delivery_quarter: string | null
+  expected_completion_date: string | null
+  delivery_date: string | null
+  down_payment_percentage: number | string | null
+  payment_plan_details: string | null
+  installment_available: boolean | null
+  total_units: number | null
+  main_image: string | null
+  is_published: boolean | null
+  developers: { name: string; slug: string | null } | { name: string; slug: string | null }[] | null
+  project_property_types: { property_types: { name: string } | null }[] | null
+  project_units: { unit_type: string | null; bedrooms: number | null; size_sqft: number | string | null; price_from: number | string | null; price_to: number | string | null }[] | null
+}
+
+const PROJECT_FIND_COLUMNS =
+  "id, name, slug, status, city, region, community, sub_community, location, launch_price_from, launch_price_to, currency, delivery_quarter, expected_completion_date, delivery_date, down_payment_percentage, payment_plan_details, installment_available, total_units, main_image, is_published, developers(name, slug), project_property_types(property_types(name)), project_units(unit_type, bedrooms, size_sqft, price_from, price_to)"
+
+/** Abbreviations agents and buyers use for Dubai areas. */
+const AREA_ALIASES: Record<string, string> = {
+  jvc: "jumeirah village circle",
+  jvt: "jumeirah village triangle",
+  jlt: "jumeirah lakes towers",
+  jbr: "jumeirah beach residence",
+  mbr: "mohammed bin rashid",
+  "mbr city": "mohammed bin rashid",
+  difc: "dubai international financial centre",
+  dso: "dubai silicon oasis",
+  "the palm": "palm jumeirah",
+  marina: "dubai marina",
+  downtown: "downtown dubai",
+}
+
+const numOf = (v: number | string | null | undefined): number | null => {
+  if (v == null || v === "") return null
+  const n = typeof v === "number" ? v : Number(v)
+  return Number.isFinite(n) ? n : null
+}
+const oneRel = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null)
+
+function unitBeds(u: { unit_type: string | null; bedrooms: number | null }): number | null {
+  if (u.bedrooms != null && Number.isFinite(u.bedrooms)) return u.bedrooms
+  const t = (u.unit_type ?? "").toLowerCase()
+  if (/studio/.test(t)) return 0
+  const m = /(\d)\s*(?:br\b|bhk|bed)/.exec(t)
+  return m ? Number(m[1]) : null
+}
+
+function seoInputOf(p: ProjectRow): ProjectSeoInput {
+  const dev = oneRel(p.developers)
+  return {
+    name: p.name,
+    status: p.status,
+    community: p.community,
+    location: p.location,
+    city: p.city,
+    launch_price_from: p.launch_price_from,
+    launch_price_to: p.launch_price_to,
+    currency: p.currency,
+    delivery_quarter: p.delivery_quarter,
+    expected_completion_date: p.expected_completion_date,
+    delivery_date: p.delivery_date,
+    total_units: p.total_units,
+    down_payment_percentage: p.down_payment_percentage,
+    payment_plan_details: p.payment_plan_details,
+    installment_available: p.installment_available,
+    developer: dev ? { name: dev.name } : null,
+    propertyTypes: (p.project_property_types ?? []).map((t) => t.property_types?.name).filter((n): n is string => Boolean(n)),
+    units: (p.project_units ?? []).map((u) => ({ unit_type: u.unit_type, bedrooms: u.bedrooms, size_sqft: u.size_sqft, price_from: u.price_from })),
+  }
+}
+
+function projectUrl(p: ProjectRow): string | null {
+  const dev = oneRel(p.developers)
+  return dev?.slug && p.slug ? `${SITE_URL.replace(/\/$/, "")}/${dev.slug}/${p.slug}` : null
+}
+
+const handoverYear = (label: string | null): number | null => {
+  const m = /(20\d{2})/.exec(label ?? "")
+  return m ? Number(m[1]) : null
+}
+
+const areaOf = (p: ProjectRow) => [p.community, p.sub_community, p.location, p.region, p.city].filter(Boolean).join(", ")
+
+/** A one-line payment plan for lists: milestones when they read as a schedule, else the sentence. */
+function paymentPlanShort(p: ProjectRow): string | null {
+  const plan = parsePaymentPlan(p.payment_plan_details, p.down_payment_percentage)
+  if (plan.milestones.length >= 2) return plan.milestones.map((m) => `${m.percent}% ${m.label}`.trim()).join(" / ")
+  return plan.note ?? (plan.milestones[0] ? `${plan.milestones[0].percent}% down payment` : null)
+}
+
+type FindProjectsArgs = {
+  area?: string
+  developer_name?: string
+  bedrooms?: number
+  property_type?: string
+  status?: string
+  off_plan_only?: boolean
+  ready_only?: boolean
+  min_price?: number
+  max_price?: number
+  handover_year?: number
+  handover_by_year?: number
+  name_contains?: string
+  sort?: "price_asc" | "price_desc" | "handover" | "name"
+  limit?: number
+}
+
+/**
+ * The buyer's question turned into a shortlist: "1-bedroom in JVC under AED
+ * 1M", "Azizi projects handing over 2027", "ready villas". Every published
+ * project is loaded with its unit table and filtered here. Prices follow the
+ * public pages' rule (lib/project-seo.ts): the advertised "from" price can
+ * never undercut the cheapest real unit, and sub-AED 50K values are data slips.
+ * When bedrooms are asked for, the price is the cheapest unit OF THAT SIZE and
+ * projects whose unit table doesn't list that size are left out (and counted,
+ * so the answer can say so).
+ */
+async function findProjects(admin: Admin, args: FindProjectsArgs) {
+  const { data, error } = await admin
+    .from("projects")
+    .select(PROJECT_FIND_COLUMNS)
+    .is("deleted_at", null)
+    .eq("is_active", true)
+    .eq("is_published", true)
+    .limit(1000)
+  if (error) throw new Error(error.message)
+  let rows = (data ?? []) as unknown as ProjectRow[]
+  const lc = (s: string | null | undefined) => (s ?? "").toLowerCase()
+
+  if (args.area?.trim()) {
+    const raw = args.area.trim().toLowerCase()
+    const needle = AREA_ALIASES[raw] ?? raw
+    rows = rows.filter((p) => lc(areaOf(p)).includes(needle) || lc(areaOf(p)).includes(raw))
+  }
+  if (args.developer_name?.trim()) {
+    const n = args.developer_name.trim().toLowerCase()
+    rows = rows.filter((p) => lc(oneRel(p.developers)?.name).includes(n))
+  }
+  if (args.name_contains?.trim()) {
+    const n = args.name_contains.trim().toLowerCase()
+    rows = rows.filter((p) => lc(p.name).includes(n))
+  }
+  if (args.status) rows = rows.filter((p) => p.status === args.status)
+  if (args.off_plan_only) rows = rows.filter((p) => isOffPlan(p.status))
+  if (args.ready_only) rows = rows.filter((p) => !isOffPlan(p.status))
+  if (args.property_type?.trim()) {
+    const t = args.property_type.trim().toLowerCase().replace(/s$/, "")
+    rows = rows.filter((p) => {
+      const types = seoInputOf(p).propertyTypes ?? []
+      const units = (p.project_units ?? []).map((u) => lc(u.unit_type))
+      return types.some((x) => x.toLowerCase().includes(t)) || units.some((x) => x.includes(t))
+    })
+  }
+
+  const beds = typeof args.bedrooms === "number" && Number.isFinite(args.bedrooms) ? args.bedrooms : null
+  const typeNeedle = args.property_type?.trim() ? args.property_type.trim().toLowerCase().replace(/s$/, "") : null
+  let withoutUnitRows = 0
+  const scored = rows
+    .map((p) => {
+      const seo = seoInputOf(p)
+      let price: number | null
+      let priceNote: string
+      if (beds != null) {
+        const matching = (p.project_units ?? []).filter((u) => unitBeds(u) === beds)
+        if (matching.length === 0) return null
+        const prices = matching.map((u) => numOf(u.price_from)).filter((n): n is number => n != null && n >= 50_000)
+        price = prices.length ? Math.min(...prices) : null
+        priceNote = price != null ? `cheapest ${beds === 0 ? "studio" : `${beds}-bedroom`} unit` : "no unit price listed"
+      } else {
+        // "Villas under 3M" on a mixed project: price the villa rows, not the
+        // apartments the headline price describes — when the unit table has them.
+        const typed = typeNeedle ? (p.project_units ?? []).filter((u) => lc(u.unit_type).includes(typeNeedle)) : []
+        const typedPrices = typed.map((u) => numOf(u.price_from)).filter((n): n is number => n != null && n >= 50_000)
+        if (typedPrices.length) {
+          price = Math.min(...typedPrices)
+          priceNote = `cheapest ${typeNeedle} unit`
+        } else {
+          price = priceFromValue(seo)
+          priceNote = price != null ? (typeNeedle ? "project from price (no per-type unit price listed)" : "from price") : "no price listed"
+        }
+      }
+      const handover = handoverLabel(seo)
+      return { p, seo, price, priceNote, handover, year: handoverYear(handover) }
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+  if (beds != null) withoutUnitRows = rows.length - scored.length
+
+  let list = scored
+  if (typeof args.min_price === "number") list = list.filter((x) => x.price != null && x.price >= args.min_price!)
+  if (typeof args.max_price === "number") list = list.filter((x) => x.price != null && x.price <= args.max_price!)
+  if (typeof args.handover_year === "number") list = list.filter((x) => x.year === args.handover_year)
+  if (typeof args.handover_by_year === "number") list = list.filter((x) => x.year != null && x.year <= args.handover_by_year!)
+
+  const sort = args.sort ?? (args.max_price != null || args.min_price != null || beds != null ? "price_asc" : "name")
+  const byPrice = (a: { price: number | null }, b: { price: number | null }) => (a.price ?? Infinity) - (b.price ?? Infinity)
+  if (sort === "price_asc") list.sort(byPrice)
+  else if (sort === "price_desc") list.sort((a, b) => byPrice(b, a))
+  else if (sort === "handover") list.sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999))
+  else list.sort((a, b) => a.p.name.localeCompare(b.p.name))
+
+  const limit = Math.min(Math.max(args.limit ?? 12, 1), 40)
+  const shown = list.slice(0, limit)
+  const countBy = (key: (x: (typeof list)[number]) => string | null) => {
+    const m = new Map<string, number>()
+    for (const x of list) m.set(key(x) ?? "Not given", (m.get(key(x) ?? "Not given") ?? 0) + 1)
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, n]) => ({ name, count: n }))
+  }
+
+  return {
+    filters: args,
+    matched: list.length,
+    shown: shown.length,
+    ...(beds != null ? { left_out_no_unit_table_for_that_size: withoutUnitRows } : {}),
+    by_developer: countBy((x) => oneRel(x.p.developers)?.name ?? null),
+    by_area: countBy((x) => x.p.community || x.p.location || x.p.city),
+    by_handover_year: countBy((x) => (x.year ? String(x.year) : null)),
+    price_rule: "Prices are what the public page shows: a from-price never below the cheapest listed unit; values under AED 50K ignored as data slips",
+    projects: shown.map((x) => {
+      const mix = unitsSummary(x.seo)
+      return {
+        name: x.p.name,
+        developer: oneRel(x.p.developers)?.name ?? null,
+        area: areaOf(x.p) || null,
+        status: statusLabel(x.p.status),
+        price_aed: x.price,
+        price_label: x.price != null ? formatPrice(x.price, beds != null ? null : priceToValue(x.seo), x.p.currency) : null,
+        price_basis: x.priceNote,
+        handover: x.handover,
+        unit_mix: mix.mix,
+        sizes: mix.sizes,
+        property_types: x.seo.propertyTypes?.length ? x.seo.propertyTypes : null,
+        payment_plan: paymentPlanShort(x.p),
+        page: projectUrl(x.p),
+      }
+    }),
+    _cards: shown
+      .filter((x) => x.p.main_image)
+      .slice(0, 8)
+      .map((x): FhiChatCard => ({
+        kind: "project",
+        title: x.p.name,
+        subtitle: [oneRel(x.p.developers)?.name, x.price != null ? formatPrice(x.price, null, x.p.currency) : null, x.handover].filter(Boolean).join(" · "),
+        image: x.p.main_image,
+      })),
+  }
+}
+
+/**
+ * Everything the site knows about ONE project — the facts an agent needs on a
+ * call: price range and every unit type with size and price, handover, the
+ * payment plan read into milestones, amenities, what's nearby, the developer's
+ * contacts, permit number, and how many validated FHI sales it has.
+ */
+async function projectDetails(admin: Admin, args: { name?: string }) {
+  const q = (args.name ?? "").trim()
+  if (!q) return { error: "Which project? Give its name." }
+  const { data, error } = await admin
+    .from("projects")
+    .select(
+      "*, developers(name, slug, phone, email, website_url, is_verified), project_property_types(property_types(name)), project_units(unit_type, layout_name, bedrooms, bathrooms, size_sqft, size_sqm, price_from, price_to, available_units, is_available), project_amenities(amenities(name)), project_neighbors(category, description), project_points(category, description), project_features(description)",
+    )
+    .is("deleted_at", null)
+    .eq("is_active", true)
+    .ilike("name", `%${q.replace(/[%_]/g, "")}%`)
+    .order("is_published", { ascending: false })
+    .limit(5)
+  if (error) throw new Error(error.message)
+  const rows = (data ?? []) as unknown as Array<ProjectRow & Record<string, unknown> & {
+    project_amenities: { amenities: { name: string } | null }[] | null
+    project_neighbors: { category: string | null; description: string }[] | null
+    project_points: { category: string | null; description: string }[] | null
+    project_features: { description: string }[] | null
+    developers: { name: string; slug: string | null; phone: string | null; email: string | null; website_url: string | null; is_verified: boolean | null } | null
+  }>
+  if (rows.length === 0) return { error: `No project matching "${q}"` }
+  // Exact name first, otherwise the shortest name containing the query.
+  const exact = rows.find((r) => r.name.toLowerCase() === q.toLowerCase())
+  const p = exact ?? [...rows].sort((a, b) => a.name.length - b.name.length)[0]
+  const seo = seoInputOf(p)
+  const plan = parsePaymentPlan(p.payment_plan_details, p.down_payment_percentage)
+  const dev = p.developers
+
+  const { data: sales } = await admin
+    .from("sales_reports")
+    .select("contract_price, validation_status")
+    .eq("project_id", p.id)
+    .limit(1000)
+  const validated = (sales ?? []).filter((s) => s.validation_status === "validated")
+  const pending = (sales ?? []).filter((s) => s.validation_status === "pending").length
+
+  const str = (k: string) => (typeof p[k] === "string" && (p[k] as string).trim() ? (p[k] as string).trim() : null)
+  const mix = unitsSummary(seo)
+  return {
+    ...(rows.length > 1 ? { other_matches: rows.filter((r) => r.id !== p.id).map((r) => r.name) } : {}),
+    name: p.name,
+    published_on_site: Boolean(p.is_published),
+    page: projectUrl(p),
+    developer: dev ? { name: dev.name, verified: Boolean(dev.is_verified), phone: dev.phone, email: dev.email, website: dev.website_url } : null,
+    status: statusLabel(p.status),
+    off_plan: isOffPlan(p.status),
+    area: { community: p.community, sub_community: p.sub_community, location: p.location, city: p.city, region: p.region },
+    price: {
+      from_aed: priceFromValue(seo),
+      to_aed: priceToValue(seo),
+      label: formatPrice(priceFromValue(seo), priceToValue(seo), p.currency),
+      headline_as_entered: numOf(p.launch_price_from),
+      note: "from/to follow the public page rule: never below the cheapest listed unit; sub-AED 50K values ignored",
+    },
+    handover: handoverLabel(seo),
+    dates: { booking: str("booking_date"), construction_start: str("construction_start_date"), expected_completion: str("expected_completion_date"), delivery: str("delivery_date"), delivery_quarter: str("delivery_quarter") },
+    payment_plan: {
+      milestones: plan.milestones,
+      fees: plan.fees,
+      as_written: plan.note ?? p.payment_plan_details ?? null,
+      down_payment_percent: numOf(p.down_payment_percentage),
+      installments_available: p.installment_available,
+      government_fee_percent: numOf(p.government_fee_percentage as number | string | null),
+    },
+    unit_mix: mix.mix,
+    sizes: mix.sizes,
+    units: (p.project_units ?? [])
+      .map((u) => ({
+        type: u.unit_type,
+        layout: (u as { layout_name?: string | null }).layout_name ?? null,
+        bedrooms: unitBeds(u),
+        bathrooms: (u as { bathrooms?: number | null }).bathrooms ?? null,
+        size_sqft: numOf(u.size_sqft),
+        price_from_aed: numOf(u.price_from),
+        price_to_aed: numOf(u.price_to),
+        available_units: (u as { available_units?: number | null }).available_units ?? null,
+      }))
+      .sort((a, b) => (a.price_from_aed ?? Infinity) - (b.price_from_aed ?? Infinity)),
+    property_types: seo.propertyTypes ?? [],
+    building: { total_units: p.total_units, floors: p.floors ?? null, buildings: p.number_of_buildings ?? null },
+    ownership: { freehold: p.freehold ?? null, type: str("ownership_type") },
+    returns: { expected_roi_percent: numOf(p.expected_roi as number | string | null), rental_yield_percent: numOf(p.rental_yield as number | string | null) },
+    amenities: (p.project_amenities ?? []).map((a) => a.amenities?.name).filter(Boolean),
+    nearby: (p.project_neighbors ?? []).map((n) => n.description),
+    highlights: [...(p.project_points ?? []).map((n) => n.description), ...(p.project_features ?? []).map((n) => n.description)].slice(0, 20),
+    permit: { trakheesi_number: str("trakheesi_permit_number"), link: str("trakheesi_permit_link") ?? str("trakheesi_permit_url") },
+    sales_contact: { phone: str("sales_contact_phone"), email: str("sales_contact_email") },
+    description: (str("description") ?? str("about_project") ?? "").slice(0, 600) || null,
+    fhi_sales: { validated_deals: validated.length, validated_value_aed: validated.reduce((s, r) => s + (numOf(r.contract_price) ?? 0), 0), pending_deals: pending, note: "For who sold it, use top_agents with project_name" },
+    _cards: p.main_image ? [{ kind: "project", title: p.name, subtitle: [dev?.name, formatPrice(priceFromValue(seo), null, p.currency), handoverLabel(seo)].filter(Boolean).join(" · "), image: p.main_image } as FhiChatCard] : [],
+  }
+}
+
 // ─── OpenAI tool definitions + dispatcher ────────────────────────────────────
 
 export const FHI_CHAT_TOOLS = [
@@ -2780,6 +3143,42 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "find_projects",
+      description:
+        "SHORTLIST projects by what a buyer wants — area/community (JVC, Dubai Marina, Business Bay…), developer, number of bedrooms (0 = studio), property type (apartment, villa, townhouse), budget (min/max AED), handover year, off-plan or ready. Returns the matching published projects sorted (cheapest first when a budget or bedroom count is given) with price, handover, unit mix, sizes, payment plan and the page link, plus counts by developer/area/handover year. Use for 'cheapest 1-bedroom in JVC', 'Azizi projects handing over 2027', 'villas under AED 3M', 'what do we have in Dubai South', 'ready apartments'. For everything about ONE named project use project_details instead.",
+      parameters: {
+        type: "object",
+        properties: {
+          area: { type: "string", description: "Community / area / city, partial ok (JVC, Marina, Downtown, Dubai South, Abu Dhabi)" },
+          developer_name: { type: "string", description: "Partial developer name" },
+          bedrooms: { type: "integer", description: "Exact bedroom count; 0 = studio. Prices then refer to the cheapest unit of that size" },
+          property_type: { type: "string", description: "apartment | villa | townhouse | penthouse | retail | office | plot" },
+          status: { type: "string", enum: ["pre_launch", "launch", "under_construction", "completed"] },
+          off_plan_only: { type: "boolean", description: "Anything not completed" },
+          ready_only: { type: "boolean", description: "Completed projects only" },
+          min_price: { type: "number", description: "AED" },
+          max_price: { type: "number", description: "AED — 'under 1M' = 1000000" },
+          handover_year: { type: "integer", description: "Handover in exactly this year" },
+          handover_by_year: { type: "integer", description: "Handover in or before this year" },
+          name_contains: { type: "string", description: "Part of the project name" },
+          sort: { type: "string", enum: ["price_asc", "price_desc", "handover", "name"] },
+          limit: { type: "integer", description: "Default 12, max 40" },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "project_details",
+      description:
+        "EVERYTHING about ONE project by name: price range, every unit type with bedrooms/size/price, handover and dates, the payment plan (milestones + fees + the text as written), down payment, amenities, what's nearby, highlights, developer contacts, permit number, ownership, ROI/yield, the public page link and FHI's validated sales on it. Use for 'tell me about Azizi Venice', 'payment plan of Samana Greenfield', 'what units does Rukan Tower have', 'handover of X'.",
+      parameters: { type: "object", properties: { name: { type: "string", description: "Project name, partial ok" } }, required: ["name"] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "leads_overview",
       description:
         "LEADS — every way a prospect reached the company in a period: project INQUIRIES (Inquire forms on project pages), CONTACT messages (/contact), BUYERS LINK and Sellers Link BRIEFS (each agent's own link, graded Priority/Qualified/Nurture/Information) and REPLIES in the company inbox. Returns totals per source with previous-period comparison, breakdowns (which project/developer, which agent's link, grade, budget, goal, readiness) and the newest entries with phone/WhatsApp/email for follow-up. Use for 'how many leads this week', 'any new inquiries', 'unanswered messages', 'which project gets the most inquiries', 'Buyers Link leads of Michelle', 'priority buyers this month'. Default: last 30 days, all sources.",
@@ -2873,6 +3272,8 @@ export async function runFhiChatTool(
       case "recent_sales": result = await recentSales(admin, args); break
       case "events_overview": result = await eventsOverview(admin); break
       case "leads_overview": result = await leadsOverview(admin, args as LeadsArgs); break
+      case "find_projects": result = await findProjects(admin, args as FindProjectsArgs); break
+      case "project_details": result = await projectDetails(admin, args); break
       case "event_attendees": result = await eventAttendees(admin, args); break
       case "new_accounts": result = await newAccounts(admin, args); break
       case "website_traffic": result = await websiteTraffic(args); break
