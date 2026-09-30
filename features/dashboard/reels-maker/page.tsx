@@ -7,6 +7,8 @@ import { ArrowLeft, ArrowRight, Building2, Clapperboard } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { canUseReelsMaker, isAdminStaffRole } from "@/lib/app-roles"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
+import { waDigits } from "@/lib/buyer-links"
+import { formatIntl } from "@/lib/website-project-share"
 import { ReelsMakerClient } from "./reels-maker-client"
 
 const STUDIOS = [
@@ -79,6 +81,13 @@ function ReelsMakerPageInner() {
     return <StudioBento pathname={pathname} />
   }
 
+  // The number the agent saved on their profile, so the outro's contact is
+  // filled in already ("+971 50 123 4567"); WhatsApp when there's no phone.
+  const meta = profile?.metadata ?? {}
+  const str = (k: string) => (typeof meta[k] === "string" ? (meta[k] as string) : "")
+  const savedDigits = waDigits(str("phone_country_code") || "+971", str("phone_number")) || waDigits(str("whatsapp_country_code") || "+971", str("whatsapp_number"))
+  const savedPhone = savedDigits ? formatIntl(savedDigits) : ""
+
   return (
     <div className="w-full space-y-4">
       {hasBento && (
@@ -95,6 +104,7 @@ function ReelsMakerPageInner() {
         userId={user?.id ?? ""}
         userName={profile?.fullname ?? user?.email ?? "User"}
         avatarUrl={profile?.profile_url ?? null}
+        defaultPhone={savedPhone}
         currentRole={role ?? "agent"}
         initialListingId={initialListingId}
         source={source}

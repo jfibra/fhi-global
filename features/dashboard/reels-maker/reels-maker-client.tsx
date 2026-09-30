@@ -2163,12 +2163,15 @@ export function ReelsMakerClient({
   userId,
   userName,
   avatarUrl,
+  defaultPhone = "",
   currentRole,
   initialListingId,
   source = "listings",
 }: {
   userId: string
   userName: string
+  /** The agent's saved profile number, pre-filled as the outro's contact (still editable). */
+  defaultPhone?: string
   /** Agent's profile photo, drawn on the outro. */
   avatarUrl?: string | null
   currentRole: string
@@ -2192,7 +2195,7 @@ export function ReelsMakerClient({
   const [location, setLocation] = useState("")
   const [price, setPrice] = useState("")
   const [agentName, setAgentName] = useState(userName)
-  const [phone, setPhone] = useState("")
+  const [phone, setPhone] = useState(defaultPhone)
   const [headline, setHeadline] = useState("")
   const [highlight, setHighlight] = useState("")
   const [outroLine, setOutroLine] = useState("")
