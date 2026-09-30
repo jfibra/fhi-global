@@ -59,6 +59,26 @@ function Skeleton({ h = 340 }: { h?: number }) {
 }
 
 /**
+ * True below the sm breakpoint (640px). Recharts' axis ticks and chart
+ * height are plain numeric props, not CSS — Tailwind can't thin out the
+ * quarterly chart's 24 labels on a phone, so this is the one place that
+ * genuinely needs a JS media query rather than responsive classes.
+ */
+function useIsNarrowScreen(): boolean {
+  // Computed lazily at first render (not set from inside the effect below) —
+  // the effect only subscribes to later changes, so there is nothing for
+  // React's set-state-in-effect check to flag.
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches)
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)")
+    const onChange = (e: MediaQueryListEvent) => setNarrow(e.matches)
+    mq.addEventListener("change", onChange)
+    return () => mq.removeEventListener("change", onChange)
+  }, [])
+  return narrow
+}
+
+/**
  * A clickable legend chip — Chart.js-style series toggle. Active: solid dot,
  * full-opacity label. Off: hollow dot, struck-through muted label. The chart
  * itself must skip rendering the Bar/Line for a hidden key entirely (not
@@ -105,6 +125,7 @@ function LatestBadge({ x, actual, delta, deltaLabel }: { x: string; actual: numb
 }
 
 export function PriceIndexChart() {
+  const narrow = useIsNarrowScreen()
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<{ series: DldPriceIndexSeries[] | null; error: string | null }>({ series: null, error: null })
   const [categoryCode, setCategoryCode] = useState("")
@@ -252,7 +273,7 @@ export function PriceIndexChart() {
               <Skeleton />
             ) : (
               <>
-                <ResponsiveContainer width="100%" height={340}>
+                <ResponsiveContainer width="100%" height={narrow ? 260 : 340}>
                   <ComposedChart data={quarterly?.points ?? []} margin={{ top: 8, right: -4, bottom: 40, left: -16 }} barCategoryGap="20%">
                     <CartesianGrid vertical={false} stroke={C.grid} />
                     <XAxis
@@ -261,7 +282,9 @@ export function PriceIndexChart() {
                       tick={{ fontSize: 11, fill: C.tick }}
                       tickLine={false}
                       axisLine={{ stroke: C.axis }}
-                      interval={0}
+                      // All 24 quarters fit on a wide screen; a phone can only
+                      // read every 4th one before the labels overlap.
+                      interval={narrow ? 3 : 0}
                       angle={-40}
                       textAnchor="end"
                       height={54}
@@ -312,7 +335,7 @@ export function PriceIndexChart() {
             )}
           </div>
 
-          <div className="p-5 sm:p-6 border-t xl:border-t-0 border-[#f0f2f5]">
+          <div className="p-5 sm:p-6 border-t xl:border-t-0 border-[#f0f2f5] min-w-0">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
               <h3 className="font-['Outfit'] text-base font-semibold text-[#0d1117]">
                 <span className="text-[#9ca3af] font-normal">Annual</span>
@@ -323,7 +346,7 @@ export function PriceIndexChart() {
               <Skeleton />
             ) : (
               <>
-                <ResponsiveContainer width="100%" height={340}>
+                <ResponsiveContainer width="100%" height={narrow ? 260 : 340}>
                   <ComposedChart data={annual?.points ?? []} margin={{ top: 8, right: -4, bottom: 24, left: -16 }} barCategoryGap="35%">
                     <CartesianGrid vertical={false} stroke={C.grid} />
                     <XAxis dataKey="x" tick={{ fontSize: 11, fill: C.tick }} tickLine={false} axisLine={{ stroke: C.axis }} />

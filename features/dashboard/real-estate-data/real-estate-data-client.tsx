@@ -492,10 +492,10 @@ function DatasetPanel({
             onValueChange={setSearchColumn}
             options={dataset.columns.map((c) => ({ value: c.key, label: c.label }))}
             ariaLabel="Column to search"
-            className="h-9 rounded-xl py-0 max-w-[220px]"
+            className="h-9 rounded-xl py-0 max-w-[160px] sm:max-w-[220px]"
             searchPlaceholder="Search columns…"
           />
-          <div className="relative flex-1 min-w-[220px]">
+          <div className="relative flex-1 min-w-[160px] sm:min-w-[220px]">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
             <input
               value={searchTerm}
@@ -704,7 +704,7 @@ function DatasetPanel({
         </div>
 
         {/* Pager */}
-        <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-t border-[#f0f2f5] text-xs text-[#6b7280]">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-t border-[#f0f2f5] text-xs text-[#6b7280]">
           <span>
             Page {money.format(page)} of {money.format(totalPages)}
           </span>

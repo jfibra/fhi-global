@@ -607,12 +607,12 @@ export function BreakdownSection() {
             right after them instead of on a row of their own. Wraps only if
             the panel is too narrow to hold all of it. */}
         <div className="flex flex-wrap items-end gap-3">
-          <div className="w-[220px] shrink-0">
+          <div className="w-full sm:w-[220px] sm:shrink-0">
             <label className="block text-sm font-medium text-[#0d1117] mb-1.5">Dataset</label>
             <FilterSelect value={command} onValueChange={(v) => switchDataset(v as DldCommand)} options={CHARTABLE} ariaLabel="Dataset" className="w-full max-w-none h-10 rounded-xl py-0" />
           </div>
           {dateFields.map((f) => (
-            <div key={f.param} className="w-[160px] shrink-0">
+            <div key={f.param} className="w-full sm:w-[160px] sm:shrink-0">
               <label htmlFor={`chart-${f.param}`} className="block text-sm font-medium text-[#0d1117] mb-1.5">
                 {f.label}
                 {f.required && <span className="text-rose-600"> *</span>}
