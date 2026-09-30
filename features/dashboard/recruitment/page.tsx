@@ -85,6 +85,13 @@ export default function RecruitmentPage() {
       setDeals(json.deals ?? [])
       setLoadedAt(Date.now())
       setError(null)
+      // A link straight to one person (the admin bell): their queue, searched for them.
+      const wanted = new URLSearchParams(window.location.search).get("focus")
+      const hit = wanted ? json.people.find((p) => p.id === wanted) : null
+      if (hit) {
+        setTab(hit.status === "pending" ? "pending" : "direct")
+        setQuery(hit.name)
+      }
     } catch (e) {
       setError((e as Error).message)
     }

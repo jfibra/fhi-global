@@ -44,7 +44,7 @@ export async function GET() {
   const [accounts, sales, replies, inquiries, contacts, tickets, briefs, registrations] = await Promise.all([
     admin.from("profiles").select("id, fullname, role, status, joined_at, metadata").not("is_deleted", "is", true).gte("joined_at", since).order("joined_at", { ascending: false }).limit(PER_KIND),
     admin.from("sales_reports").select("id, agent_id, contract_price, validation_status, created_at, projects(name), developers(name)").gte("created_at", since).order("created_at", { ascending: false }).limit(PER_KIND),
-    admin.from("inquiry_emails").select("id, from_name, from_email, subject, created_at, read_at").eq("direction", "inbound").is("owner_id", null).gte("created_at", since).order("created_at", { ascending: false }).limit(PER_KIND),
+    admin.from("inquiry_emails").select("id, inquiry_id, from_name, from_email, subject, created_at, read_at").eq("direction", "inbound").is("owner_id", null).gte("created_at", since).order("created_at", { ascending: false }).limit(PER_KIND),
     admin.from("inquiries").select("id, name, project_name, developer_name, created_at").is("deleted_at", null).gte("created_at", since).order("created_at", { ascending: false }).limit(PER_KIND),
     admin.from("contact_submissions").select("id, name, subject, created_at").is("deleted_at", null).gte("created_at", since).order("created_at", { ascending: false }).limit(PER_KIND),
     admin.from("support_tickets").select("id, title, status, created_at, reported_by_profile:reported_by(fullname)").gte("created_at", since).order("created_at", { ascending: false }).limit(PER_KIND),
@@ -68,7 +68,7 @@ export async function GET() {
       id: `account:${p.id}`, kind: "account",
       title: `${name(p.fullname)} registered${pending ? " — waiting for approval" : ""}`,
       detail: typeof meta.invited_by === "string" ? "Through an invite link" : "Directly on the website",
-      at: String(p.joined_at), path: pending ? "/accounts/recruitment" : `/accounts/users?account=${p.id}`,
+      at: String(p.joined_at), path: pending ? `/accounts/recruitment?focus=${p.id}` : `/accounts/users?account=${p.id}`,
     })
   }
   for (const s of (sales.data ?? []) as Array<Record<string, unknown>>) {
@@ -85,18 +85,19 @@ export async function GET() {
     items.push({
       id: `reply:${r.id}`, kind: "reply",
       title: `${name(r.from_name) === "Someone" ? String(r.from_email ?? "Someone") : name(r.from_name)} replied${r.read_at ? "" : " — unread"}`,
-      detail: (r.subject as string | null) ?? null, at: String(r.created_at), path: "/leads",
+      // A reply tied to an inquiry opens that conversation; a loose one opens the inbox.
+      detail: (r.subject as string | null) ?? null, at: String(r.created_at), path: r.inquiry_id ? `/leads?folder=inbox&open=${r.inquiry_id}` : "/leads?folder=inbox",
     })
   }
   for (const q of (inquiries.data ?? []) as Array<Record<string, unknown>>) {
     items.push({
       id: `inquiry:${q.id}`, kind: "inquiry",
       title: `${name(q.name)} inquired`,
-      detail: [q.project_name, q.developer_name].filter(Boolean).join(" · ") || null, at: String(q.created_at), path: "/leads",
+      detail: [q.project_name, q.developer_name].filter(Boolean).join(" · ") || null, at: String(q.created_at), path: `/leads?open=${q.id}`,
     })
   }
   for (const c of (contacts.data ?? []) as Array<Record<string, unknown>>) {
-    items.push({ id: `contact:${c.id}`, kind: "contact", title: `${name(c.name)} sent a message`, detail: (c.subject as string | null) ?? null, at: String(c.created_at), path: "/communication/contact-inbox" })
+    items.push({ id: `contact:${c.id}`, kind: "contact", title: `${name(c.name)} sent a message`, detail: (c.subject as string | null) ?? null, at: String(c.created_at), path: `/communication/contact-inbox/${c.id}` })
   }
   for (const t of (tickets.data ?? []) as Array<Record<string, unknown>>) {
     const by = one(t.reported_by_profile as { fullname: string | null } | null)?.fullname
@@ -106,11 +107,11 @@ export async function GET() {
     items.push({
       id: `brief:${b.id}`, kind: "brief",
       title: `${name(b.name)} sent a ${b.kind === "seller" ? "seller" : "buyer"} brief`,
-      detail: `To ${agents.get(String(b.agent_id)) ?? "an agent"}`, at: String(b.created_at), path: "/communication/buyer-leads",
+      detail: `To ${agents.get(String(b.agent_id)) ?? "an agent"}`, at: String(b.created_at), path: `/communication/buyer-leads?lead=${b.id}`,
     })
   }
   for (const e of (registrations.data ?? []) as Array<Record<string, unknown>>) {
-    items.push({ id: `registration:${e.id}`, kind: "registration", title: `${name(e.full_name)} registered for an event`, detail: one(e.events as { title: string } | null)?.title ?? null, at: String(e.created_at), path: "/events" })
+    items.push({ id: `registration:${e.id}`, kind: "registration", title: `${name(e.full_name)} registered for an event`, detail: one(e.events as { title: string } | null)?.title ?? null, at: String(e.created_at), path: `/events?registrations=${e.event_id}` })
   }
 
   items.sort((a, b) => b.at.localeCompare(a.at))

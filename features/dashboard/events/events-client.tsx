@@ -231,6 +231,9 @@ export function EventsClient({
     setOrigin(window.location.origin)
   }, [])
 
+  // Set by load() from ?registrations=; the effect below opens it once openRegistrations exists.
+  const [deepLinkEvent, setDeepLinkEvent] = useState<AdminEvent | null>(null)
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -239,6 +242,10 @@ export function EventsClient({
       if (!res.ok) throw new Error("failed")
       const data = (await res.json()) as { events?: AdminEvent[] }
       setEvents(data.events ?? [])
+      // A link straight to one event's registrations (the admin bell).
+      const wanted = new URLSearchParams(window.location.search).get("registrations")
+      const hit = wanted ? (data.events ?? []).find((e) => e.id === wanted) : null
+      if (hit) setDeepLinkEvent(hit)
     } catch {
       setError("Couldn't load events — refresh to try again.")
     } finally {
@@ -488,6 +495,18 @@ export function EventsClient({
       if (regOpenIdRef.current === e.id) setRegsLoading(false)
     }
   }
+
+  // Opened by ?registrations=<eventId> (the admin bell) once the list has loaded.
+  useEffect(() => {
+    if (!deepLinkEvent) return
+    const e = deepLinkEvent
+    // Deferred a tick so no state is set synchronously in the effect body.
+    const t = setTimeout(() => {
+      setDeepLinkEvent(null)
+      void openRegistrations(e)
+    }, 0)
+    return () => clearTimeout(t)
+  }, [deepLinkEvent])
 
   // Per-row certificate sending from the attendee table (same endpoint the
   // Certificates dialog uses, so the design and logging are identical).

@@ -341,6 +341,13 @@ export default function BuyersLinkPage({ scope = "agent" }: { scope?: "agent" | 
       setLeads(briefs.leads)
       setLeadsError(briefs.error)
       setLoadedAt(Date.now())
+      // A link straight to one brief (the admin bell): show its list and open it.
+      const wanted = new URLSearchParams(window.location.search).get("lead")
+      const hit = wanted ? briefs.leads.find((l) => l.id === wanted) : null
+      if (hit) {
+        setView((hit.kind ?? "buyer") === "seller" ? "sellers" : "buyers")
+        setOpenId(hit.id)
+      }
     })
     return () => {
       live = false
