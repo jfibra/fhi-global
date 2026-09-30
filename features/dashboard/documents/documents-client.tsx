@@ -15,20 +15,23 @@
 //
 // Clicking a tile opens a full page (DocumentPage below), replacing the
 // shelf entirely — same convention as the Ebooks reader: a back arrow, a
-// gold category eyebrow, the title in bold, actions on the right. ←/→ step
-// through whichever documents the current category tab shows. PDFs render
-// inline with Chrome's own toolbar hidden (PDF Open Parameters — just the
-// page, nothing else); every other file type (Word, Excel, PowerPoint, …)
-// shows a "can't preview" fallback with Download and New tab, since no
-// browser can render those inline no matter how they're embedded.
+// gold category eyebrow, the title in bold, actions on the right. (There is
+// no prev/next stepping between documents — the shelf is one click back and
+// the PDF itself scrolls.) PDFs render
+// inline with pdf.js (PdfFormViewer, pdf-form-viewer.tsx) with their form
+// fields fillable, and the toolbar offers exactly three actions: Download
+// with changes (a copy of the PDF with what was typed written into it),
+// Download without changes (the original file) and Delete — the same choice
+// Chrome's own viewer gives under its download button, without leaving the
+// page or opening a tab. Every other file type (Word, Excel, PowerPoint, …)
+// can't be rendered inline by any browser, so it shows a "can't preview"
+// fallback with a plain Download instead.
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
   Download,
-  ExternalLink,
+  FilePenLine,
   FileSpreadsheet,
   FileText,
   FileType2,
@@ -39,6 +42,7 @@ import {
 import { formatBytes } from "@/lib/materials-shared"
 import { createDocument, deleteDocument, listDocuments, type DocumentRow } from "@/lib/document-service"
 import PdfThumbnail from "./pdf-thumbnail"
+import PdfFormViewer, { type PdfFormViewerHandle } from "./pdf-form-viewer"
 
 const ALL = "All"
 const UNCATEGORIZED = "Uncategorized"
@@ -59,6 +63,21 @@ function proxyUrl(fileUrl: string, download: boolean): string {
   const qs = new URLSearchParams({ url: fileUrl })
   if (download) qs.set("download", "1")
   return `/api/document-proxy?${qs.toString()}`
+}
+
+/** Save bytes as a file through the browser's normal download path (a blob
+ *  URL + `<a download>`) — no navigation, no new tab. */
+function saveBlob(bytes: Uint8Array, fileName: string, type: string) {
+  const blob = new Blob([bytes as BlobPart], { type })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  // Deferred: revoking synchronously can abort the download in some browsers.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
 
 export function DocumentsClient() {
@@ -168,23 +187,11 @@ export function DocumentsClient() {
     setDeletingId(null)
   }
 
-  // Prev/Next step through the currently shown (category-filtered) list, so
-  // the arrows move through the same set of tiles the grid had on screen —
-  // not the full unfiltered catalogue.
-  const openIndex = open ? shown.findIndex((d) => d.id === open.id) : -1
-  const goTo = (i: number) => {
-    if (shown.length === 0) return
-    setOpenId(shown[(i + shown.length) % shown.length].id)
-  }
-
   if (open) {
     return (
       <DocumentPage
         doc={open}
         onBack={() => setOpenId(null)}
-        onPrev={shown.length > 1 ? () => goTo(openIndex - 1) : undefined}
-        onNext={shown.length > 1 ? () => goTo(openIndex + 1) : undefined}
-        position={shown.length > 1 ? { index: openIndex, total: shown.length } : undefined}
         onDelete={() => onDelete(open)}
         deleting={deletingId === open.id}
       />
@@ -394,49 +401,47 @@ function FileTile({ fileName }: { fileName: string }) {
 }
 
 /**
- * Full-screen lightbox, portalled to <body> so it sits above the dashboard
- * shell's fixed sidebar/topbar regardless of where in the tree it's mounted —
- * same reason FilipinoHomes' MediaLightbox does the same. Backdrop click and
- * Escape both close it; ←/→ step to onPrev/onNext when given.
- */
-/**
  * A full page, not an overlay — replaces the shelf entirely while a document
  * is open (same convention as the Ebooks reader: back arrow, a gold category
- * eyebrow, the title in bold, actions on the right). ←/→ still step through
- * whichever documents the current category tab shows.
+ * eyebrow, the title in bold, actions on the right).
  */
 function DocumentPage({
   doc,
   onBack,
-  onPrev,
-  onNext,
-  position,
   onDelete,
   deleting,
 }: {
   doc: DocumentRow
   onBack: () => void
-  onPrev?: () => void
-  onNext?: () => void
-  position?: { index: number; total: number }
   onDelete: () => void
   deleting: boolean
 }) {
   const previewable = isPdf(doc.file_name)
+  const viewerRef = useRef<PdfFormViewerHandle>(null)
+  const [viewerReady, setViewerReady] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const onViewerStatus = useCallback((status: "loading" | "ready" | "error") => setViewerReady(status === "ready"), [])
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft" && onPrev) {
-        e.preventDefault()
-        onPrev()
-      } else if (e.key === "ArrowRight" && onNext) {
-        e.preventDefault()
-        onNext()
+  // "With your changes": pdf.js writes what was typed into the fields into a
+  // new copy of the PDF, saved straight to the user's downloads. If the viewer
+  // isn't up (still loading, or it failed) there is nothing to merge, so it
+  // falls through to the original file rather than doing nothing.
+  const downloadWithChanges = async () => {
+    if (saving) return
+    setSaving(true)
+    try {
+      const bytes = await viewerRef.current?.saveWithChanges()
+      if (bytes) {
+        saveBlob(bytes, doc.file_name, "application/pdf")
+        return
       }
+      window.location.assign(proxyUrl(doc.file_url, true))
+    } catch {
+      window.location.assign(proxyUrl(doc.file_url, true))
+    } finally {
+      setSaving(false)
     }
-    window.addEventListener("keydown", onKey, true)
-    return () => window.removeEventListener("keydown", onKey, true)
-  }, [onPrev, onNext])
+  }
 
   return (
     // Fills the shell's <main> (which already supplies p-6) and adds none of
@@ -458,48 +463,38 @@ function DocumentPage({
             {doc.title}
           </h1>
         </div>
-        {position && (
-          <span className="hidden shrink-0 text-xs font-semibold text-[#9ca3af] sm:inline">
-            {position.index + 1} / {position.total}
-          </span>
-        )}
         <div className="flex shrink-0 items-center gap-2">
-          {onPrev && (
+          {previewable && (
             <button
               type="button"
-              onClick={onPrev}
-              aria-label="Previous document"
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e5e5e5] bg-white text-[#6b7280] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]"
+              onClick={() => void downloadWithChanges()}
+              disabled={!viewerReady || saving}
+              title={viewerReady ? "Save a copy with everything you typed into the fields" : "Available once the preview has loaded"}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#001f3f] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[#002b57] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <ChevronLeft className="h-4 w-4" />
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FilePenLine className="h-3.5 w-3.5" />}
+              <span className="hidden sm:inline">Download with changes</span>
+              <span className="sm:hidden">With changes</span>
             </button>
           )}
-          {onNext && (
-            <button
-              type="button"
-              onClick={onNext}
-              aria-label="Next document"
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e5e5e5] bg-white text-[#6b7280] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          )}
-          <a
-            href={doc.file_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-bold text-[#374151] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">New tab</span>
-          </a>
           <a
             href={proxyUrl(doc.file_url, true)}
             download={doc.file_name}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[#001f3f] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[#002b57]"
+            className={
+              previewable
+                ? "inline-flex items-center gap-1.5 rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-xs font-bold text-[#374151] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]"
+                : "inline-flex items-center gap-1.5 rounded-lg bg-[#001f3f] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[#002b57]"
+            }
           >
             <Download className="h-3.5 w-3.5" />
-            Download
+            {previewable ? (
+              <>
+                <span className="hidden sm:inline">Download without changes</span>
+                <span className="sm:hidden">Original</span>
+              </>
+            ) : (
+              "Download"
+            )}
           </a>
           <button
             type="button"
@@ -517,44 +512,20 @@ function DocumentPage({
           light gray-blue (#f4f6f9), and a plain white box here still showed
           up as a visibly different rectangle against it: the "container"
           edge. Letting the shell's own background show through removes it;
-          the PDF's actual page (rendered by the iframe) is still white. */}
+          the PDF's actual page (rendered by pdf.js) is still white. */}
       <div className="relative min-h-0 flex-1 overflow-hidden bg-transparent">
         {previewable ? (
-          <>
-            {/* Sits behind the iframe — only shows if the viewer fails to paint. */}
-            <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-              <p className="text-sm text-[#6b7280]">
-                Preparing the preview…{" "}
-                <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#001f3f] underline">
-                  open it in a new tab
-                </a>{" "}
-                if nothing appears.
-              </p>
-            </div>
-            <iframe
-              // Direct to the S3 URL — S3 is already an allowed frame-src
-              // host, so no proxy is needed here. The proxy is only used
-              // for Download above, where a cross-origin `download`
-              // attribute would otherwise be silently ignored.
-              //
-              // PDF Open Parameters (Chrome/PDFium honours these, same as
-              // FilipinoHomes' own MediaLightbox): toolbar=0 hides Chrome's
-              // own toolbar, navpanes=0 hides its left thumbnails/outline
-              // panel, scrollbar=0 hides the scrollbar chrome — what's left
-              // is just the rendered page. view=FitH fits it to the width.
-              src={`${doc.file_url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-              title={doc.title}
-              className="absolute inset-0 h-full w-full border-0"
-            />
-          </>
+          // Keyed by id so stepping to the next document tears the whole
+          // viewer (and its typed-in values) down rather than reusing it.
+          <PdfFormViewer key={doc.id} ref={viewerRef} src={proxyUrl(doc.file_url, false)} title={doc.title} onStatusChange={onViewerStatus} />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
             <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg">
               <FileTile fileName={doc.file_name} />
             </div>
             <p className="max-w-sm text-sm text-[#6b7280]">
-              {extensionOf(doc.file_name).toUpperCase()} files can&rsquo;t be previewed in the browser — use Download or New
-              tab above instead.
+              {extensionOf(doc.file_name).toUpperCase()} files can&rsquo;t be previewed in the browser — use Download above
+              instead.
             </p>
           </div>
         )}

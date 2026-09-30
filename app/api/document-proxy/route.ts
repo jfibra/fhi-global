@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 
 /**
  * Same-origin passthrough for uploaded documents (Library → Documents) —
- * currently only used for Download.
+ * used for the in-page pdf.js preview (inline, Range requests) and Download.
  *
  * The HTML `download` attribute on an <a> is only honoured for a same-origin
  * URL — for a cross-origin one (our S3 bucket) browsers silently ignore it
@@ -13,11 +13,9 @@ import { createClient } from "@/lib/supabase/server"
  * own origin with `?download=1` fixes that: it sets Content-Disposition:
  * attachment, an actual download, not a hint the browser can ignore.
  *
- * (The in-page PDF preview embeds the S3 URL directly instead, the same as
- * the Ebooks reader's Page view — that only needs frame-src to allow the
- * host, already true for S3, not this route. `download=0`/absent still
- * serves the file `inline` here too, kept in case a future caller needs it,
- * but nothing currently does.)
+ * Without `download=1` the file is served `inline` with Range passthrough —
+ * that is what the in-page pdf.js preview (PdfFormViewer) and the shelf's
+ * PdfThumbnail fetch, since pdf.js needs a same-origin URL it can read.
  *
  * The target must both sit under our own S3 documents prefix (an SSRF guard)
  * and match a real row the caller's session can read (RLS already scopes

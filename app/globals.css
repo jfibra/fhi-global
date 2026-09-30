@@ -1296,3 +1296,104 @@ html.film-open { overflow: hidden; }
 .nh-drift { animation: nh-drift 7000ms linear both; }
 @keyframes nh-drift { from { transform: scale(1); } to { transform: scale(1.06); } }
 @media (prefers-reduced-motion: reduce) { .nh-swap, .nh-drift { animation: none; } }
+
+/* ─── Library → Documents PDF form viewer (features/dashboard/documents/pdf-form-viewer.tsx)
+   The subset of pdf.js's pdf_viewer.css that its AnnotationLayer — the HTML
+   form fields laid over each rendered page — needs. The full stylesheet is
+   ~7k lines and restyles :root, so it is not imported wholesale. Selectors
+   are kept as pdf.js writes them (under .annotationLayer), scoped to our
+   page wrapper. The --scale-factor / --user-unit vars are set inline per page
+   by the viewer; pdf.js sizes the layer and every field from them. */
+.fhi-pdf-page {
+  position: relative;
+  background: #fff;
+  --scale-factor: 1;
+  --user-unit: 1;
+  --total-scale-factor: calc(var(--scale-factor) * var(--user-unit));
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+}
+.fhi-pdf-page > canvas { display: block; }
+.fhi-pdf-page .annotationLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  color-scheme: only light;
+  --annotation-unfocused-field-background: url("data:image/svg+xml;charset=UTF-8,<svg width='1px' height='1px' xmlns='http://www.w3.org/2000/svg'><rect width='100%' height='100%' style='fill:rgba(0, 54, 255, 0.13);'/></svg>");
+  --input-focus-border-color: Highlight;
+  --input-focus-outline: 1px solid Canvas;
+  --input-unfocused-border-color: transparent;
+  --input-disabled-border-color: transparent;
+  --input-hover-border-color: black;
+}
+.fhi-pdf-page .annotationLayer section {
+  position: absolute;
+  text-align: initial;
+  pointer-events: auto;
+  box-sizing: border-box;
+  transform-origin: 0 0;
+  user-select: none;
+}
+.fhi-pdf-page .annotationLayer section[hidden] { display: none; }
+.fhi-pdf-page .annotationLayer :is(.linkAnnotation, .buttonWidgetAnnotation.pushButton) > a {
+  position: absolute; font-size: 1em; top: 0; left: 0; width: 100%; height: 100%;
+}
+.fhi-pdf-page .annotationLayer :is(.linkAnnotation, .buttonWidgetAnnotation.pushButton):not(.hasBorder) > a:hover {
+  opacity: 0.2; background-color: rgb(255 255 0);
+}
+.fhi-pdf-page .annotationLayer .hasBorder { background-size: 100% 100%; }
+.fhi-pdf-page .annotationLayer .textWidgetAnnotation :is(input, textarea),
+.fhi-pdf-page .annotationLayer .choiceWidgetAnnotation select,
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input {
+  background-image: var(--annotation-unfocused-field-background);
+  border: 2px solid var(--input-unfocused-border-color);
+  box-sizing: border-box;
+  font: calc(9px * var(--total-scale-factor)) sans-serif;
+  height: 100%;
+  margin: 0;
+  vertical-align: top;
+  width: 100%;
+  color: #0d1117;
+}
+/* Contract forms are filled in caps — the viewer also upper-cases the stored value (pdf-form-viewer.tsx). */
+.fhi-pdf-page .annotationLayer .textWidgetAnnotation :is(input[type="text"], textarea) { text-transform: uppercase; }
+.fhi-pdf-page .annotationLayer .textWidgetAnnotation :is(input, textarea):required,
+.fhi-pdf-page .annotationLayer .choiceWidgetAnnotation select:required,
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input:required { outline: 1.5px solid red; }
+.fhi-pdf-page .annotationLayer .choiceWidgetAnnotation select option { padding: 0; }
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation.radioButton input { border-radius: 50%; }
+.fhi-pdf-page .annotationLayer .textWidgetAnnotation textarea { resize: none; }
+.fhi-pdf-page .annotationLayer .textWidgetAnnotation [disabled]:is(input, textarea),
+.fhi-pdf-page .annotationLayer .choiceWidgetAnnotation select[disabled],
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input[disabled] {
+  background: none; border: 2px solid var(--input-disabled-border-color); cursor: not-allowed;
+}
+.fhi-pdf-page .annotationLayer .textWidgetAnnotation :is(input, textarea):hover,
+.fhi-pdf-page .annotationLayer .choiceWidgetAnnotation select:hover,
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input:hover { border: 2px solid var(--input-hover-border-color); }
+.fhi-pdf-page .annotationLayer .textWidgetAnnotation :is(input, textarea):hover,
+.fhi-pdf-page .annotationLayer .choiceWidgetAnnotation select:hover,
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation.checkBox input:hover { border-radius: 2px; }
+.fhi-pdf-page .annotationLayer .textWidgetAnnotation :is(input, textarea):focus,
+.fhi-pdf-page .annotationLayer .choiceWidgetAnnotation select:focus {
+  background: none; border: 2px solid var(--input-focus-border-color); border-radius: 2px; outline: var(--input-focus-outline);
+}
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation:is(.checkBox, .radioButton) :focus { background-image: none; background-color: transparent; }
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation.checkBox :focus { border: 2px solid var(--input-focus-border-color); border-radius: 2px; outline: var(--input-focus-outline); }
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation.radioButton :focus { border: 2px solid var(--input-focus-border-color); outline: var(--input-focus-outline); }
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation.checkBox input:checked::before,
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation.checkBox input:checked::after,
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation.radioButton input:checked::before {
+  background-color: CanvasText; content: ""; display: block; position: absolute;
+}
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation.checkBox input:checked::before,
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation.checkBox input:checked::after { height: 80%; left: 45%; width: 1px; }
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation.checkBox input:checked::before { transform: rotate(45deg); }
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation.checkBox input:checked::after { transform: rotate(-45deg); }
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation.radioButton input:checked::before { border-radius: 50%; height: 50%; left: 25%; top: 25%; width: 50%; }
+.fhi-pdf-page .annotationLayer .textWidgetAnnotation input.comb { font-family: monospace; padding-left: 2px; padding-right: 0; }
+.fhi-pdf-page .annotationLayer .textWidgetAnnotation input.comb:focus { width: 103%; }
+.fhi-pdf-page .annotationLayer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input { appearance: none; }
+.fhi-pdf-page .annotationLayer .popupAnnotation { display: none; }
