@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
-  Check, ChevronDown, ChevronRight, Clock, ExternalLink, Loader2, Network, RefreshCw, Search, UserPlus, Users,
+  Check, ChevronDown, ChevronRight, Clock, ExternalLink, FileSpreadsheet, FileText, Loader2, Network, RefreshCw, Search, UserPlus, UserRound, Users,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
@@ -17,13 +17,15 @@ import type { RecruitmentPerson } from "@/app/api/admin/recruitment/route"
  * Directory can't answer at a glance —
  *   · who is waiting for approval, and who invited them (Activate right here);
  *   · who recruits most (direct recruits: total, active, pending, last 30 days);
- *   · a recruiter's whole downline, level by level.
+ *   · a recruiter's whole downline, level by level — with an Excel / PDF export
+ *     of the whole pyramid (each person under the one who recruited them);
+ *   · accounts that registered on the website directly, with no inviter.
  * Everything is derived on the client from one compact list of accounts
  * (GET /api/admin/recruitment); activating goes through the same
  * PATCH /api/admin/users/[id] the Directory uses.
  */
 
-type Tab = "pending" | "recruiters" | "downline"
+type Tab = "pending" | "direct" | "recruiters" | "downline"
 const DAY = 24 * 60 * 60 * 1000
 const MAX_DEPTH = 8
 
@@ -105,6 +107,12 @@ export default function RecruitmentPage() {
     [people],
   )
 
+  // Registered on the website with no invite link behind them.
+  const direct = useMemo(
+    () => (people ?? []).filter((p) => !p.invitedBy || !byId.has(p.invitedBy)).sort((a, b) => (b.joinedAt ?? "").localeCompare(a.joinedAt ?? "")),
+    [people, byId],
+  )
+
   /** Everyone under a recruiter, any depth, cycle-safe. */
   const networkSize = useCallback(
     (id: string) => {
@@ -123,6 +131,97 @@ export default function RecruitmentPage() {
     },
     [childrenOf],
   )
+
+  /** The downline as rows, depth-first: each person right under their recruiter. */
+  const downlineRows = useCallback(
+    (rootId: string) => {
+      const rows: { level: number; p: RecruitmentPerson; via: string }[] = []
+      const seen = new Set<string>([rootId])
+      const walk = (id: string, level: number, via: string) => {
+        for (const c of childrenOf.get(id) ?? []) {
+          if (seen.has(c.id)) continue
+          seen.add(c.id)
+          rows.push({ level, p: c, via })
+          if (level < 12) walk(c.id, level + 1, c.name)
+        }
+      }
+      walk(rootId, 1, byId.get(rootId)?.name ?? "")
+      return rows
+    },
+    [childrenOf, byId],
+  )
+
+  const exportDownline = (root: RecruitmentPerson, kind: "csv" | "pdf") => {
+    const rows = downlineRows(root.id)
+    const levels = rows.reduce((m, r) => Math.max(m, r.level), 0)
+    const stamp = new Date().toISOString().slice(0, 10)
+    const file = `downline-${root.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${stamp}`
+    if (kind === "csv") {
+      const head = ["Level", "Name", "Role", "Status", "Joined", "Recruited by"]
+      const body = rows.map((r) => [String(r.level), `${"    ".repeat(r.level - 1)}${r.level > 1 ? "└ " : ""}${r.p.name}`, roleToLabel(r.p.role), r.p.status, fmtDate(r.p.joinedAt), r.via])
+      const csv = "\uFEFF" + [head, ...body].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n")
+      const a = document.createElement("a")
+      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }))
+      a.download = `${file}.csv`
+      a.click()
+      URL.revokeObjectURL(a.href)
+      return
+    }
+    const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    const w = window.open("", "_blank", "width=1000,height=720")
+    if (!w) return
+    const perLevel = Array.from({ length: levels }, (_, i) => rows.filter((r) => r.level === i + 1).length)
+    const tr = rows
+      .map(
+        (r) => `<tr class="l${Math.min(r.level, 6)}">
+          <td class="n">${r.level}</td>
+          <td class="name" style="padding-left:${12 + (r.level - 1) * 22}px"><span class="tick">${r.level > 1 ? "└" : "•"}</span><strong>${esc(r.p.name)}</strong></td>
+          <td>${esc(roleToLabel(r.p.role))}</td>
+          <td><span class="st ${esc(r.p.status)}">${esc(r.p.status)}</span></td>
+          <td>${esc(fmtDate(r.p.joinedAt))}</td>
+          <td class="via">${esc(r.via)}</td>
+        </tr>`,
+      )
+      .join("")
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Downline — ${esc(root.name)}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; padding: 32px; }
+  .band { background: #001f3f; border-bottom: 4px solid #d6b357; border-radius: 12px 12px 0 0; padding: 22px 28px; }
+  .band h1 { color: #fff; font-size: 22px; }
+  .band .gold { color: #d6b357; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+  .meta { display: flex; flex-wrap: wrap; gap: 24px; padding: 14px 28px; background: #f6f8fb; border: 1px solid #e8eaed; border-top: 0; font-size: 12px; color: #4b5563; }
+  .meta strong { color: #001f3f; }
+  table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 12px; }
+  th { background: #001f3f; color: #fff; text-align: left; padding: 9px 10px; font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; }
+  td { padding: 8px 10px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
+  .n { color: #9ca3af; width: 44px; text-align: center; }
+  .tick { color: #d6b357; margin-right: 8px; font-weight: 700; }
+  .via { color: #6b7280; }
+  .l1 td { background: #fbfaf5; }
+  .st { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; text-transform: capitalize; }
+  .st.active { background: #dcfce7; color: #166534; } .st.pending { background: #fef3c7; color: #92400e; } .st.inactive { background: #f3f4f6; color: #4b5563; }
+  .foot { margin-top: 22px; text-align: center; font-size: 11px; color: #9ca3af; }
+  .foot b { color: #b8913f; }
+  @page { size: portrait; margin: 12mm; }
+</style></head><body>
+  <div class="band"><p class="gold">FHI Global · Recruitment</p><h1>${esc(root.name)} — downline</h1></div>
+  <div class="meta">
+    <span>Direct recruits: <strong>${childrenOf.get(root.id)?.length ?? 0}</strong></span>
+    <span>Whole network: <strong>${rows.length}</strong> people across <strong>${levels}</strong> level${levels === 1 ? "" : "s"}</span>
+    <span>Per level: <strong>${perLevel.join(" › ")}</strong></span>
+    <span>Generated: <strong>${esc(new Date().toLocaleDateString("en-AE", { year: "numeric", month: "long", day: "numeric" }))}</strong></span>
+  </div>
+  <table>
+    <thead><tr><th>Level</th><th>Name</th><th>Role</th><th>Status</th><th>Joined</th><th>Recruited by</th></tr></thead>
+    <tbody>${tr}</tbody>
+  </table>
+  <p class="foot">Each person is listed under the one who recruited them — indented one step per level · <b>fhiglobal.ae</b></p>
+</body></html>`)
+    w.document.close()
+    w.focus()
+    setTimeout(() => w.print(), 350)
+  }
 
   const recruiters = useMemo(() => {
     return [...childrenOf.entries()]
@@ -244,13 +343,14 @@ export default function RecruitmentPage() {
             {tabBtn("pending", "Waiting for approval", people ? pending.length : undefined)}
             {tabBtn("recruiters", "Top recruiters", people ? recruiters.length : undefined)}
             {tabBtn("downline", "Downline")}
+            {tabBtn("direct", "Direct sign-ups", people ? direct.length : undefined)}
           </div>
           <div className="relative lg:w-80">
             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9ca3af]" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={tab === "downline" ? "Find a recruiter…" : "Search by name or inviter…"}
+              placeholder={tab === "downline" ? "Find a recruiter…" : tab === "direct" ? "Search by name…" : "Search by name or inviter…"}
               className="w-full rounded-xl border border-[#e5e5e5] py-2.5 pl-10 pr-4 text-sm text-[#111827] placeholder:text-[#9ca3af] focus:border-[#001f3f] focus:outline-none"
             />
           </div>
@@ -266,6 +366,8 @@ export default function RecruitmentPage() {
           <p className="py-8 text-sm text-[#9ca3af]">Couldn&apos;t load the accounts right now. {error}</p>
         ) : tab === "pending" ? (
           <PendingList items={pending.filter(match)} byId={byId} busy={busy} onActivate={activate} profileHref={profileHref} empty={q ? "Nobody matches." : "Nobody is waiting — every account is approved."} />
+        ) : tab === "direct" ? (
+          <DirectList items={direct.filter(match)} profileHref={profileHref} empty={q ? "Nobody matches." : "Everyone came through an invite link."} />
         ) : tab === "recruiters" ? (
           <RecruiterTable
             rows={recruiters.filter((r) => match(r.person))}
@@ -287,6 +389,7 @@ export default function RecruitmentPage() {
             childrenOf={childrenOf}
             networkSize={networkSize}
             profileHref={profileHref}
+            onExport={exportDownline}
           />
         )}
       </div>
@@ -354,6 +457,37 @@ function PendingList({
         )
       })}
     </ul>
+  )
+}
+
+// ─── Direct sign-ups ─────────────────────────────────────────────────────────
+
+function DirectList({ items, profileHref, empty }: { items: RecruitmentPerson[]; profileHref: (id: string) => string; empty: string }) {
+  if (items.length === 0) return <p className="py-8 text-sm text-[#9ca3af]">{empty}</p>
+  return (
+    <>
+      <p className="mt-4 flex items-center gap-2 text-xs text-[#6b7280]">
+        <UserRound className="h-3.5 w-3.5 text-[#b8913f]" /> Registered on the website without an invite link — nobody&apos;s recruits. An admin can set their inviter from the account editor.
+      </p>
+      <ul className="mt-2 divide-y divide-[#f0f2f5]">
+        {items.map((p) => (
+          <li key={p.id} className="flex flex-wrap items-center gap-3 py-3">
+            <Avatar p={p} />
+            <div className="min-w-0 flex-1">
+              <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-[#111827]">
+                <span className="truncate">{p.name}</span>
+                <span className="rounded-full bg-[#001f3f]/5 px-2 py-0.5 text-[10.5px] font-bold text-[#001f3f]">{roleToLabel(p.role)}</span>
+                <StatusChip status={p.status} />
+              </p>
+              <p className="mt-0.5 text-xs text-[#6b7280]">Joined {fmtDate(p.joinedAt)}</p>
+            </div>
+            <Link href={profileHref(p.id)} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 text-xs font-bold text-[#374151] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]">
+              <ExternalLink className="h-3.5 w-3.5" /> Profile
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </>
   )
 }
 
@@ -426,6 +560,7 @@ function Downline({
   childrenOf,
   networkSize,
   profileHref,
+  onExport,
 }: {
   root: RecruitmentPerson | null
   candidates: RecruitmentPerson[]
@@ -433,6 +568,7 @@ function Downline({
   childrenOf: Map<string, RecruitmentPerson[]>
   networkSize: (id: string) => number
   profileHref: (id: string) => string
+  onExport: (root: RecruitmentPerson, kind: "csv" | "pdf") => void
 }) {
   return (
     <div className="mt-4">
@@ -461,9 +597,29 @@ function Downline({
                 {childrenOf.get(root.id)?.length ?? 0} direct recruits · {networkSize(root.id)} people in the whole network
               </p>
             </div>
-            <Link href={profileHref(root.id)} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/25 px-2.5 text-xs font-bold text-white hover:border-[#d6b357] hover:text-[#d6b357]">
-              <ExternalLink className="h-3.5 w-3.5" /> Profile
-            </Link>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => onExport(root, "csv")}
+                disabled={(childrenOf.get(root.id)?.length ?? 0) === 0}
+                title="Download the whole downline as Excel (CSV)"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-300/50 bg-emerald-500/15 px-2.5 text-xs font-bold text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-40"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+              </button>
+              <button
+                type="button"
+                onClick={() => onExport(root, "pdf")}
+                disabled={(childrenOf.get(root.id)?.length ?? 0) === 0}
+                title="Print the whole downline as a PDF"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#d6b357]/50 bg-[#d6b357]/15 px-2.5 text-xs font-bold text-[#f0d890] hover:bg-[#d6b357]/25 disabled:opacity-40"
+              >
+                <FileText className="h-3.5 w-3.5" /> PDF
+              </button>
+              <Link href={profileHref(root.id)} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/25 px-2.5 text-xs font-bold text-white hover:border-[#d6b357] hover:text-[#d6b357]">
+                <ExternalLink className="h-3.5 w-3.5" /> Profile
+              </Link>
+            </div>
           </div>
           <ol className="mt-3">
             {(childrenOf.get(root.id) ?? []).map((c) => (
