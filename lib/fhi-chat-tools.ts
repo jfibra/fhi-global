@@ -10,6 +10,7 @@ import { sendAdminDirectEmail, sendCongratsEmail } from "@/lib/mailer"
 import { renderTopSellerCertificatePng } from "@/lib/congrats-poster"
 import { formatPrice, handoverLabel, isOffPlan, parsePaymentPlan, priceFromValue, priceToValue, statusLabel, unitsSummary, type ProjectSeoInput } from "@/lib/project-seo"
 import { ROLES_SALES_PIPELINE } from "@/lib/app-roles"
+import { RECOMMEND_LABELS, type RecommendValue } from "@/lib/feedback-service"
 import { BUYER_LEAD_COLUMNS, LEAD_GRADES, answerLabel, budgetLabel, leadGrade, sellerAnswerLabel, waDigits, type BuyerLead, type LeadGrade } from "@/lib/buyer-links"
 
 /**
@@ -3283,6 +3284,156 @@ async function clientsOverview(admin: Admin, args: { agent_name?: string; search
   }
 }
 
+// ─── Agent reviews (client feedback) ─────────────────────────────────────────
+
+type ReviewRow = {
+  id: string
+  agent_id: string | null
+  agent_name: string | null
+  client_name: string | null
+  property_ref: string | null
+  transaction_type: string | null
+  transaction_date: string | null
+  overall_rating: number | null
+  score_communication: number | null
+  score_market: number | null
+  score_understanding: number | null
+  score_professionalism: number | null
+  score_negotiation: number | null
+  score_process: number | null
+  score_experience: number | null
+  recommend: string | null
+  did_well: string | null
+  to_improve: string | null
+  other_comments: string | null
+  status: string | null
+  created_at: string
+}
+
+const SCORE_LABELS: Array<[keyof ReviewRow, string]> = [
+  ["score_communication", "Communication"],
+  ["score_market", "Market knowledge"],
+  ["score_understanding", "Understanding needs"],
+  ["score_professionalism", "Professionalism"],
+  ["score_negotiation", "Negotiation"],
+  ["score_process", "Process handling"],
+  ["score_experience", "Overall experience"],
+]
+
+/**
+ * What clients say about agents (the feedback form): a leaderboard by review
+ * count and average rating — with a minimum-reviews rule so one 5-star review
+ * doesn't outrank twenty 4.8s — one agent's reviews in full (the seven scores,
+ * recommend answers, what went well / to improve), and the reviews still
+ * waiting for approval. Only approved reviews show on an agent's website.
+ */
+async function agentReviews(admin: Admin, args: { agent_name?: string; status?: string; min_reviews?: number; limit?: number }) {
+  const limit = Math.min(Math.max(args.limit ?? 15, 1), 60)
+  const minReviews = Math.max(args.min_reviews ?? 3, 1)
+  const status = (args.status ?? "all").trim()
+  let q = admin
+    .from("agent_feedback")
+    .select("id, agent_id, agent_name, client_name, property_ref, transaction_type, transaction_date, overall_rating, score_communication, score_market, score_understanding, score_professionalism, score_negotiation, score_process, score_experience, recommend, did_well, to_improve, other_comments, status, created_at")
+    .order("created_at", { ascending: false })
+    .limit(5000)
+  if (status !== "all") q = q.eq("status", status)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  let rows = (data ?? []) as ReviewRow[]
+  const all = rows
+
+  let agentMatches: string[] | null = null
+  if (args.agent_name?.trim()) {
+    const found = await findProfiles(admin, args.agent_name)
+    if (!found.length) return { error: `No FHI member matching "${args.agent_name}"` }
+    const ids = new Set(found.map((p) => p.id))
+    agentMatches = found.map((p) => p.fullname ?? "Unknown")
+    rows = rows.filter((r) => ids.has(String(r.agent_id)))
+  }
+
+  const { data: profiles } = rows.length
+    ? await admin.from("profiles").select("id, fullname, profile_url").in("id", [...new Set(rows.map((r) => String(r.agent_id)).filter((v) => v && v !== "null"))])
+    : { data: [] }
+  const prof = new Map(((profiles ?? []) as { id: string; fullname: string | null; profile_url: string | null }[]).map((p) => [String(p.id), p]))
+  const nameOf = (r: ReviewRow) => prof.get(String(r.agent_id))?.fullname ?? r.agent_name ?? "Unknown agent"
+  const avg = (ns: Array<number | null>) => {
+    const v = ns.filter((n): n is number => typeof n === "number" && Number.isFinite(n))
+    return v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 100) / 100 : null
+  }
+  const recommendLabel = (v: string | null) => (v && v in RECOMMEND_LABELS ? RECOMMEND_LABELS[v as RecommendValue] : v ?? "Not answered")
+  const wouldRecommend = (r: ReviewRow) => r.recommend === "definitely_yes" || r.recommend === "very_likely" || r.recommend === "likely"
+
+  // Leaderboard over the (possibly filtered) rows, approved + new both count as
+  // client voices; hidden ones are excluded from ratings.
+  const rated = rows.filter((r) => r.status !== "hidden")
+  const byAgent = new Map<string, ReviewRow[]>()
+  for (const r of rated) {
+    const k = String(r.agent_id ?? r.agent_name ?? "unknown")
+    byAgent.set(k, [...(byAgent.get(k) ?? []), r])
+  }
+  const board = [...byAgent.entries()]
+    .map(([id, list]) => ({
+      agent: nameOf(list[0]),
+      reviews: list.length,
+      approved: list.filter((r) => r.status === "approved").length,
+      average_rating: avg(list.map((r) => r.overall_rating)),
+      five_star: list.filter((r) => r.overall_rating === 5).length,
+      would_recommend_percent: Math.round((100 * list.filter(wouldRecommend).length) / list.length),
+      latest_review: list[0].created_at.slice(0, 10),
+      image: prof.get(id)?.profile_url ?? null,
+    }))
+    .sort((a, b) => b.reviews - a.reviews || (b.average_rating ?? 0) - (a.average_rating ?? 0))
+  const withoutImage = (b: (typeof board)[number]) => {
+    const copy: Partial<typeof b> = { ...b }
+    delete copy.image
+    return copy
+  }
+  const eligible = board.filter((b) => b.reviews >= minReviews)
+  const bestRated = [...eligible].sort((a, b) => (b.average_rating ?? 0) - (a.average_rating ?? 0) || b.reviews - a.reviews)
+
+  const pending = all.filter((r) => r.status === "new")
+  const scoreAverages = Object.fromEntries(SCORE_LABELS.map(([key, label]) => [label, avg(rated.map((r) => r[key] as number | null))]))
+
+  return {
+    filters: { agent_name_matched: agentMatches, status, min_reviews_for_best_rated: minReviews },
+    totals: {
+      reviews: rows.length,
+      approved_shown_on_websites: rows.filter((r) => r.status === "approved").length,
+      waiting_for_approval: rows.filter((r) => r.status === "new").length,
+      hidden: rows.filter((r) => r.status === "hidden").length,
+      agents_reviewed: byAgent.size,
+      average_rating: avg(rated.map((r) => r.overall_rating)),
+      would_recommend_percent: rated.length ? Math.round((100 * rated.filter(wouldRecommend).length) / rated.length) : null,
+    },
+    average_scores_out_of_5: scoreAverages,
+    rating_distribution: [5, 4, 3, 2, 1].map((star) => ({ stars: star, count: rated.filter((r) => r.overall_rating === star).length })),
+    recommend_answers: tally(rated, (r) => recommendLabel(r.recommend)),
+    most_reviewed: board.slice(0, limit).map((b) => withoutImage(b)),
+    best_rated: bestRated.slice(0, limit).map((b) => withoutImage(b)),
+    best_rated_note: eligible.length < board.length ? `${board.length - eligible.length} agent(s) with fewer than ${minReviews} reviews are left out of best_rated (they are in most_reviewed)` : null,
+    waiting_for_approval: pending.slice(0, limit).map((r) => ({ review_id: r.id, agent: nameOf(r), client: r.client_name, rating: r.overall_rating, recommend: recommendLabel(r.recommend), submitted: r.created_at.slice(0, 10), did_well: (r.did_well ?? "").slice(0, 160) || null })),
+    reviews: rows.slice(0, limit).map((r) => ({
+      agent: nameOf(r),
+      client: r.client_name,
+      rating: r.overall_rating,
+      scores: Object.fromEntries(SCORE_LABELS.map(([key, label]) => [label, r[key]])),
+      recommend: recommendLabel(r.recommend),
+      property: r.property_ref,
+      transaction: [r.transaction_type, r.transaction_date].filter(Boolean).join(" · ") || null,
+      did_well: r.did_well,
+      to_improve: r.to_improve,
+      other_comments: r.other_comments,
+      status: r.status,
+      submitted: r.created_at.slice(0, 10),
+    })),
+    where_in_dashboard: "Communication → Feedback (approve or hide each review); approved ones appear on the agent's website",
+    _cards: board
+      .filter((b) => b.image)
+      .slice(0, 8)
+      .map((b, i): FhiChatCard => ({ kind: "agent", title: b.agent, subtitle: `${b.reviews} review${b.reviews === 1 ? "" : "s"} · ${b.average_rating ?? "–"} / 5`, image: b.image, rank: i + 1 })),
+  }
+}
+
 // ─── OpenAI tool definitions + dispatcher ────────────────────────────────────
 
 export const FHI_CHAT_TOOLS = [
@@ -3687,6 +3838,23 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "agent_reviews",
+      description:
+        "AGENT REVIEWS / RATINGS from clients (the feedback form): which agent has the MOST reviews, the BEST RATED agents (minimum reviews rule), average rating and the seven detail scores (communication, market knowledge, understanding, professionalism, negotiation, process, experience), 'would recommend' answers, one agent's reviews in full with what clients wrote, and reviews WAITING FOR APPROVAL. Use for 'who has the most reviews', 'best rated agent', 'Michelle's rating', 'what do clients say about X', 'any reviews to approve'.",
+      parameters: {
+        type: "object",
+        properties: {
+          agent_name: { type: "string", description: "One agent (partial name ok)" },
+          status: { type: "string", enum: ["all", "approved", "new", "hidden"], description: "Default all; new = waiting for approval" },
+          min_reviews: { type: "integer", description: "Minimum reviews to appear in best_rated (default 3)" },
+          limit: { type: "integer" },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "find_projects",
       description:
         "SHORTLIST projects by what a buyer wants — area/community (JVC, Dubai Marina, Business Bay…), developer, number of bedrooms (0 = studio), property type (apartment, villa, townhouse), budget (min/max AED), handover year, off-plan or ready. Returns the matching published projects sorted (cheapest first when a budget or bedroom count is given) with price, handover, unit mix, sizes, payment plan and the page link, plus counts by developer/area/handover year. Use for 'cheapest 1-bedroom in JVC', 'Azizi projects handing over 2027', 'villas under AED 3M', 'what do we have in Dubai South', 'ready apartments'. For everything about ONE named project use project_details instead.",
@@ -3823,6 +3991,7 @@ export async function runFhiChatTool(
       case "agent_websites": result = await agentWebsites(admin, args); break
       case "listings_overview": result = await listingsOverview(admin, args as Parameters<typeof listingsOverview>[1]); break
       case "clients_overview": result = await clientsOverview(admin, args); break
+      case "agent_reviews": result = await agentReviews(admin, args); break
       case "project_details": result = await projectDetails(admin, args); break
       case "event_attendees": result = await eventAttendees(admin, args); break
       case "new_accounts": result = await newAccounts(admin, args); break
