@@ -59,9 +59,6 @@ const C = {
   tick: "#6b7280",
 } as const
 
-const INPUT_CLS =
-  "h-10 w-full rounded-xl border border-[#e5e7eb] bg-white px-3.5 text-sm text-[#0f2940] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5"
-
 const int = new Intl.NumberFormat("en-AE", { maximumFractionDigits: 0 })
 const compact = new Intl.NumberFormat("en-AE", { notation: "compact", maximumFractionDigits: 1 })
 const pct = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`
@@ -605,13 +602,17 @@ export function BreakdownSection() {
         }}
         className="bg-white rounded-2xl border border-[#e8eaed] p-5 mb-4"
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div>
+        {/* One row: each field is only as wide as it needs to be (the date
+            inputs don't stretch to fill a grid column), so the buttons sit
+            right after them instead of on a row of their own. Wraps only if
+            the panel is too narrow to hold all of it. */}
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-[220px] shrink-0">
             <label className="block text-sm font-medium text-[#0d1117] mb-1.5">Dataset</label>
             <FilterSelect value={command} onValueChange={(v) => switchDataset(v as DldCommand)} options={CHARTABLE} ariaLabel="Dataset" className="w-full max-w-none h-10 rounded-xl py-0" />
           </div>
           {dateFields.map((f) => (
-            <div key={f.param}>
+            <div key={f.param} className="w-[160px] shrink-0">
               <label htmlFor={`chart-${f.param}`} className="block text-sm font-medium text-[#0d1117] mb-1.5">
                 {f.label}
                 {f.required && <span className="text-rose-600"> *</span>}
@@ -621,28 +622,26 @@ export function BreakdownSection() {
                 type="date"
                 value={values[f.param] ?? ""}
                 onChange={(e) => setValues((prev) => ({ ...prev, [f.param]: e.target.value }))}
-                className={INPUT_CLS}
+                className="h-10 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 text-sm text-[#0f2940] focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5"
                 required={f.required}
               />
             </div>
           ))}
-          <div className="flex items-end gap-2">
-            <button
-              type="submit"
-              disabled={loading || missing.length > 0}
-              className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#0a2e57] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              Load charts
+          <button
+            type="submit"
+            disabled={loading || missing.length > 0}
+            className="inline-flex shrink-0 items-center gap-2 h-10 whitespace-nowrap px-5 rounded-xl bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#0a2e57] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Load charts
+          </button>
+          {loading ? (
+            <button type="button" onClick={job.stop} className="h-10 shrink-0 whitespace-nowrap px-4 rounded-xl border border-[#e5e7eb] bg-white text-sm font-semibold text-[#374151] hover:border-[#001f3f]/30">
+              Stop
             </button>
-            {loading ? (
-              <button type="button" onClick={job.stop} className="h-10 px-4 rounded-xl border border-[#e5e7eb] bg-white text-sm font-semibold text-[#374151] hover:border-[#001f3f]/30">
-                Stop
-              </button>
-            ) : (
-              submitted && <RefreshButton onClick={job.refresh} loading={loading} updatedAt={job.updatedAt} />
-            )}
-          </div>
+          ) : (
+            submitted && <RefreshButton onClick={job.refresh} loading={loading} updatedAt={job.updatedAt} />
+          )}
         </div>
         {missing.length > 0 && <p className="mt-3 text-xs text-[#6b7280]">Pick {missing.map((f) => f.label.toLowerCase()).join(" and ")} to load.</p>}
       </form>
