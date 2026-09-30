@@ -9,6 +9,7 @@ import { DESIGNS as CARD_DESIGNS, isDesignId as isCardDesignId } from "@/feature
 import { sendAdminDirectEmail, sendCongratsEmail } from "@/lib/mailer"
 import { renderTopSellerCertificatePng } from "@/lib/congrats-poster"
 import { formatPrice, handoverLabel, isOffPlan, parsePaymentPlan, priceFromValue, priceToValue, statusLabel, unitsSummary, type ProjectSeoInput } from "@/lib/project-seo"
+import { ROLES_SALES_PIPELINE } from "@/lib/app-roles"
 import { BUYER_LEAD_COLUMNS, LEAD_GRADES, answerLabel, budgetLabel, leadGrade, sellerAnswerLabel, waDigits, type BuyerLead, type LeadGrade } from "@/lib/buyer-links"
 
 /**
@@ -2798,6 +2799,175 @@ async function projectDetails(admin: Admin, args: { name?: string }) {
   }
 }
 
+// ─── Sales pipeline health + quiet agents ────────────────────────────────────
+
+type PipelineArgs = {
+  stale_days?: number
+  quiet_scope?: "month" | "quarter" | "year"
+  quiet_from_date?: string
+  quiet_to_date?: string
+  include_quiet_agents?: boolean
+  limit?: number
+}
+
+type PipelineSale = SaleRow & {
+  commission_status: string | null
+  validation_changed_at: string | null
+  validation_changed_by_name: string | null
+  sale_type: string | null
+  property_address: string | null
+  unit_number: string | null
+  remarks: string | null
+}
+
+/**
+ * The state of the sales pipeline as it stands NOW (not a period): what waits
+ * for validation and for how long, what was rejected, how fast validation has
+ * been, where commissions stand (status only — the amount isn't stored),
+ * shared/partner deals — plus the "quiet agents": accounts in a selling role
+ * that are active but have no validated sale in the period (this quarter by
+ * default). Every list is oldest-first so the answer names what to chase.
+ */
+async function salesPipeline(admin: Admin, args: PipelineArgs) {
+  const staleDays = Math.min(Math.max(args.stale_days ?? 7, 1), 365)
+  const limit = Math.min(Math.max(args.limit ?? 20, 1), 60)
+  const now = Date.now()
+  const daysSince = (iso: string | null) => (iso ? Math.max(0, Math.floor((now - Date.parse(iso)) / 86400e3)) : null)
+
+  const sales: PipelineSale[] = []
+  for (let page = 0; page < 10; page++) {
+    const { data, error } = await admin
+      .from("sales_reports")
+      .select("id, agent_id, developer_id, project_id, contract_price, validation_status, reservation_date, created_at, partners, commission_status, validation_changed_at, validation_changed_by_name, sale_type, property_address, unit_number, remarks")
+      .order("created_at", { ascending: true })
+      .range(page * 1000, page * 1000 + 999)
+    if (error) throw new Error(error.message)
+    sales.push(...((data ?? []) as PipelineSale[]))
+    if (!data || data.length < 1000) break
+  }
+  const names = await nameMaps(admin, sales)
+  const aed = (n: number) => Math.round(n)
+  const price = (s: SaleRow) => Number(s.contract_price ?? 0) || 0
+  const line = (s: PipelineSale) => ({
+    sale_id: s.id,
+    agent: names.agent.get(String(s.agent_id))?.name ?? "Unknown",
+    partners: saleCredits(s).filter((c) => c.agentId !== s.agent_id).map((c) => `${names.agent.get(c.agentId)?.name ?? "Unknown"} (${Math.round(c.share * 100)}%)`),
+    project: s.sale_type && s.sale_type !== "project" ? s.property_address ?? s.sale_type : names.proj.get(Number(s.project_id))?.name ?? "Unknown project",
+    developer: names.dev.get(String(s.developer_id))?.name ?? null,
+    unit: s.unit_number,
+    contract_price_aed: aed(price(s)),
+    reservation_date: s.reservation_date,
+    submitted: s.created_at.slice(0, 10),
+    days_since_submitted: daysSince(s.created_at),
+    validation_status: s.validation_status ?? "pending",
+    commission_status: s.commission_status ?? "pending",
+    validated_on: s.validation_changed_at?.slice(0, 10) ?? null,
+    validated_by: s.validation_changed_by_name,
+    remarks: s.remarks ? s.remarks.slice(0, 140) : null,
+  })
+
+  const pending = sales.filter((s) => (s.validation_status ?? "pending") === "pending").sort((a, b) => a.created_at.localeCompare(b.created_at))
+  const rejected = sales.filter((s) => s.validation_status === "rejected").sort((a, b) => b.created_at.localeCompare(a.created_at))
+  const validated = sales.filter((s) => s.validation_status === "validated")
+  const stale = pending.filter((s) => (daysSince(s.created_at) ?? 0) >= staleDays)
+  const turnaround = validated
+    .map((s) => (s.validation_changed_at ? (Date.parse(s.validation_changed_at) - Date.parse(s.created_at)) / 86400e3 : null))
+    .filter((d): d is number => d != null && d >= 0)
+  const avgTurnaround = turnaround.length ? Math.round((turnaround.reduce((a, b) => a + b, 0) / turnaround.length) * 10) / 10 : null
+
+  const byCommission = new Map<string, { count: number; value: number }>()
+  for (const s of validated) {
+    const k = s.commission_status ?? "pending"
+    const cur = byCommission.get(k) ?? { count: 0, value: 0 }
+    cur.count++
+    cur.value += price(s)
+    byCommission.set(k, cur)
+  }
+  const commissionPending = validated
+    .filter((s) => (s.commission_status ?? "pending") === "pending")
+    .sort((a, b) => (a.validation_changed_at ?? a.created_at).localeCompare(b.validation_changed_at ?? b.created_at))
+  const shared = sales.filter((s) => saleCredits(s).length > 1)
+
+  const out: Record<string, unknown> = {
+    as_of: new Date(now).toISOString().slice(0, 10),
+    all_time: { sales_submitted: sales.length, validated: validated.length, pending: pending.length, rejected: rejected.length, validated_value_aed: aed(validated.reduce((a, s) => a + price(s), 0)) },
+    awaiting_validation: {
+      count: pending.length,
+      value_aed: aed(pending.reduce((a, s) => a + price(s), 0)),
+      oldest_days_waiting: pending.length ? daysSince(pending[0].created_at) : null,
+      waiting_more_than_days: staleDays,
+      stale_count: stale.length,
+      oldest_first: pending.slice(0, limit).map(line),
+      where_in_dashboard: "Sales → filter Pending; each row opens the sale to validate or reject",
+    },
+    rejected: { count: rejected.length, most_recent: rejected.slice(0, Math.min(limit, 10)).map(line) },
+    validation_speed: { average_days_submit_to_validation: avgTurnaround, based_on_sales: turnaround.length, note: turnaround.length ? null : "No validation timestamps recorded yet" },
+    commissions: {
+      note: "Only the commission STATUS is stored per sale — no amounts or payout dates",
+      by_status: [...byCommission.entries()].map(([status, v]) => ({ status, count: v.count, contract_value_aed: aed(v.value) })),
+      pending_oldest_first: commissionPending.slice(0, limit).map((s) => ({ ...line(s), days_since_validated: daysSince(s.validation_changed_at ?? s.created_at) })),
+    },
+    partner_deals: {
+      count: shared.length,
+      value_aed: aed(shared.reduce((a, s) => a + price(s), 0)),
+      note: "Shared sales credit each agent their share; company totals count the sale once",
+      list: shared.slice(-limit).reverse().map(line),
+    },
+  }
+
+  if (args.include_quiet_agents !== false) {
+    // Selling roles, active accounts, no validated credit in the period.
+    const scope = args.quiet_scope ?? "quarter"
+    const today = new Date(now)
+    let from = (args.quiet_from_date ?? "").trim()
+    let to = (args.quiet_to_date ?? "").trim() || null
+    if (!from) {
+      const r = periodRange(scope, today.getUTCFullYear(), today.getUTCMonth() + 1)
+      from = r.from ?? "1970-01-01"
+      to = null
+    }
+    const { data: sellers, error } = await admin
+      .from("profiles")
+      .select("id, fullname, role, status, joined_at, profile_url")
+      .in("role", [...ROLES_SALES_PIPELINE])
+      .eq("status", "active")
+      .neq("is_deleted", true)
+      .limit(5000)
+    if (error) throw new Error(error.message)
+    const inPeriod = (s: SaleRow) => {
+      const d = (s.reservation_date ?? s.created_at).slice(0, 10)
+      return d >= from && (!to || d < to)
+    }
+    const soldInPeriod = new Set<string>()
+    for (const s of validated.filter(inPeriod)) for (const c of saleCredits(s)) soldInPeriod.add(c.agentId)
+    const lastSale = new Map<string, string>()
+    for (const s of validated) for (const c of saleCredits(s)) {
+      const d = (s.reservation_date ?? s.created_at).slice(0, 10)
+      if ((lastSale.get(c.agentId) ?? "") < d) lastSale.set(c.agentId, d)
+    }
+    const rows = (sellers ?? []) as { id: string; fullname: string | null; role: string; status: string; joined_at: string | null; profile_url: string | null }[]
+    const quiet = rows.filter((p) => !soldInPeriod.has(String(p.id)))
+    const byRole = (list: typeof rows) => Object.fromEntries([...list.reduce((m, p) => m.set(p.role, (m.get(p.role) ?? 0) + 1), new Map<string, number>())])
+    const neverSold = quiet.filter((p) => !lastSale.has(String(p.id)))
+    out.quiet_agents = {
+      period: { from, to: to ?? "today", scope: args.quiet_from_date ? "custom" : scope },
+      definition: "Active accounts in a selling role (agent, team leader, unit manager, global partner) with no validated sale credited in the period. Members are not counted — they have no selling role yet.",
+      selling_accounts_active: rows.length,
+      sold_in_period: rows.length - quiet.length,
+      quiet: quiet.length,
+      quiet_by_role: byRole(quiet),
+      never_sold_at_all: neverSold.length,
+      sold_before_but_not_this_period: quiet.length - neverSold.length,
+      list: quiet
+        .sort((a, b) => (lastSale.get(String(b.id)) ?? "").localeCompare(lastSale.get(String(a.id)) ?? "") || (a.fullname ?? "").localeCompare(b.fullname ?? ""))
+        .slice(0, Math.max(limit, 40))
+        .map((p) => ({ name: p.fullname, role: p.role, joined: p.joined_at?.slice(0, 10) ?? null, last_validated_sale: lastSale.get(String(p.id)) ?? "never" })),
+      list_note: quiet.length > Math.max(limit, 40) ? `Showing ${Math.max(limit, 40)} of ${quiet.length}: those who sold before are listed first, then those who never sold` : null,
+    }
+  }
+  return out
+}
+
 // ─── OpenAI tool definitions + dispatcher ────────────────────────────────────
 
 export const FHI_CHAT_TOOLS = [
@@ -3143,6 +3313,25 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "sales_pipeline",
+      description:
+        "PIPELINE HEALTH as of now: sales WAITING FOR VALIDATION (oldest first, how many days, how many past a threshold), REJECTED sales, validation turnaround, COMMISSION STATUS per validated sale (status only — no amounts), shared PARTNER deals, and QUIET AGENTS — active selling accounts with no validated sale this quarter (or month/year/custom dates), with their last sale date. Use for 'anything waiting for validation', 'stuck sales', 'pending commissions', 'who hasn't sold anything this quarter', 'inactive agents', 'how fast do we validate'. Not for totals by period — that is sales_summary.",
+      parameters: {
+        type: "object",
+        properties: {
+          stale_days: { type: "integer", description: "A pending sale older than this counts as stale (default 7)" },
+          quiet_scope: { type: "string", enum: ["month", "quarter", "year"], description: "Period for quiet agents (default quarter = the current quarter)" },
+          quiet_from_date: { type: "string", description: "YYYY-MM-DD — custom period start for quiet agents" },
+          quiet_to_date: { type: "string", description: "YYYY-MM-DD exclusive" },
+          include_quiet_agents: { type: "boolean", description: "Default true; false skips that section" },
+          limit: { type: "integer", description: "Rows per list (default 20, max 60)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "find_projects",
       description:
         "SHORTLIST projects by what a buyer wants — area/community (JVC, Dubai Marina, Business Bay…), developer, number of bedrooms (0 = studio), property type (apartment, villa, townhouse), budget (min/max AED), handover year, off-plan or ready. Returns the matching published projects sorted (cheapest first when a budget or bedroom count is given) with price, handover, unit mix, sizes, payment plan and the page link, plus counts by developer/area/handover year. Use for 'cheapest 1-bedroom in JVC', 'Azizi projects handing over 2027', 'villas under AED 3M', 'what do we have in Dubai South', 'ready apartments'. For everything about ONE named project use project_details instead.",
@@ -3273,6 +3462,7 @@ export async function runFhiChatTool(
       case "events_overview": result = await eventsOverview(admin); break
       case "leads_overview": result = await leadsOverview(admin, args as LeadsArgs); break
       case "find_projects": result = await findProjects(admin, args as FindProjectsArgs); break
+      case "sales_pipeline": result = await salesPipeline(admin, args as PipelineArgs); break
       case "project_details": result = await projectDetails(admin, args); break
       case "event_attendees": result = await eventAttendees(admin, args); break
       case "new_accounts": result = await newAccounts(admin, args); break
