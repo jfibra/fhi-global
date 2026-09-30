@@ -180,20 +180,22 @@ export function AlbumGrid({ photos, albumTitle }: { photos: GalleryPhoto[]; albu
           className="fixed inset-0 z-[100] bg-[#000c18]/95 flex items-center justify-center"
           onClick={() => setOpen(null)}
         >
-          <div className="absolute top-0 inset-x-0 flex items-center justify-between px-4 sm:px-6 py-4">
+          <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-4 sm:px-6 py-4">
             <p className="text-white/70 text-sm font-semibold">
               {open + 1} <span className="text-white/35">/ {visible.length}</span>
               {visible[open].section && (
                 <span className="ml-3 text-white/35 hidden sm:inline">{visible[open].section}</span>
               )}
             </p>
+            {/* Labelled and boxed — the bare icon went unnoticed against the photo. */}
             <button
               type="button"
               onClick={() => setOpen(null)}
               aria-label="Close"
-              className="p-2 text-white/70 hover:text-white transition-colors"
+              className="inline-flex h-11 items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 text-sm font-bold text-white backdrop-blur transition-colors hover:bg-[#d6b357] hover:text-[#001f3f] hover:border-[#d6b357]"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5" />
+              Close
             </button>
           </div>
 

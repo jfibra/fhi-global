@@ -24,12 +24,6 @@ type AlbumRow = {
   cover_url: string | null
 }
 
-function dateLabel(iso: string | null): string | null {
-  if (!iso) return null
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return null
-  return d.toLocaleDateString("en-AE", { year: "numeric", month: "long" })
-}
 
 export default async function GalleryPage() {
   const supabase = createPublicSupabaseClient()
@@ -49,7 +43,6 @@ export default async function GalleryPage() {
 
   const rows = (albums ?? []) as AlbumRow[]
   const totalPhotos = Array.from(counts.values()).reduce((a, b) => a + b, 0)
-  const latestEvent = dateLabel(rows[0]?.event_date ?? null)
   const collage = rows.map((a) => a.cover_url).filter((u): u is string => Boolean(u)).slice(0, 4)
 
   return (
@@ -117,7 +110,6 @@ export default async function GalleryPage() {
             {[
               { label: "Albums", value: String(rows.length) },
               { label: "Photos", value: totalPhotos.toLocaleString() },
-              ...(latestEvent ? [{ label: "Latest Event", value: latestEvent }] : []),
             ].map((f) => (
               <div
                 key={f.label}
@@ -151,7 +143,6 @@ export default async function GalleryPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
             {rows.map((album) => {
               const count = counts.get(album.id) ?? 0
-              const date = dateLabel(album.event_date)
               return (
                 <Link
                   key={album.id}
@@ -187,7 +178,7 @@ export default async function GalleryPage() {
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-xs text-[#6b7280] inline-flex items-center gap-1.5 min-w-0">
                         <MapPin className="w-3.5 h-3.5 text-[#d6b357] shrink-0" />
-                        <span className="truncate">{date ?? "FHI Global"}</span>
+                        <span className="truncate">FHI Global</span>
                       </p>
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[#001f3f] group-hover:text-[#b8913f] transition-colors shrink-0">
                         View <ChevronRight className="w-3.5 h-3.5 text-[#d6b357]" />
