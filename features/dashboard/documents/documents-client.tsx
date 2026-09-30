@@ -346,15 +346,14 @@ export function DocumentsClient() {
                 ) : (
                   <FileTile fileName={doc.file_name} />
                 )}
-                <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-[#001f3f]/85 px-2.5 py-2">
-                  <span className="line-clamp-2 text-xs font-semibold leading-snug text-white" title={doc.title}>
-                    {doc.title}
-                  </span>
+                <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-[#001f3f]/85 px-2.5 py-2 transition-opacity duration-200 group-hover:opacity-0">
+                  <span className="line-clamp-2 text-xs font-semibold leading-snug text-white">{doc.title}</span>
                 </span>
-                <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#001f3f]/0 opacity-0 transition-all duration-200 group-hover:bg-[#001f3f]/40 group-hover:opacity-100">
-                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#d6b357] px-3 py-2 text-xs font-bold text-[#001f3f]">
-                    <ExternalLink className="h-3.5 w-3.5" /> Open
-                  </span>
+                {/* Hover: the full (untruncated) title, centered over a full-card
+                    dark overlay — replaces the bottom bar rather than sitting on
+                    top of it, so nothing is cut off no matter how long the title is. */}
+                <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#001f3f]/0 p-4 text-center opacity-0 transition-all duration-200 group-hover:bg-[#001f3f]/90 group-hover:opacity-100">
+                  <span className="text-xs font-semibold leading-snug text-white">{doc.title}</span>
                 </span>
               </button>
 
