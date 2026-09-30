@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useRouter } from "next/navigation"
 import {
-  Menu, X, Bell, LogOut, Settings, ChevronDown, Home, Plus,
+  Menu, X, LogOut, Settings, ChevronDown, Home, Plus,
 } from "lucide-react"
 import { createClient as createSupabaseClient } from "@/lib/supabase/client"
 import { roleToLabel, getDashboardRouteByRole } from "@/lib/auth"
@@ -16,6 +16,7 @@ import { DashboardSearch } from "@/components/dashboard/dashboard-search"
 import { useNewLeadsCount } from "@/components/dashboard/use-new-leads-count"
 import { RequiredSaleProofGate } from "@/components/dashboard/required-sale-proof-gate"
 import { ViewAsMenuItem, ViewAsBanner } from "@/components/dashboard/view-as"
+import { NotificationsBell } from "@/components/dashboard/notifications-bell"
 import { ROLE_SHELL_BADGE, normalizeAppRole, isAdminStaffRole, isSalesPipelineRole } from "@/lib/app-roles"
 
 // ─── Render-once contract ────────────────────────────────────────────────────
@@ -282,33 +283,18 @@ function SidebarAccount({
 }
 
 // ─── Top bar ─────────────────────────────────────────────────────────────────
-// Owns `notificationsOpen` so opening the bell re-renders the header only.
+// The bell owns its own open state (components/dashboard/notifications-bell.tsx),
+// so opening it re-renders the header only.
 function DashboardTopBar({
   roleLabel,
   onOpenSidebar,
+  notifications,
 }: {
   roleLabel: string
   onOpenSidebar: () => void
+  /** Admin staff get the company feed; other roles the quiet bell. */
+  notifications: { enabled: boolean; base: string }
 }) {
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const notificationsRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!notificationsOpen) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setNotificationsOpen(false)
-    }
-    const onPointer = (e: MouseEvent) => {
-      const el = notificationsRef.current
-      if (el && !el.contains(e.target as Node)) setNotificationsOpen(false)
-    }
-    document.addEventListener("keydown", onKey)
-    document.addEventListener("mousedown", onPointer)
-    return () => {
-      document.removeEventListener("keydown", onKey)
-      document.removeEventListener("mousedown", onPointer)
-    }
-  }, [notificationsOpen])
 
   return (
     <header className="shrink-0 flex items-center gap-4 px-6 py-4 bg-white border-b border-[#e8eaed] shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
@@ -337,39 +323,7 @@ function DashboardTopBar({
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="relative" ref={notificationsRef}>
-          <button
-            type="button"
-            aria-label="Notifications"
-            aria-expanded={notificationsOpen}
-            aria-haspopup="dialog"
-            onClick={() => setNotificationsOpen((o) => !o)}
-            className={`relative w-8 h-8 flex items-center justify-center rounded-xl text-[#6b7280] transition-all ${
-              notificationsOpen ? "bg-[#e8eaed] text-[#0d1117]" : "bg-[#f4f6f9] hover:bg-[#e8eaed]"
-            }`}
-          >
-            <Bell className="w-4 h-4" />
-          </button>
-          {notificationsOpen && (
-            <div
-              role="dialog"
-              aria-label="Notifications"
-              className="absolute right-0 top-full z-50 mt-2 w-[min(100vw-2rem,20rem)] rounded-2xl border border-[#e8eaed] bg-white py-2 shadow-[0_8px_30px_-4px_rgba(0,31,63,0.12)]"
-            >
-              <div className="border-b border-[#f0f2f5] px-4 py-2.5">
-                <p className="font-['Outfit'] text-sm font-bold text-[#0d1117]">Notifications</p>
-                <p className="text-[11px] text-[#9ca3af]">Alerts for your account and workspace</p>
-              </div>
-              <div className="px-4 py-10 text-center">
-                <Bell className="mx-auto mb-2 h-8 w-8 text-[#d1d5db]" aria-hidden />
-                <p className="text-sm font-medium text-[#6b7280]">No notifications yet</p>
-                <p className="mt-1 text-xs text-[#9ca3af] leading-relaxed">
-                  When there are updates, they will appear here.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+        <NotificationsBell enabled={notifications.enabled} base={notifications.base} />
       </div>
     </header>
   )
@@ -477,6 +431,8 @@ export function DashboardShell({
         <DashboardTopBar
           roleLabel={effectiveRoleLabel}
           onOpenSidebar={() => setSidebarOpen(true)}
+          // The real role decides: an admin previewing another role keeps their bell.
+          notifications={{ enabled: isAdminStaffRole(realRole ?? effectiveRole), base: getDashboardRouteByRole(realRole ?? effectiveRole) }}
         />
 
         {/* Admin role-preview strip — only renders while previewing. */}
