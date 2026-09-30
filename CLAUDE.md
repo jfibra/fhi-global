@@ -71,6 +71,15 @@ A fifth factory, `lib/supabase/middleware.ts` (`updateSession`), exists solely f
 - `guides/database.md` is the reference schema dump (context only — not runnable). The rest of `guides/` documents each domain (teams, sales_report, purchases, users, support_tickets, RLS policies, the external news API, etc.) — check the matching guide before touching a domain.
 - Schema changes are incremental numbered files in `supabase/migrations/` (leading-underscore files like `_TEMPLATE.sql` and `*.example.sql` are skipped by the runner). The runner re-applies ALL files every run — it has no applied-migrations tracking and does not wrap files in a transaction — so wrap DDL in `BEGIN;`/`COMMIT;` and use idempotent patterns (`IF NOT EXISTS`).
 
+### Rules that are easy to break (learned in production)
+
+- **sharp on Vercel**: every route that imports `sharp` (directly or via `lib/trakheesi`, `lib/logo-analysis`, `lib/materials`, `lib/og-picture.ts`) must be listed in `outputFileTracingIncludes` in `next.config.mjs`, or it 500s on Vercel while working locally (libvips isn't traced). Keys are route-path fragments — never `[param]` brackets.
+- **OG images (next/og / Satori)**: can't draw AVIF/WebP (our S3 renders) — pass photos through `ogPicture()` in `lib/og-picture.ts`. No `inset` shorthand; give overlays explicit sizes. Declare `imageWidth`/`imageHeight` in metadata or Facebook's first share has no picture.
+- **Google Maps key** is HTTP-referrer restricted: it works in the browser (Maps JS, Places API (New) REST), and is refused by server-side REST and legacy Places. Dashboard code gets it from `/api/admin/maps-key`. Event venues are pinned only from a picked Places suggestion (`events.venue_lat/lng/place_id`, `components/dashboard/venue-autocomplete.tsx`) — never geocode free text onto a public map.
+- **Agent websites**: Website Builder numbers are stored without a country code; every page rendering `SiteHeader` must pass `withDialableNumbers(site.data, contact)` (`lib/website-project-share.ts`).
+- **Leads & recruits**: Buyers Link leads are owner-only under RLS; admins read them only via `GET /api/admin/buyer-leads` (read-only, no reassign). Recruits = profiles whose `metadata.invited_by` is the person and `metadata.developer_invite_id` is null (`/api/admin/recruitment`). `metadata.auto_approve_recruits` (admin-set, CEO's account) makes that inviter's registrations start `active` — per person, never per role.
+- **Events**: `agent_id` NULL = company event on `/events`; an agent's event lives on their website and appears on `/events` only when an admin sets `show_on_main`. Owners can never set `show_on_main` (the PATCH route drops it).
+
 ### UI
 
 - `components/ui/` is shadcn/ui-style (Radix + class-variance-authority, configured via `components.json`); domain components live in `components/{buy,dashboard,developer,developers,public}/`.
