@@ -8,6 +8,7 @@ import { SITE_URL } from "@/lib/seo"
 import { DESIGNS as CARD_DESIGNS, isDesignId as isCardDesignId } from "@/features/business-card/card-render"
 import { sendAdminDirectEmail, sendCongratsEmail } from "@/lib/mailer"
 import { renderTopSellerCertificatePng } from "@/lib/congrats-poster"
+import { BUYER_LEAD_COLUMNS, LEAD_GRADES, answerLabel, budgetLabel, leadGrade, sellerAnswerLabel, waDigits, type BuyerLead, type LeadGrade } from "@/lib/buyer-links"
 
 /**
  * FHI Assistant's toolbox — the predefined, parameterized queries the assistant is
@@ -2207,6 +2208,233 @@ async function searchKeywords(args: { days?: number; from_date?: string; to_date
   }
 }
 
+// ─── Leads: inquiries, contact messages, Buyers Link briefs, inbox replies ───
+
+type LeadsArgs = {
+  from_date?: string
+  to_date?: string
+  days?: number
+  source?: "all" | "inquiries" | "contact" | "buyers_link" | "inbox"
+  agent_name?: string
+  project_name?: string
+  developer_name?: string
+  only_unanswered?: boolean
+  limit?: number
+}
+
+/**
+ * Every way a prospect reaches the company, in one answer: project inquiries
+ * (the Inquire forms on project pages), contact messages (/contact), Buyers
+ * Link and Sellers Link briefs (each agent's own link — graded like the
+ * dashboard: priority / qualified / nurture / info) and replies that landed in
+ * the company inbox. Counts per source with the previous period for context,
+ * the breakdowns an admin asks for (which project, which agent, which grade)
+ * and the newest entries with contact details for follow-up. "Unanswered"
+ * means: an inquiry still marked new, a contact message not yet read, an
+ * inbound reply not yet read.
+ */
+async function leadsOverview(admin: Admin, args: LeadsArgs) {
+  let from = (args.from_date ?? "").trim()
+  if (!from) {
+    const d = new Date()
+    d.setUTCDate(d.getUTCDate() - Math.min(Math.max(args.days ?? 30, 1), 730))
+    from = d.toISOString().slice(0, 10)
+  }
+  const to = (args.to_date ?? "").trim() || null
+  const source = args.source ?? "all"
+  const want = (s: LeadsArgs["source"]) => source === "all" || source === s
+  const limit = Math.min(Math.max(args.limit ?? 15, 1), 60)
+  const unansweredOnly = args.only_unanswered === true
+  const prev = previousWindow(from, to)
+  const contains = (hay: string | null | undefined, needle: string | undefined) =>
+    !needle?.trim() || (hay ?? "").toLowerCase().includes(needle.trim().toLowerCase())
+
+  // Buyers Link briefs can be narrowed to the agent whose link they came through.
+  let agentIds: string[] | null = null
+  let agentMatch: string[] | null = null
+  if (args.agent_name?.trim()) {
+    const found = await findProfiles(admin, args.agent_name)
+    if (found.length === 0) return { error: `No FHI member matching "${args.agent_name}"` }
+    agentIds = found.map((p) => p.id)
+    // Several members can share a first name; the briefs of all of them are
+    // included and by_agent says whose link each came through.
+    agentMatch = found.map((p) => p.fullname ?? "Unknown")
+  }
+
+  const inRange = <T extends { created_at: string }>(rows: T[], f: string, t: string | null) =>
+    rows.filter((r) => r.created_at >= f && (!t || r.created_at < `${t}T00:00:00Z`))
+
+  type Inq = { id: string; name: string | null; email: string | null; phone_country_code: string | null; phone: string | null; looking_for: string | null; property_category: string | null; project_name: string | null; developer_name: string | null; status: string | null; created_at: string }
+  type Contact = { id: string; name: string | null; email: string | null; phone: string | null; company: string | null; subject: string | null; message: string | null; status: string | null; read_at: string | null; created_at: string }
+  type Reply = { id: string; inquiry_id: string | null; from_name: string | null; from_email: string | null; subject: string | null; read_at: string | null; created_at: string }
+
+  const [inqRes, contactRes, briefRes, replyRes] = await Promise.all([
+    want("inquiries")
+      ? admin.from("inquiries").select("id, name, email, phone_country_code, phone, looking_for, property_category, project_name, developer_name, status, created_at").is("deleted_at", null).gte("created_at", prev.from).order("created_at", { ascending: false }).limit(3000)
+      : Promise.resolve({ data: [] as Inq[], error: null }),
+    want("contact")
+      ? admin.from("contact_submissions").select("id, name, email, phone, company, subject, message, status, read_at, created_at").is("deleted_at", null).gte("created_at", prev.from).order("created_at", { ascending: false }).limit(3000)
+      : Promise.resolve({ data: [] as Contact[], error: null }),
+    want("buyers_link")
+      ? (() => {
+          let q = admin.from("buyer_link_leads").select(BUYER_LEAD_COLUMNS).gte("created_at", prev.from).order("created_at", { ascending: false }).limit(3000)
+          if (agentIds) q = q.in("agent_id", agentIds)
+          return q
+        })()
+      : Promise.resolve({ data: [] as BuyerLead[], error: null }),
+    want("inbox")
+      ? admin.from("inquiry_emails").select("id, inquiry_id, from_name, from_email, subject, read_at, created_at").eq("direction", "inbound").is("owner_id", null).gte("created_at", prev.from).order("created_at", { ascending: false }).limit(3000)
+      : Promise.resolve({ data: [] as Reply[], error: null }),
+  ])
+  for (const r of [inqRes, contactRes, briefRes, replyRes]) if (r.error) throw new Error(r.error.message)
+
+  const count = <T,>(rows: T[], key: (r: T) => string | null | undefined, top = 8) => {
+    const m = new Map<string, number>()
+    for (const r of rows) {
+      const k = (key(r) ?? "").trim() || "Not given"
+      m.set(k, (m.get(k) ?? 0) + 1)
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, top).map(([name, n]) => ({ name, count: n }))
+  }
+  const phone = (code: string | null | undefined, num: string | null | undefined) => {
+    const d = waDigits(code, num)
+    return d ? `+${d}` : null
+  }
+  const when = (iso: string) => iso.slice(0, 16).replace("T", " ")
+
+  const out: Record<string, unknown> = {
+    period: { from, to: to ?? "today" },
+    previous_period: { from: prev.from, to: prev.to },
+    filters: { source, agent_name_matched: agentMatch, project: args.project_name ?? null, developer: args.developer_name ?? null, only_unanswered: unansweredOnly },
+  }
+  let total = 0
+  let prevTotal = 0
+  let unanswered = 0
+
+  if (want("inquiries")) {
+    const all = ((inqRes.data ?? []) as Inq[]).filter((r) => contains(r.project_name, args.project_name) && contains(r.developer_name, args.developer_name))
+    const cur = inRange(all, from, to)
+    const prv = inRange(all, prev.from, prev.to)
+    const open = cur.filter((r) => (r.status ?? "new") === "new")
+    const list = (unansweredOnly ? open : cur).slice(0, limit)
+    total += cur.length; prevTotal += prv.length; unanswered += open.length
+    out.project_inquiries = {
+      total: cur.length,
+      previous_period_total: prv.length,
+      change_vs_previous: pctChange(cur.length, prv.length),
+      unanswered_still_new: open.length,
+      by_status: count(cur, (r) => r.status ?? "new"),
+      by_project: count(cur, (r) => r.project_name),
+      by_developer: count(cur, (r) => r.developer_name),
+      by_looking_for: count(cur, (r) => r.looking_for),
+      newest: list.map((r) => ({ when: when(r.created_at), name: r.name, project: r.project_name, developer: r.developer_name, looking_for: r.looking_for, phone: phone(r.phone_country_code, r.phone), email: r.email, status: r.status ?? "new" })),
+      where_in_dashboard: "Leads (Communication) — each inquiry opens with its email thread",
+    }
+  }
+
+  if (want("contact")) {
+    const all = (contactRes.data ?? []) as Contact[]
+    const cur = inRange(all, from, to)
+    const prv = inRange(all, prev.from, prev.to)
+    const unread = cur.filter((r) => !r.read_at && (r.status ?? "new") === "new")
+    const list = (unansweredOnly ? unread : cur).slice(0, limit)
+    total += cur.length; prevTotal += prv.length; unanswered += unread.length
+    out.contact_messages = {
+      total: cur.length,
+      previous_period_total: prv.length,
+      change_vs_previous: pctChange(cur.length, prv.length),
+      unread: unread.length,
+      by_status: count(cur, (r) => r.status ?? "new"),
+      newest: list.map((r) => ({ when: when(r.created_at), name: r.name, subject: r.subject, company: r.company, phone: r.phone, email: r.email, status: r.status ?? "new", read: Boolean(r.read_at), message_preview: (r.message ?? "").slice(0, 160) })),
+      where_in_dashboard: "Communication → Contact Inbox",
+    }
+  }
+
+  if (want("buyers_link")) {
+    const all = (briefRes.data ?? []) as BuyerLead[]
+    const cur = inRange(all, from, to)
+    const prv = inRange(all, prev.from, prev.to)
+    total += cur.length; prevTotal += prv.length
+    const ids = [...new Set(cur.map((b) => String(b.agent_id)))]
+    const names = new Map<string, string>()
+    if (ids.length) {
+      const { data } = await admin.from("profiles").select("id, fullname").in("id", ids)
+      for (const p of (data ?? []) as { id: string; fullname: string | null }[]) names.set(String(p.id), p.fullname ?? "Unknown")
+    }
+    const graded = cur.map((b) => ({ b, grade: b.kind === "seller" ? null : leadGrade(b), agent: names.get(String(b.agent_id)) ?? "Unknown" }))
+    const byAgent = new Map<string, { briefs: number; buyers: number; sellers: number; priority: number; qualified: number }>()
+    for (const g of graded) {
+      const a = byAgent.get(g.agent) ?? { briefs: 0, buyers: 0, sellers: 0, priority: 0, qualified: 0 }
+      a.briefs++
+      if (g.b.kind === "seller") a.sellers++
+      else a.buyers++
+      if (g.grade === "priority") a.priority++
+      if (g.grade === "qualified") a.qualified++
+      byAgent.set(g.agent, a)
+    }
+    const prof = (b: BuyerLead) => (b.profile ?? {}) as Record<string, string | string[] | undefined>
+    const label = (b: BuyerLead, key: string) => {
+      const v = prof(b)[key]
+      if (b.kind === "seller") return sellerAnswerLabel(key as Parameters<typeof sellerAnswerLabel>[0], v)
+      return answerLabel(key as Parameters<typeof answerLabel>[0], v)
+    }
+    out.buyers_link_briefs = {
+      total: cur.length,
+      previous_period_total: prv.length,
+      change_vs_previous: pctChange(cur.length, prv.length),
+      buyers: cur.filter((b) => b.kind !== "seller").length,
+      sellers: cur.filter((b) => b.kind === "seller").length,
+      by_grade_buyers_only: count(graded.filter((g) => g.grade), (g) => LEAD_GRADES[g.grade as LeadGrade].label),
+      grade_meaning: Object.fromEntries(Object.values(LEAD_GRADES).map((v) => [v.label, v.why])),
+      by_agent: [...byAgent.entries()].map(([name, a]) => ({ agent: name, ...a })).sort((a, b) => b.briefs - a.briefs).slice(0, 15),
+      by_budget: count(cur.filter((b) => b.kind !== "seller"), (b) => budgetLabel(b.budget)),
+      by_goal: count(cur.filter((b) => b.kind !== "seller"), (b) => label(b, "goal")),
+      by_readiness: count(cur.filter((b) => b.kind !== "seller"), (b) => label(b, "readiness")),
+      newest: graded.slice(0, limit).map(({ b, grade, agent }) => ({
+        when: when(b.created_at),
+        kind: b.kind === "seller" ? "seller" : "buyer",
+        grade: grade ? LEAD_GRADES[grade].label : null,
+        name: b.name,
+        agent,
+        whatsapp: phone(b.whatsapp_code, b.whatsapp),
+        email: b.email,
+        budget: budgetLabel(b.budget),
+        ...(b.kind === "seller"
+          ? { property: label(b, "property_type"), completion: label(b, "completion"), sell_timeline: label(b, "sell_timeline") }
+          : { goal: label(b, "goal"), timeline: label(b, "buy_timeline"), readiness: label(b, "readiness"), reach_by: label(b, "contact_channel"), lives: label(b, "residence") }),
+        message: (b.message ?? "").slice(0, 160) || null,
+      })),
+      where_in_dashboard: "Communication → Buyer Leads (admins see every agent's briefs, read-only)",
+    }
+  }
+
+  if (want("inbox")) {
+    const all = (replyRes.data ?? []) as Reply[]
+    const cur = inRange(all, from, to)
+    const prv = inRange(all, prev.from, prev.to)
+    const unread = cur.filter((r) => !r.read_at)
+    const list = (unansweredOnly ? unread : cur).slice(0, limit)
+    total += cur.length; prevTotal += prv.length; unanswered += unread.length
+    out.inbox_replies = {
+      total: cur.length,
+      previous_period_total: prv.length,
+      change_vs_previous: pctChange(cur.length, prv.length),
+      unread: unread.length,
+      newest: list.map((r) => ({ when: when(r.created_at), from: r.from_name || r.from_email, email: r.from_email, subject: r.subject, read: Boolean(r.read_at), tied_to_inquiry: Boolean(r.inquiry_id) })),
+      where_in_dashboard: "Leads → Inbox",
+    }
+  }
+
+  out.all_sources = {
+    total_leads: total,
+    previous_period_total: prevTotal,
+    change_vs_previous: pctChange(total, prevTotal),
+    waiting_for_a_reply: unanswered,
+    note: "Buyers Link briefs have no read/answered state — they go straight to the agent's WhatsApp",
+  }
+  return out
+}
+
 // ─── OpenAI tool definitions + dispatcher ────────────────────────────────────
 
 export const FHI_CHAT_TOOLS = [
@@ -2552,6 +2780,28 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "leads_overview",
+      description:
+        "LEADS — every way a prospect reached the company in a period: project INQUIRIES (Inquire forms on project pages), CONTACT messages (/contact), BUYERS LINK and Sellers Link BRIEFS (each agent's own link, graded Priority/Qualified/Nurture/Information) and REPLIES in the company inbox. Returns totals per source with previous-period comparison, breakdowns (which project/developer, which agent's link, grade, budget, goal, readiness) and the newest entries with phone/WhatsApp/email for follow-up. Use for 'how many leads this week', 'any new inquiries', 'unanswered messages', 'which project gets the most inquiries', 'Buyers Link leads of Michelle', 'priority buyers this month'. Default: last 30 days, all sources.",
+      parameters: {
+        type: "object",
+        properties: {
+          from_date: { type: "string", description: "YYYY-MM-DD inclusive" },
+          to_date: { type: "string", description: "YYYY-MM-DD exclusive" },
+          days: { type: "integer", description: "Alternative to from_date: the last N days (default 30)" },
+          source: { type: "string", enum: ["all", "inquiries", "contact", "buyers_link", "inbox"], description: "One source only, or all (default)" },
+          agent_name: { type: "string", description: "Buyers Link briefs that came through THIS agent's link (partial name ok)" },
+          project_name: { type: "string", description: "Inquiries about this project only (partial name ok)" },
+          developer_name: { type: "string", description: "Inquiries about this developer's projects only" },
+          only_unanswered: { type: "boolean", description: "Only what still waits for a reply: inquiries marked new, unread contact messages, unread inbox replies" },
+          limit: { type: "integer", description: "Newest entries listed per source (default 15, max 60)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "events_overview",
       description: "Recent and upcoming FHI events with dates, venues and registration counts. For the registrant NAMES use event_attendees.",
       parameters: { type: "object", properties: {} },
@@ -2622,6 +2872,7 @@ export async function runFhiChatTool(
       case "platform_counts": result = await platformCounts(admin); break
       case "recent_sales": result = await recentSales(admin, args); break
       case "events_overview": result = await eventsOverview(admin); break
+      case "leads_overview": result = await leadsOverview(admin, args as LeadsArgs); break
       case "event_attendees": result = await eventAttendees(admin, args); break
       case "new_accounts": result = await newAccounts(admin, args); break
       case "website_traffic": result = await websiteTraffic(args); break
