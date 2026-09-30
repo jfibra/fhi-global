@@ -196,6 +196,7 @@ const nextConfig = {
     "/materials": SHARP_LINUX_LIBS,
     "/projects/*/opengraph-image": SHARP_LINUX_LIBS,
     "/og/project/": SHARP_LINUX_LIBS,
+    "/og/news/": SHARP_LINUX_LIBS,
   },
   typescript: {
     ignoreBuildErrors: true,

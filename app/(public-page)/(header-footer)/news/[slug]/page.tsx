@@ -70,6 +70,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     "Dubai real estate news",
     "FHI Global news",
   ].filter(Boolean) as string[]
+  const ogCard = `${siteUrl}/og/news/${encodeURIComponent(article.slug)}`
   const publishedTime = toManilaIso(article.publishedAt || article.date) ?? undefined
   const modifiedTime = toManilaIso(article.updatedAt) ?? publishedTime
 
@@ -98,13 +99,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       modifiedTime,
       authors: article.author ? [article.author] : undefined,
       tags: article.tags,
-      images: image ? [{ url: image, alt: article.title }] : undefined,
+      // The branded card (photo + FHI mark, app/og/news); its size is declared
+      // so Facebook draws it on the very first share. The plain photo still
+      // rides along for scrapers that skip generated images.
+      images: [{ url: ogCard, width: 1200, height: 630, alt: article.title }, ...(image ? [{ url: image, alt: article.title }] : [])],
     },
     twitter: {
       card: "summary_large_image",
       title: article.title,
       description,
-      images: image ? [image] : undefined,
+      images: [ogCard],
     },
   }
 }
