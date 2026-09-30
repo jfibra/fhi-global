@@ -3434,6 +3434,413 @@ async function agentReviews(admin: Admin, args: { agent_name?: string; status?: 
   }
 }
 
+// ─── Activity log, member lookup, owner documents, teams, event engagement ───
+
+const isoDay = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : null)
+const isoMinute = (iso: string | null | undefined) => (iso ? iso.slice(0, 16).replace("T", " ") : null)
+
+/** The audit trail: who did what, when — every write on the platform plus logins. */
+async function activityLog(admin: Admin, args: { category?: string; event?: string; actor_name?: string; search?: string; days?: number; from_date?: string; to_date?: string; limit?: number }) {
+  const limit = Math.min(Math.max(args.limit ?? 30, 1), 100)
+  let from = (args.from_date ?? "").trim()
+  if (!from) {
+    const d = new Date()
+    d.setUTCDate(d.getUTCDate() - Math.min(Math.max(args.days ?? 7, 1), 365))
+    from = d.toISOString().slice(0, 10)
+  }
+  const to = (args.to_date ?? "").trim() || null
+  type Log = { id: string; occurred_at: string; category: string; event: string; source: string | null; actor_id: string | null; actor_name: string | null; actor_role: string | null; subject_type: string | null; subject_id: string | null; subject_label: string | null; description: string | null; changed_keys: string[] | null; ip_address: string | null; url: string | null }
+  // PostgREST hands back at most 1000 rows per call: page up to 5000.
+  const MAX = 5000
+  let rows: Log[] = []
+  for (let page = 0; page * 1000 < MAX; page++) {
+    let q = admin
+      .from("audit_logs")
+      .select("id, occurred_at, category, event, source, actor_id, actor_name, actor_role, subject_type, subject_id, subject_label, description, changed_keys, ip_address, url")
+      .gte("occurred_at", from)
+      .order("occurred_at", { ascending: false })
+      .range(page * 1000, page * 1000 + 999)
+    if (to) q = q.lt("occurred_at", `${to}T00:00:00Z`)
+    if (args.category?.trim()) q = q.eq("category", args.category.trim())
+    if (args.event?.trim()) q = q.eq("event", args.event.trim())
+    if (args.actor_name?.trim()) q = q.ilike("actor_name", `%${args.actor_name.trim().replace(/[%_]/g, "")}%`)
+    const { data, error } = await q
+    if (error) throw new Error(error.message)
+    rows.push(...((data ?? []) as Log[]))
+    if (!data || data.length < 1000) break
+  }
+  if (args.search?.trim()) {
+    const n = args.search.trim().toLowerCase()
+    rows = rows.filter((r) => `${r.subject_label ?? ""} ${r.description ?? ""} ${r.actor_name ?? ""}`.toLowerCase().includes(n))
+  }
+  const failed = rows.filter((r) => r.event === "login_failed")
+  const logins = rows.filter((r) => r.event === "login")
+  return {
+    period: { from, to: to ?? "today" },
+    filters: { category: args.category ?? null, event: args.event ?? null, actor: args.actor_name ?? null, search: args.search ?? null },
+    matching: rows.length,
+    truncated: rows.length >= MAX ? `Only the newest ${MAX} entries were read — narrow the period or category` : null,
+    by_category: tally(rows, (r) => r.category, 20),
+    by_event: tally(rows, (r) => `${r.category}.${r.event}`, 20),
+    most_active_people: tally(rows.filter((r) => r.actor_name), (r) => `${r.actor_name} (${r.actor_role ?? "automatic"})`, 10),
+    security: {
+      logins: logins.length,
+      distinct_people_logged_in: new Set(logins.map((r) => r.actor_id ?? r.actor_name)).size,
+      failed_logins: failed.length,
+      failed_login_targets: tally(failed, (r) => r.subject_label ?? r.description, 8),
+      failed_login_ips: tally(failed, (r) => r.ip_address, 5),
+    },
+    newest: rows.slice(0, limit).map((r) => ({
+      when: isoMinute(r.occurred_at),
+      who: r.actor_name ?? (r.source === "system" || !r.actor_id ? "System" : "Unknown"),
+      role: r.actor_role,
+      did: `${r.category}.${r.event}`,
+      what: r.subject_label ?? r.subject_type,
+      description: (r.description ?? "").slice(0, 200) || null,
+      changed: r.changed_keys?.length ? r.changed_keys.slice(0, 12) : null,
+      ip: r.ip_address,
+    })),
+    categories_available: ["projects", "mailer", "auth", "user_management", "teams", "security", "developers", "listings", "sales", "inquiry", "events", "finance", "website", "owner_documents", "feedback", "contact", "support"],
+    where_in_dashboard: "System Logs",
+  }
+}
+
+/** One member, everything in one place: identity, contacts, team, recruiter, website, listings, reviews, sales, recruits, last login. */
+async function memberLookup(admin: Admin, args: { query?: string; limit?: number }) {
+  const query = (args.query ?? "").trim()
+  if (!query) return { error: "Who? Give a name, email, phone number or username." }
+  const limit = Math.min(Math.max(args.limit ?? 5, 1), 10)
+  type Prof = { id: string; role: string; fname: string | null; lname: string | null; fullname: string | null; status: string; joined_at: string | null; profile_url: string | null; username: string | null; birthday: string | null; gender: string | null; mailbox_address: string | null; metadata: Record<string, unknown> | null }
+  const cols = "id, role, fname, lname, fullname, status, joined_at, profile_url, username, birthday, gender, mailbox_address, metadata"
+  let matches: Prof[] = []
+  const digits = query.replace(/\D/g, "")
+  if (query.includes("@")) {
+    // Emails live in Auth, not on the profile: walk the user list once.
+    const wanted = query.toLowerCase()
+    const ids: string[] = []
+    // Walk every page: an exact address may sit behind partial matches.
+    for (let page = 1; page <= 25; page++) {
+      const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 })
+      if (error) throw new Error(error.message)
+      for (const u of data.users) {
+        const e = (u.email ?? "").toLowerCase()
+        if (e === wanted) ids.unshift(u.id)
+        else if (e.includes(wanted)) ids.push(u.id)
+      }
+      if (data.users.length < 200) break
+    }
+    if (ids.length) {
+      const { data } = await admin.from("profiles").select(cols).in("id", ids.slice(0, limit)).neq("is_deleted", true)
+      const order = new Map(ids.map((id, i) => [id, i]))
+      matches = ((data ?? []) as Prof[]).sort((a, b) => (order.get(String(a.id)) ?? 99) - (order.get(String(b.id)) ?? 99))
+    }
+  } else if (digits.length >= 6 && digits.length >= query.replace(/\s/g, "").length - 2) {
+    const tail = digits.slice(-7)
+    const { data } = await admin.from("profiles").select(cols).neq("is_deleted", true).or(`metadata->>phone_number.ilike.%${tail}%,metadata->>whatsapp_number.ilike.%${tail}%`).limit(limit)
+    matches = (data ?? []) as Prof[]
+  } else {
+    const { data: byUser } = await admin.from("profiles").select(cols).neq("is_deleted", true).ilike("username", query.replace(/[%_]/g, "")).limit(2)
+    matches = (byUser ?? []) as Prof[]
+    if (!matches.length) {
+      const found = await findProfiles(admin, query)
+      if (found.length) {
+        const { data } = await admin.from("profiles").select(cols).in("id", found.map((p) => p.id))
+        const order = new Map(found.map((p, i) => [p.id, i]))
+        matches = ((data ?? []) as Prof[]).sort((a, b) => (order.get(String(a.id)) ?? 99) - (order.get(String(b.id)) ?? 99))
+      }
+    }
+  }
+  if (!matches.length) {
+    // Not a member — maybe a client (buyer recorded on a sale) or an event registrant.
+    const tail = digits.length >= 6 ? digits.slice(-7) : null
+    const clientQ = admin.from("clients").select("id, first_name, last_name, email, phone, country, created_by, created_at").limit(5)
+    const { data: clients } = query.includes("@")
+      ? await clientQ.ilike("email", `%${query.replace(/[%_]/g, "")}%`)
+      : tail
+        ? await clientQ.ilike("phone", `%${tail}%`)
+        : await clientQ.or(`first_name.ilike.%${query.replace(/[%_]/g, "")}%,last_name.ilike.%${query.replace(/[%_]/g, "")}%`)
+    const cl = (clients ?? []) as { id: string; first_name: string | null; last_name: string | null; email: string | null; phone: string | null; country: string | null; created_by: string | null; created_at: string }[]
+    if (cl.length) {
+      const agents = await profileNames(admin, cl.map((c) => c.created_by))
+      return {
+        query,
+        matches: 0,
+        not_a_member: `No FHI member matches "${query}" — but the client book does.`,
+        clients: cl.map((c) => ({ client: [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed", email: c.email, phone: c.phone, country: c.country, recorded_by: agents.get(String(c.created_by)) ?? "Unknown", recorded_on: isoDay(c.created_at) })),
+        hint: "For the client's deals use clients_overview with search",
+      }
+    }
+    return { error: `No FHI member, and no client, matching "${query}"` }
+  }
+  matches = matches.slice(0, limit)
+  const ids = matches.map((m) => String(m.id))
+
+  const sales = await fetchAllSales(admin)
+  const [memberships, teams, sites, listings, reviews, recruits, logins, auth] = await Promise.all([
+    admin.from("team_memberships").select("user_id, team_id, role_in_team, joined_at").in("user_id", ids).eq("is_active", true),
+    admin.from("teams").select("id, name").eq("is_active", true),
+    admin.from("website_builder").select("agent_id, slug, is_published, title").in("agent_id", ids),
+    admin.from("agent_listings").select("agent_id, status").in("agent_id", ids).is("deleted_at", null),
+    admin.from("agent_feedback").select("agent_id, overall_rating, status").in("agent_id", ids),
+    admin.from("profiles").select("id, metadata").neq("is_deleted", true).limit(5000),
+    admin.from("audit_logs").select("actor_id, occurred_at").eq("event", "login").in("actor_id", ids).order("occurred_at", { ascending: false }).limit(200),
+    Promise.all(ids.map((id) => admin.auth.admin.getUserById(id).then((r) => [id, r.data.user] as const).catch(() => [id, null] as const))),
+  ])
+  const teamName = new Map(((teams.data ?? []) as { id: string; name: string }[]).map((t) => [String(t.id), t.name]))
+  const inviterIds = matches.map((m) => (m.metadata?.invited_by as string | undefined) ?? null)
+  const inviterNames = await profileNames(admin, inviterIds)
+  const recruitCount = new Map<string, number>()
+  for (const p of (recruits.data ?? []) as { id: string; metadata: Record<string, unknown> | null }[]) {
+    const by = p.metadata?.invited_by
+    if (typeof by === "string" && ids.includes(by) && !p.metadata?.developer_invite_id) recruitCount.set(by, (recruitCount.get(by) ?? 0) + 1)
+  }
+  const lastLogin = new Map<string, string>()
+  for (const l of (logins.data ?? []) as { actor_id: string; occurred_at: string }[]) if (!lastLogin.has(l.actor_id)) lastLogin.set(l.actor_id, l.occurred_at)
+  const authById = new Map(auth.map(([id, u]) => [id, u]))
+  const phone = (m: Prof, kind: "phone" | "whatsapp") => {
+    const d = waDigits(m.metadata?.[`${kind}_country_code`] as string | undefined, m.metadata?.[`${kind}_number`] as string | undefined)
+    return d ? `+${d}` : null
+  }
+  const base = SITE_URL.replace(/\/$/, "")
+
+  const people = matches.map((m) => {
+    const id = String(m.id)
+    const credits = sales.filter((s) => s.validation_status === "validated").flatMap((s) => saleCredits(s).filter((c) => c.agentId === id).map((c) => ({ ...c, date: (s.reservation_date ?? s.created_at).slice(0, 10) })))
+    const pendingCount = sales.filter((s) => (s.validation_status ?? "pending") === "pending" && saleCredits(s).some((c) => c.agentId === id)).length
+    const myTeams = ((memberships.data ?? []) as { user_id: string; team_id: string; role_in_team: string | null; joined_at: string | null }[]).filter((t) => String(t.user_id) === id)
+    const site = ((sites.data ?? []) as { agent_id: string; slug: string | null; is_published: boolean | null; title: string | null }[]).find((s) => String(s.agent_id) === id)
+    const myListings = ((listings.data ?? []) as { agent_id: string; status: string }[]).filter((l) => String(l.agent_id) === id)
+    const myReviews = ((reviews.data ?? []) as { agent_id: string; overall_rating: number | null; status: string }[]).filter((r) => String(r.agent_id) === id && r.status !== "hidden")
+    const u = authById.get(id)
+    const inviter = m.metadata?.invited_by as string | undefined
+    return {
+      name: m.fullname,
+      role: m.role,
+      status: m.status,
+      username: m.username,
+      email: u?.email ?? null,
+      phone: phone(m, "phone"),
+      whatsapp: phone(m, "whatsapp"),
+      company_mailbox: m.mailbox_address,
+      nationality: (m.metadata?.nationality as string | undefined) ?? null,
+      license_number: (m.metadata?.license_number as string | undefined) ?? null,
+      birthday: m.birthday,
+      joined: isoDay(m.joined_at),
+      last_login: isoMinute(lastLogin.get(id) ?? u?.last_sign_in_at ?? null),
+      invited_by: inviter ? inviterNames.get(inviter) ?? "Unknown" : null,
+      auto_approves_recruits: m.metadata?.auto_approve_recruits === true,
+      recruits: recruitCount.get(id) ?? 0,
+      teams: myTeams.map((t) => ({ team: teamName.get(String(t.team_id)) ?? "Unknown team", role: t.role_in_team ?? "member", since: isoDay(t.joined_at) })),
+      website: site ? { live: Boolean(site.is_published), url: site.slug ? `${base}/website/${site.slug}` : null, title: site.title } : null,
+      listings: { total: myListings.length, published: myListings.filter((l) => l.status === "published").length },
+      reviews: { count: myReviews.length, average_rating: myReviews.length ? Math.round((myReviews.reduce((a, r) => a + (r.overall_rating ?? 0), 0) / myReviews.length) * 100) / 100 : null },
+      sales: { validated_deals: credits.length, validated_value_aed: Math.round(credits.reduce((a, c) => a + c.value, 0)), pending_deals: pendingCount, last_validated_sale: credits.map((c) => c.date).sort().pop() ?? null },
+      dashboard_link: `/dashboard/superadmin/accounts/users?account=${id}`,
+    }
+  })
+  return {
+    query,
+    matches: people.length,
+    people,
+    _cards: matches.filter((m) => m.profile_url).slice(0, 5).map((m): FhiChatCard => ({ kind: "agent", title: m.fullname ?? "Member", subtitle: `${m.role.replace(/_/g, " ")} · ${m.status}`, image: m.profile_url })),
+  }
+}
+
+/** Owner document requests: the title-deed / NOC collection links agents send to property owners. */
+async function ownerDocuments(admin: Admin, args: { status?: string; agent_name?: string; limit?: number }) {
+  const limit = Math.min(Math.max(args.limit ?? 20, 1), 60)
+  let q = admin
+    .from("owner_document_requests")
+    .select("id, agent_id, label, status, owner_name, owner_email, owner_mobile, property_building, unit_number, community_area, title_deed_number, noc_valid_until, submitted_at, expires_at, created_at")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(2000)
+  const status = (args.status ?? "all").trim()
+  if (status !== "all") q = q.eq("status", status)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  type Req = { id: string; agent_id: string | null; label: string | null; status: string; owner_name: string | null; owner_email: string | null; owner_mobile: string | null; property_building: string | null; unit_number: string | null; community_area: string | null; title_deed_number: string | null; noc_valid_until: string | null; submitted_at: string | null; expires_at: string | null; created_at: string }
+  let rows = (data ?? []) as Req[]
+  let agentMatches: string[] | null = null
+  if (args.agent_name?.trim()) {
+    const found = await findProfiles(admin, args.agent_name)
+    if (!found.length) return { error: `No FHI member matching "${args.agent_name}"` }
+    const ids = new Set(found.map((p) => p.id))
+    agentMatches = found.map((p) => p.fullname ?? "Unknown")
+    rows = rows.filter((r) => ids.has(String(r.agent_id)))
+  }
+  const names = await profileNames(admin, rows.map((r) => r.agent_id))
+  const { data: files } = rows.length ? await admin.from("owner_document_files").select("request_id").in("request_id", rows.map((r) => r.id)) : { data: [] }
+  const fileCount = new Map<string, number>()
+  for (const f of (files ?? []) as { request_id: string }[]) fileCount.set(f.request_id, (fileCount.get(f.request_id) ?? 0) + 1)
+  const now = Date.now()
+  const pending = rows.filter((r) => r.status === "pending")
+  const expired = pending.filter((r) => r.expires_at && Date.parse(r.expires_at) < now)
+  return {
+    filters: { status, agent_name_matched: agentMatches },
+    matching: rows.length,
+    by_status: tally(rows, (r) => r.status),
+    pending_links_open: pending.length,
+    pending_but_link_expired: expired.length,
+    submitted_waiting_review: rows.filter((r) => r.status === "submitted").length,
+    by_agent: tally(rows, (r) => names.get(String(r.agent_id)) ?? "Unknown"),
+    requests: rows.slice(0, limit).map((r) => ({
+      agent: names.get(String(r.agent_id)) ?? "Unknown",
+      label: r.label && !/^https?:/.test(r.label) ? r.label : null,
+      status: r.status,
+      owner: r.owner_name,
+      owner_email: r.owner_email,
+      owner_mobile: r.owner_mobile,
+      property: [r.property_building, r.unit_number ? `Unit ${r.unit_number}` : null, r.community_area].filter(Boolean).join(", ") || null,
+      title_deed: r.title_deed_number,
+      noc_valid_until: isoDay(r.noc_valid_until),
+      sent: isoDay(r.created_at),
+      submitted: isoDay(r.submitted_at),
+      link_expires: isoDay(r.expires_at),
+      link_expired: Boolean(r.expires_at && Date.parse(r.expires_at) < now && r.status === "pending"),
+      files_uploaded: fileCount.get(r.id) ?? 0,
+    })),
+    meaning: "pending = link sent, owner hasn't submitted; submitted = owner filled it in, agent/admin to review; cancelled = withdrawn",
+    where_in_dashboard: "Owner Documents (admins see every agent's requests)",
+  }
+}
+
+/** Teams in detail: rosters, leaders, validated sales per team, and selling accounts with no team. */
+async function teamsDetail(admin: Admin, args: { team_name?: string; include_members?: boolean; limit?: number }) {
+  const limit = Math.min(Math.max(args.limit ?? 60, 1), 300)
+  const [{ data: teams, error }, { data: memberships }, sales] = await Promise.all([
+    admin.from("teams").select("id, name, slug, description, team_type, parent_id, is_active, created_at").eq("is_active", true).order("name"),
+    admin.from("team_memberships").select("user_id, team_id, role_in_team, joined_at").eq("is_active", true).limit(10000),
+    fetchAllSales(admin),
+  ])
+  if (error) throw new Error(error.message)
+  type Team = { id: string; name: string; slug: string | null; description: string | null; team_type: string | null; parent_id: string | null; is_active: boolean; created_at: string }
+  type Mem = { user_id: string; team_id: string; role_in_team: string | null; joined_at: string | null }
+  let list = (teams ?? []) as Team[]
+  const mems = (memberships ?? []) as Mem[]
+  if (args.team_name?.trim()) {
+    const n = args.team_name.trim().toLowerCase()
+    list = list.filter((t) => t.name.toLowerCase().includes(n))
+    if (!list.length) return { error: `No team matching "${args.team_name}"`, teams_available: ((teams ?? []) as Team[]).map((t) => t.name) }
+  }
+  const memberIds = [...new Set(mems.map((m) => String(m.user_id)))]
+  const { data: profiles } = memberIds.length ? await admin.from("profiles").select("id, fullname, role, status, joined_at").in("id", memberIds) : { data: [] }
+  const prof = new Map(((profiles ?? []) as { id: string; fullname: string | null; role: string; status: string; joined_at: string | null }[]).map((p) => [String(p.id), p]))
+  const validated = sales.filter((s) => s.validation_status === "validated")
+  const creditByAgent = new Map<string, { deals: number; value: number }>()
+  for (const s of validated) for (const c of saleCredits(s)) {
+    const cur = creditByAgent.get(c.agentId) ?? { deals: 0, value: 0 }
+    cur.deals++
+    cur.value += c.value
+    creditByAgent.set(c.agentId, cur)
+  }
+  const teamName = new Map(((teams ?? []) as Team[]).map((t) => [String(t.id), t.name]))
+  const out = list.map((t) => {
+    const members = mems.filter((m) => String(m.team_id) === String(t.id))
+    const leaders = members.filter((m) => /lead|head|manager/i.test(m.role_in_team ?? ""))
+    const value = members.reduce((a, m) => a + (creditByAgent.get(String(m.user_id))?.value ?? 0), 0)
+    const deals = members.reduce((a, m) => a + (creditByAgent.get(String(m.user_id))?.deals ?? 0), 0)
+    return {
+      team: t.name,
+      type: t.team_type,
+      parent_team: t.parent_id ? teamName.get(String(t.parent_id)) ?? null : null,
+      created: isoDay(t.created_at),
+      members: members.length,
+      active_members: members.filter((m) => prof.get(String(m.user_id))?.status === "active").length,
+      leaders: leaders.map((m) => prof.get(String(m.user_id))?.fullname ?? "Unknown"),
+      roles_in_team: tally(members, (m) => m.role_in_team ?? "member"),
+      validated_deals: deals,
+      validated_value_aed: Math.round(value),
+      members_who_sold: members.filter((m) => creditByAgent.has(String(m.user_id))).length,
+      ...(args.include_members !== false
+        ? {
+            roster: members
+              .map((m) => ({ name: prof.get(String(m.user_id))?.fullname ?? "Unknown", account_role: prof.get(String(m.user_id))?.role ?? null, status: prof.get(String(m.user_id))?.status ?? null, role_in_team: m.role_in_team ?? "member", since: isoDay(m.joined_at), validated_deals: creditByAgent.get(String(m.user_id))?.deals ?? 0, validated_value_aed: Math.round(creditByAgent.get(String(m.user_id))?.value ?? 0) }))
+              .sort((a, b) => b.validated_value_aed - a.validated_value_aed || a.name.localeCompare(b.name))
+              .slice(0, limit),
+          }
+        : {}),
+    }
+  }).sort((a, b) => b.validated_value_aed - a.validated_value_aed || b.members - a.members)
+
+  // Selling accounts that belong to no active team.
+  const { data: sellers } = await admin.from("profiles").select("id, fullname, role, joined_at").in("role", [...ROLES_SALES_PIPELINE]).eq("status", "active").neq("is_deleted", true).limit(5000)
+  const inTeam = new Set(mems.map((m) => String(m.user_id)))
+  const noTeam = ((sellers ?? []) as { id: string; fullname: string | null; role: string; joined_at: string | null }[]).filter((p) => !inTeam.has(String(p.id)))
+  return {
+    filters: { team_name: args.team_name ?? null },
+    teams: out.length,
+    ...(out.length === 0 && !args.team_name ? { note: "There are NO active teams right now — none have been created since the team structure was cleared; every selling account is currently without a team." } : {}),
+    total_memberships: mems.length,
+    people_in_teams: memberIds.length,
+    selling_accounts_without_a_team: { count: noTeam.length, by_role: tally(noTeam, (p) => p.role), names: noTeam.sort((a, b) => (b.joined_at ?? "").localeCompare(a.joined_at ?? "")).slice(0, 40).map((p) => `${p.fullname ?? "Unknown"} (${p.role.replace(/_/g, " ")}, joined ${isoDay(p.joined_at) ?? "?"})`) },
+    team_list: out,
+    where_in_dashboard: "Teams (rosters, transfers) and Team Sales",
+  }
+}
+
+/** How each event did: registrations, certificate downloads, views, QR scans, who invited whom. */
+async function eventEngagement(admin: Admin, args: { event_title?: string; limit?: number }) {
+  const limit = Math.min(Math.max(args.limit ?? 12, 1), 50)
+  let q = admin
+    .from("events")
+    .select("id, title, event_date, venue, status, agent_id, show_on_main, registration_open, certificate, view_count, qr_scan_count, created_at")
+    .is("deleted_at", null)
+    .order("event_date", { ascending: false })
+    .limit(200)
+  if (args.event_title?.trim()) q = q.ilike("title", `%${args.event_title.trim().replace(/[%_]/g, "")}%`)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  type Ev = { id: string; title: string; event_date: string | null; venue: string | null; status: string | null; agent_id: string | null; show_on_main: boolean | null; registration_open: boolean | null; certificate: unknown; view_count: number | null; qr_scan_count: number | null; created_at: string }
+  const events = (data ?? []) as Ev[]
+  if (!events.length) return { error: args.event_title ? `No event matching "${args.event_title}"` : "No events yet" }
+  const ids = events.map((e) => e.id)
+  const [{ data: regs }, { data: downloads }, owners] = await Promise.all([
+    admin.from("event_registrations").select("event_id, invited_by, certificate_sent_at, created_at").in("event_id", ids).limit(20000),
+    admin.from("event_certificate_downloads").select("event_id, registration_id, full_name, email, ip, created_at").in("event_id", ids).limit(20000),
+    profileNames(admin, events.map((e) => e.agent_id)),
+  ])
+  type Reg = { event_id: string; invited_by: string | null; certificate_sent_at: string | null; created_at: string }
+  type Dl = { event_id: string; registration_id: string | null; full_name: string | null; email: string | null; ip: string | null; created_at: string }
+  const R = (regs ?? []) as Reg[]
+  const D = (downloads ?? []) as Dl[]
+  const now = Date.now()
+  const list = events.slice(0, limit).map((e) => {
+    const r = R.filter((x) => x.event_id === e.id)
+    const d = D.filter((x) => x.event_id === e.id)
+    // Most download rows carry only the name typed on the certificate page.
+    const uniq = new Set(d.map((x) => x.registration_id ?? x.email?.toLowerCase() ?? x.full_name?.trim().toLowerCase() ?? x.ip ?? "")).size
+    const days = r.map((x) => x.created_at.slice(0, 10))
+    return {
+      event: e.title,
+      date: isoDay(e.event_date),
+      venue: e.venue,
+      status: e.status,
+      past: e.event_date ? Date.parse(e.event_date) < now : null,
+      run_by: e.agent_id ? owners.get(String(e.agent_id)) ?? "An agent" : "FHI (company event)",
+      on_main_events_page: e.agent_id ? Boolean(e.show_on_main) : true,
+      registration_open: Boolean(e.registration_open),
+      registrations: r.length,
+      registrations_by_day_peak: days.length ? tally(days, (x) => x, 1)[0] : null,
+      certificates_sent: r.filter((x) => x.certificate_sent_at).length,
+      certificate_downloads: d.length,
+      unique_downloaders: uniq,
+      download_rate_percent: r.length ? Math.round((100 * uniq) / r.length) : null,
+      page_views: e.view_count ?? 0,
+      qr_scans: e.qr_scan_count ?? 0,
+      views_to_registration_percent: e.view_count ? Math.round((100 * r.length) / e.view_count) : null,
+      top_inviters: tally(r.filter((x) => x.invited_by?.trim()), (x) => x.invited_by, 5),
+    }
+  })
+  return {
+    filters: { event_title: args.event_title ?? null },
+    events: events.length,
+    totals: { registrations: R.length, certificate_downloads: D.length, page_views: events.reduce((a, e) => a + (e.view_count ?? 0), 0), qr_scans: events.reduce((a, e) => a + (e.qr_scan_count ?? 0), 0) },
+    event_list: list,
+    note: "Registrant NAMES are in event_attendees; this is the engagement picture per event",
+  }
+}
+
 // ─── OpenAI tool definitions + dispatcher ────────────────────────────────────
 
 export const FHI_CHAT_TOOLS = [
@@ -3855,6 +4262,46 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "activity_log",
+      description: "ACTIVITY & SECURITY LOG (audit trail): who did what and when — project/developer/listing edits, account activations and role changes, team changes, emails sent, LOGINS and FAILED LOGINS, sales and inquiry actions. Filter by period (default last 7 days), category, event, the person who acted, or a search word (e.g. a project name). Use for 'who changed Azizi Venice', 'what did Juliecor do today', 'any failed logins', 'who activated X', 'who logged in this week'. NOT for business totals — those are the other tools.",
+      parameters: { type: "object", properties: {"days":{"type":"integer","description":"Last N days (default 7)"},"from_date":{"type":"string"},"to_date":{"type":"string"},"category":{"type":"string","enum":["projects","mailer","auth","user_management","teams","security","developers","listings","sales","inquiry","events","finance","website","owner_documents","feedback","contact","support"]},"event":{"type":"string","description":"e.g. login, login_failed, updated, created, deleted, activated, role_granted, email_sent"},"actor_name":{"type":"string","description":"Who acted (partial name)"},"search":{"type":"string","description":"Word in the subject or description, e.g. a project or person name"},"limit":{"type":"integer"}} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "member_lookup",
+      description: "WHO IS THIS — one member's full profile in one answer, found by NAME, EMAIL, PHONE NUMBER or USERNAME: role, status, contacts, nationality, license, joined date, last login, who invited them, recruits, team(s), website, listings, reviews, validated and pending sales with last sale date, and the dashboard link. Use for 'who is 0505725463', 'look up juan@gmail.com', 'tell me about Agnes White', 'when did X join and who invited them'. For a person's SALES RECORD alone agent_sales still works; for their downline use agent_network.",
+      parameters: { type: "object", properties: {"query":{"type":"string","description":"Name, email, phone number or username"},"limit":{"type":"integer","description":"Max matches (default 5)"}}, required: ["query"] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "owner_documents",
+      description: "OWNER DOCUMENT REQUESTS — the title-deed / NOC collection links agents send to property owners (Owner Documents): pending (link sent, not yet submitted, incl. expired links), submitted (waiting review), cancelled; per agent; each with owner, property, deed number, NOC validity, files uploaded. Use for 'any pending owner documents', 'did the owner of X submit', 'owner documents of agent Y'.",
+      parameters: { type: "object", properties: {"status":{"type":"string","enum":["all","pending","submitted","cancelled"]},"agent_name":{"type":"string"},"limit":{"type":"integer"}} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "teams_detail",
+      description: "TEAMS IN DETAIL: every active team with its leader(s), member count, roster (each member's account role, team role, joined date, validated sales) and the team's validated sales — plus selling accounts that belong to NO team. Use for 'who is in team X', 'who leads X', 'agents without a team', 'how many teams', 'team roster'. For the ranked leaderboard alone top_teams still works.",
+      parameters: { type: "object", properties: {"team_name":{"type":"string","description":"One team (partial name); omit for all"},"include_members":{"type":"boolean","description":"Default true (rosters); false for summary only"},"limit":{"type":"integer","description":"Roster rows per team"}} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "event_engagement",
+      description: "HOW EACH EVENT DID: registrations, certificates sent and DOWNLOADED (unique downloaders, download rate), page views, QR scans, views-to-registration rate, who invited most registrants, whether an agent's event is shown on /events. Use for 'how did the Career Summit go', 'how many downloaded their certificate', 'event stats', 'which event had most registrations'. Registrant names are event_attendees.",
+      parameters: { type: "object", properties: {"event_title":{"type":"string","description":"Partial title; omit for all events"},"limit":{"type":"integer"}} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "find_projects",
       description:
         "SHORTLIST projects by what a buyer wants — area/community (JVC, Dubai Marina, Business Bay…), developer, number of bedrooms (0 = studio), property type (apartment, villa, townhouse), budget (min/max AED), handover year, off-plan or ready. Returns the matching published projects sorted (cheapest first when a budget or bedroom count is given) with price, handover, unit mix, sizes, payment plan and the page link, plus counts by developer/area/handover year. Use for 'cheapest 1-bedroom in JVC', 'Azizi projects handing over 2027', 'villas under AED 3M', 'what do we have in Dubai South', 'ready apartments'. For everything about ONE named project use project_details instead.",
@@ -3992,6 +4439,11 @@ export async function runFhiChatTool(
       case "listings_overview": result = await listingsOverview(admin, args as Parameters<typeof listingsOverview>[1]); break
       case "clients_overview": result = await clientsOverview(admin, args); break
       case "agent_reviews": result = await agentReviews(admin, args); break
+      case "activity_log": result = await activityLog(admin, args); break
+      case "member_lookup": result = await memberLookup(admin, args); break
+      case "owner_documents": result = await ownerDocuments(admin, args); break
+      case "teams_detail": result = await teamsDetail(admin, args); break
+      case "event_engagement": result = await eventEngagement(admin, args); break
       case "project_details": result = await projectDetails(admin, args); break
       case "event_attendees": result = await eventAttendees(admin, args); break
       case "new_accounts": result = await newAccounts(admin, args); break
