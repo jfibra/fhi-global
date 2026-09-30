@@ -6,13 +6,10 @@ import {
   DLD_CHART_LATEST_N,
   DLD_CHART_SPECS,
   DLD_DATASETS,
-  DLD_PRICE_INDEX_COMMAND,
   isDldCommand,
   type DldBreakdownResponse,
   type DldChartBucket,
   type DldKpiSums,
-  type DldPriceIndexResponse,
-  type DldPriceIndexSeries,
   type DldRow,
   type DldSummaryResponse,
   DLD_SUMMARY_SAMPLE,
@@ -20,13 +17,15 @@ import {
 } from "@/lib/dld-open-data"
 import { asRows, buildGatewayBody, callGateway, chunkReader, clean, flag, gatewayTotal, readChunkRange, type GatewayError } from "@/lib/dld-gateway"
 import { chunkKey, readChunk, writeChunk } from "@/lib/dld-cache"
+import { fetchPriceIndex } from "@/lib/dld-price-index"
 
 /**
  * Chart data for the admin "Real Estate Data" → Market Charts tab.
  *
  *   POST { kind: "price-index" }
- *     The DLD Property Price Index, normalized into 20 series. Cached in the
- *     same Postgres table as the dataset chunks (one entry, six hours).
+ *     The DLD Property Price Index (lib/dld-price-index.ts — shared with the
+ *     public proxy at app/api/dld/price-index), normalized into 20 series.
+ *     Cached in the same Postgres table as the dataset chunks (one entry, six hours).
  *
  *   POST { kind: "summary", command, ...filters }
  *     The fast per-tab strip. Exact counts without pulling rows: the gateway
@@ -74,51 +73,9 @@ export async function POST(req: NextRequest) {
 // ─── Price index ─────────────────────────────────────────────────────────────
 
 async function priceIndex(refresh: boolean): Promise<NextResponse> {
-  const key = chunkKey(DLD_PRICE_INDEX_COMMAND, {}, 0, 0)
-  let rows: DldRow[]
-  let fromCache = false
-
-  const cached = refresh ? null : await readChunk(key)
-  if (cached && cached.rows.length > 0) {
-    rows = cached.rows
-    fromCache = true
-  } else {
-    const upstream = await callGateway(DLD_PRICE_INDEX_COMMAND, {})
-    if (!upstream.ok) return NextResponse.json({ error: upstream.message }, { status: upstream.status })
-    rows = asRows(upstream.result)
-    if (rows.length > 0) await writeChunk(key, DLD_PRICE_INDEX_COMMAND, 0, { rows, total: rows.length })
-  }
-
-  const bySeries = new Map<string, DldPriceIndexSeries>()
-  for (const r of rows) {
-    const period = r.IDX_PER === "Quarterly" ? "Quarterly" : r.IDX_PER === "Annual" ? "Annual" : null
-    if (!period) continue
-    const categoryCode = String(r.IDX_CAT_CODE ?? "")
-    const subCategoryCode = String(r.IDX_SUB_CAT_CODE ?? "")
-    const id = `${categoryCode}|${subCategoryCode}|${period}`
-    let series = bySeries.get(id)
-    if (!series) {
-      series = {
-        category: String(r.IDX_CAT ?? categoryCode),
-        categoryCode,
-        subCategory: String(r.IDX_SUB_CAT ?? subCategoryCode).trim(),
-        subCategoryCode,
-        period,
-        points: [],
-      }
-      bySeries.set(id, series)
-    }
-    series.points.push({
-      x: String(r.IDX_X ?? ""),
-      actual: num(r.ACTUAL),
-      qoq: num(r.QOQ),
-      yoy: num(r.YOY),
-    })
-  }
-  for (const s of bySeries.values()) s.points.sort((a, b) => a.x.localeCompare(b.x, undefined, { numeric: true }))
-
-  const response: DldPriceIndexResponse = { series: [...bySeries.values()], fromCache }
-  return NextResponse.json(response)
+  const result = await fetchPriceIndex(refresh)
+  if (!result.ok) return NextResponse.json({ error: result.message }, { status: result.status })
+  return NextResponse.json(result.data)
 }
 
 // ─── Dataset breakdown ───────────────────────────────────────────────────────

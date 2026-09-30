@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation"
 import {
   Menu, X, Phone, Mail, Facebook, Instagram, ChevronDown, LayoutDashboard,
   LogOut, Building2, CalendarDays, Camera, Globe, KeyRound, Landmark, Newspaper,
-  Tag, Users, type LucideIcon,
+  Tag, Users, BarChart3, type LucideIcon,
 } from "lucide-react"
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
 import { getDashboardRouteByRole } from "@/lib/auth"
@@ -36,6 +36,7 @@ const NAV_LINKS: NavItem[] = [
       { label: "Rent",       href: "/rent",       desc: "Available rentals across Dubai",  icon: KeyRound },
       { label: "Projects",   href: "/projects",   desc: "Every development we cover",      icon: Building2 },
       { label: "Developers", href: "/developers", desc: "Verified developers and portfolios", icon: Landmark },
+      { label: "Open Data",  href: "/open-data",  desc: "DLD's official property price index", icon: BarChart3 },
     ],
   },
   {
