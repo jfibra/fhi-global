@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library, MonitorPlay,
-  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus,
+  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus, Files,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -235,6 +235,9 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { ...MATERIALS, description: "Branded marketing artwork to download and share.", mock: "materials" },
       { ...EBOOKS,    description: "Training guides and reference PDFs.", mock: "ebooks" },
       { ...VIDEOS,    description: "FHI's films to watch, download and share.", mock: "videos" },
+      // Admin-uploadable — DLD contract forms, agreements, company templates.
+      // Not on other roles' Library hubs yet (see lib/document-service.ts).
+      { icon: Files, label: "Documents", to: "documents", description: "Upload and manage DLD forms, agreements and company templates." },
     ],
   },
   { icon: ScrollText, label: "Activity Logs", to: "system-logs" },
