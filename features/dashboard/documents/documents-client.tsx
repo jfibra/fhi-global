@@ -361,9 +361,9 @@ export function DocumentsClient() {
               <a
                 href={proxyUrl(doc.file_url, true)}
                 download={doc.file_name}
-                className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-[#6b7280] transition-colors hover:text-[#001f3f]"
+                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2 text-[11px] font-bold text-white transition-colors hover:bg-rose-700"
               >
-                <Download className="h-3 w-3" /> Download
+                <Download className="h-3.5 w-3.5" /> Download
               </a>
             </article>
           ))}
