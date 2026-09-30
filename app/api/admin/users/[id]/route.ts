@@ -6,7 +6,7 @@ import type { UpdateUserPayload } from "@/lib/user-service"
 import { sendWelcomeEmail } from "@/lib/welcome-email"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
-type AdminCaller = { id: string; name: string | null; role: string | null; mailbox: string | null }
+type AdminCaller = { id: string; name: string | null; role: string | null; mailbox: string | null; /** Welcome letters they trigger carry their own name (the CEO). */ signsPersonally: boolean }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -16,7 +16,7 @@ async function requireAdmin(): Promise<AdminCaller | null> {
   if (!user) return null
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, fullname, mailbox_address")
+    .select("role, fullname, mailbox_address, metadata")
     .eq("id", user.id)
     .single()
   if (!profile || !isAdminStaffRole(profile.role)) return null
@@ -25,6 +25,8 @@ async function requireAdmin(): Promise<AdminCaller | null> {
     name: profile.fullname ?? user.email ?? null,
     role: profile.role,
     mailbox: (profile.mailbox_address as string | null) ?? null,
+    // Their welcome letters carry their own name (the CEO); other admins sign as the company.
+    signsPersonally: ((profile.metadata as Record<string, unknown> | null)?.welcome_signature_personal ?? false) === true,
   }
 }
 
@@ -80,9 +82,9 @@ export async function PATCH(
   // human subject label.
   const { data: before } = await admin
     .from("profiles")
-    .select("role, status, fullname")
+    .select("role, status, fullname, metadata")
     .eq("id", id)
-    .maybeSingle<{ role: string | null; status: string | null; fullname: string | null }>()
+    .maybeSingle<{ role: string | null; status: string | null; fullname: string | null; metadata: Record<string, unknown> | null }>()
 
   // Build profile update payload
   const profileUpdate: Record<string, unknown> = {}
@@ -126,13 +128,14 @@ export async function PATCH(
   // Admin-only flag: this person's recruits skip approval (lib/auto-approve.ts).
   const hasAutoApprove = body.auto_approve_recruits !== undefined
   let autoApproveChanged: { before: boolean; after: boolean } | null = null
+  const hasSignature = body.welcome_signature_personal !== undefined
 
   // Referrer change is tracked for the audit trail (set inside the block below).
   let referrerBefore: string | null = null
   let referrerAfter: string | null = null
   let referrerChanged = false
 
-  if (hasMeta || hasDeveloperLink || hasRoleUpdate || hasInvitedBy || hasAutoApprove) {
+  if (hasMeta || hasDeveloperLink || hasRoleUpdate || hasInvitedBy || hasAutoApprove || hasSignature) {
     const { data: current } = await admin
       .from("profiles")
       .select("metadata, role")
@@ -221,6 +224,7 @@ export async function PATCH(
       if (before !== after) autoApproveChanged = { before, after }
       nextMetadata.auto_approve_recruits = after
     }
+    if (hasSignature) nextMetadata.welcome_signature_personal = body.welcome_signature_personal === true
 
     profileUpdate.metadata = nextMetadata
   }
@@ -311,11 +315,15 @@ export async function PATCH(
   // already got one) are covered by the status transition check.
   let welcomeSent = false
   if (newStatus === "active" && (before?.status ?? null) !== "active") {
+    // The letter signs as "The FHI Global Family" — unless this admin personally
+    // invited the recruit, or is flagged to sign personally (the CEO).
+    const invitedByCaller = before?.metadata?.invited_by === caller.id
     welcomeSent = await sendWelcomeEmail({
       targetId: id,
       targetName: before?.fullname ?? null,
       approver: { id: caller.id, name: caller.name, mailbox: caller.mailbox },
-      personalTeam: false,
+      personalTeam: invitedByCaller,
+      signature: invitedByCaller || caller.signsPersonally ? "person" : "company",
     })
   }
 

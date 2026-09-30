@@ -85,6 +85,7 @@ export function UserForm({
       whatsapp_number:      s("whatsapp_number"),
       invited_by:           s("invited_by") || null,
       auto_approve_recruits: m.auto_approve_recruits === true,
+      welcome_signature_personal: m.welcome_signature_personal === true,
     }
   })
 
@@ -434,6 +435,24 @@ export function UserForm({
                   <span className="block text-[11px] text-[#9ca3af] mt-0.5">
                     Accounts that register through their invite link start <span className="font-semibold">active</span> instead of
                     waiting for approval. Meant for the CEO&apos;s link — give it sparingly.
+                  </span>
+                </span>
+              </label>
+
+              {/* Welcome letters signed with this person's name (the CEO); other admins sign as the company. */}
+              <label className="mt-2 flex items-start gap-3 rounded-xl border border-[#e8eaed] bg-[#f9fafb] px-4 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={edit.welcome_signature_personal === true}
+                  onChange={(e) => setEdit((p) => ({ ...p, welcome_signature_personal: e.target.checked }))}
+                  className="mt-0.5 h-4 w-4 accent-[#001f3f]"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-[#0d1117]">Welcome letters carry this person&apos;s name</span>
+                  <span className="block text-[11px] text-[#9ca3af] mt-0.5">
+                    When they approve or activate an account, the welcome email is signed with their name. Without this, admin
+                    activations are signed <span className="font-semibold">The FHI Global Family</span>. Agents approving their own
+                    recruits always sign personally.
                   </span>
                 </span>
               </label>

@@ -19,6 +19,13 @@ export async function sendWelcomeEmail(input: {
   /** true when the approver personally leads the recruit (the invite
    *  ladder); admin activations welcome them to the company instead. */
   personalTeam: boolean
+  /**
+   * Who signs the letter. "person": the approver's own name (an agent
+   * welcoming their recruit, the CEO). "company": "The FHI Global Family" —
+   * an admin activating someone they didn't invite shouldn't sign as
+   * themselves. Defaults to the personalTeam rule.
+   */
+  signature?: "person" | "company"
 }): Promise<boolean> {
   if (!hasMailerConfig()) return false
   try {
@@ -27,14 +34,15 @@ export async function sendWelcomeEmail(input: {
     const to = authUser?.user?.email ?? null
     if (!to) return false
 
-    const approverName = input.approver.name?.trim() || "The FHI Global Team"
+    const signPersonally = (input.signature ?? (input.personalTeam ? "person" : "company")) === "person"
+    const approverName = signPersonally ? input.approver.name?.trim() || "The FHI Global Family" : "The FHI Global Family"
     const mailbox = (input.approver.mailbox ?? "").trim().toLowerCase() || null
     const firstName = (input.targetName ?? "").trim().split(/\s+/)[0] || ""
     const subject = "Welcome to the FHI Family — your account is approved"
     // The team's own approved wording; only the greeting and the signature
     // are dynamic. The approver signs personally on invite approvals; admin
     // activations sign as the company.
-    const signTitle = input.personalTeam ? "Dubai Broker" : "FHI Global Property · Dubai"
+    const signTitle = signPersonally && input.personalTeam ? "Dubai Broker" : "FHI Global Property · Dubai"
     const message = [
       `Dear ${firstName || "Team Member"},`,
       ``,
@@ -66,7 +74,8 @@ export async function sendWelcomeEmail(input: {
         // The body carries the personal sign-off; the template footer stays
         // the generic brand block so the name isn't printed twice.
         senderName: null,
-        ...(mailbox ? { fromAccount: { address: mailbox, name: input.approver.name } } : {}),
+        // Replies still route to the approver's mailbox; the display name matches the signature.
+        ...(mailbox ? { fromAccount: { address: mailbox, name: signPersonally ? input.approver.name : "FHI Global Property" } } : {}),
       })
     } catch (err) {
       sendError = err instanceof Error ? err.message : String(err)

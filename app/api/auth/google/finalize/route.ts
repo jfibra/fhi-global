@@ -5,6 +5,7 @@ import { parseName } from "@/lib/parse-name"
 import { pickSafePostLoginRedirect } from "@/lib/auth"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 import { inviterAutoApproves } from "@/lib/auto-approve"
+import { sendWelcomeEmail } from "@/lib/welcome-email"
 
 // Completes Google sign-in AFTER the client established the Supabase session.
 // Runs as the newly-signed-in user (cookie session) and — only on the first
@@ -105,7 +106,11 @@ export async function POST(req: NextRequest) {
   }
   // A pre-approved inviter's recruits (the CEO's link) start active — only a
   // brand-new, still-pending account; a status an admin set is never touched.
-  if (invitedBy && finalStatus === "pending" && (await inviterAutoApproves(admin, invitedBy))) finalStatus = "active"
+  let autoApproved = false
+  if (invitedBy && finalStatus === "pending" && (await inviterAutoApproves(admin, invitedBy))) {
+    finalStatus = "active"
+    autoApproved = true
+  }
 
   const nextMetadata = {
     ...metadata,
@@ -136,6 +141,17 @@ export async function POST(req: NextRequest) {
   }
 
   const displayName = [fname, lname].filter(Boolean).join(" ") || user.email || null
+  if (autoApproved && invitedBy) {
+    const { data: inviterProfile } = await admin.from("profiles").select("id, fullname, mailbox_address").eq("id", invitedBy).maybeSingle()
+    if (inviterProfile) {
+      await sendWelcomeEmail({
+        targetId: user.id,
+        targetName: displayName,
+        approver: { id: inviterProfile.id, name: inviterProfile.fullname ?? null, mailbox: inviterProfile.mailbox_address ?? null },
+        personalTeam: true,
+      })
+    }
+  }
   const ctx = requestContextFromRequest(req)
   await logAuditEvent({
     category: "security",

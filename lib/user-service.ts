@@ -68,6 +68,11 @@ export type UpdateUserPayload = {
    */
   auto_approve_recruits?: boolean
   /**
+   * Admin-only: welcome letters this person triggers (activations) carry
+   * their own name instead of "The FHI Global Family" (the CEO).
+   */
+  welcome_signature_personal?: boolean
+  /**
    * Who referred/invited this user — the referrer's profile UUID, stored as
    * `metadata.invited_by` (same field the invite link stamps at registration;
    * see app/api/register/route.ts). Empty string / null clears the referrer.

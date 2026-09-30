@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 import { inviterAutoApproves } from "@/lib/auto-approve"
+import { sendWelcomeEmail } from "@/lib/welcome-email"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -74,6 +75,20 @@ export async function POST(req: NextRequest) {
         ...(invitedBy ? { metadata: { invited_by: invitedBy } } : {}),
       })
       .eq("id", userId)
+
+    // Auto-approved: the same welcome letter an Approve click sends, signed by
+    // the inviter (they lead this recruit). Never blocks registration.
+    if (autoApproved && invitedBy) {
+      const { data: inviterProfile } = await supabase.from("profiles").select("id, fullname, mailbox_address").eq("id", invitedBy).maybeSingle()
+      if (inviterProfile) {
+        await sendWelcomeEmail({
+          targetId: userId,
+          targetName: `${firstName} ${lastName}`.trim(),
+          approver: { id: inviterProfile.id, name: inviterProfile.fullname ?? null, mailbox: inviterProfile.mailbox_address ?? null },
+          personalTeam: true,
+        })
+      }
+    }
 
     const ctx = requestContextFromRequest(req)
     await logAuditEvent({
