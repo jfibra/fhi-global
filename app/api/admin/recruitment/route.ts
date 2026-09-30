@@ -30,6 +30,22 @@ export type RecruitmentPerson = {
   sales: number
 }
 
+/** One agent's credit on one validated sale — what a sales figure is made of. */
+export type RecruitmentDeal = {
+  saleId: string
+  agentId: string
+  /** Reservation date, else when it was recorded. */
+  date: string
+  project: string | null
+  developer: string | null
+  unit: string | null
+  saleType: string | null
+  /** The full contract price and this agent's share of it. */
+  price: number
+  share: number
+  value: number
+}
+
 const PAGE = 1000
 
 export async function GET() {
@@ -79,5 +95,38 @@ export async function GET() {
     }
   })
 
-  return NextResponse.json({ people })
+  // The validated sales themselves, one line per credited agent, so a figure
+  // on the page can open into "which agent, which project, how much".
+  const { data: saleRows } = await admin
+    .from("sales_reports")
+    .select("id, agent_id, contract_price, reservation_date, created_at, sale_type, unit_number, partners, projects(name), developers(name)")
+    .eq("validation_status", "validated")
+    .order("reservation_date", { ascending: false })
+    .limit(5000)
+  const deals: RecruitmentDeal[] = []
+  for (const row of (saleRows ?? []) as Array<Record<string, unknown>>) {
+    const price = Number(row.contract_price ?? 0)
+    const shared = (Array.isArray(row.partners) ? row.partners : []).flatMap((p) => {
+      const r = (p ?? {}) as { agent_id?: unknown; share?: unknown }
+      return typeof r.agent_id === "string" ? [{ agentId: r.agent_id, share: Number(r.share) || 0 }] : []
+    })
+    const credits = shared.length ? shared : [{ agentId: String(row.agent_id), share: 100 }]
+    const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? null : v)
+    for (const c of credits) {
+      deals.push({
+        saleId: String(row.id),
+        agentId: c.agentId,
+        date: (row.reservation_date as string | null) ?? String(row.created_at).slice(0, 10),
+        project: one(row.projects as { name: string | null } | null)?.name ?? null,
+        developer: one(row.developers as { name: string | null } | null)?.name ?? null,
+        unit: (row.unit_number as string | null) ?? null,
+        saleType: (row.sale_type as string | null) ?? null,
+        price,
+        share: c.share,
+        value: Math.round((price * c.share) / 100),
+      })
+    }
+  }
+
+  return NextResponse.json({ people, deals })
 }

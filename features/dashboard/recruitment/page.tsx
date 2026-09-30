@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
-  Check, ChevronDown, ChevronRight, Clock, ExternalLink, FileSpreadsheet, FileText, Loader2, Network, RefreshCw, Search, UserPlus, UserRound, Users,
+  Building2, Check, ChevronDown, ChevronRight, Clock, ExternalLink, FileSpreadsheet, FileText, Loader2, Network, RefreshCw, Search, UserPlus, UserRound, Users, X,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { isAdminStaffRole } from "@/lib/app-roles"
 import { getDashboardRouteByRole, roleToLabel } from "@/lib/auth"
 import { STATUS_COLORS } from "@/lib/user-service"
-import type { RecruitmentPerson } from "@/app/api/admin/recruitment/route"
+import type { RecruitmentDeal, RecruitmentPerson } from "@/app/api/admin/recruitment/route"
 
 /**
  * Accounts & Invites → Recruitment (admin staff): the questions the Account
@@ -63,6 +63,9 @@ export default function RecruitmentPage() {
   const base = getDashboardRouteByRole(role)
 
   const [people, setPeople] = useState<RecruitmentPerson[] | null>(null)
+  const [deals, setDeals] = useState<RecruitmentDeal[]>([])
+  /** The sales figure the admin clicked, opened into its deals. */
+  const [dealsView, setDealsView] = useState<{ title: string; subtitle: string; agentIds: Set<string>; level: Map<string, { level: number; via: string }> } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [tab, setTab] = useState<Tab>("pending")
@@ -76,9 +79,10 @@ export default function RecruitmentPage() {
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/recruitment", { cache: "no-store" })
-      const json = (await res.json().catch(() => ({}))) as { people?: RecruitmentPerson[]; error?: string }
+      const json = (await res.json().catch(() => ({}))) as { people?: RecruitmentPerson[]; deals?: RecruitmentDeal[]; error?: string }
       if (!res.ok || !json.people) throw new Error(json.error ?? `Request failed (${res.status}).`)
       setPeople(json.people)
+      setDeals(json.deals ?? [])
       setLoadedAt(Date.now())
       setError(null)
     } catch (e) {
@@ -174,6 +178,21 @@ export default function RecruitmentPage() {
     },
     [childrenOf, byId],
   )
+
+  /** "Own sales" of one person → their deals. */
+  const showOwnDeals = (p: RecruitmentPerson) =>
+    setDealsView({ title: `${p.name} — own sales`, subtitle: `${p.deals} validated deal${p.deals === 1 ? "" : "s"} · ${fmtAed(p.sales)}`, agentIds: new Set([p.id]), level: new Map() })
+  /** "Network sales" of a recruiter → every deal by anyone under them, with each seller's level. */
+  const showNetworkDeals = (root: RecruitmentPerson) => {
+    const rows = downlineRows(root.id)
+    const n = networkSales(root.id)
+    setDealsView({
+      title: `${root.name} — network sales`,
+      subtitle: `${n.deals} validated deal${n.deals === 1 ? "" : "s"} by people in the network · ${fmtAed(n.value)}`,
+      agentIds: new Set(rows.map((r) => r.p.id)),
+      level: new Map(rows.map((r) => [r.p.id, { level: r.level, via: r.via }])),
+    })
+  }
 
   const exportDownline = (root: RecruitmentPerson, kind: "csv" | "pdf") => {
     const rows = downlineRows(root.id)
@@ -406,6 +425,8 @@ export default function RecruitmentPage() {
               setTab("downline")
               setQuery("")
             }}
+            onOwnDeals={showOwnDeals}
+            onNetworkDeals={showNetworkDeals}
           />
         ) : (
           <Downline
@@ -420,7 +441,126 @@ export default function RecruitmentPage() {
             networkSales={networkSales}
             profileHref={profileHref}
             onExport={exportDownline}
+            onOwnDeals={showOwnDeals}
+            onNetworkDeals={showNetworkDeals}
           />
+        )}
+      </div>
+
+      {dealsView && (
+        <DealsPanel
+          view={dealsView}
+          deals={deals.filter((d) => dealsView.agentIds.has(d.agentId))}
+          byId={byId}
+          saleHref={(id) => `${base}/sales/${id}`}
+          profileHref={profileHref}
+          onClose={() => setDealsView(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── The deals behind a figure ───────────────────────────────────────────────
+
+function DealsPanel({
+  view,
+  deals,
+  byId,
+  saleHref,
+  profileHref,
+  onClose,
+}: {
+  view: { title: string; subtitle: string; level: Map<string, { level: number; via: string }> }
+  deals: RecruitmentDeal[]
+  byId: Map<string, RecruitmentPerson>
+  saleHref: (id: string) => string
+  profileHref: (id: string) => string
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose()
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [onClose])
+  const sorted = [...deals].sort((a, b) => b.date.localeCompare(a.date))
+  const th = "px-3 py-2 text-left text-[10.5px] font-bold uppercase tracking-wide text-[#9ca3af]"
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={view.title}>
+      <button type="button" className="absolute inset-0 bg-black/45 backdrop-blur-sm" aria-label="Close" onClick={onClose} />
+      <div className="relative flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[#e8eaed] bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 bg-[#001f3f] px-6 py-4 text-white">
+          <div>
+            <p className="font-['Outfit'] text-lg font-bold">{view.title}</p>
+            <p className="text-xs text-white/70">{view.subtitle} · validated sales only, all time</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-white/70 hover:bg-white/10 hover:text-white" aria-label="Close">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="overflow-auto">
+          {sorted.length === 0 ? (
+            <p className="px-6 py-10 text-sm text-[#9ca3af]">No validated sales here yet.</p>
+          ) : (
+            <table className="w-full min-w-[760px]">
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b border-[#f0f2f5]">
+                  <th className={th}>Date</th>
+                  <th className={th}>Agent</th>
+                  <th className={th}>Project</th>
+                  <th className={`${th} text-right`}>Credited</th>
+                  <th className={th} />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#f0f2f5]">
+                {sorted.map((d) => {
+                  const agent = byId.get(d.agentId)
+                  const lv = view.level.get(d.agentId)
+                  return (
+                    <tr key={`${d.saleId}-${d.agentId}`} className="hover:bg-[#fafbfc]">
+                      <td className="whitespace-nowrap px-3 py-3 text-sm text-[#374151]">{fmtDate(d.date)}</td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-2.5">
+                          {agent && <Avatar p={agent} size="h-8 w-8 text-xs" />}
+                          <div className="min-w-0">
+                            {agent ? (
+                              <Link href={profileHref(agent.id)} className="block truncate text-sm font-bold text-[#111827] hover:text-[#001f3f] hover:underline">{agent.name}</Link>
+                            ) : (
+                              <span className="block text-sm font-bold text-[#111827]">Unknown agent</span>
+                            )}
+                            {lv && <p className="text-[11px] text-[#6b7280]">Level {lv.level} · recruited by {lv.via}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <p className="flex items-center gap-1.5 text-sm font-semibold text-[#111827]">
+                          <Building2 className="h-3.5 w-3.5 shrink-0 text-[#d6b357]" />
+                          <span className="truncate">{d.project ?? (d.saleType ? d.saleType.replace(/_/g, " ") : "Sale")}</span>
+                        </p>
+                        <p className="text-[11px] text-[#6b7280]">{[d.developer, d.unit ? `Unit ${d.unit}` : null].filter(Boolean).join(" · ") || "—"}</p>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 text-right text-sm font-semibold tabular-nums text-[#111827]">
+                        {fmtAed(d.value)}
+                        {d.share !== 100 && <p className="text-[11px] font-normal text-[#6b7280]">{d.share}% of {fmtAed(d.price)}</p>}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <Link href={saleHref(d.saleId)} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-2.5 text-xs font-bold text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f]">
+                          <ExternalLink className="h-3.5 w-3.5" /> Open
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+        {sorted.length > 0 && (
+          <p className="border-t border-[#f0f2f5] px-6 py-3 text-right text-sm font-bold text-[#0d1117]">
+            Total {fmtAed(sorted.reduce((a, d) => a + d.value, 0))}
+          </p>
         )}
       </div>
     </div>
@@ -525,7 +665,19 @@ function DirectList({ items, profileHref, empty }: { items: RecruitmentPerson[];
 
 type RecruiterRow = { person: RecruitmentPerson; total: number; active: number; pending: number; last30: number; network: number; ownSales: number; netSales: { deals: number; value: number } }
 
-function RecruiterTable({ rows, profileHref, onDownline }: { rows: RecruiterRow[]; profileHref: (id: string) => string; onDownline: (id: string) => void }) {
+function RecruiterTable({
+  rows,
+  profileHref,
+  onDownline,
+  onOwnDeals,
+  onNetworkDeals,
+}: {
+  rows: RecruiterRow[]
+  profileHref: (id: string) => string
+  onDownline: (id: string) => void
+  onOwnDeals: (p: RecruitmentPerson) => void
+  onNetworkDeals: (p: RecruitmentPerson) => void
+}) {
   if (rows.length === 0) return <p className="py-8 text-sm text-[#9ca3af]">No recruiters match.</p>
   const th = "px-3 py-2 text-left text-[10.5px] font-bold uppercase tracking-wide text-[#9ca3af]"
   const num = "px-3 py-3 text-right text-sm font-semibold tabular-nums text-[#111827]"
@@ -566,8 +718,24 @@ function RecruiterTable({ rows, profileHref, onDownline }: { rows: RecruiterRow[
               <td className={`${num} ${r.pending ? "text-amber-700" : "text-[#9ca3af]"}`}>{r.pending}</td>
               <td className={num}>{r.last30}</td>
               <td className={num}>{r.network}</td>
-              <td className={`${num} ${r.ownSales ? "" : "text-[#9ca3af]"}`} title={r.ownSales ? `${r.person.deals} validated deal${r.person.deals === 1 ? "" : "s"} · ${fmtAed(r.ownSales)}` : "No validated sales"}>{fmtAedShort(r.ownSales)}</td>
-              <td className={`${num} ${r.netSales.value ? "text-[#001f3f]" : "text-[#9ca3af]"}`} title={r.netSales.value ? `${r.netSales.deals} validated deal${r.netSales.deals === 1 ? "" : "s"} across the network · ${fmtAed(r.netSales.value)}` : "No validated sales in the network"}>{fmtAedShort(r.netSales.value)}</td>
+              <td className={num}>
+                {r.ownSales ? (
+                  <button type="button" onClick={() => onOwnDeals(r.person)} title={`${r.person.deals} validated deal${r.person.deals === 1 ? "" : "s"} · ${fmtAed(r.ownSales)} — click for the deals`} className="underline decoration-dotted underline-offset-4 hover:text-[#001f3f]">
+                    {fmtAedShort(r.ownSales)}
+                  </button>
+                ) : (
+                  <span className="text-[#9ca3af]" title="No validated sales">—</span>
+                )}
+              </td>
+              <td className={num}>
+                {r.netSales.value ? (
+                  <button type="button" onClick={() => onNetworkDeals(r.person)} title={`${r.netSales.deals} validated deal${r.netSales.deals === 1 ? "" : "s"} across the network · ${fmtAed(r.netSales.value)} — click for who sold what`} className="text-[#001f3f] underline decoration-dotted underline-offset-4">
+                    {fmtAedShort(r.netSales.value)}
+                  </button>
+                ) : (
+                  <span className="text-[#9ca3af]" title="No validated sales in the network">—</span>
+                )}
+              </td>
               <td className="px-3 py-3 text-right">
                 <button
                   type="button"
@@ -596,6 +764,8 @@ function Downline({
   networkSales,
   profileHref,
   onExport,
+  onOwnDeals,
+  onNetworkDeals,
 }: {
   root: RecruitmentPerson | null
   candidates: RecruitmentPerson[]
@@ -605,6 +775,8 @@ function Downline({
   networkSales: (id: string) => { deals: number; value: number }
   profileHref: (id: string) => string
   onExport: (root: RecruitmentPerson, kind: "csv" | "pdf") => void
+  onOwnDeals: (p: RecruitmentPerson) => void
+  onNetworkDeals: (p: RecruitmentPerson) => void
 }) {
   return (
     <div className="mt-4">
@@ -633,9 +805,26 @@ function Downline({
                 {childrenOf.get(root.id)?.length ?? 0} direct recruits · {networkSize(root.id)} people in the whole network
                 {(() => {
                   const n = networkSales(root.id)
-                  return n.value > 0 ? ` · network sales ${fmtAed(n.value)} (${n.deals} validated deal${n.deals === 1 ? "" : "s"})` : " · no validated sales in the network yet"
+                  return n.value > 0 ? (
+                    <>
+                      {" · network sales "}
+                      <button type="button" onClick={() => onNetworkDeals(root)} className="font-bold text-[#d6b357] underline decoration-dotted underline-offset-2 hover:text-white" title="Click for who sold what">
+                        {fmtAed(n.value)}
+                      </button>
+                      {` (${n.deals} validated deal${n.deals === 1 ? "" : "s"})`}
+                    </>
+                  ) : (
+                    " · no validated sales in the network yet"
+                  )
                 })()}
-                {root.sales > 0 && ` · own sales ${fmtAed(root.sales)}`}
+                {root.sales > 0 && (
+                  <>
+                    {" · own sales "}
+                    <button type="button" onClick={() => onOwnDeals(root)} className="font-bold text-[#d6b357] underline decoration-dotted underline-offset-2 hover:text-white" title="Click for the deals">
+                      {fmtAed(root.sales)}
+                    </button>
+                  </>
+                )}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -664,7 +853,7 @@ function Downline({
           </div>
           <ol className="mt-3">
             {(childrenOf.get(root.id) ?? []).map((c) => (
-              <TreeNode key={c.id} p={c} depth={1} childrenOf={childrenOf} seen={new Set([root.id])} profileHref={profileHref} />
+              <TreeNode key={c.id} p={c} depth={1} childrenOf={childrenOf} seen={new Set([root.id])} profileHref={profileHref} onOwnDeals={onOwnDeals} />
             ))}
           </ol>
           {(childrenOf.get(root.id)?.length ?? 0) === 0 && <p className="py-6 text-sm text-[#9ca3af]">No recruits yet.</p>}
@@ -680,12 +869,14 @@ function TreeNode({
   childrenOf,
   seen,
   profileHref,
+  onOwnDeals,
 }: {
   p: RecruitmentPerson
   depth: number
   childrenOf: Map<string, RecruitmentPerson[]>
   seen: Set<string>
   profileHref: (id: string) => string
+  onOwnDeals: (p: RecruitmentPerson) => void
 }) {
   const kids = (childrenOf.get(p.id) ?? []).filter((k) => !seen.has(k.id))
   const [open, setOpen] = useState(depth < 2)
@@ -707,13 +898,17 @@ function TreeNode({
         <span className="hidden text-[11px] text-[#6b7280] sm:inline">{roleToLabel(p.role)}</span>
         <StatusChip status={p.status} />
         {kids.length > 0 && <span className="text-[11px] font-semibold text-[#6b7280]">{kids.length} recruit{kids.length === 1 ? "" : "s"}</span>}
-        {p.sales > 0 && <span className="text-[11px] font-semibold text-emerald-700" title={`${p.deals} validated deal${p.deals === 1 ? "" : "s"}`}>{fmtAedShort(p.sales)}</span>}
+        {p.sales > 0 && (
+          <button type="button" onClick={() => onOwnDeals(p)} className="text-[11px] font-semibold text-emerald-700 underline decoration-dotted underline-offset-2 hover:text-emerald-900" title={`${p.deals} validated deal${p.deals === 1 ? "" : "s"} — click for the deals`}>
+            {fmtAedShort(p.sales)}
+          </button>
+        )}
         <span className="ml-auto hidden text-[11px] text-[#9ca3af] md:inline">Joined {fmtDate(p.joinedAt)}</span>
       </div>
       {open && kids.length > 0 && depth < MAX_DEPTH && (
         <ol>
           {kids.map((k) => (
-            <TreeNode key={k.id} p={k} depth={depth + 1} childrenOf={childrenOf} seen={nextSeen} profileHref={profileHref} />
+            <TreeNode key={k.id} p={k} depth={depth + 1} childrenOf={childrenOf} seen={nextSeen} profileHref={profileHref} onOwnDeals={onOwnDeals} />
           ))}
         </ol>
       )}
