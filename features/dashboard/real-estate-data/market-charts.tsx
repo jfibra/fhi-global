@@ -286,7 +286,7 @@ function PriceIndexSection() {
       <div className="mb-4">
         <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Property Price Index</h2>
         <p className="text-sm text-[#6b7280]">
-          DLD&rsquo;s official index by property category, base 2020. Pick a category and a sub-index.
+          DLD&rsquo;s official index by property category, quarterly or annual. Pick a category and a sub-index.
         </p>
       </div>
 

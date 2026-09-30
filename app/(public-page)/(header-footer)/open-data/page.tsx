@@ -8,7 +8,7 @@ import { PriceIndexChart } from "@/components/public/price-index-chart"
 export const metadata: Metadata = createPageMetadata({
   title: "Dubai Property Price Index — Open Data",
   description:
-    "The Dubai Land Department's official Property Price Index — residential and commercial, quarterly and annual, base 2020 — free and updated from DLD's open data.",
+    "The Dubai Land Department's official Property Price Index — residential and commercial, quarterly and annual — free and updated from DLD's open data.",
   pathname: "/open-data",
   keywords: [
     "Dubai property price index",
@@ -45,7 +45,7 @@ export default function OpenDataPage() {
           </h1>
           <p className="mt-4 text-[15px] leading-relaxed text-[#6b7280] max-w-2xl">
             Sourced directly from the Dubai Land Department&rsquo;s open data — residential and commercial property, split
-            into sub-indexes, indexed to a base of 100 in 2020.
+            into sub-indexes, quarterly or annual.
           </p>
 
           <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:gap-x-0 sm:gap-y-4">
