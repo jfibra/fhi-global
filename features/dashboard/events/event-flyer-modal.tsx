@@ -17,7 +17,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { QRCodeCanvas } from "qrcode.react"
-import { Download, Loader2, X } from "lucide-react"
+import { Download, Loader2, QrCode, X } from "lucide-react"
 import { eventBrand } from "@/lib/events/brands"
 
 const W = 1080
@@ -206,6 +206,8 @@ export function EventFlyerModal({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const qrRef = useRef<HTMLDivElement>(null)
+  // A bare, print-sized QR (no flyer) for agents who drop it into their own designs.
+  const qrOnlyRef = useRef<HTMLDivElement>(null)
   const [rendering, setRendering] = useState(true)
 
   useEffect(() => {
@@ -545,6 +547,16 @@ export function EventFlyerModal({
     }
   }, [event, origin])
 
+  const downloadQrOnly = () => {
+    const canvas = qrOnlyRef.current?.querySelector("canvas")
+    if (!canvas) return
+    const a = document.createElement("a")
+    a.href = canvas.toDataURL("image/png")
+    const slug = event.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40)
+    a.download = `event-qr-${slug || event.id.slice(0, 8)}.png`
+    a.click()
+  }
+
   const download = () => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -588,17 +600,43 @@ export function EventFlyerModal({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={download}
-          disabled={rendering}
-          className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors disabled:opacity-50"
-        >
-          <Download className="w-4 h-4" />
-          Download flyer (1080×1920 PNG)
-        </button>
+        {/* Hidden print-size QR for the bare download: 1024px, white margin, same link. */}
+        <div ref={qrOnlyRef} className="hidden" aria-hidden>
+          {origin && (
+            <QRCodeCanvas
+              value={`${origin}${flyerTarget(event).path}?src=qr#register`}
+              size={1024}
+              level="M"
+              fgColor="#001f3f"
+              bgColor="#ffffff"
+              marginSize={4}
+            />
+          )}
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={download}
+            disabled={rendering}
+            className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" />
+            Download flyer
+          </button>
+          <button
+            type="button"
+            onClick={downloadQrOnly}
+            disabled={!origin}
+            title="Just the registration QR as a PNG — for your own designs, tarpaulins and slides"
+            className="inline-flex items-center justify-center gap-2 px-4 py-3 border border-[#001f3f] text-[#001f3f] text-sm font-bold hover:bg-[#001f3f] hover:text-white transition-colors disabled:opacity-50"
+          >
+            <QrCode className="w-4 h-4" />
+            Download QR only
+          </button>
+        </div>
         <p className="mt-2 text-[11px] text-[#9ca3af] text-center">
-          Story size — ready for WhatsApp status, Instagram, and print.
+          Flyer: 1080×1920 story size for WhatsApp status, Instagram and print. QR only: 1024×1024 PNG, scans to the registration form.
         </p>
       </div>
     </div>
