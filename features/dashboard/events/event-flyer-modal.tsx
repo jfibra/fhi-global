@@ -352,21 +352,24 @@ export function EventFlyerModal({
         const scriptSize = Math.round(88 * f)
         const scriptH = Math.round(112 * f)
 
+        // The whole title always prints (agents complained of "…" on long
+        // titles): wrap onto as many lines as it takes, shrinking toward two
+        // lines first; layout() below scales the stack to fit the zone.
         let wSize = Math.round(66 * f)
         let wLines: string[] = []
         if (whitePart) {
           ctx.font = `900 ${wSize}px ${F}`
-          wLines = wrapLines(ctx, whitePart, W - 120, 2)
-          while (wLines.length === 2 && wSize > Math.round(46 * f)) {
+          wLines = wrapLines(ctx, whitePart, W - 120, Infinity)
+          while (wLines.length > 2 && wSize > Math.round(46 * f)) {
             wSize -= 4
             ctx.font = `900 ${wSize}px ${F}`
-            wLines = wrapLines(ctx, whitePart, W - 120, 2)
+            wLines = wrapLines(ctx, whitePart, W - 120, Infinity)
           }
           // A single unbreakable word can still overflow — keep shrinking until every line fits
           while (wLines.some((l) => ctx.measureText(l).width > W - 120) && wSize > 30) {
             wSize -= 4
             ctx.font = `900 ${wSize}px ${F}`
-            wLines = wrapLines(ctx, whitePart, W - 120, 2)
+            wLines = wrapLines(ctx, whitePart, W - 120, Infinity)
           }
         }
         const whiteH = wLines.length * Math.round(wSize * 1.16) + (wLines.length ? 8 : 0)
@@ -377,15 +380,18 @@ export function EventFlyerModal({
           hSize -= 6
           ctx.font = `900 ${hSize}px ${F}`
         }
-        // At the 56px floor a very long hero can still overflow — ellipsize it
-        let heroText = heroPart
-        if (ctx.measureText(heroText).width > W - 110) {
-          while (heroText.length > 2 && ctx.measureText(`${heroText}…`).width > W - 110) {
-            heroText = heroText.slice(0, -1).trimEnd()
+        // Still too wide at the floor: the hero words take a line each, and a
+        // single very long word keeps shrinking — the title is never cut.
+        let heroLines = [heroPart]
+        if (ctx.measureText(heroPart).width > W - 110) {
+          heroLines = wrapLines(ctx, heroPart, W - 110, Infinity)
+          while (heroLines.some((l) => ctx.measureText(l).width > W - 110) && hSize > 30) {
+            hSize -= 4
+            ctx.font = `900 ${hSize}px ${F}`
+            heroLines = wrapLines(ctx, heroPart, W - 110, Infinity)
           }
-          heroText += "…"
         }
-        const heroH = Math.round(hSize * 1.04) + 20
+        const heroH = heroLines.length * Math.round(hSize * 1.04) + 20
 
         const dateH = hasDate ? Math.round(60 * f) : 0
 
@@ -398,7 +404,7 @@ export function EventFlyerModal({
         const venueH = venueLines.length * Math.round(venueSize * 1.4)
 
         return {
-          scriptSize, scriptH, wSize, wLines, whiteH, hSize, heroText, heroH, dateH,
+          scriptSize, scriptH, wSize, wLines, whiteH, hSize, heroLines, heroH, dateH,
           venueSize, venueLines, venueH,
           total: scriptH + whiteH + heroH + dateH + venueH,
         }
@@ -406,8 +412,9 @@ export function EventFlyerModal({
 
       const zoneH = ZONE_BOTTOM - ZONE_TOP
       let L = layout(1)
-      if (L.total > zoneH) {
-        L = layout(Math.max(0.72, zoneH / L.total))
+      for (let f = 1; L.total > zoneH && f > 0.4; ) {
+        f = Math.max(0.4, f * Math.min(0.96, zoneH / L.total))
+        L = layout(f)
       }
       let y = ZONE_TOP + Math.max(0, (zoneH - L.total) / 2)
 
@@ -436,14 +443,16 @@ export function EventFlyerModal({
         y += 8
       }
 
-      // Metallic hero line
+      // Metallic hero line(s)
       ctx.font = `900 ${L.hSize}px ${F}`
-      const heroBase = y + Math.round(L.hSize * 0.9)
       ctx.save()
       ctx.shadowColor = "rgba(214,179,87,0.55)"
       ctx.shadowBlur = 34
-      ctx.fillStyle = goldGradient(ctx, heroBase - L.hSize, heroBase)
-      ctx.fillText(L.heroText, W / 2, heroBase)
+      L.heroLines.forEach((line, i) => {
+        const heroBase = y + Math.round(L.hSize * 0.9) + i * Math.round(L.hSize * 1.04)
+        ctx.fillStyle = goldGradient(ctx, heroBase - L.hSize, heroBase)
+        ctx.fillText(line, W / 2, heroBase)
+      })
       ctx.restore()
       y += L.heroH
 
