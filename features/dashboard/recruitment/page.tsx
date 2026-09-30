@@ -29,6 +29,10 @@ type Tab = "pending" | "direct" | "recruiters" | "downline"
 const DAY = 24 * 60 * 60 * 1000
 const MAX_DEPTH = 8
 
+/** "AED 2.4M" / "AED 850K" for columns; the exact figure goes in the tooltip. */
+const fmtAedShort = (n: number) => (n >= 1_000_000 ? `AED ${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M` : n >= 1_000 ? `AED ${Math.round(n / 1_000)}K` : n > 0 ? `AED ${n}` : "—")
+const fmtAed = (n: number) => `AED ${Math.round(n).toLocaleString("en-AE")}`
+
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-AE", { year: "numeric", month: "short", day: "numeric" }) : "—"
 
@@ -113,6 +117,26 @@ export default function RecruitmentPage() {
     [people, byId],
   )
 
+  /** Validated sales of everyone under a recruiter, any depth (not the recruiter's own). */
+  const networkSales = useCallback(
+    (id: string) => {
+      const seen = new Set<string>([id])
+      const stack = [id]
+      let deals = 0, value = 0
+      while (stack.length) {
+        for (const c of childrenOf.get(stack.pop() as string) ?? []) {
+          if (seen.has(c.id)) continue
+          seen.add(c.id)
+          deals += c.deals
+          value += c.sales
+          stack.push(c.id)
+        }
+      }
+      return { deals, value }
+    },
+    [childrenOf],
+  )
+
   /** Everyone under a recruiter, any depth, cycle-safe. */
   const networkSize = useCallback(
     (id: string) => {
@@ -157,8 +181,8 @@ export default function RecruitmentPage() {
     const stamp = new Date().toISOString().slice(0, 10)
     const file = `downline-${root.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${stamp}`
     if (kind === "csv") {
-      const head = ["Level", "Name", "Role", "Status", "Joined", "Recruited by"]
-      const body = rows.map((r) => [String(r.level), `${"    ".repeat(r.level - 1)}${r.level > 1 ? "└ " : ""}${r.p.name}`, roleToLabel(r.p.role), r.p.status, fmtDate(r.p.joinedAt), r.via])
+      const head = ["Level", "Name", "Role", "Status", "Joined", "Recruited by", "Validated deals", "Validated sales (AED)"]
+      const body = rows.map((r) => [String(r.level), `${"    ".repeat(r.level - 1)}${r.level > 1 ? "└ " : ""}${r.p.name}`, roleToLabel(r.p.role), r.p.status, fmtDate(r.p.joinedAt), r.via, String(r.p.deals), String(r.p.sales)])
       const csv = "\uFEFF" + [head, ...body].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n")
       const a = document.createElement("a")
       a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }))
@@ -180,6 +204,7 @@ export default function RecruitmentPage() {
           <td><span class="st ${esc(r.p.status)}">${esc(r.p.status)}</span></td>
           <td>${esc(fmtDate(r.p.joinedAt))}</td>
           <td class="via">${esc(r.via)}</td>
+          <td class="num">${r.p.deals ? `${r.p.deals} · ${esc(fmtAed(r.p.sales))}` : "—"}</td>
         </tr>`,
       )
       .join("")
@@ -198,6 +223,7 @@ export default function RecruitmentPage() {
   .n { color: #9ca3af; width: 44px; text-align: center; }
   .tick { color: #d6b357; margin-right: 8px; font-weight: 700; }
   .via { color: #6b7280; }
+  .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .l1 td { background: #fbfaf5; }
   .st { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; text-transform: capitalize; }
   .st.active { background: #dcfce7; color: #166534; } .st.pending { background: #fef3c7; color: #92400e; } .st.inactive { background: #f3f4f6; color: #4b5563; }
@@ -210,10 +236,11 @@ export default function RecruitmentPage() {
     <span>Direct recruits: <strong>${childrenOf.get(root.id)?.length ?? 0}</strong></span>
     <span>Whole network: <strong>${rows.length}</strong> people across <strong>${levels}</strong> level${levels === 1 ? "" : "s"}</span>
     <span>Per level: <strong>${perLevel.join(" › ")}</strong></span>
+    <span>Network validated sales: <strong>${rows.reduce((a, r) => a + r.p.deals, 0)} deals · ${esc(fmtAed(rows.reduce((a, r) => a + r.p.sales, 0)))}</strong></span>
     <span>Generated: <strong>${esc(new Date().toLocaleDateString("en-AE", { year: "numeric", month: "long", day: "numeric" }))}</strong></span>
   </div>
   <table>
-    <thead><tr><th>Level</th><th>Name</th><th>Role</th><th>Status</th><th>Joined</th><th>Recruited by</th></tr></thead>
+    <thead><tr><th>Level</th><th>Name</th><th>Role</th><th>Status</th><th>Joined</th><th>Recruited by</th><th style="text-align:right">Validated sales</th></tr></thead>
     <tbody>${tr}</tbody>
   </table>
   <p class="foot">Each person is listed under the one who recruited them — indented one step per level · <b>fhiglobal.ae</b></p>
@@ -232,9 +259,11 @@ export default function RecruitmentPage() {
         pending: kids.filter((k) => k.status === "pending").length,
         last30: kids.filter(recent).length,
         network: networkSize(id),
+        ownSales: (byId.get(id) as RecruitmentPerson).sales,
+        netSales: networkSales(id),
       }))
       .sort((a, b) => b.total - a.total || b.network - a.network || a.person.name.localeCompare(b.person.name))
-  }, [childrenOf, byId, networkSize, recent])
+  }, [childrenOf, byId, networkSize, networkSales, recent])
 
   const q = query.trim().toLowerCase()
   const match = (p: RecruitmentPerson) => !q || p.name.toLowerCase().includes(q) || (p.invitedBy ? (byId.get(p.invitedBy)?.name.toLowerCase().includes(q) ?? false) : false)
@@ -388,6 +417,7 @@ export default function RecruitmentPage() {
             }}
             childrenOf={childrenOf}
             networkSize={networkSize}
+            networkSales={networkSales}
             profileHref={profileHref}
             onExport={exportDownline}
           />
@@ -493,7 +523,7 @@ function DirectList({ items, profileHref, empty }: { items: RecruitmentPerson[];
 
 // ─── Top recruiters ──────────────────────────────────────────────────────────
 
-type RecruiterRow = { person: RecruitmentPerson; total: number; active: number; pending: number; last30: number; network: number }
+type RecruiterRow = { person: RecruitmentPerson; total: number; active: number; pending: number; last30: number; network: number; ownSales: number; netSales: { deals: number; value: number } }
 
 function RecruiterTable({ rows, profileHref, onDownline }: { rows: RecruiterRow[]; profileHref: (id: string) => string; onDownline: (id: string) => void }) {
   if (rows.length === 0) return <p className="py-8 text-sm text-[#9ca3af]">No recruiters match.</p>
@@ -501,7 +531,7 @@ function RecruiterTable({ rows, profileHref, onDownline }: { rows: RecruiterRow[
   const num = "px-3 py-3 text-right text-sm font-semibold tabular-nums text-[#111827]"
   return (
     <div className="mt-4 overflow-x-auto">
-      <table className="w-full min-w-[720px]">
+      <table className="w-full min-w-[960px]">
         <thead>
           <tr className="border-b border-[#f0f2f5]">
             <th className={th}>#</th>
@@ -511,6 +541,8 @@ function RecruiterTable({ rows, profileHref, onDownline }: { rows: RecruiterRow[
             <th className={`${th} text-right`}>Pending</th>
             <th className={`${th} text-right`}>Last 30 days</th>
             <th className={`${th} text-right`}>Whole network</th>
+            <th className={`${th} text-right`} title="The recruiter's own validated sales, all time">Own sales</th>
+            <th className={`${th} text-right`} title="Validated sales of everyone in the network (not the recruiter's own), all time">Network sales</th>
             <th className={th} />
           </tr>
         </thead>
@@ -534,6 +566,8 @@ function RecruiterTable({ rows, profileHref, onDownline }: { rows: RecruiterRow[
               <td className={`${num} ${r.pending ? "text-amber-700" : "text-[#9ca3af]"}`}>{r.pending}</td>
               <td className={num}>{r.last30}</td>
               <td className={num}>{r.network}</td>
+              <td className={`${num} ${r.ownSales ? "" : "text-[#9ca3af]"}`} title={r.ownSales ? `${r.person.deals} validated deal${r.person.deals === 1 ? "" : "s"} · ${fmtAed(r.ownSales)}` : "No validated sales"}>{fmtAedShort(r.ownSales)}</td>
+              <td className={`${num} ${r.netSales.value ? "text-[#001f3f]" : "text-[#9ca3af]"}`} title={r.netSales.value ? `${r.netSales.deals} validated deal${r.netSales.deals === 1 ? "" : "s"} across the network · ${fmtAed(r.netSales.value)}` : "No validated sales in the network"}>{fmtAedShort(r.netSales.value)}</td>
               <td className="px-3 py-3 text-right">
                 <button
                   type="button"
@@ -559,6 +593,7 @@ function Downline({
   onPick,
   childrenOf,
   networkSize,
+  networkSales,
   profileHref,
   onExport,
 }: {
@@ -567,6 +602,7 @@ function Downline({
   onPick: (id: string) => void
   childrenOf: Map<string, RecruitmentPerson[]>
   networkSize: (id: string) => number
+  networkSales: (id: string) => { deals: number; value: number }
   profileHref: (id: string) => string
   onExport: (root: RecruitmentPerson, kind: "csv" | "pdf") => void
 }) {
@@ -595,6 +631,11 @@ function Downline({
               <p className="truncate font-['Outfit'] text-base font-bold">{root.name}</p>
               <p className="text-xs text-white/70">
                 {childrenOf.get(root.id)?.length ?? 0} direct recruits · {networkSize(root.id)} people in the whole network
+                {(() => {
+                  const n = networkSales(root.id)
+                  return n.value > 0 ? ` · network sales ${fmtAed(n.value)} (${n.deals} validated deal${n.deals === 1 ? "" : "s"})` : " · no validated sales in the network yet"
+                })()}
+                {root.sales > 0 && ` · own sales ${fmtAed(root.sales)}`}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -666,6 +707,7 @@ function TreeNode({
         <span className="hidden text-[11px] text-[#6b7280] sm:inline">{roleToLabel(p.role)}</span>
         <StatusChip status={p.status} />
         {kids.length > 0 && <span className="text-[11px] font-semibold text-[#6b7280]">{kids.length} recruit{kids.length === 1 ? "" : "s"}</span>}
+        {p.sales > 0 && <span className="text-[11px] font-semibold text-emerald-700" title={`${p.deals} validated deal${p.deals === 1 ? "" : "s"}`}>{fmtAedShort(p.sales)}</span>}
         <span className="ml-auto hidden text-[11px] text-[#9ca3af] md:inline">Joined {fmtDate(p.joinedAt)}</span>
       </div>
       {open && kids.length > 0 && depth < MAX_DEPTH && (

@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth-guard"
 import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { titleCaseName } from "@/lib/public-profile"
+import { fetchAllSales, saleCredits } from "@/lib/fhi-chat-tools"
 
 // Accounts & Invites → Recruitment: every live account as one compact row —
 // who they are, their status, when they joined and who invited them
@@ -24,6 +25,9 @@ export type RecruitmentPerson = {
   joinedAt: string | null
   /** The inviting account's id, or null. */
   invitedBy: string | null
+  /** Their own VALIDATED sales (partner shares respected), all time. */
+  deals: number
+  sales: number
 }
 
 const PAGE = 1000
@@ -46,6 +50,18 @@ export async function GET() {
     if (!data || data.length < PAGE) break
   }
 
+  // Own validated sales per account — the leaderboard sums them over a downline.
+  const sold = new Map<string, { deals: number; value: number }>()
+  for (const s of await fetchAllSales(admin)) {
+    if (s.validation_status !== "validated") continue
+    for (const c of saleCredits(s)) {
+      const t = sold.get(c.agentId) ?? { deals: 0, value: 0 }
+      t.deals += 1
+      t.value += c.value
+      sold.set(c.agentId, t)
+    }
+  }
+
   const people: RecruitmentPerson[] = rows.map((p) => {
     const meta = (p.metadata ?? {}) as Record<string, unknown>
     const invitedBy = typeof meta.invited_by === "string" && meta.invited_by && !meta.developer_invite_id ? meta.invited_by : null
@@ -58,6 +74,8 @@ export async function GET() {
       photo: (p.profile_url as string | null) || null,
       joinedAt: (p.joined_at as string | null) ?? null,
       invitedBy,
+      deals: sold.get(String(p.id))?.deals ?? 0,
+      sales: Math.round(sold.get(String(p.id))?.value ?? 0),
     }
   })
 

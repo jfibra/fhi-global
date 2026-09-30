@@ -53,7 +53,7 @@ type SaleRow = {
  * each agent on it their share of the contract price. Company-level figures
  * still count every sale once, in full.
  */
-function saleCredits(s: SaleRow): Array<{ agentId: string; share: number; value: number }> {
+export function saleCredits(s: SaleRow): Array<{ agentId: string; share: number; value: number }> {
   const price = Number(s.contract_price ?? 0)
   const shared = (Array.isArray(s.partners) ? s.partners : []).flatMap((p) => {
     const r = (p ?? {}) as { agent_id?: unknown; share?: unknown }
@@ -120,7 +120,7 @@ function normScope(raw: string | undefined): "month" | "quarter" | "year" | "all
 }
 
 /** Page through sales_reports (PostgREST caps a single select at 1000 rows). */
-async function fetchAllSales(admin: Admin): Promise<SaleRow[]> {
+export async function fetchAllSales(admin: Admin): Promise<SaleRow[]> {
   const out: SaleRow[] = []
   for (let page = 0; page < 10; page++) {
     const { data, error } = await admin
@@ -462,6 +462,119 @@ async function salesSummary(admin: Admin, args: { from_date?: string; to_date?: 
     rejected: { count: cur.rejected.count, total: cur.rejected.total },
     all_statuses_count: sales.length,
     ...comparison,
+  }
+}
+
+/**
+ * Everyone under a person, level by level (recruits of recruits…), with the
+ * validated sales of the whole network — the "how much did Michelle's whole
+ * team sell, all in all" question. Recruits are profiles whose
+ * metadata.invited_by is the person (developer-invite registrations excluded,
+ * as everywhere else). Cycle-safe, capped at 12 levels.
+ */
+async function agentNetwork(admin: Admin, args: { name?: string; from_date?: string; to_date?: string }) {
+  const q = (args.name ?? "").trim()
+  if (!q) return { error: "Provide the person's name." }
+  const candidates = await findProfiles(admin, q)
+  if (!candidates.length) {
+    return { error: `No account matches "${q}" (checked with typo tolerance). This is a failed LOOKUP — do not describe it as the person having no network.` }
+  }
+  const root = candidates[0]
+
+  type Person = { id: string; fullname: string | null; role: string | null; status: string | null; joined_at: string | null; profile_url: string | null; invited_by: string | null }
+  const people: Person[] = []
+  for (let page = 0; page < 20; page++) {
+    const { data, error } = await admin
+      .from("profiles")
+      .select("id, fullname, role, status, joined_at, profile_url, metadata")
+      .not("is_deleted", "is", true)
+      .range(page * 1000, page * 1000 + 999)
+    if (error) throw new Error(error.message)
+    for (const p of (data ?? []) as Array<Record<string, unknown>>) {
+      const meta = (p.metadata ?? {}) as Record<string, unknown>
+      people.push({
+        id: String(p.id), fullname: (p.fullname as string | null) ?? null, role: (p.role as string | null) ?? null,
+        status: (p.status as string | null) ?? null, joined_at: (p.joined_at as string | null) ?? null, profile_url: (p.profile_url as string | null) ?? null,
+        invited_by: typeof meta.invited_by === "string" && !meta.developer_invite_id ? meta.invited_by : null,
+      })
+    }
+    if (!data || data.length < 1000) break
+  }
+  const byId = new Map(people.map((p) => [p.id, p]))
+  const children = new Map<string, Person[]>()
+  for (const p of people) if (p.invited_by && byId.has(p.invited_by)) children.set(p.invited_by, [...(children.get(p.invited_by) ?? []), p])
+
+  // Validated sales per agent (partner shares respected), optionally in a period.
+  const from = (args.from_date ?? "").trim() || null
+  const to = (args.to_date ?? "").trim() || null
+  const sold = new Map<string, { deals: number; value: number }>()
+  for (const s of await fetchAllSales(admin)) {
+    if (s.validation_status !== "validated" || !inRange(s, from, to)) continue
+    for (const c of saleCredits(s)) {
+      const t = sold.get(c.agentId) ?? { deals: 0, value: 0 }
+      t.deals += 1
+      t.value += c.value
+      sold.set(c.agentId, t)
+    }
+  }
+
+  // Walk the tree.
+  type Node = { p: Person; level: number; via: string }
+  const nodes: Node[] = []
+  const seen = new Set<string>([root.id])
+  const walk = (id: string, level: number, via: string) => {
+    for (const c of children.get(id) ?? []) {
+      if (seen.has(c.id) || level > 12) continue
+      seen.add(c.id)
+      nodes.push({ p: c, level, via })
+      walk(c.id, level + 1, c.fullname ?? "")
+    }
+  }
+  walk(root.id, 1, root.fullname ?? "")
+  const branchSize = (id: string): number => (children.get(id) ?? []).reduce((a, c) => (seen.has(c.id) ? a + 1 + branchSize(c.id) : a), 0)
+  const branchSales = (id: string): { deals: number; value: number } =>
+    (children.get(id) ?? []).reduce((a, c) => {
+      const own = sold.get(c.id) ?? { deals: 0, value: 0 }
+      const sub = branchSales(c.id)
+      return { deals: a.deals + own.deals + sub.deals, value: a.value + own.value + sub.value }
+    }, { deals: 0, value: 0 })
+
+  const levels = nodes.reduce((m, n) => Math.max(m, n.level), 0)
+  const perLevel = Array.from({ length: levels }, (_, i) => nodes.filter((n) => n.level === i + 1).length)
+  const netSales = nodes.reduce((a, n) => { const t = sold.get(n.p.id); return { deals: a.deals + (t?.deals ?? 0), value: a.value + (t?.value ?? 0) } }, { deals: 0, value: 0 })
+  const own = sold.get(root.id) ?? { deals: 0, value: 0 }
+  const sellers = nodes.filter((n) => (sold.get(n.p.id)?.deals ?? 0) > 0).sort((a, b) => (sold.get(b.p.id)?.value ?? 0) - (sold.get(a.p.id)?.value ?? 0))
+  const direct = (children.get(root.id) ?? []).map((c) => ({ ...c, branch: branchSize(c.id), branchSales: branchSales(c.id) })).sort((a, b) => b.branchSales.value - a.branchSales.value || b.branch - a.branch)
+  const rootProfile = byId.get(root.id)
+
+  return {
+    person: root.fullname,
+    other_name_matches: candidates.slice(1).map((m) => m.fullname),
+    sales_period: { from: from ?? "all time", to: to ?? "today" },
+    own_validated_sales: { deals: own.deals, total: AED(own.value) },
+    direct_recruits: direct.length,
+    whole_network: {
+      people: nodes.length,
+      levels,
+      per_level: perLevel,
+      by_status: Object.fromEntries([...nodes.reduce((m, n) => m.set(n.p.status ?? "unknown", (m.get(n.p.status ?? "unknown") ?? 0) + 1), new Map<string, number>())]),
+      validated_sales: { sellers: sellers.length, deals: netSales.deals, total: AED(netSales.value) },
+      including_own_sales: { deals: netSales.deals + own.deals, total: AED(netSales.value + own.value) },
+    },
+    branches: direct.slice(0, 15).map((c) => ({
+      direct_recruit: c.fullname, role: c.role, status: c.status,
+      people_under_them: c.branch,
+      branch_validated_sales: { deals: c.branchSales.deals, total: AED(c.branchSales.value) },
+    })),
+    top_sellers_in_network: sellers.slice(0, 15).map((n) => ({
+      name: n.p.fullname, level: n.level, recruited_by: n.via, role: n.p.role,
+      deals: sold.get(n.p.id)?.deals ?? 0, total: AED(sold.get(n.p.id)?.value ?? 0),
+    })),
+    _cards: [
+      ...(rootProfile ? [{ kind: "agent" as const, title: rootProfile.fullname ?? "Agent", subtitle: `${nodes.length} in network · ${levels} level${levels === 1 ? "" : "s"} · ${AED(netSales.value)} network sales`, image: rootProfile.profile_url }] : []),
+      ...sellers.slice(0, 7).map((n): FhiChatCard => ({ kind: "agent", title: n.p.fullname ?? "Member", subtitle: `Level ${n.level} · ${sold.get(n.p.id)?.deals ?? 0} deal${(sold.get(n.p.id)?.deals ?? 0) === 1 ? "" : "s"} · ${AED(sold.get(n.p.id)?.value ?? 0)}`, image: n.p.profile_url })),
+    ],
+    _names: [root.fullname, ...nodes.map((n) => n.p.fullname)].filter((n): n is string => Boolean(n)),
   }
 }
 
@@ -2160,6 +2273,23 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "agent_network",
+      description:
+        "The WHOLE NETWORK (downline, all levels) of ONE SPECIFIC PERSON: their recruits, their recruits' recruits and so on — how many per level, statuses, and the VALIDATED sales of everyone in the network combined, plus each direct recruit's branch (branch size and branch sales) and the top sellers in the network with their level. Use for 'whole network', 'downline', 'all levels', 'everyone under X', 'how much did X's network/team sell all in all'. For DIRECT recruits only use agent_recruits. Requires the person's name.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          from_date: { type: "string", description: "YYYY-MM-DD inclusive — count only sales reserved from this date" },
+          to_date: { type: "string", description: "YYYY-MM-DD exclusive" },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "developer_overview",
       description:
         "Without a name: every developer with their project count. With a name: that developer's projects (counts, statuses, names) and validated sales.",
@@ -2452,6 +2582,7 @@ export async function runFhiChatTool(
       case "sales_summary": result = await salesSummary(admin, args); break
       case "agent_sales": result = await agentSales(admin, args); break
       case "agent_recruits": result = await agentRecruits(admin, args); break
+      case "agent_network": result = await agentNetwork(admin, args); break
       case "developer_overview": result = await developerOverview(admin, args); break
       case "projects_stats": result = await projectsStats(admin, args); break
       case "platform_counts": result = await platformCounts(admin); break
