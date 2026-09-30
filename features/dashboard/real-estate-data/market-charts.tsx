@@ -20,7 +20,6 @@ import {
   CartesianGrid,
   Line,
   LineChart,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -46,8 +45,6 @@ import {
   type DldChartSpec,
   type DldCommand,
   type DldDataset,
-  type DldPriceIndexResponse,
-  type DldPriceIndexSeries,
   type DldRow,
   type DldSummaryResponse,
 } from "@/lib/dld-open-data"
@@ -78,16 +75,6 @@ const longDate = (iso: string) => {
 }
 
 const TOOLTIP_STYLE = { borderRadius: 12, border: "1px solid #e8eaed", fontSize: 12, boxShadow: "0 8px 24px -12px rgba(0,20,40,.25)" }
-
-export function MarketCharts() {
-  return (
-    <div className="space-y-8">
-      <SalesOverviewSection />
-      <PriceIndexSection />
-      <BreakdownSection />
-    </div>
-  )
-}
 
 // ─── Shared card ─────────────────────────────────────────────────────────────
 
@@ -204,209 +191,6 @@ export function RefreshButton({
   )
 }
 
-// ─── 1. Price index ──────────────────────────────────────────────────────────
-
-const PRICE_INDEX_CACHE_KEY = "charts:price-index"
-
-type PriceIndexState = { attempt: number; res: DldPriceIndexResponse | null; error: string | null; at: number }
-
-function PriceIndexSection() {
-  // attempt 0 = "use the cache if fresh"; each Refresh bumps it and bypasses
-  // both the client cache and the server's Postgres copy.
-  const [attempt, setAttempt] = useState(0)
-  const [data, setData] = useState<PriceIndexState | null>(() => {
-    const hit = cacheGet<DldPriceIndexResponse>(PRICE_INDEX_CACHE_KEY)
-    return hit ? { attempt: 0, res: hit.data, error: null, at: hit.at } : null
-  })
-  const [categoryCode, setCategoryCode] = useState("")
-  const [subCode, setSubCode] = useState("")
-  const [period, setPeriod] = useState<"Quarterly" | "Annual">("Quarterly")
-
-  const haveCached = data?.attempt === attempt && !!data.res
-  useEffect(() => {
-    if (haveCached) return
-    let cancelled = false
-    void (async () => {
-      let next: { res: DldPriceIndexResponse | null; error: string | null }
-      try {
-        const r = await fetch("/api/admin/dld/charts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ kind: "price-index", refresh: attempt > 0 }),
-        })
-        const json = (await r.json()) as DldPriceIndexResponse & { error?: string }
-        next = r.ok ? { res: json, error: null } : { res: null, error: json.error || "Request failed." }
-      } catch {
-        next = { res: null, error: "Could not load the price index." }
-      }
-      if (cancelled) return
-      const at = next.res ? cacheSet(PRICE_INDEX_CACHE_KEY, next.res).at : Date.now()
-      setData({ attempt, ...next, at })
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [attempt, haveCached])
-
-  const loading = data?.attempt !== attempt
-  const series = useMemo(() => data?.res?.series ?? [], [data])
-  const updatedAt = data?.res ? data.at : null
-
-  const categories = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const s of series) m.set(s.categoryCode, s.category)
-    return [...m.entries()].map(([value, label]) => ({ value, label }))
-  }, [series])
-  const activeCategory = categoryCode || categories[0]?.value || ""
-
-  const subCategories = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const s of series) if (s.categoryCode === activeCategory) m.set(s.subCategoryCode, s.subCategory)
-    return [...m.entries()].map(([value, label]) => ({ value, label }))
-  }, [series, activeCategory])
-  const activeSub = subCategories.some((s) => s.value === subCode) ? subCode : subCategories[0]?.value || ""
-
-  const current: DldPriceIndexSeries | undefined = series.find(
-    (s) => s.categoryCode === activeCategory && s.subCategoryCode === activeSub && s.period === period,
-  )
-  const points = current?.points ?? []
-  const changeKey = period === "Quarterly" ? "qoq" : "yoy"
-  // Diverging bars as two series on one stack: positives in blue, negatives
-  // in orange (Recharts 3 has retired per-bar <Cell> colouring).
-  const changePoints = points.map((p) => {
-    const v = p[changeKey]
-    return { x: p.x, up: v !== null && v >= 0 ? v : null, down: v !== null && v < 0 ? v : null }
-  })
-  const changeLabel = period === "Quarterly" ? "Quarter-on-quarter change" : "Year-on-year change"
-  const xLabel = (x: string) => (period === "Quarterly" ? x.replace(/^(\d{4})\.(\d)$/, "Q$2 $1") : x)
-  const latest = points.length ? points[points.length - 1] : null
-
-  return (
-    <section>
-      <div className="mb-4">
-        <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Property Price Index</h2>
-        <p className="text-sm text-[#6b7280]">
-          DLD&rsquo;s official index by property category, quarterly or annual. Pick a category and a sub-index.
-        </p>
-      </div>
-
-      {data?.error && !loading && <ErrorBox message={data.error} onRetry={() => setAttempt((a) => a + 1)} />}
-
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        {categories.map((c) => (
-          <button
-            key={c.value}
-            type="button"
-            onClick={() => {
-              setCategoryCode(c.value)
-              setSubCode("")
-            }}
-            className={`h-9 px-4 rounded-xl text-sm font-semibold transition-colors ${
-              c.value === activeCategory ? "bg-[#001f3f] text-white" : "bg-white border border-[#e5e7eb] text-[#374151] hover:border-[#001f3f]/30"
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
-        {subCategories.length > 0 && (
-          <FilterSelect
-            value={activeSub}
-            onValueChange={setSubCode}
-            options={subCategories}
-            ariaLabel="Sub-index"
-            className="h-9 py-0 rounded-xl"
-          />
-        )}
-        <RefreshButton onClick={() => setAttempt((a) => a + 1)} loading={loading} updatedAt={updatedAt} className="ml-auto" />
-        <div className="inline-flex p-0.5 rounded-xl bg-[#eef1f5] border border-[#e8eaed]">
-          {(["Quarterly", "Annual"] as const).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPeriod(p)}
-              className={`h-8 px-3 rounded-[10px] text-xs font-semibold ${period === p ? "bg-white text-[#001f3f] shadow-sm" : "text-[#6b7280]"}`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {latest && !loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-          <Stat label={`Latest index · ${xLabel(latest.x)}`} value={latest.actual === null ? "—" : int.format(latest.actual)} />
-          <Stat label="Year-on-year" value={latest.yoy === null ? "—" : pct(latest.yoy)} tone={latest.yoy === null ? undefined : latest.yoy >= 0 ? "up" : "down"} />
-          <Stat
-            label="Quarter-on-quarter"
-            value={latest.qoq === null ? "—" : pct(latest.qoq)}
-            tone={latest.qoq === null ? undefined : latest.qoq >= 0 ? "up" : "down"}
-          />
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <ChartCard
-          title={current ? `${current.category} · ${current.subCategory}` : "Index"}
-          subtitle="Index value (2020 = 100)"
-          table={{ head: ["Period", "Index"], rows: points.map((p) => [xLabel(p.x), p.actual ?? "—"]) }}
-        >
-          {loading ? (
-            <Skeleton />
-          ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={points} margin={{ top: 12, right: 12, bottom: 0, left: -16 }}>
-                <CartesianGrid vertical={false} stroke={C.grid} />
-                <XAxis dataKey="x" tickFormatter={xLabel} tick={{ fontSize: 11, fill: C.tick }} tickLine={false} axisLine={{ stroke: C.axis }} minTickGap={24} />
-                <YAxis tick={{ fontSize: 11, fill: C.tick }} tickLine={false} axisLine={false} domain={["auto", "auto"]} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(x) => xLabel(String(x))} formatter={(v) => [int.format(Number(v)), "Index"]} />
-                <Line type="monotone" dataKey="actual" stroke={C.blue} strokeWidth={2} dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: "#fff" }} />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
-        <ChartCard
-          title={changeLabel}
-          subtitle="Percent, blue above zero and orange below"
-          table={{ head: ["Period", "Change %"], rows: points.map((p) => [xLabel(p.x), p[changeKey] === null ? "—" : pct(p[changeKey] as number)]) }}
-        >
-          {loading ? (
-            <Skeleton />
-          ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={changePoints} margin={{ top: 12, right: 12, bottom: 0, left: -16 }} barCategoryGap="25%">
-                <CartesianGrid vertical={false} stroke={C.grid} />
-                <XAxis dataKey="x" tickFormatter={xLabel} tick={{ fontSize: 11, fill: C.tick }} tickLine={false} axisLine={{ stroke: C.axis }} minTickGap={24} />
-                <YAxis tick={{ fontSize: 11, fill: C.tick }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
-                <ReferenceLine y={0} stroke={C.axis} />
-                <Tooltip
-                  cursor={{ fill: "rgba(0,31,63,0.04)" }}
-                  contentStyle={TOOLTIP_STYLE}
-                  labelFormatter={(x) => xLabel(String(x))}
-                  formatter={(v) => (v === null || v === undefined ? [] : [pct(Number(v)), changeLabel])}
-                />
-                <Bar dataKey="up" stackId="c" fill={C.blue} radius={[4, 4, 0, 0]} maxBarSize={28} />
-                <Bar dataKey="down" stackId="c" fill={C.orange} radius={[0, 0, 4, 4]} maxBarSize={28} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-      </div>
-    </section>
-  )
-}
-
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "up" | "down" }) {
-  return (
-    <div className="bg-white rounded-2xl border border-[#e8eaed] px-5 py-4">
-      <div className="text-xs text-[#6b7280]">{label}</div>
-      <div className={`mt-1 text-2xl font-bold tabular-nums ${tone === "up" ? "text-[#1d5fb0]" : tone === "down" ? "text-[#c2491d]" : "text-[#0d1117]"}`}>
-        {value}
-      </div>
-    </div>
-  )
-}
-
 // ─── 2. Dataset breakdowns ───────────────────────────────────────────────────
 
 // The Breakdowns form only exposes date fields, so it lists the date-filtered datasets.
@@ -434,6 +218,8 @@ type Accum = {
   kpi: { count: number; valueSum: number; valueWithAreaSum: number; areaSqmSum: number; locations: Tally } | null
   /** Newest KPI rows seen so far, newest first, capped at DLD_CHART_LATEST_N. */
   latest: DldRow[]
+  /** Breakdowns' own price-per-sqft sums — every row in scope, no category filter. */
+  areaAgg: { valueWithAreaSum: number; areaSqmSum: number } | null
 }
 
 const addTo = (m: Tally, label: string, b: { count: number; value: number }) => {
@@ -455,6 +241,7 @@ function mergeBatch(acc: Accum | null, res: DldBreakdownResponse): Accum {
         top: { ...acc.top },
         kpi: acc.kpi ? { ...acc.kpi, locations: { ...acc.kpi.locations } } : null,
         latest: [...acc.latest],
+        areaAgg: acc.areaAgg ? { ...acc.areaAgg } : null,
       }
     : {
         command: res.command,
@@ -471,6 +258,7 @@ function mergeBatch(acc: Accum | null, res: DldBreakdownResponse): Accum {
         cacheHits: 0,
         kpi: null,
         latest: [],
+        areaAgg: null,
       }
   for (const d of res.daily) addTo(next.daily, d.date, d)
   for (const [k, buckets] of Object.entries(res.breakdowns)) {
@@ -500,6 +288,13 @@ function mergeBatch(acc: Accum | null, res: DldBreakdownResponse): Accum {
   if (res.latest?.length) {
     // Batches arrive in date order, so the new batch's rows are the newest.
     next.latest = [...res.latest, ...next.latest].slice(0, DLD_CHART_LATEST_N)
+  }
+  if (res.areaAgg) {
+    const a = next.areaAgg ?? { valueWithAreaSum: 0, areaSqmSum: 0 }
+    next.areaAgg = {
+      valueWithAreaSum: a.valueWithAreaSum + res.areaAgg.valueWithAreaSum,
+      areaSqmSum: a.areaSqmSum + res.areaAgg.areaSqmSum,
+    }
   }
   return next
 }
@@ -662,16 +457,7 @@ function CoverageLine({
   )
 }
 
-// ─── 0. Sales overview (Bayut-style) ─────────────────────────────────────────
-
-const SALES_PRESETS = [
-  { key: "7d", label: "last 7 days", days: 7 },
-  { key: "30d", label: "last 30 days", days: 30 },
-  { key: "90d", label: "last 90 days", days: 90 },
-  { key: "ytd", label: "this year", days: 0 },
-] as const
-type SalesPresetKey = (typeof SALES_PRESETS)[number]["key"]
-const SALES_PRESET_CACHE_KEY = "charts:sales:preset"
+// ─── Shared date helpers (Breakdowns' last-7-days default and comparison window) ───
 
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 const shiftDays = (d: Date, n: number) => {
@@ -679,200 +465,26 @@ const shiftDays = (d: Date, n: number) => {
   x.setDate(x.getDate() + n)
   return x
 }
-
-/** Current window + the equal-length window just before it (null when that would reach before this year's data). */
-function salesWindows(preset: SalesPresetKey): { current: { from: string; to: string }; previous: { from: string; to: string } | null } {
+/** Today and the 6 days before it — "last 7 days" inclusive of today. */
+const last7DaysRange = () => {
   const today = new Date()
-  const yearStart = new Date(today.getFullYear(), 0, 1)
-  const p = SALES_PRESETS.find((x) => x.key === preset) ?? SALES_PRESETS[0]
-  if (p.days === 0) return { current: { from: isoOf(yearStart), to: isoOf(today) }, previous: null }
-  const from = shiftDays(today, -(p.days - 1))
-  const prevTo = shiftDays(from, -1)
-  const prevFrom = shiftDays(prevTo, -(p.days - 1))
-  return {
-    current: { from: isoOf(from), to: isoOf(today) },
-    previous: prevFrom >= yearStart ? { from: isoOf(prevFrom), to: isoOf(prevTo) } : null,
-  }
+  return { from: isoOf(shiftDays(today, -6)), to: isoOf(today) }
 }
 
-const txJob = (w: { from: string; to: string }): BatchJob => ({
-  command: "transactions",
-  values: Object.fromEntries(DLD_DATASETS.transactions.filters.map((f) => [f.param, f.param === "P_FROM_DATE" ? w.from : f.param === "P_TO_DATE" ? w.to : resolveDefault(f)])),
-})
-
-type Kpis = { volume: number; avgPrice: number | null; perSqft: number | null }
-function kpisOf(acc: Accum | null): Kpis | null {
-  if (!acc?.kpi) return null
-  const k = acc.kpi
-  return {
-    volume: k.count,
-    avgPrice: k.count > 0 ? k.valueSum / k.count : null,
-    perSqft: k.areaSqmSum > 0 ? k.valueWithAreaSum / (k.areaSqmSum * SQFT_PER_SQM) : null,
-  }
-}
-const delta = (cur: number | null, prev: number | null) => (cur === null || prev === null || prev === 0 ? null : ((cur - prev) / prev) * 100)
-
-function SalesOverviewSection() {
-  const [preset, setPreset] = useState<SalesPresetKey>(() => cacheGet<SalesPresetKey>(SALES_PRESET_CACHE_KEY)?.data ?? "7d")
-  const windows = useMemo(() => salesWindows(preset), [preset])
-  const cur = useBatchJob(`charts:sales:current:${preset}`, txJob(windows.current), true)
-  const prev = useBatchJob(`charts:sales:previous:${preset}`, windows.previous ? txJob(windows.previous) : null, true)
-  const [showAllLocations, setShowAllLocations] = useState(false)
-
-  const choosePreset = (k: SalesPresetKey) => {
-    setPreset(k)
-    cacheSet(SALES_PRESET_CACHE_KEY, k)
-  }
-
-  const kpis = kpisOf(cur.acc)
-  const prevKpis = prev.acc?.done ? kpisOf(prev.acc) : null
-  const locations = useMemo(() => (cur.acc?.kpi ? toBuckets(cur.acc.kpi.locations) : []), [cur.acc])
-  const latest = cur.acc?.latest ?? []
-  const presetLabel = SALES_PRESETS.find((p) => p.key === preset)?.label ?? ""
-
-  return (
-    <section>
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
-        <div>
-          <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">
-            Sale transactions in Dubai in the{" "}
-            <FilterSelect
-              value={preset}
-              onValueChange={(v) => choosePreset(v as SalesPresetKey)}
-              options={SALES_PRESETS.map((p) => ({ value: p.key, label: p.label }))}
-              ariaLabel="Period"
-              className="align-middle h-9 py-0 rounded-xl font-bold text-[#001f3f]"
-            />
-          </h2>
-          <p className="text-sm text-[#6b7280] mt-1">
-            Registered sales from DLD, {longDate(windows.current.from)} – {longDate(windows.current.to)}
-            {windows.previous ? ` · change vs ${longDate(windows.previous.from)} – ${longDate(windows.previous.to)}` : " · no earlier data this year to compare"}
-          </p>
-        </div>
-        <RefreshButton
-          onClick={() => {
-            cur.refresh()
-            prev.refresh()
-          }}
-          loading={cur.loading || prev.loading}
-          updatedAt={cur.updatedAt}
-        />
-      </div>
-
-      {cur.error && <div className="mb-4"><ErrorBox message={cur.error} onRetry={cur.resume} /></div>}
-
-      {/* KPI tiles */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-        <KpiTile label="Sales volume" value={kpis ? int.format(kpis.volume) : null} change={delta(kpis?.volume ?? null, prevKpis?.volume ?? null)} pending={!!windows.previous && !prevKpis && !prev.error} />
-        <KpiTile label="Average price (AED)" value={kpis?.avgPrice != null ? int.format(Math.round(kpis.avgPrice)) : null} change={delta(kpis?.avgPrice ?? null, prevKpis?.avgPrice ?? null)} pending={!!windows.previous && !prevKpis && !prev.error} />
-        <KpiTile
-          label="Average price per sqft (AED)"
-          value={kpis?.perSqft != null ? `${int.format(Math.round(kpis.perSqft))} / sqft` : null}
-          change={delta(kpis?.perSqft ?? null, prevKpis?.perSqft ?? null)}
-          pending={!!windows.previous && !prevKpis && !prev.error}
-        />
-      </div>
-
-      {/* Top locations */}
-      <div className="bg-white rounded-2xl border border-[#e8eaed] px-5 py-3.5 mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-        {locations.length === 0 ? (
-          <span className="text-[#9ca3af]">{cur.acc ? "No sales in this period." : "Loading locations…"}</span>
-        ) : (
-          <>
-            {(showAllLocations ? locations : locations.slice(0, 4)).map((l) => (
-              <span key={l.label} className="inline-flex items-baseline gap-1.5">
-                <span className="font-semibold text-[#001f3f]">{l.label}</span>
-                <span className="text-[#6b7280]">({int.format(l.count)})</span>
-              </span>
-            ))}
-            {locations.length > 4 && (
-              <button type="button" onClick={() => setShowAllLocations((v) => !v)} className="ml-auto text-xs font-semibold uppercase tracking-wide text-[#001f3f] hover:underline">
-                {showAllLocations ? "Show fewer" : `View all ${int.format(locations.length)} locations`}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      <div className="mb-4">
-        <CoverageLine acc={cur.acc} loading={cur.loading} stopped={cur.stopped} error={cur.error} label="transaction" onResume={cur.resume}>
-          {windows.previous && (
-            <span className="text-[#9ca3af]">
-              · comparison period:{" "}
-              {prev.error ? (
-                <button type="button" onClick={prev.resume} className="text-rose-700 font-semibold underline underline-offset-2">
-                  failed — retry
-                </button>
-              ) : prev.acc?.done ? (
-                "ready"
-              ) : (
-                `${int.format(prev.acc?.count ?? 0)} of ${prev.acc ? int.format(prev.acc.available) : "…"} rows`
-              )}
-            </span>
-          )}
-          {cur.loading && (
-            <button type="button" onClick={cur.stop} className="text-xs font-semibold text-[#374151] underline underline-offset-2">
-              Stop
-            </button>
-          )}
-        </CoverageLine>
-      </div>
-
-      {/* Sales history */}
-      <div className="bg-white rounded-2xl border border-[#e8eaed] overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-[#f0f2f5]">
-          <h3 className="text-[15px] font-semibold text-[#0d1117]">Sales history</h3>
-          <p className="text-xs text-[#6b7280] mt-0.5">
-            Latest {int.format(Math.min(DLD_CHART_LATEST_N, latest.length || DLD_CHART_LATEST_N))} registered sales {presetLabel === "this year" ? "this year" : `in the ${presetLabel}`} · sizes converted from sqm
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-[#f8fafc] text-[11px] uppercase tracking-wide text-[#6b7280]">
-              <tr>
-                {["Date", "Location", "Price (AED)", "Type", "Beds", "Size (sqft)", "Registration"].map((h, i) => (
-                  <th key={h} scope="col" className={`px-4 py-3 font-semibold whitespace-nowrap ${i === 2 || i === 5 ? "text-right" : "text-left"}`}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f2f5]">
-              {latest.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-[#9ca3af]">
-                    {cur.acc ? "No sales in this period." : "Loading…"}
-                  </td>
-                </tr>
-              ) : (
-                latest.map((r, i) => {
-                  const sqm = typeof r.PROCEDURE_AREA === "number" ? r.PROCEDURE_AREA : null
-                  return (
-                    <tr key={`${r.TRANSACTION_NUMBER ?? i}`} className="hover:bg-[#f8fafc]">
-                      <td className="px-4 py-3 whitespace-nowrap text-[#374151]">{typeof r.INSTANCE_DATE === "string" ? longDate(r.INSTANCE_DATE.slice(0, 10)) : "—"}</td>
-                      <td className="px-4 py-3 text-[#374151]">
-                        <div className="font-medium text-[#0d1117] truncate max-w-[22rem]">{r.PROJECT_EN ?? r.AREA_EN ?? "—"}</div>
-                        {r.PROJECT_EN && <div className="text-xs text-[#6b7280] truncate max-w-[22rem]">{r.AREA_EN ?? ""}</div>}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        <div className="font-semibold text-[#0d1117]">{typeof r.TRANS_VALUE === "number" ? int.format(r.TRANS_VALUE) : "—"}</div>
-                        <div className="text-xs text-[#6b7280] whitespace-nowrap">{r.PROCEDURE_EN ?? ""}</div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-[#374151]">{r.PROP_SB_TYPE_EN ?? r.PROP_TYPE_EN ?? "—"}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-[#374151]">{r.ROOMS_EN ?? "—"}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-[#374151]">{sqm && sqm > 0 ? int.format(Math.round(sqm * SQFT_PER_SQM)) : "—"}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-[#374151]">{r.IS_OFFPLAN_EN ?? "—"}</td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
+/**
+ * Initial filter values for the Breakdowns tab: every date field defaults to
+ * the last 7 days (unlike the raw dataset tables under Real Estate Data,
+ * which start blank and require the user to pick a range) — Breakdowns is
+ * meant to load something useful the moment you open it.
+ */
+function defaultBreakdownValues(dataset: DldDataset): Record<string, string> {
+  const range = last7DaysRange()
+  return Object.fromEntries(
+    dataset.filters.map((f) => [f.param, f.kind === "date" ? (f.param === "P_TO_DATE" ? range.to : range.from) : resolveDefault(f)]),
   )
 }
+
+const delta = (cur: number | null, prev: number | null) => (cur === null || prev === null || prev === 0 ? null : ((cur - prev) / prev) * 100)
 
 function KpiTile({ label, value, change, pending }: { label: string; value: string | null; change: number | null; pending: boolean }) {
   return (
@@ -896,32 +508,74 @@ function KpiTile({ label, value, change, pending }: { label: string; value: stri
   )
 }
 
-// ─── 2. Dataset breakdowns ───────────────────────────────────────────────────
-
 const BREAKDOWN_CACHE_KEY = "charts:breakdown:last"
+const BREAKDOWN_PREVIOUS_CACHE_KEY = "charts:breakdown:previous"
 
-function BreakdownSection() {
+/**
+ * The equal-length window immediately before `job`'s date range, for the
+ * "compared to before" tiles — e.g. job = 14–20 Sep → previous = 7–13 Sep.
+ * Null when the dataset has no date range to shift (shouldn't happen for
+ * anything in CHARTABLE, which is filtered to date-required datasets).
+ */
+function previousWindowJob(job: BatchJob): BatchJob | null {
+  const from = job.values.P_FROM_DATE
+  const to = job.values.P_TO_DATE
+  if (!from || !to) return null
+  const fromD = new Date(`${from}T00:00:00`)
+  const toD = new Date(`${to}T00:00:00`)
+  if (Number.isNaN(fromD.getTime()) || Number.isNaN(toD.getTime())) return null
+  const days = Math.round((toD.getTime() - fromD.getTime()) / 86_400_000) + 1
+  if (days <= 0) return null
+  const prevTo = shiftDays(fromD, -1)
+  const prevFrom = shiftDays(prevTo, -(days - 1))
+  return { command: job.command, values: { ...job.values, P_FROM_DATE: isoOf(prevFrom), P_TO_DATE: isoOf(prevTo) } }
+}
+
+export function BreakdownSection() {
   // The form; `submitted` is the job on screen (restored from the last visit).
   const restoredRef = useState(() => cacheGet<BatchMemo>(BREAKDOWN_CACHE_KEY)?.data.job ?? null)[0]
   const [command, setCommand] = useState<DldCommand>(restoredRef?.command ?? CHARTABLE[0].value)
   const dataset = DLD_DATASETS[command]
   const dateFields = dataset.filters.filter((f) => f.kind === "date")
-  const [values, setValues] = useState<Record<string, string>>(
-    () => restoredRef?.values ?? Object.fromEntries(dataset.filters.map((f) => [f.param, resolveDefault(f)])),
-  )
-  const [submitted, setSubmitted] = useState<BatchJob | null>(restoredRef)
+  const [values, setValues] = useState<Record<string, string>>(() => restoredRef?.values ?? defaultBreakdownValues(dataset))
+  // No earlier session to restore → load the last-7-days default right away,
+  // same as the Market Charts tab, instead of sitting on an empty placeholder.
+  const [submitted, setSubmitted] = useState<BatchJob | null>(() => restoredRef ?? { command, values })
   const job = useBatchJob(BREAKDOWN_CACHE_KEY, submitted, false)
   const { acc, loading } = job
 
+  // The equal-length prior period, loaded automatically in the background —
+  // this is what powers the "vs previous period" change on the tiles below.
+  const previousJob = useMemo(() => (submitted ? previousWindowJob(submitted) : null), [submitted])
+  const prev = useBatchJob(BREAKDOWN_PREVIOUS_CACHE_KEY, previousJob, true)
+  const prevDone = !!prev.acc?.done
+
   const switchDataset = (next: DldCommand) => {
     setCommand(next)
-    setValues(Object.fromEntries(DLD_DATASETS[next].filters.map((f) => [f.param, resolveDefault(f)])))
+    setValues(defaultBreakdownValues(DLD_DATASETS[next]))
   }
   const missing = missingRequired(dataset, values)
 
   const appliedDataset: DldDataset = submitted ? DLD_DATASETS[submitted.command] : dataset
   const appliedSpec = (submitted ? DLD_CHART_SPECS[submitted.command] : DLD_CHART_SPECS[command]) as DldChartSpec
   const colLabel = (key: string) => appliedDataset.columns.find((c) => c.key === key)?.label ?? key
+
+  // "Average" and "compared to before" — the two figures Breakdowns didn't
+  // have (Market Charts' Sales Overview is where they lived, sales-only).
+  // Rows always compares; the average only where the dataset has a value field.
+  const avgOf = (a: Accum | null) => (a && appliedSpec.valueKey && a.count > 0 ? a.value / a.count : null)
+  const currentAvg = avgOf(acc)
+  const previousAvg = prevDone ? avgOf(prev.acc) : null
+  const countChange = prevDone && prev.acc ? delta(acc?.count ?? null, prev.acc.count) : null
+  const avgChange = currentAvg !== null && previousAvg !== null ? delta(currentAvg, previousAvg) : null
+  const comparisonPending = !!previousJob && !prevDone && !prev.error
+
+  // Price per sqft — same "value ÷ size" math Market Charts used to show for
+  // Sales, generalized to whatever rows are in scope for any dataset with an area field.
+  const perSqftOf = (a: Accum | null) => (a?.areaAgg && a.areaAgg.areaSqmSum > 0 ? a.areaAgg.valueWithAreaSum / (a.areaAgg.areaSqmSum * SQFT_PER_SQM) : null)
+  const currentPerSqft = perSqftOf(acc)
+  const previousPerSqft = prevDone ? perSqftOf(prev.acc) : null
+  const perSqftChange = currentPerSqft !== null && previousPerSqft !== null ? delta(currentPerSqft, previousPerSqft) : null
 
   const daily = useMemo(
     () => (acc ? Object.entries(acc.daily).map(([date, v]) => ({ date, count: v.count, value: v.value })).sort((a, b) => a.date.localeCompare(b.date)) : []),
@@ -1010,6 +664,34 @@ function BreakdownSection() {
               </span>
             )}
           </CoverageLine>
+
+          {/* Average + "compared to before" — the previous equal-length period
+              loads in the background; each tile shows its own pending state
+              until that finishes, so the rest of the page never waits on it. */}
+          {acc && previousJob && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              <KpiTile label={`${appliedDataset.label} (this period)`} value={int.format(acc.count)} change={countChange} pending={comparisonPending} />
+              {appliedSpec.valueKey && (
+                <KpiTile
+                  label={`Average ${appliedSpec.valueLabel?.replace(" (AED)", "").toLowerCase()}`}
+                  value={currentAvg !== null ? `${int.format(Math.round(currentAvg))}${appliedSpec.valueLabel?.includes("(AED)") ? " AED" : ""}` : "—"}
+                  change={avgChange}
+                  pending={comparisonPending}
+                />
+              )}
+              {appliedSpec.areaKey && (
+                <KpiTile
+                  label="Average price per sqft (AED)"
+                  value={currentPerSqft !== null ? `${int.format(Math.round(currentPerSqft))} / sqft` : "—"}
+                  change={perSqftChange}
+                  pending={comparisonPending}
+                />
+              )}
+              <p className="sm:col-span-2 xl:col-span-3 -mt-1 text-xs text-[#9ca3af]">
+                vs {longDate(previousJob.values.P_FROM_DATE)} – {longDate(previousJob.values.P_TO_DATE)}
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             {appliedSpec.dateKey && (

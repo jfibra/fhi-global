@@ -736,9 +736,17 @@ export interface DldChartSpec {
   /** "Top N" field, e.g. area or developer, ranked by count. */
   topKey: string
   /**
+   * Row field with the size in sqm, when one applies to `valueKey` — powers a
+   * generic AED-per-sqft figure in Breakdowns, over whatever rows match the
+   * current filters (not restricted by category, unlike `kpi` below).
+   */
+  areaKey?: string
+  /**
    * Headline figures over a subset of rows (e.g. sales only): count, average
    * price and price per sqft, a location ranking, and the latest rows for a
-   * history table. Only Transactions has this today.
+   * history table. Only Transactions has this today — it feeds the per-tab
+   * Summary strip's exact-figures upgrade (app/api/admin/dld/charts
+   * `breakdown()`), not Breakdowns' own price-per-sqft (`areaKey` above).
    */
   kpi?: {
     filterKey: string
@@ -761,6 +769,7 @@ export const DLD_CHART_SPECS: Record<DldCommand, DldChartSpec> = {
     valueLabel: "Transaction value (AED)",
     breakdowns: ["GROUP_EN", "USAGE_EN", "IS_OFFPLAN_EN", "PROP_TYPE_EN", "IS_FREE_HOLD_EN"],
     topKey: "AREA_EN",
+    areaKey: "PROCEDURE_AREA",
     kpi: {
       filterKey: "GROUP_EN",
       filterValue: "Sales",
@@ -789,6 +798,7 @@ export const DLD_CHART_SPECS: Record<DldCommand, DldChartSpec> = {
     valueLabel: "Annual rent (AED)",
     breakdowns: ["USAGE_EN", "PROP_SUB_TYPE_EN", "VERSION_EN", "IS_FREE_HOLD_EN"],
     topKey: "AREA_EN",
+    areaKey: "ACTUAL_AREA",
   },
   projects: {
     command: "projects",
@@ -807,6 +817,7 @@ export const DLD_CHART_SPECS: Record<DldCommand, DldChartSpec> = {
     valueLabel: "Valuation (AED)",
     breakdowns: ["PROPERTY_TYPE_EN", "PROP_SUB_TYPE_EN", "ROW_STATUS_CODE"],
     topKey: "AREA_EN",
+    areaKey: "ACTUAL_AREA",
   },
   // The registry datasets have no date filter; their charts are splits only.
   lands: {
@@ -944,6 +955,8 @@ export interface DldBreakdownResponse {
   kpi?: DldKpiSums
   /** Latest filtered rows in this batch (trimmed to `kpi.latestKeys`), newest first. */
   latest?: DldRow[]
+  /** Present when the spec has `areaKey` — Breakdowns' own price-per-sqft, over ALL rows in this batch (not category-restricted). */
+  areaAgg?: { valueWithAreaSum: number; areaSqmSum: number }
   coverage: {
     /** Rows in this batch. */
     rows: number

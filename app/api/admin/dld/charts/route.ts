@@ -115,11 +115,17 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
   }
 
   // KPI subset (e.g. sales only): sums for the tiles, a location ranking, and
-  // the newest rows for the history table.
+  // the newest rows for the history table. Feeds the per-tab Summary strip's
+  // exact-figures upgrade — Breakdowns' own price-per-sqft (`areaAgg` below)
+  // is separate and never restricted by category.
   const kpiSpec = spec.kpi
   const kpiLocations = new Map<string, { count: number; value: number }>()
   const kpi: DldKpiSums = { count: 0, valueSum: 0, valueWithAreaSum: 0, areaSqmSum: 0, locations: [] }
   const latestPool: DldRow[] = []
+
+  // Breakdowns' price-per-sqft: over every row in scope, no category filter.
+  let areaValueSum = 0
+  let areaSqmSum = 0
 
   for (const row of rows) {
     const value = spec.valueKey ? (num(row[spec.valueKey]) ?? 0) : 0
@@ -135,6 +141,14 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
       }
       bump(kpiLocations, labelOf(row[kpiSpec.locationKey]), value)
       latestPool.push(row)
+    }
+
+    if (spec.areaKey && value > 0) {
+      const area = num(row[spec.areaKey]) ?? 0
+      if (area > 0) {
+        areaValueSum += value
+        areaSqmSum += area
+      }
     }
 
     const day = spec.dateKey ? isoDay(row[spec.dateKey]) : null
@@ -173,6 +187,7 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
     top: toBuckets(top),
     totals: { count: rows.length, value: Math.round(totalValue) },
     ...(kpiSpec ? { kpi, latest } : {}),
+    ...(spec.areaKey ? { areaAgg: { valueWithAreaSum: Math.round(areaValueSum), areaSqmSum } } : {}),
     coverage: {
       rows: rows.length,
       available,

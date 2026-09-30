@@ -2,19 +2,29 @@
 
 // Admin → Real Estate Data.
 //
-// A faithful port of the DLD open-data explorer: nine tabs, each with its own
-// filter form and a paged, sortable table. Everything about a tab — its
-// filters, default sort, and columns — comes from lib/dld-open-data.ts; this
-// file only knows how to render a dataset, not what any dataset contains.
+// Three top-level tabs:
+//   Index           — DLD's official Property Price Index. Reuses the exact
+//                      same component the public /open-data page renders
+//                      (components/public/price-index-chart.tsx) — one chart,
+//                      one implementation, so the two surfaces never drift.
+//   Breakdowns      — daily volume / value and category splits for a dataset
+//                      + date range, defaulting to the last 7 days.
+//   Real Estate Data — the nine raw DLD tables (Transactions, Rents, Project,
+//                      Valuations, Land, Building, Unit, Broker, Developer),
+//                      each with its own filter form, summary strip and table,
+//                      reachable through a second row of tabs underneath.
 //
-// Data flows through /api/admin/dld/{command} (see that route for why it is
-// proxied). Lookups (areas, projects, property types) are fetched once per
-// page load and shared across tabs.
+// Everything about a dataset — its filters, default sort, and columns — comes
+// from lib/dld-open-data.ts; this file only knows how to render one, not what
+// it contains. Data flows through /api/admin/dld/{command} (see that route
+// for why it is proxied). Lookups (areas, projects, property types) are
+// fetched once per page load and shared across the dataset tabs.
 
 import { useEffect, useMemo, useState } from "react"
-import { ArrowDown, ArrowUp, ArrowUpDown, BarChart3, CalendarRange, ChevronLeft, ChevronRight, Loader2, RefreshCw, Search, X } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarRange, ChevronLeft, ChevronRight, Loader2, RefreshCw, Search, X } from "lucide-react"
 import { FilterSelect, type FilterSelectOption } from "@/components/ui/filter-select"
-import { MarketCharts, RefreshButton, TabSummary } from "./market-charts"
+import { PriceIndexChart } from "@/components/public/price-index-chart"
+import { BreakdownSection, RefreshButton, TabSummary } from "./market-charts"
 import { cacheDelete, cacheGet, cacheSet } from "./client-cache"
 import {
   DLD_DATASETS,
@@ -61,15 +71,30 @@ type TableMemo = {
   appliedSearch: { column: string; term: string; scanRows: number } | null
 }
 
-/** The nine DLD datasets plus the Market Charts tab. */
-type TabKey = DldCommand | "charts"
-const CHARTS_TAB: TabKey = "charts"
+type TopTab = "index" | "breakdowns" | "real-estate-data"
+const TOP_TABS: Array<{ key: TopTab; label: string }> = [
+  { key: "index", label: "General Index" },
+  { key: "breakdowns", label: "Breakdowns" },
+  { key: "real-estate-data", label: "Real Estate Data" },
+]
 
-/** Market Charts is the landing tab; a dataset opens only via its hash. */
-function tabFromHash(): TabKey {
-  if (typeof window === "undefined") return CHARTS_TAB
+/**
+ * Index is the landing tab. A dataset's own hash (#rents, #brokers, …) opens
+ * straight to Real Estate Data on that dataset — same deep links as before —
+ * and any other recognized hash opens its own top tab.
+ */
+function topTabFromHash(): TopTab {
+  if (typeof window === "undefined") return "index"
   const h = window.location.hash.replace("#", "")
-  return (DLD_TAB_ORDER as readonly string[]).includes(h) ? (h as DldCommand) : CHARTS_TAB
+  if ((TOP_TABS.map((t) => t.key) as string[]).includes(h)) return h as TopTab
+  if ((DLD_TAB_ORDER as readonly string[]).includes(h)) return "real-estate-data"
+  return "index"
+}
+
+function datasetFromHash(): DldCommand {
+  if (typeof window === "undefined") return "transactions"
+  const h = window.location.hash.replace("#", "")
+  return (DLD_TAB_ORDER as readonly string[]).includes(h) ? (h as DldCommand) : "transactions"
 }
 
 function initialValues(dataset: DldDataset): Record<string, string> {
@@ -112,7 +137,7 @@ function formatCell(col: DldColumn, raw: string | number | null | undefined): st
     case "percent":
       return typeof raw === "number" ? `${num.format(raw)}%` : String(raw)
     default:
-      return String(raw).replace(/ /g, " ").trim() || "—"
+      return String(raw).replace(/ /g, " ").trim() || "—"
   }
 }
 
@@ -123,14 +148,19 @@ function isNumericFormat(col: DldColumn): boolean {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function RealEstateDataClient() {
-  const [tab, setTab] = useState<TabKey>(CHARTS_TAB)
+  const [topTab, setTopTab] = useState<TopTab>("index")
+  const [dataset, setDataset] = useState<DldCommand>("transactions")
   const [lookups, setLookups] = useState<Lookups>({})
   const [lookupErrors, setLookupErrors] = useState<Partial<Record<DldLookupName, string>>>({})
 
-  // URL-hash-driven tabs (deep-linkable: #rents, #brokers, …), same as System Logs.
+  // URL-hash-driven tabs (deep-linkable: #index, #breakdowns, #rents, …).
   useEffect(() => {
-    setTab(tabFromHash())
-    const onHash = () => setTab(tabFromHash())
+    setTopTab(topTabFromHash())
+    setDataset(datasetFromHash())
+    const onHash = () => {
+      setTopTab(topTabFromHash())
+      setDataset(datasetFromHash())
+    }
     window.addEventListener("hashchange", onHash)
     return () => window.removeEventListener("hashchange", onHash)
   }, [])
@@ -158,8 +188,16 @@ export function RealEstateDataClient() {
     }
   }, [])
 
-  const selectTab = (key: TabKey) => {
-    setTab(key)
+  const selectTopTab = (key: TopTab) => {
+    setTopTab(key)
+    if (typeof window === "undefined") return
+    // Real Estate Data keeps a dataset-specific hash (#rents, …) so deep
+    // links stay precise; the other three tabs just use their own key.
+    window.history.replaceState(null, "", `#${key === "real-estate-data" ? dataset : key}`)
+  }
+  const selectDataset = (key: DldCommand) => {
+    setDataset(key)
+    setTopTab("real-estate-data")
     if (typeof window !== "undefined") window.history.replaceState(null, "", `#${key}`)
   }
 
@@ -168,48 +206,60 @@ export function RealEstateDataClient() {
       <div className="mb-6">
         <h1 className="font-['Outfit'] text-2xl font-bold text-[#0d1117]">Real Estate Data</h1>
         <p className="text-sm text-[#6b7280] mt-0.5">
-          Live open data from the Dubai Land Department — transactions, rents, projects, valuations, land, buildings, units, brokers and developers.
+          Live open data from the Dubai Land Department — the official price index, quick breakdowns, a sales overview,
+          and the full transactions, rents, projects, valuations, land, buildings, units, brokers and developers tables.
         </p>
       </div>
 
-      {/* Tab bar */}
-      <div className="mb-6 -mx-1 overflow-x-auto">
-        <div className="mx-1 inline-flex min-w-full gap-1 p-1 rounded-2xl bg-[#eef1f5] border border-[#e8eaed]">
-          {[CHARTS_TAB, ...DLD_TAB_ORDER].map((key) => {
-            const label = key === CHARTS_TAB ? "Market Charts" : DLD_DATASETS[key as DldCommand].label
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => selectTab(key)}
-                className={`flex-1 whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  tab === key ? "bg-white text-[#001f3f] shadow-sm" : "text-[#6b7280] hover:text-[#001f3f]"
-                }`}
-              >
-                {key === CHARTS_TAB ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <BarChart3 className="w-4 h-4" />
-                    {label}
-                  </span>
-                ) : (
-                  label
-                )}
-              </button>
-            )
-          })}
+      {/* Top-level tab bar — plain underline tabs (label + a bar under the
+          active one), not filled pills. */}
+      <div className="mb-6 overflow-x-auto border-b border-[#e8eaed]">
+        <div className="flex min-w-max gap-x-7">
+          {TOP_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => selectTopTab(t.key)}
+              className={`relative -mb-px whitespace-nowrap pb-3 text-sm font-semibold transition-colors ${
+                topTab === t.key ? "text-[#001f3f]" : "text-[#8a93a3] hover:text-[#4b5563]"
+              }`}
+            >
+              {t.label}
+              {topTab === t.key && <span aria-hidden className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-[#001f3f]" />}
+            </button>
+          ))}
         </div>
       </div>
 
-      {tab === CHARTS_TAB ? (
-        <MarketCharts />
-      ) : (
-        // Keyed on the tab so each dataset gets fresh form + table state.
-        <DatasetPanel key={tab} dataset={DLD_DATASETS[tab as DldCommand]} lookups={lookups} lookupErrors={lookupErrors} />
+      {topTab === "index" && <PriceIndexChart />}
+      {topTab === "breakdowns" && <BreakdownSection />}
+      {topTab === "real-estate-data" && (
+        <>
+          {/* Dataset sub-tabs */}
+          <div className="mb-6 -mx-1 overflow-x-auto">
+            <div className="mx-1 inline-flex min-w-full gap-1 p-1 rounded-2xl bg-[#eef1f5] border border-[#e8eaed]">
+              {DLD_TAB_ORDER.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => selectDataset(key)}
+                  className={`flex-1 whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                    dataset === key ? "bg-white text-[#001f3f] shadow-sm" : "text-[#6b7280] hover:text-[#001f3f]"
+                  }`}
+                >
+                  {DLD_DATASETS[key].label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Keyed on the dataset so each one gets fresh form + table state. */}
+          <DatasetPanel key={dataset} dataset={DLD_DATASETS[dataset]} lookups={lookups} lookupErrors={lookupErrors} />
+        </>
       )}
     </>
   )
 }
-
 // ─── One dataset: filter form + table ────────────────────────────────────────
 
 function DatasetPanel({

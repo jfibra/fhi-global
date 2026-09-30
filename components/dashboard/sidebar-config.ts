@@ -197,7 +197,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
   EVENTS,
   // Dubai Land Department open data (transactions, rents, projects, …), proxied
   // through /api/admin/dld. Admin staff only — see SUB_PATH_ROLES in lib/auth.ts.
-  { icon: Database, label: "Real Estate Data (DLD)", to: "real-estate-data" },
+  { icon: Database, label: "Open Data (DLD)", to: "real-estate-data" },
   {
     group: "Agent Resource",
     to: "agent-resource",
