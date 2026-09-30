@@ -5,6 +5,7 @@ import {
   Mail, MapPin, Phone, ShieldCheck,
 } from "lucide-react"
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
+import { WhatsAppLogo } from "@/components/brand-icons"
 import { SEO_SEARCH_PAGES, SEO_AREA_GUIDES } from "@/lib/seo-pages"
 import { WhatsAppFab } from "@/components/public/whatsapp-fab"
 import { InView } from "@/components/public/in-view"
@@ -56,6 +57,7 @@ const SECTIONS = [
 
 const SOCIALS = [
   { label: "Facebook", href: SOCIAL_URLS.facebook, Icon: Facebook },
+  { label: "WhatsApp", href: SOCIAL_URLS.whatsapp, Icon: WhatsAppLogo },
 ]
 
 /**

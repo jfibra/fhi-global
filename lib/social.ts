@@ -11,6 +11,8 @@
  */
 export const SOCIAL_URLS = {
   facebook: "https://www.facebook.com/fhiglobal",
+  /** The company WhatsApp line (+971 56 742 8288), same as the floating button. */
+  whatsapp: "https://wa.me/971567428288",
   instagram: "#",
   linkedin: "#",
   youtube: "#",
