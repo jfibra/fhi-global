@@ -32,7 +32,7 @@ const getSite = cache((slug: string) => loadSiteBySlug(createAdminSupabase(), sl
 const getEvent = cache(async (agentId: string, key: string): Promise<PublicEvent | null> => {
   const query = createAdminSupabase()
     .from("events")
-    .select("id, slug, title, description, brand, image_url, video_url, event_date, venue, registration_open, registration_fields, certificate")
+    .select("id, slug, title, description, brand, image_url, video_url, event_date, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate")
     .eq("agent_id", agentId)
     .eq("status", "published")
     .is("deleted_at", null)
@@ -119,6 +119,7 @@ export default async function AgentEventPage({ params, searchParams }: Props) {
         <EventViewPing eventId={event.id} />
         <EventDetail
           event={event}
+          mapsKey={process.env.GOOGLE_MAPS_API_KEY?.trim() || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || ""}
           sharePath={path}
           back={{ href: websiteEventsPath(site.slug), label: `${host}'s events` }}
           breadcrumbs={[

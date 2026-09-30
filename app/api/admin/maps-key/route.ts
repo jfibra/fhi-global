@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireRole } from "@/lib/auth-guard"
-import { ROLES_DEVELOPER_CONTENT_MANAGERS } from "@/lib/app-roles"
+import { ROLES_DEVELOPER_CONTENT_MANAGERS, ROLES_EVENT_MANAGERS, ROLES_EVENT_OWNERS } from "@/lib/app-roles"
 
 /**
  * Hands the Maps browser key to the project form so it can geocode an address
@@ -17,7 +17,9 @@ import { ROLES_DEVELOPER_CONTENT_MANAGERS } from "@/lib/app-roles"
 export const runtime = "nodejs"
 
 export async function GET() {
-  const guard = await requireRole([...ROLES_DEVELOPER_CONTENT_MANAGERS, "developer"])
+  // Project editors geocode addresses; event managers and owners get place
+  // suggestions in the event form's venue box (components/dashboard/venue-autocomplete).
+  const guard = await requireRole([...ROLES_DEVELOPER_CONTENT_MANAGERS, "developer", ...ROLES_EVENT_MANAGERS, ...ROLES_EVENT_OWNERS])
   if (!guard.ok) return guard.response
 
   const key = process.env.GOOGLE_MAPS_API_KEY?.trim() || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || ""

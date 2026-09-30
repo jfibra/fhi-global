@@ -39,6 +39,7 @@ import {
 import type { CertificateSettings } from "@/lib/events/certificate"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 import { isPlayableVideoUrl } from "@/lib/video-embed"
+import { VenueAutocomplete, type VenuePin } from "@/components/dashboard/venue-autocomplete"
 
 type AdminEvent = {
   id: string
@@ -53,6 +54,9 @@ type AdminEvent = {
   videoUrl: string | null
   eventDate: string | null
   venue: string | null
+  venueLat: number | null
+  venueLng: number | null
+  venuePlaceId: string | null
   status: string
   registrationOpen: boolean
   createdAt: string
@@ -89,6 +93,8 @@ type FormState = {
   videoUrl: string
   eventDate: string // datetime-local value
   venue: string
+  /** The picked place's exact spot, or null when the venue was typed freely. */
+  venuePin: VenuePin | null
   status: string
   registrationOpen: boolean
   /** Extra fields this event's registration form asks for. */
@@ -103,6 +109,7 @@ const EMPTY_FORM: FormState = {
   videoUrl: "",
   eventDate: "",
   venue: "",
+  venuePin: null,
   status: "draft",
   registrationOpen: true,
   registrationFields: [],
@@ -260,6 +267,7 @@ export function EventsClient({
       videoUrl: e.videoUrl ?? "",
       eventDate: toDubaiInput(e.eventDate),
       venue: e.venue ?? "",
+      venuePin: e.venueLat != null && e.venueLng != null ? { lat: e.venueLat, lng: e.venueLng, placeId: e.venuePlaceId ?? "" } : null,
       status: e.status,
       registrationOpen: e.registrationOpen,
       registrationFields: e.registrationFields ?? [],
@@ -347,6 +355,9 @@ export function EventsClient({
         status: form.status,
         registration_open: form.registrationOpen,
         registration_fields: form.registrationFields,
+        venue_lat: form.venuePin?.lat ?? null,
+        venue_lng: form.venuePin?.lng ?? null,
+        venue_place_id: form.venuePin?.placeId ?? null,
       }
       const res = editing
         ? await fetch(`/api/admin/events/${editing.id}`, {
@@ -952,7 +963,13 @@ export function EventsClient({
                 </div>
                 <div>
                   <label className={labelCls}>Venue</label>
-                  <input className={inputCls} value={form.venue} onChange={(e) => setForm((f) => ({ ...f, venue: e.target.value }))} placeholder="Rigga Business Center, Deira, Dubai" maxLength={300} />
+                  <VenueAutocomplete
+                    inputClassName={inputCls}
+                    value={form.venue}
+                    pin={form.venuePin}
+                    onChange={(venue, venuePin) => setForm((f) => ({ ...f, venue, venuePin }))}
+                    placeholder="Search a hotel, building or address…"
+                  />
                 </div>
               </div>
 

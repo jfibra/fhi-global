@@ -1,6 +1,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { ArrowLeft, CalendarDays, ChevronRight, Clock, MapPin, Ticket } from "lucide-react"
+import { ProjectLocationMap } from "@/components/public/project-location-map"
 import { eventBrand } from "@/lib/events/brands"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
 import { parseRegistrationFields } from "@/lib/events/fields"
@@ -23,6 +24,9 @@ export type PublicEvent = {
   video_url?: string | null
   event_date: string | null
   venue: string | null
+  /** The venue's exact spot (migration 068); null when it was typed, not picked. */
+  venue_lat?: number | null
+  venue_lng?: number | null
   registration_open: boolean | null
   registration_fields: unknown
   certificate: unknown
@@ -43,8 +47,11 @@ export function EventDetail({
   back,
   breadcrumbs,
   moreEventsHref,
+  mapsKey,
 }: {
   event: PublicEvent
+  /** Google Maps browser key; the venue map shows only with it and a pinned venue. */
+  mapsKey?: string
   /** Page this event lives at — what the share button hands out. */
   sharePath: string
   back: { href: string; label: string }
@@ -176,6 +183,17 @@ export function EventDetail({
 
             {event.description?.trim() && (
               <p className="text-[#374151] leading-relaxed whitespace-pre-wrap">{event.description.trim()}</p>
+            )}
+
+            {/* Where it is — only for a venue picked from the place suggestions,
+                so the pin is the real spot, never a guess from "Manila". */}
+            {mapsKey && typeof event.venue_lat === "number" && typeof event.venue_lng === "number" && (
+              <section className="mt-8">
+                <h2 className="mb-3 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#b8913f]">
+                  <MapPin className="w-4 h-4" /> Where it is
+                </h2>
+                <ProjectLocationMap apiKey={mapsKey} projectName={event.venue ?? event.title} address={event.venue ?? ""} lat={event.venue_lat} lng={event.venue_lng} />
+              </section>
             )}
 
             <p className="mt-7 pt-6 border-t border-[#f0f0f0] text-sm text-[#6b7280]">

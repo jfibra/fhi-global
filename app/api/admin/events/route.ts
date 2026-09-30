@@ -30,7 +30,7 @@ export async function GET() {
   const admin = createAdminSupabase()
   let query = admin
     .from("events")
-    .select("id, slug, title, description, brand, image_url, video_url, event_date, venue, status, registration_open, registration_fields, certificate, created_at, view_count, qr_scan_count, agent_id, show_on_main, owner:profiles!events_agent_id_fkey(fullname), event_registrations(count)")
+    .select("id, slug, title, description, brand, image_url, video_url, event_date, venue, status, registration_open, registration_fields, certificate, created_at, view_count, qr_scan_count, agent_id, show_on_main, venue_lat, venue_lng, venue_place_id, owner:profiles!events_agent_id_fkey(fullname), event_registrations(count)")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
   if (access.scope.kind === "own") query = query.eq("agent_id", access.scope.agentId)
@@ -60,6 +60,10 @@ export async function GET() {
       videoUrl: (e.video_url as string | null) ?? null,
       eventDate: (e.event_date as string | null) ?? null,
       venue: (e.venue as string | null) ?? null,
+      /** The venue's exact spot (068), when a place suggestion was picked. */
+      venueLat: (e.venue_lat as number | null) ?? null,
+      venueLng: (e.venue_lng as number | null) ?? null,
+      venuePlaceId: (e.venue_place_id as string | null) ?? null,
       status: (e.status as string) ?? "draft",
       registrationOpen: (e.registration_open as boolean | null) !== false,
       registrationFields: parseRegistrationFields(e.registration_fields),

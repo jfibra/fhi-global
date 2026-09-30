@@ -40,6 +40,16 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
   // Admin pick (migration 067): an agent's event also listed on /events. Only
   // when sent; the PATCH route drops it for owners.
   const show_on_main = body.show_on_main !== undefined ? body.show_on_main === true : undefined
+  // The venue's exact spot (migration 068), from a picked place suggestion.
+  // Only when sent; anything but a valid pair clears it.
+  let venue_pin: { venue_lat: number | null; venue_lng: number | null; venue_place_id: string | null } | undefined
+  if (body.venue_lat !== undefined || body.venue_lng !== undefined) {
+    const lat = typeof body.venue_lat === "number" && Number.isFinite(body.venue_lat) && Math.abs(body.venue_lat) <= 90 ? body.venue_lat : null
+    const lng = typeof body.venue_lng === "number" && Number.isFinite(body.venue_lng) && Math.abs(body.venue_lng) <= 180 ? body.venue_lng : null
+    const ok = lat !== null && lng !== null
+    const placeId = typeof body.venue_place_id === "string" ? body.venue_place_id.trim().slice(0, 300) : ""
+    venue_pin = { venue_lat: ok ? lat : null, venue_lng: ok ? lng : null, venue_place_id: ok && placeId ? placeId : null }
+  }
   return {
     title,
     description: description || null,
@@ -53,5 +63,6 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
     ...(certificate !== undefined ? { certificate } : {}),
     ...(video_url !== undefined ? { video_url } : {}),
     ...(show_on_main !== undefined ? { show_on_main } : {}),
+    ...(venue_pin ?? {}),
   }
 }
