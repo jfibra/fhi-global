@@ -1,17 +1,32 @@
 "use client"
 
-// Documents shelf — same look and feel as the Ebooks shelf (cover-style tile
-// grid, category pills, click a tile to open a full-page viewer) but for
-// admin-uploaded document templates (DLD contract forms, agency agreements,
-// company templates) rather than a fixed set of training PDFs. Unlike
-// Materials/Ebooks (a developer drops a file into a repo folder and
-// redeploys), uploading here is a real in-app flow: files go to S3
-// (app/api/upload/document) and the catalog row to Postgres
+// Documents shelf — cover-style tile grid + category pills, same look as the
+// Ebooks shelf, but for admin-uploaded document templates (DLD contract
+// forms, agency agreements, company templates) rather than a fixed set of
+// training PDFs. Unlike Materials/Ebooks (a developer drops a file into a
+// repo folder and redeploys), uploading here is a real in-app flow: files go
+// to S3 (app/api/upload/document) and the catalog row to Postgres
 // (lib/document-service.ts), admin-staff only both ways.
+//
+// A PDF's tile shows its actual page 1, rendered client-side by
+// PdfThumbnail (pdf-thumbnail.tsx) — there's no authored cover art the way
+// Ebooks has. A non-PDF file (Word, Excel, PowerPoint, …) falls back to
+// FileTile's generic file-type icon, same as before.
+//
+// Clicking a tile opens a full page (DocumentPage below), replacing the
+// shelf entirely — same convention as the Ebooks reader: a back arrow, a
+// gold category eyebrow, the title in bold, actions on the right. ←/→ step
+// through whichever documents the current category tab shows. PDFs render
+// inline with Chrome's own toolbar hidden (PDF Open Parameters — just the
+// page, nothing else); every other file type (Word, Excel, PowerPoint, …)
+// shows a "can't preview" fallback with Download and New tab, since no
+// browser can render those inline no matter how they're embedded.
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Download,
   ExternalLink,
   FileSpreadsheet,
@@ -23,6 +38,7 @@ import {
 } from "lucide-react"
 import { formatBytes } from "@/lib/materials-shared"
 import { createDocument, deleteDocument, listDocuments, type DocumentRow } from "@/lib/document-service"
+import PdfThumbnail from "./pdf-thumbnail"
 
 const ALL = "All"
 const UNCATEGORIZED = "Uncategorized"
@@ -36,8 +52,6 @@ function isPdf(fileName: string): boolean {
 function categoryOf(doc: DocumentRow): string {
   return doc.category?.trim() || UNCATEGORIZED
 }
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
 
 /** Same-origin passthrough (see app/api/document-proxy) — required for both
  *  the in-page preview and a real (not ignored) browser download. */
@@ -154,7 +168,28 @@ export function DocumentsClient() {
     setDeletingId(null)
   }
 
-  if (open) return <Viewer doc={open} onBack={() => setOpenId(null)} onDelete={() => onDelete(open)} deleting={deletingId === open.id} />
+  // Prev/Next step through the currently shown (category-filtered) list, so
+  // the arrows move through the same set of tiles the grid had on screen —
+  // not the full unfiltered catalogue.
+  const openIndex = open ? shown.findIndex((d) => d.id === open.id) : -1
+  const goTo = (i: number) => {
+    if (shown.length === 0) return
+    setOpenId(shown[(i + shown.length) % shown.length].id)
+  }
+
+  if (open) {
+    return (
+      <DocumentPage
+        doc={open}
+        onBack={() => setOpenId(null)}
+        onPrev={shown.length > 1 ? () => goTo(openIndex - 1) : undefined}
+        onNext={shown.length > 1 ? () => goTo(openIndex + 1) : undefined}
+        position={shown.length > 1 ? { index: openIndex, total: shown.length } : undefined}
+        onDelete={() => onDelete(open)}
+        deleting={deletingId === open.id}
+      />
+    )
+  }
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -302,7 +337,20 @@ export function DocumentsClient() {
                 aria-label={`Open ${doc.title}`}
                 className="group relative block aspect-[2/3] w-full overflow-hidden rounded-lg border border-black/[0.08] bg-[#eef1f5] shadow-sm transition-shadow hover:shadow-[0_12px_28px_-12px_rgba(0,31,63,0.5)] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#001f3f]/20"
               >
-                <FileTile fileName={doc.file_name} />
+                {isPdf(doc.file_name) ? (
+                  <PdfThumbnail
+                    src={proxyUrl(doc.file_url, false)}
+                    alt={doc.title}
+                    fallback={<FileTile fileName={doc.file_name} />}
+                  />
+                ) : (
+                  <FileTile fileName={doc.file_name} />
+                )}
+                <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-[#001f3f]/85 px-2.5 py-2">
+                  <span className="line-clamp-2 text-xs font-semibold leading-snug text-white" title={doc.title}>
+                    {doc.title}
+                  </span>
+                </span>
                 <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#001f3f]/0 opacity-0 transition-all duration-200 group-hover:bg-[#001f3f]/40 group-hover:opacity-100">
                   <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#d6b357] px-3 py-2 text-xs font-bold text-[#001f3f]">
                     <ExternalLink className="h-3.5 w-3.5" /> Open
@@ -310,13 +358,10 @@ export function DocumentsClient() {
                 </span>
               </button>
 
-              <p className="mt-2 line-clamp-2 text-xs font-semibold leading-snug text-[#0d1117]" title={doc.title}>
-                {doc.title}
-              </p>
               <a
                 href={proxyUrl(doc.file_url, true)}
                 download={doc.file_name}
-                className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-[#6b7280] transition-colors hover:text-[#001f3f]"
+                className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-[#6b7280] transition-colors hover:text-[#001f3f]"
               >
                 <Download className="h-3 w-3" /> Download
               </a>
@@ -349,18 +394,50 @@ function FileTile({ fileName }: { fileName: string }) {
   )
 }
 
-function Viewer({
+/**
+ * Full-screen lightbox, portalled to <body> so it sits above the dashboard
+ * shell's fixed sidebar/topbar regardless of where in the tree it's mounted —
+ * same reason FilipinoHomes' MediaLightbox does the same. Backdrop click and
+ * Escape both close it; ←/→ step to onPrev/onNext when given.
+ */
+/**
+ * A full page, not an overlay — replaces the shelf entirely while a document
+ * is open (same convention as the Ebooks reader: back arrow, a gold category
+ * eyebrow, the title in bold, actions on the right). ←/→ still step through
+ * whichever documents the current category tab shows.
+ */
+function DocumentPage({
   doc,
   onBack,
+  onPrev,
+  onNext,
+  position,
   onDelete,
   deleting,
 }: {
   doc: DocumentRow
   onBack: () => void
+  onPrev?: () => void
+  onNext?: () => void
+  position?: { index: number; total: number }
   onDelete: () => void
   deleting: boolean
 }) {
   const previewable = isPdf(doc.file_name)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" && onPrev) {
+        e.preventDefault()
+        onPrev()
+      } else if (e.key === "ArrowRight" && onNext) {
+        e.preventDefault()
+        onNext()
+      }
+    }
+    window.addEventListener("keydown", onKey, true)
+    return () => window.removeEventListener("keydown", onKey, true)
+  }, [onPrev, onNext])
 
   return (
     // Fills the shell's <main> (which already supplies p-6) and adds none of
@@ -381,15 +458,33 @@ function Viewer({
           <h1 className="truncate font-['Outfit'] text-base font-bold leading-tight text-[#0d1117]" title={doc.title}>
             {doc.title}
           </h1>
-          <p className="mt-0.5 truncate text-xs text-[#9ca3af]">
-            {doc.file_name}
-            {doc.file_size != null && <> · {formatBytes(doc.file_size)}</>}
-            {" · uploaded "}
-            {formatDate(doc.created_at)}
-            {doc.profiles?.fullname && <> by {doc.profiles.fullname}</>}
-          </p>
         </div>
+        {position && (
+          <span className="hidden shrink-0 text-xs font-semibold text-[#9ca3af] sm:inline">
+            {position.index + 1} / {position.total}
+          </span>
+        )}
         <div className="flex shrink-0 items-center gap-2">
+          {onPrev && (
+            <button
+              type="button"
+              onClick={onPrev}
+              aria-label="Previous document"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e5e5e5] bg-white text-[#6b7280] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          )}
+          {onNext && (
+            <button
+              type="button"
+              onClick={onNext}
+              aria-label="Next document"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e5e5e5] bg-white text-[#6b7280] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          )}
           <a
             href={doc.file_url}
             target="_blank"
@@ -397,7 +492,7 @@ function Viewer({
             className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-bold text-[#374151] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]"
           >
             <ExternalLink className="h-3.5 w-3.5" />
-            New tab
+            <span className="hidden sm:inline">New tab</span>
           </a>
           <a
             href={proxyUrl(doc.file_url, true)}
@@ -412,36 +507,43 @@ function Viewer({
             onClick={onDelete}
             disabled={deleting}
             aria-label={`Delete ${doc.title}`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-bold text-[#9ca3af] transition-colors hover:border-rose-300 hover:text-rose-600 disabled:opacity-50"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e5e5e5] bg-white text-[#9ca3af] transition-colors hover:border-rose-300 hover:text-rose-600 disabled:opacity-50"
           >
             {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-            Delete
           </button>
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-black/[0.08] bg-[#525659]">
+      {/* Transparent, not white — the dashboard shell's own background is a
+          light gray-blue (#f4f6f9), and a plain white box here still showed
+          up as a visibly different rectangle against it: the "container"
+          edge. Letting the shell's own background show through removes it;
+          the PDF's actual page (rendered by the iframe) is still white. */}
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-transparent">
         {previewable ? (
           <>
             {/* Sits behind the iframe — only shows if the viewer fails to paint. */}
             <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-              <p className="text-sm text-white/70">
+              <p className="text-sm text-[#6b7280]">
                 Preparing the preview…{" "}
-                <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#d6b357] underline">
+                <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#001f3f] underline">
                   open it in a new tab
                 </a>{" "}
                 if nothing appears.
               </p>
             </div>
             <iframe
-              // Direct to the S3 URL, same as the Ebooks reader (S3 is
-              // already an allowed frame-src host) — no proxy for the
-              // preview. The proxy is still used for Download below, where
-              // it earns its keep: a cross-origin `download` attribute is
-              // silently ignored by the browser, so that link needs the
-              // same-origin round trip; a plain iframe embed does not.
-              // #view=FitH opens fitted to the page width rather than zoomed in.
-              src={`${doc.file_url}#view=FitH`}
+              // Direct to the S3 URL — S3 is already an allowed frame-src
+              // host, so no proxy is needed here. The proxy is only used
+              // for Download above, where a cross-origin `download`
+              // attribute would otherwise be silently ignored.
+              //
+              // PDF Open Parameters (Chrome/PDFium honours these, same as
+              // FilipinoHomes' own MediaLightbox): toolbar=0 hides Chrome's
+              // own toolbar, navpanes=0 hides its left thumbnails/outline
+              // panel, scrollbar=0 hides the scrollbar chrome — what's left
+              // is just the rendered page. view=FitH fits it to the width.
+              src={`${doc.file_url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
               title={doc.title}
               className="absolute inset-0 h-full w-full border-0"
             />
@@ -451,9 +553,9 @@ function Viewer({
             <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg">
               <FileTile fileName={doc.file_name} />
             </div>
-            <p className="max-w-sm text-sm text-white/70">
-              {extensionOf(doc.file_name).toUpperCase()} files can&rsquo;t be previewed in the browser — download it or open it
-              in a new tab instead.
+            <p className="max-w-sm text-sm text-[#6b7280]">
+              {extensionOf(doc.file_name).toUpperCase()} files can&rsquo;t be previewed in the browser — use Download or New
+              tab above instead.
             </p>
           </div>
         )}
