@@ -2968,6 +2968,321 @@ async function salesPipeline(admin: Admin, args: PipelineArgs) {
   return out
 }
 
+// ─── Support tickets, purchases, agent websites, listings, clients ───────────
+
+async function profileNames(admin: Admin, ids: Array<string | null | undefined>): Promise<Map<string, string>> {
+  const clean = [...new Set(ids.filter((v): v is string => typeof v === "string" && v.length > 0))]
+  const m = new Map<string, string>()
+  if (!clean.length) return m
+  const { data } = await admin.from("profiles").select("id, fullname").in("id", clean)
+  for (const p of (data ?? []) as { id: string; fullname: string | null }[]) m.set(String(p.id), p.fullname ?? "Unknown")
+  return m
+}
+
+const dayAge = (iso: string | null | undefined) => (iso ? Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 86400e3)) : null)
+
+const tally = <T,>(rows: T[], key: (r: T) => string | null | undefined, top = 10) => {
+  const m = new Map<string, number>()
+  for (const r of rows) {
+    const k = (key(r) ?? "").toString().trim() || "Not given"
+    m.set(k, (m.get(k) ?? 0) + 1)
+  }
+  return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, top).map(([name, count]) => ({ name, count }))
+}
+
+/** Every support ticket that still needs someone, oldest first; resolved ones on request. */
+async function supportTickets(admin: Admin, args: { status?: string; limit?: number }) {
+  const limit = Math.min(Math.max(args.limit ?? 20, 1), 60)
+  const status = (args.status ?? "open").trim()
+  let q = admin
+    .from("support_tickets")
+    .select("id, reported_by, ticket_type, priority, status, title, description, page_url, module, device_type, browser, assigned_to, resolved_at, created_at, updated_at")
+    .order("created_at", { ascending: true })
+    .limit(2000)
+  if (status === "open") q = q.in("status", ["open", "in_progress"])
+  else if (status !== "all") q = q.eq("status", status)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  type Ticket = { id: string; reported_by: string | null; ticket_type: string | null; priority: string | null; status: string; title: string | null; description: string | null; page_url: string | null; module: string | null; device_type: string | null; browser: string | null; assigned_to: string | null; resolved_at: string | null; created_at: string; updated_at: string | null }
+  const rows = (data ?? []) as Ticket[]
+  const { data: all } = await admin.from("support_tickets").select("status, priority")
+  const names = await profileNames(admin, rows.flatMap((t) => [t.reported_by, t.assigned_to]))
+  const { data: comments } = rows.length ? await admin.from("support_ticket_comments").select("ticket_id").in("ticket_id", rows.map((t) => t.id)) : { data: [] }
+  const commentCount = new Map<string, number>()
+  for (const c of (comments ?? []) as { ticket_id: string }[]) commentCount.set(c.ticket_id, (commentCount.get(c.ticket_id) ?? 0) + 1)
+  const open = rows.filter((t) => t.status === "open" || t.status === "in_progress")
+  return {
+    filter: status,
+    all_tickets_by_status: tally((all ?? []) as { status: string }[], (t) => t.status),
+    all_tickets_by_priority: tally((all ?? []) as { priority: string | null }[], (t) => t.priority),
+    matching: rows.length,
+    unassigned_open: open.filter((t) => !t.assigned_to).length,
+    oldest_open_days: open.length ? dayAge(open[0].created_at) : null,
+    by_module: tally(rows, (t) => t.module),
+    by_type: tally(rows, (t) => t.ticket_type),
+    tickets_oldest_first: rows.slice(0, limit).map((t) => ({
+      ticket_id: t.id,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      type: t.ticket_type,
+      module: t.module,
+      reported_by: names.get(String(t.reported_by)) ?? "Unknown",
+      assigned_to: t.assigned_to ? names.get(String(t.assigned_to)) ?? "Unknown" : null,
+      opened: t.created_at.slice(0, 10),
+      days_open: t.resolved_at ? null : dayAge(t.created_at),
+      resolved_on: t.resolved_at?.slice(0, 10) ?? null,
+      comments: commentCount.get(t.id) ?? 0,
+      page: t.page_url,
+      device: [t.device_type, t.browser].filter(Boolean).join(" · ") || null,
+      description: (t.description ?? "").slice(0, 200) || null,
+    })),
+    where_in_dashboard: "Communication → Support; each ticket opens with its comment thread",
+  }
+}
+
+/** Company purchases (the tax ledger): totals by category, entity, month and tax type, plus the invoices. */
+async function companyPurchases(admin: Admin, args: { from_date?: string; to_date?: string; year?: number; category?: string; entity?: string; limit?: number }) {
+  const limit = Math.min(Math.max(args.limit ?? 20, 1), 100)
+  const year = args.year ?? new Date().getUTCFullYear()
+  const from = (args.from_date ?? "").trim() || `${year}-01-01`
+  const to = (args.to_date ?? "").trim() || `${year + 1}-01-01`
+  const { data, error } = await admin
+    .from("purchases")
+    .select("id, tax_entity_id, tax_month, tax_type, invoice_number, gross_taxable, total_actual_amount, category_id, currency_code, notes, created_by, created_at")
+    .is("deleted_at", null)
+    .gte("tax_month", from)
+    .lt("tax_month", to)
+    .order("tax_month", { ascending: false })
+    .limit(5000)
+  if (error) throw new Error(error.message)
+  type Purchase = { id: string; tax_entity_id: string | null; tax_month: string; tax_type: string | null; invoice_number: string | null; gross_taxable: number | string | null; total_actual_amount: number | string | null; category_id: string | null; currency_code: string | null; notes: string | null; created_by: string | null; created_at: string }
+  let rows = (data ?? []) as Purchase[]
+  const [{ data: cats }, { data: ents }] = await Promise.all([
+    admin.from("purchase_categories").select("id, category_name, category_type"),
+    admin.from("company_tax_entities").select("id, registered_name, trade_name, currency_code"),
+  ])
+  const catName = new Map(((cats ?? []) as { id: string; category_name: string; category_type: string | null }[]).map((c) => [c.id, c.category_name]))
+  const entName = new Map(((ents ?? []) as { id: string; registered_name: string; trade_name: string | null }[]).map((e) => [e.id, e.trade_name || e.registered_name]))
+  if (args.category?.trim()) rows = rows.filter((r) => (catName.get(String(r.category_id)) ?? "").toLowerCase().includes(args.category!.trim().toLowerCase()))
+  if (args.entity?.trim()) rows = rows.filter((r) => (entName.get(String(r.tax_entity_id)) ?? "").toLowerCase().includes(args.entity!.trim().toLowerCase()))
+  const num = (v: number | string | null) => Number(v ?? 0) || 0
+  const sumBy = (key: (r: Purchase) => string) => {
+    const m = new Map<string, { count: number; gross_taxable: number; total_actual: number }>()
+    for (const r of rows) {
+      const k = key(r)
+      const cur = m.get(k) ?? { count: 0, gross_taxable: 0, total_actual: 0 }
+      cur.count++
+      cur.gross_taxable += num(r.gross_taxable)
+      cur.total_actual += num(r.total_actual_amount)
+      m.set(k, cur)
+    }
+    return [...m.entries()].map(([name, v]) => ({ name, count: v.count, gross_taxable: Math.round(v.gross_taxable), total_actual: Math.round(v.total_actual) })).sort((a, b) => b.total_actual - a.total_actual)
+  }
+  const creators = await profileNames(admin, rows.map((r) => r.created_by))
+  const currency = rows[0]?.currency_code?.trim() || "AED"
+  return {
+    period: { from, to_exclusive: to },
+    filters: { category: args.category ?? null, entity: args.entity ?? null },
+    currency,
+    totals: { purchases: rows.length, gross_taxable: Math.round(rows.reduce((a, r) => a + num(r.gross_taxable), 0)), total_actual_amount: Math.round(rows.reduce((a, r) => a + num(r.total_actual_amount), 0)) },
+    by_category: sumBy((r) => catName.get(String(r.category_id)) ?? "Uncategorised"),
+    by_entity: sumBy((r) => entName.get(String(r.tax_entity_id)) ?? "No entity"),
+    by_month: sumBy((r) => r.tax_month.slice(0, 7)).sort((a, b) => a.name.localeCompare(b.name)),
+    by_tax_type: sumBy((r) => r.tax_type ?? "Not given"),
+    newest: rows.slice(0, limit).map((r) => ({
+      tax_month: r.tax_month.slice(0, 7),
+      invoice: r.invoice_number,
+      category: catName.get(String(r.category_id)) ?? null,
+      entity: entName.get(String(r.tax_entity_id)) ?? null,
+      tax_type: r.tax_type,
+      gross_taxable: Math.round(num(r.gross_taxable)),
+      total_actual_amount: Math.round(num(r.total_actual_amount)),
+      notes: (r.notes ?? "").slice(0, 120) || null,
+      recorded_by: creators.get(String(r.created_by)) ?? null,
+      recorded_on: r.created_at.slice(0, 10),
+    })),
+    where_in_dashboard: "Purchases (with Purchase Categories and Tax Entities alongside)",
+  }
+}
+
+/** Who has an agent website, whether it is live, and its address. */
+async function agentWebsites(admin: Admin, args: { agent_name?: string; published_only?: boolean; limit?: number }) {
+  const limit = Math.min(Math.max(args.limit ?? 40, 1), 200)
+  const { data, error } = await admin
+    .from("website_builder")
+    .select("id, agent_id, title, slug, is_published, created_at, updated_at, contact, show_reviews")
+    .order("updated_at", { ascending: false })
+    .limit(1000)
+  if (error) throw new Error(error.message)
+  type Site = { id: string; agent_id: string; title: string | null; slug: string | null; is_published: boolean | null; created_at: string; updated_at: string | null; contact: Record<string, unknown> | null; show_reviews: boolean | null }
+  let rows = (data ?? []) as Site[]
+  const names = await profileNames(admin, rows.map((s) => s.agent_id))
+  let agentMatches: string[] | null = null
+  if (args.agent_name?.trim()) {
+    const found = await findProfiles(admin, args.agent_name)
+    if (!found.length) return { error: `No FHI member matching "${args.agent_name}"` }
+    const ids = new Set(found.map((p) => p.id))
+    agentMatches = found.map((p) => p.fullname ?? "Unknown")
+    rows = rows.filter((s) => ids.has(String(s.agent_id)))
+  }
+  if (args.published_only) rows = rows.filter((s) => s.is_published)
+  const [{ count: events }, { count: listings }] = await Promise.all([
+    admin.from("events").select("id", { count: "exact", head: true }).not("agent_id", "is", null),
+    admin.from("agent_listings").select("id", { count: "exact", head: true }).is("deleted_at", null).eq("status", "published"),
+  ])
+  const base = SITE_URL.replace(/\/$/, "")
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null)
+  return {
+    filters: { agent_name_matched: agentMatches, published_only: Boolean(args.published_only) },
+    total_websites: rows.length,
+    published: rows.filter((s) => s.is_published).length,
+    drafts_not_live: rows.filter((s) => !s.is_published).length,
+    agent_run_events_total: events ?? 0,
+    published_listings_total: listings ?? 0,
+    websites: rows.slice(0, limit).map((s) => ({
+      agent: names.get(String(s.agent_id)) ?? "Unknown",
+      title: s.title,
+      live: Boolean(s.is_published),
+      url: s.slug ? `${base}/website/${s.slug}` : null,
+      phone: str(s.contact?.phone) ?? str(s.contact?.whatsapp) ?? null,
+      email: str(s.contact?.email),
+      reviews_shown: Boolean(s.show_reviews),
+      created: s.created_at.slice(0, 10),
+      last_updated: s.updated_at?.slice(0, 10) ?? null,
+    })),
+    where_in_dashboard: "Each agent edits theirs under Website Builder; admins see all under Agent Websites",
+  }
+}
+
+/** Agents' own listings (sale and rent): who lists what, at what price, live or draft. */
+async function listingsOverview(admin: Admin, args: { agent_name?: string; kind?: "sale" | "rent"; status?: string; project_name?: string; min_price?: number; max_price?: number; search?: string; limit?: number }) {
+  const limit = Math.min(Math.max(args.limit ?? 20, 1), 100)
+  let q = admin
+    .from("agent_listings")
+    .select("id, agent_id, project_id, title, description, listing_kind, price, currency, status, unit_type, slug, is_featured, created_at, updated_at, projects(name, community, city)")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(2000)
+  const status = (args.status ?? "published").trim()
+  if (status !== "all") q = q.eq("status", status)
+  if (args.kind) q = q.eq("listing_kind", args.kind)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  type Listing = { id: string; agent_id: string; project_id: number | null; title: string | null; description: string | null; listing_kind: string; price: number | string | null; currency: string | null; status: string; unit_type: string | null; slug: string | null; is_featured: boolean | null; created_at: string; updated_at: string | null; projects: { name: string; community: string | null; city: string | null } | { name: string; community: string | null; city: string | null }[] | null }
+  let rows = (data ?? []) as Listing[]
+  const proj = (l: Listing) => (Array.isArray(l.projects) ? l.projects[0] ?? null : l.projects)
+  const lc = (s: string | null | undefined) => (s ?? "").toLowerCase()
+  let agentMatches: string[] | null = null
+  if (args.agent_name?.trim()) {
+    const found = await findProfiles(admin, args.agent_name)
+    if (!found.length) return { error: `No FHI member matching "${args.agent_name}"` }
+    const ids = new Set(found.map((p) => p.id))
+    agentMatches = found.map((p) => p.fullname ?? "Unknown")
+    rows = rows.filter((l) => ids.has(String(l.agent_id)))
+  }
+  if (args.project_name?.trim()) rows = rows.filter((l) => lc(proj(l)?.name).includes(args.project_name!.trim().toLowerCase()))
+  if (args.search?.trim()) {
+    const n = args.search.trim().toLowerCase()
+    rows = rows.filter((l) => lc(l.title).includes(n) || lc(l.description).includes(n) || lc(proj(l)?.community).includes(n) || lc(proj(l)?.name).includes(n))
+  }
+  const price = (l: Listing) => Number(l.price ?? 0) || null
+  if (typeof args.min_price === "number") rows = rows.filter((l) => (price(l) ?? 0) >= args.min_price!)
+  if (typeof args.max_price === "number") rows = rows.filter((l) => price(l) != null && price(l)! <= args.max_price!)
+  const names = await profileNames(admin, rows.map((l) => l.agent_id))
+  const base = SITE_URL.replace(/\/$/, "")
+  const { data: all } = await admin.from("agent_listings").select("status, listing_kind").is("deleted_at", null)
+  return {
+    filters: { agent_name_matched: agentMatches, kind: args.kind ?? "both", status, project: args.project_name ?? null, search: args.search ?? null },
+    all_listings_by_status: tally((all ?? []) as { status: string }[], (l) => l.status),
+    all_listings_by_kind: tally((all ?? []) as { listing_kind: string }[], (l) => l.listing_kind),
+    matching: rows.length,
+    by_agent: tally(rows, (l) => names.get(String(l.agent_id)) ?? "Unknown", 15),
+    by_project: tally(rows, (l) => proj(l)?.name),
+    by_unit_type: tally(rows, (l) => l.unit_type),
+    listings: rows.slice(0, limit).map((l) => ({
+      title: l.title,
+      kind: l.listing_kind,
+      status: l.status,
+      price: price(l),
+      price_label: price(l) != null ? `${l.currency ?? "AED"} ${price(l)!.toLocaleString("en-AE")}${l.listing_kind === "rent" ? " / year" : ""}` : null,
+      unit_type: l.unit_type,
+      project: proj(l)?.name ?? null,
+      area: [proj(l)?.community, proj(l)?.city].filter(Boolean).join(", ") || null,
+      agent: names.get(String(l.agent_id)) ?? "Unknown",
+      featured: Boolean(l.is_featured),
+      url: l.status === "published" ? `${base}/listings/${l.slug ?? l.id}` : null,
+      created: l.created_at.slice(0, 10),
+    })),
+    where_in_dashboard: "Listings (admins see every agent's; agents their own)",
+  }
+}
+
+/** The client book: buyers recorded on sales, who brought them, where they are from. */
+async function clientsOverview(admin: Admin, args: { agent_name?: string; search?: string; country?: string; limit?: number }) {
+  const limit = Math.min(Math.max(args.limit ?? 25, 1), 100)
+  const { data, error } = await admin
+    .from("clients")
+    .select("id, first_name, middle_name, last_name, email, phone, age, gender, occupation, city, state_province, country, created_at, created_by")
+    .order("created_at", { ascending: false })
+    .limit(5000)
+  if (error) throw new Error(error.message)
+  type Client = { id: string; first_name: string | null; middle_name: string | null; last_name: string | null; email: string | null; phone: string | null; age: number | null; gender: string | null; occupation: string | null; city: string | null; state_province: string | null; country: string | null; created_at: string; created_by: string | null }
+  let rows = (data ?? []) as Client[]
+  const total = rows.length
+  const lc = (s: string | null | undefined) => (s ?? "").toLowerCase()
+  const fullName = (c: Client) => [c.first_name, c.middle_name, c.last_name].filter(Boolean).join(" ").trim() || "Unnamed"
+  let agentMatches: string[] | null = null
+  if (args.agent_name?.trim()) {
+    const found = await findProfiles(admin, args.agent_name)
+    if (!found.length) return { error: `No FHI member matching "${args.agent_name}"` }
+    const ids = new Set(found.map((p) => p.id))
+    agentMatches = found.map((p) => p.fullname ?? "Unknown")
+    rows = rows.filter((c) => ids.has(String(c.created_by)))
+  }
+  if (args.country?.trim()) rows = rows.filter((c) => lc(c.country).includes(args.country!.trim().toLowerCase()))
+  if (args.search?.trim()) {
+    const n = args.search.trim().toLowerCase()
+    rows = rows.filter((c) => lc(fullName(c)).includes(n) || lc(c.email).includes(n) || (c.phone ?? "").replace(/\D/g, "").includes(n.replace(/\D/g, "") || "§"))
+  }
+  const [{ data: sales }, names] = await Promise.all([
+    admin.from("sales_reports").select("client_id, contract_price, validation_status, project_id, projects(name)").in("client_id", rows.map((c) => c.id).slice(0, 1000)),
+    profileNames(admin, rows.map((c) => c.created_by)),
+  ])
+  const byClient = new Map<string, { deals: number; validated_value: number; projects: string[] }>()
+  for (const s of (sales ?? []) as { client_id: string; contract_price: number | string | null; validation_status: string | null; projects: { name: string } | { name: string }[] | null }[]) {
+    const cur = byClient.get(s.client_id) ?? { deals: 0, validated_value: 0, projects: [] }
+    cur.deals++
+    if (s.validation_status === "validated") cur.validated_value += Number(s.contract_price ?? 0) || 0
+    const p = Array.isArray(s.projects) ? s.projects[0] : s.projects
+    if (p?.name && !cur.projects.includes(p.name)) cur.projects.push(p.name)
+    byClient.set(s.client_id, cur)
+  }
+  return {
+    filters: { agent_name_matched: agentMatches, country: args.country ?? null, search: args.search ?? null },
+    clients_total: total,
+    matching: rows.length,
+    by_country: tally(rows, (c) => c.country),
+    by_city: tally(rows, (c) => c.city),
+    by_agent: tally(rows, (c) => names.get(String(c.created_by)) ?? "Unknown", 15),
+    by_gender: tally(rows, (c) => c.gender),
+    newest: rows.slice(0, limit).map((c) => ({
+      name: fullName(c),
+      email: c.email,
+      phone: c.phone,
+      age: c.age,
+      occupation: c.occupation,
+      from: [c.city, c.state_province, c.country].filter(Boolean).join(", ") || null,
+      recorded_by: names.get(String(c.created_by)) ?? null,
+      recorded_on: c.created_at.slice(0, 10),
+      deals: byClient.get(c.id)?.deals ?? 0,
+      validated_value_aed: Math.round(byClient.get(c.id)?.validated_value ?? 0),
+      projects: byClient.get(c.id)?.projects ?? [],
+    })),
+    note: "Clients are the buyers recorded on Record Your Sale — one row per buyer, linked to their sales",
+  }
+}
+
 // ─── OpenAI tool definitions + dispatcher ────────────────────────────────────
 
 export const FHI_CHAT_TOOLS = [
@@ -3332,6 +3647,46 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "support_tickets",
+      description: "SUPPORT TICKETS: what is still open or in progress (oldest first, days open, unassigned), by module and type, with reporter, assignee and comment count; resolved/closed on request. Use for 'any open tickets', 'oldest unresolved ticket', 'what are people reporting', 'tickets nobody picked up'.",
+      parameters: { type: "object", properties: {"status":{"type":"string","enum":["open","in_progress","resolved","closed","all"],"description":"Default open = open + in_progress"},"limit":{"type":"integer","description":"Default 20, max 60"}} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "company_purchases",
+      description: "COMPANY PURCHASES / EXPENSES (the tax ledger under Purchases): totals by category, tax entity, month and tax type, plus the invoices, for a year or a date range. Use for 'how much did we spend this month/year', 'expenses by category', 'purchases of entity X', 'VAT purchases'. Amounts as recorded (gross taxable and total actual).",
+      parameters: { type: "object", properties: {"from_date":{"type":"string","description":"YYYY-MM-DD on tax_month, inclusive"},"to_date":{"type":"string","description":"YYYY-MM-DD exclusive"},"year":{"type":"integer","description":"Whole year when no dates given (default current year)"},"category":{"type":"string","description":"Partial category name"},"entity":{"type":"string","description":"Partial tax entity name"},"limit":{"type":"integer"}} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "agent_websites",
+      description: "AGENT WEBSITES (Website Builder): how many agents have a website, which are live vs draft, each site's agent, title, address, contact and last update. Use for 'who has a website', 'is X's website live', 'how many agent websites'.",
+      parameters: { type: "object", properties: {"agent_name":{"type":"string","description":"One agent (partial name ok)"},"published_only":{"type":"boolean"},"limit":{"type":"integer"}} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "listings_overview",
+      description: "AGENT LISTINGS (sale and rent units agents list themselves — NOT developer projects): counts by status/kind/agent/project, and the listings with price, unit type, project, area, agent and public link. Filters: agent, sale|rent, status, project, budget, free text (area, title). Use for 'how many listings', 'who has the most listings', 'rent listings in Marina', 'X's listings', 'listings under 2M'.",
+      parameters: { type: "object", properties: {"agent_name":{"type":"string"},"kind":{"type":"string","enum":["sale","rent"]},"status":{"type":"string","enum":["published","draft","archived","all"],"description":"Default published"},"project_name":{"type":"string"},"min_price":{"type":"number"},"max_price":{"type":"number"},"search":{"type":"string","description":"Matches title, description, project or community"},"limit":{"type":"integer"}} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "clients_overview",
+      description: "CLIENTS (buyers recorded on sales): total, by country/city/agent, and the client list with contact details, who recorded them, their deals and projects. Filters: agent, country, search by name/email/phone. Use for 'how many clients', 'clients of Michelle', 'clients from the Philippines', 'find client Juan'.",
+      parameters: { type: "object", properties: {"agent_name":{"type":"string"},"country":{"type":"string"},"search":{"type":"string"},"limit":{"type":"integer"}} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "find_projects",
       description:
         "SHORTLIST projects by what a buyer wants — area/community (JVC, Dubai Marina, Business Bay…), developer, number of bedrooms (0 = studio), property type (apartment, villa, townhouse), budget (min/max AED), handover year, off-plan or ready. Returns the matching published projects sorted (cheapest first when a budget or bedroom count is given) with price, handover, unit mix, sizes, payment plan and the page link, plus counts by developer/area/handover year. Use for 'cheapest 1-bedroom in JVC', 'Azizi projects handing over 2027', 'villas under AED 3M', 'what do we have in Dubai South', 'ready apartments'. For everything about ONE named project use project_details instead.",
@@ -3463,6 +3818,11 @@ export async function runFhiChatTool(
       case "leads_overview": result = await leadsOverview(admin, args as LeadsArgs); break
       case "find_projects": result = await findProjects(admin, args as FindProjectsArgs); break
       case "sales_pipeline": result = await salesPipeline(admin, args as PipelineArgs); break
+      case "support_tickets": result = await supportTickets(admin, args); break
+      case "company_purchases": result = await companyPurchases(admin, args); break
+      case "agent_websites": result = await agentWebsites(admin, args); break
+      case "listings_overview": result = await listingsOverview(admin, args as Parameters<typeof listingsOverview>[1]); break
+      case "clients_overview": result = await clientsOverview(admin, args); break
       case "project_details": result = await projectDetails(admin, args); break
       case "event_attendees": result = await eventAttendees(admin, args); break
       case "new_accounts": result = await newAccounts(admin, args); break
