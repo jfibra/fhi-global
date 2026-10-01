@@ -22,6 +22,16 @@ export type ContactSubmission = {
   deleted_at: string | null
 }
 
+export type ContactReply = {
+  id: string
+  subject: string
+  body_text: string
+  sent_by_name: string | null
+  status: "sent" | "failed"
+  error: string | null
+  created_at: string
+}
+
 export type ContactInboxSummary = { total: number; unread: number }
 
 export type ContactInboxQuery = {
@@ -73,14 +83,33 @@ export async function fetchContactInbox(query: ContactInboxQuery): Promise<Conta
 /** Fetch one submission. Server-side this marks a 'new' submission as read. */
 export async function fetchContactSubmission(
   id: string,
-): Promise<{ data: ContactSubmission | null; error: string | null }> {
+): Promise<{ data: ContactSubmission | null; replies: ContactReply[]; error: string | null }> {
   try {
     const res = await fetch(`/api/admin/contact-inbox/${id}`, { cache: "no-store" })
-    if (!res.ok) return { data: null, error: await readError(res) }
-    const json = (await res.json()) as { submission: ContactSubmission }
-    return { data: json.submission ?? null, error: null }
+    if (!res.ok) return { data: null, replies: [], error: await readError(res) }
+    const json = (await res.json()) as { submission: ContactSubmission; replies?: ContactReply[] }
+    return { data: json.submission ?? null, replies: json.replies ?? [], error: null }
   } catch (error) {
-    return { data: null, error: (error as Error).message }
+    return { data: null, replies: [], error: (error as Error).message }
+  }
+}
+
+/** Email a reply from the house mailbox; the thread records it. */
+export async function sendContactReply(
+  id: string,
+  input: { subject: string; message: string },
+): Promise<{ reply: ContactReply | null; error: string | null }> {
+  try {
+    const res = await fetch(`/api/admin/contact-inbox/${id}/reply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    })
+    const json = (await res.json().catch(() => ({}))) as { reply?: ContactReply; error?: string }
+    if (!res.ok) return { reply: json.reply ?? null, error: json.error ?? `Request failed (${res.status})` }
+    return { reply: json.reply ?? null, error: null }
+  } catch (error) {
+    return { reply: null, error: (error as Error).message }
   }
 }
 

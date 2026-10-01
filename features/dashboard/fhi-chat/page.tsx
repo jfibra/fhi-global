@@ -415,6 +415,8 @@ const TOOL_LABELS: Record<string, string> = {
   member_lookup: "Member lookup",
   owner_documents: "Owner documents",
   teams_detail: "Teams",
+  news_overview: "Website news",
+  data_health: "Data health",
 }
 
 /** Branded print view — parses the plain-text answer into a real report

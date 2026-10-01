@@ -11,6 +11,7 @@ import { renderTopSellerCertificatePng } from "@/lib/congrats-poster"
 import { formatPrice, handoverLabel, isOffPlan, parsePaymentPlan, priceFromValue, priceToValue, statusLabel, unitsSummary, type ProjectSeoInput } from "@/lib/project-seo"
 import { ROLES_SALES_PIPELINE } from "@/lib/app-roles"
 import { RECOMMEND_LABELS, type RecommendValue } from "@/lib/feedback-service"
+import { fetchArticlesList, isIndexableNewsArticle, type NewsArticle } from "@/lib/news-service"
 import { BUYER_LEAD_COLUMNS, LEAD_GRADES, answerLabel, budgetLabel, leadGrade, sellerAnswerLabel, waDigits, type BuyerLead, type LeadGrade } from "@/lib/buyer-links"
 
 /**
@@ -3132,7 +3133,7 @@ async function salesPipeline(admin: Admin, args: PipelineArgs) {
         .map((p) => ({ name: p.fullname, role: p.role, joined: p.joined_at?.slice(0, 10) ?? null, last_validated_sale: lastSale.get(String(p.id)) ?? "never" })),
       list_note: quiet.length > Math.max(limit, 40) ? `Showing ${Math.max(limit, 40)} of ${quiet.length}: those who sold before are listed first, then those who never sold` : null,
     }
-    ;(out._stats as FhiChatStat[]).push(stat("Quiet agents", quiet.length, null, `of ${rows.length} selling accounts, ${scope}`))
+    ;(out._stats as FhiChatStat[]).push(stat("Quiet agents", quiet.length, null, `of ${rows.length} selling accounts, ${args.quiet_from_date ? "in the period" : scope === "month" ? "this month" : scope === "year" ? "this year" : "this quarter"}`))
     ;(out._charts as FhiChatChart[]).push(
       ...pieChart("Selling accounts: sold vs quiet", [{ name: "sold this period", count: rows.length - quiet.length }, { name: "quiet", count: quiet.length }]),
       ...pieChart("Quiet agents by role", objCounts(byRole(quiet))),
@@ -4103,6 +4104,173 @@ async function eventEngagement(admin: Admin, args: { event_title?: string; limit
   }
 }
 
+// ─── Website news + data health ──────────────────────────────────────────────
+
+/** The news feed as the public site shows it: latest stories, most read, by category. */
+async function newsOverview(_admin: Admin, args: { limit?: number; search?: string; category?: string }) {
+  const limit = Math.min(Math.max(args.limit ?? 8, 1), 25)
+  const pages = await Promise.all([1, 2, 3].map((page) => fetchArticlesList({ page, perPage: 50, search: args.search?.trim() || undefined }).catch(() => null)))
+  const seen = new Set<string>()
+  let articles = pages.flatMap((p) => p?.articles ?? []).filter((a) => (seen.has(a.id) ? false : (seen.add(a.id), true)))
+  if (args.category?.trim()) {
+    const c = args.category.trim().toLowerCase()
+    articles = articles.filter((a) => (a.category ?? "").toLowerCase().includes(c) || (a.categorySlug ?? "").includes(c))
+  }
+  if (!articles.length) return { error: pages.every((p) => p === null) ? "The news feed is unavailable right now" : "No articles match" }
+  const base = SITE_URL.replace(/\/$/, "")
+  const line = (a: NewsArticle) => ({
+    title: a.title,
+    published: (a.publishedAt ?? a.date ?? "").slice(0, 10) || null,
+    category: a.category ?? null,
+    views: a.viewsCount ?? null,
+    author: a.author ?? null,
+    indexable_for_google: isIndexableNewsArticle(a),
+    url: a.slug ? `${base}/news/${a.slug}` : null,
+  })
+  const byDate = [...articles].sort((a, b) => (b.publishedAt ?? b.date ?? "").localeCompare(a.publishedAt ?? a.date ?? ""))
+  const withViews = articles.filter((a) => typeof a.viewsCount === "number")
+  const mostRead = [...withViews].sort((a, b) => (b.viewsCount ?? 0) - (a.viewsCount ?? 0))
+  const last7 = byDate.filter((a) => Date.parse(a.publishedAt ?? a.date ?? "") > Date.now() - 7 * 86400e3)
+  return {
+    source: "HomesPH news feed as shown on fhiglobal.ae/news (views counted on our site)",
+    articles_checked: articles.length,
+    total_in_feed: pages[0]?.total ?? null,
+    published_last_7_days: last7.length,
+    published_last_30_days: byDate.filter((a) => Date.parse(a.publishedAt ?? a.date ?? "") > Date.now() - 30 * 86400e3).length,
+    total_views_on_checked: withViews.reduce((s, a) => s + (a.viewsCount ?? 0), 0),
+    by_category: tally(articles, (a) => a.category),
+    latest: byDate.slice(0, limit).map(line),
+    most_read: mostRead.slice(0, limit).map(line),
+    _stats: [
+      stat("Articles in feed", pages[0]?.total ?? articles.length),
+      stat("Published last 7 days", last7.length),
+      stat("Most read", mostRead[0] ? `${(mostRead[0].viewsCount ?? 0).toLocaleString("en-AE")} views` : "–", null, mostRead[0]?.title ?? null),
+      stat("Categories", tally(articles, (a) => a.category, 50).filter((c) => c.name !== "Not given").length),
+    ],
+    _charts: [
+      ...sharesChart("Most read articles", mostRead.slice(0, 8).map((a) => ({ name: a.title.length > 48 ? `${a.title.slice(0, 46)}…` : a.title, count: a.viewsCount ?? 0 }))),
+      ...pieChart("Articles by category", tally(articles, (a) => a.category, 6)),
+    ],
+    where_on_site: "/news (homepage carousel shows the newest)",
+  }
+}
+
+/**
+ * What is missing on the site's own records — the gaps that make other
+ * answers weaker: projects without a price, payment plan, photo, handover,
+ * map pin or permit; listings without a price; clients sharing one contact.
+ */
+async function dataHealth(admin: Admin, args: { area?: "projects" | "listings" | "clients" | "all"; limit?: number }) {
+  const area = args.area ?? "all"
+  const limit = Math.min(Math.max(args.limit ?? 15, 1), 60)
+  const out: Record<string, unknown> = { checked_on: new Date().toISOString().slice(0, 10) }
+  const stats: FhiChatStat[] = []
+  const charts: FhiChatChart[] = []
+
+  if (area === "all" || area === "projects") {
+    const { data, error } = await admin
+      .from("projects")
+      .select("id, name, slug, launch_price_from, payment_plan_details, main_image, delivery_quarter, expected_completion_date, delivery_date, latitude, longitude, trakheesi_permit_number, trakheesi_permit_link, community, location, city, description, developers(name, slug), project_units(id)")
+      .is("deleted_at", null)
+      .eq("is_active", true)
+      .eq("is_published", true)
+      .limit(1000)
+    if (error) throw new Error(error.message)
+    type P = { id: number; name: string; slug: string; launch_price_from: number | string | null; payment_plan_details: string | null; main_image: string | null; delivery_quarter: string | null; expected_completion_date: string | null; delivery_date: string | null; latitude: string | null; longitude: string | null; trakheesi_permit_number: string | null; trakheesi_permit_link: string | null; community: string | null; location: string | null; city: string | null; description: string | null; developers: { name: string; slug: string | null } | { name: string; slug: string | null }[] | null; project_units: { id: number }[] | null }
+    const rows = (data ?? []) as P[]
+    const blank = (v: unknown) => v == null || (typeof v === "string" && v.trim() === "")
+    const checks: Array<[string, (p: P) => boolean]> = [
+      ["no price", (p) => blank(p.launch_price_from) && !(p.project_units ?? []).length],
+      ["no payment plan", (p) => blank(p.payment_plan_details)],
+      ["no photo", (p) => blank(p.main_image)],
+      ["no handover date", (p) => blank(p.delivery_quarter) && blank(p.expected_completion_date) && blank(p.delivery_date)],
+      ["no map pin", (p) => blank(p.latitude) || blank(p.longitude)],
+      ["no permit number", (p) => blank(p.trakheesi_permit_number) && blank(p.trakheesi_permit_link)],
+      ["no unit table", (p) => !(p.project_units ?? []).length],
+      ["no area", (p) => blank(p.community) && blank(p.location)],
+      ["no description", (p) => blank(p.description)],
+    ]
+    const gaps = rows.map((p) => ({ p, missing: checks.filter(([, f]) => f(p)).map(([k]) => k) }))
+    const counts = checks.map(([k]) => ({ name: k, count: gaps.filter((g) => g.missing.includes(k)).length }))
+    const complete = gaps.filter((g) => g.missing.length === 0).length
+    const base = SITE_URL.replace(/\/$/, "")
+    const url = (p: P) => {
+      const d = Array.isArray(p.developers) ? p.developers[0] : p.developers
+      return d?.slug ? `${base}/${d.slug}/${p.slug}` : null
+    }
+    out.projects = {
+      published: rows.length,
+      complete_on_every_check: complete,
+      gaps_by_check: counts,
+      most_incomplete: [...gaps]
+        .sort((a, b) => b.missing.length - a.missing.length || a.p.name.localeCompare(b.p.name))
+        .slice(0, limit)
+        .map((g) => ({ project: g.p.name, developer: (Array.isArray(g.p.developers) ? g.p.developers[0] : g.p.developers)?.name ?? null, missing: g.missing, page: url(g.p) })),
+      by_developer_missing_payment_plan: tally(gaps.filter((g) => g.missing.includes("no payment plan")), (g) => (Array.isArray(g.p.developers) ? g.p.developers[0] : g.p.developers)?.name ?? "Unknown", 8),
+      where_to_fix: "Projects → edit the project (price, payment plan, photos, handover, map pin, permit)",
+    }
+    stats.push(stat("Published projects", rows.length, null, `${complete} complete on every check`), stat("No payment plan", counts.find((c) => c.name === "no payment plan")?.count ?? 0), stat("No handover date", counts.find((c) => c.name === "no handover date")?.count ?? 0), stat("No map pin", counts.find((c) => c.name === "no map pin")?.count ?? 0))
+    charts.push(...barsChart("Projects missing…", counts.filter((c) => c.count > 0).map((c) => ({ label: c.name.replace(/^no /, ""), value: c.count, display: String(c.count) }))))
+  }
+
+  if (area === "all" || area === "listings") {
+    const { data, error } = await admin.from("agent_listings").select("id, title, price, unit_type, project_id, agent_id, status, slug").is("deleted_at", null).neq("status", "archived").limit(2000)
+    if (error) throw new Error(error.message)
+    type L = { id: string; title: string | null; price: number | string | null; unit_type: string | null; project_id: number | null; agent_id: string; status: string; slug: string | null }
+    const rows = (data ?? []) as L[]
+    const { data: imgs } = rows.length ? await admin.from("agent_listing_images").select("listing_id").in("listing_id", rows.map((l) => l.id)) : { data: [] }
+    const withImg = new Set(((imgs ?? []) as { listing_id: string }[]).map((i) => i.listing_id))
+    const names = await profileNames(admin, rows.map((l) => l.agent_id))
+    const noPrice = rows.filter((l) => !(Number(l.price ?? 0) > 0))
+    const noPhoto = rows.filter((l) => !withImg.has(l.id))
+    const noType = rows.filter((l) => !l.unit_type)
+    const drafts = rows.filter((l) => l.status === "draft")
+    out.listings = {
+      live_or_draft: rows.length,
+      no_price: noPrice.length,
+      no_photo: noPhoto.length,
+      no_unit_type: noType.length,
+      drafts_never_published: drafts.length,
+      fix_list: rows
+        .map((l) => ({ l, missing: [!(Number(l.price ?? 0) > 0) && "no price", !withImg.has(l.id) && "no photo", !l.unit_type && "no unit type", !l.project_id && "no project linked"].filter(Boolean) as string[] }))
+        .filter((x) => x.missing.length)
+        .slice(0, limit)
+        .map((x) => ({ listing: x.l.title, agent: names.get(String(x.l.agent_id)) ?? "Unknown", status: x.l.status, missing: x.missing })),
+      where_to_fix: "Listings → the agent edits their own; admins can edit any",
+    }
+    stats.push(stat("Listings without a price", noPrice.length, null, `of ${rows.length}`))
+  }
+
+  if (area === "all" || area === "clients") {
+    const { data, error } = await admin.from("clients").select("id, first_name, last_name, email, phone, country, created_by").limit(5000)
+    if (error) throw new Error(error.message)
+    type C = { id: string; first_name: string | null; last_name: string | null; email: string | null; phone: string | null; country: string | null; created_by: string | null }
+    const rows = (data ?? []) as C[]
+    const byEmail = new Map<string, C[]>()
+    for (const c of rows) {
+      const e = (c.email ?? "").trim().toLowerCase()
+      if (e) byEmail.set(e, [...(byEmail.get(e) ?? []), c])
+    }
+    const shared = [...byEmail.entries()].filter(([, list]) => list.length > 1)
+    const names = await profileNames(admin, rows.map((c) => c.created_by))
+    out.clients = {
+      total: rows.length,
+      missing_email: rows.filter((c) => !c.email?.trim()).length,
+      missing_phone: rows.filter((c) => !c.phone?.trim()).length,
+      missing_country: rows.filter((c) => !c.country?.trim()).length,
+      clients_sharing_one_email: shared.reduce((a, [, l]) => a + l.length, 0),
+      shared_emails: shared.slice(0, limit).map(([email, list]) => ({ email, clients: list.map((c) => [c.first_name, c.last_name].filter(Boolean).join(" ")), recorded_by: [...new Set(list.map((c) => names.get(String(c.created_by)) ?? "Unknown"))] })),
+      note: "Several clients on one email usually means the agent typed their own address as a placeholder — the client can't be contacted",
+      where_to_fix: "Sales → open the sale → client details",
+    }
+    stats.push(stat("Clients sharing one email", shared.reduce((a, [, l]) => a + l.length, 0), null, `of ${rows.length}`))
+  }
+
+  out._stats = stats
+  out._charts = charts
+  return out
+}
+
 // ─── OpenAI tool definitions + dispatcher ────────────────────────────────────
 
 export const FHI_CHAT_TOOLS = [
@@ -4564,6 +4732,22 @@ export const FHI_CHAT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "news_overview",
+      description: "WEBSITE NEWS (the /news feed and homepage carousel): latest articles, MOST READ articles with view counts, how many published this week/month, by category, with links. Use for 'what's the latest news', 'most read article', 'top news this week', 'how many news articles do we have'. Not FHI sales news — these are market articles shown on the site.",
+      parameters: { type: "object", properties: {"limit":{"type":"integer","description":"Articles per list (default 8)"},"search":{"type":"string","description":"Keyword in the articles"},"category":{"type":"string","description":"Partial category name"}} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "data_health",
+      description: "DATA HEALTH / what's MISSING on our own records: published projects without a price, payment plan, photo, handover date, map pin, permit number, unit table, area or description (with the most incomplete projects and which developers' projects lack payment plans); listings without price/photo/unit type; clients sharing one email or missing contacts. Use for 'what's missing on our projects', 'which projects have no payment plan', 'data quality', 'listings without prices', 'duplicate client emails'.",
+      parameters: { type: "object", properties: {"area":{"type":"string","enum":["all","projects","listings","clients"],"description":"Default all"},"limit":{"type":"integer"}} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "find_projects",
       description:
         "SHORTLIST projects by what a buyer wants — area/community (JVC, Dubai Marina, Business Bay…), developer, number of bedrooms (0 = studio), property type (apartment, villa, townhouse), budget (min/max AED), handover year, off-plan or ready. Returns the matching published projects sorted (cheapest first when a budget or bedroom count is given) with price, handover, unit mix, sizes, payment plan and the page link, plus counts by developer/area/handover year. Use for 'cheapest 1-bedroom in JVC', 'Azizi projects handing over 2027', 'villas under AED 3M', 'what do we have in Dubai South', 'ready apartments'. For everything about ONE named project use project_details instead.",
@@ -4705,6 +4889,8 @@ export async function runFhiChatTool(
       case "listings_overview": result = await listingsOverview(admin, args as Parameters<typeof listingsOverview>[1]); break
       case "clients_overview": result = await clientsOverview(admin, args); break
       case "agent_reviews": result = await agentReviews(admin, args); break
+      case "news_overview": result = await newsOverview(admin, args); break
+      case "data_health": result = await dataHealth(admin, args); break
       case "activity_log": result = await activityLog(admin, args); break
       case "member_lookup": result = await memberLookup(admin, args); break
       case "owner_documents": result = await ownerDocuments(admin, args); break

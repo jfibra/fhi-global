@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer"
+import type { PeriodicReport } from "@/lib/periodic-report"
 import { SITE_URL } from "@/lib/seo"
 import { logAuditEvent } from "@/lib/audit-log"
 import type { DailyReport } from "@/lib/daily-report"
@@ -1370,5 +1371,77 @@ export async function sendEventCertificateEmail(input: {
       { filename: "certificate-preview.jpg", content: input.preview, cid: "certificate-preview", contentType: "image/jpeg" },
       { filename: input.filename, content: input.pdf, contentType: "application/pdf" },
     ],
+  })
+}
+
+/**
+ * The Monday / 1st-of-month boss report: headline sentences, the stat tiles
+ * and charts as one inline picture (also attached as a file), then the same
+ * section rows the daily email uses. Same navy/gold shell as every FHI email.
+ */
+export async function sendPeriodicReportEmail(to: string | string[], report: PeriodicReport, picture: Buffer | null): Promise<void> {
+  const subject = `FHI ${report.title} — ${report.periodLabel}`
+  const periodWord = report.kind === "weekly" ? "Last week" : "Last month"
+
+  const highlightsHtml = report.highlights.length
+    ? `
+        <tr>
+          <td style="padding:22px 40px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fbfaf5;border-left:3px solid ${GOLD};">
+              <tr><td style="padding:14px 18px;">
+                ${report.highlights.map((h) => `<p style="margin:0;padding:4px 0;font-size:14px;line-height:1.6;color:#1f2937;">${esc(h)}</p>`).join("")}
+              </td></tr>
+            </table>
+          </td>
+        </tr>`
+    : ""
+
+  const pictureHtml = picture
+    ? `
+        <tr>
+          <td style="padding:22px 40px 0;">
+            <img src="cid:fhi-report-picture" width="520" alt="${esc(report.title)} — headline figures and charts" style="display:block;width:100%;max-width:520px;height:auto;border:1px solid #e8eaed;border-radius:12px;">
+          </td>
+        </tr>`
+    : ""
+
+  const sectionsHtml = report.sections.map((s) => reportSection(s.title, s.rows.map((r) => detailRow(r.label, r.value)).join(""))).join("")
+
+  const bodyHtml = `
+        <tr>
+          <td style="padding:34px 40px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">${esc(report.title)}</p>
+            <h1 style="margin:0 0 6px;font-size:22px;line-height:1.3;font-weight:700;color:#0d1117;">${esc(report.periodLabel)}</h1>
+            <p style="margin:0;font-size:13.5px;line-height:1.6;color:#6b7280;">${periodWord} at FHI Global Property — sales, leads, sign-ups, website and pipeline, with the ${report.kind === "weekly" ? "week" : "month"} before for comparison.</p>
+          </td>
+        </tr>
+        ${highlightsHtml}
+        ${pictureHtml}
+        ${sectionsHtml}
+        <tr>
+          <td style="padding:26px 40px 30px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <p style="margin:0;font-size:11.5px;line-height:1.6;color:#9ca3af;">
+              Generated automatically by FHI Assistant from the live database and Google Analytics. Ask the assistant in the dashboard for any figure in more detail.
+            </p>
+          </td>
+        </tr>`
+
+  const text = [
+    `FHI ${report.title.toUpperCase()} — ${report.periodLabel}`,
+    "",
+    ...report.highlights.map((h) => `- ${h}`),
+    "",
+    ...report.sections.flatMap((s) => [s.title.toUpperCase(), ...s.rows.map((r) => `- ${r.label}: ${r.value}`), ""]),
+  ].join("\n")
+
+  await deliver("PeriodicReportMailer", {
+    from: fromAddress(),
+    to,
+    subject,
+    text,
+    html: eventEmailShell({ subject, preheader: report.highlights[0] ?? `${periodWord} at FHI Global in numbers.`, bodyHtml }),
+    attachments: picture
+      ? [{ filename: `fhi-${report.kind}-report-${report.from}.png`, content: picture, cid: "fhi-report-picture", contentType: "image/png" }]
+      : undefined,
   })
 }

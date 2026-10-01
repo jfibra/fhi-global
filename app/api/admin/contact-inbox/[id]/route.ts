@@ -44,7 +44,13 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
     data.read_at = now
   }
 
-  return NextResponse.json({ submission: data })
+  const { data: replies } = await admin
+    .from("contact_replies")
+    .select("id, subject, body_text, sent_by_name, status, error, created_at")
+    .eq("submission_id", id)
+    .order("created_at", { ascending: true })
+
+  return NextResponse.json({ submission: data, replies: replies ?? [] })
 }
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {

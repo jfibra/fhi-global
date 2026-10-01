@@ -5,13 +5,15 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   ArrowLeft, Mail, Phone, Building2, Clock, Send, Trash2, Archive,
-  ArchiveRestore, MailOpen, Loader2, Paperclip, Wrench, RotateCcw,
+  ArchiveRestore, MailOpen, Loader2, RotateCcw, CheckCircle2, AlertTriangle,
 } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
 import { formatDateTime, relativeTime } from "@/lib/utils"
 import {
   type ContactSubmission,
+  type ContactReply,
   fetchContactSubmission,
+  sendContactReply,
   setContactStatus,
   setContactDeleted,
 } from "@/lib/contact-inbox-service"
@@ -29,14 +31,18 @@ export function ContactDetailClient({ id }: { id: string }) {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [replyBody, setReplyBody] = useState("")
+  const [replySubjectEdit, setReplySubjectEdit] = useState<string | null>(null)
+  const [replies, setReplies] = useState<ContactReply[]>([])
+  const [sending, setSending] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     void (async () => {
-      const { data, error: err } = await fetchContactSubmission(id)
+      const { data, replies: thread, error: err } = await fetchContactSubmission(id)
       if (cancelled) return
       setSubmission(data)
+      setReplies(thread)
       setError(err)
       setLoading(false)
     })()
@@ -44,8 +50,24 @@ export function ContactDetailClient({ id }: { id: string }) {
   }, [id])
 
   const refresh = async () => {
-    const { data } = await fetchContactSubmission(id)
+    const { data, replies: thread } = await fetchContactSubmission(id)
     if (data) setSubmission(data)
+    setReplies(thread)
+  }
+
+  const sendReply = async () => {
+    if (!submission || sending) return
+    const subject = (replySubjectEdit ?? `Re: ${submission.subject?.trim() || "Your inquiry"}`).trim()
+    const message = replyBody.trim()
+    if (!subject || !message) { setNotice("Write a subject and a message first."); return }
+    setSending(true)
+    const { error: err } = await sendContactReply(id, { subject, message })
+    setSending(false)
+    if (err) { setNotice(err); void refresh(); return }
+    setReplyBody("")
+    setReplySubjectEdit(null)
+    setNotice(`Reply sent to ${submission.email}.`)
+    void refresh()
   }
 
   const markUnread = async () => {
@@ -100,7 +122,7 @@ export function ContactDetailClient({ id }: { id: string }) {
 
   const s = submission
   const isDeleted = Boolean(s.deleted_at)
-  const replySubject = `Re: ${s.subject?.trim() || "Your inquiry"}`
+  const replySubject = replySubjectEdit ?? `Re: ${s.subject?.trim() || "Your inquiry"}`
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
@@ -164,56 +186,73 @@ export function ContactDetailClient({ id }: { id: string }) {
         <p className="text-sm text-[#111827] leading-relaxed whitespace-pre-wrap">{s.message}</p>
       </div>
 
-      {/* Reply — present but disabled (under maintenance) */}
-      <div className="bg-white rounded-[24px] border border-[#eef0f2] shadow-sm p-6">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af] mb-1">Reply</p>
-        <p className="text-xs text-[#9ca3af] mb-4">
-          Sending as <span className="font-semibold text-[#374151]">{SUPPORT_EMAIL}</span> to {s.email}.
-        </p>
-
-        {/* Maintenance banner */}
-        <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 mb-4">
-          <Wrench className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-amber-800">This reply feature is under maintenance and is temporarily unavailable.</p>
-        </div>
-
-        <div className="space-y-3 opacity-70 pointer-events-none select-none" aria-disabled="true">
-          <div>
-            <label className="text-xs font-semibold text-[#6b7280] mb-1.5 block">Subject</label>
-            <input
-              value={replySubject}
-              readOnly
-              disabled
-              className="w-full px-4 py-3 rounded-2xl border border-[#e5e5e5] bg-[#f9fafb] text-sm text-[#374151]"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-[#6b7280] mb-1.5 block">Message</label>
-            <textarea
-              value={replyBody}
-              onChange={(e) => setReplyBody(e.target.value)}
-              disabled
-              rows={5}
-              placeholder="Write your reply…"
-              className="w-full px-4 py-3 rounded-2xl border border-[#e5e5e5] bg-[#f9fafb] text-sm text-[#374151] resize-none"
-            />
+      {/* The thread so far — every reply sent from the inbox, newest last. */}
+      {replies.length > 0 && (
+        <div className="bg-white rounded-[24px] border border-[#eef0f2] shadow-sm p-6">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af] mb-3">Replies sent ({replies.length})</p>
+          <div className="space-y-3">
+            {replies.map((r) => (
+              <div key={r.id} className={`rounded-2xl border px-4 py-3 ${r.status === "failed" ? "border-rose-200 bg-rose-50" : "border-[#eef0f2] bg-[#fafbfc]"}`}>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[#6b7280]">
+                  {r.status === "failed" ? <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                  <span className="font-semibold text-[#374151]">{r.sent_by_name ?? "FHI Global"}</span>
+                  <span>{formatDateTime(r.created_at)}</span>
+                  {r.status === "failed" && <span className="text-rose-700">not delivered{r.error ? ` — ${r.error}` : ""}</span>}
+                </div>
+                <p className="mt-1.5 text-sm font-semibold text-[#111827]">{r.subject}</p>
+                <p className="mt-1 text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">{r.body_text}</p>
+              </div>
+            ))}
           </div>
         </div>
+      )}
 
-        <div className="flex items-center justify-between mt-4">
-          <span className="inline-flex items-center gap-1.5 text-xs text-[#9ca3af]">
-            <Paperclip className="w-3.5 h-3.5" /> Attach images
-          </span>
-          <button
-            type="button"
-            disabled
-            title="This reply feature is under maintenance"
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#e5e7eb] text-[#9ca3af] text-sm font-semibold cursor-not-allowed"
-          >
-            <Send className="w-4 h-4" /> Send reply
-          </button>
+      {/* Reply — sent from the house mailbox, signed with the admin's name. */}
+      {!isDeleted && (
+        <div className="bg-white rounded-[24px] border border-[#eef0f2] shadow-sm p-6">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af] mb-1">Reply</p>
+          <p className="text-xs text-[#9ca3af] mb-4">
+            Sending as <span className="font-semibold text-[#374151]">{SUPPORT_EMAIL}</span> to {s.email}, signed with your name.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="contact-reply-subject" className="text-xs font-semibold text-[#6b7280] mb-1.5 block">Subject</label>
+              <input
+                id="contact-reply-subject"
+                value={replySubject}
+                onChange={(e) => setReplySubjectEdit(e.target.value)}
+                disabled={sending}
+                maxLength={200}
+                className="w-full px-4 py-3 rounded-2xl border border-[#e5e5e5] bg-white text-sm text-[#111827] focus:border-[#001f3f] focus:outline-none"
+              />
+            </div>
+            <div>
+              <label htmlFor="contact-reply-body" className="text-xs font-semibold text-[#6b7280] mb-1.5 block">Message</label>
+              <textarea
+                id="contact-reply-body"
+                value={replyBody}
+                onChange={(e) => setReplyBody(e.target.value)}
+                disabled={sending}
+                rows={6}
+                maxLength={10000}
+                placeholder="Write your reply…"
+                className="w-full px-4 py-3 rounded-2xl border border-[#e5e5e5] bg-white text-sm text-[#111827] resize-y focus:border-[#001f3f] focus:outline-none"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between mt-4">
+            <span className="text-xs text-[#9ca3af]">The client replies to {SUPPORT_EMAIL}; it lands in Leads → Inbox.</span>
+            <button
+              type="button"
+              onClick={() => void sendReply()}
+              disabled={sending || !replyBody.trim()}
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#00152b] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} {sending ? "Sending…" : "Send reply"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
