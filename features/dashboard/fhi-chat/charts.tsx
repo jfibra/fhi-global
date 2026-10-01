@@ -79,12 +79,14 @@ export function PieChart({ title, rows }: { title: string; rows: ShareRow[] }) {
   const R = 44
   const r = 28
   const C = 56
-  let angle = -Math.PI / 2
+  // Each slice starts where the previous ones end — cumulative shares, so
+  // nothing is reassigned while rendering.
+  const fracs = data.map((row) => row.value / total)
+  const starts = fracs.map((_, i) => -Math.PI / 2 + fracs.slice(0, i).reduce((a, b) => a + b, 0) * Math.PI * 2)
   const arcs = data.map((row, i) => {
-    const frac = row.value / total
-    const start = angle
-    const end = angle + frac * Math.PI * 2 - (data.length > 1 ? 0.025 : 0)
-    angle += frac * Math.PI * 2
+    const frac = fracs[i]
+    const start = starts[i]
+    const end = start + frac * Math.PI * 2 - 0.025
     const large = end - start > Math.PI ? 1 : 0
     const p = (rad: number, ang: number) => [C + rad * Math.cos(ang), C + rad * Math.sin(ang)]
     const [x1, y1] = p(R, start)
