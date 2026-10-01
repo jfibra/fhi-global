@@ -8,7 +8,7 @@
 
 import { type RefObject, useState } from "react"
 import Image from "next/image"
-import { CheckCircle2, RotateCcw, Users } from "lucide-react"
+import { CheckCircle2, RotateCcw, UserPlus, Users, X } from "lucide-react"
 import type { A2AInput, A2AParty, A2AScope } from "@/lib/a2a-agreement"
 import { SignaturePad } from "./signature-pad"
 
@@ -19,7 +19,8 @@ export const A2A_SCOPES: Array<{ key: A2AScope; title: string; desc: string }> =
 ]
 
 /** Fields that block the agreement until filled in — highlighted when missing. */
-export type A2ARequiredField = "partyA.fullName" | "partyB.fullName" | "scope"
+export type A2ARequiredField = "partyA.fullName" | "partyB.fullName" | "partyC.fullName" | "scope"
+export type A2APartyKey = "A" | "B" | "C"
 
 /** yyyy-mm-dd in local time — toISOString would shift the day in Dubai. */
 export function todayLocal(): string {
@@ -76,6 +77,8 @@ export function A2AFormFields({
   fieldErrors,
   onClearFieldError,
   refs,
+  onAddPartyC,
+  onRemovePartyC,
   lockNamesAndSplits = false,
   lockedNote,
   partyNameSuffix,
@@ -84,30 +87,35 @@ export function A2AFormFields({
 }: {
   value: A2AInput
   onChange: (patch: Partial<A2AInput>) => void
-  onPartyChange: (party: "A" | "B", patch: Partial<A2AParty>) => void
+  onPartyChange: (party: A2APartyKey, patch: Partial<A2AParty>) => void
+  /** A2A page: lets the user add / drop a third agent (Party C). */
+  onAddPartyC?: () => void
+  onRemovePartyC?: () => void
   fieldErrors?: ReadonlySet<A2ARequiredField>
   onClearFieldError?: (key: A2ARequiredField) => void
   /** Scroll targets, so a failed submit can jump to the first missing field. */
   refs?: {
     partyAName?: RefObject<HTMLInputElement | null>
     partyBName?: RefObject<HTMLInputElement | null>
+    partyCName?: RefObject<HTMLInputElement | null>
     scope?: RefObject<HTMLDivElement | null>
   }
   /** Record Your Sale: the names and shares come from the sale's partner table. */
   lockNamesAndSplits?: boolean
   lockedNote?: string
   /** e.g. { A: " (you)" } — shown after the party heading. */
-  partyNameSuffix?: { A?: string; B?: string }
+  partyNameSuffix?: { A?: string; B?: string; C?: string }
   /** Hints for the reference boxes (Record Your Sale fills them from the sale when left blank). */
   referencePlaceholders?: { propertyRef?: string; clientName?: string }
   signatureNote?: string
 }) {
-  const { partyA, partyB, scope } = value
+  const { partyA, partyB, partyC, scope } = value
   const clear = (key: A2ARequiredField) => onClearFieldError?.(key)
 
   const a = Number(value.splitA)
   const b = Number(value.splitB)
-  const splitTotal = Number.isFinite(a) && Number.isFinite(b) ? a + b : null
+  const c = partyC ? Number(value.splitC ?? 0) : 0
+  const splitTotal = Number.isFinite(a) && Number.isFinite(b) && Number.isFinite(c) ? a + b + c : null
 
   const inputBase = "w-full px-3 py-2.5 border bg-white text-sm text-[#0d1117] placeholder:text-[#9ca3af] focus:outline-none"
   const inputCls = (invalid?: boolean) =>
@@ -118,7 +126,7 @@ export function A2AFormFields({
 
   const partyFields = (
     p: A2AParty,
-    which: "A" | "B",
+    which: A2APartyKey,
     name: { ref?: RefObject<HTMLInputElement | null>; invalid: boolean; key: A2ARequiredField },
   ) => (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -192,6 +200,39 @@ export function A2AFormFields({
           key: "partyB.fullName",
         })}
       </section>
+
+      {/* Party C — a third agent on the deal. Optional on the A2A page; fixed by the sale in Record Your Sale. */}
+      {partyC ? (
+        <section className="bg-white border border-[#e8eaed] p-6">
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <h2 className="font-['Outfit'] text-base font-bold text-[#001f3f] flex items-center gap-2">
+              <Users className="w-4 h-4 text-[#d6b357]" /> Party C — Collaborating Agent{partyNameSuffix?.C}
+            </h2>
+            {!lockNamesAndSplits && onRemovePartyC && (
+              <button type="button" onClick={onRemovePartyC} className="inline-flex items-center gap-1 text-xs font-semibold text-[#6b7280] hover:text-rose-600">
+                <X className="w-3.5 h-3.5" /> Remove Party C
+              </button>
+            )}
+          </div>
+          <span className="block w-full h-px bg-[#d6b357] mb-5" aria-hidden="true" />
+          {partyFields(partyC, "C", {
+            ref: refs?.partyCName,
+            invalid: Boolean(fieldErrors?.has("partyC.fullName")),
+            key: "partyC.fullName",
+          })}
+        </section>
+      ) : (
+        !lockNamesAndSplits &&
+        onAddPartyC && (
+          <button
+            type="button"
+            onClick={onAddPartyC}
+            className="flex w-full items-center justify-center gap-2 border border-dashed border-[#c4c9cf] bg-white px-6 py-4 text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] hover:bg-[#d6b357]/10"
+          >
+            <UserPlus className="w-4 h-4 text-[#b8913f]" /> Add a third agent (Party C)
+          </button>
+        )
+      )}
 
       {/* Scope */}
       <section className="bg-white border border-[#e8eaed] p-6">
@@ -273,6 +314,12 @@ export function A2AFormFields({
             <label className={label}>Party B Share %</label>
             <input type="number" min={0} max={100} value={value.splitB} readOnly={lockNamesAndSplits} onChange={(e) => onChange({ splitB: e.target.value })} className={lockNamesAndSplits ? lockedInput : input} />
           </div>
+          {partyC && (
+            <div className="w-32">
+              <label className={label}>Party C Share %</label>
+              <input type="number" min={0} max={100} value={value.splitC ?? ""} readOnly={lockNamesAndSplits} onChange={(e) => onChange({ splitC: e.target.value })} className={lockNamesAndSplits ? lockedInput : input} />
+            </div>
+          )}
           {!lockNamesAndSplits && splitTotal !== null && splitTotal !== 100 && (
             <p className="text-xs font-semibold text-amber-600 pb-3">
               Shares total {splitTotal}% — usually these add up to 100%.
@@ -305,7 +352,7 @@ export function A2AFormFields({
       <section className="bg-white border border-[#e8eaed] p-6">
         <h2 className="font-['Outfit'] text-base font-bold text-[#001f3f] mb-1">Signatures</h2>
         <span className="block w-full h-px bg-[#d6b357] mb-5" aria-hidden="true" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className={`grid grid-cols-1 gap-6 ${partyC ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
           <div className="space-y-3">
             <SignatureField
               label={`Party A signature${partyNameSuffix?.A ?? ""}`}
@@ -328,6 +375,19 @@ export function A2AFormFields({
               <input value={partyB.signedName} onChange={(e) => onPartyChange("B", { signedName: e.target.value })} placeholder={partyB.fullName || "Party B name"} className={input} />
             </div>
           </div>
+          {partyC && (
+            <div className="space-y-3">
+              <SignatureField
+                label={`Party C signature${partyNameSuffix?.C ?? ""}`}
+                value={partyC.signatureDataUrl}
+                onChange={(v) => onPartyChange("C", { signatureDataUrl: v })}
+              />
+              <div>
+                <label className={label}>Printed name</label>
+                <input value={partyC.signedName} onChange={(e) => onPartyChange("C", { signedName: e.target.value })} placeholder={partyC.fullName || "Party C name"} className={input} />
+              </div>
+            </div>
+          )}
         </div>
         <p className="text-xs text-[#9ca3af] leading-relaxed mt-4">{signatureNote}</p>
       </section>

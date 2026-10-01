@@ -46,10 +46,10 @@ import { Field, SelectShell, inputCls, labelCls } from "./encode-ui"
 import { PartnerStep, type PartnerAgentInfo } from "./partner-step"
 import { PartnerA2ASection, type A2AMode } from "./partner-a2a-form"
 import {
+  agreementOrder,
   composeA2A,
   downloadPartnerA2A,
   newPairDraft,
-  pairOrder,
   partnerA2AFile,
   type A2APairDraft,
 } from "./partner-a2a"
@@ -172,12 +172,12 @@ export function EncodeSaleClient({
   const [agents, setAgents] = useState<SalePartner[]>([])
   const [agentInfo, setAgentInfo] = useState<Record<string, PartnerAgentInfo>>({})
   // The A2A: "have" = they upload the signed copy on Review (staged like the
-  // proof); "fill" = the A2A form filled and signed on the Partner step, one
-  // per partner (keyed by the partner's agent_id), built into PDFs on submit.
+  // proof); "fill" = the A2A form filled and signed on the Partner step — ONE
+  // agreement naming every agent on the deal — built into a PDF on submit.
   const [a2aMode, setA2aMode] = useState<A2AMode | null>(null)
-  const [a2aDrafts, setA2aDrafts] = useState<Record<string, A2APairDraft>>({})
+  const [a2aDraft, setA2aDraft] = useState<A2APairDraft>(newPairDraft)
   const [agreementFiles, setAgreementFiles] = useState<File[]>([])
-  const [a2aBusyFor, setA2aBusyFor] = useState<string | null>(null)
+  const [a2aBusy, setA2aBusy] = useState(false)
   const [a2aError, setA2aError] = useState<string | null>(null)
   const partners = agents.filter((a) => a.agent_id !== currentUserId)
   const isShared = hasPartner === true
@@ -213,7 +213,7 @@ export function EncodeSaleClient({
     setAgreementFiles([])
     setA2aError(null)
     setA2aMode(null)
-    setA2aDrafts({})
+    setA2aDraft(newPairDraft())
   }
 
   // "No" moves straight on to Property; "Yes" opens the partner table with
@@ -278,15 +278,10 @@ export function EncodeSaleClient({
       if (errs.partners) return errs
       if (!a2aMode) errs.a2a_mode = "Tell us if you already have a signed A2A agreement"
       if (a2aMode === "fill" && owner) {
-        for (const p of partners) {
-          const draft = a2aDrafts[p.agent_id] ?? newPairDraft()
-          if (!draft.scope) errs[`a2a_scope_${p.agent_id}`] = `A2A with ${p.name}: choose the scope of collaboration`
-          const unsigned = pairOrder(owner, p).filter((a) => !draft.parties[a.agent_id]?.signatureDataUrl)
-          if (unsigned.length) {
-            errs[`a2a_sign_${p.agent_id}`] = `A2A with ${p.name}: still to sign — ${unsigned
-              .map((a) => (a.agent_id === currentUserId ? "you" : a.name))
-              .join(" and ")}`
-          }
+        if (!a2aDraft.scope) errs.a2a_scope = "A2A agreement: choose the scope of collaboration"
+        const unsigned = agreementOrder(owner, partners).filter((a) => !a2aDraft.parties[a.agent_id]?.signatureDataUrl)
+        if (unsigned.length) {
+          errs.a2a_sign = `A2A agreement: still to sign — ${unsigned.map((a) => (a.agent_id === currentUserId ? "you" : a.name)).join(" and ")}`
         }
       }
       return errs
@@ -342,12 +337,8 @@ export function EncodeSaleClient({
       let agreements = isShared && a2aMode === "have" ? agreementFiles : []
       if (isShared && a2aMode === "fill") {
         try {
-          agreements = await Promise.all(
-            partners.flatMap((p) => {
-              const built = a2aBuiltFor(p)
-              return built ? [partnerA2AFile(built)] : []
-            }),
-          )
+          const built = a2aBuilt()
+          agreements = built ? [await partnerA2AFile(built)] : []
         } catch (err) {
           setSubmitError(`Couldn't build the A2A agreement: ${(err as Error).message || "unknown error"}`)
           return
@@ -414,30 +405,23 @@ export function EncodeSaleClient({
       .join(" "),
   }
 
-  // The finished agreement for one partner (you ↔ them), ready to build.
-  const a2aBuiltFor = (partner: SalePartner) =>
-    owner
-      ? composeA2A({
-          owner,
-          partner,
-          draft: a2aDrafts[partner.agent_id] ?? newPairDraft(),
-          defaults: a2aDefaults,
-          sale: saleRef,
-          forPdf: true,
-        })
+  // The finished agreement for the whole deal, ready to build.
+  const a2aBuilt = () =>
+    owner && partners.length
+      ? composeA2A({ owner, partners, draft: a2aDraft, defaults: a2aDefaults, sale: saleRef, forPdf: true })
       : null
 
-  const downloadA2A = async (partner: SalePartner) => {
-    const built = a2aBuiltFor(partner)
+  const downloadA2A = async () => {
+    const built = a2aBuilt()
     if (!built) return
-    setA2aBusyFor(partner.agent_id)
+    setA2aBusy(true)
     setA2aError(null)
     try {
       await downloadPartnerA2A(built)
     } catch (err) {
       setA2aError((err as Error).message || "Could not build the agreement PDF.")
     } finally {
-      setA2aBusyFor(null)
+      setA2aBusy(false)
     }
   }
 
@@ -605,9 +589,9 @@ export function EncodeSaleClient({
                 }}
                 owner={owner}
                 partners={partners}
-                drafts={a2aDrafts}
-                onDraft={(partnerId, next) => {
-                  setA2aDrafts((prev) => ({ ...prev, [partnerId]: next }))
+                draft={a2aDraft}
+                onDraft={(next) => {
+                  setA2aDraft(next)
                   setErrors({})
                 }}
                 onAgentBrn={(agentId, brn) =>
@@ -854,22 +838,21 @@ export function EncodeSaleClient({
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                   <span>
                     Filled in and signed on the Partner step —{" "}
-                    {partners.length > 1 ? "one agreement per partner is" : "it's"} attached to the sale automatically when you submit.
+                    {partners.length > 1 ? "one agreement naming all three of you is" : "it's"} attached to the sale automatically when you submit.
                   </span>
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {partners.map((p) => (
+                  {(
                     <button
-                      key={p.agent_id}
                       type="button"
-                      onClick={() => void downloadA2A(p)}
-                      disabled={a2aBusyFor !== null}
+                      onClick={() => void downloadA2A()}
+                      disabled={a2aBusy}
                       className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#e5e5e5] bg-white text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-colors disabled:opacity-60"
                     >
-                      {a2aBusyFor === p.agent_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                      Download a copy — you &amp; {p.name}
+                      {a2aBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                      Download a copy — you{partners.length > 1 ? ", " : " & "}{partners.map((p) => p.name).join(" & ")}
                     </button>
-                  ))}
+                  )}
                 </div>
                 {a2aError && <p className="mt-2 text-xs text-rose-600">{a2aError}</p>}
               </div>
@@ -912,25 +895,22 @@ export function EncodeSaleClient({
                 <p className={`mt-2 text-[11px] ${agreementFiles.length === 0 ? "text-rose-600 font-semibold" : "text-[#9ca3af]"}`}>
                   {agreementFiles.length === 0
                     ? "The signed A2A is required to submit a shared sale — a scan or photo (image or PDF)."
-                    : partners.length > agreementFiles.length
-                      ? `Tip: one signed agreement per partner — ${partners.length} partners on this sale.`
-                      : "Signed agreement ready — it uploads with the sale."}
+                    : "Signed agreement ready — it uploads with the sale."}
                 </p>
                 <div className="mt-3 border-t border-[#eef0f3] pt-3">
                   <p className="mb-2 text-[11px] text-[#6b7280]">Need to print one to sign on paper? Download it pre-filled from this sale:</p>
                   <div className="flex flex-wrap gap-2">
-                    {partners.map((p) => (
+                    {(
                       <button
-                        key={p.agent_id}
                         type="button"
-                        onClick={() => void downloadA2A(p)}
-                        disabled={a2aBusyFor !== null}
+                        onClick={() => void downloadA2A()}
+                        disabled={a2aBusy}
                         className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#e5e5e5] bg-white text-xs font-semibold text-[#374151] hover:border-[#001f3f] transition-colors disabled:opacity-60"
                       >
-                        {a2aBusyFor === p.agent_id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                        A2A — you &amp; {p.name}
+                        {a2aBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                        A2A — you{partners.length > 1 ? ", " : " & "}{partners.map((p) => p.name).join(" & ")}
                       </button>
-                    ))}
+                    )}
                   </div>
                 </div>
                 {a2aError && <p className="mt-2 text-xs text-rose-600">{a2aError}</p>}

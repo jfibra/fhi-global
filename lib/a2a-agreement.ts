@@ -26,11 +26,14 @@ export type A2AInput = {
   date: string
   partyA: A2AParty
   partyB: A2AParty
+  /** A third agent on the deal (a sale with two partners). */
+  partyC?: A2AParty
   scope: A2AScope | ""
   propertyRef: string
   clientName: string
   splitA: string
   splitB: string
+  splitC?: string
   noticePeriodDays: string
   validUntil: string
 }
@@ -97,6 +100,9 @@ export async function buildA2APdfBlob(input: A2AInput): Promise<Blob> {
   }
   const sigA = await embedSig(input.partyA.signatureDataUrl)
   const sigB = await embedSig(input.partyB.signatureDataUrl)
+  const sigC = input.partyC ? await embedSig(input.partyC.signatureDataUrl) : null
+  const three = Boolean(input.partyC)
+  const parties = three ? "all parties" : "both parties"
 
   let logo: Awaited<ReturnType<typeof doc.embedPng>> | null = null
   try {
@@ -236,7 +242,7 @@ export async function buildA2APdfBlob(input: A2AInput): Promise<Blob> {
   y -= 26
 
   para(
-    'This Agent-to-Agent (A2A) Collaboration Agreement ("Agreement") is entered into on the date below, between the two real estate agents/brokers named below, for the purpose of sharing property inventory listings and/or client leads in a professional, transparent, and mutually beneficial manner.',
+    `This Agent-to-Agent (A2A) Collaboration Agreement ("Agreement") is entered into on the date below, between the ${three ? "three" : "two"} real estate agents/brokers named below, for the purpose of sharing property inventory listings and/or client leads in a professional, transparent, and mutually beneficial manner.`,
     { gap: 10 },
   )
 
@@ -245,6 +251,7 @@ export async function buildA2APdfBlob(input: A2AInput): Promise<Blob> {
 
   partyBlock("Party A - Introducing / Listing Agent", input.partyA)
   partyBlock("Party B - Collaborating Agent", input.partyB)
+  if (input.partyC) partyBlock("Party C - Collaborating Agent", input.partyC)
 
   section("Scope of Collaboration")
   for (const line of SCOPE_LINES) {
@@ -279,26 +286,32 @@ export async function buildA2APdfBlob(input: A2AInput): Promise<Blob> {
     { gap: 8 },
   )
   ensure(26)
-  field("Party A Share:", input.splitA ? `${input.splitA} %` : "", { labelW: 82, boxW: 80 })
-  field("Party B Share:", input.splitB ? `${input.splitB} %` : "", { x: MARGIN + 200, labelW: 82, boxW: 80 })
+  if (three) {
+    field("Party A Share:", input.splitA ? `${input.splitA} %` : "", { labelW: 82, boxW: 64 })
+    field("Party B Share:", input.splitB ? `${input.splitB} %` : "", { x: MARGIN + 164, labelW: 82, boxW: 64 })
+    field("Party C Share:", input.splitC ? `${input.splitC} %` : "", { x: MARGIN + 328, labelW: 82, boxW: 64 })
+  } else {
+    field("Party A Share:", input.splitA ? `${input.splitA} %` : "", { labelW: 82, boxW: 80 })
+    field("Party B Share:", input.splitB ? `${input.splitB} %` : "", { x: MARGIN + 200, labelW: 82, boxW: 80 })
+  }
   y -= 26
   para(
-    "Commission will be released only after full receipt of funds from the client, and both parties agree to settle payment within 7 business days of receipt unless otherwise agreed in writing.",
+    `Commission will be released only after full receipt of funds from the client, and ${parties} agree to settle payment within 7 business days of receipt unless otherwise agreed in writing.`,
     { gap: 10 },
   )
 
-  // ── Page 2 — clauses + signatures ───────────────────────────────────────────
-  newPage()
+  // ── Clauses + signatures — on a fresh page unless we are already near the top of one ─
+  if (y < H * 0.7) newPage()
 
   section("Confidentiality")
   para(
-    "Both parties agree to keep all shared client information, property details, and commercial terms strictly confidential, and to use such information solely for the purpose of this collaboration.",
+    `${three ? "All parties" : "Both parties"} agree to keep all shared client information, property details, and commercial terms strictly confidential, and to use such information solely for the purpose of this collaboration.`,
     { gap: 10 },
   )
 
   section("Non-Circumvention")
   para(
-    "Neither party shall directly or indirectly approach, negotiate with, or transact with any client, landlord, seller, or property introduced by the other party without the introducing party's written consent, for the duration of this Agreement and for 12 months thereafter.",
+    `${three ? "No party" : "Neither party"} shall directly or indirectly approach, negotiate with, or transact with any client, landlord, seller, or property introduced by the other party without the introducing party's written consent, for the duration of this Agreement and for 12 months thereafter.`,
     { gap: 10 },
   )
 
@@ -353,6 +366,7 @@ export async function buildA2APdfBlob(input: A2AInput): Promise<Blob> {
 
   signatureBlock("Party A", input.partyA, sigA)
   signatureBlock("Party B", input.partyB, sigB)
+  if (input.partyC) signatureBlock("Party C", input.partyC, sigC)
 
   // ── Footer on every page ────────────────────────────────────────────────────
   const foot = safe("FHI Global Property  ·  Dubai, UAE  ·  fhiglobal.ae")

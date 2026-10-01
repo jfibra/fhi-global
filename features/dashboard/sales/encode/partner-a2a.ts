@@ -4,10 +4,11 @@
 // they fill and sign the same A2A form right in the flow, and the PDF built
 // here is attached to the sale as its partnership agreement.
 //
-// The A2A is a two-party form, so a sale with two partners gets one agreement
-// per partner (you ↔ that partner). Each shows the two agents' shares of the
-// WHOLE deal, which is how the sale records them. Names, shares and BRNs always
-// come from the sale's partner table; everything else is what was typed.
+// ONE agreement names every agent on the deal: Party A is the Lead (the client
+// source), Party B the next agent, Party C the third when the sale has two
+// partners. Each party's share is their share of the WHOLE deal, exactly as the
+// sale records it. Names, shares and BRNs always come from the sale's partner
+// table; everything else is what was typed.
 
 import { buildA2APdfBlob, downloadA2APdf, type A2AInput, type A2AParty, type A2AScope } from "@/lib/a2a-agreement"
 import { todayLocal } from "@/features/dashboard/a2a-agreement/a2a-form"
@@ -15,11 +16,11 @@ import type { SalePartner } from "@/lib/sales-service"
 
 export const A2A_AGENCY = "FHI Global Property"
 
-/** What one agent has typed on an agreement beyond the sale's own data. */
+/** What one agent has typed on the agreement beyond the sale's own data. */
 export type A2APartyDraft = Pick<A2AParty, "agency" | "phone" | "email" | "signedName" | "signatureDataUrl">
 
-/** One partner's agreement as typed so far. Party fields are keyed by agent_id,
- *  so changing who is Lead (Party A) never mixes up whose details are whose. */
+/** The agreement as typed so far. Party fields are keyed by agent_id, so
+ *  changing who is Lead (Party A) never mixes up whose details are whose. */
 export type A2APairDraft = {
   date: string
   scope: A2AScope | ""
@@ -40,26 +41,31 @@ export const newPairDraft = (): A2APairDraft => ({
   parties: {},
 })
 
-/** Party A is the "Introducing / Listing Agent": the Lead when they are in this pair, else the owner. */
-export function pairOrder(owner: SalePartner, partner: SalePartner): [SalePartner, SalePartner] {
-  return partner.role === "lead" ? [partner, owner] : [owner, partner]
+/** The parties in agreement order: Party A is the Lead ("Introducing / Listing
+ *  Agent"), then the recording agent if they aren't the Lead, then the rest in
+ *  table order. At most three (the sale allows two partners). */
+export function agreementOrder(owner: SalePartner, partners: SalePartner[]): SalePartner[] {
+  const all = [owner, ...partners.filter((p) => p.agent_id !== owner.agent_id)]
+  const lead = all.find((a) => a.role === "lead") ?? owner
+  return [lead, ...all.filter((a) => a.agent_id !== lead.agent_id)].slice(0, 3)
 }
 
 /**
- * The A2AInput for one pair. `forPdf` fills blank reference boxes from the sale
- * (the form shows those as placeholders) and stamps the signing date.
+ * The A2AInput for the whole deal. `forPdf` fills blank reference boxes from
+ * the sale (the form shows those as placeholders) and stamps the signing date.
  */
 export function composeA2A(opts: {
   owner: SalePartner
-  partner: SalePartner
+  partners: SalePartner[]
   draft: A2APairDraft
   /** Pre-fill for an agent's contact details (their profile phone, your email). */
   defaults: (agentId: string) => { phone: string; email: string }
   sale: { propertyRef: string; clientName: string }
   forPdf?: boolean
-}): { input: A2AInput; fileName: string } {
-  const { owner, partner, draft, defaults, sale, forPdf } = opts
-  const [a, b] = pairOrder(owner, partner)
+}): { input: A2AInput; fileName: string; order: SalePartner[] } {
+  const { owner, partners, draft, defaults, sale, forPdf } = opts
+  const order = agreementOrder(owner, partners)
+  const [a, b, c] = order
   const date = draft.date || todayLocal()
   const party = (agent: SalePartner): A2AParty => {
     const typed = draft.parties[agent.agent_id] ?? {}
@@ -76,10 +82,12 @@ export function composeA2A(opts: {
     }
   }
   return {
+    order,
     input: {
       date,
       partyA: party(a),
       partyB: party(b),
+      ...(c ? { partyC: party(c), splitC: String(c.share) } : {}),
       scope: draft.scope,
       propertyRef: forPdf ? draft.propertyRef.trim() || sale.propertyRef : draft.propertyRef,
       clientName: forPdf ? draft.clientName.trim() || sale.clientName : draft.clientName,
@@ -88,7 +96,7 @@ export function composeA2A(opts: {
       noticePeriodDays: draft.noticePeriodDays,
       validUntil: draft.validUntil,
     },
-    fileName: `A2A-Agreement-${a.name.replace(/\s+/g, "-")}-${b.name.replace(/\s+/g, "-")}.pdf`,
+    fileName: `A2A-Agreement-${order.map((p) => p.name.replace(/\s+/g, "-")).join("-")}.pdf`,
   }
 }
 

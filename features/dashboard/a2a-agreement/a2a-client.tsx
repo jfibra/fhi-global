@@ -9,7 +9,7 @@
 import { useCallback, useRef, useState } from "react"
 import { Download, FileSignature, Loader2 } from "lucide-react"
 import { type A2AInput, type A2AParty, downloadA2APdf } from "@/lib/a2a-agreement"
-import { A2AFormFields, todayLocal, type A2ARequiredField } from "./a2a-form"
+import { A2AFormFields, todayLocal, type A2APartyKey, type A2ARequiredField } from "./a2a-form"
 
 const emptyParty = (): A2AParty => ({
   fullName: "", agency: "", brn: "", phone: "", email: "",
@@ -39,7 +39,24 @@ export function A2AClient() {
   // straight to the first thing that needs filling in.
   const partyANameRef = useRef<HTMLInputElement>(null)
   const partyBNameRef = useRef<HTMLInputElement>(null)
+  const partyCNameRef = useRef<HTMLInputElement>(null)
   const scopeRef = useRef<HTMLDivElement>(null)
+
+  // A third agent on the deal. Adding one re-splits an untouched 50/50 three
+  // ways; removing one puts it back. Typed splits are left alone.
+  const addPartyC = () =>
+    setValue((v) => ({
+      ...v,
+      partyC: emptyParty(),
+      ...(v.splitA === "50" && v.splitB === "50" ? { splitA: "34", splitB: "33", splitC: "33" } : { splitC: v.splitC ?? "0" }),
+    }))
+  const removePartyC = () =>
+    setValue((v) => {
+      const { partyC: _dropped, splitC, ...rest } = v
+      void _dropped
+      const untouched = v.splitA === "34" && v.splitB === "33" && splitC === "33"
+      return { ...rest, ...(untouched ? { splitA: "50", splitB: "50" } : {}) }
+    })
 
   const clearFieldError = (key: A2ARequiredField) => {
     setFieldErrors((prev) => {
@@ -52,16 +69,17 @@ export function A2AClient() {
   }
 
   const generate = useCallback(async () => {
-    const { partyA, partyB, scope, date } = value
+    const { partyA, partyB, partyC, scope, date } = value
     const invalid = new Set<A2ARequiredField>()
     if (!partyA.fullName.trim()) invalid.add("partyA.fullName")
     if (!partyB.fullName.trim()) invalid.add("partyB.fullName")
+    if (partyC && !partyC.fullName.trim()) invalid.add("partyC.fullName")
     if (!scope) invalid.add("scope")
 
     if (invalid.size > 0) {
       setFieldErrors(invalid)
       const needs: string[] = []
-      if (invalid.has("partyA.fullName") || invalid.has("partyB.fullName")) needs.push("a full name for both parties")
+      if (invalid.has("partyA.fullName") || invalid.has("partyB.fullName") || invalid.has("partyC.fullName")) needs.push(`a full name for ${partyC ? "every party" : "both parties"}`)
       if (invalid.has("scope")) needs.push("a scope of collaboration")
       setError(`Please add ${needs.join(" and ")} before downloading.`)
 
@@ -70,7 +88,9 @@ export function A2AClient() {
         ? partyANameRef.current
         : invalid.has("partyB.fullName")
           ? partyBNameRef.current
-          : scopeRef.current
+          : invalid.has("partyC.fullName")
+            ? partyCNameRef.current
+            : scopeRef.current
       if (first) {
         first.scrollIntoView({ behavior: "smooth", block: "center" })
         const focusTarget =
@@ -91,8 +111,9 @@ export function A2AClient() {
           date: stamp,
           partyA: { ...partyA, signedDate: partyA.signedDate || stamp },
           partyB: { ...partyB, signedDate: partyB.signedDate || stamp },
+          ...(partyC ? { partyC: { ...partyC, signedDate: partyC.signedDate || stamp } } : {}),
         },
-        `A2A-Agreement-${(partyA.fullName || "party-a").replace(/\s+/g, "-")}-${(partyB.fullName || "party-b").replace(/\s+/g, "-")}.pdf`,
+        `A2A-Agreement-${[partyA.fullName || "party-a", partyB.fullName || "party-b", ...(partyC ? [partyC.fullName || "party-c"] : [])].map((n) => n.replace(/\s+/g, "-")).join("-")}.pdf`,
       )
     } catch (err) {
       setError((err as Error).message || "Could not build the PDF.")
@@ -112,7 +133,7 @@ export function A2AClient() {
           Agent-to-Agent (A2A) Collaboration Agreement
         </h1>
         <p className="text-white/65 text-sm leading-relaxed mt-2 max-w-2xl">
-          Fill in both parties, agree the split, sign on screen, and download the signed PDF.
+          Fill in the parties (two agents, or three with Party C), agree the split, sign on screen, and download the signed PDF.
           Nothing is saved — the agreement is built on your device and downloaded straight to you.
         </p>
       </div>
@@ -124,14 +145,20 @@ export function A2AClient() {
       <A2AFormFields
         value={value}
         onChange={(patch) => setValue((v) => ({ ...v, ...patch }))}
-        onPartyChange={(which, patch) =>
+        onPartyChange={(which: A2APartyKey, patch) =>
           setValue((v) =>
-            which === "A" ? { ...v, partyA: { ...v.partyA, ...patch } } : { ...v, partyB: { ...v.partyB, ...patch } },
+            which === "A"
+              ? { ...v, partyA: { ...v.partyA, ...patch } }
+              : which === "B"
+                ? { ...v, partyB: { ...v.partyB, ...patch } }
+                : { ...v, partyC: { ...(v.partyC ?? emptyParty()), ...patch } },
           )
         }
+        onAddPartyC={addPartyC}
+        onRemovePartyC={removePartyC}
         fieldErrors={fieldErrors}
         onClearFieldError={clearFieldError}
-        refs={{ partyAName: partyANameRef, partyBName: partyBNameRef, scope: scopeRef }}
+        refs={{ partyAName: partyANameRef, partyBName: partyBNameRef, partyCName: partyCNameRef, scope: scopeRef }}
       />
 
       <div className="flex flex-wrap items-center gap-3">
