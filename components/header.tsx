@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation"
 import {
   Menu, X, Phone, Mail, Facebook, Instagram, ChevronDown, LayoutDashboard,
   LogOut, Building2, CalendarDays, Camera, Globe, KeyRound, Landmark, Newspaper,
-  Tag, Users, BarChart3, type LucideIcon,
+  Tag, Users, type LucideIcon,
 } from "lucide-react"
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
 import { getDashboardRouteByRole } from "@/lib/auth"
@@ -17,11 +17,13 @@ import { AuthModal } from "@/components/auth/auth-modal"
 type NavChild = { label: string; href: string; desc: string; icon: LucideIcon }
 type NavItem = { label: string; href: string; children?: NavChild[] }
 
-// Six top-level items, three of them dropdowns, so the bar stays short as
+// Seven top-level items, three of them dropdowns, so the bar stays short as
 // sections are added: the four browse destinations collapse into Properties,
-// the two "who we are" pages into About Us, and the two timely ones into News
-// & Events. Off-Plan stays top-level because it is the search people actually
-// type, and it points at the landing page built for that query.
+// the "who we are" pages into About Us, and the two timely ones into News &
+// Events. Off-Plan stays top-level because it is the search people actually
+// type, and it points at the landing page built for that query. Open Data is
+// top-level too (after Contact) — it is a reference tool rather than a way to
+// browse listings, and it was easy to miss buried inside Properties.
 //
 // A parent's href is never navigated to (the button only opens the menu) — it
 // exists so every item has one; keep it pointing at the primary child.
@@ -36,7 +38,6 @@ const NAV_LINKS: NavItem[] = [
       { label: "Rent",       href: "/rent",       desc: "Available rentals across Dubai",  icon: KeyRound },
       { label: "Projects",   href: "/projects",   desc: "Every development we cover",      icon: Building2 },
       { label: "Developers", href: "/developers", desc: "Verified developers and portfolios", icon: Landmark },
-      { label: "Open Data",  href: "/open-data",  desc: "DLD's official property price index", icon: BarChart3 },
     ],
   },
   {
@@ -58,6 +59,7 @@ const NAV_LINKS: NavItem[] = [
     ],
   },
   { label: "Contact", href: "/contact" },
+  { label: "Open Data", href: "/open-data" },
 ]
 
 const SOCIAL_LINKS = [
@@ -98,6 +100,13 @@ function writeCachedSession(value: HeaderSession | null) {
   } catch {
     // storage unavailable (private mode) — module cache still helps
   }
+}
+
+/** The first word of a display name (or the whole thing if it has no spaces),
+ *  for the compact desktop account pill. */
+function firstNameOf(displayName: string): string {
+  const n = displayName.trim()
+  return n.split(/\s+/)[0] || n
 }
 
 function initialsFrom(displayName: string, email: string | null) {
@@ -382,7 +391,7 @@ export function Header() {
                     onMouseEnter={(e) => moveIndicatorTo(e.currentTarget)}
                     onFocus={(e) => moveIndicatorTo(e.currentTarget)}
                     onClick={() => setOpenMenu(null)}
-                    className={`relative px-5 py-2.5 text-[15px] font-semibold tracking-[0.01em] transition-colors duration-200 ${tone}`}
+                    className={`relative px-3.5 xl:px-[18px] py-2.5 text-[15px] font-semibold tracking-[0.01em] transition-colors duration-200 ${tone}`}
                   >
                     {label}
                   </Link>
@@ -408,7 +417,7 @@ export function Header() {
                     onMouseEnter={(e) => moveIndicatorTo(e.currentTarget)}
                     onFocus={(e) => moveIndicatorTo(e.currentTarget)}
                     onClick={() => setOpenMenu(open ? null : label)}
-                    className={`relative inline-flex items-center gap-1.5 px-5 py-2.5 text-[15px] font-semibold tracking-[0.01em] transition-colors duration-200 ${tone}`}
+                    className={`relative inline-flex items-center gap-1.5 px-3.5 xl:px-[18px] py-2.5 text-[15px] font-semibold tracking-[0.01em] transition-colors duration-200 ${tone}`}
                   >
                     {label}
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
@@ -485,9 +494,9 @@ export function Header() {
           </nav>
 
           {/* Desktop: signed-in account / guest CTAs */}
-          <div className="hidden lg:flex items-center gap-3 min-h-[42px]">
+          <div className="hidden lg:flex items-center gap-3 min-h-[42px] shrink-0">
             {!authReady ? (
-              <div className="w-[200px] h-10 rounded-full bg-white/5 animate-pulse" aria-hidden />
+              <div className="w-[150px] h-10 rounded-full bg-white/5 animate-pulse" aria-hidden />
             ) : session ? (
               <div className="relative flex items-center gap-2" ref={accountRef}>
                 <button
@@ -514,8 +523,15 @@ export function Header() {
                       {initialsFrom(session.displayName, session.email)}
                     </div>
                   )}
-                  <span className="text-sm font-medium text-white max-w-[140px] truncate hidden sm:inline">
-                    {session.displayName}
+                  {/* First name only — the full name made the pill wide enough to
+                      overflow the bar on a 1024–1280px viewport now that there are
+                      seven nav items. The full name is still in the tooltip and in
+                      the mobile drawer. */}
+                  <span
+                    className="text-sm font-medium text-white max-w-[120px] truncate hidden sm:inline"
+                    title={session.displayName}
+                  >
+                    {firstNameOf(session.displayName)}
                   </span>
                   <ChevronDown className={`w-4 h-4 text-white/70 shrink-0 transition-transform ${accountOpen ? "rotate-180" : ""}`} />
                 </button>
