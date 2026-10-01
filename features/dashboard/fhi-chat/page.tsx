@@ -843,7 +843,6 @@ export default function FhiChatPage() {
             Checking the numbers…
           </div>
         )}
-        <div ref={endRef} />
       </div>
 
       {/* Composer — stays in view while the thread scrolls behind it. */}
@@ -897,6 +896,7 @@ export default function FhiChatPage() {
         </div>
         <p className="mt-1.5 text-center text-[10.5px] text-[#9ca3af]">Admin only · answers are computed from the live database at the moment you ask.</p>
       </div>
+      <div ref={endRef} aria-hidden />
     </div>
   )
 }
