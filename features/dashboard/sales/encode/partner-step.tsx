@@ -255,6 +255,11 @@ export function PartnerStep({
   // Share boxes keep what was typed ("33.") until blur; the number is pushed up
   // on every keystroke so validation always sees the latest value.
   const [shareDrafts, setShareDrafts] = useState<Record<string, string>>({})
+  // Shares typed by hand, in order. Typing one share re-splits what is left
+  // among the agents nobody has typed a share for yet ("50" on the Lead of a
+  // three-agent deal fills the other two with 25 and 25). Once every share has
+  // been typed, nothing moves on its own and the total line says if it's off.
+  const [typedShares, setTypedShares] = useState<string[]>([])
 
   const partnerCount = agents.filter((a) => a.agent_id !== ownerId).length
   const total = totalPartnerShare(agents)
@@ -263,6 +268,24 @@ export function PartnerStep({
   const patch = (agentId: string, change: Partial<SalePartner>) =>
     onAgentsChange(agents.map((a) => (a.agent_id === agentId ? { ...a, ...change } : a)))
 
+  const setShare = (agentId: string, share: number) => {
+    const typed = [...typedShares.filter((id) => id !== agentId), agentId]
+    let next = agents.map((a) => (a.agent_id === agentId ? { ...a, share } : a))
+    const open = next.filter((a) => !typed.includes(a.agent_id))
+    if (Number.isFinite(share) && open.length > 0) {
+      const taken = next.filter((a) => typed.includes(a.agent_id)).reduce((sum, a) => sum + (Number.isFinite(a.share) ? a.share : 0), 0)
+      const remainder = Math.max(0, Math.round((100 - taken) * 100) / 100)
+      const base = Math.floor((remainder / open.length) * 100) / 100
+      const first = Math.round((remainder - base * (open.length - 1)) * 100) / 100
+      next = next.map((a) => {
+        const i = open.findIndex((o) => o.agent_id === a.agent_id)
+        return i < 0 ? a : { ...a, share: i === 0 ? first : base }
+      })
+    }
+    setTypedShares(typed)
+    onAgentsChange(next)
+  }
+
   const makeLead = (agentId: string) =>
     onAgentsChange(agents.map((a) => ({ ...a, role: a.agent_id === agentId ? "lead" : "co_agent" })))
 
@@ -270,6 +293,7 @@ export function PartnerStep({
     if (agents.some((a) => a.agent_id === agent.id) || partnerCount >= MAX_SALE_PARTNERS) return
     onAgentInfo(agent.id, { avatar: agent.avatar, roleLabel: agent.role_label, phone: agent.phone })
     setShareDrafts({})
+    setTypedShares([])
     onAgentsChange(evenlySplit([...agents, { agent_id: agent.id, name: agent.name, role: "co_agent", share: 0, brn: null }]))
   }
 
@@ -280,6 +304,7 @@ export function PartnerStep({
       ? rest
       : rest.map((a) => ({ ...a, role: a.agent_id === ownerId ? ("lead" as const) : a.role }))
     setShareDrafts({})
+    setTypedShares([])
     onAgentsChange(evenlySplit(withLead))
   }
 
@@ -334,6 +359,9 @@ export function PartnerStep({
               <p className={labelCls}>
                 Agents and work-effort share <span className="text-rose-500">*</span>
               </p>
+              <p className="-mt-1 mb-2 text-[11px] text-[#9ca3af]">
+                Type one agent&apos;s share and the rest fill in to make 100% — e.g. 50 for the Lead leaves 25 and 25.
+              </p>
               <div className="space-y-3">
                 {agents.map((a) => {
                   const isOwner = a.agent_id === ownerId
@@ -386,7 +414,7 @@ export function PartnerStep({
                               onChange={(e) => {
                                 const v = e.target.value.replace(/[^0-9.]/g, "")
                                 setShareDrafts((d) => ({ ...d, [a.agent_id]: v }))
-                                patch(a.agent_id, { share: v === "" ? Number.NaN : Number(v) })
+                                setShare(a.agent_id, v === "" ? Number.NaN : Number(v))
                               }}
                               onBlur={() =>
                                 setShareDrafts((d) => {
