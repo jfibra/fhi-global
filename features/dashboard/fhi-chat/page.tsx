@@ -42,6 +42,8 @@ type Msg = {
   charts?: ChartSpec[]
   printCards?: PrintCardSpec[]
   typed?: boolean
+  /** When it was sent/received (ISO), shown as a small time. */
+  at?: string
 }
 
 function escapeRe(s: string) {
@@ -354,14 +356,15 @@ function PrintBusinessCards({ spec }: { spec: PrintCardSpec }) {
   )
 }
 
-const SUGGESTIONS = [
-  "Who are the top agents this year?",
-  "How many website visits this week?",
-  "Total validated sales value in 2026?",
-  "How many projects does each developer have?",
-  "What were our most recent sales?",
-  "How many registrations does our latest event have?",
-]
+/** The first screen: one question per line, grouped by what the admin runs. */
+const SUGGESTION_GROUPS = [
+  { label: "Sales", items: ["Who are the top agents this year?", "How are sales growing month by month?", "Anything waiting for validation?"] },
+  { label: "Leads", items: ["How many leads did we get this month?", "Any unanswered inquiries?", "Priority buyers from Buyers Link?"] },
+  { label: "Projects", items: ["Cheapest 1-bedroom in JVC?", "Azizi projects handing over in 2027?", "Tell me about Azizi Venice"] },
+  { label: "People", items: ["Who has the most reviews?", "Who hasn't sold anything this year?", "Whose birthday is coming up?"] },
+  { label: "Website & events", items: ["How many website visits this week?", "How did the Career Summit go?", "What do people search on Google to find us?"] },
+  { label: "Reports", items: ["Give me the full report for this month", "Sales report for last quarter", "What happened today?"] },
+] as const
 
 /** One-tap professional reports — each sends a preset question. */
 const REPORT_BUTTONS = [
@@ -375,26 +378,42 @@ const TOOL_LABELS: Record<string, string> = {
   top_agents: "Top Sales board",
   top_developers: "Top Developers board",
   top_teams: "Team Sales board",
-  sales_summary: "sales totals",
-  agent_sales: "agent record",
-  agent_recruits: "recruits",
-  developer_overview: "developer portfolio",
-  projects_stats: "project counts",
-  platform_counts: "platform KPIs",
-  recent_sales: "recent sales",
-  events_overview: "events",
-  event_attendees: "event registrations",
-  new_accounts: "new signups",
+  sales_summary: "Sales totals",
+  agent_sales: "Agent record",
+  agent_recruits: "Recruits",
+  agent_network: "Network",
+  developer_overview: "Developer portfolio",
+  projects_stats: "Project counts",
+  find_projects: "Projects",
+  project_details: "Project details",
+  platform_counts: "Platform KPIs",
+  recent_sales: "Recent sales",
+  sales_pipeline: "Sales pipeline",
+  leads_overview: "Leads",
+  events_overview: "Events",
+  event_attendees: "Event registrations",
+  event_engagement: "Event stats",
+  new_accounts: "New sign-ups",
   website_traffic: "Google Analytics",
   search_keywords: "Google Search Console",
-  activity_feed: "activity feed",
-  upcoming_birthdays: "birthday calendar",
-  birthday_poster: "poster studio",
-  meeting_poster: "poster studio",
-  business_card: "business cards",
-  print_business_card: "card designer",
-  send_email: "email sender",
-  congratulate_top_agents: "congratulations mailer",
+  activity_feed: "Activity feed",
+  activity_log: "Activity log",
+  upcoming_birthdays: "Birthday calendar",
+  birthday_poster: "Poster studio",
+  meeting_poster: "Poster studio",
+  business_card: "Business cards",
+  print_business_card: "Card designer",
+  send_email: "Email sender",
+  congratulate_top_agents: "Congratulations mailer",
+  support_tickets: "Support",
+  company_purchases: "Purchases",
+  agent_websites: "Agent websites",
+  listings_overview: "Listings",
+  clients_overview: "Clients",
+  agent_reviews: "Reviews",
+  member_lookup: "Member lookup",
+  owner_documents: "Owner documents",
+  teams_detail: "Teams",
 }
 
 /** Branded print view — parses the plain-text answer into a real report
@@ -620,7 +639,7 @@ export default function FhiChatPage() {
     if (!question || busy) return
     setError(null)
     setInput("")
-    const next: Msg[] = [...messages, { role: "user", content: question }]
+    const next: Msg[] = [...messages, { role: "user", content: question, at: new Date().toISOString() }]
     setMessages(next)
     setBusy(true)
     try {
@@ -650,6 +669,7 @@ export default function FhiChatPage() {
           charts: data.charts,
           printCards: data.printCards,
           typed: false,
+          at: new Date().toISOString(),
         },
       ])
     } catch (e) {
@@ -661,25 +681,25 @@ export default function FhiChatPage() {
     }
   }
 
+  const timeOf = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString("en-AE", { hour: "2-digit", minute: "2-digit" }) : null)
+
   return (
-    <div className="mx-auto flex h-[calc(100vh-8.5rem)] max-w-4xl flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-3 pb-4">
-        <span className="flex h-11 w-11 items-center justify-center bg-[#001f3f]">
+    <div className="mx-auto max-w-[900px] pb-6">
+      {/* Title band — the page's one anchor; everything below flows on the page. */}
+      <div className="flex items-center gap-4 rounded-2xl bg-[#001f3f] px-5 py-4 text-white shadow-[0_10px_30px_-14px_rgba(0,31,63,0.6)] sm:px-6">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
           <Sparkles className="h-5 w-5 text-[#d6b357]" />
         </span>
-        <div>
-          <h1 className="font-['Outfit'] text-xl font-bold text-[#0d1117] leading-tight">FHI Assistant</h1>
-          <p className="text-xs text-[#6b7280]">
-            Ask anything about FHI&apos;s data — sales, agents, developers, projects, events. Answers come from live queries.
-          </p>
+        <div className="min-w-0 flex-1">
+          <h1 className="font-['Outfit'] text-lg font-bold leading-tight sm:text-xl">FHI Assistant</h1>
+          <p className="truncate text-[12px] text-white/65">Ask anything about FHI&apos;s data. Every figure comes from the live database.</p>
         </div>
         {messages.length > 0 && (
           <button
             type="button"
             onClick={newChat}
             disabled={busy}
-            className="ml-auto inline-flex shrink-0 items-center gap-1.5 border border-[#e5e5e5] bg-white px-3 py-2 text-[12px] font-semibold text-[#001f3f] transition-colors hover:border-[#d6b357] hover:bg-[#d6b357]/10 disabled:opacity-50"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/20 px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:border-[#d6b357] hover:text-[#d6b357] disabled:opacity-50"
           >
             <RotateCcw className="h-3.5 w-3.5" /> New chat
           </button>
@@ -687,98 +707,113 @@ export default function FhiChatPage() {
       </div>
 
       {/* Thread */}
-      <div className="flex-1 overflow-y-auto border border-[#e5e8ec] bg-white p-4 sm:p-6">
+      <div className="mt-6 space-y-5">
         {messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <Sparkles className="h-8 w-8 text-[#d6b357] mb-3" />
-            <p className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Your data, answered.</p>
-            <p className="mt-1 text-sm text-[#6b7280] max-w-sm">
-              Every number comes from the live database — the same figures as your dashboard, in plain language.
-            </p>
-            <div className="mt-6 flex max-w-xl flex-wrap items-center justify-center gap-2">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => void ask(s)}
-                  className="border border-[#e5e5e5] bg-[#f8fafc] px-3.5 py-2 text-[13px] font-semibold text-[#001f3f] transition-colors hover:border-[#d6b357] hover:bg-[#d6b357]/10"
-                >
-                  {s}
-                </button>
+          <div className="rounded-2xl border border-[#e8eaed] bg-white px-5 py-8 shadow-[0_6px_24px_-16px_rgba(0,31,63,0.25)] sm:px-8">
+            <div className="text-center">
+              <p className="font-['Outfit'] text-[22px] font-bold text-[#0d1117]">Your data, answered.</p>
+              <p className="mx-auto mt-1 max-w-md text-[13.5px] leading-relaxed text-[#6b7280]">
+                Sales, leads, projects, people, the website — the same figures as your dashboard, in plain language, with charts.
+              </p>
+            </div>
+            <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {SUGGESTION_GROUPS.map((g) => (
+                <div key={g.label}>
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b8913f]">{g.label}</p>
+                  <div className="space-y-1.5">
+                    {g.items.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => void ask(s)}
+                        className="block w-full rounded-lg border border-[#eceef1] bg-[#fafbfc] px-3 py-2 text-left text-[13px] font-medium text-[#1f2937] transition-colors hover:border-[#d6b357] hover:bg-[#d6b357]/10 hover:text-[#001f3f]"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            {messages.map((m, i) =>
-              m.role === "user" ? (
-                <div key={i} className="flex justify-end">
-                  <p className="max-w-[85%] bg-[#001f3f] px-4 py-2.5 text-sm leading-relaxed text-white whitespace-pre-wrap">
-                    {m.content}
-                  </p>
-                </div>
-              ) : (
-                <div key={i} className="flex justify-start">
-                  <div className="max-w-[85%] min-w-0">
-                    {/* One answer block: the typed text and its cards live in
-                        the same bubble, not as separate stacked pieces. */}
-                    <div className="border border-[#e5e8ec] border-l-2 border-l-[#d6b357] bg-[#fafbfc]">
-                      <div className="px-4 py-3 text-sm leading-relaxed text-[#1f2937] whitespace-pre-wrap">
-                        {m.typed === false ? (
-                          <TypedText
-                            text={m.content}
-                            names={m.names ?? (m.cards ?? []).map((c) => c.title)}
-                            onDone={() =>
-                              setMessages((ms) => ms.map((x, xi) => (xi === i ? { ...x, typed: true } : x)))
-                            }
-                          />
+          messages.map((m, i) =>
+            m.role === "user" ? (
+              <div key={i} className="flex flex-col items-end gap-1">
+                <p className="max-w-[80%] rounded-2xl rounded-br-md bg-[#001f3f] px-4 py-2.5 text-[14px] leading-relaxed text-white whitespace-pre-wrap shadow-[0_6px_18px_-10px_rgba(0,31,63,0.6)]">
+                  {m.content}
+                </p>
+                {m.at && <span className="pr-1 text-[10.5px] text-[#9ca3af]">{timeOf(m.at)}</span>}
+              </div>
+            ) : (
+              <div key={i} className="group">
+                <div className="overflow-hidden rounded-2xl border border-[#e8eaed] bg-white shadow-[0_8px_28px_-16px_rgba(0,31,63,0.28)]">
+                  <div className="flex items-center gap-2.5 px-5 pt-4">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#001f3f]">
+                      <Sparkles className="h-3.5 w-3.5 text-[#d6b357]" />
+                    </span>
+                    <span className="font-['Outfit'] text-[12.5px] font-bold text-[#0d1117]">FHI Assistant</span>
+                    {m.at && <span className="text-[10.5px] text-[#9ca3af]">{timeOf(m.at)}</span>}
+                  </div>
+                  <div className="px-5 pb-4 pt-2.5 text-[14px] leading-[1.7] text-[#1f2937] whitespace-pre-wrap">
+                    {m.typed === false ? (
+                      <TypedText
+                        text={m.content}
+                        names={m.names ?? (m.cards ?? []).map((c) => c.title)}
+                        onDone={() => setMessages((ms) => ms.map((x, xi) => (xi === i ? { ...x, typed: true } : x)))}
+                      />
+                    ) : (
+                      <RichText text={m.content} names={m.names ?? (m.cards ?? []).map((c) => c.title)} />
+                    )}
+                  </div>
+                  {m.typed !== false && m.charts && m.charts.length > 0 && (
+                    <div className="grid gap-x-8 gap-y-5 border-t border-[#eef0f3] bg-[#fbfcfd] px-5 py-4 sm:grid-cols-2">
+                      {m.charts.map((c, ci) =>
+                        c.kind === "trend" ? (
+                          <div key={ci} className="sm:col-span-2">
+                            <TrendChart title={c.title} points={c.points} />
+                          </div>
+                        ) : c.kind === "bars" ? (
+                          <div key={ci} className={c.points.length > 6 ? "sm:col-span-2" : ""}>
+                            <BarsChart title={c.title} points={c.points} />
+                          </div>
+                        ) : c.kind === "pie" ? (
+                          <PieChart key={ci} title={c.title} rows={c.rows} />
                         ) : (
-                          <RichText text={m.content} names={m.names ?? (m.cards ?? []).map((c) => c.title)} />
-                        )}
-                      </div>
-                      {m.typed !== false && m.charts && m.charts.length > 0 && (
-                        <div className="grid gap-x-6 gap-y-4 border-t border-[#eceef1] px-4 py-3 sm:grid-cols-2">
-                          {m.charts.map((c, ci) =>
-                            c.kind === "trend" ? (
-                              <div key={ci} className="sm:col-span-2">
-                                <TrendChart title={c.title} points={c.points} />
-                              </div>
-                            ) : c.kind === "bars" ? (
-                              <div key={ci} className={c.points.length > 6 ? "sm:col-span-2" : ""}>
-                                <BarsChart title={c.title} points={c.points} />
-                              </div>
-                            ) : c.kind === "pie" ? (
-                              <PieChart key={ci} title={c.title} rows={c.rows} />
-                            ) : (
-                              <ShareChart key={ci} chart={c} />
-                            ),
-                          )}
-                        </div>
+                          <ShareChart key={ci} chart={c} />
+                        ),
                       )}
-                      {m.typed !== false && m.printCards && m.printCards.length > 0 && (
-                        <div className="space-y-4 border-t border-[#eceef1] px-4 py-3">
-                          {m.printCards.map((pc, pi) => (
-                            <PrintBusinessCards key={pi} spec={pc} />
+                    </div>
+                  )}
+                  {m.typed !== false && m.printCards && m.printCards.length > 0 && (
+                    <div className="space-y-4 border-t border-[#eef0f3] px-5 py-4">
+                      {m.printCards.map((pc, pi) => (
+                        <PrintBusinessCards key={pi} spec={pc} />
+                      ))}
+                    </div>
+                  )}
+                  {m.typed !== false && m.cards && m.cards.length > 0 && (
+                    <div className="border-t border-[#eef0f3] px-3 py-3">
+                      <CardRow cards={m.cards} />
+                    </div>
+                  )}
+                  {m.typed !== false && (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-[#eef0f3] px-5 py-2.5">
+                      {m.used && m.used.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[10.5px] font-semibold uppercase tracking-wide text-[#9ca3af]">Sources</span>
+                          {[...new Set(m.used.map((u) => TOOL_LABELS[u] ?? u.replace(/_/g, " ")))].map((label) => (
+                            <span key={label} className="rounded-full border border-[#e8eaed] bg-[#f6f7f9] px-2 py-0.5 text-[10.5px] font-semibold text-[#374151]">
+                              {label}
+                            </span>
                           ))}
                         </div>
                       )}
-                      {m.typed !== false && m.cards && m.cards.length > 0 && (
-                        <div className="border-t border-[#eceef1] p-2.5">
-                          <CardRow cards={m.cards} />
-                        </div>
-                      )}
-                    </div>
-                    {m.typed !== false && (
-                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                        {m.used && m.used.length > 0 && (
-                          <p className="text-[11px] text-[#9ca3af]">
-                            Checked: {m.used.map((u) => TOOL_LABELS[u] ?? u).join(" · ")}
-                          </p>
-                        )}
+                      <div className="ml-auto flex items-center gap-3 opacity-60 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                         <button
                           type="button"
                           onClick={() => void copyAnswer(i, m.content)}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#9ca3af] hover:text-[#001f3f] transition-colors"
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#6b7280] transition-colors hover:text-[#001f3f]"
                         >
                           {copiedIdx === i ? <Check className="h-3 w-3 text-[#15803d]" /> : <Copy className="h-3 w-3" />}
                           {copiedIdx === i ? "Copied" : "Copy"}
@@ -786,78 +821,82 @@ export default function FhiChatPage() {
                         <button
                           type="button"
                           onClick={() => exportAnswer(m.content)}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#9ca3af] hover:text-[#001f3f] transition-colors"
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#6b7280] transition-colors hover:text-[#001f3f]"
                         >
                           <Printer className="h-3 w-3" /> Export PDF
                         </button>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
-              ),
-            )}
-            {busy && (
-              <div className="flex items-center gap-2 text-sm text-[#6b7280]">
-                <Loader2 className="h-4 w-4 animate-spin text-[#b8913f]" />
-                Checking the numbers…
               </div>
-            )}
-            <div ref={endRef} />
+            ),
+          )
+        )}
+        {busy && (
+          <div className="inline-flex items-center gap-2.5 rounded-2xl border border-[#e8eaed] bg-white px-4 py-3 text-[13px] text-[#6b7280] shadow-[0_8px_28px_-16px_rgba(0,31,63,0.28)]">
+            <span className="flex items-center gap-1" aria-hidden>
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357] [animation-delay:-0.3s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357] [animation-delay:-0.15s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357]" />
+            </span>
+            Checking the numbers…
           </div>
         )}
+        <div ref={endRef} />
       </div>
 
-      {/* One-tap reports — the "one command" professional report. */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#9ca3af]">
-          <FileText className="h-3.5 w-3.5" /> Reports
-        </span>
-        {REPORT_BUTTONS.map((r) => (
-          <button
-            key={r.label}
-            type="button"
-            disabled={busy}
-            onClick={() => void ask(r.prompt)}
-            className="border border-[#001f3f]/20 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-[#001f3f] transition-colors hover:border-[#d6b357] hover:bg-[#d6b357]/10 disabled:opacity-50"
+      {/* Composer — stays in view while the thread scrolls behind it. */}
+      <div className="sticky bottom-0 z-10 -mx-2 mt-6 bg-gradient-to-t from-[#f4f6f9] via-[#f4f6f9]/95 to-transparent px-2 pb-2 pt-6">
+        {error && (
+          <p role="alert" className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+            {error}
+          </p>
+        )}
+        <div className="rounded-2xl border border-[#e3e6ea] bg-white p-2.5 shadow-[0_14px_40px_-16px_rgba(0,31,63,0.35)]">
+          <div className="flex flex-wrap items-center gap-1.5 px-1 pb-2">
+            <span className="inline-flex items-center gap-1 pr-1 text-[10.5px] font-bold uppercase tracking-wide text-[#9ca3af]">
+              <FileText className="h-3.5 w-3.5" /> Reports
+            </span>
+            {REPORT_BUTTONS.map((r) => (
+              <button
+                key={r.label}
+                type="button"
+                disabled={busy}
+                onClick={() => void ask(r.prompt)}
+                className="rounded-full border border-[#e3e6ea] bg-[#fafbfc] px-3 py-1 text-[12px] font-semibold text-[#001f3f] transition-colors hover:border-[#d6b357] hover:bg-[#d6b357]/10 disabled:opacity-50"
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void ask()
+            }}
           >
-            {r.label}
-          </button>
-        ))}
+            <input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder='Ask FHI Assistant — e.g. "Who sold the most this month?"'
+              disabled={busy}
+              className="w-full rounded-xl border border-transparent bg-[#f4f6f9] px-4 py-3 text-[14px] text-[#111827] placeholder:text-[#9ca3af] transition-colors focus:border-[#001f3f]/30 focus:bg-white focus:outline-none disabled:opacity-70"
+            />
+            <button
+              type="submit"
+              disabled={busy || !input.trim()}
+              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl bg-[#001f3f] px-5 text-sm font-bold text-white transition-colors hover:bg-[#00152b] disabled:opacity-40"
+            >
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Ask
+            </button>
+          </form>
+        </div>
+        <p className="mt-1.5 text-center text-[10.5px] text-[#9ca3af]">Admin only · answers are computed from the live database at the moment you ask.</p>
       </div>
-
-      {/* Composer */}
-      {error && (
-        <p role="alert" className="border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-          {error}
-        </p>
-      )}
-      <form
-        className="mt-3 flex items-center gap-2"
-        onSubmit={(e) => {
-          e.preventDefault()
-          void ask()
-        }}
-      >
-        <input
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder='Ask FHI Assistant — e.g. "Who sold the most this month?"'
-          disabled={busy}
-          className="w-full border border-[#e5e5e5] px-4 py-3 text-sm text-[#111827] placeholder:text-[#9ca3af] focus:border-[#001f3f] focus:outline-none transition-colors disabled:bg-[#f8fafc]"
-        />
-        <button
-          type="submit"
-          disabled={busy || !input.trim()}
-          className="inline-flex shrink-0 items-center gap-2 bg-[#001f3f] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-[#00152b] disabled:opacity-50"
-        >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          Ask
-        </button>
-      </form>
-      <p className="mt-2 text-[11px] text-[#9ca3af]">
-        Admin only · answers are computed from the live database at the moment you ask.
-      </p>
     </div>
   )
 }
