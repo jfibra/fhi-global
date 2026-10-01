@@ -44,6 +44,63 @@ import { createDocument, deleteDocument, listDocuments, type DocumentRow } from 
 import PdfThumbnail from "./pdf-thumbnail"
 import PdfFormViewer, { type PdfFormViewerHandle } from "./pdf-form-viewer"
 
+// Catalogue cache — stale-while-revalidate. The list is tiny (a few dozen
+// rows of metadata) but it used to be fetched from scratch on every mount,
+// so a refresh (or a return from another dashboard page) showed the skeleton
+// grid and then every tile re-appeared. Now the last good list is kept in
+// localStorage: a mount paints it immediately with no loading state, then
+// refetches in the background and swaps in the fresh rows only if they
+// differ. Writes (upload, delete) update the cache as well as the state, so
+// the next mount is already correct. Module cache covers client-side
+// navigation inside one tab; localStorage covers reloads and new tabs.
+const DOCS_CACHE_KEY = "fhi-library-documents-v1"
+let docsMemoryCache: DocumentRow[] | undefined
+
+function readCachedDocs(): DocumentRow[] | undefined {
+  if (docsMemoryCache !== undefined) return docsMemoryCache
+  try {
+    const raw = localStorage.getItem(DOCS_CACHE_KEY)
+    if (!raw) return undefined
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return undefined
+    docsMemoryCache = parsed as DocumentRow[]
+    return docsMemoryCache
+  } catch {
+    return undefined
+  }
+}
+
+function writeCachedDocs(rows: DocumentRow[]) {
+  docsMemoryCache = rows
+  try {
+    localStorage.setItem(DOCS_CACHE_KEY, JSON.stringify(rows))
+  } catch {
+    // storage unavailable or full — the module cache still helps within the tab
+  }
+}
+
+/** Cheap structural equality so a background refetch that returns the same
+ *  rows doesn't replace the array (which would re-key nothing but still
+ *  cause a render pass across every tile). */
+function sameDocs(a: DocumentRow[], b: DocumentRow[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i]!
+    const y = b[i]!
+    if (
+      x.id !== y.id ||
+      x.title !== y.title ||
+      x.category !== y.category ||
+      x.file_url !== y.file_url ||
+      x.file_name !== y.file_name ||
+      x.file_size !== y.file_size
+    ) {
+      return false
+    }
+  }
+  return true
+}
+
 const ALL = "All"
 const UNCATEGORIZED = "Uncategorized"
 
@@ -81,12 +138,17 @@ function saveBlob(bytes: Uint8Array, fileName: string, type: string) {
 }
 
 export function DocumentsClient() {
-  // `null` = not fetched yet, derives the loading state — never set from
-  // inside the effect below (only its async callback, after the await, sets
-  // it), so there is nothing for the set-state-in-effect check to flag.
-  // `load()` is reused directly (a plain event-handler call, not an effect)
-  // to refresh the list after an upload or a delete.
-  const [result, setResult] = useState<{ data: DocumentRow[]; error: string | null } | null>(null)
+  // `null` = nothing to show yet, derives the loading state. The initialiser
+  // seeds it from the cache so a mount with a cached list never shows the
+  // skeleton at all; the effect below then revalidates in the background.
+  // Never set from inside the effect itself (only its async callback, after
+  // the await, sets it), so there is nothing for the set-state-in-effect
+  // check to flag. `load()` is reused directly (a plain event-handler call,
+  // not an effect) to refresh the list after an upload.
+  const [result, setResult] = useState<{ data: DocumentRow[]; error: string | null } | null>(() => {
+    const cached = readCachedDocs()
+    return cached ? { data: cached, error: null } : null
+  })
   const loading = result === null
   const docs = useMemo(() => result?.data ?? [], [result])
   const error = result?.error ?? null
@@ -95,21 +157,33 @@ export function DocumentsClient() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [showUpload, setShowUpload] = useState(false)
 
+  /** Applies a fetch result: a success refreshes the cache and only replaces
+   *  the rows if they actually changed; a failure keeps whatever is already
+   *  on screen (cached rows beat an empty error state) but surfaces the
+   *  message. */
+  const applyResult = useCallback((res: { data: DocumentRow[]; error: string | null }) => {
+    if (res.error) {
+      setResult((prev) => ({ data: prev?.data ?? [], error: res.error }))
+      return
+    }
+    writeCachedDocs(res.data)
+    setResult((prev) => (prev && !prev.error && sameDocs(prev.data, res.data) ? prev : { data: res.data, error: null }))
+  }, [])
+
   const load = async () => {
-    const res = await listDocuments()
-    setResult(res)
+    applyResult(await listDocuments())
   }
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
       const res = await listDocuments()
-      if (!cancelled) setResult(res)
+      if (!cancelled) applyResult(res)
     })()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [applyResult])
 
   // Upload form
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -181,7 +255,12 @@ export function DocumentsClient() {
     if (res.error) {
       window.alert(res.error)
     } else {
-      setResult((prev) => (prev ? { ...prev, data: prev.data.filter((d) => d.id !== doc.id) } : prev))
+      setResult((prev) => {
+        if (!prev) return prev
+        const data = prev.data.filter((d) => d.id !== doc.id)
+        writeCachedDocs(data)
+        return { ...prev, data }
+      })
       if (openId === doc.id) setOpenId(null)
     }
     setDeletingId(null)

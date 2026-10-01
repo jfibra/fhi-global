@@ -10,8 +10,12 @@
 // Rendering is deferred until the tile actually scrolls into view
 // (IntersectionObserver) — a shelf can hold a couple dozen documents, and
 // nobody should pay for rendering ones they never scroll to. Once rendered,
-// the result is cached in memory by URL so switching category tabs (which
-// unmounts and remounts tiles) doesn't re-render the same page twice.
+// the result is cached by URL in two layers: a module Map (so switching
+// category tabs, which unmounts and remounts tiles, doesn't re-render the
+// same page twice within a tab) and localStorage (so a reload, or a new
+// tab, paints every thumbnail instantly instead of fetching each PDF and
+// running pdf.js again). Rendering a page is the expensive part of this
+// shelf — worth more than the catalogue query to keep across refreshes.
 
 import { useEffect, useRef, useState } from "react"
 
@@ -20,6 +24,58 @@ const RENDER_WIDTH = 400
 
 /** Module-scoped, not component state — survives a tile unmounting (e.g. a category tab switch) for the lifetime of the tab. */
 const cache = new Map<string, string>()
+
+// Persistent layer. One localStorage entry holding { [src]: dataUrl } in
+// insertion order, capped so it can't creep past the ~5 MB origin quota
+// (a 400px JPEG at q=0.82 is roughly 30–60 KB, so 60 entries ≈ 2–3 MB).
+// Evicts oldest-first when over the cap, and starts over if a write still
+// fails (quota taken by something else) — it's only a cache.
+const STORAGE_KEY = "fhi-library-doc-thumbs-v1"
+const MAX_ENTRIES = 60
+let persisted: Record<string, string> | undefined
+
+function readPersisted(): Record<string, string> {
+  if (persisted) return persisted
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    const parsed = raw ? (JSON.parse(raw) as unknown) : null
+    persisted = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, string>) : {}
+  } catch {
+    persisted = {}
+  }
+  return persisted
+}
+
+function getCached(src: string): string | null {
+  const mem = cache.get(src)
+  if (mem) return mem
+  const hit = readPersisted()[src]
+  if (typeof hit === "string" && hit.startsWith("data:image/")) {
+    cache.set(src, hit)
+    return hit
+  }
+  return null
+}
+
+function setCached(src: string, dataUrl: string) {
+  cache.set(src, dataUrl)
+  const store = readPersisted()
+  // Re-insert at the end so the most recently rendered is evicted last.
+  delete store[src]
+  store[src] = dataUrl
+  const keys = Object.keys(store)
+  for (let i = 0; i < keys.length - MAX_ENTRIES; i++) delete store[keys[i]!]
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store))
+  } catch {
+    try {
+      persisted = { [src]: dataUrl }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted))
+    } catch {
+      // storage unavailable (private mode) or still full — the module cache still helps
+    }
+  }
+}
 
 type Props = {
   /** Same-origin, inline (not `download=1`) proxy URL — pdf.js fetches this itself, so it must not force Content-Disposition: attachment. */
@@ -30,7 +86,7 @@ type Props = {
 }
 
 export default function PdfThumbnail({ src, alt, fallback }: Props) {
-  const [dataUrl, setDataUrl] = useState<string | null>(cache.get(src) ?? null)
+  const [dataUrl, setDataUrl] = useState<string | null>(() => getCached(src))
   const [failed, setFailed] = useState(false)
   const hostRef = useRef<HTMLDivElement>(null)
 
@@ -64,7 +120,7 @@ export default function PdfThumbnail({ src, alt, fallback }: Props) {
         const url = canvas.toDataURL("image/jpeg", 0.82)
         void pdf.destroy()
         if (cancelled) return
-        cache.set(src, url)
+        setCached(src, url)
         setDataUrl(url)
       } catch {
         if (!cancelled) setFailed(true)
