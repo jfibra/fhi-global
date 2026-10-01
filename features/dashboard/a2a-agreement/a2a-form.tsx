@@ -168,11 +168,39 @@ export function A2AFormFields({
         <p className="border border-[#d6b357]/40 bg-[#d6b357]/10 px-4 py-3 text-xs leading-relaxed text-[#6b5320]">{lockedNote}</p>
       )}
 
-      {/* Date */}
+      {/* Date + how many agents sign */}
       <section className="bg-white border border-[#e8eaed] p-6">
-        <div className="max-w-xs">
-          <label className={label}>Agreement Date</label>
-          <input type="date" value={value.date} onChange={(e) => onChange({ date: e.target.value })} className={input} />
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="w-full max-w-xs">
+            <label className={label}>Agreement Date</label>
+            <input type="date" value={value.date} onChange={(e) => onChange({ date: e.target.value })} className={input} />
+          </div>
+          {!lockNamesAndSplits && (onAddPartyC || onRemovePartyC) && (
+            <div className="flex flex-col items-start gap-1.5 sm:items-end">
+              <span className={label}>Agents on this agreement: {partyC ? "three" : "two"}</span>
+              {partyC ? (
+                onRemovePartyC && (
+                  <button
+                    type="button"
+                    onClick={onRemovePartyC}
+                    className="inline-flex items-center gap-2 border border-[#dfe3e8] bg-white px-4 py-2.5 text-sm font-semibold text-[#374151] hover:border-rose-300 hover:text-rose-600"
+                  >
+                    <X className="w-4 h-4" /> Remove Party C
+                  </button>
+                )
+              ) : (
+                onAddPartyC && (
+                  <button
+                    type="button"
+                    onClick={onAddPartyC}
+                    className="inline-flex items-center gap-2 bg-[#001f3f] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0a3d6b]"
+                  >
+                    <UserPlus className="w-4 h-4 text-[#d6b357]" /> Add a third agent (Party C)
+                  </button>
+                )
+              )}
+            </div>
+          )}
         </div>
       </section>
 
@@ -221,18 +249,7 @@ export function A2AFormFields({
             key: "partyC.fullName",
           })}
         </section>
-      ) : (
-        !lockNamesAndSplits &&
-        onAddPartyC && (
-          <button
-            type="button"
-            onClick={onAddPartyC}
-            className="flex w-full items-center justify-center gap-2 border border-dashed border-[#c4c9cf] bg-white px-6 py-4 text-sm font-semibold text-[#001f3f] hover:border-[#d6b357] hover:bg-[#d6b357]/10"
-          >
-            <UserPlus className="w-4 h-4 text-[#b8913f]" /> Add a third agent (Party C)
-          </button>
-        )
-      )}
+      ) : null}
 
       {/* Scope */}
       <section className="bg-white border border-[#e8eaed] p-6">
