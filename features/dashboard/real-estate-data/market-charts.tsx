@@ -574,6 +574,15 @@ export function BreakdownSection() {
   const previousPerSqft = prevDone ? perSqftOf(prev.acc) : null
   const perSqftChange = currentPerSqft !== null && previousPerSqft !== null ? delta(currentPerSqft, previousPerSqft) : null
 
+  // Total value — sales only where the dataset has a sales subset
+  // (Transactions: Sales, not mortgages or gifts), otherwise every row's value.
+  const totalOf = (a: Accum | null) => (!a || !appliedSpec.valueKey ? null : appliedSpec.kpi ? (a.kpi?.valueSum ?? null) : a.value)
+  const currentTotal = totalOf(acc)
+  const previousTotal = prevDone ? totalOf(prev.acc) : null
+  const totalChange = currentTotal !== null && previousTotal !== null ? delta(currentTotal, previousTotal) : null
+  const totalLabel = appliedSpec.kpi ? "Total sales value" : `Total ${appliedSpec.valueLabel?.replace(/ \((AED|sqm)\)/, "").toLowerCase()}`
+  const totalUnit = appliedSpec.valueLabel?.includes("(sqm)") ? " sqm" : " AED"
+
   const daily = useMemo(
     () => (acc ? Object.entries(acc.daily).map(([date, v]) => ({ date, count: v.count, value: v.value })).sort((a, b) => a.date.localeCompare(b.date)) : []),
     [acc],
@@ -668,8 +677,16 @@ export function BreakdownSection() {
               loads in the background; each tile shows its own pending state
               until that finishes, so the rest of the page never waits on it. */}
           {acc && previousJob && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
               <KpiTile label={`${appliedDataset.label} (this period)`} value={int.format(acc.count)} change={countChange} pending={comparisonPending} />
+              {appliedSpec.valueKey && (
+                <KpiTile
+                  label={totalLabel}
+                  value={currentTotal !== null ? `${compact.format(currentTotal)}${totalUnit}` : "—"}
+                  change={totalChange}
+                  pending={comparisonPending}
+                />
+              )}
               {appliedSpec.valueKey && (
                 <KpiTile
                   label={`Average ${appliedSpec.valueLabel?.replace(" (AED)", "").toLowerCase()}`}
@@ -686,7 +703,7 @@ export function BreakdownSection() {
                   pending={comparisonPending}
                 />
               )}
-              <p className="sm:col-span-2 xl:col-span-3 -mt-1 text-xs text-[#9ca3af]">
+              <p className="sm:col-span-2 xl:col-span-4 -mt-1 text-xs text-[#9ca3af]">
                 vs {longDate(previousJob.values.P_FROM_DATE)} – {longDate(previousJob.values.P_TO_DATE)}
               </p>
             </div>
