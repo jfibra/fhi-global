@@ -31,6 +31,13 @@
 // the page column upper-cases the field before pdf.js's own listener (on the
 // input itself) copies the value into AnnotationStorage, and
 // `saveWithChanges()` normalises the storage once more as a belt-and-braces.
+//
+// Single-line text fields also auto-shrink on screen: pdf.js sizes a field's
+// font from the PDF's default appearance and never changes it, so a long
+// value simply scrolls out of view inside the box. `fitFieldFont()` measures
+// the typed value and scales the font down (never up) until it fits the
+// field's width, the way Acrobat's auto-size fields behave. Display only —
+// the saved file already auto-sizes, this just makes the preview match it.
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
@@ -38,6 +45,51 @@ import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist"
 import type { AnnotationLayer } from "pdfjs-dist"
 
 const LOAD_TIMEOUT_MS = 25_000
+/** Auto-shrink floor: below this the text is unreadable anyway, so let it overflow instead. */
+const MIN_FIT_RATIO = 0.3
+/** What pdf.js's CSS gives a field when the PDF sets no size (app/globals.css, .textWidgetAnnotation input). */
+const DEFAULT_FIELD_FONT = "calc(9px * var(--total-scale-factor))"
+
+let measureCtx: CanvasRenderingContext2D | null | undefined
+function textWidth(text: string, font: string): number {
+  if (measureCtx === undefined) measureCtx = document.createElement("canvas").getContext("2d")
+  if (!measureCtx) return 0
+  measureCtx.font = font
+  return measureCtx.measureText(text).width
+}
+
+/**
+ * Scale a single-line text field's font down so its value fits the box.
+ *
+ * pdf.js writes the size inline as `calc(Npx * var(--total-scale-factor))`,
+ * so it tracks page zoom by itself. That expression is kept as the base
+ * (remembered on the element the first time) and multiplied by a ratio in
+ * [MIN_FIT_RATIO, 1]. The ratio is width-over-width, so it is independent of
+ * the page scale — a fit computed at one zoom is still right after a resize,
+ * which is why layout() never needs to re-run this.
+ *
+ * Skipped for comb fields (one character per cell — their spacing is the
+ * point) and textareas (multi-line fields wrap instead).
+ */
+function fitFieldFont(el: HTMLInputElement) {
+  if (el.classList.contains("comb")) return
+  const base = el.dataset.fhiBaseFont ?? (el.dataset.fhiBaseFont = el.style.fontSize || DEFAULT_FIELD_FONT)
+  const current = Number(el.dataset.fhiFit || "1")
+  const cs = getComputedStyle(el)
+  const basePx = Number.parseFloat(cs.fontSize) / current
+  // Inner width minus a little slack so the last glyph never touches the border.
+  const available = el.clientWidth - Number.parseFloat(cs.paddingLeft) - Number.parseFloat(cs.paddingRight) - 2
+  if (!(basePx > 0) || !(available > 0)) return
+  const width = textWidth(el.value, `${cs.fontStyle} ${cs.fontWeight} ${basePx}px ${cs.fontFamily}`)
+  const ratio = width > available ? Math.max(MIN_FIT_RATIO, available / width) : 1
+  if (Math.abs(ratio - current) < 0.005) return
+  el.dataset.fhiFit = String(ratio)
+  el.style.fontSize = ratio === 1 ? base : `calc(${base} * ${ratio})`
+}
+
+function isFittableField(el: EventTarget | Element | null): el is HTMLInputElement {
+  return el instanceof HTMLInputElement && el.type === "text" && !!el.closest(".textWidgetAnnotation")
+}
 /** Breathing room either side of the page inside the scroller, in px. */
 const SIDE_GUTTER = 16
 /** Never blow a small page up past this, even in a very wide container. */
@@ -130,14 +182,16 @@ const PdfFormViewer = forwardRef<PdfFormViewerHandle, Props>(function PdfFormVie
       if (el instanceof HTMLInputElement && el.type !== "text") return
       if (!el.closest(".textWidgetAnnotation")) return
       const upper = el.value.toUpperCase()
-      if (upper === el.value) return
-      const { selectionStart, selectionEnd } = el
-      el.value = upper
-      try {
-        el.setSelectionRange(selectionStart, selectionEnd)
-      } catch {
-        /* not all input types support selection ranges */
+      if (upper !== el.value) {
+        const { selectionStart, selectionEnd } = el
+        el.value = upper
+        try {
+          el.setSelectionRange(selectionStart, selectionEnd)
+        } catch {
+          /* not all input types support selection ranges */
+        }
       }
+      if (isFittableField(el)) fitFieldFont(el)
     }
     column.addEventListener("input", upperCaseOnInput, true)
 
@@ -272,6 +326,9 @@ const PdfFormViewer = forwardRef<PdfFormViewerHandle, Props>(function PdfFormVie
                 fieldObjects: fieldObjects as Record<string, object[]> | null,
                 imageResourcesPath: "",
               })
+              // Values the PDF already carries (or that pdf.js restored from
+              // storage) get the same treatment as typed ones.
+              for (const el of layerDiv.querySelectorAll("input")) if (isFittableField(el) && el.value) fitFieldFont(el)
             }),
           )
         }
