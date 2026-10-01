@@ -69,6 +69,25 @@ export function saleCredits(s: SaleRow): Array<{ agentId: string; share: number;
 
 const AED = (n: number) => `AED ${Math.round(n).toLocaleString("en-AE")}`
 
+// ─── Chart helpers: tools attach these as `_charts`; the UI draws them ───────
+type ChartCount = { name: string; count: number }
+/** A donut from name/count rows (by status, by role, by source…). Nothing is drawn for fewer than two non-zero slices. */
+function pieChart(title: string, rows: ChartCount[], display?: (n: number) => string): FhiChatChart[] {
+  const live = rows.filter((r) => r.count > 0)
+  return live.length >= 2 ? [{ kind: "pie", title, rows: live.map((r) => ({ label: r.name, value: r.count, display: display ? display(r.count) : undefined })) }] : []
+}
+/** Ranked horizontal bars from name/count rows. */
+function sharesChart(title: string, rows: ChartCount[], display?: (n: number) => string): FhiChatChart[] {
+  const live = rows.filter((r) => r.count > 0)
+  return live.length >= 2 ? [{ kind: "shares", title, rows: live.map((r) => ({ label: r.name, value: r.count, display: display ? display(r.count) : undefined })) }] : []
+}
+/** Labelled vertical bars — months, stars, statuses. Drawn when at least two points exist. */
+function barsChart(title: string, points: FhiChatBarPoint[]): FhiChatChart[] {
+  return points.length >= 2 ? [{ kind: "bars", title, points }] : []
+}
+const monthLabel = (ym: string) => new Date(`${ym}-01T00:00:00Z`).toLocaleDateString("en-AE", { month: "short", year: "2-digit", timeZone: "UTC" })
+const objCounts = (o: Record<string, number>): ChartCount[] => Object.entries(o).map(([name, count]) => ({ name: name.replace(/_/g, " "), count }))
+
 function businessDate(s: SaleRow): string {
   return s.reservation_date ?? s.created_at.slice(0, 10)
 }
@@ -459,8 +478,35 @@ async function salesSummary(admin: Admin, args: { from_date?: string; to_date?: 
       },
     }
   }
+  // The month-by-month picture of the window (or the last 12 months when no
+  // period was given) — one call answers "how are sales growing".
+  const months: string[] = []
+  {
+    const lastDay = to ? new Date(Date.parse(`${to}T00:00:00Z`) - 86400e3) : new Date()
+    const first = from ? new Date(`${from}T00:00:00Z`) : new Date(Date.UTC(lastDay.getUTCFullYear(), lastDay.getUTCMonth() - 11, 1))
+    const cursor = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), 1))
+    while (cursor <= lastDay && months.length < 36) {
+      months.push(cursor.toISOString().slice(0, 7))
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1)
+    }
+  }
+  const monthSource = from ? sales : all
+  const byMonth = months.map((ym) => {
+    const rows = monthSource.filter((s) => s.validation_status === "validated" && businessDate(s).startsWith(ym))
+    return { month: ym, validated_deals: rows.length, validated_value: rows.reduce((a, s) => a + Number(s.contract_price ?? 0), 0) }
+  })
   return {
     period: { from: from ?? "beginning", to: to ?? "no upper bound" },
+    ...(months.length >= 2 ? { by_month: byMonth.map((m) => ({ month: m.month, validated_deals: m.validated_deals, validated_value: AED(m.validated_value) })) } : {}),
+    _charts: [
+      ...(months.length >= 2 ? barsChart("Validated sales by month", byMonth.map((m) => ({ label: monthLabel(m.month), value: m.validated_value, display: m.validated_value ? `${(m.validated_value / 1e6).toFixed(2)}M` : "0" }))) : []),
+      ...(months.length >= 2 ? barsChart("Validated deals by month", byMonth.map((m) => ({ label: monthLabel(m.month), value: m.validated_deals, display: String(m.validated_deals) }))) : []),
+      ...pieChart("Sales by status", [
+        { name: "validated", count: cur.validated.count },
+        { name: "pending", count: cur.pending.count },
+        { name: "rejected", count: cur.rejected.count },
+      ]),
+    ],
     validated: { count: cur.validated.count, total: cur.validated.total },
     pending: { count: cur.pending.count, total: cur.pending.total },
     rejected: { count: cur.rejected.count, total: cur.rejected.total },
@@ -922,6 +968,10 @@ async function projectsStats(admin: Admin, args: { developer_name?: string; stat
       [...rows.reduce((m, p) => m.set(p.status ?? "unknown", (m.get(p.status ?? "unknown") ?? 0) + 1), new Map<string, number>())],
     ),
     sample_names: rows.slice(0, 12).map((p) => p.name),
+    _charts: [
+      ...pieChart("Projects by status", objCounts(Object.fromEntries([...rows.reduce((m, p) => m.set(p.status ?? "unknown", (m.get(p.status ?? "unknown") ?? 0) + 1), new Map<string, number>())]))),
+      ...sharesChart("Projects by developer", [...rows.reduce((m, p) => { const n = (p.developers as unknown as { name?: string } | null)?.name ?? "Unknown"; return m.set(n, (m.get(n) ?? 0) + 1) }, new Map<string, number>())].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 10)),
+    ],
     _cards: rows
       .filter((p) => p.main_image)
       .slice(0, 8)
@@ -1028,6 +1078,7 @@ async function eventsOverview(admin: Admin) {
       registration_open: e.registration_open,
       registrations: regCount.get(String(e.id)) ?? 0,
     })),
+    _charts: sharesChart("Registrations by event", (events ?? []).map((e) => ({ name: e.title, count: regCount.get(String(e.id)) ?? 0 })).sort((a, b) => b.count - a.count).slice(0, 8)),
   }
 }
 
@@ -1101,6 +1152,21 @@ async function newAccounts(admin: Admin, args: { from_date?: string; to_date?: s
     top_recruiters_in_period: topRecruiters,
     by_role: group("role"),
     by_status: group("status"),
+    _charts: [
+      ...pieChart("New accounts by role", objCounts(group("role"))),
+      ...pieChart("Recruited vs direct", [{ name: "recruited", count: recruited.length }, { name: "direct sign-up", count: rows.length - recruited.length }]),
+      ...(() => {
+        const days = new Map<string, number>()
+        for (const r of rows) {
+          const d = String(r.joined_at ?? "").slice(0, 10)
+          if (d) days.set(d, (days.get(d) ?? 0) + 1)
+        }
+        const sorted = [...days.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+        return sorted.length >= 2 && sorted.length <= 31
+          ? barsChart("Sign-ups by day", sorted.map(([d, n]) => ({ label: new Date(`${d}T00:00:00Z`).toLocaleDateString("en-AE", { month: "short", day: "numeric", timeZone: "UTC" }), value: n, display: String(n) })))
+          : []
+      })(),
+    ],
     newest: rows.slice(0, 20).map((r) => ({
       name: r.fullname?.trim() || "Unnamed account",
       role: r.role,
@@ -2435,6 +2501,19 @@ async function leadsOverview(admin: Admin, args: LeadsArgs) {
     waiting_for_a_reply: unanswered,
     note: "Buyers Link briefs have no read/answered state — they go straight to the agent's WhatsApp",
   }
+  const srcCount = (k: string) => Number((out[k] as { total?: number } | undefined)?.total ?? 0)
+  const grades = ((out.buyers_link_briefs as { by_grade_buyers_only?: ChartCount[] } | undefined)?.by_grade_buyers_only ?? [])
+  const inqProjects = ((out.project_inquiries as { by_project?: ChartCount[] } | undefined)?.by_project ?? [])
+  out._charts = [
+    ...pieChart("Leads by source", [
+      { name: "project inquiries", count: srcCount("project_inquiries") },
+      { name: "contact messages", count: srcCount("contact_messages") },
+      { name: "Buyers Link briefs", count: srcCount("buyers_link_briefs") },
+      { name: "inbox replies", count: srcCount("inbox_replies") },
+    ]),
+    ...barsChart("Briefs by grade", ["Priority", "Qualified", "Nurture", "Information"].map((g) => ({ label: g, value: grades.find((x) => x.name === g)?.count ?? 0, display: String(grades.find((x) => x.name === g)?.count ?? 0) })).filter((p, _i, arr) => arr.some((x) => x.value > 0) && (p.value > 0 || true))),
+    ...sharesChart("Inquiries by project", inqProjects),
+  ]
   return out
 }
 
@@ -2670,6 +2749,10 @@ async function findProjects(admin: Admin, args: FindProjectsArgs) {
     by_area: countBy((x) => x.p.community || x.p.location || x.p.city),
     by_handover_year: countBy((x) => (x.year ? String(x.year) : null)),
     price_rule: "Prices are what the public page shows: a from-price never below the cheapest listed unit; values under AED 50K ignored as data slips",
+    _charts: [
+      ...sharesChart("Matching projects by developer", countBy((x) => oneRel(x.p.developers)?.name ?? null)),
+      ...barsChart("Matching projects by handover year", countBy((x) => (x.year ? String(x.year) : null)).filter((c) => c.name !== "Not given").sort((a, b) => a.name.localeCompare(b.name)).map((c) => ({ label: c.name, value: c.count, display: String(c.count) }))),
+    ],
     projects: shown.map((x) => {
       const mix = unitsSummary(x.seo)
       return {
@@ -2891,6 +2974,10 @@ async function salesPipeline(admin: Admin, args: PipelineArgs) {
 
   const out: Record<string, unknown> = {
     as_of: new Date(now).toISOString().slice(0, 10),
+    _charts: [
+      ...pieChart("Sales by validation status", [{ name: "validated", count: validated.length }, { name: "pending", count: pending.length }, { name: "rejected", count: rejected.length }]),
+      ...pieChart("Commission status (validated sales)", [...byCommission.entries()].map(([name, v]) => ({ name, count: v.count }))),
+    ],
     all_time: { sales_submitted: sales.length, validated: validated.length, pending: pending.length, rejected: rejected.length, validated_value_aed: aed(validated.reduce((a, s) => a + price(s), 0)) },
     awaiting_validation: {
       count: pending.length,
@@ -2965,6 +3052,10 @@ async function salesPipeline(admin: Admin, args: PipelineArgs) {
         .map((p) => ({ name: p.fullname, role: p.role, joined: p.joined_at?.slice(0, 10) ?? null, last_validated_sale: lastSale.get(String(p.id)) ?? "never" })),
       list_note: quiet.length > Math.max(limit, 40) ? `Showing ${Math.max(limit, 40)} of ${quiet.length}: those who sold before are listed first, then those who never sold` : null,
     }
+    ;(out._charts as FhiChatChart[]).push(
+      ...pieChart("Selling accounts: sold vs quiet", [{ name: "sold this period", count: rows.length - quiet.length }, { name: "quiet", count: quiet.length }]),
+      ...pieChart("Quiet agents by role", objCounts(byRole(quiet))),
+    )
   }
   return out
 }
@@ -3021,6 +3112,10 @@ async function supportTickets(admin: Admin, args: { status?: string; limit?: num
     oldest_open_days: open.length ? dayAge(open[0].created_at) : null,
     by_module: tally(rows, (t) => t.module),
     by_type: tally(rows, (t) => t.ticket_type),
+    _charts: [
+      ...pieChart("Tickets by status", tally((all ?? []) as { status: string }[], (t) => t.status)),
+      ...sharesChart("Open tickets by module", tally(rows, (t) => t.module)),
+    ],
     tickets_oldest_first: rows.slice(0, limit).map((t) => ({
       ticket_id: t.id,
       title: t.title,
@@ -3091,6 +3186,10 @@ async function companyPurchases(admin: Admin, args: { from_date?: string; to_dat
     by_entity: sumBy((r) => entName.get(String(r.tax_entity_id)) ?? "No entity"),
     by_month: sumBy((r) => r.tax_month.slice(0, 7)).sort((a, b) => a.name.localeCompare(b.name)),
     by_tax_type: sumBy((r) => r.tax_type ?? "Not given"),
+    _charts: [
+      ...sharesChart("Spend by category", sumBy((r) => catName.get(String(r.category_id)) ?? "Uncategorised").map((x) => ({ name: x.name, count: x.total_actual })), (n) => `${currency} ${n.toLocaleString("en-AE")}`),
+      ...barsChart("Spend by month", sumBy((r) => r.tax_month.slice(0, 7)).sort((a, b) => a.name.localeCompare(b.name)).map((x) => ({ label: monthLabel(x.name), value: x.total_actual, display: x.total_actual.toLocaleString("en-AE") }))),
+    ],
     newest: rows.slice(0, limit).map((r) => ({
       tax_month: r.tax_month.slice(0, 7),
       invoice: r.invoice_number,
@@ -3201,6 +3300,10 @@ async function listingsOverview(admin: Admin, args: { agent_name?: string; kind?
     by_agent: tally(rows, (l) => names.get(String(l.agent_id)) ?? "Unknown", 15),
     by_project: tally(rows, (l) => proj(l)?.name),
     by_unit_type: tally(rows, (l) => l.unit_type),
+    _charts: [
+      ...pieChart("Listings: sale vs rent", tally(rows, (l) => l.listing_kind)),
+      ...sharesChart("Listings by agent", tally(rows, (l) => names.get(String(l.agent_id)) ?? "Unknown", 8)),
+    ],
     listings: rows.slice(0, limit).map((l) => ({
       title: l.title,
       kind: l.listing_kind,
@@ -3267,6 +3370,10 @@ async function clientsOverview(admin: Admin, args: { agent_name?: string; search
     by_city: tally(rows, (c) => c.city),
     by_agent: tally(rows, (c) => names.get(String(c.created_by)) ?? "Unknown", 15),
     by_gender: tally(rows, (c) => c.gender),
+    _charts: [
+      ...pieChart("Clients by country", tally(rows, (c) => c.country, 6)),
+      ...sharesChart("Clients by agent", tally(rows, (c) => names.get(String(c.created_by)) ?? "Unknown", 8)),
+    ],
     newest: rows.slice(0, limit).map((c) => ({
       name: fullName(c),
       email: c.email,
@@ -3407,6 +3514,12 @@ async function agentReviews(admin: Admin, args: { agent_name?: string; status?: 
     },
     average_scores_out_of_5: scoreAverages,
     rating_distribution: [5, 4, 3, 2, 1].map((star) => ({ stars: star, count: rated.filter((r) => r.overall_rating === star).length })),
+    _charts: [
+      ...barsChart("Ratings given", [1, 2, 3, 4, 5].map((star) => ({ label: `${star} ★`, value: rated.filter((r) => r.overall_rating === star).length, display: String(rated.filter((r) => r.overall_rating === star).length) }))),
+      ...barsChart("Average score by area (out of 5)", SCORE_LABELS.map(([key, label]) => ({ label, value: avg(rated.map((r) => r[key] as number | null)) ?? 0, display: String(avg(rated.map((r) => r[key] as number | null)) ?? "–") }))),
+      ...pieChart("Would recommend", tally(rated, (r) => recommendLabel(r.recommend))),
+      ...sharesChart("Reviews by agent", board.map((b) => ({ name: b.agent, count: b.reviews }))),
+    ],
     recommend_answers: tally(rated, (r) => recommendLabel(r.recommend)),
     most_reviewed: board.slice(0, limit).map((b) => withoutImage(b)),
     best_rated: bestRated.slice(0, limit).map((b) => withoutImage(b)),
@@ -3483,6 +3596,11 @@ async function activityLog(admin: Admin, args: { category?: string; event?: stri
     by_category: tally(rows, (r) => r.category, 20),
     by_event: tally(rows, (r) => `${r.category}.${r.event}`, 20),
     most_active_people: tally(rows.filter((r) => r.actor_name), (r) => `${r.actor_name} (${r.actor_role ?? "automatic"})`, 10),
+    _charts: [
+      ...pieChart("Activity by category", tally(rows, (r) => r.category, 8)),
+      ...sharesChart("Most active people", tally(rows.filter((r) => r.actor_name && r.actor_name !== "System"), (r) => r.actor_name, 8)),
+      ...(failed.length + logins.length > 0 ? pieChart("Sign-ins", [{ name: "successful", count: logins.length }, { name: "failed", count: failed.length }]) : []),
+    ],
     security: {
       logins: logins.length,
       distinct_people_logged_in: new Set(logins.map((r) => r.actor_id ?? r.actor_name)).size,
@@ -3775,6 +3893,10 @@ async function teamsDetail(admin: Admin, args: { team_name?: string; include_mem
     people_in_teams: memberIds.length,
     selling_accounts_without_a_team: { count: noTeam.length, by_role: tally(noTeam, (p) => p.role), names: noTeam.sort((a, b) => (b.joined_at ?? "").localeCompare(a.joined_at ?? "")).slice(0, 40).map((p) => `${p.fullname ?? "Unknown"} (${p.role.replace(/_/g, " ")}, joined ${isoDay(p.joined_at) ?? "?"})`) },
     team_list: out,
+    _charts: [
+      ...sharesChart("Validated sales value by team", out.map((t) => ({ name: t.team, count: t.validated_value_aed })), AED),
+      ...pieChart("Selling accounts: in a team vs none", [{ name: "in a team", count: memberIds.length }, { name: "no team", count: noTeam.length }]),
+    ],
     where_in_dashboard: "Teams (rosters, transfers) and Team Sales",
   }
 }
@@ -3837,6 +3959,14 @@ async function eventEngagement(admin: Admin, args: { event_title?: string; limit
     events: events.length,
     totals: { registrations: R.length, certificate_downloads: D.length, page_views: events.reduce((a, e) => a + (e.view_count ?? 0), 0), qr_scans: events.reduce((a, e) => a + (e.qr_scan_count ?? 0), 0) },
     event_list: list,
+    _charts: [
+      ...(list.length > 1 ? sharesChart("Registrations by event", list.map((e) => ({ name: e.event, count: e.registrations }))) : []),
+      ...(list.length > 1 ? sharesChart("Certificate downloads by event", list.map((e) => ({ name: e.event, count: e.certificate_downloads }))) : []),
+      ...(list.length === 1
+        ? barsChart("Registrations by day", [...R.filter((x) => x.event_id === events[0].id).reduce((m, x) => m.set(x.created_at.slice(0, 10), (m.get(x.created_at.slice(0, 10)) ?? 0) + 1), new Map<string, number>()).entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-14).map(([d, n]) => ({ label: new Date(`${d}T00:00:00Z`).toLocaleDateString("en-AE", { month: "short", day: "numeric", timeZone: "UTC" }), value: n, display: String(n) })))
+        : []),
+      ...(list.length === 1 ? pieChart("Registrants who downloaded a certificate", [{ name: "downloaded", count: list[0].unique_downloaders }, { name: "not yet", count: Math.max(0, list[0].registrations - list[0].unique_downloaders) }]) : []),
+    ],
     note: "Registrant NAMES are in event_attendees; this is the engagement picture per event",
   }
 }
@@ -4399,9 +4529,12 @@ export type FhiChatTrendPoint = { date: string; visitors: number }
 export type FhiChatShareRow = { label: string; value: number; display?: string; iso?: string | null; icon?: string | null }
 /** Charts the UI renders under an answer — attached by tools as `_charts`,
  *  stripped before the model sees the JSON (same contract as cards). */
+export type FhiChatBarPoint = { label: string; value: number; display?: string }
 export type FhiChatChart =
   | { kind: "trend"; title: string; points: FhiChatTrendPoint[] }
   | { kind: "shares"; title: string; rows: FhiChatShareRow[] }
+  | { kind: "bars"; title: string; points: FhiChatBarPoint[] }
+  | { kind: "pie"; title: string; rows: FhiChatShareRow[] }
 
 export async function runFhiChatTool(
   name: string,

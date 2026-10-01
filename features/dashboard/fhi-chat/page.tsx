@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Check, Copy, Download, FileText, Globe, Loader2, Monitor, Printer, RotateCcw, Send, Smartphone, Sparkles, Tablet } from "lucide-react"
+import { BarsChart, PieChart, type ChartSpec, type ShareRow, type TrendPoint } from "./charts"
 import {
   DESIGNS as CARD_DESIGNS,
   DISP_H,
@@ -28,11 +29,6 @@ type Card = {
   image?: string | null
   rank?: number
 }
-type TrendPoint = { date: string; visitors: number }
-type ShareRow = { label: string; value: number; display?: string; iso?: string | null; icon?: string | null }
-type ChartSpec =
-  | { kind: "trend"; title: string; points: TrendPoint[] }
-  | { kind: "shares"; title: string; rows: ShareRow[] }
 type PrintCardSpec = {
   member: { name: string; phoneDial: string; phoneLocal: string; email: string; avatarUrl: string | null; initials: string }
   designs: string[]
@@ -747,6 +743,12 @@ export default function FhiChatPage() {
                               <div key={ci} className="sm:col-span-2">
                                 <TrendChart title={c.title} points={c.points} />
                               </div>
+                            ) : c.kind === "bars" ? (
+                              <div key={ci} className={c.points.length > 6 ? "sm:col-span-2" : ""}>
+                                <BarsChart title={c.title} points={c.points} />
+                              </div>
+                            ) : c.kind === "pie" ? (
+                              <PieChart key={ci} title={c.title} rows={c.rows} />
                             ) : (
                               <ShareChart key={ci} chart={c} />
                             ),
