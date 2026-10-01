@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Check, Copy, Download, FileText, Globe, Loader2, Monitor, Printer, RotateCcw, Send, Smartphone, Sparkles, Tablet } from "lucide-react"
-import { BarsChart, PieChart, type ChartSpec, type ShareRow, type TrendPoint } from "./charts"
+import { BarsChart, PieChart, StatTiles, type ChartSpec, type ShareRow, type StatSpec, type TrendPoint } from "./charts"
 import {
   DESIGNS as CARD_DESIGNS,
   DISP_H,
@@ -40,6 +40,7 @@ type Msg = {
   cards?: Card[]
   names?: string[]
   charts?: ChartSpec[]
+  stats?: StatSpec[]
   printCards?: PrintCardSpec[]
   typed?: boolean
   /** When it was sent/received (ISO), shown as a small time. */
@@ -654,6 +655,7 @@ export default function FhiChatPage() {
         cards?: Card[]
         names?: string[]
         charts?: ChartSpec[]
+        stats?: StatSpec[]
         printCards?: PrintCardSpec[]
         error?: string
       }
@@ -667,6 +669,7 @@ export default function FhiChatPage() {
           cards: data.cards,
           names: data.names,
           charts: data.charts,
+          stats: data.stats,
           printCards: data.printCards,
           typed: false,
           at: new Date().toISOString(),
@@ -755,6 +758,11 @@ export default function FhiChatPage() {
                     <span className="font-['Outfit'] text-[12.5px] font-bold text-[#0d1117]">FHI Assistant</span>
                     {m.at && <span className="text-[10.5px] text-[#9ca3af]">{timeOf(m.at)}</span>}
                   </div>
+                  {m.stats && m.stats.length > 1 && (
+                    <div className="px-5 pt-3">
+                      <StatTiles stats={m.stats} />
+                    </div>
+                  )}
                   <div className="px-5 pb-4 pt-2.5 text-[14px] leading-[1.7] text-[#1f2937] whitespace-pre-wrap">
                     {m.typed === false ? (
                       <TypedText

@@ -69,6 +69,28 @@ export function saleCredits(s: SaleRow): Array<{ agentId: string; share: number;
 
 const AED = (n: number) => `AED ${Math.round(n).toLocaleString("en-AE")}`
 
+// ─── Stat tiles: a tool's headline figures, drawn big above the answer ───────
+export type FhiChatStat = {
+  label: string
+  value: string
+  /** "+33%", "-8%", "new (previous period was 0)", "n/a…" — shown as a small chip. */
+  change?: string | null
+  tone?: "up" | "down" | "flat" | "neutral"
+  /** One short line under the value, e.g. "vs 2 last month". */
+  hint?: string | null
+}
+function toneOf(change: string | null | undefined): FhiChatStat["tone"] {
+  if (!change) return "neutral"
+  if (change.startsWith("+") || change.startsWith("new")) return "up"
+  if (change.startsWith("-")) return "down"
+  if (change.startsWith("0%")) return "flat"
+  return "neutral"
+}
+function stat(label: string, value: string | number | null | undefined, change?: string | null, hint?: string | null): FhiChatStat {
+  const v = value == null || value === "" ? "–" : typeof value === "number" ? value.toLocaleString("en-AE") : value
+  return { label, value: v, change: change ?? null, tone: toneOf(change), hint: hint ?? null }
+}
+
 // ─── Chart helpers: tools attach these as `_charts`; the UI draws them ───────
 type ChartCount = { name: string; count: number }
 /** A donut from name/count rows (by status, by role, by source…). Nothing is drawn for fewer than two non-zero slices. */
@@ -497,6 +519,12 @@ async function salesSummary(admin: Admin, args: { from_date?: string; to_date?: 
   })
   return {
     period: { from: from ?? "beginning", to: to ?? "no upper bound" },
+    _stats: [
+      stat("Validated deals", cur.validated.count, (comparison.change_vs_previous as Record<string, string> | undefined)?.validated_deals, from ? `vs ${(comparison.previous_period as { validated?: { count?: number } } | undefined)?.validated?.count ?? 0} before` : "all time"),
+      stat("Validated value", cur.validated.total, (comparison.change_vs_previous as Record<string, string> | undefined)?.validated_value, from ? `vs ${(comparison.previous_period as { validated?: { total?: string } } | undefined)?.validated?.total ?? "AED 0"} before` : "all time"),
+      stat("Pending", cur.pending.count, null, cur.pending.count ? cur.pending.total : "nothing waiting"),
+      ...(cur.rejected.count ? [stat("Rejected", cur.rejected.count)] : []),
+    ],
     ...(months.length >= 2 ? { by_month: byMonth.map((m) => ({ month: m.month, validated_deals: m.validated_deals, validated_value: AED(m.validated_value) })) } : {}),
     _charts: [
       ...(months.length >= 2 ? barsChart("Validated sales by month", byMonth.map((m) => ({ label: monthLabel(m.month), value: m.validated_value, display: m.validated_value ? `${(m.validated_value / 1e6).toFixed(2)}M` : "0" }))) : []),
@@ -713,6 +741,11 @@ async function agentSales(admin: Admin, args: { name?: string }) {
       email,
     },
     other_name_matches: candidates.slice(1).map((m) => m.fullname),
+    _stats: [
+      stat("Validated deals", validated.length),
+      stat("Validated value", AED(totalValidated), null, sales.some((s) => saleCredits(s).length > 1) ? "own share of shared deals" : null),
+      stat("Pending", sales.filter((s) => (s.validation_status ?? "pending") === "pending").length),
+    ],
     validated: { count: validated.length, total: AED(totalValidated) },
     ...(sales.some((s) => saleCredits(s).length > 1)
       ? { note: "Totals count this agent's share of shared (partnership) sales; each listed sale shows its full contract price." }
@@ -1001,6 +1034,14 @@ async function platformCounts(admin: Admin) {
     [...(tickets ?? []).reduce((m, t) => m.set(t.status ?? "unknown", (m.get(t.status ?? "unknown") ?? 0) + 1), new Map<string, number>())],
   )
   return {
+    _stats: [
+      stat("Accounts", users ?? 0, null, `${(activeUsers ?? 0).toLocaleString("en-AE")} active`),
+      stat("Developers", devs ?? 0, null, "active"),
+      stat("Projects", projects ?? 0, null, "published"),
+      stat("Listings", listings ?? 0, null, "published"),
+      stat("Clients", clients ?? 0),
+      stat("Open tickets", (ticketCounts.open ?? 0) + (ticketCounts.in_progress ?? 0)),
+    ],
     accounts_total: users ?? 0,
     accounts_active: activeUsers ?? 0,
     developers_active: devs ?? 0,
@@ -1152,6 +1193,12 @@ async function newAccounts(admin: Admin, args: { from_date?: string; to_date?: s
     top_recruiters_in_period: topRecruiters,
     by_role: group("role"),
     by_status: group("status"),
+    _stats: [
+      stat("New accounts", rows.length, pctChange(rows.length, prevAll.length), `vs ${prevAll.length} before`),
+      stat("Recruited", recruited.length, pctChange(recruited.length, prevRecruited), "registered under someone"),
+      stat("Direct sign-ups", rows.length - recruited.length, null, "from the website"),
+      stat("Waiting for approval", rows.filter((r) => r.status === "pending").length, null, "status pending"),
+    ],
     _charts: [
       ...pieChart("New accounts by role", objCounts(group("role"))),
       ...pieChart("Recruited vs direct", [{ name: "recruited", count: recruited.length }, { name: "direct sign-up", count: rows.length - recruited.length }]),
@@ -2112,6 +2159,13 @@ async function websiteTraffic(args: { days?: number; from_date?: string; to_date
   return {
     period: { from: startDate, to: endDate },
     note: "public website only (internal dashboard pages excluded from top pages); GA data can lag up to 24-48h",
+    _stats: [
+      stat("Visitors", num(0), prevTotals ? pctChange(num(0), pnum(0)) : null, prevTotals ? `vs ${pnum(0).toLocaleString("en-AE")} before` : null),
+      stat("Sessions", num(1), prevTotals ? pctChange(num(1), pnum(1)) : null),
+      stat("Page views", num(2), prevTotals ? pctChange(num(2), pnum(2)) : null),
+      stat("New visitors", num(3), null, `${Math.max(0, num(0) - num(3)).toLocaleString("en-AE")} returning`),
+      stat("Avg. time on site", `${Math.floor(num(4) / 60)}m ${Math.round(num(4) % 60)}s`, null, `${Math.round(num(5) * 100)}% engaged`),
+    ],
     visitors: num(0),
     sessions: num(1),
     page_views: num(2),
@@ -2504,6 +2558,14 @@ async function leadsOverview(admin: Admin, args: LeadsArgs) {
   const srcCount = (k: string) => Number((out[k] as { total?: number } | undefined)?.total ?? 0)
   const grades = ((out.buyers_link_briefs as { by_grade_buyers_only?: ChartCount[] } | undefined)?.by_grade_buyers_only ?? [])
   const inqProjects = ((out.project_inquiries as { by_project?: ChartCount[] } | undefined)?.by_project ?? [])
+  out._stats = [
+    stat("Leads", total, pctChange(total, prevTotal), `vs ${prevTotal} before`),
+    stat("Waiting for a reply", unanswered, null, "inquiries, messages, replies"),
+    ...(want("inquiries") ? [stat("Project inquiries", srcCount("project_inquiries"))] : []),
+    ...(want("buyers_link") ? [stat("Buyers Link briefs", srcCount("buyers_link_briefs"), null, `${grades.find((g) => g.name === "Priority")?.count ?? 0} priority`)] : []),
+    ...(want("contact") ? [stat("Contact messages", srcCount("contact_messages"))] : []),
+    ...(want("inbox") ? [stat("Inbox replies", srcCount("inbox_replies"))] : []),
+  ]
   out._charts = [
     ...pieChart("Leads by source", [
       { name: "project inquiries", count: srcCount("project_inquiries") },
@@ -2748,6 +2810,12 @@ async function findProjects(admin: Admin, args: FindProjectsArgs) {
     by_developer: countBy((x) => oneRel(x.p.developers)?.name ?? null),
     by_area: countBy((x) => x.p.community || x.p.location || x.p.city),
     by_handover_year: countBy((x) => (x.year ? String(x.year) : null)),
+    _stats: [
+      stat("Matching projects", list.length, null, beds != null && withoutUnitRows ? `+${withoutUnitRows} without unit data for that size` : null),
+      stat("Cheapest", shown[0]?.price != null ? formatPrice(shown[0].price, null, shown[0].p.currency) ?? "–" : "–", null, shown[0] ? shown[0].p.name : null),
+      stat("Developers", countBy((x) => oneRel(x.p.developers)?.name ?? null).length),
+      ...(list.some((x) => x.year) ? [stat("Earliest handover", String(Math.min(...list.map((x) => x.year ?? 9999))))] : []),
+    ],
     price_rule: "Prices are what the public page shows: a from-price never below the cheapest listed unit; values under AED 50K ignored as data slips",
     _charts: [
       ...sharesChart("Matching projects by developer", countBy((x) => oneRel(x.p.developers)?.name ?? null)),
@@ -2878,6 +2946,12 @@ async function projectDetails(admin: Admin, args: { name?: string }) {
     permit: { trakheesi_number: str("trakheesi_permit_number"), link: str("trakheesi_permit_link") ?? str("trakheesi_permit_url") },
     sales_contact: { phone: str("sales_contact_phone"), email: str("sales_contact_email") },
     description: (str("description") ?? str("about_project") ?? "").slice(0, 600) || null,
+    _stats: [
+      stat("From price", formatPrice(priceFromValue(seo), null, p.currency) ?? "–", null, priceToValue(seo) ? `to ${formatPrice(priceToValue(seo), null, p.currency)}` : null),
+      stat("Handover", handoverLabel(seo) ?? "–", null, statusLabel(p.status)),
+      stat("Unit types", (p.project_units ?? []).length, null, mix.mix),
+      stat("FHI validated deals", validated.length, null, validated.length ? AED(validated.reduce((s2, r) => s2 + (numOf(r.contract_price) ?? 0), 0)) : null),
+    ],
     fhi_sales: { validated_deals: validated.length, validated_value_aed: validated.reduce((s, r) => s + (numOf(r.contract_price) ?? 0), 0), pending_deals: pending, note: "For who sold it, use top_agents with project_name" },
     _cards: p.main_image ? [{ kind: "project", title: p.name, subtitle: [dev?.name, formatPrice(priceFromValue(seo), null, p.currency), handoverLabel(seo)].filter(Boolean).join(" · "), image: p.main_image } as FhiChatCard] : [],
   }
@@ -2974,6 +3048,12 @@ async function salesPipeline(admin: Admin, args: PipelineArgs) {
 
   const out: Record<string, unknown> = {
     as_of: new Date(now).toISOString().slice(0, 10),
+    _stats: [
+      stat("Awaiting validation", pending.length, null, pending.length ? `oldest ${daysSince(pending[0].created_at)} days` : "queue is clear"),
+      stat(`Stale (> ${staleDays} days)`, stale.length),
+      stat("Commissions pending", commissionPending.length, null, `of ${validated.length} validated`),
+      stat("Validation time", avgTurnaround != null ? `${avgTurnaround} days` : "–", null, "average, submit to validated"),
+    ],
     _charts: [
       ...pieChart("Sales by validation status", [{ name: "validated", count: validated.length }, { name: "pending", count: pending.length }, { name: "rejected", count: rejected.length }]),
       ...pieChart("Commission status (validated sales)", [...byCommission.entries()].map(([name, v]) => ({ name, count: v.count }))),
@@ -3052,6 +3132,7 @@ async function salesPipeline(admin: Admin, args: PipelineArgs) {
         .map((p) => ({ name: p.fullname, role: p.role, joined: p.joined_at?.slice(0, 10) ?? null, last_validated_sale: lastSale.get(String(p.id)) ?? "never" })),
       list_note: quiet.length > Math.max(limit, 40) ? `Showing ${Math.max(limit, 40)} of ${quiet.length}: those who sold before are listed first, then those who never sold` : null,
     }
+    ;(out._stats as FhiChatStat[]).push(stat("Quiet agents", quiet.length, null, `of ${rows.length} selling accounts, ${scope}`))
     ;(out._charts as FhiChatChart[]).push(
       ...pieChart("Selling accounts: sold vs quiet", [{ name: "sold this period", count: rows.length - quiet.length }, { name: "quiet", count: quiet.length }]),
       ...pieChart("Quiet agents by role", objCounts(byRole(quiet))),
@@ -3112,6 +3193,11 @@ async function supportTickets(admin: Admin, args: { status?: string; limit?: num
     oldest_open_days: open.length ? dayAge(open[0].created_at) : null,
     by_module: tally(rows, (t) => t.module),
     by_type: tally(rows, (t) => t.ticket_type),
+    _stats: [
+      stat(status === "open" ? "Open tickets" : "Tickets", rows.length),
+      stat("Unassigned", open.filter((t) => !t.assigned_to).length),
+      stat("Oldest open", open.length ? `${dayAge(open[0].created_at)} days` : "–"),
+    ],
     _charts: [
       ...pieChart("Tickets by status", tally((all ?? []) as { status: string }[], (t) => t.status)),
       ...sharesChart("Open tickets by module", tally(rows, (t) => t.module)),
@@ -3186,6 +3272,11 @@ async function companyPurchases(admin: Admin, args: { from_date?: string; to_dat
     by_entity: sumBy((r) => entName.get(String(r.tax_entity_id)) ?? "No entity"),
     by_month: sumBy((r) => r.tax_month.slice(0, 7)).sort((a, b) => a.name.localeCompare(b.name)),
     by_tax_type: sumBy((r) => r.tax_type ?? "Not given"),
+    _stats: [
+      stat("Purchases", rows.length),
+      stat("Total spend", `${currency} ${Math.round(rows.reduce((a, r) => a + num(r.total_actual_amount), 0)).toLocaleString("en-AE")}`, null, "total actual amount"),
+      stat("Gross taxable", `${currency} ${Math.round(rows.reduce((a, r) => a + num(r.gross_taxable), 0)).toLocaleString("en-AE")}`),
+    ],
     _charts: [
       ...sharesChart("Spend by category", sumBy((r) => catName.get(String(r.category_id)) ?? "Uncategorised").map((x) => ({ name: x.name, count: x.total_actual })), (n) => `${currency} ${n.toLocaleString("en-AE")}`),
       ...barsChart("Spend by month", sumBy((r) => r.tax_month.slice(0, 7)).sort((a, b) => a.name.localeCompare(b.name)).map((x) => ({ label: monthLabel(x.name), value: x.total_actual, display: x.total_actual.toLocaleString("en-AE") }))),
@@ -3300,6 +3391,12 @@ async function listingsOverview(admin: Admin, args: { agent_name?: string; kind?
     by_agent: tally(rows, (l) => names.get(String(l.agent_id)) ?? "Unknown", 15),
     by_project: tally(rows, (l) => proj(l)?.name),
     by_unit_type: tally(rows, (l) => l.unit_type),
+    _stats: [
+      stat(status === "published" ? "Published listings" : "Listings", rows.length),
+      stat("For sale", rows.filter((l) => l.listing_kind === "sale").length),
+      stat("For rent", rows.filter((l) => l.listing_kind === "rent").length),
+      stat("Agents listing", tally(rows, (l) => names.get(String(l.agent_id)) ?? "Unknown", 100).length),
+    ],
     _charts: [
       ...pieChart("Listings: sale vs rent", tally(rows, (l) => l.listing_kind)),
       ...sharesChart("Listings by agent", tally(rows, (l) => names.get(String(l.agent_id)) ?? "Unknown", 8)),
@@ -3370,6 +3467,11 @@ async function clientsOverview(admin: Admin, args: { agent_name?: string; search
     by_city: tally(rows, (c) => c.city),
     by_agent: tally(rows, (c) => names.get(String(c.created_by)) ?? "Unknown", 15),
     by_gender: tally(rows, (c) => c.gender),
+    _stats: [
+      stat("Clients", rows.length, null, rows.length !== total ? `of ${total} in the book` : "in the book"),
+      stat("Countries", tally(rows, (c) => c.country, 50).filter((x) => x.name !== "Not given").length),
+      stat("Recorded by", tally(rows, (c) => names.get(String(c.created_by)) ?? "Unknown", 100).length, null, "agents"),
+    ],
     _charts: [
       ...pieChart("Clients by country", tally(rows, (c) => c.country, 6)),
       ...sharesChart("Clients by agent", tally(rows, (c) => names.get(String(c.created_by)) ?? "Unknown", 8)),
@@ -3514,6 +3616,12 @@ async function agentReviews(admin: Admin, args: { agent_name?: string; status?: 
     },
     average_scores_out_of_5: scoreAverages,
     rating_distribution: [5, 4, 3, 2, 1].map((star) => ({ stars: star, count: rated.filter((r) => r.overall_rating === star).length })),
+    _stats: [
+      stat("Reviews", rows.length, null, `${byAgent.size} agent${byAgent.size === 1 ? "" : "s"} reviewed`),
+      stat("Average rating", avg(rated.map((r) => r.overall_rating)) != null ? `${avg(rated.map((r) => r.overall_rating))} / 5` : "–"),
+      stat("Would recommend", rated.length ? `${Math.round((100 * rated.filter(wouldRecommend).length) / rated.length)}%` : "–"),
+      stat("Waiting for approval", rows.filter((r) => r.status === "new").length),
+    ],
     _charts: [
       ...barsChart("Ratings given", [1, 2, 3, 4, 5].map((star) => ({ label: `${star} ★`, value: rated.filter((r) => r.overall_rating === star).length, display: String(rated.filter((r) => r.overall_rating === star).length) }))),
       ...barsChart("Average score by area (out of 5)", SCORE_LABELS.map(([key, label]) => ({ label, value: avg(rated.map((r) => r[key] as number | null)) ?? 0, display: String(avg(rated.map((r) => r[key] as number | null)) ?? "–") }))),
@@ -3596,6 +3704,11 @@ async function activityLog(admin: Admin, args: { category?: string; event?: stri
     by_category: tally(rows, (r) => r.category, 20),
     by_event: tally(rows, (r) => `${r.category}.${r.event}`, 20),
     most_active_people: tally(rows.filter((r) => r.actor_name), (r) => `${r.actor_name} (${r.actor_role ?? "automatic"})`, 10),
+    _stats: [
+      stat("Entries", rows.length),
+      stat("Logins", logins.length, null, `${new Set(logins.map((r) => r.actor_id ?? r.actor_name)).size} people`),
+      stat("Failed logins", failed.length),
+    ],
     _charts: [
       ...pieChart("Activity by category", tally(rows, (r) => r.category, 8)),
       ...sharesChart("Most active people", tally(rows.filter((r) => r.actor_name && r.actor_name !== "System"), (r) => r.actor_name, 8)),
@@ -3893,6 +4006,11 @@ async function teamsDetail(admin: Admin, args: { team_name?: string; include_mem
     people_in_teams: memberIds.length,
     selling_accounts_without_a_team: { count: noTeam.length, by_role: tally(noTeam, (p) => p.role), names: noTeam.sort((a, b) => (b.joined_at ?? "").localeCompare(a.joined_at ?? "")).slice(0, 40).map((p) => `${p.fullname ?? "Unknown"} (${p.role.replace(/_/g, " ")}, joined ${isoDay(p.joined_at) ?? "?"})`) },
     team_list: out,
+    _stats: [
+      stat("Active teams", out.length),
+      stat("People in teams", memberIds.length),
+      stat("Selling accounts without a team", noTeam.length),
+    ],
     _charts: [
       ...sharesChart("Validated sales value by team", out.map((t) => ({ name: t.team, count: t.validated_value_aed })), AED),
       ...pieChart("Selling accounts: in a team vs none", [{ name: "in a team", count: memberIds.length }, { name: "no team", count: noTeam.length }]),
@@ -3959,6 +4077,20 @@ async function eventEngagement(admin: Admin, args: { event_title?: string; limit
     events: events.length,
     totals: { registrations: R.length, certificate_downloads: D.length, page_views: events.reduce((a, e) => a + (e.view_count ?? 0), 0), qr_scans: events.reduce((a, e) => a + (e.qr_scan_count ?? 0), 0) },
     event_list: list,
+    _stats:
+      list.length === 1
+        ? [
+            stat("Registrations", list[0].registrations),
+            stat("Certificate downloads", list[0].certificate_downloads, null, `${list[0].unique_downloaders} people · ${list[0].download_rate_percent ?? 0}% of registrants`),
+            stat("Page views", list[0].page_views, null, list[0].views_to_registration_percent != null ? `${list[0].views_to_registration_percent}% registered` : null),
+            stat("QR scans", list[0].qr_scans),
+          ]
+        : [
+            stat("Events", events.length),
+            stat("Registrations", R.length),
+            stat("Certificate downloads", D.length),
+            stat("Page views", events.reduce((a, e) => a + (e.view_count ?? 0), 0)),
+          ],
     _charts: [
       ...(list.length > 1 ? sharesChart("Registrations by event", list.map((e) => ({ name: e.event, count: e.registrations }))) : []),
       ...(list.length > 1 ? sharesChart("Certificate downloads by event", list.map((e) => ({ name: e.event, count: e.certificate_downloads }))) : []),
@@ -4546,6 +4678,7 @@ export async function runFhiChatTool(
   names: string[]
   charts: FhiChatChart[]
   printCards: FhiChatPrintCard[]
+  stats: FhiChatStat[]
 }> {
   const admin = createAdminSupabase()
   try {
@@ -4590,10 +4723,10 @@ export async function runFhiChatTool(
       case "print_business_card": result = await printBusinessCard(admin, args); break
       case "send_email": result = await sendChatEmail(admin, args, sender); break
       case "congratulate_top_agents": result = await congratulateTopAgents(admin, args, sender); break
-      default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [], printCards: [] }
+      default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [], printCards: [], stats: [] }
     }
-    const { _cards, _names, _charts, _printCards, ...rest } = result as {
-      _cards?: FhiChatCard[]; _names?: string[]; _charts?: FhiChatChart[]; _printCards?: FhiChatPrintCard[]
+    const { _cards, _names, _charts, _printCards, _stats, ...rest } = result as {
+      _cards?: FhiChatCard[]; _names?: string[]; _charts?: FhiChatChart[]; _printCards?: FhiChatPrintCard[]; _stats?: FhiChatStat[]
     } & Record<string, unknown>
     return {
       forModel: JSON.stringify(rest),
@@ -4601,11 +4734,12 @@ export async function runFhiChatTool(
       names: Array.isArray(_names) ? _names : [],
       charts: Array.isArray(_charts) ? _charts : [],
       printCards: Array.isArray(_printCards) ? _printCards : [],
+      stats: Array.isArray(_stats) ? _stats : [],
     }
   } catch (e) {
     return {
       forModel: JSON.stringify({ error: e instanceof Error ? e.message : "Query failed" }),
-      cards: [], names: [], charts: [], printCards: [],
+      cards: [], names: [], charts: [], printCards: [], stats: [],
     }
   }
 }

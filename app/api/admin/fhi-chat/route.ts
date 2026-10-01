@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireRole } from "@/lib/auth-guard"
 import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
-import { FHI_CHAT_TOOLS, runFhiChatTool, type FhiChatCard, type FhiChatChart, type FhiChatPrintCard } from "@/lib/fhi-chat-tools"
+import { FHI_CHAT_TOOLS, runFhiChatTool, type FhiChatCard, type FhiChatChart, type FhiChatPrintCard, type FhiChatStat } from "@/lib/fhi-chat-tools"
 
 /**
  * FHI Assistant — the admin analytics assistant. The model (OpenAI, same account
@@ -51,6 +51,7 @@ Rules:
 - When listing event attendees, include each person's email and WhatsApp number when available — admins use the list for follow-up. Format: one line per person: name - whatsapp - email.
 - For website traffic answers, also mention the top 2-3 traffic sources (e.g. "mostly Organic Search and Direct") and, when available, how many are on the site right now — the tool returns both.
 - "Is our traffic growing / visitors by day / trend": use website_traffic's visitors_trend — state the direction, the period total, and the peak day with its number. Do NOT list every single day; the UI draws the day-by-day chart automatically under your answer.
+- The UI shows the headline figures of every answer as big stat tiles above your text (totals, changes vs the previous period). Keep the text brief: lead with the one-sentence insight, then only the details the tiles don't show.
 - The UI draws charts automatically under your answer — bar charts for leaderboards, month-by-month bars for sales, pies for splits (status, role, source, country), trend lines for visitors. Never describe or re-list what a chart shows — give the headline numbers and the insight. For "growth / trend / per month" questions about sales, call sales_summary ONCE for the WHOLE period (it returns by_month and the chart) — never one call per month.
 - Match a report's SCOPE to the request — NEVER produce the full multi-domain report unless explicitly asked for a full/complete/overall report. "Sales report" means sales ONLY (no accounts, no website). For a sales report use exactly this layout (call sales_summary, top_agents and top_developers for the period):
 
@@ -159,6 +160,7 @@ export async function POST(req: NextRequest) {
   const entityNames: string[] = []
   const charts: FhiChatChart[] = []
   const printCards: FhiChatPrintCard[] = []
+  const stats: FhiChatStat[] = []
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     const callOpenAI = () =>
@@ -233,12 +235,20 @@ export async function POST(req: NextRequest) {
         chartSeen.add(c.title)
         return true
       }).reverse().slice(0, 6)
+      // Stat tiles: a re-called tool wins with its latest figure; at most 8.
+      const statSeen = new Set<string>()
+      const uniqueStats = [...stats].reverse().filter((t) => {
+        if (statSeen.has(t.label)) return false
+        statSeen.add(t.label)
+        return true
+      }).reverse().slice(0, 8)
       return NextResponse.json({
         reply,
         used: [...new Set(used)],
         cards: uniqueCards,
         names,
         charts: uniqueCharts,
+        stats: uniqueStats,
         printCards: printCards.slice(0, 3),
       })
     }
@@ -261,6 +271,7 @@ export async function POST(req: NextRequest) {
       entityNames.push(...result.names)
       charts.push(...result.charts)
       printCards.push(...result.printCards)
+      stats.push(...result.stats)
       messages.push({ role: "tool", tool_call_id: call.id, content: result.forModel.slice(0, 24000) })
     }
   }
