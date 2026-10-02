@@ -224,6 +224,9 @@ export type Accum = {
   developersMatched: Tally | null
   developersGuessed: Tally | null
   projectsUnmatched: Tally | null
+  /** Every named project, developer known or not, + which developer each resolved to. */
+  projects: Tally | null
+  projectDevelopers: Record<string, string> | null
   developerSources: Record<string, number> | null
 }
 
@@ -251,6 +254,8 @@ function mergeBatch(acc: Accum | null, res: DldBreakdownResponse): Accum {
         developersMatched: acc.developersMatched ? { ...acc.developersMatched } : null,
         developersGuessed: acc.developersGuessed ? { ...acc.developersGuessed } : null,
         projectsUnmatched: acc.projectsUnmatched ? { ...acc.projectsUnmatched } : null,
+        projects: acc.projects ? { ...acc.projects } : null,
+        projectDevelopers: acc.projectDevelopers ? { ...acc.projectDevelopers } : null,
         developerSources: acc.developerSources ? { ...acc.developerSources } : null,
       }
     : {
@@ -273,6 +278,8 @@ function mergeBatch(acc: Accum | null, res: DldBreakdownResponse): Accum {
         developersMatched: null,
         developersGuessed: null,
         projectsUnmatched: null,
+        projects: null,
+        projectDevelopers: null,
         developerSources: null,
       }
   for (const d of res.daily) addTo(next.daily, d.date, d)
@@ -320,6 +327,9 @@ function mergeBatch(acc: Accum | null, res: DldBreakdownResponse): Accum {
     for (const b of res.developersGuessed ?? []) addTo(next.developersGuessed, b.label, b)
     next.projectsUnmatched ??= {}
     for (const b of res.projectsUnmatched ?? []) addTo(next.projectsUnmatched, b.label, b)
+    next.projects ??= {}
+    for (const b of res.projects ?? []) addTo(next.projects, b.label, b)
+    next.projectDevelopers = { ...(next.projectDevelopers ?? {}), ...(res.projectDevelopers ?? {}) }
     const src = next.developerSources ?? {}
     for (const [k, n] of Object.entries(res.developerSources ?? {})) src[k] = (src[k] ?? 0) + n
     next.developerSources = src
@@ -937,10 +947,13 @@ export function RankChart({
   rowHeight = 30,
   labelShare,
   tooltipNote,
+  measure = "count",
 }: {
   buckets: DldChartBucket[]
   hasValue: boolean
   rowHeight?: number
+  /** Which number the bars show — row count (default) or the AED value sum. The caller sorts. */
+  measure?: "count" | "value"
   /** Extra text appended to a bar's tooltip (e.g. a matched/guessed split). */
   tooltipNote?: (bucket: DldChartBucket) => string | null
   /**
@@ -981,7 +994,7 @@ export function RankChart({
   return (
     <div ref={hostRef} className="w-full">
     <ResponsiveContainer width="100%" height={h}>
-      <BarChart data={buckets} layout="vertical" margin={{ top: 4, right: 48, bottom: 4, left: marginLeft }} barCategoryGap="30%">
+      <BarChart data={buckets} layout="vertical" margin={{ top: 4, right: measure === "value" ? 72 : 48, bottom: 4, left: marginLeft }} barCategoryGap="30%">
         <CartesianGrid horizontal={false} stroke={C.grid} />
         <XAxis type="number" tick={{ fontSize: 11, fill: C.tick }} tickLine={false} axisLine={false} tickFormatter={(v) => compact.format(Number(v))} />
         <YAxis
@@ -997,14 +1010,20 @@ export function RankChart({
         <Tooltip
           cursor={{ fill: "rgba(0,31,63,0.04)" }}
           contentStyle={TOOLTIP_STYLE}
-          formatter={(v, _n, item) => {
+          formatter={(_v, _n, item) => {
             const b = item.payload as DldChartBucket
-            const base = hasValue ? `${int.format(Number(v))} rows · AED ${compact.format(b.value)}` : `${int.format(Number(v))} rows`
+            const base = hasValue ? `${int.format(b.count)} rows · AED ${compact.format(b.value)}` : `${int.format(b.count)} rows`
             const note = tooltipNote?.(b)
             return [note ? `${base} · ${note}` : base, b.label]
           }}
         />
-        <Bar dataKey="count" fill={C.blue} radius={[0, 4, 4, 0]} maxBarSize={18} label={{ position: "right", fontSize: 11, fill: "#374151", formatter: (v: unknown) => int.format(Number(v)) }} />
+        <Bar
+          dataKey={measure}
+          fill={measure === "value" ? C.aqua : C.blue}
+          radius={[0, 4, 4, 0]}
+          maxBarSize={18}
+          label={{ position: "right", fontSize: 11, fill: "#374151", formatter: (v: unknown) => (measure === "value" ? `AED ${compact.format(Number(v))}` : int.format(Number(v))) }}
+        />
       </BarChart>
     </ResponsiveContainer>
     </div>

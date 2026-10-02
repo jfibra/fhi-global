@@ -17,15 +17,14 @@
 // the coverage line says how much of the range it has reached. Its own cache
 // keys, so it never disturbs the Breakdowns tab's remembered job.
 
-import { useMemo, useState } from "react"
-import { Loader2, Search } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { ChevronDown, Loader2, Search } from "lucide-react"
 import { FilterSelect } from "@/components/ui/filter-select"
 import { DLD_CHART_TOP_N, DLD_DATASETS, resolveDefault, type DldChartBucket } from "@/lib/dld-open-data"
 import {
   ChartCard,
   CoverageLine,
   ErrorBox,
-  RankChart,
   RefreshButton,
   MiniStat,
   ShareBars,
@@ -43,7 +42,7 @@ const CACHE_KEY = "charts:developers:last"
 
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 /** Last 30 days inclusive of today. */
-function last30Days(): { from: string; to: string } {
+export function last30Days(): { from: string; to: string } {
   const to = new Date()
   const from = new Date(to)
   from.setDate(from.getDate() - 29)
@@ -51,14 +50,14 @@ function last30Days(): { from: string; to: string } {
 }
 
 /** Sales only by default — mortgages and gifts say nothing about who is selling. */
-const GROUPS = [
+export const GROUPS = [
   { value: "1", label: "Sales" },
   { value: "", label: "All transactions" },
   { value: "2", label: "Mortgages" },
   { value: "3", label: "Gifts" },
 ]
 
-function jobFor(range: { from: string; to: string }, group: string): BatchJob {
+export function jobFor(range: { from: string; to: string }, group: string): BatchJob {
   const dataset = DLD_DATASETS.transactions
   const values = Object.fromEntries(
     dataset.filters.map((f) => [f.param, f.kind === "date" ? (f.param === "P_TO_DATE" ? range.to : range.from) : resolveDefault(f)]),
@@ -68,6 +67,10 @@ function jobFor(range: { from: string; to: string }, group: string): BatchJob {
 }
 
 type MergedBucket = DldChartBucket & { matched: number; guessed: number }
+type ProjectRow = DldChartBucket & { guessed: boolean }
+const tagOf = (p: ProjectRow) => (p.guessed ? "(by name)" : "(matched)")
+
+
 
 /** Company-form abbreviations DLD writes in caps that would read wrong title-cased. */
 const KEEP_UPPER = new Set(["LLC", "L.L.C", "L.L.C.", "FZE", "FZCO", "FZ-LLC", "PJSC", "PSC", "LLP", "DMCC", "JLT", "SPV", "UAE"])
@@ -77,7 +80,7 @@ const KEEP_UPPER = new Set(["LLC", "L.L.C", "L.L.C.", "FZE", "FZCO", "FZ-LLC", "
  * Display only — DLD and the catalogue write names in every case imaginable;
  * one case on the page also lets two spellings of the same developer merge.
  */
-function titleCase(label: string): string {
+export function titleCase(label: string): string {
   return label
     .split(/\s+/)
     .map((w) => {
@@ -87,7 +90,7 @@ function titleCase(label: string): string {
     })
     .join(" ")
 }
-const relabel = (b: DldChartBucket): DldChartBucket => ({ ...b, label: titleCase(b.label) })
+export const relabel = (b: DldChartBucket): DldChartBucket => ({ ...b, label: titleCase(b.label) })
 
 /** "738 matched · 332 guessed" for a merged developer bar; nothing for the Unmatched/Unknown bars. */
 function splitNote(b: DldChartBucket): string | null {
@@ -97,7 +100,7 @@ function splitNote(b: DldChartBucket): string | null {
 }
 
 /** "17% of rows" for the tiles; undefined until there is a total. */
-const pctOf = (n: number, total: number) => (total > 0 ? `${((n / total) * 100).toFixed(0)}% of rows` : undefined)
+export const pctOf = (n: number, total: number) => (total > 0 ? `${((n / total) * 100).toFixed(0)}% of rows` : undefined)
 
 const SOURCE_LABEL: Record<string, string> = {
   dld: "DLD register",
@@ -110,6 +113,10 @@ const SOURCE_LABEL: Record<string, string> = {
 export function DevelopersBreakdownSection() {
   const [range, setRange] = useState(last30Days)
   const [group, setGroup] = useState("1")
+  // Rank by how many rows a developer has, or by how much AED they add up to.
+  const [rankBy, setRankBy] = useState<"count" | "value">("count")
+  const byMeasure = (a: DldChartBucket, b: DldChartBucket) => (rankBy === "value" ? b.value - a.value : b.count - a.count) || a.label.localeCompare(b.label)
+  const measureWord = rankBy === "value" ? "value" : "count"
   const [submitted, setSubmitted] = useState<BatchJob>(() => jobFor(range, group))
   const job = useBatchJob(CACHE_KEY, submitted, true)
   const { acc, loading } = job
@@ -123,6 +130,26 @@ export function DevelopersBreakdownSection() {
     [acc],
   )
   const unmatched = useMemo(() => (acc?.projectsUnmatched ? toBuckets(acc.projectsUnmatched).map(relabel) : []), [acc])
+  // developer (display label) → its projects, each flagged guessed or not, for
+  // the expandable rows of the three developer lists.
+  const projectsByDeveloper = useMemo(() => {
+    const out = new Map<string, ProjectRow[]>()
+    if (!acc?.projects) return out
+    const devs = acc.projectDevelopers ?? {}
+    for (const b of toBuckets(acc.projects)) {
+      const raw = devs[b.label]
+      if (!raw) continue
+      const guessedDev = raw.endsWith("(by name)")
+      const dev = titleCase(raw.replace(/ \(by name\)$/, ""))
+      const list = out.get(dev) ?? []
+      list.push({ label: titleCase(b.label), count: b.count, value: b.value, guessed: guessedDev })
+      out.set(dev, list)
+    }
+    return out
+  }, [acc])
+  const projectsFor = (developer: string, which: "all" | "matched" | "guessed") =>
+    (projectsByDeveloper.get(developer) ?? []).filter((p) => (which === "all" ? true : which === "guessed" ? p.guessed : !p.guessed)).sort(byMeasure)
+
 
   // Combined card: ONE bar per developer — its register matches and its
   // "(by name)" guesses added together, with the split kept for the tooltip
@@ -149,6 +176,14 @@ export function DevelopersBreakdownSection() {
   const unmatchedRows = sources?.unmatched ?? 0
   const unknownRows = sources?.unknown ?? 0
   const attributedRows = total - unmatchedRows - unknownRows
+  // AED behind each group, from the buckets (every bucket carries its value sum).
+  const sumValue = (bs: DldChartBucket[]) => bs.reduce((s, b) => s + b.value, 0)
+  const matchedValue = sumValue(matched)
+  const guessedValue = sumValue(guessed)
+  const unmatchedValue = sumValue(unmatched)
+  const totalValue = acc?.value ?? 0
+  const unknownValue = Math.max(0, totalValue - matchedValue - guessedValue - unmatchedValue)
+  const aed = (v: number) => `AED ${compact.format(v)}`
   const groupLabel = GROUPS.find((g) => g.value === group)?.label.toLowerCase() ?? "rows"
 
   const sourceBuckets: DldChartBucket[] = sources
@@ -181,6 +216,22 @@ export function DevelopersBreakdownSection() {
             <label className="block text-sm font-medium text-[#0d1117] mb-1.5">Transaction type</label>
             <FilterSelect value={group} onValueChange={setGroup} options={GROUPS} ariaLabel="Transaction type" className="w-full max-w-none h-10 rounded-xl py-0" />
           </div>
+          <div className="w-full sm:w-auto sm:shrink-0">
+            <span className="block text-sm font-medium text-[#0d1117] mb-1.5">Rank by</span>
+            <div className="inline-flex h-10 rounded-xl border border-[#e5e7eb] bg-[#f8fafc] p-1" role="group" aria-label="Rank by">
+              {(["count", "value"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setRankBy(m)}
+                  aria-pressed={rankBy === m}
+                  className={`px-3 rounded-lg text-xs font-semibold transition-colors ${rankBy === m ? "bg-white text-[#001f3f] shadow-sm" : "text-[#6b7280] hover:text-[#001f3f]"}`}
+                >
+                  {m === "count" ? "Sales count" : "Sales value (AED)"}
+                </button>
+              ))}
+            </div>
+          </div>
           {(["from", "to"] as const).map((k) => (
             <div key={k} className="w-full sm:w-[160px] sm:shrink-0">
               <label htmlFor={`dev-${k}`} className="block text-sm font-medium text-[#0d1117] mb-1.5">
@@ -209,7 +260,7 @@ export function DevelopersBreakdownSection() {
               Stop
             </button>
           ) : (
-            <RefreshButton onClick={job.refresh} loading={loading} updatedAt={job.updatedAt} />
+            <RefreshButton onClick={job.refresh} loading={loading} updatedAt={null} />
           )}
         </div>
       </form>
@@ -232,8 +283,8 @@ export function DevelopersBreakdownSection() {
 
         {/* 1. Combined — the whole row, every source together, full width. */}
         <ChartCard
-          title={`Top ${DLD_CHART_TOP_N} developers — all ${groupLabel}`}
-          subtitle={`${longDate(submitted.values.P_FROM_DATE ?? "")} – ${longDate(submitted.values.P_TO_DATE ?? "")}. One bar per developer: register matches and name guesses added together (hover or open the table for the split). ${
+          title={`Top ${DLD_CHART_TOP_N} developers by ${measureWord} — all ${groupLabel}`}
+          subtitle={`${longDate(submitted.values.P_FROM_DATE ?? "")} – ${longDate(submitted.values.P_TO_DATE ?? "")}. One bar per developer: register matches and name guesses added together (hover or open the table for the split), ranked by ${rankBy === "value" ? "total AED" : "sales count"}. ${
             sources && total > 0
               ? `Covers ${int.format(attributedRows)} of ${int.format(total)} rows (${((attributedRows / total) * 100).toFixed(0)}%) — the other ${int.format(unmatchedRows)} name a project nobody has on record and ${int.format(unknownRows)} name no project.`
               : ""
@@ -244,59 +295,205 @@ export function DevelopersBreakdownSection() {
           }}
         >
           {/* Full-width card: names get half the width on one line, bars the other half. */}
-          {!acc ? <Skeleton h={300} /> : <RankChart buckets={merged.slice(0, DLD_CHART_TOP_N)} hasValue labelShare={0.5} tooltipNote={splitNote} />}
+          {!acc ? (
+            <Skeleton h={300} />
+          ) : (
+            <DeveloperRankList rows={[...merged].sort(byMeasure).slice(0, DLD_CHART_TOP_N)} measure={rankBy} note={splitNote} projectsFor={(d) => projectsFor(d, "all")} totalOf={{ count: total, value: totalValue }} />
+          )}
         </ChartCard>
 
         {/* Totals at a glance — how the rows loaded so far split by how (or whether) a developer was found. */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-          <MiniStat label={`Total ${groupLabel}`} value={acc ? int.format(total) : null} hint={acc ? `${compact.format(acc.value)} AED` : undefined} />
-          <MiniStat label="Matched" value={acc ? int.format(known) : null} hint={pctOf(known, total)} />
-          <MiniStat label="Guessed by name" value={acc ? int.format(guessedRows) : null} hint={pctOf(guessedRows, total)} />
-          <MiniStat label="Matched + guessed by name" value={acc ? int.format(attributedRows) : null} hint={pctOf(attributedRows, total)} />
+          <MiniStat label="Number of transactions" value={acc ? int.format(total) : null} hint={acc ? `${groupLabel} in the range` : undefined} />
+          <MiniStat
+            label="Total value (AED)"
+            value={acc ? aed(totalValue) : null}
+            hint={acc && total > 0 ? `${int.format(Math.round(totalValue / total))} AED per transaction` : undefined}
+          />
+          <MiniStat label="Matched" value={acc ? int.format(known) : null} hint={acc ? `${pctOf(known, total)} · ${aed(matchedValue)}` : undefined} />
+          <MiniStat label="Guessed by name" value={acc ? int.format(guessedRows) : null} hint={acc ? `${pctOf(guessedRows, total)} · ${aed(guessedValue)}` : undefined} />
           <MiniStat
             label="No developer"
             value={acc ? int.format(unmatchedRows + unknownRows) : null}
-            hint={acc && total > 0 ? `${pctOf(unmatchedRows + unknownRows, total)} · ${int.format(unmatchedRows)} unmatched project, ${int.format(unknownRows)} no project` : undefined}
+            hint={acc && total > 0 ? `${pctOf(unmatchedRows + unknownRows, total)} · ${aed(unmatchedValue + unknownValue)} · ${int.format(unmatchedRows)} unmatched project, ${int.format(unknownRows)} no project` : undefined}
           />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {/* 2. Register matches only — the developer comes from the project. */}
           <ChartCard
-            title={`Top ${DLD_CHART_TOP_N} — matched through the project`}
+            title={`Top ${DLD_CHART_TOP_N} by ${measureWord} — matched through the project`}
             subtitle={`${sources ? `${int.format(known)} of ${int.format(total)} rows (${total ? ((known / total) * 100).toFixed(0) : 0}%). ` : ""}Developer taken from the DLD projects register or FHI's catalogue — not guessed.`}
             table={{ head: ["Developer", "Rows", "AED"], rows: matched.map((b) => [b.label, b.count, int.format(b.value)]) }}
           >
-            {!acc ? <Skeleton h={300} /> : <RankChart buckets={matched.slice(0, DLD_CHART_TOP_N)} hasValue labelShare={0.5} />}
+            {!acc ? <Skeleton h={300} /> : <DeveloperRankList rows={[...matched].sort(byMeasure).slice(0, DLD_CHART_TOP_N)} measure={rankBy} projectsFor={(d) => projectsFor(d, "matched")} totalOf={{ count: total, value: totalValue }} />}
           </ChartCard>
 
           {/* 3. Name guesses only — clearly labelled as such. */}
           <ChartCard
-            title={`Top ${DLD_CHART_TOP_N} — guessed by name only`}
+            title={`Top ${DLD_CHART_TOP_N} by ${measureWord} — guessed by name only`}
             subtitle={`${sources ? `${int.format(guessedRows)} of ${int.format(total)} rows (${total ? ((guessedRows / total) * 100).toFixed(0) : 0}%). ` : ""}No register match for the project, but its first word is a developer the register or catalogue already knows — a GUESS. Treat as indicative only.`}
             table={{ head: ["Developer (guess)", "Rows", "AED"], rows: guessed.map((b) => [b.label, b.count, int.format(b.value)]) }}
           >
-            {!acc ? <Skeleton h={300} /> : <RankChart buckets={guessed.slice(0, DLD_CHART_TOP_N)} hasValue labelShare={0.5} />}
+            {!acc ? <Skeleton h={300} /> : <DeveloperRankList rows={[...guessed].sort(byMeasure).slice(0, DLD_CHART_TOP_N)} measure={rankBy} projectsFor={(d) => projectsFor(d, "guessed")} totalOf={{ count: total, value: totalValue }} />}
           </ChartCard>
 
-          {/* 4. The catalogue to-do list: projects nobody could attribute. */}
-          <ChartCard
-            title={`Top ${DLD_CHART_TOP_N} projects with no developer on record`}
-            subtitle={`${sources ? `${int.format(sources.unmatched ?? 0)} of ${int.format(total)} rows (${total ? (((sources.unmatched ?? 0) / total) * 100).toFixed(0) : 0}%). ` : ""}Not in DLD's register (this year only) nor in FHI's catalogue, and no known developer in the name. Add these to the catalogue with their developer and they move into “matched”.`}
-            table={{ head: ["Project", "Rows", "AED"], rows: unmatched.map((b) => [b.label, b.count, int.format(b.value)]) }}
-          >
-            {!acc ? <Skeleton h={300} /> : <RankChart buckets={unmatched.slice(0, DLD_CHART_TOP_N)} hasValue labelShare={0.5} />}
-          </ChartCard>
-
-          <ChartCard
-            title="How the developer was found"
-            subtitle="“Guessed by name” feeds the guessed card; “project not on record” is the Unmatched project bucket and the list above; “no project on the row” is Unknown."
-            table={{ head: ["Source", "Rows", ""], rows: sourceBuckets.map((b) => [b.label, b.count, ""]) }}
-          >
-            {!acc ? <Skeleton h={160} /> : <ShareBars buckets={sourceBuckets} total={total} />}
-          </ChartCard>
         </div>
+
+        {/* Full width, on its own row — one share bar per source. */}
+        <ChartCard
+          title="How the developer was found"
+          subtitle="“Guessed by name” feeds the guessed card; “project not on record” is the Unmatched project bucket; “no project on the row” is Unknown."
+          table={{ head: ["Source", "Rows", ""], rows: sourceBuckets.map((b) => [b.label, b.count, ""]) }}
+        >
+          {!acc ? <Skeleton h={160} /> : <ShareBars buckets={sourceBuckets} total={total} />}
+        </ChartCard>
       </div>
     </section>
+  )
+}
+
+// ─── Expandable developer ranking ────────────────────────────────────────────
+//
+// Same reading as RankChart (one line per developer: name, a bar, the number)
+// but as a list, so a row can open: the chevron reveals the developer's
+// projects underneath, each with its own share of the developer's total.
+// The name column is as wide as the longest name needs, capped at half the
+// card (names past that truncate on one line), and the bars share one scale.
+
+export const LIST_FONT = "12px Inter, ui-sans-serif, system-ui, sans-serif"
+let listMeasure: CanvasRenderingContext2D | null | undefined
+export function textPx(text: string): number {
+  const ctx = listMeasure ?? (listMeasure = document.createElement("canvas").getContext("2d"))
+  if (!ctx) return text.length * 6.5
+  ctx.font = LIST_FONT
+  return ctx.measureText(text).width
+}
+
+export function useWidth(ref: React.RefObject<HTMLDivElement | null>): number {
+  const [width, setWidth] = useState(0)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0
+      setWidth((prev) => (Math.abs(prev - w) < 1 ? prev : w))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref])
+  return width
+}
+
+function DeveloperRankList({
+  rows,
+  measure,
+  note,
+  projectsFor,
+  totalOf,
+}: {
+  rows: DldChartBucket[]
+  measure: "count" | "value"
+  /** Extra text after the number (e.g. the matched/guessed split). */
+  note?: (b: DldChartBucket) => string | null
+  projectsFor: (developer: string) => ProjectRow[]
+  /** What each row's percentage is of — the whole range's row count and AED. */
+  totalOf: { count: number; value: number }
+}) {
+  const hostRef = useRef<HTMLDivElement>(null)
+  const width = useWidth(hostRef)
+  const [open, setOpen] = useState<string | null>(null)
+  if (rows.length === 0) return <div className="flex items-center justify-center text-sm text-[#9ca3af]" style={{ height: 200 }}>No rows for these filters.</div>
+
+  const chevronPx = 22
+  const cap = width > 0 ? Math.floor(width * 0.5) : 220
+  const longest = Math.ceil(Math.max(0, ...rows.map((r) => textPx(r.label))))
+  const labelW = Math.min(cap, longest + chevronPx + 12)
+  const max = Math.max(1, ...rows.map((r) => r[measure]))
+  const fmt = (v: number) => (measure === "value" ? `AED ${compact.format(v)}` : int.format(v))
+  const pctOfTotal = (v: number) => (totalOf[measure] > 0 ? `${((v / totalOf[measure]) * 100).toFixed(1)}%` : "—")
+  const numText = (r: DldChartBucket) => `${fmt(r[measure])} · ${pctOfTotal(r[measure])}`
+  // One width for the number column — the longest "1,070 · 9.8%" — so every
+  // bar track spans exactly the same range and their ends line up.
+  const numW = Math.ceil(Math.max(0, ...rows.map((r) => textPx(numText(r))))) + 4
+  const color = measure === "value" ? "#1baf7a" : "#2a78d6"
+
+  return (
+    <div ref={hostRef} className="w-full">
+      <ul className="divide-y divide-[#f0f2f5]">
+        {rows.map((r) => {
+          const isOpen = open === r.label
+          const projects = isOpen ? projectsFor(r.label) : []
+          const extra = note?.(r)
+          // The opened list follows the same rule as the rows: name column as
+          // wide as the longest "Project (tag)" needs, capped at half the card.
+          const innerCap = Math.max(80, cap - 12)
+          const innerLongest = Math.ceil(Math.max(0, ...projects.map((pr) => textPx(`${pr.label} ${tagOf(pr)}`))))
+          const innerLabelW = Math.min(innerCap, innerLongest + 8)
+          const innerNumW = Math.ceil(Math.max(0, ...projects.map((pr) => textPx(`${fmt(pr[measure])} · ${(r[measure] > 0 ? (pr[measure] / r[measure]) * 100 : 0).toFixed(0)}%`)))) + 4
+          return (
+            <li key={r.label}>
+              <button
+                type="button"
+                onClick={() => setOpen(isOpen ? null : r.label)}
+                aria-expanded={isOpen}
+                title={`${r.label} · ${int.format(r.count)} rows · AED ${compact.format(r.value)}${extra ? ` · ${extra}` : ""}`}
+                className="group grid w-full items-center gap-3 py-2 text-left hover:bg-[#f8fafc] rounded-lg -mx-1 px-1"
+                style={{ gridTemplateColumns: `${labelW}px minmax(0,1fr) ${numW}px` }}
+              >
+                <span className="flex min-w-0 items-center gap-1.5 text-xs text-[#374151]">
+                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-[#9ca3af] transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                  <span className="truncate">{r.label}</span>
+                </span>
+                <span className="h-[14px] rounded-r bg-[#eef1f5] overflow-hidden">
+                  <span className="block h-full rounded-r" style={{ width: `${Math.max(1, (r[measure] / max) * 100)}%`, background: color }} />
+                </span>
+                <span className="text-xs tabular-nums text-[#374151] whitespace-nowrap text-right">
+                  {fmt(r[measure])} <span className="text-[#9ca3af]">· {pctOfTotal(r[measure])}</span>
+                </span>
+              </button>
+
+              {isOpen && (
+                <div
+                  // Full row width — both edges line up with the rows above — with equal padding inside.
+                  className="mb-2 rounded-xl border border-[#eef1f5] bg-[#fafbfc] px-3 py-2"
+                >
+                  {(extra || projects.length > 10) && (
+                    <p className="mb-1 text-[11px] text-[#9ca3af]">
+                      {extra}
+                      {extra && projects.length > 10 && " · "}
+                      {projects.length > 10 && `${int.format(projects.length)} projects — scroll for the rest`}
+                    </p>
+                  )}
+                  {projects.length === 0 ? (
+                    <p className="py-1 text-xs text-[#9ca3af]">No project names on these rows.</p>
+                  ) : (
+                    // Roughly 10 rows tall; longer lists scroll inside the panel.
+                    <ul className="space-y-1 overflow-y-auto pr-1" style={{ maxHeight: 10 * 22 }}>
+                      {projects.map((pr) => {
+                        const share = r[measure] > 0 ? (pr[measure] / r[measure]) * 100 : 0
+                        return (
+                          <li key={pr.label} className="grid items-center gap-3 text-[11px]" style={{ gridTemplateColumns: `${innerLabelW}px minmax(0,1fr) ${innerNumW}px` }}>
+                            <span className="truncate text-[#374151]" title={`${pr.label} ${tagOf(pr)}`}>
+                              {pr.label} <span className={pr.guessed ? "text-amber-700" : "text-[#9ca3af]"}>{tagOf(pr)}</span>
+                            </span>
+                            <span className="h-[8px] rounded-r bg-white border border-[#eef1f5] overflow-hidden">
+                              <span className="block h-full rounded-r opacity-70" style={{ width: `${Math.max(1, share)}%`, background: color }} />
+                            </span>
+                            <span className="tabular-nums text-[#6b7280] whitespace-nowrap text-right">
+                              {fmt(pr[measure])} <span className="text-[#9ca3af]">· {share.toFixed(0)}%</span>
+                            </span>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }

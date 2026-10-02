@@ -149,6 +149,8 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
   const developersMatched = new Map<string, { count: number; value: number }>()
   const developersGuessed = new Map<string, { count: number; value: number }>()
   const projectsUnmatched = new Map<string, { count: number; value: number }>()
+  const projects = new Map<string, { count: number; value: number }>()
+  const projectDevelopers: Record<string, string> = {}
   const developerSources: Record<DldDeveloperSource, number> = { dld: 0, fhi: 0, name: 0, unmatched: 0, unknown: 0 }
 
   for (const row of rows) {
@@ -190,6 +192,10 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
       if (m.source === "dld" || m.source === "fhi") bump(developersMatched, m.developer, value)
       else if (m.source === "name") bump(developersGuessed, m.developer, value)
       else if (m.source === "unmatched" && m.project) bump(projectsUnmatched, m.project, value)
+      if (m.project) {
+        bump(projects, m.project, value)
+        if (m.source !== "unmatched" && !projectDevelopers[m.project]) projectDevelopers[m.project] = m.developer
+      }
       developerSources[m.source] += 1
     }
   }
@@ -227,6 +233,8 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
           developersMatched: toBuckets(developersMatched),
           developersGuessed: toBuckets(developersGuessed),
           projectsUnmatched: toBuckets(projectsUnmatched),
+          projects: toBuckets(projects),
+          projectDevelopers,
           developerSources,
         }
       : {}),

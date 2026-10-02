@@ -971,6 +971,10 @@ export interface DldBreakdownResponse {
   developersGuessed?: DldChartBucket[]
   /** Projects (by name) that no register or catalogue knows — the rows behind "Unmatched project". */
   projectsUnmatched?: DldChartBucket[]
+  /** Every project named on a row (by PROJECT_EN), developer known or not. */
+  projects?: DldChartBucket[]
+  /** project name → the developer label it resolved to (register, catalogue or "(by name)" guess); absent when unmatched. */
+  projectDevelopers?: Record<string, string>
   /** How the developer was found, per row in this batch — the card's "matched" line. */
   developerSources?: Record<DldDeveloperSource, number>
   coverage: {
