@@ -8,13 +8,18 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
  * A transaction row names its project (PROJECT_EN) but never its developer,
  * so the developer is looked up through the project, in three layers:
  *
- *   1. "dld"  — the archived DLD projects register (dld_projects, migration
+ *   1. "fhi"  — FHI's own projects + developers tables, matched by normalised
+ *               project name. Brand-level names ("Imtiaz Developments"), and
+ *               it covers the older projects FHI has catalogued. Checked
+ *               first so a brand name wins whenever one is known.
+ *   2. "dld"  — the archived DLD projects register (dld_projects, migration
  *               065): PROJECT_EN → DEVELOPER_EN. Exact, but the gateway only
- *               serves the current year's projects, so older ones are absent.
- *               DLD's developer is the legal entity (often an SPV LLC).
- *   2. "fhi"  — FHI's own projects + developers tables, matched by normalised
- *               project name. Brand-level names, and it covers the older
- *               projects FHI has catalogued.
+ *               serves the current year's projects, so older ones are absent,
+ *               and DLD's developer is the legal entity — usually a per-project
+ *               SPV ("IMTIAZ JA REAL ESTATE DEVELOPMENT L.L.C"). When exactly
+ *               one developer in FHI's catalogue shares the SPV's leading word,
+ *               the SPV is rolled up to that brand for display (the match is
+ *               still the register's; only the name is normalised).
  *   3. "name" — the project's leading word matches the leading word of a
  *               developer that IS known (register or catalogue): "Binghatti
  *               Skyflame 1" → "Binghatti Developers". Shown with a "(by
@@ -37,7 +42,7 @@ export const UNKNOWN_DEVELOPER = "Unknown"
 export const UNMATCHED_DEVELOPER = "Unmatched project"
 
 type Lookup = {
-  /** normalised project name → developer (dld first, fhi fills gaps) */
+  /** normalised project name → developer (fhi first, dld fills gaps) */
   byProject: Map<string, { developer: string; source: "dld" | "fhi" }>
   /** lower-cased first word of a known developer name → that developer name */
   byFirstWord: Map<string, string>
@@ -66,22 +71,10 @@ async function build(): Promise<Lookup> {
   const byFirstWord: Lookup["byFirstWord"] = new Map()
   const supabase = createAdminSupabase()
 
-  // Layer 1 — DLD register.
-  try {
-    const { data } = await supabase.from("dld_projects").select("project_en, developer_en").limit(20_000)
-    for (const r of (data ?? []) as Array<{ project_en: string | null; developer_en: string | null }>) {
-      const key = normalizeName(r.project_en)
-      const dev = r.developer_en?.trim()
-      if (!key || !dev) continue
-      if (!byProject.has(key)) byProject.set(key, { developer: dev, source: "dld" })
-      const fw = firstWord(dev)
-      if (fw && !byFirstWord.has(fw)) byFirstWord.set(fw, dev)
-    }
-  } catch {
-    /* archive unavailable — the other layers still work */
-  }
-
-  // Layer 2 — FHI catalogue.
+  // Layer 1 — FHI catalogue (brand-level developer names).
+  // brandByFirstWord: leading word → brand, only when ONE brand owns that
+  // word; "dubai" shared by Dubai Properties and Dubai Holding stays unmapped.
+  const brandByFirstWord = new Map<string, string | null>()
   try {
     const [{ data: devs }, { data: projects }] = await Promise.all([
       supabase.from("developers").select("id, name").limit(5_000),
@@ -93,8 +86,9 @@ async function build(): Promise<Lookup> {
       if (!n) continue
       devName.set(String(d.id), n)
       const fw = firstWord(n)
-      // FHI names are brand-level — prefer them over an SPV for the by-name layer.
-      if (fw) byFirstWord.set(fw, n)
+      if (!fw) continue
+      byFirstWord.set(fw, n)
+      brandByFirstWord.set(fw, brandByFirstWord.has(fw) && brandByFirstWord.get(fw) !== n ? null : n)
     }
     for (const p of (projects ?? []) as Array<{ name: string | null; developer_id: string | null }>) {
       const key = normalizeName(p.name)
@@ -103,7 +97,25 @@ async function build(): Promise<Lookup> {
       if (!byProject.has(key)) byProject.set(key, { developer: dev, source: "fhi" })
     }
   } catch {
-    /* catalogue unavailable — fall through */
+    /* catalogue unavailable — the register still works */
+  }
+
+  // Layer 2 — DLD register, for projects the catalogue doesn't have.
+  try {
+    const { data } = await supabase.from("dld_projects").select("project_en, developer_en").limit(20_000)
+    for (const r of (data ?? []) as Array<{ project_en: string | null; developer_en: string | null }>) {
+      const key = normalizeName(r.project_en)
+      const legal = r.developer_en?.trim()
+      if (!key || !legal) continue
+      // SPV → brand when the catalogue has exactly one brand with that leading word.
+      const brand = brandByFirstWord.get(firstWord(legal))
+      const dev = brand ?? legal
+      if (!byProject.has(key)) byProject.set(key, { developer: dev, source: "dld" })
+      const fw = firstWord(dev)
+      if (fw && !byFirstWord.has(fw)) byFirstWord.set(fw, dev)
+    }
+  } catch {
+    /* archive unavailable — fall through */
   }
 
   return { byProject, byFirstWord, at: Date.now() }

@@ -18,7 +18,7 @@ import { ChevronDown, Loader2, Search } from "lucide-react"
 import { FilterSelect } from "@/components/ui/filter-select"
 import { DLD_CHART_TOP_N, type DldChartBucket } from "@/lib/dld-open-data"
 import { ChartCard, CoverageLine, ErrorBox, MiniStat, RefreshButton, Skeleton, longDate, toBuckets, useBatchJob, type BatchJob } from "./market-charts"
-import { GROUPS, jobFor, last30Days, pctOf, relabel, textPx, titleCase, useWidth } from "./developers-breakdown"
+import { DeveloperRankList, GROUPS, jobFor, last30Days, pctOf, relabel, textPx, titleCase, useWidth, type ProjectRow as AreaProjectRow } from "./developers-breakdown"
 
 const int = new Intl.NumberFormat("en-AE", { maximumFractionDigits: 0 })
 const compact = new Intl.NumberFormat("en-AE", { notation: "compact", maximumFractionDigits: 1 })
@@ -56,6 +56,36 @@ export function ProjectsBreakdownSection() {
       }
     })
   }, [acc])
+
+  // Areas (the dataset's top-N field is AREA_EN) and the projects on each area's rows.
+  const areas = useMemo(() => (acc ? toBuckets(acc.top).map(relabel) : []), [acc])
+  const allAreaProjects = (area: string): AreaProjectRow[] => {
+    // `areas` labels are title-cased for display; the tally is keyed by DLD's spelling.
+    const key = Object.keys(acc?.areaProjects ?? {}).find((k) => titleCase(k) === area)
+    const tally = key ? acc?.areaProjects?.[key] : undefined
+    return tally ? toBuckets(tally).map((b) => ({ ...relabel(b), guessed: false })).sort(byMeasure) : []
+  }
+  // Per-area cards: the area's projects with the developer each resolved to.
+  const areaProjectRows = (area: string): ProjectRow[] => {
+    const devs = acc?.projectDevelopers ?? {}
+    const key = Object.keys(acc?.areaProjects ?? {}).find((k) => titleCase(k) === area)
+    const tally = key ? acc?.areaProjects?.[key] : undefined
+    if (!tally) return []
+    return toBuckets(tally)
+      .map((b) => {
+        const raw = devs[b.label]
+        return { ...relabel(b), developer: raw ? titleCase(raw.replace(/ \(by name\)$/, "")) : null, guessed: !!raw && raw.endsWith("(by name)") }
+      })
+      .sort(byMeasure)
+  }
+  const topAreas = [...areas].sort(byMeasure).slice(0, DLD_CHART_TOP_N)
+
+  // An opened area shows its own top 10, like every other ranking on the page.
+  const areaProjectsFor = (area: string): AreaProjectRow[] => allAreaProjects(area).slice(0, DLD_CHART_TOP_N)
+  const areaNote = (a: DldChartBucket): string | null => {
+    const n = allAreaProjects(a.label).length
+    return n > DLD_CHART_TOP_N ? `top ${DLD_CHART_TOP_N} of ${int.format(n)} projects` : n > 0 ? `${int.format(n)} project${n === 1 ? "" : "s"}` : null
+  }
 
   const total = acc?.count ?? 0
   const totalValue = acc?.value ?? 0
@@ -156,8 +186,9 @@ export function ProjectsBreakdownSection() {
           )}
         </CoverageLine>
 
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <ChartCard
-          title={`Top ${DLD_CHART_TOP_N} projects by ${measureWord} — ${groupLabel}`}
+          title={`Top ${DLD_CHART_TOP_N} overall projects by ${measureWord} — ${groupLabel}`}
           subtitle={`${longDate(submitted.values.P_FROM_DATE ?? "")} – ${longDate(submitted.values.P_TO_DATE ?? "")}. One row per project as DLD names it, ranked by ${rankBy === "value" ? "total AED" : "transaction count"}; open a row for its developer. ${
             acc && total > 0 ? `Covers ${int.format(withProjectRows)} of ${int.format(total)} rows (${((withProjectRows / total) * 100).toFixed(0)}%) — the other ${int.format(noProjectRows)} name no project.` : ""
           }`}
@@ -168,6 +199,38 @@ export function ProjectsBreakdownSection() {
         >
           {!acc ? <Skeleton h={300} /> : <ProjectRankList rows={[...projects].sort(byMeasure).slice(0, DLD_CHART_TOP_N)} measure={rankBy} totalOf={{ count: total, value: totalValue }} />}
         </ChartCard>
+
+        <ChartCard
+          title={`Top ${DLD_CHART_TOP_N} areas by ${measureWord} — ${groupLabel}`}
+          subtitle={`Areas as DLD names them, ranked by ${rankBy === "value" ? "total AED" : "transaction count"} across every row in the range. Open an area for its top ${DLD_CHART_TOP_N} projects — e.g. Business Bay → the towers selling most there.`}
+          table={{ head: ["Area", "Rows", "AED"], rows: [...areas].sort(byMeasure).map((a) => [a.label, a.count, int.format(a.value)]) }}
+        >
+          {!acc ? (
+            <Skeleton h={300} />
+          ) : (
+            <DeveloperRankList rows={[...areas].sort(byMeasure).slice(0, DLD_CHART_TOP_N)} measure={rankBy} note={areaNote} projectsFor={areaProjectsFor} totalOf={{ count: total, value: totalValue }} showTags={false} />
+          )}
+        </ChartCard>
+        </div>
+
+        {/* One card per top area — its top 10 projects, two columns. */}
+        {acc && topAreas.length > 0 && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {topAreas.map((a) => {
+              const rows = areaProjectRows(a.label)
+              return (
+                <ChartCard
+                  key={a.label}
+                  title={`Top ${DLD_CHART_TOP_N} ${a.label} projects by ${measureWord}`}
+                  subtitle={`${int.format(a.count)} ${groupLabel} · AED ${compact.format(a.value)} in ${a.label}${rows.length > DLD_CHART_TOP_N ? ` · top ${DLD_CHART_TOP_N} of ${int.format(rows.length)} projects` : ""}. Share is of the area's total.`}
+                  table={{ head: ["Project", "Developer", "Rows", "AED"], rows: rows.map((p) => [p.label, p.developer ? `${p.developer}${p.guessed ? " (by name)" : ""}` : "— not on record", p.count, int.format(p.value)]) }}
+                >
+                  <ProjectRankList rows={rows.slice(0, DLD_CHART_TOP_N)} measure={rankBy} totalOf={{ count: a.count, value: a.value }} />
+                </ChartCard>
+              )
+            })}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
           <MiniStat label="Number of transactions" value={acc ? int.format(total) : null} hint={acc ? `${groupLabel} in the range` : undefined} />

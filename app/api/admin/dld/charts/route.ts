@@ -151,6 +151,7 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
   const projectsUnmatched = new Map<string, { count: number; value: number }>()
   const projects = new Map<string, { count: number; value: number }>()
   const projectDevelopers: Record<string, string> = {}
+  const areaProjects = new Map<string, Map<string, { count: number; value: number }>>()
   const developerSources: Record<DldDeveloperSource, number> = { dld: 0, fhi: 0, name: 0, unmatched: 0, unknown: 0 }
 
   for (const row of rows) {
@@ -195,6 +196,10 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
       if (m.project) {
         bump(projects, m.project, value)
         if (m.source !== "unmatched" && !projectDevelopers[m.project]) projectDevelopers[m.project] = m.developer
+        const area = labelOf(row.AREA_EN)
+        let perArea = areaProjects.get(area)
+        if (!perArea) areaProjects.set(area, (perArea = new Map()))
+        bump(perArea, m.project, value)
       }
       developerSources[m.source] += 1
     }
@@ -235,6 +240,7 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
           projectsUnmatched: toBuckets(projectsUnmatched),
           projects: toBuckets(projects),
           projectDevelopers,
+          areaProjects: Object.fromEntries([...areaProjects.entries()].map(([area, m]) => [area, toBuckets(m)])),
           developerSources,
         }
       : {}),

@@ -975,6 +975,8 @@ export interface DldBreakdownResponse {
   projects?: DldChartBucket[]
   /** project name → the developer label it resolved to (register, catalogue or "(by name)" guess); absent when unmatched. */
   projectDevelopers?: Record<string, string>
+  /** area → the projects named on its rows (by PROJECT_EN), mergeable per area. Drives "Top areas → its projects". */
+  areaProjects?: Record<string, DldChartBucket[]>
   /** How the developer was found, per row in this batch — the card's "matched" line. */
   developerSources?: Record<DldDeveloperSource, number>
   coverage: {

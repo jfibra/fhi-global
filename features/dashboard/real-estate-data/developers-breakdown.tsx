@@ -67,7 +67,7 @@ export function jobFor(range: { from: string; to: string }, group: string): Batc
 }
 
 type MergedBucket = DldChartBucket & { matched: number; guessed: number }
-type ProjectRow = DldChartBucket & { guessed: boolean }
+export type ProjectRow = DldChartBucket & { guessed: boolean }
 const tagOf = (p: ProjectRow) => (p.guessed ? "(by name)" : "(matched)")
 
 
@@ -385,12 +385,13 @@ export function useWidth(ref: React.RefObject<HTMLDivElement | null>): number {
   return width
 }
 
-function DeveloperRankList({
+export function DeveloperRankList({
   rows,
   measure,
   note,
   projectsFor,
   totalOf,
+  showTags = true,
 }: {
   rows: DldChartBucket[]
   measure: "count" | "value"
@@ -399,6 +400,8 @@ function DeveloperRankList({
   projectsFor: (developer: string) => ProjectRow[]
   /** What each row's percentage is of — the whole range's row count and AED. */
   totalOf: { count: number; value: number }
+  /** Show the "(matched)" / "(by name)" tag on each opened project (off for lists where it doesn't apply, e.g. areas). */
+  showTags?: boolean
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const width = useWidth(hostRef)
@@ -428,7 +431,7 @@ function DeveloperRankList({
           // The opened list follows the same rule as the rows: name column as
           // wide as the longest "Project (tag)" needs, capped at half the card.
           const innerCap = Math.max(80, cap - 12)
-          const innerLongest = Math.ceil(Math.max(0, ...projects.map((pr) => textPx(`${pr.label} ${tagOf(pr)}`))))
+          const innerLongest = Math.ceil(Math.max(0, ...projects.map((pr) => textPx(showTags ? `${pr.label} ${tagOf(pr)}` : pr.label))))
           const innerLabelW = Math.min(innerCap, innerLongest + 8)
           const innerNumW = Math.ceil(Math.max(0, ...projects.map((pr) => textPx(`${fmt(pr[measure])} · ${(r[measure] > 0 ? (pr[measure] / r[measure]) * 100 : 0).toFixed(0)}%`)))) + 4
           return (
@@ -474,8 +477,9 @@ function DeveloperRankList({
                         const share = r[measure] > 0 ? (pr[measure] / r[measure]) * 100 : 0
                         return (
                           <li key={pr.label} className="grid items-center gap-3 text-[11px]" style={{ gridTemplateColumns: `${innerLabelW}px minmax(0,1fr) ${innerNumW}px` }}>
-                            <span className="truncate text-[#374151]" title={`${pr.label} ${tagOf(pr)}`}>
-                              {pr.label} <span className={pr.guessed ? "text-amber-700" : "text-[#9ca3af]"}>{tagOf(pr)}</span>
+                            <span className="truncate text-[#374151]" title={showTags ? `${pr.label} ${tagOf(pr)}` : pr.label}>
+                              {pr.label}
+                              {showTags && <span className={pr.guessed ? "text-amber-700" : "text-[#9ca3af]"}> {tagOf(pr)}</span>}
                             </span>
                             <span className="h-[8px] rounded-r bg-white border border-[#eef1f5] overflow-hidden">
                               <span className="block h-full rounded-r opacity-70" style={{ width: `${Math.max(1, share)}%`, background: color }} />

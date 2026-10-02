@@ -227,6 +227,8 @@ export type Accum = {
   /** Every named project, developer known or not, + which developer each resolved to. */
   projects: Tally | null
   projectDevelopers: Record<string, string> | null
+  /** area → project tally, for the Projects tab's "Top areas" drill-down. */
+  areaProjects: Record<string, Tally> | null
   developerSources: Record<string, number> | null
 }
 
@@ -256,6 +258,7 @@ function mergeBatch(acc: Accum | null, res: DldBreakdownResponse): Accum {
         projectsUnmatched: acc.projectsUnmatched ? { ...acc.projectsUnmatched } : null,
         projects: acc.projects ? { ...acc.projects } : null,
         projectDevelopers: acc.projectDevelopers ? { ...acc.projectDevelopers } : null,
+        areaProjects: acc.areaProjects ? Object.fromEntries(Object.entries(acc.areaProjects).map(([k, m]) => [k, { ...m }])) : null,
         developerSources: acc.developerSources ? { ...acc.developerSources } : null,
       }
     : {
@@ -280,6 +283,7 @@ function mergeBatch(acc: Accum | null, res: DldBreakdownResponse): Accum {
         projectsUnmatched: null,
         projects: null,
         projectDevelopers: null,
+        areaProjects: null,
         developerSources: null,
       }
   for (const d of res.daily) addTo(next.daily, d.date, d)
@@ -330,6 +334,11 @@ function mergeBatch(acc: Accum | null, res: DldBreakdownResponse): Accum {
     next.projects ??= {}
     for (const b of res.projects ?? []) addTo(next.projects, b.label, b)
     next.projectDevelopers = { ...(next.projectDevelopers ?? {}), ...(res.projectDevelopers ?? {}) }
+    next.areaProjects ??= {}
+    for (const [area, buckets] of Object.entries(res.areaProjects ?? {})) {
+      next.areaProjects[area] ??= {}
+      for (const b of buckets) addTo(next.areaProjects[area], b.label, b)
+    }
     const src = next.developerSources ?? {}
     for (const [k, n] of Object.entries(res.developerSources ?? {})) src[k] = (src[k] ?? 0) + n
     next.developerSources = src
