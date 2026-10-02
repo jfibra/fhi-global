@@ -248,13 +248,16 @@ export function DevelopersBreakdownSection() {
         </ChartCard>
 
         {/* Totals at a glance — how the rows loaded so far split by how (or whether) a developer was found. */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
           <MiniStat label={`Total ${groupLabel}`} value={acc ? int.format(total) : null} hint={acc ? `${compact.format(acc.value)} AED` : undefined} />
           <MiniStat label="Matched" value={acc ? int.format(known) : null} hint={pctOf(known, total)} />
           <MiniStat label="Guessed" value={acc ? int.format(guessedRows) : null} hint={pctOf(guessedRows, total)} />
           <MiniStat label="Matched + guessed" value={acc ? int.format(attributedRows) : null} hint={pctOf(attributedRows, total)} />
-          <MiniStat label="Unmatched project" value={acc ? int.format(unmatchedRows) : null} hint={pctOf(unmatchedRows, total)} />
-          <MiniStat label="Unknown" value={acc ? int.format(unknownRows) : null} hint={pctOf(unknownRows, total)} />
+          <MiniStat
+            label="No developer"
+            value={acc ? int.format(unmatchedRows + unknownRows) : null}
+            hint={acc && total > 0 ? `${pctOf(unmatchedRows + unknownRows, total)} · ${int.format(unmatchedRows)} unmatched project, ${int.format(unknownRows)} no project` : undefined}
+          />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
