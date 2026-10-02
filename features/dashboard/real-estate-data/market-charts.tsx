@@ -798,7 +798,7 @@ export function BreakdownSection({ fixed }: { fixed?: FixedBreakdown } = {}) {
               </ChartCard>
             )}
             {appliedSpec.dateKey && appliedSpec.valueKey && (
-              <ChartCard title={`${appliedSpec.valueLabel?.replace(" (AED)", "")} per day`} subtitle="Sum in AED" table={{ head: ["Day", "AED"], rows: daily.map((d) => [longDate(d.date), int.format(d.value)]) }}>
+              <ChartCard title={`${appliedSpec.valueLabel?.replace(" (AED)", "")} per day`} subtitle="Sum in AED" table={{ head: ["Day", "AED"], rows: (fixed?.compact ? [...daily].reverse() : daily).map((d) => [longDate(d.date), int.format(d.value)]) }}>
                 {!acc ? <Skeleton /> : <DailyChart data={daily} dataKey="value" color={C.aqua} format={(v) => `AED ${compact.format(v)}`} label={appliedSpec.valueLabel ?? "Value"} />}
               </ChartCard>
             )}
