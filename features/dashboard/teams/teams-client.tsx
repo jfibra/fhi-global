@@ -30,6 +30,9 @@ import { TOOLBAR_GRADIENT } from "@/components/common/header-toolbar"
 import { TeamFormDialog } from "./team-form-dialog"
 import { TeamLogoUpload } from "./team-logo-upload"
 import { AddMemberDialog, TransferMemberDialog } from "./add-member-dialog"
+import { TeamSalesPanel } from "./team-sales-panel"
+import { useAuth } from "@/context/auth-context"
+import { getDashboardRouteByRole } from "@/lib/auth"
 
 // ─── Toast ─────────────────────────────────────────────────────────────────────
 
@@ -54,6 +57,7 @@ function fmtDate(iso: string) {
 // ─── Main Client ───────────────────────────────────────────────────────────────
 
 export function TeamsClient({ currentRole: _role }: { currentRole: string; userId: string }) {
+  const salesBase = `${getDashboardRouteByRole(useAuth().role)}/sales`
   const [teams,           setTeams]           = useState<Team[]>([])
   const [teamsLoading,    setTeamsLoading]     = useState(true)
   const [selectedId,      setSelectedId]       = useState<string | null>(null)
@@ -389,6 +393,9 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
                 onToggleActive={() => handleToggleTeam(selectedTeam)}
                 onDelete={() => setConfirmDelete({ type: "team", id: selectedTeam.id, label: selectedTeam.name })}
               />
+
+              {/* ── Team sales: any span of time, who sold what ──────────── */}
+              <TeamSalesPanel key={selectedTeam.id} teamId={selectedTeam.id} salesBase={salesBase} />
 
               {/* ── Members table card ───────────────────────────────────── */}
               <div className="bg-white rounded-2xl border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] overflow-hidden">

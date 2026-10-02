@@ -75,7 +75,7 @@ export function TeamOverviewCard({ teamSalesHref }: { teamSalesHref: string }) {
           <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{data ? title : "Your team"}</h2>
           <p className="text-xs text-[#6b7280]">
             {data
-              ? `${data.scope === "team" ? "Your team" : "People who joined through your link"} · ${data.membersTotal.toLocaleString("en-US")} ${data.membersTotal === 1 ? "person" : "people"} · validated sales`
+              ? `${data.scope === "team" ? "Your team" : "People who joined through your link"} · ${data.membersTotal.toLocaleString("en-US")} ${data.membersTotal === 1 ? "person" : "people"} · sales recorded by the team`
               : "Loading your team…"}
           </p>
         </div>
