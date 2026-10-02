@@ -112,7 +112,8 @@ export const BUYER_QUESTIONS = {
     label: "How should we reach you?",
     short: "Reach by",
     multi: false,
-    options: opts([["whatsapp", "WhatsApp"], ["viber", "Viber"], ["messenger", "Messenger"], ["call", "Phone call"], ["email", "Email"]]),
+    // Messenger and Phone call removed 2026-10-02 (boss); no brief had chosen them.
+    options: opts([["whatsapp", "WhatsApp"], ["viber", "Viber"], ["email", "Email"]]),
   },
   buying_for: {
     label: "Who are you buying for?",
