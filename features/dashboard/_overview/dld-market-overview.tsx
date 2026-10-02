@@ -10,8 +10,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useAuth } from "@/context/auth-context"
-import { canSeeDldMarketOverview, canViewDldOpenData } from "@/lib/app-roles"
-import { getDashboardRouteByRole } from "@/lib/auth"
+import { canSeeDldMarketOverview } from "@/lib/app-roles"
 import { BreakdownSection } from "@/features/dashboard/real-estate-data/market-charts"
 import { lastMonthView } from "@/features/dashboard/real-estate-data/open-data-page"
 
@@ -23,7 +22,8 @@ export function DldMarketOverview() {
       ...view,
       title: view.title.replace(/^Dubai market/, "Dubai market (DLD)"),
       description: "What sold in Dubai last month, by the Land Department's own records: value per day, the busiest areas, and the split by type, usage, off-plan or ready, property type and freehold.",
-      compact: { fullHref: canViewDldOpenData(role) ? `${getDashboardRouteByRole(role)}/real-estate-data` : null },
+      // No link to the full Open Data page from here (boss, 2026-10-02).
+      compact: { fullHref: null },
     }
   })
   const ref = useRef<HTMLDivElement>(null)
