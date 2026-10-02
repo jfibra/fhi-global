@@ -1,7 +1,8 @@
 "use client"
 
-// The Dubai market on the overview (2026-10-02, boss's request): last
-// calendar month's DLD transactions — value per day, the top 10 areas and the
+// The Dubai market on the overview (2026-10-02, boss's request): the last 30
+// days of DLD transactions, up to today (a rolling window, so it is current
+// every day — the agents' Open Data page keeps the full calendar month) — value per day, the top 10 areas and the
 // splits by type, usage, registration, property type and freehold — for
 // agents, team leaders, unit managers, Global Partners and members. It is the
 // Open Data page's own chart section in its compact mode (same data, same
@@ -11,21 +12,29 @@
 import { useEffect, useRef, useState } from "react"
 import { useAuth } from "@/context/auth-context"
 import { canSeeDldMarketOverview } from "@/lib/app-roles"
-import { BreakdownSection } from "@/features/dashboard/real-estate-data/market-charts"
-import { lastMonthView } from "@/features/dashboard/real-estate-data/open-data-page"
+import { BreakdownSection, type FixedBreakdown } from "@/features/dashboard/real-estate-data/market-charts"
+
+const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+
+/** The last 30 days, today included. */
+function last30Days(): FixedBreakdown {
+  const today = new Date()
+  const first = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29)
+  return {
+    command: "transactions",
+    dateRange: { from: iso(first), to: iso(today) },
+    title: "Dubai market (DLD) · Last 30 days",
+    description: "What sold in Dubai over the last 30 days, by the Land Department's own records: value per day, the busiest areas, and the split by type, usage, off-plan or ready, property type and freehold. Today's figures fill in as DLD records them.",
+    cacheKey: `charts:overview:last-30:${iso(first)}`,
+    // No link to the full Open Data page from here (boss, 2026-10-02).
+    compact: { fullHref: null },
+  }
+}
 
 export function DldMarketOverview() {
   const { role } = useAuth()
-  const [fixed] = useState(() => {
-    const view = lastMonthView()
-    return {
-      ...view,
-      title: view.title.replace(/^Dubai market/, "Dubai market (DLD)"),
-      description: "What sold in Dubai last month, by the Land Department's own records: value per day, the busiest areas, and the split by type, usage, off-plan or ready, property type and freehold.",
-      // No link to the full Open Data page from here (boss, 2026-10-02).
-      compact: { fullHref: null },
-    }
-  })
+  // Fixed on mount so the whole section agrees on the window.
+  const [fixed] = useState(last30Days)
   const ref = useRef<HTMLDivElement>(null)
   const [seen, setSeen] = useState(false)
 
