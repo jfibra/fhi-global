@@ -11,6 +11,7 @@ import { AdminDashboardContent } from "./_dashboard"
 import { EditorDashboardContent } from "./editor-overview"
 import { TopSalesBoard } from "./top-sales-board"
 import { TopDevelopersBoard } from "./top-developers-board"
+import { TeamOverviewCard } from "./team-overview-card"
 
 export { DeveloperOverview } from "./developer-overview"
 
@@ -76,16 +77,25 @@ export function EditorOverview() {
   )
 }
 
-/** agent / team leader / unit manager overview. */
+/** agent / team leader / unit manager overview. Leaders see their team first. */
 export function SalesOverview() {
-  const { user, profile } = useAuth()
-  return (
+  const { user, profile, role } = useAuth()
+  const r = normalizeAppRole(role)
+  const leadsTeam = r === "team_leader" || r === "unit_manager"
+  const overview = (
     <WithTopSales userId={user?.id}>
       <SalesPipelineOverview
         displayName={profile?.fullname ?? user?.email ?? "User"}
         userId={user?.id}
       />
     </WithTopSales>
+  )
+  if (!leadsTeam) return overview
+  return (
+    <div className="space-y-8">
+      <TeamOverviewCard teamSalesHref={`${getDashboardRouteByRole(role)}/team-sales`} />
+      {overview}
+    </div>
   )
 }
 
