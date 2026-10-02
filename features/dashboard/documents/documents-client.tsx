@@ -6,7 +6,10 @@
 // training PDFs. Unlike Materials/Ebooks (a developer drops a file into a
 // repo folder and redeploys), uploading here is a real in-app flow: files go
 // to S3 (app/api/upload/document) and the catalog row to Postgres
-// (lib/document-service.ts), admin-staff only both ways.
+// (lib/document-service.ts). Admin staff upload and delete; the sales ladder
+// (agents, team leaders, unit managers — ROLES_DOCUMENT_LIBRARY) gets the same
+// shelf and reader without the Upload button or Delete (migration 071 lets
+// them read the catalog; the insert/delete policies stay admin-only).
 //
 // A PDF's tile shows its actual page 1, rendered client-side by
 // PdfThumbnail (pdf-thumbnail.tsx) — there's no authored cover art the way
@@ -39,6 +42,8 @@ import {
   Trash2,
   UploadCloud,
 } from "lucide-react"
+import { useAuth } from "@/context/auth-context"
+import { canManageDocumentLibrary } from "@/lib/app-roles"
 import { formatBytes } from "@/lib/materials-shared"
 import { createDocument, deleteDocument, listDocuments, type DocumentRow } from "@/lib/document-service"
 import PdfThumbnail from "./pdf-thumbnail"
@@ -138,6 +143,8 @@ function saveBlob(bytes: Uint8Array, fileName: string, type: string) {
 }
 
 export function DocumentsClient() {
+  const { role } = useAuth()
+  const canManage = canManageDocumentLibrary(role)
   // `null` = nothing to show yet, derives the loading state. The initialiser
   // seeds it from the cache so a mount with a cached list never shows the
   // skeleton at all; the effect below then revalidates in the background.
@@ -271,7 +278,7 @@ export function DocumentsClient() {
       <DocumentPage
         doc={open}
         onBack={() => setOpenId(null)}
-        onDelete={() => onDelete(open)}
+        onDelete={canManage ? () => onDelete(open) : undefined}
         deleting={deletingId === open.id}
       />
     )
@@ -293,6 +300,7 @@ export function DocumentsClient() {
               {docs.length} {docs.length === 1 ? "document" : "documents"}
             </span>
           )}
+          {canManage && (
           <button
             type="button"
             onClick={() => setShowUpload((v) => !v)}
@@ -304,10 +312,11 @@ export function DocumentsClient() {
             <UploadCloud className="h-4 w-4" />
             Upload
           </button>
+          )}
         </div>
       </div>
 
-      {showUpload && (
+      {canManage && showUpload && (
         <form onSubmit={onUpload} className="rounded-lg border border-[#e5e5e5] bg-white p-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
@@ -410,7 +419,7 @@ export function DocumentsClient() {
       ) : shown.length === 0 ? (
         <div className="rounded-lg border border-dashed border-[#e5e5e5] bg-white px-6 py-16 text-center">
           <p className="text-sm text-[#9ca3af]">
-            {docs.length === 0 ? "No documents yet — click Upload above to add the first one." : "Nothing in this category yet."}
+            {docs.length === 0 ? (canManage ? "No documents yet — click Upload above to add the first one." : "No documents yet.") : "Nothing in this category yet."}
           </p>
         </div>
       ) : (
@@ -492,7 +501,8 @@ function DocumentPage({
 }: {
   doc: DocumentRow
   onBack: () => void
-  onDelete: () => void
+  /** Absent for roles that can only read (no Delete button). */
+  onDelete?: () => void
   deleting: boolean
 }) {
   const previewable = isPdf(doc.file_name)
@@ -575,6 +585,7 @@ function DocumentPage({
               "Download"
             )}
           </a>
+          {onDelete && (
           <button
             type="button"
             onClick={onDelete}
@@ -584,6 +595,7 @@ function DocumentPage({
           >
             {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
           </button>
+          )}
         </div>
       </div>
 

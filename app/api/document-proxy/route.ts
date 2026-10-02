@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireRole } from "@/lib/auth-guard"
-import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
+import { ROLES_DOCUMENT_LIBRARY } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 
 /**
@@ -25,7 +25,7 @@ import { createClient } from "@/lib/supabase/server"
 export const runtime = "nodejs"
 
 export async function GET(req: NextRequest) {
-  const guard = await requireRole([...ROLES_ADMIN_STAFF])
+  const guard = await requireRole([...ROLES_DOCUMENT_LIBRARY])
   if (!guard.ok) return guard.response
 
   const target = req.nextUrl.searchParams.get("url") ?? ""

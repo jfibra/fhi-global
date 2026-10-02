@@ -15,6 +15,7 @@ import {
   ROLES_PROJECT_STUDIO_VIEWERS,
   ROLES_INTERNAL_RESOURCES,
   ROLES_WEBSITE_BUILDER,
+  ROLES_DLD_OPEN_DATA,
 } from "@/lib/app-roles"
 
 export type AppUser = {
@@ -63,7 +64,8 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   "purchase-categories": ["super_admin", "admin"],
   "contact-inbox": ["super_admin", "admin"],
   "system-logs": ["super_admin", "admin"],
-  "real-estate-data": ["super_admin", "admin"],
+  // Admin staff get the full workbench; agents / TLs / UMs a fixed last-month view.
+  "real-estate-data": [...ROLES_DLD_OPEN_DATA],
   listings: ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager"],
   "owner-documents": ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager"],
   // Content managers + developers get the full editor; studio viewers get read-only.

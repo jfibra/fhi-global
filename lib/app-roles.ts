@@ -208,6 +208,37 @@ export const ROLES_BUYER_LINK_OWNERS: readonly AppRoleId[] = [...ROLES_SALES_PIP
 
 export const ROLES_SECRETARY_LIKE: readonly AppRoleId[] = ["secretary", "team_secretary"]
 
+/**
+ * DLD open data (`/{role}/real-estate-data`, app/api/admin/dld/charts).
+ * Admin staff get the whole workbench (index, every dataset table, free date
+ * ranges); the sales ladder gets a read-only last-month market view built
+ * from the same charts endpoint (`kind: "breakdown"` only — the route
+ * enforces that). Global partners are not included.
+ */
+export const ROLES_DLD_OPEN_DATA: readonly AppRoleId[] = ["super_admin", "admin", "agent", "team_leader", "unit_manager"]
+
+export function canViewDldOpenData(role: string | null | undefined): boolean {
+  return roleInList(role, ROLES_DLD_OPEN_DATA)
+}
+
+/**
+ * Library → Documents (DLD contract forms, agreements, company templates;
+ * migration 069 + 071). Admin staff upload and delete; the sales ladder can
+ * open, fill in and download. Mirrored by the `documents` RLS policies, the
+ * document proxy route and the Library hub of each role's sidebar. Global
+ * partners are not included.
+ */
+export const ROLES_DOCUMENT_LIBRARY: readonly AppRoleId[] = ["super_admin", "admin", "agent", "team_leader", "unit_manager"]
+
+export function canViewDocumentLibrary(role: string | null | undefined): boolean {
+  return roleInList(role, ROLES_DOCUMENT_LIBRARY)
+}
+
+/** Upload / delete in the Documents library — admin staff only (RLS insert/delete policies agree). */
+export function canManageDocumentLibrary(role: string | null | undefined): boolean {
+  return isAdminStaffRole(role)
+}
+
 /** `/{role}/sales`, sale detail, and sale file uploads (view / assist with paperwork, not encode new sales). */
 export const ROLES_SALES_REPORTS_ACCESS: readonly AppRoleId[] = [
   "super_admin",

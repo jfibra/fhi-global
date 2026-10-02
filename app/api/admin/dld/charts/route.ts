@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { requireRole } from "@/lib/auth-guard"
-import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
+import { ROLES_DLD_OPEN_DATA, isAdminStaffRole } from "@/lib/app-roles"
 import {
   DLD_CHART_BATCH_CHUNKS,
   DLD_CHART_LATEST_N,
@@ -50,8 +50,9 @@ export const runtime = "nodejs"
 export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
-  const guard = await requireRole([...ROLES_ADMIN_STAFF])
+  const guard = await requireRole([...ROLES_DLD_OPEN_DATA])
   if (!guard.ok) return guard.response
+  const adminStaff = isAdminStaffRole(guard.context.profile.role)
 
   let incoming: Record<string, unknown>
   try {
@@ -62,6 +63,9 @@ export async function POST(req: NextRequest) {
   }
 
   const kind = clean(incoming.kind)
+  // The sales ladder's page is the fixed last-month breakdown only; the
+  // summary and index kinds (the admin workbench) stay admin-staff.
+  if (!adminStaff && kind !== "breakdown") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   // `refresh: true` re-pulls from DLD instead of reading the Postgres cache.
   const refresh = flag(incoming.refresh)
   if (kind === "price-index") return priceIndex(refresh)
@@ -98,6 +102,13 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
   await reader.flush()
   if ("error" in pulled) return NextResponse.json({ error: pulled.error.message }, { status: pulled.error.status })
   const { rows, available, chunkTo, done } = pulled
+
+  // The requested window: a row the gateway returned for it belongs to it,
+  // so a day that the cutoff estimate above still leaves a hair outside is
+  // folded onto the nearest edge rather than drawn as a stray extra day.
+  const windowFrom = windowDay(built.body.P_FROM_DATE)
+  const windowTo = windowDay(built.body.P_TO_DATE)
+  const clampDay = (day: string) => (windowFrom && day < windowFrom ? windowFrom : windowTo && day > windowTo ? windowTo : day)
 
   const daily = new Map<string, { count: number; value: number }>()
   const breakdowns: Record<string, Map<string, { count: number; value: number }>> = {}
@@ -151,7 +162,8 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
       }
     }
 
-    const day = spec.dateKey ? isoDay(row[spec.dateKey]) : null
+    const rawDay = spec.dateKey ? isoDay(row[spec.dateKey]) : null
+    const day = rawDay ? clampDay(rawDay) : null
     if (day) {
       bump(daily, day, value)
       if (!from || day < from) from = day
@@ -343,11 +355,34 @@ function num(v: unknown): number | null {
   return null
 }
 
-/** "2026-09-23T15:30:19" → "2026-09-23"; anything unparsable → null. */
+/**
+ * The gateway's day does not start at midnight. Probing single-day windows
+ * (Oct 2026) shows "09/01/2026" returning INSTANCE_DATE from 2026-08-31T15:16
+ * through 2026-09-01T15:13, "09/02" starting at 2026-09-01T15:16, and
+ * "09/30" running 2026-09-29T15:15:57 → 2026-09-30T15:14:31 — a cutoff at
+ * about 15:15 in the stamps as served (DLD states no timezone). So the day a
+ * row belongs to, by DLD's own filter, is the date of (stamp + 8h45m).
+ * Bucketing by the raw date put the first ~9 hours of every day on the day
+ * before, and made "September" start on 31 Aug. Date-only values (the rents
+ * dates, for instance) carry no time and are taken as they are.
+ */
+const DLD_DAY_CUTOFF_SHIFT_MS = (8 * 60 + 45) * 60 * 1000
+
+/** "2026-09-23T15:30:19" → "2026-09-24" (DLD's day, see above); "2026-09-23" → "2026-09-23"; anything unparsable → null. */
 function isoDay(v: unknown): string | null {
   if (typeof v !== "string") return null
-  const m = /^(\d{4}-\d{2}-\d{2})/.exec(v)
-  return m ? m[1] : null
+  const m = /^(\d{4}-\d{2}-\d{2})(T\d{2}:\d{2}(?::\d{2})?)?/.exec(v)
+  if (!m) return null
+  if (!m[2]) return m[1]
+  const t = Date.parse(`${m[1]}${m[2]}Z`)
+  if (Number.isNaN(t)) return m[1]
+  return new Date(t + DLD_DAY_CUTOFF_SHIFT_MS).toISOString().slice(0, 10)
+}
+
+/** "09/01/2026" (the gateway's MM/DD/YYYY) → "2026-09-01"; anything else → null. */
+function windowDay(v: string | undefined): string | null {
+  const m = v ? /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v) : null
+  return m ? `${m[3]}-${m[1]}-${m[2]}` : null
 }
 
 function labelOf(v: unknown): string {

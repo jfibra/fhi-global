@@ -528,27 +528,62 @@ function previousWindowJob(job: BatchJob): BatchJob | null {
   return { command: job.command, values: { ...job.values, P_FROM_DATE: isoOf(prevFrom), P_TO_DATE: isoOf(prevTo) } }
 }
 
-export function BreakdownSection() {
+/**
+ * A locked-period variant of the section: the date range is chosen by the
+ * caller and cannot be edited; the dataset can still be switched (and loads
+ * on the spot — there is no Load button). The sales ladder's Open Data page
+ * uses it for "last month", defaulting to Transactions.
+ */
+export type FixedBreakdown = {
+  /** Dataset shown first. */
+  command: DldCommand
+  /** The locked date range, ISO yyyy-mm-dd, applied to whichever dataset is picked. */
+  dateRange: { from: string; to: string }
+  title: string
+  description: string
+  /** Client-cache key — distinct per fixed view so it never collides with the admin form's memo. */
+  cacheKey: string
+}
+
+/** Every filter of `dataset` at its default, with the locked range on the date fields. */
+function fixedValues(dataset: DldDataset, range: { from: string; to: string }): Record<string, string> {
+  return Object.fromEntries(
+    dataset.filters.map((f) => [f.param, f.kind === "date" ? (f.param === "P_TO_DATE" ? range.to : range.from) : resolveDefault(f)]),
+  )
+}
+
+export function BreakdownSection({ fixed }: { fixed?: FixedBreakdown } = {}) {
   // The form; `submitted` is the job on screen (restored from the last visit).
-  const restoredRef = useState(() => cacheGet<BatchMemo>(BREAKDOWN_CACHE_KEY)?.data.job ?? null)[0]
-  const [command, setCommand] = useState<DldCommand>(restoredRef?.command ?? CHARTABLE[0].value)
+  // A fixed view skips the restore — its job is whatever the caller says.
+  const cacheKey = fixed?.cacheKey ?? BREAKDOWN_CACHE_KEY
+  const restoredRef = useState(() => (fixed ? null : (cacheGet<BatchMemo>(BREAKDOWN_CACHE_KEY)?.data.job ?? null)))[0]
+  const [command, setCommand] = useState<DldCommand>(fixed?.command ?? restoredRef?.command ?? CHARTABLE[0].value)
   const dataset = DLD_DATASETS[command]
   const dateFields = dataset.filters.filter((f) => f.kind === "date")
-  const [values, setValues] = useState<Record<string, string>>(() => restoredRef?.values ?? defaultBreakdownValues(dataset))
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    fixed ? fixedValues(dataset, fixed.dateRange) : (restoredRef?.values ?? defaultBreakdownValues(dataset)),
+  )
   // No earlier session to restore → load the last-7-days default right away,
   // same as the Market Charts tab, instead of sitting on an empty placeholder.
-  const [submitted, setSubmitted] = useState<BatchJob | null>(() => restoredRef ?? { command, values })
-  const job = useBatchJob(BREAKDOWN_CACHE_KEY, submitted, false)
+  const [submitted, setSubmitted] = useState<BatchJob | null>(() => (fixed ? { command, values } : (restoredRef ?? { command, values })))
+  const job = useBatchJob(cacheKey, submitted, !!fixed)
   const { acc, loading } = job
 
   // The equal-length prior period, loaded automatically in the background —
   // this is what powers the "vs previous period" change on the tiles below.
   const previousJob = useMemo(() => (submitted ? previousWindowJob(submitted) : null), [submitted])
-  const prev = useBatchJob(BREAKDOWN_PREVIOUS_CACHE_KEY, previousJob, true)
+  const prev = useBatchJob(fixed ? `${cacheKey}:previous` : BREAKDOWN_PREVIOUS_CACHE_KEY, previousJob, true)
   const prevDone = !!prev.acc?.done
 
   const switchDataset = (next: DldCommand) => {
     setCommand(next)
+    if (fixed) {
+      // No Load button in the locked view — a new dataset loads right away on the same period.
+      const nextValues = fixedValues(DLD_DATASETS[next], fixed.dateRange)
+      setValues(nextValues)
+      setSubmitted({ command: next, values: nextValues })
+      return
+    }
     setValues(defaultBreakdownValues(DLD_DATASETS[next]))
   }
   const missing = missingRequired(dataset, values)
@@ -596,10 +631,40 @@ export function BreakdownSection() {
   return (
     <section>
       <div className="mb-4">
-        <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Breakdowns</h2>
-        <p className="text-sm text-[#6b7280]">Daily volume, category splits and a top-10 ranking for a date range. Built from the same rows as the tables.</p>
+        <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{fixed?.title ?? "Breakdowns"}</h2>
+        <p className="text-sm text-[#6b7280]">
+          {fixed?.description ?? "Daily volume, category splits and a top-10 ranking for a date range. Built from the same rows as the tables."}
+        </p>
       </div>
 
+      {fixed ? (
+        // Locked-period strip in place of the form: the dataset is a live
+        // picker (loads on change), the dates are shown but not editable.
+        <div className="bg-white rounded-2xl border border-[#e8eaed] p-5 mb-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="w-full sm:w-[220px] sm:shrink-0">
+              <label className="block text-sm font-medium text-[#0d1117] mb-1.5">Dataset</label>
+              <FilterSelect value={command} onValueChange={(v) => switchDataset(v as DldCommand)} options={CHARTABLE} ariaLabel="Dataset" className="w-full max-w-none h-10 rounded-xl py-0" />
+            </div>
+            {dateFields.map((f) => (
+              <div key={f.param} className="w-full sm:w-[160px] sm:shrink-0">
+                <span className="block text-sm font-medium text-[#0d1117] mb-1.5">{f.label}</span>
+                <div className="h-10 flex items-center rounded-xl border border-[#e5e7eb] bg-[#f8fafc] px-3 text-sm text-[#374151] tabular-nums">
+                  {values[f.param] ? longDate(values[f.param]) : "—"}
+                </div>
+              </div>
+            ))}
+            {loading ? (
+              <button type="button" onClick={job.stop} className="h-10 shrink-0 whitespace-nowrap px-4 rounded-xl border border-[#e5e7eb] bg-white text-sm font-semibold text-[#374151] hover:border-[#001f3f]/30">
+                Stop
+              </button>
+            ) : (
+              <RefreshButton onClick={job.refresh} loading={loading} updatedAt={job.updatedAt} />
+            )}
+          </div>
+          <p className="mt-3 text-xs text-[#9ca3af]">The period is set automatically to the previous calendar month. Pick a dataset to see its figures for that month.</p>
+        </div>
+      ) : (
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -654,6 +719,7 @@ export function BreakdownSection() {
         </div>
         {missing.length > 0 && <p className="mt-3 text-xs text-[#6b7280]">Pick {missing.map((f) => f.label.toLowerCase()).join(" and ")} to load.</p>}
       </form>
+      )}
 
       {job.error && <div className="mb-4"><ErrorBox message={job.error} onRetry={job.resume} /></div>}
 

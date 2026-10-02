@@ -236,7 +236,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { ...EBOOKS,    description: "Training guides and reference PDFs.", mock: "ebooks" },
       { ...VIDEOS,    description: "FHI's films to watch, download and share.", mock: "videos" },
       // Admin-uploadable — DLD contract forms, agreements, company templates.
-      // Not on other roles' Library hubs yet (see lib/document-service.ts).
+      // The sales ladder has a read-only copy on its Library hub (DOCUMENTS below).
       { icon: Files, label: "Documents", to: "documents", description: "Upload and manage DLD forms, agreements and company templates." },
     ],
   },
@@ -277,7 +277,11 @@ const DEVELOPER_NAV: RoleNavEntry[] = [
  * their OWN events on their website (ROLES_EVENT_OWNERS in app-roles.ts; admin
  * staff manage every event from their own nav).
  */
-const salesPipelineNav = ({ projects = false, teamSales = false, invite = true } = {}): RoleNavEntry[] => [
+// Read-only Documents library for the sales ladder — fill in and download
+// DLD forms (ROLES_DOCUMENT_LIBRARY in app-roles.ts; migration 071).
+const DOCUMENTS: NavEntry = { icon: Files, label: "Documents", to: "documents" }
+
+const salesPipelineNav = ({ projects = false, teamSales = false, invite = true, openData = false, documents = false } = {}): RoleNavEntry[] => [
   OVERVIEW,
   // Their Website Builder site — open/copy the link, or the prompt to build one.
   { icon: Globe, label: "My Website", to: "my-website" },
@@ -295,6 +299,9 @@ const salesPipelineNav = ({ projects = false, teamSales = false, invite = true }
   // Team leaders / unit managers see their whole team's production
   // (keep in sync with "team-sales" in SUB_PATH_ROLES, lib/auth.ts).
   ...(teamSales ? [{ icon: Users, label: "Team Sales", to: "team-sales" } satisfies NavEntry] : []),
+  // Last month's DLD transactions, read-only (ROLES_DLD_OPEN_DATA in app-roles.ts;
+  // "real-estate-data" in SUB_PATH_ROLES). Not for global partners.
+  ...(openData ? [{ icon: Database, label: "Open Data (DLD)", to: "real-estate-data" } satisfies NavEntry] : []),
   FEEDBACK,
   SUPPORT_TICKETS,
   // The agent toolkit, consolidated into one hub row (mirrors admin's Agent
@@ -323,6 +330,7 @@ const salesPipelineNav = ({ projects = false, teamSales = false, invite = true }
       { ...MATERIALS, description: "Branded marketing artwork to download and share.", mock: "materials" },
       { ...EBOOKS,    description: "Training guides and reference PDFs.", mock: "ebooks" },
       { ...VIDEOS,    description: "FHI's films to watch, download and share.", mock: "videos" },
+      ...(documents ? [{ ...DOCUMENTS, description: "DLD forms, agreements and company templates — fill in and download." }] : []),
     ],
   },
 ]
@@ -364,9 +372,9 @@ const ROLE_NAV: Record<AppRoleId, RoleNavEntry[]> = {
   admin:          ADMIN_NAV,
   editor:         EDITOR_NAV,
   developer:      DEVELOPER_NAV,
-  team_leader:    salesPipelineNav({ projects: true, teamSales: true }),
-  unit_manager:   salesPipelineNav({ projects: true, teamSales: true }),
-  agent:          salesPipelineNav({ projects: true }),
+  team_leader:    salesPipelineNav({ projects: true, teamSales: true, openData: true, documents: true }),
+  unit_manager:   salesPipelineNav({ projects: true, teamSales: true, openData: true, documents: true }),
+  agent:          salesPipelineNav({ projects: true, openData: true, documents: true }),
   secretary:      SECRETARY_NAV,
   team_secretary: SECRETARY_NAV,
   member:         MEMBER_NAV,
