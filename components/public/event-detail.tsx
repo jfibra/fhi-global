@@ -4,7 +4,7 @@ import { ArrowLeft, CalendarDays, ChevronRight, Clock, MapPin, Ticket } from "lu
 import { ProjectLocationMap } from "@/components/public/project-location-map"
 import { eventBrand } from "@/lib/events/brands"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
-import { eventDateRangeLabel, eventLengthLabel, eventStartTime } from "@/lib/events/dates"
+import { eventDateRangeLabel, eventLengthLabel, eventSchedule, eventStartTime, hasCustomDayTimes } from "@/lib/events/dates"
 import { parseRegistrationFields } from "@/lib/events/fields"
 import { EventRegisterForm } from "@/components/public/event-register-form"
 import { EventPageQr } from "@/components/public/event-page-qr"
@@ -26,6 +26,8 @@ export type PublicEvent = {
   event_date: string | null
   /** Consecutive days (migration 071); 1 or missing for a one-day event. */
   event_days?: number | null
+  /** Per-day start times (072), day 1 first. */
+  day_times?: unknown
   venue: string | null
   /** The venue's exact spot (migration 068); null when it was typed, not picked. */
   venue_lat?: number | null
@@ -72,6 +74,8 @@ export function EventDetail({
   const startTime = eventStartTime(event.event_date)
   const length = eventLengthLabel(event.event_days)
   const timeLabel = startTime ? `${length ? "From " : ""}${startTime} (GST)${length ? ` · ${length}` : ""}` : null
+  // Days that start at different times get their own line each (072).
+  const schedule = hasCustomDayTimes(event.event_date, event.event_days, event.day_times) ? eventSchedule(event.event_date, event.event_days, event.day_times) : []
 
   return (
     <>
@@ -167,6 +171,20 @@ export function EventDetail({
                 <span className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#e5e8ec] text-[#0f2940] text-sm font-semibold">
                   <MapPin className="w-4 h-4 text-[#d6b357]" /> {event.venue}
                 </span>
+              )}
+              {schedule.length > 0 && (
+                <div className="w-full border border-[#e5e8ec] bg-[#fafbfc]">
+                  <p className="border-b border-[#e5e8ec] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#9ca3af]">Schedule (GST)</p>
+                  <ul className="divide-y divide-[#eef0f3]">
+                    {schedule.map((d) => (
+                      <li key={d.day} className="flex items-center gap-4 px-4 py-2.5 text-sm">
+                        <span className="w-14 shrink-0 font-bold text-[#001f3f]">Day {d.day}</span>
+                        <span className="min-w-0 flex-1 text-[#4b5563]">{d.dateLabel}</span>
+                        <span className="shrink-0 font-semibold text-[#0f2940]">{d.time}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
               <EventShare
                 slug={event.slug ?? event.id}

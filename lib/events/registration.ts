@@ -14,9 +14,11 @@ export function isEventRegistrationOpen(event: {
   event_date?: string | null
   /** Consecutive days (071): the grace runs from the LAST day's start. */
   event_days?: number | null
+  /** Per-day start times (072): the last day's own time counts. */
+  day_times?: unknown
 }): boolean {
   if (event.registration_open === false) return false
-  const last = eventLastDayStart(event.event_date, event.event_days)
+  const last = eventLastDayStart(event.event_date, event.event_days, event.day_times)
   if (last && Date.now() > last.getTime() + GRACE_MS) return false
   return true
 }

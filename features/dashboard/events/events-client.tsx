@@ -40,7 +40,7 @@ import type { CertificateSettings } from "@/lib/events/certificate"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 import { isPlayableVideoUrl } from "@/lib/video-embed"
 import { VenueAutocomplete, type VenuePin } from "@/components/dashboard/venue-autocomplete"
-import { eventDateRangeLabel, eventWhenLabel, normalizeEventDays } from "@/lib/events/dates"
+import { eventDateRangeLabel, eventSchedule, eventWhenLabel, normalizeEventDays } from "@/lib/events/dates"
 
 type AdminEvent = {
   id: string
@@ -56,6 +56,8 @@ type AdminEvent = {
   eventDate: string | null
   /** Consecutive days the event runs (migration 071). */
   eventDays: number
+  /** Per-day start times, day 1 first (072). */
+  dayTimes: (string | null)[]
   venue: string | null
   venueLat: number | null
   venueLng: number | null
@@ -97,6 +99,8 @@ type FormState = {
   eventDate: string // datetime-local value
   /** 1 for a one-day event; 2, 3… for a multi-day one. */
   eventDays: number
+  /** "HH:MM" start per day, index = day − 1; "" = same as day 1. Index 0 is unused (day 1 is the start above). */
+  dayTimes: string[]
   venue: string
   /** The picked place's exact spot, or null when the venue was typed freely. */
   venuePin: VenuePin | null
@@ -114,6 +118,7 @@ const EMPTY_FORM: FormState = {
   videoUrl: "",
   eventDate: "",
   eventDays: 1,
+  dayTimes: [],
   venue: "",
   venuePin: null,
   status: "draft",
@@ -276,6 +281,7 @@ export function EventsClient({
       videoUrl: e.videoUrl ?? "",
       eventDate: toDubaiInput(e.eventDate),
       eventDays: normalizeEventDays(e.eventDays),
+      dayTimes: (e.dayTimes ?? []).map((t, i) => (i === 0 ? "" : t ?? "")),
       venue: e.venue ?? "",
       venuePin: e.venueLat != null && e.venueLng != null ? { lat: e.venueLat, lng: e.venueLng, placeId: e.venuePlaceId ?? "" } : null,
       status: e.status,
@@ -362,6 +368,7 @@ export function EventsClient({
         video_url: form.videoUrl.trim(),
         event_date: form.eventDate ? fromDubaiInput(form.eventDate) : "",
         event_days: form.eventDays,
+        day_times: Array.from({ length: form.eventDays }, (_, i) => (i === 0 ? null : form.dayTimes[i] || null)),
         venue: form.venue,
         status: form.status,
         registration_open: form.registrationOpen,
@@ -1004,6 +1011,34 @@ export function EventsClient({
                         ? `Runs ${eventDateRangeLabel(fromDubaiInput(form.eventDate), form.eventDays, "short")}${form.eventDays > 1 ? ` — ${form.eventDays} days in a row` : ""}`
                         : "Pick the first day above; the last day is worked out for you."}
                     </p>
+                    {form.eventDays > 1 && form.eventDate && (
+                      <div className="mt-3 border border-[#e5e7eb] bg-[#fafbfc]">
+                        <p className="border-b border-[#e5e7eb] px-3 py-2 text-xs font-semibold text-[#374151]">Start time each day <span className="font-normal text-[#9ca3af]">— change a day if it starts later or earlier</span></p>
+                        {eventSchedule(fromDubaiInput(form.eventDate), form.eventDays, Array.from({ length: form.eventDays }, (_, i) => (i === 0 ? null : form.dayTimes[i] || null))).map((d) => (
+                          <div key={d.day} className="flex items-center gap-3 border-b border-[#eef0f3] px-3 py-2 last:border-b-0">
+                            <span className="w-12 shrink-0 text-xs font-bold text-[#001f3f]">Day {d.day}</span>
+                            <span className="min-w-0 flex-1 text-xs text-[#6b7280]">{d.dateLabel}</span>
+                            {d.day === 1 ? (
+                              <span className="w-[120px] shrink-0 px-2 text-right text-xs font-semibold text-[#374151]" title="Day 1 starts at the time set above">{d.time}</span>
+                            ) : (
+                              <input
+                                type="time"
+                                aria-label={`Day ${d.day} start time`}
+                                value={form.dayTimes[d.day - 1] || form.eventDate.slice(11, 16)}
+                                onChange={(e) =>
+                                  setForm((f) => {
+                                    const next = Array.from({ length: f.eventDays }, (_, i) => f.dayTimes[i] ?? "")
+                                    next[d.day - 1] = e.target.value
+                                    return { ...f, dayTimes: next }
+                                  })
+                                }
+                                className="w-[120px] shrink-0 border border-[#e5e7eb] bg-white px-2 py-1 text-xs text-[#111827] focus:border-[#001f3f] focus:outline-none"
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>

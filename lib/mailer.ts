@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer"
-import { eventWhenLabel } from "@/lib/events/dates"
+import { eventSchedule, eventWhenLabel, hasCustomDayTimes } from "@/lib/events/dates"
 import type { PeriodicReport } from "@/lib/periodic-report"
 import { SITE_URL } from "@/lib/seo"
 import { logAuditEvent } from "@/lib/audit-log"
@@ -381,6 +381,8 @@ export async function sendEventRegistrationEmail(input: {
   eventDate: string | null
   /** Consecutive days (071); the email then shows the whole span. */
   eventDays?: number | null
+  /** Per-day start times (072); differing days get a line each. */
+  dayTimes?: unknown
   venue: string | null
   eventUrl: string
 }): Promise<void> {
@@ -389,6 +391,9 @@ export async function sendEventRegistrationEmail(input: {
   const rows = [
     detailRow("Event", input.eventTitle),
     dateLabel ? detailRow("When", dateLabel) : "",
+    ...(hasCustomDayTimes(input.eventDate, input.eventDays, input.dayTimes)
+      ? eventSchedule(input.eventDate, input.eventDays, input.dayTimes).map((d) => detailRow(`Day ${d.day}`, `${d.dateLabel} · ${d.time} (GST)`))
+      : []),
     input.venue ? detailRow("Venue", input.venue) : "",
     detailRow("Name", input.fullName),
     detailRow("Email", input.to),

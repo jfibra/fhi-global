@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   const { data: event, error: eventError } = await admin
     .from("events")
-    .select("id, slug, title, venue, status, deleted_at, event_date, event_days, registration_open, registration_fields")
+    .select("id, slug, title, venue, status, deleted_at, event_date, event_days, day_times, registration_open, registration_fields")
     .eq("id", eventId)
     .maybeSingle()
 
@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
       eventTitle: (event.title as string) ?? "FHI Global event",
       eventDate: (event.event_date as string | null) ?? null,
       eventDays: (event.event_days as number | null) ?? 1,
+      dayTimes: event.day_times,
       venue: (event.venue as string | null) ?? null,
       eventUrl: `${SITE_URL.replace(/\/$/, "")}/events/${(event.slug as string | null) ?? eventId}`,
     })

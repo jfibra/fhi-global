@@ -10,6 +10,8 @@ export type WebsiteEventCard = {
   event_date: string | null
   /** Consecutive days (071). */
   event_days: number | null
+  /** Per-day start times (072). */
+  day_times: unknown
   venue: string | null
   registration_open: boolean | null
 }
@@ -30,7 +32,7 @@ export async function loadAgentWebsiteEvents(
 ): Promise<{ upcoming: WebsiteEventCard[]; past: WebsiteEventCard[] }> {
   const { data, error } = await admin
     .from("events")
-    .select("id, slug, title, image_url, event_date, event_days, venue, registration_open")
+    .select("id, slug, title, image_url, event_date, event_days, day_times, venue, registration_open")
     .eq("agent_id", agentId)
     .eq("status", "published")
     .is("deleted_at", null)
@@ -42,7 +44,7 @@ export async function loadAgentWebsiteEvents(
   const rows = data as WebsiteEventCard[]
   // Past a day after the LAST day starts (a multi-day event stays upcoming).
   const isPast = (e: WebsiteEventCard) => {
-    const last = eventLastDayStart(e.event_date, e.event_days)
+    const last = eventLastDayStart(e.event_date, e.event_days, e.day_times)
     return last !== null && last.getTime() + PAST_AFTER_MS < now
   }
   const upcoming = rows.filter((e) => !isPast(e))

@@ -28,6 +28,8 @@ type EventRow = {
   event_date: string | null
   /** Consecutive days (071). */
   event_days: number | null
+  /** Per-day start times (072). */
+  day_times: unknown
   venue: string | null
   registration_open: boolean | null
   /** null = company event; otherwise an agent's own event an admin picked for this page (067). */
@@ -69,7 +71,7 @@ function splitByDate(all: EventRow[]): { upcoming: EventRow[]; past: EventRow[] 
   const now = Date.now()
   const stamp = (e: EventRow) => (e.event_date ? new Date(e.event_date).getTime() : NaN)
   // A multi-day event stays upcoming until its last day has started.
-  const isPast = (e: EventRow) => eventIsPast(e.event_date, e.event_days, now)
+  const isPast = (e: EventRow) => eventIsPast(e.event_date, e.event_days, now, e.day_times)
   return {
     upcoming: all
       .filter((e) => !isPast(e))
@@ -103,7 +105,7 @@ export default async function EventsPage() {
   const supabase = createPublicSupabaseClient()
   const { data: events } = await supabase
     .from("events")
-    .select("id, slug, title, description, brand, image_url, event_date, event_days, venue, registration_open, agent_id")
+    .select("id, slug, title, description, brand, image_url, event_date, event_days, day_times, venue, registration_open, agent_id")
     .eq("status", "published")
     .is("deleted_at", null)
     // Company events, plus the agents' own events (057) an admin picked for

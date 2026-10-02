@@ -22,15 +22,21 @@ const valid = (iso: string | null | undefined): Date | null => {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
-/** When the last day starts (the first day for a one-day event). */
-export function eventLastDayStart(startIso: string | null | undefined, days: unknown): Date | null {
+/** When the last day starts (the first day for a one-day event), at that day's own time when one is set (072). */
+export function eventLastDayStart(startIso: string | null | undefined, days: unknown, times?: unknown): Date | null {
   const d = valid(startIso)
-  return d ? new Date(d.getTime() + (normalizeEventDays(days) - 1) * DAY_MS) : null
+  if (!d) return null
+  const n = normalizeEventDays(days)
+  if (n > 1 && Array.isArray(times)) {
+    const sched = eventSchedule(startIso, n, times)
+    if (sched.length) return sched[sched.length - 1].start
+  }
+  return new Date(d.getTime() + (n - 1) * DAY_MS)
 }
 
 /** True once the last day has started — the event moves to "past". */
-export function eventIsPast(startIso: string | null | undefined, days: unknown, now = Date.now()): boolean {
-  const last = eventLastDayStart(startIso, days)
+export function eventIsPast(startIso: string | null | undefined, days: unknown, now = Date.now(), times?: unknown): boolean {
+  const last = eventLastDayStart(startIso, days, times)
   return last ? last.getTime() < now : false
 }
 
@@ -97,4 +103,67 @@ export function eventWhenLabel(startIso: string | null | undefined, days: unknow
   const time = eventStartTime(startIso)
   const n = normalizeEventDays(days)
   return [date, time ? `${n > 1 ? "from " : ""}${time} GST` : null, n > 1 ? `${n} days` : null].filter(Boolean).join(" · ")
+}
+
+// ─── Per-day start times (migration 072) ─────────────────────────────────────
+//
+// `events.day_times` holds one "HH:MM" Dubai start time per day, day 1 first
+// (day 1 always mirrors event_date). A missing or empty entry means "same time
+// as day 1", so a plain multi-day event needs nothing stored.
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
+
+/** "10:00" style Dubai wall time of an instant. */
+function dubaiHHMM(d: Date): string {
+  const t = new Date(d.getTime() + 4 * 60 * 60 * 1000)
+  return `${String(t.getUTCHours()).padStart(2, "0")}:${String(t.getUTCMinutes()).padStart(2, "0")}`
+}
+
+/** The Dubai calendar date "YYYY-MM-DD" of an instant. */
+function dubaiYMD(d: Date): string {
+  return new Date(d.getTime() + 4 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
+/** Clean, aligned times: length = days, [0] = day 1's own time, the rest valid "HH:MM" or null (= same as day 1). */
+export function normalizeDayTimes(raw: unknown, startIso: string | null | undefined, days: unknown): (string | null)[] {
+  const n = normalizeEventDays(days)
+  const start = valid(startIso)
+  const list = Array.isArray(raw) ? raw : []
+  const out: (string | null)[] = []
+  for (let i = 0; i < n; i++) {
+    if (i === 0) out.push(start ? dubaiHHMM(start) : null)
+    else out.push(typeof list[i] === "string" && HHMM.test(list[i] as string) ? (list[i] as string) : null)
+  }
+  return out
+}
+
+export type EventDay = { day: number; start: Date; dateLabel: string; time: string }
+
+/** Every day of the event with its own start: "Day 2 · Sun 11 Oct · 10:00 AM". */
+export function eventSchedule(startIso: string | null | undefined, days: unknown, times?: unknown): EventDay[] {
+  const start = valid(startIso)
+  if (!start) return []
+  const n = normalizeEventDays(days)
+  const t = normalizeDayTimes(times, startIso, n)
+  const firstDate = dubaiYMD(start)
+  const out: EventDay[] = []
+  for (let i = 0; i < n; i++) {
+    const d0 = new Date(`${firstDate}T00:00:00Z`)
+    d0.setUTCDate(d0.getUTCDate() + i)
+    const hhmm = t[i] ?? t[0] ?? dubaiHHMM(start)
+    const at = i === 0 ? start : new Date(`${d0.toISOString().slice(0, 10)}T${hhmm}:00+04:00`)
+    out.push({
+      day: i + 1,
+      start: at,
+      dateLabel: at.toLocaleDateString("en-AE", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Dubai" }),
+      time: at.toLocaleTimeString("en-AE", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dubai" }),
+    })
+  }
+  return out
+}
+
+/** True when some day starts at a different time from day 1. */
+export function hasCustomDayTimes(startIso: string | null | undefined, days: unknown, times?: unknown): boolean {
+  const t = normalizeDayTimes(times, startIso, days)
+  return t.slice(1).some((x) => x !== null && x !== t[0])
 }
