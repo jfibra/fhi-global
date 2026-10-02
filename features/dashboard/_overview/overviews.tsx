@@ -12,6 +12,7 @@ import { EditorDashboardContent } from "./editor-overview"
 import { TopSalesBoard } from "./top-sales-board"
 import { TopDevelopersBoard } from "./top-developers-board"
 import { TeamOverviewCard } from "./team-overview-card"
+import { DldMarketOverview } from "./dld-market-overview"
 
 export { DeveloperOverview } from "./developer-overview"
 
@@ -88,6 +89,7 @@ export function SalesOverview() {
         displayName={profile?.fullname ?? user?.email ?? "User"}
         userId={user?.id}
       />
+      <DldMarketOverview />
     </WithTopSales>
   )
   if (!leadsTeam) return overview
@@ -133,6 +135,7 @@ export function MemberOverview() {
   return (
     <WithTopSales userId={user?.id}>
       <MemberOverviewCard displayName={profile?.fullname ?? user?.email ?? "User"} />
+      <DldMarketOverview />
     </WithTopSales>
   )
 }
@@ -150,6 +153,7 @@ export function GlobalPartnerOverview() {
     <div className="space-y-8">
       <GlobalPartnerOverviewCard displayName={profile?.fullname ?? user?.email ?? "Partner"} uplineName={uplineName} />
       <SalesPipelineOverview displayName={profile?.fullname ?? user?.email ?? "User"} userId={user?.id} />
+      <DldMarketOverview />
     </div>
   )
 }

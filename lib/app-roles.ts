@@ -222,6 +222,17 @@ export function canViewDldOpenData(role: string | null | undefined): boolean {
 }
 
 /**
+ * Who sees the "Dubai market" DLD cards on their overview (2026-10-02, boss's
+ * request): the Open Data roles plus Global Partners and members. Only the
+ * fixed last-month breakdown — the full Open Data page stays ROLES_DLD_OPEN_DATA.
+ */
+export const ROLES_DLD_MARKET_OVERVIEW: readonly AppRoleId[] = [...ROLES_DLD_OPEN_DATA, "global_partner", "member"]
+
+export function canSeeDldMarketOverview(role: string | null | undefined): boolean {
+  return roleInList(role, ROLES_DLD_MARKET_OVERVIEW)
+}
+
+/**
  * Library → Documents (DLD contract forms, agreements, company templates;
  * migration 069 + 071). Admin staff upload and delete; the sales ladder can
  * open, fill in and download. Mirrored by the `documents` RLS policies, the

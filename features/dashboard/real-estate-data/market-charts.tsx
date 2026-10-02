@@ -543,6 +543,12 @@ export type FixedBreakdown = {
   description: string
   /** Client-cache key — distinct per fixed view so it never collides with the admin form's memo. */
   cacheKey: string
+  /**
+   * The overview's cut (2026-10-02): no dataset picker, no headline tiles, no
+   * rows-per-day chart and no previous-period load — just value per day, the
+   * top 10 and the category splits. `fullHref` links to the Open Data page.
+   */
+  compact?: { fullHref?: string | null }
 }
 
 /** Every filter of `dataset` at its default, with the locked range on the date fields. */
@@ -572,7 +578,7 @@ export function BreakdownSection({ fixed }: { fixed?: FixedBreakdown } = {}) {
   // The equal-length prior period, loaded automatically in the background —
   // this is what powers the "vs previous period" change on the tiles below.
   const previousJob = useMemo(() => (submitted ? previousWindowJob(submitted) : null), [submitted])
-  const prev = useBatchJob(fixed ? `${cacheKey}:previous` : BREAKDOWN_PREVIOUS_CACHE_KEY, previousJob, true)
+  const prev = useBatchJob(fixed ? `${cacheKey}:previous` : BREAKDOWN_PREVIOUS_CACHE_KEY, fixed?.compact ? null : previousJob, true)
   const prevDone = !!prev.acc?.done
 
   const switchDataset = (next: DldCommand) => {
@@ -637,7 +643,17 @@ export function BreakdownSection({ fixed }: { fixed?: FixedBreakdown } = {}) {
         </p>
       </div>
 
-      {fixed ? (
+      {fixed?.compact ? (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-[#6b7280]">
+          <span className="rounded-full border border-[#e5e7eb] bg-white px-3 py-1 font-semibold text-[#374151] tabular-nums">
+            {longDate(fixed.dateRange.from)} – {longDate(fixed.dateRange.to)}
+          </span>
+          <span>Source: Dubai Land Department open data</span>
+          {fixed.compact.fullHref && (
+            <a href={fixed.compact.fullHref} className="font-semibold text-[#001f3f] hover:underline">Open full DLD data →</a>
+          )}
+        </div>
+      ) : fixed ? (
         // Locked-period strip in place of the form: the dataset is a live
         // picker (loads on change), the dates are shown but not editable.
         <div className="bg-white rounded-2xl border border-[#e8eaed] p-5 mb-4">
@@ -742,7 +758,7 @@ export function BreakdownSection({ fixed }: { fixed?: FixedBreakdown } = {}) {
           {/* Average + "compared to before" — the previous equal-length period
               loads in the background; each tile shows its own pending state
               until that finishes, so the rest of the page never waits on it. */}
-          {acc && previousJob && (
+          {acc && previousJob && !fixed?.compact && (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
               <KpiTile label={`${appliedDataset.label} (this period)`} value={int.format(acc.count)} change={countChange} pending={comparisonPending} />
               {appliedSpec.valueKey && (
@@ -776,7 +792,7 @@ export function BreakdownSection({ fixed }: { fixed?: FixedBreakdown } = {}) {
           )}
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {appliedSpec.dateKey && (
+            {appliedSpec.dateKey && !fixed?.compact && (
               <ChartCard title="Rows per day" subtitle={`Count of ${appliedDataset.label.toLowerCase()} by ${colLabel(appliedSpec.dateKey).toLowerCase()}`} table={{ head: ["Day", "Rows"], rows: daily.map((d) => [longDate(d.date), d.count]) }}>
                 {!acc ? <Skeleton /> : <DailyChart data={daily} dataKey="count" color={C.blue} format={(v) => int.format(v)} label="Rows" />}
               </ChartCard>

@@ -28,7 +28,7 @@ function lastCalendarMonth(): { from: string; to: string; label: string } {
   return { from: iso(first), to: iso(last), label: first.toLocaleDateString("en-AE", { month: "long", year: "numeric" }) }
 }
 
-function lastMonthView(): FixedBreakdown {
+export function lastMonthView(): FixedBreakdown {
   const month = lastCalendarMonth()
   return {
     command: "transactions",

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { requireRole } from "@/lib/auth-guard"
-import { ROLES_DLD_OPEN_DATA, isAdminStaffRole } from "@/lib/app-roles"
+import { ROLES_DLD_MARKET_OVERVIEW, isAdminStaffRole } from "@/lib/app-roles"
 import {
   DLD_CHART_BATCH_CHUNKS,
   DLD_CHART_LATEST_N,
@@ -50,7 +50,10 @@ export const runtime = "nodejs"
 export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
-  const guard = await requireRole([...ROLES_DLD_OPEN_DATA])
+  // Breakdowns also feed the overview's Dubai market cards, which Global
+  // Partners and members see too (ROLES_DLD_MARKET_OVERVIEW); everything else
+  // below stays admin-staff.
+  const guard = await requireRole([...ROLES_DLD_MARKET_OVERVIEW])
   if (!guard.ok) return guard.response
   const adminStaff = isAdminStaffRole(guard.context.profile.role)
 
