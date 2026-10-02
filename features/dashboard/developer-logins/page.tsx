@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { Building2, Check, Clock, Copy, Info, KeyRound, Loader2, RefreshCw, Search, ShieldCheck, UserPlus, X } from "lucide-react"
+import { Building2, Check, Clock, Copy, Eye, EyeOff, Info, KeyRound, Loader2, RefreshCw, Search, ShieldCheck, UserPlus, X } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { isAdminStaffRole } from "@/lib/app-roles"
@@ -15,16 +15,19 @@ import type { CompanyWithoutLogin, DeveloperLogin } from "@/lib/developer-logins
  * Admin → Developers Login: every developer partner's sign-in in one list —
  * the username (or email) they type, where they sign in, when they last did,
  * and when the password was last set (GET /api/admin/developer-logins).
- * Existing passwords can't be shown — Supabase Auth keeps only a one-way hash —
- * so "Set new password" makes one, saves it through the Account Directory's
- * POST /api/admin/users/[id]/password, and shows it ONCE with a copy-ready
- * message. It is never stored anywhere readable. Active companies with no login
- * yet sit underneath, with the Developers page's Create Account dialog.
+ * "Set new password" makes one, saves it through the Account Directory's
+ * POST /api/admin/users/[id]/password and hands over a copy-ready message.
+ * Supabase Auth keeps only a one-way hash, so the app also keeps an encrypted
+ * copy of every password an admin sets (lib/developer-login-secrets.ts) — the
+ * row's Show button (POST /api/admin/developer-logins/[id]/reveal, logged on
+ * every view). Passwords from before that existed, and ones developers chose
+ * themselves, can't be shown. Active companies with no login yet sit
+ * underneath, with the Developers page's Create Account dialog.
  */
 
 type Method = DeveloperLogin["method"]
 /** The login details an admin copies and sends to the developer. */
-type Handover = { company: string; method: Method; login: string; password: string }
+type Handover = { company: string; method: Method; login: string; password: string; saved: boolean }
 
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-AE", { year: "numeric", month: "short", day: "numeric" }) : "—"
@@ -193,10 +196,17 @@ function HandoverCard({ h }: { h: Handover }) {
         ))}
       </div>
       <CopyButton solid text={handoverMessage(h)} label="Copy the whole message" />
-      <p className="flex gap-2 rounded-xl bg-amber-50 px-3 py-2.5 text-xs font-medium text-amber-800">
-        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        Copy it now — this password isn&apos;t kept anywhere, so it won&apos;t be shown again. If it gets lost, just set a new one.
-      </p>
+      {h.saved ? (
+        <p className="flex gap-2 rounded-xl bg-[#001f3f]/[0.04] px-3 py-2.5 text-xs font-medium text-[#374151]">
+          <Eye className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#001f3f]" />
+          Also saved, encrypted — press Show on this login in the list any time to see it again.
+        </p>
+      ) : (
+        <p className="flex gap-2 rounded-xl bg-amber-50 px-3 py-2.5 text-xs font-medium text-amber-800">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          Copy it now — it couldn&apos;t be saved for Show, so it won&apos;t be shown again. If it gets lost, just set a new one.
+        </p>
+      )}
     </div>
   )
 }
@@ -206,6 +216,7 @@ function SetPasswordDialog({ account, onClose, onSet }: { account: DeveloperLogi
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  const [saved, setSaved] = useState(false)
   const company = account.company?.name ?? account.name
 
   const save = async () => {
@@ -222,9 +233,10 @@ function SetPasswordDialog({ account, onClose, onSet }: { account: DeveloperLogi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: pw }),
       })
-      const json = (await res.json().catch(() => ({}))) as { error?: string }
+      const json = (await res.json().catch(() => ({}))) as { error?: string; saved?: boolean }
       if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status}).`)
       setPassword(pw)
+      setSaved(json.saved === true)
       setDone(true)
       onSet()
     } catch (e) {
@@ -239,7 +251,7 @@ function SetPasswordDialog({ account, onClose, onSet }: { account: DeveloperLogi
       <Modal onClose={onClose} sticky>
         <ModalHeader icon={Check} tone="bg-emerald-600" title="New password set" subtitle={`${company} · their old password no longer works`} onClose={onClose} />
         <div className="overflow-y-auto px-6 py-5">
-          <HandoverCard h={{ company, method: account.method, login: account.login, password }} />
+          <HandoverCard h={{ company, method: account.method, login: account.login, password, saved }} />
         </div>
         <div className="flex justify-end border-t border-[#f0f0f0] px-6 py-4">
           <button type="button" onClick={onClose} className="rounded-full border border-[#e5e5e5] px-6 py-3 text-sm font-semibold text-[#374151] transition-all hover:border-[#001f3f] hover:text-[#001f3f]">
@@ -298,6 +310,84 @@ function SetPasswordDialog({ account, onClose, onSet }: { account: DeveloperLogi
         </button>
       </div>
     </Modal>
+  )
+}
+
+/** The Password column: dots, and Show for a password an admin set that the app kept. */
+function PasswordCell({ account }: { account: DeveloperLogin }) {
+  const [shown, setShown] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const hide = () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current)
+    setShown(null)
+  }
+
+  const show = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/admin/developer-logins/${account.id}/reveal`, { method: "POST", cache: "no-store" })
+      const json = (await res.json().catch(() => ({}))) as { password?: string; error?: string }
+      if (!res.ok || !json.password) throw new Error(json.error ?? `Request failed (${res.status}).`)
+      setShown(json.password)
+      // Back to dots after a minute, so it doesn't sit on screen.
+      if (hideTimer.current) clearTimeout(hideTimer.current)
+      hideTimer.current = setTimeout(() => setShown(null), 60_000)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (account.method === "google") return <p className="text-sm text-[#6b7280]">Signs in with Google — no password</p>
+
+  const by = account.passwordSetBy ? ` by ${account.passwordSetBy}` : ""
+  return (
+    <>
+      <div className="flex min-w-0 items-center gap-1">
+        {shown ? (
+          <>
+            <span className="truncate font-mono text-[13px] font-semibold text-[#0d1117]">{shown}</span>
+            <CopyButton text={shown} label="Copy password" />
+            <button
+              type="button"
+              onClick={hide}
+              aria-label="Hide password"
+              title="Hide"
+              className="inline-flex h-7 shrink-0 items-center justify-center rounded-lg px-2 text-[#9ca3af] transition-colors hover:bg-[#f3f4f6] hover:text-[#001f3f]"
+            >
+              <EyeOff className="h-3.5 w-3.5" />
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="font-mono text-sm tracking-[0.2em] text-[#9ca3af]" aria-label="Hidden">
+              ••••••••
+            </span>
+            {account.savedPassword && (
+              <button
+                type="button"
+                onClick={() => void show()}
+                disabled={busy}
+                className="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-[#001f3f] transition-colors hover:bg-[#001f3f]/5 disabled:opacity-60"
+              >
+                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />} Show
+              </button>
+            )}
+          </>
+        )}
+      </div>
+      <p className="text-[11px] text-[#9ca3af]">
+        Set {fmtDate(account.passwordSetAt)}
+        {by}
+        {!account.savedPassword && (account.passwordSetBy === "the developer" ? " · only they know it" : " · can't be shown")}
+      </p>
+      {error && <p className="text-[11px] font-semibold text-rose-600">{error}</p>}
+    </>
   )
 }
 
@@ -383,9 +473,10 @@ export default function DeveloperLoginsPage() {
       <div className="flex gap-3 rounded-2xl border border-[#001f3f]/10 bg-[#001f3f]/[0.03] px-4 py-3.5 text-sm text-[#374151]">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#001f3f]" />
         <p>
-          <span className="font-semibold text-[#0d1117]">Passwords can&apos;t be looked up</span> — the login system keeps them encrypted, so nobody can read an
-          existing one, admins included. To send a developer their login, press <span className="font-semibold text-[#0d1117]">Set new password</span>: the
-          new one is shown once, ready to copy. Username logins sign in at{" "}
+          <span className="font-semibold text-[#0d1117]">Show</span> works for every password an admin sets from 2 Oct 2026 on — kept encrypted, visible to
+          admins only, and every view goes into the Activity Logs. Older ones (John&apos;s from 5 Aug) can&apos;t be shown: press{" "}
+          <span className="font-semibold text-[#0d1117]">Set new password</span> once and Show works from then on. A password a developer changes
+          themselves stays private to them. Username logins sign in at{" "}
           <span className="font-mono text-[13px] font-semibold text-[#001f3f]">{signInUrl("username").replace(/^https?:\/\//, "")}</span>.
         </p>
       </div>
@@ -474,19 +565,8 @@ export default function DeveloperLoginsPage() {
 
                     <div>
                       <p className="text-[10.5px] font-bold uppercase tracking-wider text-[#9ca3af] lg:hidden">Password</p>
-                      {a.method === "google" ? (
-                        <p className="text-sm text-[#6b7280]">Signs in with Google — no password</p>
-                      ) : (
-                        <>
-                          <p className="font-mono text-sm tracking-[0.2em] text-[#9ca3af]" aria-label="Hidden">
-                            ••••••••
-                          </p>
-                          <p className="text-[11px] text-[#9ca3af]">
-                            Set {fmtDate(a.passwordSetAt)}
-                            {a.passwordSetBy ? ` by ${a.passwordSetBy}` : ""}
-                          </p>
-                        </>
-                      )}
+                      {/* Keyed on when it was set, so a new password never shows the old one. */}
+                      <PasswordCell key={`${a.id}:${a.passwordSetAt ?? ""}`} account={a} />
                     </div>
 
                     <div className="lg:w-[170px] lg:text-right">
@@ -536,8 +616,8 @@ export default function DeveloperLoginsPage() {
         open={createFor !== null}
         preset={createFor}
         onClose={() => setCreateFor(null)}
-        onSaved={(username, password) => {
-          setCreated({ company: createFor?.name ?? "", method: "username", login: username, password })
+        onSaved={(username, password, saved) => {
+          setCreated({ company: createFor?.name ?? "", method: "username", login: username, password, saved })
           setCreateFor(null)
           void load()
         }}

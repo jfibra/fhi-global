@@ -3,6 +3,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
+import { forgetDeveloperPassword } from "@/lib/developer-login-secrets"
 
 export const runtime = "nodejs"
 
@@ -72,6 +73,9 @@ export async function POST(req: NextRequest) {
     description: "Changed own password",
     ...requestContextFromRequest(req),
   })
+
+  // Developers Login's Show button would offer the old one — drop it.
+  await forgetDeveloperPassword(admin, userId)
 
   return NextResponse.json({ ok: true })
 }

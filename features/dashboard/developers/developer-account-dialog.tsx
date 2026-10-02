@@ -41,8 +41,9 @@ interface Props {
   open: boolean;
   preset: AccountPreset;
   onClose: () => void;
-  /** Gets the password too, so a caller can show the login details to hand over. */
-  onSaved: (username: string, password: string) => void;
+  /** Gets the password too, so a caller can show the login details to hand over —
+   *  and whether its encrypted copy was kept for Developers Login's Show button. */
+  onSaved: (username: string, password: string, saved: boolean) => void;
   onError: (msg: string) => void;
 }
 
@@ -167,12 +168,12 @@ export function DeveloperAccountDialog({
           display_name: displayName.trim() || undefined,
         }),
       });
-      const json = (await res.json()) as { username?: string; error?: string };
+      const json = (await res.json()) as { username?: string; error?: string; saved?: boolean };
       if (!res.ok) {
         onError(json.error ?? "Failed to create developer account.");
         return;
       }
-      onSaved(json.username ?? uname, password);
+      onSaved(json.username ?? uname, password, json.saved === true);
       // Keep the dialog open so the admin sees the new account appear and can add
       // another for the same company; clear the credential fields.
       setUsername("");

@@ -2,13 +2,16 @@ import "server-only"
 
 import type { createAdminSupabase } from "@/lib/admin-supabase"
 import { DEVELOPER_LOGIN_EMAIL_DOMAIN } from "@/lib/developer-accounts"
+import { savedPasswordTimes } from "@/lib/developer-login-secrets"
 
 // Admin → Developers Login (GET /api/admin/developer-logins): every developer
 // account's sign-in — the username (or the email, for accounts made through the
 // regular sign-up), when the developer last used it and when its password was
-// last set — plus the active developer companies with no login yet. Passwords
-// are never readable: Supabase Auth keeps only a one-way hash, so the page sets
-// a new one through POST /api/admin/users/[id]/password and shows it once.
+// last set — plus the active developer companies with no login yet. Supabase
+// Auth keeps only a one-way hash, so a password shows (the Show button, POST
+// /api/admin/developer-logins/[id]/reveal) only when an admin set it after
+// 2026-10-02 and the app kept its encrypted copy (lib/developer-login-secrets.ts).
+// This list says only WHETHER a copy exists — never the password.
 
 type Admin = ReturnType<typeof createAdminSupabase>
 
@@ -29,6 +32,8 @@ export type DeveloperLogin = {
   passwordSetAt: string | null
   /** …and by whom: the admin's name, or "the developer" (their own change, or their sign-up). */
   passwordSetBy: string | null
+  /** An admin-set password the app kept (encrypted) — the row offers Show. */
+  savedPassword: boolean
 }
 
 export type CompanyWithoutLogin = { id: string; name: string; logo: string | null }
@@ -69,7 +74,7 @@ export async function listDeveloperLogins(admin: Admin): Promise<{ accounts: Dev
 
   // Sign-in method + email live on the auth user; creation, logins and
   // password changes in the audit log (logins by actor, the rest by subject).
-  const [users, logsRes] = await Promise.all([
+  const [users, logsRes, savedAt] = await Promise.all([
     Promise.all(ids.map((id) => admin.auth.admin.getUserById(id).then((r) => r.data.user ?? null, () => null))),
     ids.length
       ? admin
@@ -80,6 +85,7 @@ export async function listDeveloperLogins(admin: Admin): Promise<{ accounts: Dev
           .order("occurred_at", { ascending: false })
           .limit(5000)
       : Promise.resolve({ data: [] as AuditRow[], error: null }),
+    savedPasswordTimes(admin, ids),
   ])
   if (logsRes.error) throw new Error(logsRes.error.message)
   const logs = (logsRes.data ?? []) as AuditRow[]
@@ -112,6 +118,9 @@ export async function listDeveloperLogins(admin: Admin): Promise<{ accounts: Dev
     const visit = logins.find((l) => (l.description ?? "").toLowerCase().includes("master password"))
     const pw = mine.find((l) => l.subject_id === p.id && l.category === "security" && (l.event === "password_reset" || l.event === "password_changed"))
     const createdAt = created?.occurred_at ?? (p.joined_at as string | null)
+    // A copy outlived by the developer's own change no longer works.
+    const kept = savedAt.get(p.id as string)
+    const savedPassword = !!kept && !(pw?.event === "password_changed" && Date.parse(pw.occurred_at) > Date.parse(kept))
 
     return {
       id: p.id as string,
@@ -127,6 +136,7 @@ export async function listDeveloperLogins(admin: Admin): Promise<{ accounts: Dev
       passwordSetBy: pw
         ? pw.event === "password_changed" ? "the developer" : tidy(pw.actor_name)
         : method === "google" ? null : createdBy,
+      savedPassword,
     }
   })
 

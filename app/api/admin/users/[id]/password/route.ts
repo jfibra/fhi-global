@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { isAdminStaffRole, isDeveloperRole } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
+import { saveDeveloperPassword } from "@/lib/developer-login-secrets"
 
 type AdminCaller = { id: string; name: string | null; role: string | null }
 
@@ -42,9 +43,9 @@ export async function POST(
   // Never log the password itself — just that a reset happened, by whom, to whom.
   const { data: target } = await admin
     .from("profiles")
-    .select("fullname")
+    .select("fullname, role")
     .eq("id", id)
-    .maybeSingle<{ fullname: string | null }>()
+    .maybeSingle<{ fullname: string | null; role: string | null }>()
 
   await logAuditEvent({
     category: "security",
@@ -58,5 +59,8 @@ export async function POST(
     ...requestContextFromRequest(req),
   })
 
-  return NextResponse.json({ ok: true })
+  // Developer logins keep an encrypted copy for Developers Login's Show button.
+  const saved = isDeveloperRole(target?.role) ? await saveDeveloperPassword(admin, id, password, caller) : false
+
+  return NextResponse.json({ ok: true, saved })
 }

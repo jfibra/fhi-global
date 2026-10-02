@@ -4,6 +4,7 @@ import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 import { isValidUsername, normalizeUsername, usernameToEmail } from "@/lib/developer-accounts"
+import { saveDeveloperPassword } from "@/lib/developer-login-secrets"
 
 export const runtime = "nodejs"
 
@@ -125,5 +126,8 @@ export async function POST(req: NextRequest) {
     ...requestContextFromRequest(req),
   })
 
-  return NextResponse.json({ id: newUserId, username }, { status: 201 })
+  // Kept encrypted for Developers Login's Show button.
+  const saved = await saveDeveloperPassword(admin, newUserId, password, { id: guard.context.userId, name: guard.context.profile.fullname })
+
+  return NextResponse.json({ id: newUserId, username, saved }, { status: 201 })
 }

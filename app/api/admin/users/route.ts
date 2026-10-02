@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { isAdminStaffRole, isKnownAppRoleId } from "@/lib/app-roles"
+import { isAdminStaffRole, isDeveloperRole, isKnownAppRoleId } from "@/lib/app-roles"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import type { CreateUserPayload, UsersListResponse, UserRecord } from "@/lib/user-service"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 import { emailTypoMessage } from "@/lib/email-typo"
 import { checkEmailDeliverable } from "@/lib/email-validate"
+import { saveDeveloperPassword } from "@/lib/developer-login-secrets"
 
 type AdminCaller = { id: string; name: string | null; role: string | null }
 
@@ -298,6 +299,9 @@ export async function POST(req: NextRequest) {
     changedKeys: ["role", "status"],
     ...requestContextFromRequest(req),
   })
+
+  // A developer login keeps an encrypted copy for Developers Login's Show button.
+  if (isDeveloperRole(normalizedRole)) await saveDeveloperPassword(admin, newUserId, password, caller)
 
   return NextResponse.json({ id: newUserId }, { status: 201 })
 }
