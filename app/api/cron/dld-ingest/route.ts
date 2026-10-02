@@ -110,12 +110,24 @@ async function pullAll(
   return { ok: true, rows, total }
 }
 
-/** The gateway body for a target. Dates are ignored by the areas lookup. */
+/**
+ * The gateway body for a target. Dates are ignored by the areas lookup.
+ *
+ * Projects and developers are registers, not a stream: the gateway only
+ * serves the current calendar year of them (a few hundred rows), and the
+ * project → developer lookup behind the Developers Breakdown tab needs ALL
+ * of this year's projects, not the ones that happened to START in the last
+ * week. So those two always pull from 1 January of the window's year to the
+ * window's end, whatever `from` the caller passed. (Before this, a nightly
+ * run with the 7-day transaction window archived almost no projects, and
+ * the register matched 1 transaction in 10,930.)
+ */
 function bodyFor(target: IngestTarget, from: string, to: string): { ok: true; body: Record<string, string> } | { ok: false; error: string } {
   if (target === "areas") return { ok: true, body: {} }
 
   const dataset = DLD_DATASETS[target]
-  const incoming: Record<string, string> = { P_FROM_DATE: from, P_TO_DATE: to }
+  const registerFrom = target === "projects" || target === "developers" ? `01/01/${to.slice(-4)}` : from
+  const incoming: Record<string, string> = { P_FROM_DATE: registerFrom, P_TO_DATE: to }
   // Projects declare a date-type selector with no default in the catalog;
   // 1 = Start Date, which is what the DLD site itself submits.
   if (target === "projects") incoming.P_DATE_TYPE = "1"
