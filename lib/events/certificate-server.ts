@@ -19,6 +19,7 @@ export type CertificateEventRow = {
   slug: string | null
   title: string
   event_date: string | null
+  event_days?: number | null
   venue: string | null
   brand: string | null
   certificate: unknown
@@ -31,7 +32,7 @@ export const SAMPLE_ATTENDEE = "Maria Clara Santos"
 export async function loadCertificateEvent(admin: SupabaseClient, eventId: string): Promise<CertificateEventRow | null> {
   const { data } = await admin
     .from("events")
-    .select("id, slug, title, event_date, venue, brand, certificate")
+    .select("id, slug, title, event_date, event_days, venue, brand, certificate")
     .eq("id", eventId)
     .is("deleted_at", null)
     .maybeSingle()
@@ -66,7 +67,7 @@ export async function buildCertificateInput(opts: {
   return {
     attendeeName: registration ? titleCaseName(registration.full_name) : SAMPLE_ATTENDEE,
     eventTitle: event.title,
-    dateLabel: certificateDateLabel(event.event_date),
+    dateLabel: certificateDateLabel(event.event_date, event.event_days ?? 1),
     venue: event.venue,
     brandKey: brand.key,
     // Logo filenames contain spaces; Satori needs a proper URL.

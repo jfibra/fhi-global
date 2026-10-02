@@ -52,7 +52,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       to: registration.email,
       fullName: input.attendeeName,
       eventTitle: event.title,
-      dateLabel: certificateDateLabel(event.event_date),
+      dateLabel: certificateDateLabel(event.event_date, event.event_days ?? 1),
       venue: event.venue,
       heading: input.settings.heading,
       pdf,

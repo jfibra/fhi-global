@@ -1,4 +1,6 @@
-/** How long after the event's start registration stays available (walk-ins). */
+import { eventLastDayStart } from "@/lib/events/dates"
+
+/** How long after the (last) day's start registration stays available (walk-ins). */
 const GRACE_MS = 24 * 60 * 60 * 1000
 
 /**
@@ -10,11 +12,11 @@ const GRACE_MS = 24 * 60 * 60 * 1000
 export function isEventRegistrationOpen(event: {
   registration_open?: boolean | null
   event_date?: string | null
+  /** Consecutive days (071): the grace runs from the LAST day's start. */
+  event_days?: number | null
 }): boolean {
   if (event.registration_open === false) return false
-  if (event.event_date) {
-    const t = new Date(event.event_date).getTime()
-    if (!Number.isNaN(t) && Date.now() > t + GRACE_MS) return false
-  }
+  const last = eventLastDayStart(event.event_date, event.event_days)
+  if (last && Date.now() > last.getTime() + GRACE_MS) return false
   return true
 }

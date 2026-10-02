@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer"
+import { eventWhenLabel } from "@/lib/events/dates"
 import type { PeriodicReport } from "@/lib/periodic-report"
 import { SITE_URL } from "@/lib/seo"
 import { logAuditEvent } from "@/lib/audit-log"
@@ -378,11 +379,13 @@ export async function sendEventRegistrationEmail(input: {
   fullName: string
   eventTitle: string
   eventDate: string | null
+  /** Consecutive days (071); the email then shows the whole span. */
+  eventDays?: number | null
   venue: string | null
   eventUrl: string
 }): Promise<void> {
   const subject = `You're registered — ${input.eventTitle}`
-  const dateLabel = dubaiDateLabel(input.eventDate)
+  const dateLabel = (input.eventDays ?? 1) > 1 ? eventWhenLabel(input.eventDate, input.eventDays, "long") : dubaiDateLabel(input.eventDate)
   const rows = [
     detailRow("Event", input.eventTitle),
     dateLabel ? detailRow("When", dateLabel) : "",

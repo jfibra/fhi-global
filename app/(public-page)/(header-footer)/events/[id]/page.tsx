@@ -4,6 +4,7 @@ import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata, truncateDescription } from "@/lib/seo"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
 import { breadcrumbList, eventSchema } from "@/lib/structured-data"
+import { eventDateRangeLabel } from "@/lib/events/dates"
 import { JsonLd } from "@/components/json-ld"
 import { EventViewPing } from "@/components/public/event-view-ping"
 import { EventDetail } from "@/components/public/event-detail"
@@ -41,7 +42,7 @@ async function fetchEvent(idOrSlug: string) {
   const supabase = createPublicSupabaseClient()
   const query = supabase
     .from("events")
-    .select("id, slug, title, description, brand, image_url, video_url, event_date, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate, agent_id")
+    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate, agent_id")
     .eq("status", "published")
     .is("deleted_at", null)
   const { data, error } = UUID_RE.test(idOrSlug)
@@ -82,11 +83,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // turns a dead event URL into a real HTTP 404.
   if (!event) notFound()
   const home = await agentHome(event)
-  const d = event.event_date ? new Date(event.event_date) : null
-  const dateLabel =
-    d && !Number.isNaN(d.getTime())
-      ? d.toLocaleDateString("en-AE", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Dubai" })
-      : null
+  const dateLabel = eventDateRangeLabel(event.event_date, event.event_days, "plain")
   if (home) {
     return createPageMetadata({
       title: event.title,
@@ -126,6 +123,7 @@ export default async function EventDetailPage({ params }: Props) {
             path: `/events/${event.slug ?? event.id}`,
             imageUrl: event.image_url,
             eventDate: event.event_date,
+            eventDays: event.event_days,
             venue: event.venue,
           }),
           breadcrumbList([

@@ -2,6 +2,7 @@ import { EVENT_BRANDS } from "@/lib/events/brands"
 import { parseRegistrationFields } from "@/lib/events/fields"
 import { parseCertificateSettings } from "@/lib/events/certificate"
 import { isPlayableVideoUrl } from "@/lib/video-embed"
+import { normalizeEventDays } from "@/lib/events/dates"
 
 const STATUSES = ["draft", "published", "archived"] as const
 
@@ -22,6 +23,8 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
     const d = new Date(body.event_date)
     if (!Number.isNaN(d.getTime())) event_date = d.toISOString()
   }
+  // How many consecutive days the event runs (migration 071). Only when sent.
+  const event_days = body.event_days !== undefined ? normalizeEventDays(body.event_days) : undefined
   // Manual registration toggle; anything but an explicit false means open.
   const registration_open = body.registration_open !== false
   // Per-event questions. Editable at any time — parseRegistrationFields drops
@@ -58,6 +61,7 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
     venue: venue || null,
     status,
     event_date,
+    ...(event_days !== undefined ? { event_days } : {}),
     registration_open,
     ...(registration_fields !== undefined ? { registration_fields } : {}),
     ...(certificate !== undefined ? { certificate } : {}),

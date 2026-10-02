@@ -5,6 +5,7 @@ import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata } from "@/lib/seo"
 import { eventBrand } from "@/lib/events/brands"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
+import { eventIsPast, eventLastDayStart, eventWhenLabel, normalizeEventDays } from "@/lib/events/dates"
 import { CalendarDays, ChevronRight, Clock, MapPin, Star, UserRound } from "lucide-react"
 
 export const revalidate = 120
@@ -25,6 +26,8 @@ type EventRow = {
   brand: string | null
   image_url: string | null
   event_date: string | null
+  /** Consecutive days (071). */
+  event_days: number | null
   venue: string | null
   registration_open: boolean | null
   /** null = company event; otherwise an agent's own event an admin picked for this page (067). */
@@ -33,17 +36,26 @@ type EventRow = {
 
 function dateParts(
   iso: string | null,
-): { day: string; month: string; year: string; time: string } | null {
+  days: number | null,
+): { day: string; month: string; year: string; time: string; range: boolean } | null {
   if (!iso) return null
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
   // Event times are Dubai time (GST) — force the zone; this renders on the
   // server, whose clock is usually UTC.
+  const z = { timeZone: "Asia/Dubai" } as const
+  const n = normalizeEventDays(days)
+  const end = eventLastDayStart(iso, n) ?? d
+  const sameMonth = d.toLocaleDateString("en-AE", { month: "short", ...z }) === end.toLocaleDateString("en-AE", { month: "short", ...z })
+  const startDay = d.toLocaleDateString("en-AE", { day: "2-digit", ...z })
+  const endDay = end.toLocaleDateString("en-AE", { day: "2-digit", ...z })
   return {
-    day: d.toLocaleDateString("en-AE", { day: "2-digit", timeZone: "Asia/Dubai" }),
-    month: d.toLocaleDateString("en-AE", { month: "short", timeZone: "Asia/Dubai" }),
-    year: d.toLocaleDateString("en-AE", { year: "numeric", timeZone: "Asia/Dubai" }),
-    time: d.toLocaleTimeString("en-AE", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dubai" }) + " GST",
+    // A multi-day event shows its span: "10–12" in one month, else the first day.
+    day: n > 1 && sameMonth ? `${startDay}–${endDay}` : startDay,
+    month: n > 1 && !sameMonth ? `${d.toLocaleDateString("en-AE", { month: "short", ...z })}–${end.toLocaleDateString("en-AE", { month: "short", ...z })}` : d.toLocaleDateString("en-AE", { month: "short", ...z }),
+    year: d.toLocaleDateString("en-AE", { year: "numeric", ...z }),
+    time: (eventWhenLabel(iso, n, "short") ?? "").split(" · ").slice(1).join(" · "),
+    range: n > 1,
   }
 }
 
@@ -56,11 +68,13 @@ function dateParts(
 function splitByDate(all: EventRow[]): { upcoming: EventRow[]; past: EventRow[] } {
   const now = Date.now()
   const stamp = (e: EventRow) => (e.event_date ? new Date(e.event_date).getTime() : NaN)
+  // A multi-day event stays upcoming until its last day has started.
+  const isPast = (e: EventRow) => eventIsPast(e.event_date, e.event_days, now)
   return {
     upcoming: all
-      .filter((e) => !e.event_date || stamp(e) >= now)
+      .filter((e) => !isPast(e))
       .sort((a, b) => (stamp(a) || Infinity) - (stamp(b) || Infinity)),
-    past: all.filter((e) => e.event_date && stamp(e) < now).sort((a, b) => stamp(b) - stamp(a)),
+    past: all.filter(isPast).sort((a, b) => stamp(b) - stamp(a)),
   }
 }
 
@@ -89,7 +103,7 @@ export default async function EventsPage() {
   const supabase = createPublicSupabaseClient()
   const { data: events } = await supabase
     .from("events")
-    .select("id, slug, title, description, brand, image_url, event_date, venue, registration_open, agent_id")
+    .select("id, slug, title, description, brand, image_url, event_date, event_days, venue, registration_open, agent_id")
     .eq("status", "published")
     .is("deleted_at", null)
     // Company events, plus the agents' own events (057) an admin picked for
@@ -204,7 +218,7 @@ function SectionHeading({ children, className }: { children: React.ReactNode; cl
  */
 function EventCard({ event: e, host, past = false }: { event: EventRow; /** The agent hosting it, for a picked agent's event. */ host?: string; past?: boolean }) {
   const brand = eventBrand(e.brand)
-  const dp = dateParts(e.event_date)
+  const dp = dateParts(e.event_date, e.event_days)
   return (
     <Link
       href={`/events/${e.slug ?? e.id}`}
@@ -229,12 +243,12 @@ function EventCard({ event: e, host, past = false }: { event: EventRow; /** The 
           </div>
         )}
         {dp && (
-          <div className="absolute top-0 left-0 text-center w-[54px]">
+          <div className={`absolute top-0 left-0 text-center ${dp.range ? "w-[64px]" : "w-[54px]"}`}>
             <div className="bg-[#d6b357] text-[#1a1408] text-[10px] font-bold uppercase tracking-[0.12em] py-1">
               {dp.month}
             </div>
             <div className="bg-white pt-1 pb-1.5">
-              <span className="block font-['Outfit'] text-2xl font-bold leading-none text-[#001f3f]">
+              <span className={`block font-['Outfit'] font-bold leading-none text-[#001f3f] ${dp.range && dp.day.length > 2 ? "text-[15px] tracking-tight" : "text-2xl"}`}>
                 {dp.day}
               </span>
               <span className="block text-[10px] font-semibold text-[#9ca3af] mt-0.5">{dp.year}</span>

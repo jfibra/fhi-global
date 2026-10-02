@@ -32,7 +32,7 @@ const getSite = cache((slug: string) => loadSiteBySlug(createAdminSupabase(), sl
 const getEvent = cache(async (agentId: string, key: string): Promise<PublicEvent | null> => {
   const query = createAdminSupabase()
     .from("events")
-    .select("id, slug, title, description, brand, image_url, video_url, event_date, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate")
+    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate")
     .eq("agent_id", agentId)
     .eq("status", "published")
     .is("deleted_at", null)
@@ -102,6 +102,7 @@ export default async function AgentEventPage({ params, searchParams }: Props) {
             path,
             imageUrl: event.image_url,
             eventDate: event.event_date,
+            eventDays: event.event_days,
             venue: event.venue,
             organizer: { name: host, path: home },
             // Agents run events abroad too (e.g. roadshows in Manila) — claim no country.

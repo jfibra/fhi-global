@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarDays, ChevronRight, Clock, MapPin, Ticket } from "lu
 import { ProjectLocationMap } from "@/components/public/project-location-map"
 import { eventBrand } from "@/lib/events/brands"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
+import { eventDateRangeLabel, eventLengthLabel, eventStartTime } from "@/lib/events/dates"
 import { parseRegistrationFields } from "@/lib/events/fields"
 import { EventRegisterForm } from "@/components/public/event-register-form"
 import { EventPageQr } from "@/components/public/event-page-qr"
@@ -23,6 +24,8 @@ export type PublicEvent = {
   /** Optional video LINK (lib/video-embed.ts) — played on click, never uploaded. */
   video_url?: string | null
   event_date: string | null
+  /** Consecutive days (migration 071); 1 or missing for a one-day event. */
+  event_days?: number | null
   venue: string | null
   /** The venue's exact spot (migration 068); null when it was typed, not picked. */
   venue_lat?: number | null
@@ -62,17 +65,13 @@ export function EventDetail({
 }) {
   const brand = eventBrand(event.brand ?? "fhiglobal")
   const registrationOpen = isEventRegistrationOpen(event)
-  const d = event.event_date ? new Date(event.event_date) : null
-  // Event times are Dubai time (GST) — force the zone; this renders on the
-  // server, whose clock is usually UTC.
-  const dateLabel =
-    d && !Number.isNaN(d.getTime())
-      ? d.toLocaleDateString("en-AE", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Dubai" })
-      : "Date to be announced"
-  const timeLabel =
-    d && !Number.isNaN(d.getTime())
-      ? d.toLocaleTimeString("en-AE", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dubai" }) + " (GST)"
-      : null
+  // Event times are Dubai time (GST) — lib/events/dates forces the zone; this
+  // renders on the server, whose clock is usually UTC. A multi-day event shows
+  // its whole span ("Friday 10 – Sunday 12 October 2026").
+  const dateLabel = eventDateRangeLabel(event.event_date, event.event_days, "long") ?? "Date to be announced"
+  const startTime = eventStartTime(event.event_date)
+  const length = eventLengthLabel(event.event_days)
+  const timeLabel = startTime ? `${length ? "From " : ""}${startTime} (GST)${length ? ` · ${length}` : ""}` : null
 
   return (
     <>

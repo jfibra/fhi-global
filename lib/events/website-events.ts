@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { eventLastDayStart } from "@/lib/events/dates"
 
 /** One card in an agent website's Events section (migration 057). */
 export type WebsiteEventCard = {
@@ -7,6 +8,8 @@ export type WebsiteEventCard = {
   title: string
   image_url: string | null
   event_date: string | null
+  /** Consecutive days (071). */
+  event_days: number | null
   venue: string | null
   registration_open: boolean | null
 }
@@ -27,7 +30,7 @@ export async function loadAgentWebsiteEvents(
 ): Promise<{ upcoming: WebsiteEventCard[]; past: WebsiteEventCard[] }> {
   const { data, error } = await admin
     .from("events")
-    .select("id, slug, title, image_url, event_date, venue, registration_open")
+    .select("id, slug, title, image_url, event_date, event_days, venue, registration_open")
     .eq("agent_id", agentId)
     .eq("status", "published")
     .is("deleted_at", null)
@@ -37,9 +40,10 @@ export async function loadAgentWebsiteEvents(
 
   const now = Date.now()
   const rows = data as WebsiteEventCard[]
+  // Past a day after the LAST day starts (a multi-day event stays upcoming).
   const isPast = (e: WebsiteEventCard) => {
-    const t = e.event_date ? new Date(e.event_date).getTime() : NaN
-    return !Number.isNaN(t) && t + PAST_AFTER_MS < now
+    const last = eventLastDayStart(e.event_date, e.event_days)
+    return last !== null && last.getTime() + PAST_AFTER_MS < now
   }
   const upcoming = rows.filter((e) => !isPast(e))
   const past = rows.filter(isPast).reverse()

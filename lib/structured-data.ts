@@ -1,4 +1,5 @@
 import { SITE_URL, absoluteUrl } from "@/lib/seo"
+import { eventLastDayStart } from "@/lib/events/dates"
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
 
 /**
@@ -195,6 +196,8 @@ export function eventSchema(event: {
   path: string
   imageUrl?: string | null
   eventDate?: string | null
+  /** Consecutive days (migration 071) — gives the event its endDate. */
+  eventDays?: number | null
   venue?: string | null
   /** Who runs it — FHI Global unless given. An agent's own event (migration
    *  057) names the agent, linked to their website. */
@@ -212,6 +215,7 @@ export function eventSchema(event: {
     url: absoluteUrl(event.path),
     image: event.imageUrl || undefined,
     startDate: event.eventDate ? toDubaiIso(event.eventDate) : undefined,
+    endDate: event.eventDate && (event.eventDays ?? 1) > 1 ? toDubaiIso(eventLastDayStart(event.eventDate, event.eventDays)?.toISOString() ?? event.eventDate) : undefined,
     eventStatus: "https://schema.org/EventScheduled",
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
     location: {

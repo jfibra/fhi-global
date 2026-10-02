@@ -40,6 +40,7 @@ import type { CertificateSettings } from "@/lib/events/certificate"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 import { isPlayableVideoUrl } from "@/lib/video-embed"
 import { VenueAutocomplete, type VenuePin } from "@/components/dashboard/venue-autocomplete"
+import { eventDateRangeLabel, eventWhenLabel, normalizeEventDays } from "@/lib/events/dates"
 
 type AdminEvent = {
   id: string
@@ -53,6 +54,8 @@ type AdminEvent = {
   /** Optional video LINK — played on the event page, never uploaded. */
   videoUrl: string | null
   eventDate: string | null
+  /** Consecutive days the event runs (migration 071). */
+  eventDays: number
   venue: string | null
   venueLat: number | null
   venueLng: number | null
@@ -92,6 +95,8 @@ type FormState = {
   /** YouTube / Facebook / Drive / .mp4 link — optional. */
   videoUrl: string
   eventDate: string // datetime-local value
+  /** 1 for a one-day event; 2, 3… for a multi-day one. */
+  eventDays: number
   venue: string
   /** The picked place's exact spot, or null when the venue was typed freely. */
   venuePin: VenuePin | null
@@ -108,6 +113,7 @@ const EMPTY_FORM: FormState = {
   imageUrl: "",
   videoUrl: "",
   eventDate: "",
+  eventDays: 1,
   venue: "",
   venuePin: null,
   status: "draft",
@@ -148,12 +154,8 @@ function registeredLabel(iso: string): string {
   )
 }
 
-function eventDateLabel(iso: string | null): string {
-  if (!iso) return "Date TBA"
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return "Date TBA"
-  return d.toLocaleDateString(undefined, { weekday: "short", year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Dubai" }) +
-    " · " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dubai" }) + " GST"
+function eventDateLabel(iso: string | null, days: number = 1): string {
+  return eventWhenLabel(iso, days, "short") ?? "Date TBA"
 }
 
 export function EventsClient({
@@ -273,6 +275,7 @@ export function EventsClient({
       imageUrl: e.imageUrl ?? "",
       videoUrl: e.videoUrl ?? "",
       eventDate: toDubaiInput(e.eventDate),
+      eventDays: normalizeEventDays(e.eventDays),
       venue: e.venue ?? "",
       venuePin: e.venueLat != null && e.venueLng != null ? { lat: e.venueLat, lng: e.venueLng, placeId: e.venuePlaceId ?? "" } : null,
       status: e.status,
@@ -358,6 +361,7 @@ export function EventsClient({
         image_url: form.imageUrl,
         video_url: form.videoUrl.trim(),
         event_date: form.eventDate ? fromDubaiInput(form.eventDate) : "",
+        event_days: form.eventDays,
         venue: form.venue,
         status: form.status,
         registration_open: form.registrationOpen,
@@ -796,7 +800,7 @@ export function EventsClient({
                       </button>
                     )}
                     <h3 className="font-['Outfit'] font-bold text-[#111827] truncate">{e.title}</h3>
-                    <p className="text-xs text-[#6b7280] mt-1">{eventDateLabel(e.eventDate)}</p>
+                    <p className="text-xs text-[#6b7280] mt-1">{eventDateLabel(e.eventDate, e.eventDays)}</p>
                     {e.venue && (
                       <p className="text-xs text-[#6b7280] truncate mt-0.5 inline-flex items-center gap-1">
                         <MapPin className="w-3 h-3 text-[#d6b357]" /> {e.venue}
@@ -977,8 +981,30 @@ export function EventsClient({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className={labelCls}>Date &amp; time (Dubai time, GST)</label>
+                  <label className={labelCls}>{form.eventDays > 1 ? "Starts — date & time (Dubai time, GST)" : "Date & time (Dubai time, GST)"}</label>
                   <input type="datetime-local" className={inputCls} value={form.eventDate} onChange={(e) => setForm((f) => ({ ...f, eventDate: e.target.value }))} />
+                  <div className="mt-3">
+                    <p className="mb-1.5 text-xs font-semibold text-[#374151]">How many days?</p>
+                    <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="How many days the event runs">
+                      {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          role="radio"
+                          aria-checked={form.eventDays === n}
+                          onClick={() => setForm((f) => ({ ...f, eventDays: n }))}
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${form.eventDays === n ? "border-[#001f3f] bg-[#001f3f] text-white" : "border-[#e5e7eb] bg-white text-[#374151] hover:border-[#d6b357]"}`}
+                        >
+                          {n === 1 ? "1 day" : `${n} days`}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-[#6b7280]">
+                      {form.eventDate
+                        ? `Runs ${eventDateRangeLabel(fromDubaiInput(form.eventDate), form.eventDays, "short")}${form.eventDays > 1 ? ` — ${form.eventDays} days in a row` : ""}`
+                        : "Pick the first day above; the last day is worked out for you."}
+                    </p>
+                  </div>
                 </div>
                 <div>
                   <label className={labelCls}>Venue</label>
@@ -1062,7 +1088,7 @@ export function EventsClient({
                     </button>
                   </div>
                   <p className="text-[11px] text-[#9ca3af] mt-1.5">
-                    Also closes automatically the day after the event.
+                    Also closes automatically the day after the event{form.eventDays > 1 ? "’s last day" : ""}.
                   </p>
                 </div>
               </div>
@@ -1196,7 +1222,7 @@ export function EventsClient({
       {/* ── Export dialog (sits above the registrations modal) ── */}
       {regEvent && exportOpen && (
         <EventExportModal
-          event={{ title: regEvent.title, slug: regEvent.slug, venue: regEvent.venue, eventDateText: eventDateLabel(regEvent.eventDate), brand: regEvent.brand }}
+          event={{ title: regEvent.title, slug: regEvent.slug, venue: regEvent.venue, eventDateText: eventDateLabel(regEvent.eventDate, regEvent.eventDays), brand: regEvent.brand }}
           registrations={filteredRegs}
           fields={regFields}
           filterLabel={regQuery.trim() || undefined}
@@ -1206,7 +1232,7 @@ export function EventsClient({
 
       {regEvent && certOpen && (
         <EventCertificateModal
-          event={{ id: regEvent.id, slug: regEvent.slug, title: regEvent.title, brand: regEvent.brand, eventDateText: regEvent.eventDate ? eventDateLabel(regEvent.eventDate) : null, venue: regEvent.venue, certificate: regEvent.certificate }}
+          event={{ id: regEvent.id, slug: regEvent.slug, title: regEvent.title, brand: regEvent.brand, eventDateText: regEvent.eventDate ? eventDateLabel(regEvent.eventDate, regEvent.eventDays) : null, venue: regEvent.venue, certificate: regEvent.certificate }}
           registrations={registrations}
           onClose={() => setCertOpen(false)}
           onSaved={(certificate) => {

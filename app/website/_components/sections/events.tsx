@@ -6,15 +6,13 @@ import Link from "next/link"
 import { ArrowRight, CalendarDays, MapPin } from "lucide-react"
 import { eventPublicPath } from "@/lib/events/paths"
 import type { WebsiteEventCard } from "@/lib/events/website-events"
+import { eventWhenLabel } from "@/lib/events/dates"
 import { BRAND_TO, GOLD, GOLD_GRADIENT, NAVY } from "../../_data"
 import { FancyEyebrow } from "../ui"
 
-function dateLabel(iso: string | null) {
-  if (!iso) return "Date to be announced"
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return "Date to be announced"
+function dateLabel(iso: string | null, days: number | null) {
   // Event times are Dubai time (GST), like everywhere else in events.
-  return `${d.toLocaleDateString("en-AE", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Dubai" })} · ${d.toLocaleTimeString("en-AE", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dubai" })} GST`
+  return eventWhenLabel(iso, days, "short") ?? "Date to be announced"
 }
 
 function EventCard({ siteSlug, event, past }: { siteSlug: string; event: WebsiteEventCard; past?: boolean }) {
@@ -46,7 +44,7 @@ function EventCard({ siteSlug, event, past }: { siteSlug: string; event: Website
         )}
       </div>
       <div className="flex flex-1 flex-col p-5">
-        <p className="text-[12px] font-semibold" style={{ color: GOLD }}>{dateLabel(event.event_date)}</p>
+        <p className="text-[12px] font-semibold" style={{ color: GOLD }}>{dateLabel(event.event_date, event.event_days)}</p>
         <h3 className="mt-1.5 font-serif text-lg font-bold leading-snug" style={{ color: NAVY }}>{event.title}</h3>
         {event.venue && (
           <p className="mt-2 flex items-start gap-1.5 text-[13px] text-[#6b7280]">

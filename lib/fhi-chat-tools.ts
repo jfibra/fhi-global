@@ -1,6 +1,7 @@
 import "server-only"
 
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { eventIsPast, eventWhenLabel } from "@/lib/events/dates"
 import { gaConfigured, gaRunRealtime, gaRunReport, gscQuery } from "@/lib/ga-data"
 import { DEFAULT_POSTER_DESIGN, posterDesignIds, posterDesignLabel, renderBirthdayPosterPng } from "@/lib/birthday-poster"
 import { renderMeetingPosterPng, type MeetingPosterData } from "@/lib/meeting-poster"
@@ -1100,7 +1101,7 @@ async function recentSales(admin: Admin, args: { limit?: number }) {
 async function eventsOverview(admin: Admin) {
   const { data: events, error } = await admin
     .from("events")
-    .select("id, title, event_date, venue, status, registration_open, image_url")
+    .select("id, title, event_date, event_days, venue, status, registration_open, image_url")
     .is("deleted_at", null)
     .order("event_date", { ascending: false })
     .limit(12)
@@ -1115,6 +1116,8 @@ async function eventsOverview(admin: Admin) {
     events: (events ?? []).map((e) => ({
       title: e.title,
       date: e.event_date,
+      days: e.event_days ?? 1,
+      when: eventWhenLabel(e.event_date, e.event_days, "short"),
       venue: e.venue,
       status: e.status,
       registration_open: e.registration_open,
@@ -4034,14 +4037,14 @@ async function eventEngagement(admin: Admin, args: { event_title?: string; limit
   const limit = Math.min(Math.max(args.limit ?? 12, 1), 50)
   let q = admin
     .from("events")
-    .select("id, title, event_date, venue, status, agent_id, show_on_main, registration_open, certificate, view_count, qr_scan_count, created_at")
+    .select("id, title, event_date, event_days, venue, status, agent_id, show_on_main, registration_open, certificate, view_count, qr_scan_count, created_at")
     .is("deleted_at", null)
     .order("event_date", { ascending: false })
     .limit(200)
   if (args.event_title?.trim()) q = q.ilike("title", `%${args.event_title.trim().replace(/[%_]/g, "")}%`)
   const { data, error } = await q
   if (error) throw new Error(error.message)
-  type Ev = { id: string; title: string; event_date: string | null; venue: string | null; status: string | null; agent_id: string | null; show_on_main: boolean | null; registration_open: boolean | null; certificate: unknown; view_count: number | null; qr_scan_count: number | null; created_at: string }
+  type Ev = { id: string; title: string; event_date: string | null; event_days: number | null; venue: string | null; status: string | null; agent_id: string | null; show_on_main: boolean | null; registration_open: boolean | null; certificate: unknown; view_count: number | null; qr_scan_count: number | null; created_at: string }
   const events = (data ?? []) as Ev[]
   if (!events.length) return { error: args.event_title ? `No event matching "${args.event_title}"` : "No events yet" }
   const ids = events.map((e) => e.id)
@@ -4064,9 +4067,11 @@ async function eventEngagement(admin: Admin, args: { event_title?: string; limit
     return {
       event: e.title,
       date: isoDay(e.event_date),
+      days: e.event_days ?? 1,
+      when: eventWhenLabel(e.event_date, e.event_days, "short"),
       venue: e.venue,
       status: e.status,
-      past: e.event_date ? Date.parse(e.event_date) < now : null,
+      past: e.event_date ? eventIsPast(e.event_date, e.event_days, now) : null,
       run_by: e.agent_id ? owners.get(String(e.agent_id)) ?? "An agent" : "FHI (company event)",
       on_main_events_page: e.agent_id ? Boolean(e.show_on_main) : true,
       registration_open: Boolean(e.registration_open),

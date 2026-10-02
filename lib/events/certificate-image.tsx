@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og"
 import { eventBrand } from "@/lib/events/brands"
+import { eventDateRangeLabel } from "@/lib/events/dates"
 import type { CertificateSettings } from "@/lib/events/certificate"
 
 /**
@@ -252,9 +253,11 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
 }
 
 /** Same date style as the confirmation email, in Dubai time. */
-export function certificateDateLabel(iso: string | null): string | null {
+export function certificateDateLabel(iso: string | null, days: number | null = 1): string | null {
   if (!iso) return null
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
+  // A multi-day event (071) names its whole span: "Friday 10 – Sunday 12 October 2026".
+  if ((days ?? 1) > 1) return eventDateRangeLabel(iso, days, "long")
   return d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Dubai" })
 }
