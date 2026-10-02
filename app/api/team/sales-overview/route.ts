@@ -177,13 +177,24 @@ export async function GET(req: NextRequest) {
 
   if (team?.team_id) {
     scope = "team"
+    // A team includes its subteams, at any depth (2026-10-02): when someone in
+    // CMG Properties leads their own team, it sits under CMG and still counts
+    // for Michelle.
+    const { data: allTeams } = await admin.from("teams").select("id, parent_id").eq("is_active", true).limit(2000)
+    const teamIds = new Set<string>([team.team_id])
+    for (let grew = true; grew; ) {
+      grew = false
+      for (const t of (allTeams ?? []) as Array<{ id: string; parent_id: string | null }>) {
+        if (t.parent_id && teamIds.has(t.parent_id) && !teamIds.has(t.id)) { teamIds.add(t.id); grew = true }
+      }
+    }
     // Leaderboard rows are capped for payload size, but the id list feeding
     // the SQL aggregates is not — totals stay exact for oversized teams.
     const [rowsRes, idsRes] = await Promise.all([
       admin
         .from("team_memberships")
         .select("user_id, profiles!inner(id, fullname, role, profile_url)")
-        .eq("team_id", team.team_id)
+        .in("team_id", [...teamIds])
         .eq("is_active", true)
         .not("profiles.is_deleted", "is", true)
         .order("joined_at", { ascending: true })
@@ -191,9 +202,9 @@ export async function GET(req: NextRequest) {
       admin
         .from("team_memberships")
         .select("user_id")
-        .eq("team_id", team.team_id)
+        .in("team_id", [...teamIds])
         .eq("is_active", true)
-        .limit(2000),
+        .limit(5000),
     ])
     memberRows = (rowsRes.data ?? []) as unknown as MemberRow[]
     allMemberIds = ((idsRes.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id)

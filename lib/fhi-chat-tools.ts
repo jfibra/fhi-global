@@ -407,19 +407,28 @@ async function topTeams(
   if (args.from_date?.trim()) from = args.from_date.trim()
   if (args.to_date?.trim()) to = args.to_date.trim()
   const [{ data: teams, error: teamErr }, { data: memberships, error: memErr }] = await Promise.all([
-    admin.from("teams").select("id, name, logo_url, is_active").eq("is_active", true).limit(500),
-    admin.from("team_memberships").select("user_id, team_id").eq("is_active", true).limit(5000),
+    admin.from("teams").select("id, name, logo_url, is_active, parent_id").eq("is_active", true).limit(500),
+    admin.from("team_memberships").select("user_id, team_id").eq("is_active", true).limit(10000),
   ])
   if (teamErr) throw new Error(teamErr.message)
   if (memErr) throw new Error(memErr.message)
 
+  // A member counts for their own team AND every team above it: a subteam
+  // (e.g. a leader inside CMG Properties with their own team) rolls up into
+  // its parent. Each team's figure is its whole tree.
+  const parentOf = new Map((teams ?? []).map((t) => [String(t.id), t.parent_id ? String(t.parent_id) : null]))
+  const chain = (tid: string): string[] => {
+    const out: string[] = []
+    for (let cur: string | null = tid; cur && !out.includes(cur) && out.length < 12; cur = parentOf.get(cur) ?? null) out.push(cur)
+    return out
+  }
   const teamsOf = new Map<string, string[]>()
   const memberCount = new Map<string, number>()
   for (const m of memberships ?? []) {
     const uid = String(m.user_id)
-    const tid = String(m.team_id)
-    teamsOf.set(uid, [...(teamsOf.get(uid) ?? []), tid])
-    memberCount.set(tid, (memberCount.get(tid) ?? 0) + 1)
+    const tids = chain(String(m.team_id))
+    teamsOf.set(uid, [...(teamsOf.get(uid) ?? []), ...tids])
+    for (const tid of tids) memberCount.set(tid, (memberCount.get(tid) ?? 0) + 1)
   }
 
   const sales = (await fetchAllSales(admin)).filter(
@@ -442,14 +451,22 @@ async function topTeams(
     }
   }
   const teamById = new Map((teams ?? []).map((t) => [String(t.id), t]))
+  const isTop = (id: string) => !parentOf.get(id) || !teamById.has(parentOf.get(id) as string)
+  // The ranking is of top-level teams (each including its subteams), so no
+  // sale is counted twice in one list; subteams are listed on their own.
   const ranked = [...byTeam.entries()]
-    .filter(([id]) => teamById.has(id))
+    .filter(([id]) => teamById.has(id) && isTop(id))
     .map(([id, t]) => ({ id, ...t }))
     .sort((a, b) => b.value - a.value || b.deals - a.deals)
     .slice(0, 10)
+  const subteamRows = [...byTeam.entries()]
+    .filter(([id]) => teamById.has(id) && !isTop(id))
+    .map(([id, t]) => ({ team: teamById.get(id)?.name ?? id, part_of: teamById.get(parentOf.get(id) as string)?.name ?? null, members: memberCount.get(id) ?? 0, deals: t.deals, total: AED(t.value), _v: t.value }))
+    .sort((a, b) => b._v - a._v)
+    .map(({ _v, ...rest }) => { void _v; return rest })
   return {
     period: { scope, from, to },
-    note: "teams ranked by their members' validated sales; shared sales credit each member's share, and a deal shared inside one team counts once",
+    note: "top-level teams ranked by their members' validated sales, each INCLUDING its subteams; shared sales credit each member's share, and a deal shared inside one team counts once. Subteams are listed separately under subteams (their sales are already inside their parent's total — never add them again).",
     teams_total: (teams ?? []).length,
     leaders: ranked.map((t, i) => ({
       rank: i + 1,
@@ -458,6 +475,7 @@ async function topTeams(
       deals: t.deals,
       total: AED(t.value),
     })),
+    ...(subteamRows.length ? { subteams: subteamRows } : {}),
     _cards: ranked.slice(0, 8).map((t, i): FhiChatCard => ({
       kind: "developer",
       rank: i + 1,
@@ -3979,15 +3997,29 @@ async function teamsDetail(admin: Admin, args: { team_name?: string; include_mem
     creditByAgent.set(c.agentId, cur)
   }
   const teamName = new Map(((teams ?? []) as Team[]).map((t) => [String(t.id), t.name]))
+  // A team includes its subteams at any depth (a leader inside CMG with their own team still counts for CMG).
+  const allTeamRows = (teams ?? []) as Team[]
+  const treeOf = (rootId: string): Set<string> => {
+    const ids = new Set<string>([rootId])
+    for (let grew = true; grew; ) {
+      grew = false
+      for (const x of allTeamRows) if (x.parent_id && ids.has(String(x.parent_id)) && !ids.has(String(x.id))) { ids.add(String(x.id)); grew = true }
+    }
+    return ids
+  }
   const out = list.map((t) => {
-    const members = mems.filter((m) => String(m.team_id) === String(t.id))
-    const leaders = members.filter((m) => /lead|head|manager/i.test(m.role_in_team ?? ""))
+    const tree = treeOf(String(t.id))
+    const members = mems.filter((m) => tree.has(String(m.team_id)))
+    // Leaders of THIS team only; subteam leaders show under their own team.
+    const leaders = members.filter((m) => String(m.team_id) === String(t.id) && /lead|head|manager/i.test(m.role_in_team ?? ""))
     const value = members.reduce((a, m) => a + (creditByAgent.get(String(m.user_id))?.value ?? 0), 0)
     const deals = members.reduce((a, m) => a + (creditByAgent.get(String(m.user_id))?.deals ?? 0), 0)
     return {
       team: t.name,
       type: t.team_type,
       parent_team: t.parent_id ? teamName.get(String(t.parent_id)) ?? null : null,
+      subteams: [...tree].filter((id) => id !== String(t.id)).map((id) => teamName.get(id) ?? id),
+      totals_include_subteams: tree.size > 1,
       created: isoDay(t.created_at),
       members: members.length,
       active_members: members.filter((m) => prof.get(String(m.user_id))?.status === "active").length,
