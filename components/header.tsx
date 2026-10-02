@@ -6,8 +6,8 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Menu, X, Phone, Mail, Facebook, Instagram, ChevronDown, LayoutDashboard,
-  LogOut, Building2, CalendarDays, Camera, Globe, KeyRound, Landmark, Newspaper,
-  Tag, Users, type LucideIcon,
+  LogOut, Building2, Camera, Globe, KeyRound, Landmark,
+  Tag, Users, BarChart3, type LucideIcon,
 } from "lucide-react"
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
 import { getDashboardRouteByRole } from "@/lib/auth"
@@ -19,11 +19,11 @@ type NavItem = { label: string; href: string; children?: NavChild[] }
 
 // Seven top-level items, three of them dropdowns, so the bar stays short as
 // sections are added: the four browse destinations collapse into Properties,
-// the "who we are" pages into About Us, and the two timely ones into News &
-// Events. Off-Plan stays top-level because it is the search people actually
-// type, and it points at the landing page built for that query. Open Data is
-// top-level too (after Contact) — it is a reference tool rather than a way to
-// browse listings, and it was easy to miss buried inside Properties.
+// the "who we are" pages into About Us, and the secondary destinations
+// (Open Data, Contact) into More. Off-Plan stays top-level because it is the
+// search people actually type, and it points at the landing page built for
+// that query. News and Events are each one click — they used to share a
+// dropdown, but both are visited often enough to deserve their own link.
 //
 // A parent's href is never navigated to (the button only opens the menu) — it
 // exists so every item has one; keep it pointing at the primary child.
@@ -50,16 +50,16 @@ const NAV_LINKS: NavItem[] = [
       { label: "Gallery",     href: "/gallery", desc: "Photos from our events",          icon: Camera },
     ],
   },
+  { label: "News", href: "/news" },
+  { label: "Events", href: "/events" },
   {
-    label: "News & Events",
-    href: "/events",
+    label: "More",
+    href: "/open-data",
     children: [
-      { label: "Events", href: "/events", desc: "Showcases and investor nights", icon: CalendarDays },
-      { label: "News",   href: "/news",   desc: "Dubai market updates",           icon: Newspaper },
+      { label: "Open Data", href: "/open-data", desc: "DLD's official property price index", icon: BarChart3 },
+      { label: "Contact",   href: "/contact",   desc: "Get in touch with our team",          icon: Phone },
     ],
   },
-  { label: "Contact", href: "/contact" },
-  { label: "Open Data", href: "/open-data" },
 ]
 
 const SOCIAL_LINKS = [
