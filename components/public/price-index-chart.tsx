@@ -11,7 +11,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
-import type { DldPriceIndexResponse, DldPriceIndexSeries } from "@/lib/dld-open-data"
+import { InView } from "@/components/public/in-view"
+import type { DldPriceIndexPoint, DldPriceIndexResponse, DldPriceIndexSeries } from "@/lib/dld-open-data"
 
 /**
  * Dubai Land Department's official Property Price Index, for the public
@@ -29,25 +30,27 @@ import type { DldPriceIndexResponse, DldPriceIndexSeries } from "@/lib/dld-open-
  * /en/open-data/indexes-home): quarterly and annual side by side for the
  * active category, each a dual-axis chart — percent change as bars on the
  * left axis, the index level as a line on the right. That's why it breaks
- * the usual one-axis-per-chart rule here; everything else (palette, card
- * chrome, tabs) follows FHI's own brand.
+ * the usual one-axis-per-chart rule here. Everything else follows the public
+ * site's design (as on /projects and the mortgage calculator): square corners,
+ * hairline #e5e8ec borders, the black segmented switch (.pl-view), gold
+ * eyebrows whose rule draws in (InView + .wf-rule), Outfit figures, and the
+ * navy / gold brand palette below.
  */
 
-// Validated categorical slots (dataviz reference palette): blue, aqua, amber.
-// Passes CVD/contrast checks as a trio; the on-chart legend's text labels
-// satisfy the "visible labels" relief the surface-contrast WARN calls for.
+// Brand colours, contrast-checked on white (charts need 3:1): navy 16.6:1,
+// steel 3.4:1, deep gold 3.5:1. The two bar series differ in lightness (navy
+// vs steel) and the index line in hue and shape, so the three still separate
+// for colour-blind readers. A series keeps its colour in both charts.
 const C = {
-  qoq: "#2a78d6",
-  yoy: "#1baf7a",
-  actualQuarterly: "#eda100",
-  actualAnnual: "#2a78d6",
-  navy: "#001f3f",
-  gold: "#d6b357",
-  grid: "#eef0f2",
-  axis: "#e5e7eb",
+  qoq: "#6f8db3",
+  yoy: "#001f3f",
+  actual: "#a8842f",
+  grid: "#eef0f3",
+  axis: "#e5e8ec",
   tick: "#8b92a0",
 } as const
-const TOOLTIP_STYLE = { borderRadius: 12, border: "1px solid #e8eaed", fontSize: 12, boxShadow: "0 8px 24px -12px rgba(0,20,40,.25)" }
+const TOOLTIP_STYLE = { borderRadius: 0, border: "1px solid #e5e8ec", fontSize: 12, boxShadow: "0 12px 32px -18px rgba(0,20,40,.28)" }
+const TOOLTIP_LABEL = { fontWeight: 700, color: "#0d1117", marginBottom: 4 }
 // Actual (the index level) keeps up to 2 decimals rather than rounding —
 // 110.64 stays 110.64, not 111. Percent change already caps at 1 (pctLabel).
 const dec = new Intl.NumberFormat("en-AE", { maximumFractionDigits: 2 })
@@ -55,7 +58,7 @@ const pctLabel = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`
 const xLabel = (x: string) => x.replace(/^(\d{4})\.(\d)$/, "Q$2 $1")
 
 function Skeleton({ h = 340 }: { h?: number }) {
-  return <div className="rounded-xl bg-[#f0f2f5] animate-pulse" style={{ height: h }} />
+  return <div className="bg-[#f0f2f5] animate-pulse" style={{ height: h }} />
 }
 
 /**
@@ -79,46 +82,56 @@ function useIsNarrowScreen(): boolean {
 }
 
 /**
- * A clickable legend chip — Chart.js-style series toggle. Active: solid dot,
- * full-opacity label. Off: hollow dot, struck-through muted label. The chart
- * itself must skip rendering the Bar/Line for a hidden key entirely (not
+ * A clickable legend key — Chart.js-style series toggle. The marker is drawn
+ * like its series (a square for bars, a line with a dot for the index). On:
+ * solid marker, full label. Off: hollow marker, dashed edge, struck label. The
+ * chart itself must skip rendering the Bar/Line for a hidden key entirely (not
  * just visually hide it), so Recharts recomputes each axis from only the
  * series still on screen, the same rescale Chart.js does on legend click.
  */
-function LegendChip({ color, label, active, onToggle }: { color: string; label: string; active: boolean; onToggle: () => void }) {
+function LegendKey({ color, label, line, active, onToggle }: { color: string; label: string; line?: boolean; active: boolean; onToggle: () => void }) {
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-pressed={active}
       title={active ? `Hide ${label}` : `Show ${label}`}
-      className={`inline-flex items-center gap-1.5 rounded-full pl-1.5 pr-3 py-1 transition-colors ${
-        active ? "bg-[#f8fafc] hover:bg-[#eef1f5]" : "bg-transparent hover:bg-[#f8fafc]"
+      className={`inline-flex items-center gap-2 border px-3 py-1.5 text-[12px] font-semibold transition-colors hover:border-[#d6b357] ${
+        active ? "border-[#e5e8ec] bg-white text-[#374151]" : "border-dashed border-[#e5e8ec] bg-transparent text-[#9ca3af] line-through decoration-1"
       }`}
     >
-      <span
-        className="h-2.5 w-2.5 rounded-full shrink-0 transition-colors"
-        style={active ? { background: color } : { background: "transparent", border: `1.5px solid ${color}`, opacity: 0.5 }}
-      />
-      <span className={`text-[12.5px] font-medium transition-colors ${active ? "text-[#374151]" : "text-[#9ca3af] line-through decoration-1"}`}>
-        {label}
-      </span>
+      {line ? (
+        <span className="relative flex h-2.5 w-4 shrink-0 items-center" aria-hidden="true" style={{ opacity: active ? 1 : 0.45 }}>
+          <span className="h-[2px] w-full" style={{ background: color }} />
+          <span className="absolute left-1/2 h-2 w-2 -translate-x-1/2 rounded-full" style={{ background: active ? color : "#fff", border: `1.5px solid ${color}` }} />
+        </span>
+      ) : (
+        <span className="h-2.5 w-2.5 shrink-0" aria-hidden="true" style={{ background: active ? color : "transparent", border: `1.5px solid ${color}`, opacity: active ? 1 : 0.5 }} />
+      )}
+      {label}
     </button>
   )
 }
 
-/** Small "as of" reading in the card header, computed from the latest point. */
-function LatestBadge({ x, actual, delta, deltaLabel }: { x: string; actual: number | null; delta: number | null; deltaLabel: string }) {
-  if (actual === null) return null
+/** Period eyebrow + the latest reading, in the site's eyebrow-and-figure style. */
+function ChartHead({ period, context, point }: { period: string; context: string; point: DldPriceIndexPoint | null }) {
   return (
-    <div className="hidden sm:flex items-center gap-2 rounded-lg bg-[#f8fafc] px-3 py-1.5 text-xs">
-      <span className="text-[#6b7280]">{xLabel(x)}</span>
-      <span className="h-3 w-px bg-[#e5e7eb]" aria-hidden="true" />
-      <span className="font-semibold text-[#001f3f] tabular-nums">{dec.format(actual)}</span>
-      {delta !== null && (
-        <span className={`font-semibold tabular-nums ${delta >= 0 ? "text-[#0f7a4f]" : "text-[#b3261e]"}`}>
-          {pctLabel(delta)} <span className="font-normal text-[#9ca3af]">{deltaLabel}</span>
-        </span>
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+      <h3 className="flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8913f]">
+        <span className="wf-rule h-px w-8 bg-[#d6b357]" aria-hidden="true" />
+        <span className="sr-only">{context} — </span>
+        {period}
+      </h3>
+      {point && point.actual !== null && (
+        <p className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 tabular-nums">
+          <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9ca3af]">{xLabel(point.x)}</span>
+          <span className="font-['Outfit'] text-[22px] font-bold leading-none text-[#001f3f]">{dec.format(point.actual)}</span>
+          {point.yoy !== null && (
+            <span className={`text-[12.5px] font-semibold ${point.yoy >= 0 ? "text-[#0f7a4f]" : "text-[#b3261e]"}`}>
+              {pctLabel(point.yoy)} <span className="font-normal text-[#9ca3af]">annual change</span>
+            </span>
+          )}
+        </p>
       )}
     </div>
   )
@@ -186,6 +199,7 @@ export function PriceIndexChart() {
 
   const activeCategoryLabel = categories.find((c) => c.value === activeCategory)?.label ?? ""
   const activeSubLabel = subCategories.find((s) => s.value === activeSub)?.label ?? ""
+  const context = [activeCategoryLabel, activeSubLabel].filter(Boolean).join(", ")
   const quarterly = series.find((s) => s.categoryCode === activeCategory && s.subCategoryCode === activeSub && s.period === "Quarterly")
   const annual = series.find((s) => s.categoryCode === activeCategory && s.subCategoryCode === activeSub && s.period === "Annual")
   const latestQ = quarterly?.points.at(-1) ?? null
@@ -194,7 +208,7 @@ export function PriceIndexChart() {
   return (
     <div>
       {state.error && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+        <div className="mb-4 flex items-center justify-between gap-3 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           <span>{state.error}</span>
           <button type="button" onClick={() => setAttempt((a) => a + 1)} className="shrink-0 font-semibold underline underline-offset-2">
             Retry
@@ -203,15 +217,15 @@ export function PriceIndexChart() {
       )}
 
       {/* One panel holds the tabs and both charts, so the whole thing reads as
-          a single instrument rather than three stacked boxes. */}
-      <div className="bg-white rounded-2xl border border-[#e8eaed] shadow-sm overflow-hidden">
-        {/* Header strip: category tabs + sub-index pills */}
-        <div className="bg-[#fafbfc] border-b border-[#e8eaed] px-5 pt-4">
-          <div className="flex flex-wrap items-center gap-1 -mb-px">
+          a single instrument rather than stacked boxes. */}
+      <InView className="overflow-hidden border border-[#e5e8ec] bg-white">
+        {/* Category tabs — gold underline, like the header's active link */}
+        <div className="border-b border-[#e5e8ec] bg-[#fafbfc] px-5 sm:px-6">
+          <div className="-mb-px flex flex-wrap items-center gap-1">
             {loading ? (
               <>
-                <div className="h-10 w-40 rounded-md bg-[#eef1f5] animate-pulse mb-2" />
-                <div className="h-10 w-40 rounded-md bg-[#eef1f5] animate-pulse mb-2" />
+                <div className="my-2 h-10 w-40 bg-[#eef1f5] animate-pulse" />
+                <div className="my-2 h-10 w-40 bg-[#eef1f5] animate-pulse" />
               </>
             ) : (
               categories.map((c) => (
@@ -223,52 +237,43 @@ export function PriceIndexChart() {
                     setSubCode("")
                   }}
                   aria-current={c.value === activeCategory ? "true" : undefined}
-                  className={`h-11 px-4 border-b-2 text-[15px] font-semibold transition-colors ${
-                    c.value === activeCategory ? "border-[#d6b357] text-[#001f3f]" : "border-transparent text-[#6b7280] hover:text-[#374151]"
+                  className={`h-12 border-b-2 px-3 text-[15px] font-semibold transition-colors sm:px-4 ${
+                    c.value === activeCategory ? "border-[#d6b357] text-[#001f3f]" : "border-transparent text-[#6b7280] hover:text-[#0d1117]"
                   }`}
                 >
-                  {c.label}
+                  {/* "Residential" / "Commercial" on a phone, so both tabs share one row. */}
+                  <span className="sm:hidden">{c.label.replace(/\s+Properties$/i, "")}</span>
+                  <span className="hidden sm:inline">{c.label}</span>
                 </button>
               ))
             )}
           </div>
         </div>
 
-        <div className="px-5 pt-4">
-          {loading ? (
-            <div className="h-11 w-64 rounded-xl bg-[#eef1f5] animate-pulse mb-2" />
-          ) : (
-            subCategories.length > 1 && (
-              <div className="inline-flex flex-wrap gap-1 p-1 rounded-xl bg-[#eef1f5] border border-[#e8eaed]">
-                {subCategories.map((sc) => (
-                  <button
-                    key={sc.value}
-                    type="button"
-                    onClick={() => setSubCode(sc.value)}
-                    aria-current={sc.value === activeSub ? "true" : undefined}
-                    className={`h-9 px-4 rounded-lg text-sm font-semibold transition-colors ${
-                      sc.value === activeSub ? "bg-white text-[#001f3f] shadow-sm" : "text-[#6b7280] hover:text-[#374151]"
-                    }`}
-                  >
-                    {sc.label}
-                  </button>
-                ))}
+        {/* Sub-index switch — the same black segmented control as /projects' List / Map */}
+        {(loading || subCategories.length > 1) && (
+          <div className="px-5 pt-5 sm:px-6">
+            {loading ? (
+              <div className="h-9 w-64 bg-[#eef1f5] animate-pulse" />
+            ) : (
+              <div role="group" aria-label="Index" className="inline-flex flex-wrap border border-[#e5e8ec] bg-white p-0.5">
+                {subCategories.map((sc) => {
+                  const on = sc.value === activeSub
+                  return (
+                    <button key={sc.value} type="button" onClick={() => setSubCode(sc.value)} aria-pressed={on} className={`pl-view ${on ? "pl-view--on" : ""}`}>
+                      {sc.label}
+                    </button>
+                  )
+                })}
               </div>
-            )
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Charts — one shared surface, a hairline divider between them on wide screens. */}
-        <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] xl:divide-x xl:divide-[#f0f2f5]">
+        <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] xl:divide-x xl:divide-[#eef0f3]">
           <div className="p-5 sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-              <h3 className="font-['Outfit'] text-base font-semibold text-[#0d1117]">
-                {activeCategoryLabel}
-                {activeSubLabel && activeSubLabel !== "General Index" && <span className="text-[#9ca3af] font-normal"> · {activeSubLabel}</span>}
-                <span className="text-[#9ca3af] font-normal"> — Quarterly</span>
-              </h3>
-              {latestQ && <LatestBadge x={latestQ.x} actual={latestQ.actual} delta={latestQ.yoy} deltaLabel="Annual Change" />}
-            </div>
+            <ChartHead period="Quarterly" context={context} point={latestQ} />
             {loading ? (
               <Skeleton />
             ) : (
@@ -305,43 +310,39 @@ export function PriceIndexChart() {
                     />
                     <Tooltip
                       contentStyle={TOOLTIP_STYLE}
+                      labelStyle={TOOLTIP_LABEL}
                       labelFormatter={(x) => xLabel(String(x))}
                       formatter={(v, name) =>
                         name === "actual" ? [dec.format(Number(v)), "Actual"] : [pctLabel(Number(v)), name === "qoq" ? "Quarterly Change" : "Annual Change"]
                       }
                     />
-                    {!qHidden.has("qoq") && <Bar yAxisId="left" dataKey="qoq" name="qoq" fill={C.qoq} radius={[3, 3, 0, 0]} maxBarSize={10} />}
-                    {!qHidden.has("yoy") && <Bar yAxisId="left" dataKey="yoy" name="yoy" fill={C.yoy} radius={[3, 3, 0, 0]} maxBarSize={10} />}
+                    {!qHidden.has("qoq") && <Bar yAxisId="left" dataKey="qoq" name="qoq" fill={C.qoq} maxBarSize={10} />}
+                    {!qHidden.has("yoy") && <Bar yAxisId="left" dataKey="yoy" name="yoy" fill={C.yoy} maxBarSize={10} />}
                     {!qHidden.has("actual") && (
                       <Line
                         yAxisId="right"
                         type="monotone"
                         dataKey="actual"
                         name="actual"
-                        stroke={C.actualQuarterly}
-                        strokeWidth={2}
-                        dot={{ r: 4, fill: C.actualQuarterly, strokeWidth: 0 }}
+                        stroke={C.actual}
+                        strokeWidth={2.5}
+                        dot={{ r: 3.5, fill: C.actual, strokeWidth: 0 }}
                         activeDot={{ r: 6, strokeWidth: 2, stroke: "#fff" }}
                       />
                     )}
                   </ComposedChart>
                 </ResponsiveContainer>
-                <div className="flex flex-wrap justify-center gap-2 mt-3">
-                  <LegendChip color={C.qoq} label="Quarterly Change" active={!qHidden.has("qoq")} onToggle={() => toggle(setQHidden, "qoq")} />
-                  <LegendChip color={C.yoy} label="Annual Change" active={!qHidden.has("yoy")} onToggle={() => toggle(setQHidden, "yoy")} />
-                  <LegendChip color={C.actualQuarterly} label="Actual" active={!qHidden.has("actual")} onToggle={() => toggle(setQHidden, "actual")} />
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  <LegendKey color={C.qoq} label="Quarterly Change" active={!qHidden.has("qoq")} onToggle={() => toggle(setQHidden, "qoq")} />
+                  <LegendKey color={C.yoy} label="Annual Change" active={!qHidden.has("yoy")} onToggle={() => toggle(setQHidden, "yoy")} />
+                  <LegendKey color={C.actual} label="Actual" line active={!qHidden.has("actual")} onToggle={() => toggle(setQHidden, "actual")} />
                 </div>
               </>
             )}
           </div>
 
-          <div className="p-5 sm:p-6 border-t xl:border-t-0 border-[#f0f2f5] min-w-0">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-              <h3 className="font-['Outfit'] text-base font-semibold text-[#0d1117]">
-                <span className="text-[#9ca3af] font-normal">Annual</span>
-              </h3>
-              {latestA && <LatestBadge x={latestA.x} actual={latestA.actual} delta={latestA.yoy} deltaLabel="Annual Change" />}
-            </div>
+          <div className="min-w-0 border-t border-[#eef0f3] p-5 sm:p-6 xl:border-t-0">
+            <ChartHead period="Annual" context={context} point={latestA} />
             {loading ? (
               <Skeleton />
             ) : (
@@ -366,32 +367,33 @@ export function PriceIndexChart() {
                     />
                     <Tooltip
                       contentStyle={TOOLTIP_STYLE}
+                      labelStyle={TOOLTIP_LABEL}
                       formatter={(v, name) => (name === "actual" ? [dec.format(Number(v)), "Actual"] : [pctLabel(Number(v)), "Annual Change"])}
                     />
-                    {!aHidden.has("yoy") && <Bar yAxisId="left" dataKey="yoy" name="yoy" fill={C.yoy} radius={[4, 4, 0, 0]} maxBarSize={40} />}
+                    {!aHidden.has("yoy") && <Bar yAxisId="left" dataKey="yoy" name="yoy" fill={C.yoy} maxBarSize={40} />}
                     {!aHidden.has("actual") && (
                       <Line
                         yAxisId="right"
                         type="monotone"
                         dataKey="actual"
                         name="actual"
-                        stroke={C.actualAnnual}
-                        strokeWidth={2}
-                        dot={{ r: 5, fill: C.actualAnnual, strokeWidth: 0 }}
+                        stroke={C.actual}
+                        strokeWidth={2.5}
+                        dot={{ r: 4.5, fill: C.actual, strokeWidth: 0 }}
                         activeDot={{ r: 6, strokeWidth: 2, stroke: "#fff" }}
                       />
                     )}
                   </ComposedChart>
                 </ResponsiveContainer>
-                <div className="flex flex-wrap justify-center gap-2 mt-3">
-                  <LegendChip color={C.yoy} label="Annual Change" active={!aHidden.has("yoy")} onToggle={() => toggle(setAHidden, "yoy")} />
-                  <LegendChip color={C.actualAnnual} label="Actual" active={!aHidden.has("actual")} onToggle={() => toggle(setAHidden, "actual")} />
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  <LegendKey color={C.yoy} label="Annual Change" active={!aHidden.has("yoy")} onToggle={() => toggle(setAHidden, "yoy")} />
+                  <LegendKey color={C.actual} label="Actual" line active={!aHidden.has("actual")} onToggle={() => toggle(setAHidden, "actual")} />
                 </div>
               </>
             )}
           </div>
         </div>
-      </div>
+      </InView>
     </div>
   )
 }

@@ -52,7 +52,8 @@ export default function OpenDataPage() {
             {FACTS.map((f) => (
               <div key={f.label} className="sm:pr-8 sm:mr-8 sm:border-r sm:border-[#e8eaed] sm:last:mr-0 sm:last:border-0 sm:last:pr-0">
                 <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b8913f] mb-1.5">{f.label}</dt>
-                <dd className="font-['Outfit'] text-lg font-bold text-[#001f3f] leading-none whitespace-nowrap">{f.value}</dd>
+                {/* Wraps on phones: "Residential · Commercial" is wider than half a phone screen. */}
+                <dd className="font-['Outfit'] text-lg font-bold text-[#001f3f] leading-tight sm:leading-none sm:whitespace-nowrap">{f.value}</dd>
               </div>
             ))}
           </dl>
