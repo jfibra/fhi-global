@@ -3,7 +3,7 @@
 import { useRef, useState } from "react"
 import { gaEvent } from "@/lib/ga"
 import {
-  BUDGET_OPTIONS, BUYER_QUESTIONS, BUYER_STEPS, CONTACT_TIME_OPTIONS, type BuyerProfile, type QuestionKey,
+  BUDGET_OPTIONS, BUYER_QUESTIONS, BUYER_STEPS, CONTACT_TIME_OPTIONS, ownsBusiness, type BuyerProfile, type QuestionKey,
 } from "@/lib/buyer-links"
 import {
   ContactFields, EMPTY_CONTACT, Honeypot, Pills, Question, SentCard, StepIntro, StepNav, StepRail, briefCardCls,
@@ -34,6 +34,8 @@ export function BuyerLeadForm({
   const [contactTime, setContactTime] = useState<string | undefined>(undefined)
   const [answers, setAnswers] = useState<Partial<Answers>>({})
   const [areasOther, setAreasOther] = useState("")
+  const [profession, setProfession] = useState("")
+  const [position, setPosition] = useState("")
   const [budget, setBudget] = useState<string | undefined>(undefined)
   const [message, setMessage] = useState("")
   const [website, setWebsite] = useState("") // honeypot
@@ -101,7 +103,13 @@ export function BuyerLeadForm({
     }
     setServerError(null)
     setSending(true)
-    const profile: BuyerProfile = { ...answers, nationality: contact.nationality.trim() || undefined, areas_other: areasOther.trim() || undefined }
+    const profile: BuyerProfile = {
+      ...answers,
+      nationality: contact.nationality.trim() || undefined,
+      areas_other: areasOther.trim() || undefined,
+      profession: profession.trim() || undefined,
+      position: position.trim() || undefined,
+    }
     const error = await sendBrief({
       kind: "buyer",
       code,
@@ -230,6 +238,37 @@ export function BuyerLeadForm({
                   }}
                 />
               </Question>
+              {q("income_source")}
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="bq-profession" className={briefLabelCls}>
+                    Profession <span className="font-normal text-[#9ca3af]">optional</span>
+                  </label>
+                  <input
+                    id="bq-profession"
+                    value={profession}
+                    onChange={(e) => setProfession(e.target.value)}
+                    maxLength={80}
+                    autoComplete="organization-title"
+                    placeholder="e.g. Nurse, Engineer, Accountant"
+                    className={briefInputCls}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="bq-position" className={briefLabelCls}>
+                    {ownsBusiness(answers.income_source) ? "Your business" : "Position and company"} <span className="font-normal text-[#9ca3af]">optional</span>
+                  </label>
+                  <input
+                    id="bq-position"
+                    value={position}
+                    onChange={(e) => setPosition(e.target.value)}
+                    maxLength={120}
+                    autoComplete="organization"
+                    placeholder={ownsBusiness(answers.income_source) ? "e.g. Owner, trading company in Deira" : "e.g. Operations Manager, Emirates"}
+                    className={briefInputCls}
+                  />
+                </div>
+              </div>
               {q("payment", true)}
               {answers.payment === "mortgage" && q("mortgage_status")}
               {q("down_payment")}

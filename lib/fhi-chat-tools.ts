@@ -2525,7 +2525,16 @@ async function leadsOverview(admin: Admin, args: LeadsArgs) {
         budget: budgetLabel(b.budget),
         ...(b.kind === "seller"
           ? { property: label(b, "property_type"), completion: label(b, "completion"), sell_timeline: label(b, "sell_timeline") }
-          : { goal: label(b, "goal"), timeline: label(b, "buy_timeline"), readiness: label(b, "readiness"), reach_by: label(b, "contact_channel"), lives: label(b, "residence") }),
+          : {
+              goal: label(b, "goal"),
+              timeline: label(b, "buy_timeline"),
+              readiness: label(b, "readiness"),
+              reach_by: label(b, "contact_channel"),
+              lives: label(b, "residence"),
+              income: label(b, "income_source"),
+              profession: typeof prof(b).profession === "string" ? (prof(b).profession as string) : null,
+              position: typeof prof(b).position === "string" ? (prof(b).position as string) : null,
+            }),
         message: (b.message ?? "").slice(0, 160) || null,
       })),
       where_in_dashboard: "Communication → Buyer Leads (admins see every agent's briefs, read-only)",

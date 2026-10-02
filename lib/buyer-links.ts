@@ -205,6 +205,21 @@ export const BUYER_QUESTIONS = {
       ["maid_room", "Maid's room"],
     ]),
   },
+  // Work and income (added 2026-10-02 on the boss's request), with two free-text
+  // fields beside it: profession and position / business (see BuyerProfile).
+  income_source: {
+    label: "Main source of income",
+    short: "Income",
+    multi: false,
+    options: opts([
+      ["employed", "Employed (salary)"],
+      ["business", "Business owner"],
+      ["self_employed", "Self-employed / freelancer"],
+      ["investments", "Investments or rental income"],
+      ["retired", "Retired / pension"],
+      ["other", "Other"],
+    ]),
+  },
   payment: {
     label: "How will you pay?",
     short: "Payment",
@@ -245,18 +260,25 @@ export const BUYER_QUESTIONS = {
 
 export type QuestionKey = keyof typeof BUYER_QUESTIONS
 
-/** The brief's answers: option keys, plus two short free-text fields. */
+/** The brief's answers: option keys, plus short free-text fields. */
 export type BuyerProfile = Partial<Record<QuestionKey, string | string[]>> & {
   nationality?: string
   areas_other?: string
+  /** "Nurse", "Civil engineer". */
+  profession?: string
+  /** Job title and employer, or the business for an owner. */
+  position?: string
 }
+
+/** Business owners and the self-employed describe their business, not a job title. */
+export const ownsBusiness = (incomeSource: unknown) => incomeSource === "business" || incomeSource === "self_employed"
 
 /** The four steps, in order, with the choice questions each one asks. */
 export const BUYER_STEPS: { id: "details" | "profile" | "preferences" | "financials"; title: string; keys: QuestionKey[] }[] = [
   { id: "details", title: "Your details", keys: ["residence", "contact_channel"] },
   { id: "profile", title: "Buying profile", keys: ["buying_for", "goal", "buying_with", "buy_timeline", "move_in"] },
   { id: "preferences", title: "Preferences", keys: ["property_types", "bedrooms", "completion", "areas", "must_haves"] },
-  { id: "financials", title: "Financials", keys: ["payment", "mortgage_status", "down_payment", "golden_visa", "readiness"] },
+  { id: "financials", title: "Financials", keys: ["income_source", "payment", "mortgage_status", "down_payment", "golden_visa", "readiness"] },
 ]
 
 /** Choice questions the client must answer (budget is required too). */
@@ -267,7 +289,7 @@ export const REQUIRED_QUESTIONS: QuestionKey[] = ["buying_for", "buy_timeline", 
  * the API on every submission, so stored briefs are always clean.
  */
 export function parseProfile(raw: unknown): BuyerProfile {
-  const out = parseAnswers(BUYER_QUESTIONS, { nationality: { max: 60 }, areas_other: { max: 200 } }, raw) as BuyerProfile
+  const out = parseAnswers(BUYER_QUESTIONS, { nationality: { max: 60 }, areas_other: { max: 200 }, profession: { max: 80 }, position: { max: 120 } }, raw) as BuyerProfile
   // A pre-approval only means something for a mortgage buyer.
   if (out.payment !== "mortgage") delete out.mortgage_status
   return out

@@ -21,7 +21,7 @@ import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { titleCaseName } from "@/lib/public-profile"
 import {
   BUDGET_OPTIONS, BUYER_QUESTIONS, BUYER_STEPS, GRADE_OPTIONS, LEAD_GRADES, SELLER_QUESTIONS, answerLabel, budgetLabel, buyerLinkPath,
-  contactTimeLabel, formatAed, formatSqft, leadGrade, sellerAnswerLabel, sellerLinkPath, waDigits,
+  contactTimeLabel, formatAed, formatSqft, leadGrade, ownsBusiness, sellerAnswerLabel, sellerLinkPath, waDigits,
   type BriefKind, type BuyerLead, type BuyerLink, type Choice, type LeadGrade, type QuestionKey, type SellerQuestionKey,
 } from "@/lib/buyer-links"
 import { fetchAllBuyerLeads, fetchMyBuyerLeads, fetchMyBuyerLink } from "@/lib/buyer-link-service"
@@ -60,6 +60,12 @@ const buyerAnswer = (l: BuyerLead, k: QuestionKey): string => (k === "areas" ? a
 const COMPACT: Record<string, string> = { asap: "ASAP", payment_plan: "Payment plan" }
 const compact = (l: BuyerLead, k: "buy_timeline" | "payment") => COMPACT[txt(l, k)] || buyerAnswer(l, k)
 
+/** Profession and position / business: read right under the income answer. */
+const positionLabel = (l: BuyerLead) => (ownsBusiness(l.profile?.income_source) ? "Business" : "Position")
+const workRows = (l: BuyerLead) => [rowOf("Profession", txt(l, "profession")), rowOf(positionLabel(l), txt(l, "position"))]
+/** Rows that follow a question's own row in the brief. */
+const followUps = (l: BuyerLead, k: QuestionKey): (Row | null)[] => (k === "income_source" ? workRows(l) : [])
+
 /**
  * The buyer's brief as the agent reads it, in the client's four steps.
  * Contact fields lead the first step and the budget leads the last.
@@ -72,7 +78,7 @@ function buyerSections(l: BuyerLead): Section[] {
   const after: Record<string, (Row | null)[]> = { details: [rowOf("Best time", contactTimeLabel(l.contact_time))] }
   return BUYER_STEPS.map((s) => ({
     title: s.id === "details" ? "Contact" : s.title,
-    rows: rows([...(before[s.id] ?? []), ...s.keys.map((k) => rowOf(BUYER_QUESTIONS[k].short, buyerAnswer(l, k))), ...(after[s.id] ?? [])]),
+    rows: rows([...(before[s.id] ?? []), ...s.keys.flatMap((k) => [rowOf(BUYER_QUESTIONS[k].short, buyerAnswer(l, k)), ...followUps(l, k)]), ...(after[s.id] ?? [])]),
   }))
 }
 
@@ -197,7 +203,15 @@ const VIEWS: Record<View, ViewConfig> = {
       { header: "Best time", get: (l) => contactTimeLabel(l.contact_time) ?? "" },
       { header: "Budget", get: (l) => budgetLabel(l.budget) ?? "" },
       { header: "Grade", get: (l) => LEAD_GRADES[leadGrade(l)].label },
-      ...BUYER_STEPS.flatMap((s) => s.keys).map((k) => ({ header: BUYER_QUESTIONS[k].short, get: (l: BuyerLead) => buyerAnswer(l, k) })),
+      ...BUYER_STEPS.flatMap((s) => s.keys).flatMap((k) => [
+        { header: BUYER_QUESTIONS[k].short, get: (l: BuyerLead) => buyerAnswer(l, k) },
+        ...(k === "income_source"
+          ? [
+              { header: "Profession", get: (l: BuyerLead) => txt(l, "profession") },
+              { header: "Position / business", get: (l: BuyerLead) => txt(l, "position") },
+            ]
+          : []),
+      ]),
       { header: "Message", get: (l) => l.message ?? "" },
     ],
     pdf: {
@@ -214,7 +228,7 @@ const VIEWS: Record<View, ViewConfig> = {
         fmtDate(l.created_at),
       ],
     },
-    searchText: (l) => txt(l, "areas_other"),
+    searchText: (l) => [txt(l, "areas_other"), txt(l, "profession"), txt(l, "position")].join(" "),
   },
   sellers: {
     kind: "seller",
