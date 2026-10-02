@@ -124,7 +124,7 @@ export function TopDevelopersBoard() {
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-lg bg-[#f3f4f6] p-0.5">
-          {(["month", "quarter", "year", "all"] as Scope[]).map((s) => (
+          {(["month", "quarter", "year"] as Scope[]).map((s) => (
             <button
               key={s}
               type="button"

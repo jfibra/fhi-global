@@ -5,6 +5,7 @@ import { parseName } from "@/lib/parse-name"
 import { pickSafePostLoginRedirect } from "@/lib/auth"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 import { inviterAutoApproves } from "@/lib/auto-approve"
+import { joinInvitersTeam } from "@/lib/recruit-team"
 import { sendWelcomeEmail } from "@/lib/welcome-email"
 
 // Completes Google sign-in AFTER the client established the Supabase session.
@@ -139,6 +140,9 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     )
   }
+
+  // A recruit joins their recruiter's team (lib/recruit-team.ts). Best effort.
+  if (invitedBy) await joinInvitersTeam(admin, { userId: user.id, inviterId: invitedBy, accountRole: finalRole })
 
   const displayName = [fname, lname].filter(Boolean).join(" ") || user.email || null
   if (autoApproved && invitedBy) {

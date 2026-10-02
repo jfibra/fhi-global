@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 import { inviterAutoApproves } from "@/lib/auto-approve"
+import { joinInvitersTeam } from "@/lib/recruit-team"
 import { sendWelcomeEmail } from "@/lib/welcome-email"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -75,6 +76,9 @@ export async function POST(req: NextRequest) {
         ...(invitedBy ? { metadata: { invited_by: invitedBy } } : {}),
       })
       .eq("id", userId)
+
+    // A recruit joins their recruiter's team (lib/recruit-team.ts). Best effort.
+    if (invitedBy) await joinInvitersTeam(supabase, { userId, inviterId: invitedBy, accountRole: role })
 
     // Auto-approved: the same welcome letter an Approve click sends, signed by
     // the inviter (they lead this recruit). Never blocks registration.
