@@ -345,7 +345,6 @@ function PasswordCell({ account }: { account: DeveloperLogin }) {
 
   if (account.method === "google") return <p className="text-sm text-[#6b7280]">Signs in with Google — no password</p>
 
-  const by = account.passwordSetBy ? ` by ${account.passwordSetBy}` : ""
   return (
     <>
       <div className="flex min-w-0 items-center gap-1">
@@ -365,7 +364,17 @@ function PasswordCell({ account }: { account: DeveloperLogin }) {
           </>
         ) : (
           <>
-            <span className="font-mono text-sm tracking-[0.2em] text-[#9ca3af]" aria-label="Hidden">
+            <span
+              className="font-mono text-sm tracking-[0.2em] text-[#9ca3af]"
+              aria-label="Hidden"
+              title={
+                account.savedPassword
+                  ? undefined
+                  : account.passwordSetBy === "the developer"
+                    ? "Their own password — only they know it"
+                    : "Can't be shown — press Set new password to see it here"
+              }
+            >
               ••••••••
             </span>
             {account.savedPassword && (
@@ -381,11 +390,6 @@ function PasswordCell({ account }: { account: DeveloperLogin }) {
           </>
         )}
       </div>
-      <p className="text-[11px] text-[#9ca3af]">
-        Set {fmtDate(account.passwordSetAt)}
-        {by}
-        {!account.savedPassword && (account.passwordSetBy === "the developer" ? " · only they know it" : " · can't be shown")}
-      </p>
       {error && <p className="text-[11px] font-semibold text-rose-600">{error}</p>}
     </>
   )
