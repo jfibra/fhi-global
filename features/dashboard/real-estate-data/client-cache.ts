@@ -14,7 +14,7 @@ export const CLIENT_CACHE_TTL_MS = 30 * 60 * 1000
 
 // Bump the version to discard everything browsers have stored (e.g. after a
 // bug produced wrong cached figures).
-const PREFIX = "dld:v3:"
+const PREFIX = "dld:v6:"
 const mem = new Map<string, { at: number; data: unknown }>()
 
 type Entry<T> = { at: number; data: T }

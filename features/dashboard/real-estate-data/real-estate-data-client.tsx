@@ -25,6 +25,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, CalendarRange, ChevronLeft, ChevronRig
 import { FilterSelect, type FilterSelectOption } from "@/components/ui/filter-select"
 import { PriceIndexChart } from "@/components/public/price-index-chart"
 import { BreakdownSection, RefreshButton, TabSummary } from "./market-charts"
+import { DevelopersBreakdownSection } from "./developers-breakdown"
 import { cacheDelete, cacheGet, cacheSet } from "./client-cache"
 import {
   DLD_DATASETS,
@@ -71,11 +72,13 @@ type TableMemo = {
   appliedSearch: { column: string; term: string; scanRows: number } | null
 }
 
-type TopTab = "index" | "breakdowns" | "real-estate-data"
+type TopTab = "index" | "breakdowns" | "real-estate-data" | "developers"
 const TOP_TABS: Array<{ key: TopTab; label: string }> = [
   { key: "index", label: "General Index" },
   { key: "breakdowns", label: "Breakdowns" },
   { key: "real-estate-data", label: "Real Estate Data" },
+  // Under review — who is selling, by developer (developers-breakdown.tsx).
+  { key: "developers", label: "Developers Breakdown" },
 ]
 
 /**
@@ -233,6 +236,7 @@ export function RealEstateDataClient() {
 
       {topTab === "index" && <PriceIndexChart />}
       {topTab === "breakdowns" && <BreakdownSection />}
+      {topTab === "developers" && <DevelopersBreakdownSection />}
       {topTab === "real-estate-data" && (
         <>
           {/* Dataset sub-tabs */}

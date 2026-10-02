@@ -9,6 +9,7 @@ import {
   isDldCommand,
   type DldBreakdownResponse,
   type DldChartBucket,
+  type DldDeveloperSource,
   type DldKpiSums,
   type DldRow,
   type DldSummaryResponse,
@@ -18,6 +19,7 @@ import {
 import { asRows, buildGatewayBody, callGateway, chunkReader, clean, flag, gatewayTotal, readChunkRange, type GatewayError } from "@/lib/dld-gateway"
 import { chunkKey, readChunk, writeChunk } from "@/lib/dld-cache"
 import { fetchPriceIndex } from "@/lib/dld-price-index"
+import { getDeveloperLookup, resolveDeveloper } from "@/lib/dld-developer-lookup"
 
 /**
  * Chart data for the admin "Real Estate Data" → Market Charts tab.
@@ -141,6 +143,14 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
   let areaValueSum = 0
   let areaSqmSum = 0
 
+  // Transactions: developer behind each row's project (three-layer lookup).
+  const developerLookup = command === "transactions" ? await getDeveloperLookup() : null
+  const developers = new Map<string, { count: number; value: number }>()
+  const developersMatched = new Map<string, { count: number; value: number }>()
+  const developersGuessed = new Map<string, { count: number; value: number }>()
+  const projectsUnmatched = new Map<string, { count: number; value: number }>()
+  const developerSources: Record<DldDeveloperSource, number> = { dld: 0, fhi: 0, name: 0, unmatched: 0, unknown: 0 }
+
   for (const row of rows) {
     const value = spec.valueKey ? (num(row[spec.valueKey]) ?? 0) : 0
     totalValue += value
@@ -174,6 +184,14 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
     }
     for (const k of spec.breakdowns) bump(breakdowns[k], labelOf(row[k]), value)
     bump(top, labelOf(row[spec.topKey]), value)
+    if (developerLookup) {
+      const m = resolveDeveloper(developerLookup, row.PROJECT_EN)
+      bump(developers, m.developer, value)
+      if (m.source === "dld" || m.source === "fhi") bump(developersMatched, m.developer, value)
+      else if (m.source === "name") bump(developersGuessed, m.developer, value)
+      else if (m.source === "unmatched" && m.project) bump(projectsUnmatched, m.project, value)
+      developerSources[m.source] += 1
+    }
   }
 
   const toBuckets = (m: Map<string, { count: number; value: number }>): DldChartBucket[] =>
@@ -203,6 +221,15 @@ async function breakdown(incoming: Record<string, unknown>, refresh: boolean): P
     totals: { count: rows.length, value: Math.round(totalValue) },
     ...(kpiSpec ? { kpi, latest } : {}),
     ...(spec.areaKey ? { areaAgg: { valueWithAreaSum: Math.round(areaValueSum), areaSqmSum } } : {}),
+    ...(developerLookup
+      ? {
+          developers: toBuckets(developers),
+          developersMatched: toBuckets(developersMatched),
+          developersGuessed: toBuckets(developersGuessed),
+          projectsUnmatched: toBuckets(projectsUnmatched),
+          developerSources,
+        }
+      : {}),
     coverage: {
       rows: rows.length,
       available,

@@ -871,6 +871,8 @@ export const DLD_CHART_LATEST_N = 25
 /** DLD sizes are sqm; the Bayut-style figures are per sqft. */
 export const SQFT_PER_SQM = 10.7639
 
+export type DldDeveloperSource = "dld" | "fhi" | "name" | "unmatched" | "unknown"
+
 export interface DldChartBucket {
   label: string
   count: number
@@ -957,6 +959,20 @@ export interface DldBreakdownResponse {
   latest?: DldRow[]
   /** Present when the spec has `areaKey` — Breakdowns' own price-per-sqft, over ALL rows in this batch (not category-restricted). */
   areaAgg?: { valueWithAreaSum: number; areaSqmSum: number }
+  /**
+   * Transactions only: rows tallied by the developer behind their project
+   * (lib/dld-developer-lookup.ts). Every bucket, mergeable like `top`.
+   * "Unknown" = no project name on the row.
+   */
+  developers?: DldChartBucket[]
+  /** The same tally restricted to rows whose developer came from a register (DLD or FHI) via the project. */
+  developersMatched?: DldChartBucket[]
+  /** …and restricted to rows whose developer was only guessed from the project's name. */
+  developersGuessed?: DldChartBucket[]
+  /** Projects (by name) that no register or catalogue knows — the rows behind "Unmatched project". */
+  projectsUnmatched?: DldChartBucket[]
+  /** How the developer was found, per row in this batch — the card's "matched" line. */
+  developerSources?: Record<DldDeveloperSource, number>
   coverage: {
     /** Rows in this batch. */
     rows: number

@@ -1,0 +1,135 @@
+import "server-only"
+import { createAdminSupabase } from "@/lib/admin-supabase"
+
+/**
+ * Project name → developer, for the "Top developers" ranking of DLD
+ * transactions (app/api/admin/dld/charts, `breakdown()` for Transactions).
+ *
+ * A transaction row names its project (PROJECT_EN) but never its developer,
+ * so the developer is looked up through the project, in three layers:
+ *
+ *   1. "dld"  — the archived DLD projects register (dld_projects, migration
+ *               065): PROJECT_EN → DEVELOPER_EN. Exact, but the gateway only
+ *               serves the current year's projects, so older ones are absent.
+ *               DLD's developer is the legal entity (often an SPV LLC).
+ *   2. "fhi"  — FHI's own projects + developers tables, matched by normalised
+ *               project name. Brand-level names, and it covers the older
+ *               projects FHI has catalogued.
+ *   3. "name" — the project's leading word matches the leading word of a
+ *               developer that IS known (register or catalogue): "Binghatti
+ *               Skyflame 1" → "Binghatti Developers". Shown with a "(by
+ *               name)" suffix so it is never mistaken for a register match.
+ *               A leading word that matches no known developer is NOT a
+ *               guess — "Verdana", "Sky", "Boulevard" are project names, not
+ *               developers — so the row is "unmatched" instead.
+ *
+ * No project name at all → "Unknown". A project name nobody recognises →
+ * "Unmatched project" (its name is kept so the page can list which projects
+ * need adding to the catalogue). The lookup is built once per server
+ * instance and refreshed every LOOKUP_TTL_MS; it is a few hundred rows.
+ */
+
+export type DeveloperSource = "dld" | "fhi" | "name" | "unmatched" | "unknown"
+export type DeveloperMatch = { developer: string; source: DeveloperSource; /** The row's project name, when it had one. */ project: string | null }
+
+const LOOKUP_TTL_MS = 10 * 60 * 1000
+export const UNKNOWN_DEVELOPER = "Unknown"
+export const UNMATCHED_DEVELOPER = "Unmatched project"
+
+type Lookup = {
+  /** normalised project name → developer (dld first, fhi fills gaps) */
+  byProject: Map<string, { developer: string; source: "dld" | "fhi" }>
+  /** lower-cased first word of a known developer name → that developer name */
+  byFirstWord: Map<string, string>
+  at: number
+}
+
+let cached: Lookup | null = null
+let inflight: Promise<Lookup> | null = null
+
+export function normalizeName(v: unknown): string {
+  return String(v ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+}
+
+function firstWord(v: string): string {
+  const w = normalizeName(v).split(" ")[0] ?? ""
+  // Skip articles and single letters — "The Residences", "Al Habtoor" would
+  // otherwise all collapse onto "the" / "al".
+  return w.length >= 3 && !["the", "al", "one", "new"].includes(w) ? w : ""
+}
+
+async function build(): Promise<Lookup> {
+  const byProject: Lookup["byProject"] = new Map()
+  const byFirstWord: Lookup["byFirstWord"] = new Map()
+  const supabase = createAdminSupabase()
+
+  // Layer 1 — DLD register.
+  try {
+    const { data } = await supabase.from("dld_projects").select("project_en, developer_en").limit(20_000)
+    for (const r of (data ?? []) as Array<{ project_en: string | null; developer_en: string | null }>) {
+      const key = normalizeName(r.project_en)
+      const dev = r.developer_en?.trim()
+      if (!key || !dev) continue
+      if (!byProject.has(key)) byProject.set(key, { developer: dev, source: "dld" })
+      const fw = firstWord(dev)
+      if (fw && !byFirstWord.has(fw)) byFirstWord.set(fw, dev)
+    }
+  } catch {
+    /* archive unavailable — the other layers still work */
+  }
+
+  // Layer 2 — FHI catalogue.
+  try {
+    const [{ data: devs }, { data: projects }] = await Promise.all([
+      supabase.from("developers").select("id, name").limit(5_000),
+      supabase.from("projects").select("name, developer_id").limit(20_000),
+    ])
+    const devName = new Map<string, string>()
+    for (const d of (devs ?? []) as Array<{ id: string; name: string | null }>) {
+      const n = d.name?.trim()
+      if (!n) continue
+      devName.set(String(d.id), n)
+      const fw = firstWord(n)
+      // FHI names are brand-level — prefer them over an SPV for the by-name layer.
+      if (fw) byFirstWord.set(fw, n)
+    }
+    for (const p of (projects ?? []) as Array<{ name: string | null; developer_id: string | null }>) {
+      const key = normalizeName(p.name)
+      const dev = p.developer_id ? devName.get(String(p.developer_id)) : undefined
+      if (!key || !dev) continue
+      if (!byProject.has(key)) byProject.set(key, { developer: dev, source: "fhi" })
+    }
+  } catch {
+    /* catalogue unavailable — fall through */
+  }
+
+  return { byProject, byFirstWord, at: Date.now() }
+}
+
+export async function getDeveloperLookup(): Promise<Lookup> {
+  if (cached && Date.now() - cached.at < LOOKUP_TTL_MS) return cached
+  if (!inflight) {
+    inflight = build()
+      .then((l) => {
+        cached = l
+        return l
+      })
+      .finally(() => {
+        inflight = null
+      })
+  }
+  return inflight
+}
+
+export function resolveDeveloper(lookup: Lookup, projectName: unknown): DeveloperMatch {
+  const raw = String(projectName ?? "").trim()
+  if (!raw) return { developer: UNKNOWN_DEVELOPER, source: "unknown", project: null }
+  const hit = lookup.byProject.get(normalizeName(raw))
+  if (hit) return { ...hit, project: raw }
+  const known = lookup.byFirstWord.get(firstWord(raw))
+  if (known) return { developer: `${known} (by name)`, source: "name", project: raw }
+  return { developer: UNMATCHED_DEVELOPER, source: "unmatched", project: raw }
+}

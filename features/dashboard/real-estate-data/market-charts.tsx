@@ -12,7 +12,7 @@
 // blue/orange for above/below zero, thin marks with rounded ends, a hover
 // tooltip everywhere, and a table view behind every chart for accessibility.
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Loader2, RefreshCw, Search, Table2, BarChart3 } from "lucide-react"
 import {
   Bar,
@@ -24,6 +24,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  type YAxisProps,
 } from "recharts"
 import { FilterSelect } from "@/components/ui/filter-select"
 import { agoLabel, cacheDelete, cacheGet, cacheSet } from "./client-cache"
@@ -62,11 +63,12 @@ const C = {
 const int = new Intl.NumberFormat("en-AE", { maximumFractionDigits: 0 })
 const compact = new Intl.NumberFormat("en-AE", { notation: "compact", maximumFractionDigits: 1 })
 const pct = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`
+
 const shortDate = (iso: string) => {
   const d = new Date(`${iso}T00:00:00`)
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })
 }
-const longDate = (iso: string) => {
+export const longDate = (iso: string) => {
   const d = new Date(`${iso}T00:00:00`)
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
 }
@@ -75,7 +77,7 @@ const TOOLTIP_STYLE = { borderRadius: 12, border: "1px solid #e8eaed", fontSize:
 
 // ─── Shared card ─────────────────────────────────────────────────────────────
 
-function ChartCard({
+export function ChartCard({
   title,
   subtitle,
   table,
@@ -138,11 +140,11 @@ function ChartCard({
   )
 }
 
-function Skeleton({ h = 240 }: { h?: number }) {
+export function Skeleton({ h = 240 }: { h?: number }) {
   return <div className="rounded-xl bg-[#eef1f5] animate-pulse" style={{ height: h }} />
 }
 
-function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }) {
+export function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
       <span>{message}</span>
@@ -198,7 +200,7 @@ const CHARTABLE = (Object.keys(DLD_CHART_SPECS) as DldCommand[])
 type Tally = Record<string, { count: number; value: number }>
 
 /** Accumulated aggregates across the batches loaded so far (JSON-serializable, it's cached). */
-type Accum = {
+export type Accum = {
   command: DldCommand
   daily: Tally
   breakdowns: Record<string, Tally>
@@ -217,6 +219,12 @@ type Accum = {
   latest: DldRow[]
   /** Breakdowns' own price-per-sqft sums — every row in scope, no category filter. */
   areaAgg: { valueWithAreaSum: number; areaSqmSum: number } | null
+  /** Transactions only: rows by the developer behind their project (see lib/dld-developer-lookup.ts). */
+  developers: Tally | null
+  developersMatched: Tally | null
+  developersGuessed: Tally | null
+  projectsUnmatched: Tally | null
+  developerSources: Record<string, number> | null
 }
 
 const addTo = (m: Tally, label: string, b: { count: number; value: number }) => {
@@ -239,6 +247,11 @@ function mergeBatch(acc: Accum | null, res: DldBreakdownResponse): Accum {
         kpi: acc.kpi ? { ...acc.kpi, locations: { ...acc.kpi.locations } } : null,
         latest: [...acc.latest],
         areaAgg: acc.areaAgg ? { ...acc.areaAgg } : null,
+        developers: acc.developers ? { ...acc.developers } : null,
+        developersMatched: acc.developersMatched ? { ...acc.developersMatched } : null,
+        developersGuessed: acc.developersGuessed ? { ...acc.developersGuessed } : null,
+        projectsUnmatched: acc.projectsUnmatched ? { ...acc.projectsUnmatched } : null,
+        developerSources: acc.developerSources ? { ...acc.developerSources } : null,
       }
     : {
         command: res.command,
@@ -256,6 +269,11 @@ function mergeBatch(acc: Accum | null, res: DldBreakdownResponse): Accum {
         kpi: null,
         latest: [],
         areaAgg: null,
+        developers: null,
+        developersMatched: null,
+        developersGuessed: null,
+        projectsUnmatched: null,
+        developerSources: null,
       }
   for (const d of res.daily) addTo(next.daily, d.date, d)
   for (const [k, buckets] of Object.entries(res.breakdowns)) {
@@ -293,15 +311,28 @@ function mergeBatch(acc: Accum | null, res: DldBreakdownResponse): Accum {
       areaSqmSum: a.areaSqmSum + res.areaAgg.areaSqmSum,
     }
   }
+  if (res.developers) {
+    next.developers ??= {}
+    for (const b of res.developers) addTo(next.developers, b.label, b)
+    next.developersMatched ??= {}
+    for (const b of res.developersMatched ?? []) addTo(next.developersMatched, b.label, b)
+    next.developersGuessed ??= {}
+    for (const b of res.developersGuessed ?? []) addTo(next.developersGuessed, b.label, b)
+    next.projectsUnmatched ??= {}
+    for (const b of res.projectsUnmatched ?? []) addTo(next.projectsUnmatched, b.label, b)
+    const src = next.developerSources ?? {}
+    for (const [k, n] of Object.entries(res.developerSources ?? {})) src[k] = (src[k] ?? 0) + n
+    next.developerSources = src
+  }
   return next
 }
 
-const toBuckets = (m: Tally): DldChartBucket[] =>
+export const toBuckets = (m: Tally): DldChartBucket[] =>
   Object.entries(m).map(([label, v]) => ({ label, count: v.count, value: v.value })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
 
 // ─── Batched loading hook ────────────────────────────────────────────────────
 
-type BatchJob = { command: DldCommand; values: Record<string, string> }
+export type BatchJob = { command: DldCommand; values: Record<string, string> }
 /** What the page remembers between visits: the job and what it loaded. */
 type BatchMemo = { jobKey: string; job: BatchJob; acc: Accum | null }
 
@@ -316,7 +347,7 @@ const jobKeyOf = (job: BatchJob | null) => (job ? JSON.stringify([job.command, j
  * one, it's restored with no request. `auto` decides whether an unfinished
  * restored job resumes by itself or waits for Continue.
  */
-function useBatchJob(cacheKey: string, want: BatchJob | null, auto: boolean) {
+export function useBatchJob(cacheKey: string, want: BatchJob | null, auto: boolean) {
   const [memo] = useState(() => cacheGet<BatchMemo>(cacheKey))
   const wantKey = jobKeyOf(want)
 
@@ -390,7 +421,7 @@ function useBatchJob(cacheKey: string, want: BatchJob | null, auto: boolean) {
 }
 
 /** "3,412 of 9,439 rows · 01 Jan – 22 Jan · loading more…" + progress bar. */
-function CoverageLine({
+export function CoverageLine({
   acc,
   loading,
   stopped,
@@ -858,31 +889,130 @@ function DailyChart({
   )
 }
 
-function RankChart({ buckets, hasValue, rowHeight = 30 }: { buckets: DldChartBucket[]; hasValue: boolean; rowHeight?: number }) {
+/** Width of a container, kept current through a ResizeObserver (0 until mounted). */
+function useWidth(ref: React.RefObject<HTMLDivElement | null>): number {
+  const [width, setWidth] = useState(0)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0
+      setWidth((prev) => (Math.abs(prev - w) < 1 ? prev : w))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref])
+  return width
+}
+
+function measureLabel(text: string, font: string): number {
+  const ctx = labelMeasure ?? (labelMeasure = document.createElement("canvas").getContext("2d"))
+  if (!ctx) return text.length * 6.2
+  ctx.font = font
+  return ctx.measureText(text).width
+}
+
+/** Longest prefix of `text` that fits `maxPx` at the given font, with an ellipsis when cut. */
+function fitLabel(text: string, maxPx: number, font: string): string {
+  const ctx = labelMeasure ?? (labelMeasure = document.createElement("canvas").getContext("2d"))
+  if (!ctx) return text
+  ctx.font = font
+  if (ctx.measureText(text).width <= maxPx) return text
+  let lo = 0
+  let hi = text.length
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2)
+    if (ctx.measureText(`${text.slice(0, mid)}…`).width <= maxPx) lo = mid
+    else hi = mid - 1
+  }
+  return `${text.slice(0, lo).trimEnd()}…`
+}
+let labelMeasure: CanvasRenderingContext2D | null | undefined
+
+const RANK_TICK_FONT = "11px Inter, ui-sans-serif, system-ui, sans-serif"
+
+export function RankChart({
+  buckets,
+  hasValue,
+  rowHeight = 30,
+  labelShare,
+  tooltipNote,
+}: {
+  buckets: DldChartBucket[]
+  hasValue: boolean
+  rowHeight?: number
+  /** Extra text appended to a bar's tooltip (e.g. a matched/guessed split). */
+  tooltipNote?: (bucket: DldChartBucket) => string | null
+  /**
+   * Cap on the fraction of the chart width the labels may take. The label
+   * column is sized to the LONGEST name, so the bars get everything the
+   * names don't need; only when the longest name would pass the cap does
+   * the column stop there and that name truncate (ellipsis, one line).
+   * Unset keeps the default 150px label column, where the chart library
+   * wraps long names onto two lines.
+   */
+  labelShare?: number
+}) {
+  const hostRef = useRef<HTMLDivElement>(null)
+  const width = useWidth(hostRef)
   if (buckets.length === 0) return <Empty />
   const h = Math.max(160, buckets.length * rowHeight)
+  const marginLeft = 8
+  // Recharts leaves a few px of padding between the tick text and the axis.
+  const tickPad = 12
+  let yWidth = 150
+  if (labelShare && width > 0) {
+    const cap = Math.max(80, Math.floor(width * labelShare) - marginLeft)
+    const longest = Math.ceil(Math.max(0, ...buckets.map((b) => measureLabel(b.label, RANK_TICK_FONT))))
+    yWidth = Math.min(cap, longest + tickPad)
+  }
+  const labelPx = yWidth - tickPad
+  const tick: YAxisProps["tick"] = labelShare
+    ? (props) => {
+        const value = String((props.payload as { value?: unknown } | undefined)?.value ?? "")
+        return (
+          <text x={props.x} y={props.y} dy={4} textAnchor="end" fontSize={11} fill="#374151">
+            <title>{value}</title>
+            {fitLabel(value, labelPx, RANK_TICK_FONT)}
+          </text>
+        )
+      }
+    : { fontSize: 11, fill: "#374151" }
   return (
+    <div ref={hostRef} className="w-full">
     <ResponsiveContainer width="100%" height={h}>
-      <BarChart data={buckets} layout="vertical" margin={{ top: 4, right: 48, bottom: 4, left: 8 }} barCategoryGap="30%">
+      <BarChart data={buckets} layout="vertical" margin={{ top: 4, right: 48, bottom: 4, left: marginLeft }} barCategoryGap="30%">
         <CartesianGrid horizontal={false} stroke={C.grid} />
         <XAxis type="number" tick={{ fontSize: 11, fill: C.tick }} tickLine={false} axisLine={false} tickFormatter={(v) => compact.format(Number(v))} />
-        <YAxis type="category" dataKey="label" width={150} tick={{ fontSize: 11, fill: "#374151" }} tickLine={false} axisLine={false} tickFormatter={(v) => (String(v).length > 22 ? `${String(v).slice(0, 21)}…` : String(v))} />
+        <YAxis
+          type="category"
+          dataKey="label"
+          width={yWidth}
+          tick={tick}
+          tickLine={false}
+          axisLine={false}
+          interval={0}
+          tickFormatter={labelShare ? undefined : (v) => (String(v).length > 22 ? `${String(v).slice(0, 21)}…` : String(v))}
+        />
         <Tooltip
           cursor={{ fill: "rgba(0,31,63,0.04)" }}
           contentStyle={TOOLTIP_STYLE}
           formatter={(v, _n, item) => {
             const b = item.payload as DldChartBucket
-            return [hasValue ? `${int.format(Number(v))} rows · AED ${compact.format(b.value)}` : `${int.format(Number(v))} rows`, b.label]
+            const base = hasValue ? `${int.format(Number(v))} rows · AED ${compact.format(b.value)}` : `${int.format(Number(v))} rows`
+            const note = tooltipNote?.(b)
+            return [note ? `${base} · ${note}` : base, b.label]
           }}
         />
         <Bar dataKey="count" fill={C.blue} radius={[0, 4, 4, 0]} maxBarSize={18} label={{ position: "right", fontSize: 11, fill: "#374151", formatter: (v: unknown) => int.format(Number(v)) }} />
       </BarChart>
     </ResponsiveContainer>
+    </div>
   )
 }
 
 /** Part-to-whole as labeled horizontal bars — no pie. Tail past 6 folds into "Other". */
-function ShareBars({ buckets, total }: { buckets: DldChartBucket[]; total: number }) {
+export function ShareBars({ buckets, total }: { buckets: DldChartBucket[]; total: number }) {
   if (buckets.length === 0 || total === 0) return <Empty />
   const head = buckets.slice(0, 6)
   const tail = buckets.slice(6)
@@ -1117,7 +1247,7 @@ export function TabSummary({
   )
 }
 
-function MiniStat({ label, value, hint }: { label: string; value: string | null; hint?: string }) {
+export function MiniStat({ label, value, hint }: { label: string; value: string | null; hint?: string }) {
   return (
     <div className="rounded-xl bg-[#f8fafc] border border-[#f0f2f5] px-4 py-3">
       <div className="text-[11px] uppercase tracking-wide text-[#6b7280] truncate" title={label}>
