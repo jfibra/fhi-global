@@ -179,6 +179,9 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { icon: ClipboardList, label: "Listings",   to: "listings",   description: "Every listing across all agents." },
     ],
   },
+  // Every developer partner's sign-in (username or email), when they last used
+  // it, and Set new password — passwords themselves are never readable.
+  { icon: KeyRound, label: "Developers Login", to: "developer-logins" },
   OWNER_DOCUMENTS,
   {
     group: "Finance",

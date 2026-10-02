@@ -52,6 +52,7 @@ const ROLE_SLUG_SET = new Set(ROLE_SLUGS)
  */
 const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   users: ["super_admin", "admin"],
+  "developer-logins": ["super_admin", "admin"],
   teams: ["super_admin", "admin"],
   developers: ["super_admin", "admin", "editor"],
   // Admin staff manage every event; Website Builder users only their own

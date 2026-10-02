@@ -41,7 +41,8 @@ interface Props {
   open: boolean;
   preset: AccountPreset;
   onClose: () => void;
-  onSaved: (username: string) => void;
+  /** Gets the password too, so a caller can show the login details to hand over. */
+  onSaved: (username: string, password: string) => void;
   onError: (msg: string) => void;
 }
 
@@ -171,7 +172,7 @@ export function DeveloperAccountDialog({
         onError(json.error ?? "Failed to create developer account.");
         return;
       }
-      onSaved(json.username ?? uname);
+      onSaved(json.username ?? uname, password);
       // Keep the dialog open so the admin sees the new account appear and can add
       // another for the same company; clear the credential fields.
       setUsername("");
