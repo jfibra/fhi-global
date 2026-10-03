@@ -24,6 +24,7 @@ const int = new Intl.NumberFormat("en-AE", { maximumFractionDigits: 0 })
 const compact = new Intl.NumberFormat("en-AE", { notation: "compact", maximumFractionDigits: 1 })
 
 const CACHE_KEY = "charts:projects:last"
+const MEASURES = ["count", "value"] as const
 
 type ProjectRow = DldChartBucket & {
   /** Display label of the developer this project resolved to, or null when none is on record. */
@@ -35,15 +36,16 @@ type ProjectRow = DldChartBucket & {
 export function ProjectsBreakdownSection() {
   const [range, setRange] = useState(last30Days)
   const [group, setGroup] = useState("1")
-  const [rankBy, setRankBy] = useState<"count" | "value">("count")
+  // Every ranking is shown twice — by row count and by AED — so no toggle.
   // Area whose projects the right-hand card shows; null = the top-ranked area.
   const [pickedArea, setPickedArea] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState<BatchJob>(() => jobFor(range, group))
   const job = useBatchJob(CACHE_KEY, submitted, true)
   const { acc, loading } = job
 
-  const byMeasure = (a: DldChartBucket, b: DldChartBucket) => (rankBy === "value" ? b.value - a.value : b.count - a.count) || a.label.localeCompare(b.label)
-  const measureWord = rankBy === "value" ? "value" : "count"
+  const byCount = (a: DldChartBucket, b: DldChartBucket) => b.count - a.count || a.label.localeCompare(b.label)
+  const byValue = (a: DldChartBucket, b: DldChartBucket) => b.value - a.value || a.label.localeCompare(b.label)
+  const sorter = (m: "count" | "value") => (m === "value" ? byValue : byCount)
   const groupLabel = GROUPS.find((g) => g.value === group)?.label.toLowerCase() ?? "rows"
 
   const projects = useMemo<ProjectRow[]>(() => {
@@ -88,10 +90,10 @@ export function ProjectsBreakdownSection() {
         const raw = devs[b.label]
         return { ...relabel(b), developer: raw ? titleCase(raw.replace(/ \(by name\)$/, "")) : null, guessed: !!raw && raw.endsWith("(by name)") }
       })
-      .sort(byMeasure)
   }
-  const topAreas = [...areas].sort(byMeasure).slice(0, DLD_CHART_TOP_N)
-  const selectedArea = (pickedArea && topAreas.find((a) => a.label === pickedArea)) || topAreas[0] || null
+  const topAreasBy = (m: "count" | "value") => [...areas].sort(sorter(m)).slice(0, DLD_CHART_TOP_N)
+  // One picked area for both rows: the click in either list drives both right-hand cards.
+  const selectedArea = (pickedArea && areas.find((a) => a.label === pickedArea)) || topAreasBy("count")[0] || null
   const selectedRows = selectedArea ? areaProjectRows(selectedArea.label) : []
   // What the picked area has beyond its named projects (plots, project-less units).
   const selectedAll = selectedArea ? areaAll.get(selectedArea.label) : undefined
@@ -131,22 +133,6 @@ export function ProjectsBreakdownSection() {
           <div className="w-full sm:w-[200px] sm:shrink-0">
             <label className="block text-sm font-medium text-[#0d1117] mb-1.5">Transaction type</label>
             <FilterSelect value={group} onValueChange={setGroup} options={GROUPS} ariaLabel="Transaction type" className="w-full max-w-none h-10 rounded-xl py-0" />
-          </div>
-          <div className="w-full sm:w-auto sm:shrink-0">
-            <span className="block text-sm font-medium text-[#0d1117] mb-1.5">Rank by</span>
-            <div className="inline-flex h-10 rounded-xl border border-[#e5e7eb] bg-[#f8fafc] p-1" role="group" aria-label="Rank by">
-              {(["count", "value"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setRankBy(m)}
-                  aria-pressed={rankBy === m}
-                  className={`px-3 rounded-lg text-xs font-semibold transition-colors ${rankBy === m ? "bg-white text-[#001f3f] shadow-sm" : "text-[#6b7280] hover:text-[#001f3f]"}`}
-                >
-                  {m === "count" ? "Sales count" : "Sales value (AED)"}
-                </button>
-              ))}
-            </div>
           </div>
           {(["from", "to"] as const).map((k) => (
             <div key={k} className="w-full sm:w-[160px] sm:shrink-0">
@@ -196,50 +182,26 @@ export function ProjectsBreakdownSection() {
           )}
         </CoverageLine>
 
-        <ChartCard
-          title={`Top ${DLD_CHART_TOP_N} overall projects by ${measureWord} — ${groupLabel}`}
-          subtitle={`${longDate(submitted.values.P_FROM_DATE ?? "")} – ${longDate(submitted.values.P_TO_DATE ?? "")}. One row per project as DLD names it, ranked by ${rankBy === "value" ? "total AED" : "transaction count"}; open a row for its developer. ${
-            acc && total > 0 ? `Covers ${int.format(withProjectRows)} of ${int.format(total)} rows (${((withProjectRows / total) * 100).toFixed(0)}%) — the other ${int.format(noProjectRows)} name no project.` : ""
-          }`}
-          table={{
-            head: ["Project", "Developer", "Rows", "AED"],
-            rows: [...projects].sort(byMeasure).map((p) => [p.label, p.developer ? `${p.developer}${p.guessed ? " (by name)" : ""}` : "— not on record", p.count, int.format(p.value)]),
-          }}
-        >
-          {!acc ? <Skeleton h={300} /> : <ProjectRankList rows={[...projects].sort(byMeasure).slice(0, DLD_CHART_TOP_N)} measure={rankBy} totalOf={{ count: total, value: totalValue }} />}
-        </ChartCard>
-
-        {/* Areas on the left pick which area's projects the right card shows. */}
+        {/* 1. Overall projects — by count on the left, by AED on the right. */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <ChartCard
-            title={`Top ${DLD_CHART_TOP_N} areas by ${measureWord} — ${groupLabel}`}
-            subtitle={`Areas as DLD names them, ranked by ${rankBy === "value" ? "total AED" : "transaction count"} of the rows that name a project (plots and project-less units are left out, so the figures match the project list). Click an area to see its top ${DLD_CHART_TOP_N} projects on the right.`}
-            table={{ head: ["Area", "Rows", "AED"], rows: [...areas].sort(byMeasure).map((a) => [a.label, a.count, int.format(a.value)]) }}
-          >
-            {!acc ? <Skeleton h={300} /> : <AreaPickList rows={topAreas} measure={rankBy} totalOf={{ count: withProjectRows, value: withProjectValue }} selected={selectedArea?.label ?? null} onPick={setPickedArea} />}
-          </ChartCard>
-
-          <ChartCard
-            title={selectedArea ? `Top ${DLD_CHART_TOP_N} ${selectedArea.label} projects by ${measureWord}` : `Top ${DLD_CHART_TOP_N} projects in an area`}
-            subtitle={
-              selectedArea
-                ? `${int.format(selectedArea.count)} ${groupLabel} · AED ${compact.format(selectedArea.value)} in ${selectedArea.label}'s named projects${selectedRows.length > DLD_CHART_TOP_N ? ` · top ${DLD_CHART_TOP_N} of ${int.format(selectedRows.length)} projects` : ""}. Share is of that total; open a row for its developer.${
-                    selectedRest && selectedRest.count > 0 ? ` Not shown: ${int.format(selectedRest.count)} ${groupLabel} · AED ${compact.format(selectedRest.value)} in the area with no project on the row (plots, project-less units).` : ""
-                  }`
-                : "Pick an area on the left."
-            }
-            table={{ head: ["Project", "Developer", "Rows", "AED"], rows: selectedRows.map((p) => [p.label, p.developer ? `${p.developer}${p.guessed ? " (by name)" : ""}` : "— not on record", p.count, int.format(p.value)]) }}
-          >
-            {!acc ? (
-              <Skeleton h={300} />
-            ) : selectedArea ? (
-              <ProjectRankList key={selectedArea.label} rows={selectedRows.slice(0, DLD_CHART_TOP_N)} measure={rankBy} totalOf={{ count: selectedArea.count, value: selectedArea.value }} />
-            ) : (
-              <div className="flex items-center justify-center text-sm text-[#9ca3af]" style={{ height: 200 }}>No areas for these filters.</div>
-            )}
-          </ChartCard>
+          {MEASURES.map((m) => (
+            <ChartCard
+              key={m}
+              title={`Top ${DLD_CHART_TOP_N} overall projects by ${m} — ${groupLabel}`}
+              subtitle={`${longDate(submitted.values.P_FROM_DATE ?? "")} – ${longDate(submitted.values.P_TO_DATE ?? "")}. One row per project as DLD names it, ranked by ${m === "value" ? "total AED" : "transaction count"}; open a row for its developer. ${
+                acc && total > 0 ? `Covers ${int.format(withProjectRows)} of ${int.format(total)} rows (${((withProjectRows / total) * 100).toFixed(0)}%) — the other ${int.format(noProjectRows)} name no project.` : ""
+              }`}
+              table={{
+                head: ["Project", "Developer", "Rows", "AED"],
+                rows: [...projects].sort(sorter(m)).map((p) => [p.label, p.developer ? `${p.developer}${p.guessed ? " (by name)" : ""}` : "— not on record", p.count, int.format(p.value)]),
+              }}
+            >
+              {!acc ? <Skeleton h={300} /> : <ProjectRankList rows={[...projects].sort(sorter(m)).slice(0, DLD_CHART_TOP_N)} measure={m} totalOf={{ count: total, value: totalValue }} />}
+            </ChartCard>
+          ))}
         </div>
 
+        {/* Totals at a glance. */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
           <MiniStat label="Number of transactions" value={acc ? int.format(total) : null} hint={acc ? `${groupLabel} in the range` : undefined} />
           <MiniStat label="Total value (AED)" value={acc ? aed(totalValue) : null} hint={acc && total > 0 ? `${int.format(Math.round(totalValue / total))} AED per transaction` : undefined} />
@@ -247,6 +209,44 @@ export function ProjectsBreakdownSection() {
           <MiniStat label="With a developer on record" value={acc ? int.format(withDeveloper.length) : null} hint={acc ? `${pctOf(withDeveloperRows, total)} · ${aed(withDeveloperValue)}` : undefined} />
           <MiniStat label="No project on the row" value={acc ? int.format(noProjectRows) : null} hint={acc ? `${pctOf(noProjectRows, total)} · ${aed(Math.max(0, totalValue - withProjectValue))}` : undefined} />
         </div>
+
+        {/* 2. Areas (pick one) | that area's projects — one row by count, one by AED. The pick is shared. */}
+        {MEASURES.map((m) => {
+          const top = topAreasBy(m)
+          const rows = [...selectedRows].sort(sorter(m))
+          return (
+            <div key={m} className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <ChartCard
+                title={`Top ${DLD_CHART_TOP_N} areas by ${m} — ${groupLabel}`}
+                subtitle={`Areas as DLD names them, ranked by ${m === "value" ? "total AED" : "transaction count"} of the rows that name a project (plots and project-less units are left out, so the figures match the project list). Click an area to see its top ${DLD_CHART_TOP_N} projects on the right.`}
+                table={{ head: ["Area", "Rows", "AED"], rows: [...areas].sort(sorter(m)).map((a) => [a.label, a.count, int.format(a.value)]) }}
+              >
+                {!acc ? <Skeleton h={300} /> : <AreaPickList rows={top} measure={m} totalOf={{ count: withProjectRows, value: withProjectValue }} selected={selectedArea?.label ?? null} onPick={setPickedArea} />}
+              </ChartCard>
+
+              <ChartCard
+                title={selectedArea ? `Top ${DLD_CHART_TOP_N} ${selectedArea.label} projects by ${m}` : `Top ${DLD_CHART_TOP_N} projects in an area`}
+                subtitle={
+                  selectedArea
+                    ? `${int.format(selectedArea.count)} ${groupLabel} · AED ${compact.format(selectedArea.value)} in ${selectedArea.label}'s named projects${rows.length > DLD_CHART_TOP_N ? ` · top ${DLD_CHART_TOP_N} of ${int.format(rows.length)} projects` : ""}. Share is of that total; open a row for its developer.${
+                        selectedRest && selectedRest.count > 0 ? ` Not shown: ${int.format(selectedRest.count)} ${groupLabel} · AED ${compact.format(selectedRest.value)} in the area with no project on the row (plots, project-less units).` : ""
+                      }`
+                    : "Pick an area on the left."
+                }
+                table={{ head: ["Project", "Developer", "Rows", "AED"], rows: rows.map((p) => [p.label, p.developer ? `${p.developer}${p.guessed ? " (by name)" : ""}` : "— not on record", p.count, int.format(p.value)]) }}
+              >
+                {!acc ? (
+                  <Skeleton h={300} />
+                ) : selectedArea ? (
+                  <ProjectRankList key={`${m}:${selectedArea.label}`} rows={rows.slice(0, DLD_CHART_TOP_N)} measure={m} totalOf={{ count: selectedArea.count, value: selectedArea.value }} />
+                ) : (
+                  <div className="flex items-center justify-center text-sm text-[#9ca3af]" style={{ height: 200 }}>No areas for these filters.</div>
+                )}
+              </ChartCard>
+            </div>
+          )
+        })}
+
       </div>
     </section>
   )
@@ -270,7 +270,8 @@ function ProjectRankList({ rows, measure, totalOf }: { rows: ProjectRow[]; measu
   const max = Math.max(1, ...rows.map((r) => r[measure]))
   const fmt = (v: number) => (measure === "value" ? `AED ${compact.format(v)}` : int.format(v))
   const pctOfTotal = (v: number) => (totalOf[measure] > 0 ? `${((v / totalOf[measure]) * 100).toFixed(1)}%` : "—")
-  const numW = Math.ceil(Math.max(0, ...rows.map((r) => textPx(`${fmt(r[measure])} · ${pctOfTotal(r[measure])}`)))) + 4
+  const shownTotal = rows.reduce((sum, r) => sum + r[measure], 0)
+  const numW = Math.ceil(Math.max(0, ...rows.map((r) => textPx(`${fmt(r[measure])} · ${pctOfTotal(r[measure])}`)), textPx(`${fmt(shownTotal)} · ${pctOfTotal(shownTotal)}`))) + 4
   const color = measure === "value" ? "#1baf7a" : "#2a78d6"
 
   return (
@@ -322,6 +323,14 @@ function ProjectRankList({ rows, measure, totalOf }: { rows: ProjectRow[]; measu
           )
         })}
       </ul>
+      {/* Total of the rows shown, in the same columns as the rows. */}
+      <div className="mt-1 grid items-center gap-3 border-t border-[#e5e7eb] pt-2 -mx-1 px-1" style={{ gridTemplateColumns: `${labelW}px minmax(0,1fr) ${numW}px` }}>
+        <span className="text-xs font-semibold text-[#0d1117]">Total of top {rows.length}</span>
+        <span />
+        <span className="text-xs font-semibold tabular-nums text-[#0d1117] whitespace-nowrap text-right">
+          {fmt(shownTotal)} <span className="font-normal text-[#9ca3af]">· {pctOfTotal(shownTotal)}</span>
+        </span>
+      </div>
     </div>
   )
 }
@@ -354,7 +363,8 @@ function AreaPickList({
   const max = Math.max(1, ...rows.map((r) => r[measure]))
   const fmt = (v: number) => (measure === "value" ? `AED ${compact.format(v)}` : int.format(v))
   const pctOfTotal = (v: number) => (totalOf[measure] > 0 ? `${((v / totalOf[measure]) * 100).toFixed(1)}%` : "—")
-  const numW = Math.ceil(Math.max(0, ...rows.map((r) => textPx(`${fmt(r[measure])} · ${pctOfTotal(r[measure])}`)))) + 4
+  const shownTotal = rows.reduce((sum, r) => sum + r[measure], 0)
+  const numW = Math.ceil(Math.max(0, ...rows.map((r) => textPx(`${fmt(r[measure])} · ${pctOfTotal(r[measure])}`)), textPx(`${fmt(shownTotal)} · ${pctOfTotal(shownTotal)}`))) + 4
   const color = measure === "value" ? "#1baf7a" : "#2a78d6"
 
   return (
@@ -384,6 +394,14 @@ function AreaPickList({
           )
         })}
       </ul>
+      {/* Total of the rows shown, in the same columns as the rows. */}
+      <div className="mt-1 grid items-center gap-3 border-t border-[#e5e7eb] pt-2 -mx-1 px-1" style={{ gridTemplateColumns: `${labelW}px minmax(0,1fr) ${numW}px` }}>
+        <span className="text-xs font-semibold text-[#0d1117]">Total of top {rows.length}</span>
+        <span />
+        <span className="text-xs font-semibold tabular-nums text-[#0d1117] whitespace-nowrap text-right">
+          {fmt(shownTotal)} <span className="font-normal text-[#9ca3af]">· {pctOfTotal(shownTotal)}</span>
+        </span>
+      </div>
     </div>
   )
 }
