@@ -59,8 +59,24 @@ export function ProjectsBreakdownSection() {
     })
   }, [acc])
 
-  // Areas (the dataset's top-N field is AREA_EN) and the projects on each area's rows.
-  const areas = useMemo(() => (acc ? toBuckets(acc.top).map(relabel) : []), [acc])
+  // Areas, counted from rows that NAME A PROJECT only — this tab is about
+  // projects, and an area's land plots and project-less units would otherwise
+  // make its total far bigger than anything its project list can show (Al
+  // Rowaiyah First: AED 1.8B of sales, AED 183M of it in named projects).
+  // `acc.top` (every row) is kept alongside to say how much was left out.
+  const areaAll = useMemo(() => new Map((acc ? toBuckets(acc.top) : []).map((b) => [titleCase(b.label), b])), [acc])
+  const areas = useMemo<DldChartBucket[]>(() => {
+    if (!acc?.areaProjects) return []
+    return Object.entries(acc.areaProjects).map(([area, tally]) => {
+      let count = 0
+      let value = 0
+      for (const v of Object.values(tally)) {
+        count += v.count
+        value += v.value
+      }
+      return { label: titleCase(area), count, value }
+    })
+  }, [acc])
   // An area's projects with the developer each resolved to (the right-hand card).
   const areaProjectRows = (area: string): ProjectRow[] => {
     const devs = acc?.projectDevelopers ?? {}
@@ -77,6 +93,9 @@ export function ProjectsBreakdownSection() {
   const topAreas = [...areas].sort(byMeasure).slice(0, DLD_CHART_TOP_N)
   const selectedArea = (pickedArea && topAreas.find((a) => a.label === pickedArea)) || topAreas[0] || null
   const selectedRows = selectedArea ? areaProjectRows(selectedArea.label) : []
+  // What the picked area has beyond its named projects (plots, project-less units).
+  const selectedAll = selectedArea ? areaAll.get(selectedArea.label) : undefined
+  const selectedRest = selectedArea && selectedAll ? { count: selectedAll.count - selectedArea.count, value: selectedAll.value - selectedArea.value } : null
 
   const total = acc?.count ?? 0
   const totalValue = acc?.value ?? 0
@@ -194,17 +213,19 @@ export function ProjectsBreakdownSection() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <ChartCard
             title={`Top ${DLD_CHART_TOP_N} areas by ${measureWord} — ${groupLabel}`}
-            subtitle={`Areas as DLD names them, ranked by ${rankBy === "value" ? "total AED" : "transaction count"} across every row in the range. Click an area to see its top ${DLD_CHART_TOP_N} projects on the right.`}
+            subtitle={`Areas as DLD names them, ranked by ${rankBy === "value" ? "total AED" : "transaction count"} of the rows that name a project (plots and project-less units are left out, so the figures match the project list). Click an area to see its top ${DLD_CHART_TOP_N} projects on the right.`}
             table={{ head: ["Area", "Rows", "AED"], rows: [...areas].sort(byMeasure).map((a) => [a.label, a.count, int.format(a.value)]) }}
           >
-            {!acc ? <Skeleton h={300} /> : <AreaPickList rows={topAreas} measure={rankBy} totalOf={{ count: total, value: totalValue }} selected={selectedArea?.label ?? null} onPick={setPickedArea} />}
+            {!acc ? <Skeleton h={300} /> : <AreaPickList rows={topAreas} measure={rankBy} totalOf={{ count: withProjectRows, value: withProjectValue }} selected={selectedArea?.label ?? null} onPick={setPickedArea} />}
           </ChartCard>
 
           <ChartCard
             title={selectedArea ? `Top ${DLD_CHART_TOP_N} ${selectedArea.label} projects by ${measureWord}` : `Top ${DLD_CHART_TOP_N} projects in an area`}
             subtitle={
               selectedArea
-                ? `${int.format(selectedArea.count)} ${groupLabel} · AED ${compact.format(selectedArea.value)} in ${selectedArea.label}${selectedRows.length > DLD_CHART_TOP_N ? ` · top ${DLD_CHART_TOP_N} of ${int.format(selectedRows.length)} projects` : ""}. Share is of the area's total; open a row for its developer.`
+                ? `${int.format(selectedArea.count)} ${groupLabel} · AED ${compact.format(selectedArea.value)} in ${selectedArea.label}'s named projects${selectedRows.length > DLD_CHART_TOP_N ? ` · top ${DLD_CHART_TOP_N} of ${int.format(selectedRows.length)} projects` : ""}. Share is of that total; open a row for its developer.${
+                    selectedRest && selectedRest.count > 0 ? ` Not shown: ${int.format(selectedRest.count)} ${groupLabel} · AED ${compact.format(selectedRest.value)} in the area with no project on the row (plots, project-less units).` : ""
+                  }`
                 : "Pick an area on the left."
             }
             table={{ head: ["Project", "Developer", "Rows", "AED"], rows: selectedRows.map((p) => [p.label, p.developer ? `${p.developer}${p.guessed ? " (by name)" : ""}` : "— not on record", p.count, int.format(p.value)]) }}
