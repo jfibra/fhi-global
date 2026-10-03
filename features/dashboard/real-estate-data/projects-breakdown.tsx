@@ -18,7 +18,7 @@ import { ChevronDown, Loader2, Search } from "lucide-react"
 import { FilterSelect } from "@/components/ui/filter-select"
 import { DLD_CHART_TOP_N, type DldChartBucket } from "@/lib/dld-open-data"
 import { ChartCard, CoverageLine, ErrorBox, MiniStat, RefreshButton, Skeleton, longDate, toBuckets, useBatchJob, type BatchJob } from "./market-charts"
-import { DeveloperRankList, GROUPS, jobFor, last30Days, pctOf, relabel, textPx, titleCase, useWidth, type ProjectRow as AreaProjectRow } from "./developers-breakdown"
+import { GROUPS, jobFor, last30Days, pctOf, relabel, textPx, titleCase, useWidth } from "./developers-breakdown"
 
 const int = new Intl.NumberFormat("en-AE", { maximumFractionDigits: 0 })
 const compact = new Intl.NumberFormat("en-AE", { notation: "compact", maximumFractionDigits: 1 })
@@ -36,6 +36,8 @@ export function ProjectsBreakdownSection() {
   const [range, setRange] = useState(last30Days)
   const [group, setGroup] = useState("1")
   const [rankBy, setRankBy] = useState<"count" | "value">("count")
+  // Area whose projects the right-hand card shows; null = the top-ranked area.
+  const [pickedArea, setPickedArea] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState<BatchJob>(() => jobFor(range, group))
   const job = useBatchJob(CACHE_KEY, submitted, true)
   const { acc, loading } = job
@@ -59,13 +61,7 @@ export function ProjectsBreakdownSection() {
 
   // Areas (the dataset's top-N field is AREA_EN) and the projects on each area's rows.
   const areas = useMemo(() => (acc ? toBuckets(acc.top).map(relabel) : []), [acc])
-  const allAreaProjects = (area: string): AreaProjectRow[] => {
-    // `areas` labels are title-cased for display; the tally is keyed by DLD's spelling.
-    const key = Object.keys(acc?.areaProjects ?? {}).find((k) => titleCase(k) === area)
-    const tally = key ? acc?.areaProjects?.[key] : undefined
-    return tally ? toBuckets(tally).map((b) => ({ ...relabel(b), guessed: false })).sort(byMeasure) : []
-  }
-  // Per-area cards: the area's projects with the developer each resolved to.
+  // An area's projects with the developer each resolved to (the right-hand card).
   const areaProjectRows = (area: string): ProjectRow[] => {
     const devs = acc?.projectDevelopers ?? {}
     const key = Object.keys(acc?.areaProjects ?? {}).find((k) => titleCase(k) === area)
@@ -79,13 +75,8 @@ export function ProjectsBreakdownSection() {
       .sort(byMeasure)
   }
   const topAreas = [...areas].sort(byMeasure).slice(0, DLD_CHART_TOP_N)
-
-  // An opened area shows its own top 10, like every other ranking on the page.
-  const areaProjectsFor = (area: string): AreaProjectRow[] => allAreaProjects(area).slice(0, DLD_CHART_TOP_N)
-  const areaNote = (a: DldChartBucket): string | null => {
-    const n = allAreaProjects(a.label).length
-    return n > DLD_CHART_TOP_N ? `top ${DLD_CHART_TOP_N} of ${int.format(n)} projects` : n > 0 ? `${int.format(n)} project${n === 1 ? "" : "s"}` : null
-  }
+  const selectedArea = (pickedArea && topAreas.find((a) => a.label === pickedArea)) || topAreas[0] || null
+  const selectedRows = selectedArea ? areaProjectRows(selectedArea.label) : []
 
   const total = acc?.count ?? 0
   const totalValue = acc?.value ?? 0
@@ -186,7 +177,6 @@ export function ProjectsBreakdownSection() {
           )}
         </CoverageLine>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <ChartCard
           title={`Top ${DLD_CHART_TOP_N} overall projects by ${measureWord} — ${groupLabel}`}
           subtitle={`${longDate(submitted.values.P_FROM_DATE ?? "")} – ${longDate(submitted.values.P_TO_DATE ?? "")}. One row per project as DLD names it, ranked by ${rankBy === "value" ? "total AED" : "transaction count"}; open a row for its developer. ${
@@ -200,37 +190,34 @@ export function ProjectsBreakdownSection() {
           {!acc ? <Skeleton h={300} /> : <ProjectRankList rows={[...projects].sort(byMeasure).slice(0, DLD_CHART_TOP_N)} measure={rankBy} totalOf={{ count: total, value: totalValue }} />}
         </ChartCard>
 
-        <ChartCard
-          title={`Top ${DLD_CHART_TOP_N} areas by ${measureWord} — ${groupLabel}`}
-          subtitle={`Areas as DLD names them, ranked by ${rankBy === "value" ? "total AED" : "transaction count"} across every row in the range. Open an area for its top ${DLD_CHART_TOP_N} projects — e.g. Business Bay → the towers selling most there.`}
-          table={{ head: ["Area", "Rows", "AED"], rows: [...areas].sort(byMeasure).map((a) => [a.label, a.count, int.format(a.value)]) }}
-        >
-          {!acc ? (
-            <Skeleton h={300} />
-          ) : (
-            <DeveloperRankList rows={[...areas].sort(byMeasure).slice(0, DLD_CHART_TOP_N)} measure={rankBy} note={areaNote} projectsFor={areaProjectsFor} totalOf={{ count: total, value: totalValue }} showTags={false} />
-          )}
-        </ChartCard>
-        </div>
+        {/* Areas on the left pick which area's projects the right card shows. */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <ChartCard
+            title={`Top ${DLD_CHART_TOP_N} areas by ${measureWord} — ${groupLabel}`}
+            subtitle={`Areas as DLD names them, ranked by ${rankBy === "value" ? "total AED" : "transaction count"} across every row in the range. Click an area to see its top ${DLD_CHART_TOP_N} projects on the right.`}
+            table={{ head: ["Area", "Rows", "AED"], rows: [...areas].sort(byMeasure).map((a) => [a.label, a.count, int.format(a.value)]) }}
+          >
+            {!acc ? <Skeleton h={300} /> : <AreaPickList rows={topAreas} measure={rankBy} totalOf={{ count: total, value: totalValue }} selected={selectedArea?.label ?? null} onPick={setPickedArea} />}
+          </ChartCard>
 
-        {/* One card per top area — its top 10 projects, two columns. */}
-        {acc && topAreas.length > 0 && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {topAreas.map((a) => {
-              const rows = areaProjectRows(a.label)
-              return (
-                <ChartCard
-                  key={a.label}
-                  title={`Top ${DLD_CHART_TOP_N} ${a.label} projects by ${measureWord}`}
-                  subtitle={`${int.format(a.count)} ${groupLabel} · AED ${compact.format(a.value)} in ${a.label}${rows.length > DLD_CHART_TOP_N ? ` · top ${DLD_CHART_TOP_N} of ${int.format(rows.length)} projects` : ""}. Share is of the area's total.`}
-                  table={{ head: ["Project", "Developer", "Rows", "AED"], rows: rows.map((p) => [p.label, p.developer ? `${p.developer}${p.guessed ? " (by name)" : ""}` : "— not on record", p.count, int.format(p.value)]) }}
-                >
-                  <ProjectRankList rows={rows.slice(0, DLD_CHART_TOP_N)} measure={rankBy} totalOf={{ count: a.count, value: a.value }} />
-                </ChartCard>
-              )
-            })}
-          </div>
-        )}
+          <ChartCard
+            title={selectedArea ? `Top ${DLD_CHART_TOP_N} ${selectedArea.label} projects by ${measureWord}` : `Top ${DLD_CHART_TOP_N} projects in an area`}
+            subtitle={
+              selectedArea
+                ? `${int.format(selectedArea.count)} ${groupLabel} · AED ${compact.format(selectedArea.value)} in ${selectedArea.label}${selectedRows.length > DLD_CHART_TOP_N ? ` · top ${DLD_CHART_TOP_N} of ${int.format(selectedRows.length)} projects` : ""}. Share is of the area's total; open a row for its developer.`
+                : "Pick an area on the left."
+            }
+            table={{ head: ["Project", "Developer", "Rows", "AED"], rows: selectedRows.map((p) => [p.label, p.developer ? `${p.developer}${p.guessed ? " (by name)" : ""}` : "— not on record", p.count, int.format(p.value)]) }}
+          >
+            {!acc ? (
+              <Skeleton h={300} />
+            ) : selectedArea ? (
+              <ProjectRankList key={selectedArea.label} rows={selectedRows.slice(0, DLD_CHART_TOP_N)} measure={rankBy} totalOf={{ count: selectedArea.count, value: selectedArea.value }} />
+            ) : (
+              <div className="flex items-center justify-center text-sm text-[#9ca3af]" style={{ height: 200 }}>No areas for these filters.</div>
+            )}
+          </ChartCard>
+        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
           <MiniStat label="Number of transactions" value={acc ? int.format(total) : null} hint={acc ? `${groupLabel} in the range` : undefined} />
@@ -297,7 +284,7 @@ function ProjectRankList({ rows, measure, totalOf }: { rows: ProjectRow[]; measu
                   {r.developer ? (
                     <>
                       Developer: <span className="font-semibold">{r.developer}</span>{" "}
-                      <span className={r.guessed ? "text-amber-700" : "text-[#9ca3af]"}>{r.guessed ? "(by name — guessed from the project's first word)" : "(matched — DLD register or FHI catalogue)"}</span>
+                      <span className={r.guessed ? "text-amber-700" : "text-[#9ca3af]"}>{r.guessed ? "(by name — taken from the project's own name, not a register match)" : "(matched — DLD register or FHI catalogue)"}</span>
                     </>
                   ) : (
                     <>
@@ -310,6 +297,68 @@ function ProjectRankList({ rows, measure, totalOf }: { rows: ProjectRow[]; measu
                   </span>
                 </div>
               )}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+// ─── Area picker ─────────────────────────────────────────────────────────────
+//
+// Same row grammar as the rankings, but a row is a choice, not a dropdown:
+// the picked area is highlighted and drives the card to its right.
+
+function AreaPickList({
+  rows,
+  measure,
+  totalOf,
+  selected,
+  onPick,
+}: {
+  rows: DldChartBucket[]
+  measure: "count" | "value"
+  totalOf: { count: number; value: number }
+  selected: string | null
+  onPick: (area: string) => void
+}) {
+  const hostRef = useRef<HTMLDivElement>(null)
+  const width = useWidth(hostRef)
+  if (rows.length === 0) return <div className="flex items-center justify-center text-sm text-[#9ca3af]" style={{ height: 200 }}>No rows for these filters.</div>
+
+  const cap = width > 0 ? Math.floor(width * 0.5) : 220
+  const longest = Math.ceil(Math.max(0, ...rows.map((r) => textPx(r.label))))
+  const labelW = Math.min(cap, longest + 12)
+  const max = Math.max(1, ...rows.map((r) => r[measure]))
+  const fmt = (v: number) => (measure === "value" ? `AED ${compact.format(v)}` : int.format(v))
+  const pctOfTotal = (v: number) => (totalOf[measure] > 0 ? `${((v / totalOf[measure]) * 100).toFixed(1)}%` : "—")
+  const numW = Math.ceil(Math.max(0, ...rows.map((r) => textPx(`${fmt(r[measure])} · ${pctOfTotal(r[measure])}`)))) + 4
+  const color = measure === "value" ? "#1baf7a" : "#2a78d6"
+
+  return (
+    <div ref={hostRef} className="w-full">
+      <ul className="divide-y divide-[#f0f2f5]">
+        {rows.map((r) => {
+          const active = r.label === selected
+          return (
+            <li key={r.label}>
+              <button
+                type="button"
+                onClick={() => onPick(r.label)}
+                aria-pressed={active}
+                title={`${r.label} · ${int.format(r.count)} rows · AED ${compact.format(r.value)} — click to see its projects`}
+                className={`grid w-full items-center gap-3 py-2 text-left rounded-lg -mx-1 px-1 transition-colors ${active ? "bg-[#eef3fb]" : "hover:bg-[#f8fafc]"}`}
+                style={{ gridTemplateColumns: `${labelW}px minmax(0,1fr) ${numW}px` }}
+              >
+                <span className={`truncate text-xs ${active ? "font-semibold text-[#001f3f]" : "text-[#374151]"}`}>{r.label}</span>
+                <span className="h-[14px] rounded-r bg-[#eef1f5] overflow-hidden">
+                  <span className="block h-full rounded-r" style={{ width: `${Math.max(1, (r[measure] / max) * 100)}%`, background: active ? "#001f3f" : color }} />
+                </span>
+                <span className="text-xs tabular-nums text-[#374151] whitespace-nowrap text-right">
+                  {fmt(r[measure])} <span className="text-[#9ca3af]">· {pctOfTotal(r[measure])}</span>
+                </span>
+              </button>
             </li>
           )
         })}

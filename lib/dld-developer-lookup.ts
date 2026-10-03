@@ -20,13 +20,18 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
  *               one developer in FHI's catalogue shares the SPV's leading word,
  *               the SPV is rolled up to that brand for display (the match is
  *               still the register's; only the name is normalised).
- *   3. "name" — the project's leading word matches the leading word of a
- *               developer that IS known (register or catalogue): "Binghatti
- *               Skyflame 1" → "Binghatti Developers". Shown with a "(by
- *               name)" suffix so it is never mistaken for a register match.
- *               A leading word that matches no known developer is NOT a
- *               guess — "Verdana", "Sky", "Boulevard" are project names, not
- *               developers — so the row is "unmatched" instead.
+ *   3. "name" — the project's own wording names a developer that IS known
+ *               (register or catalogue). Two patterns, in this order:
+ *                 • "… by <Developer>": "Arian By Azizi" → Azizi, "Eleve By
+ *                   Deyaar" → Deyaar, "Raw District 2 By Imtiaz" → Imtiaz.
+ *                   DLD writes "by" precisely to name the developer, so this
+ *                   is checked before the leading word.
+ *                 • leading word: "Binghatti Skyflame 1" → Binghatti.
+ *               Either way the candidate word must match a known developer's
+ *               leading word; shown with a "(by name)" suffix so it is never
+ *               mistaken for a register match. A word that matches no known
+ *               developer is NOT a guess — "Verdana", "Sky", "Boulevard" are
+ *               project names, not developers — so the row is "unmatched".
  *
  * No project name at all → "Unknown". A project name nobody recognises →
  * "Unmatched project" (its name is kept so the page can list which projects
@@ -141,6 +146,10 @@ export function resolveDeveloper(lookup: Lookup, projectName: unknown): Develope
   if (!raw) return { developer: UNKNOWN_DEVELOPER, source: "unknown", project: null }
   const hit = lookup.byProject.get(normalizeName(raw))
   if (hit) return { ...hit, project: raw }
+  // "… by <Developer>" first — the words after the last "by" name the developer.
+  const by = /\bby\s+(.+)$/i.exec(raw)
+  const afterBy = by ? lookup.byFirstWord.get(firstWord(by[1])) : undefined
+  if (afterBy) return { developer: `${afterBy} (by name)`, source: "name", project: raw }
   const known = lookup.byFirstWord.get(firstWord(raw))
   if (known) return { developer: `${known} (by name)`, source: "name", project: raw }
   return { developer: UNMATCHED_DEVELOPER, source: "unmatched", project: raw }

@@ -332,7 +332,7 @@ export function DevelopersBreakdownSection() {
           {/* 3. Name guesses only — clearly labelled as such. */}
           <ChartCard
             title={`Top ${DLD_CHART_TOP_N} by ${measureWord} — guessed by name only`}
-            subtitle={`${sources ? `${int.format(guessedRows)} of ${int.format(total)} rows (${total ? ((guessedRows / total) * 100).toFixed(0) : 0}%). ` : ""}No register match for the project, but its first word is a developer the register or catalogue already knows — a GUESS. Treat as indicative only.`}
+            subtitle={`${sources ? `${int.format(guessedRows)} of ${int.format(total)} rows (${total ? ((guessedRows / total) * 100).toFixed(0) : 0}%). ` : ""}No register match for the project, but its name says who built it (“… by Azizi”, or a leading “Binghatti …”) and that developer is already known — a GUESS. Treat as indicative only.`}
             table={{ head: ["Developer (guess)", "Rows", "AED"], rows: guessed.map((b) => [b.label, b.count, int.format(b.value)]) }}
           >
             {!acc ? <Skeleton h={300} /> : <DeveloperRankList rows={[...guessed].sort(byMeasure).slice(0, DLD_CHART_TOP_N)} measure={rankBy} projectsFor={(d) => projectsFor(d, "guessed")} totalOf={{ count: total, value: totalValue }} />}
