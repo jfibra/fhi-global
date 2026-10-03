@@ -579,15 +579,15 @@ function previousWindowJob(job: BatchJob): BatchJob | null {
 }
 
 /**
- * A locked-period variant of the section: the date range is chosen by the
- * caller and cannot be edited; the dataset can still be switched (and loads
- * on the spot — there is no Load button). The sales ladder's Open Data page
- * uses it for "last month", defaulting to Transactions.
+ * The sales-ladder variant of the section: the caller sets the starting date
+ * range (last calendar month) and the first dataset; the user can switch
+ * datasets (loads on the spot) and edit the dates (Load applies them). No
+ * restore of a previous session — it always opens on the caller's range.
  */
 export type FixedBreakdown = {
   /** Dataset shown first. */
   command: DldCommand
-  /** The locked date range, ISO yyyy-mm-dd, applied to whichever dataset is picked. */
+  /** The starting date range, ISO yyyy-mm-dd — editable on the page, and applied to a newly picked dataset until changed. */
   dateRange: { from: string; to: string }
   title: string
   description: string
@@ -634,8 +634,10 @@ export function BreakdownSection({ fixed }: { fixed?: FixedBreakdown } = {}) {
   const switchDataset = (next: DldCommand) => {
     setCommand(next)
     if (fixed) {
-      // No Load button in the locked view — a new dataset loads right away on the same period.
-      const nextValues = fixedValues(DLD_DATASETS[next], fixed.dateRange)
+      // A new dataset loads right away, on the dates currently in the inputs
+      // (which start as the fixed range and can be edited).
+      const current = { from: values.P_FROM_DATE || fixed.dateRange.from, to: values.P_TO_DATE || fixed.dateRange.to }
+      const nextValues = fixedValues(DLD_DATASETS[next], current)
       setValues(nextValues)
       setSubmitted({ command: next, values: nextValues })
       return
@@ -704,9 +706,19 @@ export function BreakdownSection({ fixed }: { fixed?: FixedBreakdown } = {}) {
           )}
         </div>
       ) : fixed ? (
-        // Locked-period strip in place of the form: the dataset is a live
-        // picker (loads on change), the dates are shown but not editable.
-        <div className="bg-white rounded-2xl border border-[#e8eaed] p-5 mb-4">
+        // Sales-ladder form: the dataset is a live picker (loads on change);
+        // the dates start at the caller's range (last calendar month) and can
+        // be edited — Load applies them.
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (missing.length) return
+            const next = { command, values }
+            if (jobKeyOf(next) === jobKeyOf(submitted)) job.refresh()
+            else setSubmitted(next)
+          }}
+          className="bg-white rounded-2xl border border-[#e8eaed] p-5 mb-4"
+        >
           <div className="flex flex-wrap items-end gap-3">
             <div className="w-full sm:w-[220px] sm:shrink-0">
               <label className="block text-sm font-medium text-[#0d1117] mb-1.5">Dataset</label>
@@ -714,12 +726,28 @@ export function BreakdownSection({ fixed }: { fixed?: FixedBreakdown } = {}) {
             </div>
             {dateFields.map((f) => (
               <div key={f.param} className="w-full sm:w-[160px] sm:shrink-0">
-                <span className="block text-sm font-medium text-[#0d1117] mb-1.5">{f.label}</span>
-                <div className="h-10 flex items-center rounded-xl border border-[#e5e7eb] bg-[#f8fafc] px-3 text-sm text-[#374151] tabular-nums">
-                  {values[f.param] ? longDate(values[f.param]) : "—"}
-                </div>
+                <label htmlFor={`fixed-${f.param}`} className="block text-sm font-medium text-[#0d1117] mb-1.5">
+                  {f.label}
+                  {f.required && <span className="text-rose-600"> *</span>}
+                </label>
+                <input
+                  id={`fixed-${f.param}`}
+                  type="date"
+                  value={values[f.param] ?? ""}
+                  onChange={(e) => setValues((prev) => ({ ...prev, [f.param]: e.target.value }))}
+                  className="h-10 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 text-sm text-[#0f2940] focus:outline-none focus:border-[#001f3f] focus:ring-4 focus:ring-[#001f3f]/5"
+                  required={f.required}
+                />
               </div>
             ))}
+            <button
+              type="submit"
+              disabled={loading || missing.length > 0}
+              className="inline-flex shrink-0 items-center gap-2 h-10 whitespace-nowrap px-5 rounded-xl bg-[#001f3f] text-white text-sm font-semibold hover:bg-[#0a2e57] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              Load
+            </button>
             {loading ? (
               <button type="button" onClick={job.stop} className="h-10 shrink-0 whitespace-nowrap px-4 rounded-xl border border-[#e5e7eb] bg-white text-sm font-semibold text-[#374151] hover:border-[#001f3f]/30">
                 Stop
@@ -728,8 +756,8 @@ export function BreakdownSection({ fixed }: { fixed?: FixedBreakdown } = {}) {
               <RefreshButton onClick={job.refresh} loading={loading} updatedAt={job.updatedAt} />
             )}
           </div>
-          <p className="mt-3 text-xs text-[#9ca3af]">The period is set automatically to the previous calendar month. Pick a dataset to see its figures for that month.</p>
-        </div>
+          <p className="mt-3 text-xs text-[#9ca3af]">Dates start at the previous calendar month — change them and press Load. Picking a dataset reloads on the dates shown.</p>
+        </form>
       ) : (
       <form
         onSubmit={(e) => {

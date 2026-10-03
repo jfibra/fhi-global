@@ -4,8 +4,8 @@
 //
 // The sales ladder's cut of the admin Real Estate Data workbench: last
 // calendar month only, with the same tiles and charts the admin Breakdowns
-// tab draws (BreakdownSection in fixed mode). The period is chosen here, not
-// by the user; the dataset can be switched and defaults to Transactions.
+// tab draws (BreakdownSection in fixed mode). The dates start at last
+// month and can be edited; the dataset can be switched and defaults to Transactions.
 // No index tab and no raw tables. Role access: ROLES_DLD_OPEN_DATA
 // (lib/app-roles.ts), mirrored by SUB_PATH_ROLES["real-estate-data"] in
 // lib/auth.ts and the charts route.
@@ -33,8 +33,10 @@ export function lastMonthView(): FixedBreakdown {
   return {
     command: "transactions",
     dateRange: { from: month.from, to: month.to },
-    title: `Dubai market · ${month.label}`,
-    description: "DLD's figures for last month: daily volume and value, totals, price per sqft, the busiest areas and how the month compares with the one before. Transactions by default — pick another dataset to see the same month for rents, projects or valuations.",
+    // No month in the title — the dates are editable now; the coverage line
+    // under the form states the range actually loaded.
+    title: "Dubai market",
+    description: "DLD's figures for the dates you choose — starting with last month: daily volume and value, totals, price per sqft, the busiest areas and how the period compares with the one before. Transactions by default; pick another dataset for rents, projects or valuations.",
     cacheKey: `charts:open-data:last-month:${month.from}`,
   }
 }
