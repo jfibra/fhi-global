@@ -123,6 +123,8 @@ export async function fetchAgentEventPaths(): Promise<Array<{ path: string; upda
       .eq("status", "published")
       .is("deleted_at", null)
       .not("agent_id", "is", null)
+      // Shown on the website (074) — a fhiglobal.ae-only event's site URL just forwards.
+      .eq("show_on_website", true)
       .order("id", { ascending: true })
       .limit(SUPABASE_PER_PAGE)
     if (error || !events) return null

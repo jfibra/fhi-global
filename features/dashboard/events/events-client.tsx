@@ -5,10 +5,11 @@
  * publish them, generate a branded flyer with the registration QR baked in,
  * and view who registered. Two scopes (migration 057):
  *   · all — admin staff: every event. Company events publish to /events;
- *     agents' own events are labelled with whose website they're on.
- *   · own — Website Builder users: only their own events, which publish to
- *     their website. No website yet → a "create your website first" prompt;
- *     otherwise a guide to where the events go, with the link + QR to share.
+ *     agents' own events are labelled with whose they are and where they show.
+ *   · own — Website Builder users: only their own events. Each one goes where
+ *     the agent chooses (074): fhiglobal.ae/events, their website, or both.
+ *     No website yet → fhiglobal.ae only, with a nudge to build one; otherwise
+ *     a guide to where the events go, with the website link + QR to share.
  * Every event carries its publicPath, so View, the flyer QR and sharing all
  * point at the right page.
  */
@@ -24,7 +25,7 @@ import { InlineInviterEdit } from "@/components/dashboard/inline-inviter-edit"
 import { EventExportModal } from "./event-export-modal"
 import { EventFlyerModal } from "./event-flyer-modal"
 import { EventRaffle } from "./event-raffle"
-import { CreateWebsiteFirst, EventsWebsiteGuide } from "./events-website-guide"
+import { EventsWebsiteGuide, NoWebsiteYet } from "./events-website-guide"
 import { EVENT_BRANDS, eventBrand } from "@/lib/events/brands"
 import {
   FIELD_TYPE_LABELS,
@@ -71,11 +72,19 @@ type AdminEvent = {
   /** null = company event (/events); otherwise the agent whose website it's on. */
   agentId: string | null
   ownerName: string | null
-  /** Admin pick (migration 067): an agent's event also listed on fhiglobal.ae/events. */
+  /** An agent's event listed on fhiglobal.ae/events (067; the agent's choice since 074). */
   showOnMain: boolean
-  /** The public page — /events/<slug> or the owner's website. */
+  /** An agent's event shown on their own website (074). */
+  showOnWebsite: boolean
+  /** The public page — the owner's website when it shows there, else /events/<slug>. */
   publicPath: string
 }
+
+/** Where an agent's event appears (074) — never nowhere. */
+type Placement = "main" | "website" | "both"
+
+const placementOf = (e: { showOnMain: boolean; showOnWebsite: boolean }): Placement =>
+  e.showOnMain && e.showOnWebsite ? "both" : e.showOnMain ? "main" : "website"
 
 type Registration = {
   id: string
@@ -108,6 +117,8 @@ type FormState = {
   registrationOpen: boolean
   /** Extra fields this event's registration form asks for. */
   registrationFields: RegistrationField[]
+  /** Agents' events only: fhiglobal.ae/events, their website, or both. */
+  placement: Placement
 }
 
 const EMPTY_FORM: FormState = {
@@ -124,6 +135,7 @@ const EMPTY_FORM: FormState = {
   status: "draft",
   registrationOpen: true,
   registrationFields: [],
+  placement: "both",
 }
 
 // Event times are always Dubai time (GST, UTC+4 — no DST), regardless of the
@@ -266,7 +278,8 @@ export function EventsClient({
 
   const openCreate = () => {
     setEditing(null)
-    setForm(EMPTY_FORM)
+    // Both places by default; fhiglobal.ae only until they have a website.
+    setForm({ ...EMPTY_FORM, placement: own && !website ? "main" : "both" })
     setFormError(null)
     setModalOpen(true)
   }
@@ -287,6 +300,7 @@ export function EventsClient({
       status: e.status,
       registrationOpen: e.registrationOpen,
       registrationFields: e.registrationFields ?? [],
+      placement: placementOf(e),
     })
     setFormError(null)
     setModalOpen(true)
@@ -376,6 +390,10 @@ export function EventsClient({
         venue_lat: form.venuePin?.lat ?? null,
         venue_lng: form.venuePin?.lng ?? null,
         venue_place_id: form.venuePin?.placeId ?? null,
+        // Where an agent's event appears (074); company events are always on /events.
+        ...(own || editing?.agentId
+          ? { show_on_main: form.placement !== "website", show_on_website: form.placement !== "main" }
+          : {}),
       }
       const res = editing
         ? await fetch(`/api/admin/events/${editing.id}`, {
@@ -449,10 +467,12 @@ export function EventsClient({
     }
   }
 
-  // Admin staff only: list an agent's event on fhiglobal.ae/events too, or take
-  // it off again. Nothing else on the event changes; the API ignores this
-  // field from owners.
+  // Admin staff: list an agent's event on fhiglobal.ae/events too, or take it
+  // off again (the agent sets this in the editor; this is the quick switch).
+  // Nothing else on the event changes. Not for an event on fhiglobal.ae only —
+  // taking it off would leave it nowhere (the API refuses that too).
   const toggleShowOnMain = async (e: AdminEvent) => {
+    if (e.showOnMain && !e.showOnWebsite) return
     const showOnMain = !e.showOnMain
     const res = await fetch(`/api/admin/events/${e.id}`, {
       method: "PATCH",
@@ -658,19 +678,18 @@ export function EventsClient({
               {own ? (
                 <>
                   Create events for your clients, share a flyer with its registration QR, and see who signed
-                  up. Published events appear on <strong className="text-[#374151]">your website</strong>.
+                  up. Each event appears where you choose — <strong className="text-[#374151]">fhiglobal.ae/events</strong>,{" "}
+                  <strong className="text-[#374151]">your website</strong>, or both.
                 </>
               ) : (
                 <>
                   Create branded events, generate a share-ready flyer with its registration QR, and see
                   who signed up. Company events appear on the public Events page; agents&apos; own events
-                  appear on their websites.
+                  appear where each agent chose — fhiglobal.ae/events, their website, or both.
                 </>
               )}
             </p>
           </div>
-          {/* No website yet → nothing to publish to; the prompt below replaces the tools. */}
-          {!(own && !website) && (
           <div className="flex gap-2">
             <button
               type="button"
@@ -689,11 +708,10 @@ export function EventsClient({
               New event
             </button>
           </div>
-          )}
         </div>
 
-        {/* An agent's events publish to their website: build it first, or see where they go. */}
-        {own && !website && <CreateWebsiteFirst websiteBuilderHref={websiteBuilderHref} />}
+        {/* No website yet: events still go on fhiglobal.ae; a website adds the second place. */}
+        {own && !website && <NoWebsiteYet websiteBuilderHref={websiteBuilderHref} />}
         {own && website && (
           <EventsWebsiteGuide
             siteSlug={website.slug}
@@ -707,14 +725,16 @@ export function EventsClient({
           <div className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
         )}
 
-        {own && !website ? null : loading ? (
+        {loading ? (
           <div className="border border-[#e8eaed] bg-white p-12 text-center text-sm text-[#9ca3af]">
             Loading events…
           </div>
         ) : events.length === 0 ? (
           <div className="border border-[#e8eaed] bg-white p-12 text-center">
             <p className="text-[#6b7280] mb-4">
-              {own ? "You haven't created an event yet — publish one and it appears on your website." : "No events yet."}
+              {own
+                ? `You haven't created an event yet — publish one and it appears on fhiglobal.ae/events${website ? ", your website, or both" : ""}.`
+                : "No events yet."}
             </p>
             <button type="button" onClick={openCreate} className="text-sm font-semibold text-[#001f3f] hover:underline">
               Create your first event
@@ -779,14 +799,23 @@ export function EventsClient({
                         className={`mb-1.5 inline-flex max-w-full items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                           e.agentId ? "bg-[#d6b357]/15 text-[#8a6d2a]" : "bg-[#001f3f]/5 text-[#001f3f]"
                         }`}
-                        title={e.agentId ? "An agent's own event, shown on their website" : "Company event, shown on fhiglobal.ae/events"}
+                        title={
+                          !e.agentId
+                            ? "Company event, shown on fhiglobal.ae/events"
+                            : e.showOnWebsite
+                              ? "An agent's own event, shown on their website"
+                              : "An agent's own event, shown on fhiglobal.ae/events only"
+                        }
                       >
                         <Globe className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{e.agentId ? `${e.ownerName ?? "Agent"}'s website` : "Company · /events"}</span>
+                        <span className="truncate">
+                          {!e.agentId ? "Company · /events" : e.showOnWebsite ? `${e.ownerName ?? "Agent"}'s website` : `${e.ownerName ?? "Agent"} · fhiglobal.ae only`}
+                        </span>
                       </p>
                     )}
-                    {/* The admin's pick: an agent's event on the main Events page too (067). */}
-                    {!own && e.agentId && (
+                    {/* An agent's event on the main Events page (the agent's choice since 074) —
+                        admins can switch it here too, unless it's the event's only place. */}
+                    {!own && e.agentId && e.showOnWebsite && (
                       <button
                         type="button"
                         onClick={() => void toggleShowOnMain(e)}
@@ -805,6 +834,15 @@ export function EventsClient({
                         {e.showOnMain ? <Check className="h-3 w-3 shrink-0" /> : <Plus className="h-3 w-3 shrink-0" />}
                         <span className="truncate">{e.showOnMain ? "On fhiglobal.ae" : "Add to fhiglobal.ae"}</span>
                       </button>
+                    )}
+                    {/* The agent's own view: where this event appears (074). */}
+                    {own && (
+                      <p className="mb-1.5 inline-flex max-w-full items-center gap-1 bg-[#001f3f]/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#001f3f]">
+                        <Globe className="h-3 w-3 shrink-0" />
+                        <span className="truncate">
+                          {placementOf(e) === "both" ? "fhiglobal.ae + your website" : placementOf(e) === "main" ? "fhiglobal.ae only" : "Your website only"}
+                        </span>
+                      </p>
                     )}
                     <h3 className="font-['Outfit'] font-bold text-[#111827] truncate">{e.title}</h3>
                     <p className="text-xs text-[#6b7280] mt-1">{eventDateLabel(e.eventDate, e.eventDays)}</p>
@@ -857,7 +895,7 @@ export function EventsClient({
                             target="_blank"
                             rel="noopener noreferrer"
                             className={cardChipBtn}
-                            title={e.agentId ? "Open the event on the website in a new tab" : "Open the public event page in a new tab"}
+                            title={e.agentId && e.showOnWebsite ? "Open the event on the website in a new tab" : "Open the public event page in a new tab"}
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                             View
@@ -1127,6 +1165,55 @@ export function EventsClient({
                   </p>
                 </div>
               </div>
+
+              {/* Where an agent's event appears (074) — the agent's choice, never nowhere.
+                  Company events (admins, new or editing one) don't get this: always /events. */}
+              {(own || editing?.agentId) && (
+                <div>
+                  <p className={labelCls}>Where should it appear?</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Where the event appears">
+                    {(
+                      [
+                        { value: "main", label: "fhiglobal.ae", hint: "The company Events page, fhiglobal.ae/events" },
+                        {
+                          value: "website",
+                          label: own ? "My website" : `${editing?.ownerName ?? "The agent"}'s website`,
+                          hint: own ? "The Events section of your website" : "The Events section of their website",
+                        },
+                        { value: "both", label: "Both", hint: own ? "fhiglobal.ae/events and your website" : "fhiglobal.ae/events and their website" },
+                      ] as const
+                    ).map((p) => {
+                      const on = form.placement === p.value
+                      // Only the agent's own form knows they have no website yet.
+                      const disabled = own && !website && p.value !== "main"
+                      return (
+                        <button
+                          key={p.value}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          disabled={disabled}
+                          onClick={() => setForm((f) => ({ ...f, placement: p.value }))}
+                          className={`border-2 px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                            on ? "border-[#001f3f] bg-[#001f3f]/[0.04]" : "border-[#e5e5e5] enabled:hover:border-[#9ca3af]"
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5 text-sm font-bold text-[#0d1117]">
+                            {on && <Check className="h-3.5 w-3.5 text-[#001f3f]" />}
+                            {p.label}
+                          </span>
+                          <span className="mt-0.5 block text-[11px] leading-snug text-[#6b7280]">{p.hint}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {own && !website && (
+                    <p className="mt-1.5 text-[11px] text-[#9ca3af]">
+                      Build your website in the Website Builder to show your events there too.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Extra fields this event's form asks for. Safe to change at any
                   time: adding one leaves earlier sign-ups blank for it, and

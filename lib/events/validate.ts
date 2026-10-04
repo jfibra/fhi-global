@@ -42,9 +42,12 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
   // rather than saved as a broken player.
   const rawVideo = typeof body.video_url === "string" ? body.video_url.trim().slice(0, 1000) : ""
   const video_url = body.video_url !== undefined ? (rawVideo && isPlayableVideoUrl(rawVideo) ? rawVideo : null) : undefined
-  // Admin pick (migration 067): an agent's event also listed on /events. Only
-  // when sent; the PATCH route drops it for owners.
+  // Where an agent's event appears (067 + 074): on /events and/or on their
+  // website — the agent's own choice since 2026-10-04 (admins can change it
+  // too). Only when sent; the routes check the pair (never both off) and drop
+  // it for company events, which are always on /events.
   const show_on_main = body.show_on_main !== undefined ? body.show_on_main === true : undefined
+  const show_on_website = body.show_on_website !== undefined ? body.show_on_website === true : undefined
   // The venue's exact spot (migration 068), from a picked place suggestion.
   // Only when sent; anything but a valid pair clears it.
   let venue_pin: { venue_lat: number | null; venue_lng: number | null; venue_place_id: string | null } | undefined
@@ -70,6 +73,7 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
     ...(certificate !== undefined ? { certificate } : {}),
     ...(video_url !== undefined ? { video_url } : {}),
     ...(show_on_main !== undefined ? { show_on_main } : {}),
+    ...(show_on_website !== undefined ? { show_on_website } : {}),
     ...(venue_pin ?? {}),
   }
 }

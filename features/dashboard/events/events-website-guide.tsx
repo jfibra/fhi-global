@@ -1,9 +1,11 @@
 "use client"
 
-// The agent side of Events (migration 057). An agent's events are published on
-// their own Website Builder site, so their Events page either sends them to
-// build that site first, or shows where their events go and the one link + QR
-// to hand clients — so nobody wonders where an event went after publishing.
+// The agent side of Events (migration 057). Each of an agent's events goes
+// where they choose (074): fhiglobal.ae/events, their own Website Builder
+// site, or both. Without a website their events still go on fhiglobal.ae and
+// this nudges them to build one; with it, it shows where events go and the
+// website's events link + QR to hand clients — so nobody wonders where an
+// event went after publishing.
 
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
@@ -11,30 +13,28 @@ import { QRCodeCanvas } from "qrcode.react"
 import { AlertTriangle, Check, Copy, Download, ExternalLink, Globe, MonitorSmartphone, Send, Sparkles, Users } from "lucide-react"
 import { websiteEventsPath } from "@/lib/events/paths"
 
-export function CreateWebsiteFirst({ websiteBuilderHref }: { websiteBuilderHref: string }) {
+export function NoWebsiteYet({ websiteBuilderHref }: { websiteBuilderHref: string }) {
   return (
     <div className="border border-[#e8eaed] bg-white">
       <div className="h-[3px] bg-[#d6b357]" aria-hidden />
-      <div className="flex flex-col items-center gap-5 px-6 py-12 text-center">
-        <span className="flex h-16 w-16 items-center justify-center bg-[#001f3f]">
-          <Globe className="h-8 w-8 text-[#d6b357]" />
+      <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:p-6">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center bg-[#001f3f]">
+          <Globe className="h-6 w-6 text-[#d6b357]" />
         </span>
-        <div className="max-w-lg">
-          <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117]">Create your website first</h2>
-          <p className="mt-2 text-sm leading-relaxed text-[#6b7280]">
-            Your events are published on <strong className="text-[#374151]">your own website</strong> — that&apos;s
-            where your clients see them and register. Build it in the Website Builder (it only takes a few
-            minutes), then come back here to create your event.
+        <div className="min-w-0 flex-1">
+          <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Your events go on fhiglobal.ae/events</h2>
+          <p className="mt-1 text-sm leading-relaxed text-[#6b7280]">
+            You don&apos;t have a website yet, so your events appear on the company Events page. Build yours in the
+            Website Builder (it only takes a few minutes) to show them on <strong className="text-[#374151]">your own website</strong> too.
           </p>
         </div>
         <Link
           href={websiteBuilderHref}
-          className="inline-flex items-center gap-2 bg-[#001f3f] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-[#00356b]"
+          className="inline-flex shrink-0 items-center justify-center gap-2 bg-[#001f3f] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-[#00356b]"
         >
           <Sparkles className="h-4 w-4 text-[#d6b357]" />
           Create my website
         </Link>
-        <p className="text-xs text-[#9ca3af]">Company events on fhiglobal.ae/events are run by the admin team.</p>
       </div>
     </div>
   )
@@ -42,7 +42,7 @@ export function CreateWebsiteFirst({ websiteBuilderHref }: { websiteBuilderHref:
 
 const STEPS = [
   { icon: Sparkles, title: "Create", text: "Add an event with its poster, date, venue and the questions your registration form asks." },
-  { icon: MonitorSmartphone, title: "Publish", text: "It appears straight away in the Events section of your website — not on the company events page." },
+  { icon: MonitorSmartphone, title: "Publish", text: "It appears straight away where you chose — fhiglobal.ae/events, the Events section of your website, or both." },
   { icon: Send, title: "Share", text: "Send clients the link or QR below. Each event also has its own page and a Flyer with its QR." },
   { icon: Users, title: "Follow up", text: "Registrations, the raffle and certificates are on each event card below — only you (and admins) see them." },
 ]
@@ -93,7 +93,7 @@ export function EventsWebsiteGuide({
       <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div className="min-w-0">
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8a6d2a]">Where your events go</p>
-          <h2 className="mt-1 font-['Outfit'] text-xl font-bold text-[#0d1117]">Your events live on your website</h2>
+          <h2 className="mt-1 font-['Outfit'] text-xl font-bold text-[#0d1117]">On fhiglobal.ae, your website, or both — you choose</h2>
 
           {!isPublished && (
             <p className="mt-3 flex flex-wrap items-center gap-2 border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
@@ -120,7 +120,7 @@ export function EventsWebsiteGuide({
           </ol>
 
           <div className="mt-5">
-            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#374151]">Your events link — give this to clients</p>
+            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#374151]">Your website&apos;s events link — give this to clients</p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 readOnly

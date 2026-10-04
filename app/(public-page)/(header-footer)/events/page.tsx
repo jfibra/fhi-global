@@ -81,8 +81,8 @@ function splitByDate(all: EventRow[]): { upcoming: EventRow[]; past: EventRow[] 
 }
 
 /**
- * agent_id → the host's name from their published website, so a picked
- * agent's event says whose it is. An agent without a published site has no
+ * agent_id → the host's name from their published website, so an agent's
+ * event here says whose it is. An agent without a published site has no
  * entry (the card then just carries the brand, like a company event).
  */
 async function hostNames(events: EventRow[]): Promise<Map<string, string>> {
@@ -108,8 +108,9 @@ export default async function EventsPage() {
     .select("id, slug, title, description, brand, image_url, event_date, event_days, day_times, venue, registration_open, agent_id")
     .eq("status", "published")
     .is("deleted_at", null)
-    // Company events, plus the agents' own events (057) an admin picked for
-    // this page (show_on_main, 067). The rest stay on their agent's website.
+    // Company events, plus the agents' own events (057) placed on this page
+    // (show_on_main — the agent's choice since 074: fhiglobal.ae or both).
+    // The rest are on their agent's website only.
     .or("agent_id.is.null,show_on_main.eq.true")
     .order("event_date", { ascending: true, nullsFirst: false })
 

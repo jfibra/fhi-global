@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { after } from "next/server"
 import { revalidatePath } from "next/cache"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { agentWebsite, publishedSiteSlugs, requireEventAccess } from "@/lib/events/access"
+import { agentWebsite, placementProblem, publishedSiteSlugs, requireEventAccess } from "@/lib/events/access"
 import { eventPublicPath } from "@/lib/events/paths"
 import { sanitizeEventInput } from "@/lib/events/validate"
 import { parseRegistrationFields } from "@/lib/events/fields"
@@ -20,8 +20,9 @@ function actorFrom(ctx: { userId: string; email: string | null; profile: { role:
 /**
  * Events (any status) with registration counts. Admin staff get every event,
  * company and agents'; a Website Builder user gets only their own (057). Each
- * comes with its public path — /events/<slug> for a company event, the owner's
- * website for an agent's.
+ * comes with its public path — the owner's website for an agent's event shown
+ * there, otherwise /events/<slug> (company events, and agents' events on
+ * fhiglobal.ae only — 074).
  */
 export async function GET() {
   const access = await requireEventAccess()
@@ -30,7 +31,7 @@ export async function GET() {
   const admin = createAdminSupabase()
   let query = admin
     .from("events")
-    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, day_times, venue, status, registration_open, registration_fields, certificate, created_at, view_count, qr_scan_count, agent_id, show_on_main, venue_lat, venue_lng, venue_place_id, owner:profiles!events_agent_id_fkey(fullname), event_registrations(count)")
+    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, day_times, venue, status, registration_open, registration_fields, certificate, created_at, view_count, qr_scan_count, agent_id, show_on_main, show_on_website, venue_lat, venue_lng, venue_place_id, owner:profiles!events_agent_id_fkey(fullname), event_registrations(count)")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
   if (access.scope.kind === "own") query = query.eq("agent_id", access.scope.agentId)
@@ -50,6 +51,7 @@ export async function GET() {
     const counts = e.event_registrations as unknown as { count: number }[] | null
     const agentId = (e.agent_id as string | null) ?? null
     const owner = (Array.isArray(e.owner) ? e.owner[0] : e.owner) as { fullname: string | null } | null
+    const showOnWebsite = (e.show_on_website as boolean | null) !== false
     return {
       id: e.id as string,
       slug: (e.slug as string | null) ?? null,
@@ -79,11 +81,13 @@ export async function GET() {
       /** null = company event on /events; otherwise the agent it belongs to. */
       agentId,
       ownerName: agentId ? (owner?.fullname ?? null) : null,
-      /** Admin pick (067): an agent's event also listed on fhiglobal.ae/events. */
+      /** An agent's event listed on fhiglobal.ae/events (067; the agent's choice since 074). */
       showOnMain: (e.show_on_main as boolean | null) === true,
+      /** An agent's event shown on their own website (074). */
+      showOnWebsite,
       publicPath: eventPublicPath(
         { id: e.id as string, slug: (e.slug as string | null) ?? null },
-        agentId ? siteByAgent.get(agentId) : null,
+        agentId && showOnWebsite ? siteByAgent.get(agentId) : null,
       ),
     }
   })
@@ -106,8 +110,9 @@ function slugify(title: string): string {
 
 /**
  * Create an event. Admin staff create company events (listed on /events); a
- * Website Builder user creates their OWN event, shown on their website — which
- * they must have created first.
+ * Website Builder user creates their OWN event and chooses where it appears
+ * (074): fhiglobal.ae/events, their website, or both. Showing it on their
+ * website needs one; fhiglobal.ae only doesn't.
  */
 export async function POST(req: NextRequest) {
   const access = await requireEventAccess()
@@ -122,14 +127,18 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminSupabase()
 
-  // An agent's event lives on their website, so it needs one to live on.
   const ownerId = access.scope.kind === "own" ? access.scope.agentId : null
   const site = ownerId ? await agentWebsite(admin, ownerId) : null
-  if (ownerId && !site) {
-    return NextResponse.json(
-      { error: "Create your website in the Website Builder first — your events are published on it.", code: "no_website" },
-      { status: 409 },
-    )
+  if (ownerId) {
+    // Unsent → both places when they have a website, else fhiglobal.ae.
+    input.show_on_main = input.show_on_main ?? true
+    input.show_on_website = input.show_on_website ?? Boolean(site)
+    const placementError = placementProblem(input.show_on_main, input.show_on_website, Boolean(site))
+    if (placementError) return placementError
+  } else {
+    // Company events are always on /events; the flags don't apply.
+    delete input.show_on_main
+    delete input.show_on_website
   }
 
   const base = slugify(input.title)
@@ -170,7 +179,11 @@ export async function POST(req: NextRequest) {
 
   // Created live → tell IndexNow after the response is sent (after() keeps
   // the serverless function alive; see app/news-sitemap.xml/route.ts).
-  const publicPath = eventPublicPath({ id: String(result.data.id), slug }, site?.isPublished ? site.slug : null)
+  const publicPath = eventPublicPath(
+    { id: String(result.data.id), slug },
+    input.show_on_website && site?.isPublished ? site.slug : null,
+  )
+  if (ownerId && input.show_on_main) revalidatePath("/events")
   if (input.status === "published") {
     const loc = `${SITE_URL.replace(/\/$/, "")}${publicPath}`
     after(() => submitToIndexNow([loc]))

@@ -42,7 +42,7 @@ async function fetchEvent(idOrSlug: string) {
   const supabase = createPublicSupabaseClient()
   const query = supabase
     .from("events")
-    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, day_times, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate, agent_id")
+    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, day_times, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate, agent_id, show_on_website")
     .eq("status", "published")
     .is("deleted_at", null)
   const { data, error } = UUID_RE.test(idOrSlug)
@@ -55,13 +55,14 @@ async function fetchEvent(idOrSlug: string) {
 }
 
 /**
- * An agent's own event (migration 057) lives on their website — where this
- * page forwards, with the host's name for the interstitial. Null for a company
- * event, or when the agent's site isn't published (the event then keeps
- * rendering here, so a link never dies).
+ * An agent's own event (migration 057) shown on their website lives there —
+ * where this page forwards, with the host's name for the interstitial. Null
+ * for a company event, for an agent's event on fhiglobal.ae only (074 — it
+ * renders right here), or when the agent's site isn't published (the event
+ * then keeps rendering here, so a link never dies).
  */
-async function agentHome(event: { id: string; slug: string | null; agent_id: string | null }) {
-  if (!event.agent_id) return null
+async function agentHome(event: { id: string; slug: string | null; agent_id: string | null; show_on_website?: boolean | null }) {
+  if (!event.agent_id || event.show_on_website === false) return null
   const { data } = await createPublicSupabaseClient()
     .from("website_builder")
     .select("slug, contact")

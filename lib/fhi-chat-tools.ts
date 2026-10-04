@@ -4069,14 +4069,14 @@ async function eventEngagement(admin: Admin, args: { event_title?: string; limit
   const limit = Math.min(Math.max(args.limit ?? 12, 1), 50)
   let q = admin
     .from("events")
-    .select("id, title, event_date, event_days, venue, status, agent_id, show_on_main, registration_open, certificate, view_count, qr_scan_count, created_at")
+    .select("id, title, event_date, event_days, venue, status, agent_id, show_on_main, show_on_website, registration_open, certificate, view_count, qr_scan_count, created_at")
     .is("deleted_at", null)
     .order("event_date", { ascending: false })
     .limit(200)
   if (args.event_title?.trim()) q = q.ilike("title", `%${args.event_title.trim().replace(/[%_]/g, "")}%`)
   const { data, error } = await q
   if (error) throw new Error(error.message)
-  type Ev = { id: string; title: string; event_date: string | null; event_days: number | null; venue: string | null; status: string | null; agent_id: string | null; show_on_main: boolean | null; registration_open: boolean | null; certificate: unknown; view_count: number | null; qr_scan_count: number | null; created_at: string }
+  type Ev = { id: string; title: string; event_date: string | null; event_days: number | null; venue: string | null; status: string | null; agent_id: string | null; show_on_main: boolean | null; show_on_website: boolean | null; registration_open: boolean | null; certificate: unknown; view_count: number | null; qr_scan_count: number | null; created_at: string }
   const events = (data ?? []) as Ev[]
   if (!events.length) return { error: args.event_title ? `No event matching "${args.event_title}"` : "No events yet" }
   const ids = events.map((e) => e.id)
@@ -4106,6 +4106,7 @@ async function eventEngagement(admin: Admin, args: { event_title?: string; limit
       past: e.event_date ? eventIsPast(e.event_date, e.event_days, now) : null,
       run_by: e.agent_id ? owners.get(String(e.agent_id)) ?? "An agent" : "FHI (company event)",
       on_main_events_page: e.agent_id ? Boolean(e.show_on_main) : true,
+      on_agent_website: e.agent_id ? e.show_on_website !== false : false,
       registration_open: Boolean(e.registration_open),
       registrations: r.length,
       registrations_by_day_peak: days.length ? tally(days, (x) => x, 1)[0] : null,

@@ -1,6 +1,6 @@
 import { cache } from "react"
 import type { Metadata } from "next"
-import { notFound, permanentRedirect } from "next/navigation"
+import { notFound, permanentRedirect, redirect } from "next/navigation"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { loadSiteBySlug } from "@/lib/website-builder-service"
 import { createPageMetadata, truncateDescription } from "@/lib/seo"
@@ -20,7 +20,9 @@ import { loadShareContact, withDialableNumbers } from "@/lib/website-project-sha
 // footer and theme around the same event page body, registration form,
 // certificate banner and scan-tracking as the company events. Only events the
 // site's owner owns render here — a company event is never served under an
-// agent's site. Always fresh, like the site itself.
+// agent's site. One the agent put on fhiglobal.ae only (074) forwards to its
+// /events page, so a link shared earlier still lands. Always fresh, like the
+// site itself.
 
 export const dynamic = "force-dynamic"
 
@@ -29,17 +31,20 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const getSite = cache((slug: string) => loadSiteBySlug(createAdminSupabase(), slug))
 
 /** A live, published event owned by this site's agent — by slug or legacy id. */
-const getEvent = cache(async (agentId: string, key: string): Promise<PublicEvent | null> => {
+const getEvent = cache(async (agentId: string, key: string): Promise<(PublicEvent & { show_on_website: boolean | null }) | null> => {
   const query = createAdminSupabase()
     .from("events")
-    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, day_times, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate")
+    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, day_times, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate, show_on_website")
     .eq("agent_id", agentId)
     .eq("status", "published")
     .is("deleted_at", null)
   const { data, error } = UUID_RE.test(key) ? await query.eq("id", key).maybeSingle() : await query.eq("slug", key).maybeSingle()
   if (error) throw new Error("Failed to load event")
-  return (data as PublicEvent | null) ?? null
+  return (data as (PublicEvent & { show_on_website: boolean | null }) | null) ?? null
 })
+
+/** The fhiglobal.ae page of an event the agent put on the main site only (074). */
+const mainEventPath = (event: { id: string; slug: string | null }) => `/events/${event.slug ?? event.id}`
 
 type Props = {
   params: Promise<{ slug: string; event: string }>
@@ -52,6 +57,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!site) notFound()
   const event = await getEvent(site.agentId, key)
   if (!event) notFound()
+  // Not shown on this site (074) — the page forwards to fhiglobal.ae.
+  if (event.show_on_website === false) {
+    return createPageMetadata({ title: event.title, pathname: mainEventPath(event), robots: { index: false, follow: true } })
+  }
   const host = titleCaseName(site.data.agent.name?.replace(/\s+/g, " ").trim() ?? "")
   return createPageMetadata({
     title: event.title,
@@ -78,6 +87,14 @@ export default async function AgentEventPage({ params, searchParams }: Props) {
   }
   const event = await getEvent(site.agentId, key)
   if (!event) notFound()
+  // On fhiglobal.ae only (074): send the visitor there, keeping ?src=qr so a
+  // flyer scan still counts. Temporary — the agent can put it back here.
+  if (event.show_on_website === false) {
+    const query = new URLSearchParams(
+      Object.entries(await searchParams).flatMap(([k, v]) => (Array.isArray(v) ? v.map((x) => [k, x]) : v != null ? [[k, v]] : [])),
+    ).toString()
+    redirect(`${mainEventPath(event)}${query ? `?${query}` : ""}`)
+  }
 
   const home = `/website/${site.slug}`
   const path = eventPublicPath(event, site.slug)

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { after } from "next/server"
 import { revalidatePath } from "next/cache"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { agentWebsite, requireEventAccess } from "@/lib/events/access"
+import { agentWebsite, placementProblem, requireEventAccess } from "@/lib/events/access"
 import { eventPublicPath } from "@/lib/events/paths"
 import { sanitizeEventInput } from "@/lib/events/validate"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
@@ -12,7 +12,7 @@ import { submitToIndexNow } from "@/lib/indexnow"
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 // Fields editors can change via sanitizeEventInput — diffed for the audit trail.
-const EDITABLE = ["title", "description", "brand", "image_url", "venue", "status", "event_date", "event_days", "day_times", "registration_open", "registration_fields", "certificate", "video_url", "show_on_main", "venue_lat", "venue_lng", "venue_place_id"] as const
+const EDITABLE = ["title", "description", "brand", "image_url", "venue", "status", "event_date", "event_days", "day_times", "registration_open", "registration_fields", "certificate", "video_url", "show_on_main", "show_on_website", "venue_lat", "venue_lng", "venue_place_id"] as const
 
 type ExistingEvent = Record<(typeof EDITABLE)[number], unknown> & { id: string }
 
@@ -53,13 +53,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!input.title) {
     return NextResponse.json({ error: "Title is required" }, { status: 400 })
   }
-  // Only admin staff decide what the main /events page lists (migration 067).
-  if (g.scope.kind === "own") delete input.show_on_main
-
   const admin = createAdminSupabase()
   let existingQuery = admin
     .from("events")
-    .select("id, slug, agent_id, title, description, brand, image_url, venue, status, event_date, event_days, day_times, registration_open, registration_fields, certificate, video_url, show_on_main, venue_lat, venue_lng, venue_place_id")
+    .select("id, slug, agent_id, title, description, brand, image_url, venue, status, event_date, event_days, day_times, registration_open, registration_fields, certificate, video_url, show_on_main, show_on_website, venue_lat, venue_lng, venue_place_id")
     .eq("id", id)
     .is("deleted_at", null)
   if (g.scope.kind === "own") existingQuery = existingQuery.eq("agent_id", g.scope.agentId)
@@ -67,6 +64,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (fetchErr) return NextResponse.json({ error: "Failed to update event" }, { status: 500 })
   if (!existing) return NextResponse.json({ error: "Event not found" }, { status: 404 })
+
+  // Where an agent's event appears is the agent's choice since 074 (admins can
+  // change it too) — checked as the pair it ends up as. Company events are
+  // always on /events, so the flags don't apply to them.
+  const site = existing.agent_id ? await agentWebsite(admin, existing.agent_id) : null
+  if (!existing.agent_id) {
+    delete input.show_on_main
+    delete input.show_on_website
+  } else if (input.show_on_main !== undefined || input.show_on_website !== undefined) {
+    const onMain = input.show_on_main ?? existing.show_on_main === true
+    const onWebsite = input.show_on_website ?? existing.show_on_website !== false
+    // A website only matters when this save turns the website on.
+    const placementError = placementProblem(onMain, onWebsite, Boolean(site) || existing.show_on_website !== false)
+    if (placementError) return placementError
+  }
 
   const { error } = await admin
     .from("events")
@@ -112,10 +124,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // Purge the public page immediately (a draft flip must not serve stale for
   // up to `revalidate` seconds) and, when live, ping IndexNow after response.
-  // An agent's event lives on their website; its old /events/<slug> page only
-  // forwards there, so purge both.
-  const site = existing.agent_id ? await agentWebsite(admin, existing.agent_id) : null
-  const publicPath = eventPublicPath(existing, site?.isPublished ? site.slug : null)
+  // An agent's event shown on their website lives there and its /events/<slug>
+  // page forwards to it; one on fhiglobal.ae only renders at /events/<slug> —
+  // purge both, since the choice may just have changed.
+  const onWebsiteNow = (input.show_on_website ?? existing.show_on_website) !== false
+  const publicPath = eventPublicPath(existing, onWebsiteNow && site?.isPublished ? site.slug : null)
   revalidatePath(publicPath)
   if (publicPath !== `/events/${existing.slug ?? id}`) revalidatePath(`/events/${existing.slug ?? id}`)
   // The list page decides by status and show_on_main — both may have just changed.
