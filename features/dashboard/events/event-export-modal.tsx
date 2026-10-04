@@ -15,6 +15,7 @@ import { useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, FileText, X } from "lucide-react"
 import { formatAnswer, type AnswerValue, type RegistrationField } from "@/lib/events/fields"
 import { eventBrand } from "@/lib/events/brands"
+import { daysLabel } from "@/lib/events/pax"
 
 export type ExportRegistration = {
   fullName: string
@@ -22,6 +23,8 @@ export type ExportRegistration = {
   whatsapp: string | null
   invitedBy: string | null
   answers: Record<string, AnswerValue>
+  /** The days they attend (075) — shown as a column on a multi-day event. */
+  days?: number[]
   createdAt: string
   certificateSentAt?: string | null
 }
@@ -55,10 +58,14 @@ function registeredStamp(iso: string, format: Format): string {
   )
 }
 
-function buildColumns(fields: RegistrationField[]): Column[] {
+function buildColumns(fields: RegistrationField[], eventDays: number): Column[] {
   return [
     { id: "index", label: "#", cell: (_r, i) => String(i + 1), defaultOn: { pdf: true, csv: false }, cls: "n" },
     { id: "name", label: "Name", cell: (r) => r.fullName, defaultOn: { pdf: true, csv: true }, cls: "name" },
+    // Which dates each person comes to (pax per date, 075) — multi-day events only.
+    ...(eventDays > 1
+      ? [{ id: "days", label: "Days", cell: (r: ExportRegistration) => daysLabel(r.days ?? [], eventDays), defaultOn: { pdf: true, csv: true } }]
+      : []),
     { id: "email", label: "Email", cell: (r) => r.email, defaultOn: { pdf: true, csv: true } },
     { id: "whatsapp", label: "WhatsApp", cell: (r) => r.whatsapp ?? "", defaultOn: { pdf: true, csv: true } },
     { id: "invited_by", label: "Invited by", cell: (r) => r.invitedBy ?? "", defaultOn: { pdf: true, csv: true } },
@@ -81,6 +88,7 @@ export function EventExportModal({
   event,
   registrations,
   fields,
+  eventDays = 1,
   filterLabel,
   onClose,
 }: {
@@ -88,11 +96,13 @@ export function EventExportModal({
   /** Already filtered by the attendee-list search, so the export matches what is on screen. */
   registrations: ExportRegistration[]
   fields: RegistrationField[]
+  /** How many days the event runs — a multi-day one gets a Days column. */
+  eventDays?: number
   /** The active search text, echoed onto the sheet so a partial list is labelled as such. */
   filterLabel?: string
   onClose: () => void
 }) {
-  const columns = useMemo(() => buildColumns(fields), [fields])
+  const columns = useMemo(() => buildColumns(fields, eventDays), [fields, eventDays])
   const [format, setFormat] = useState<Format>("pdf")
   const [page, setPage] = useState(1)
   // One selection per format, so switching PDF ↔ CSV never discards choices.

@@ -1,20 +1,50 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Image from "next/image"
-import { CheckCircle2, Loader2, Mail, MessageCircle, User, UserPlus } from "lucide-react"
+import { CalendarDays, CheckCircle2, Loader2, Mail, MessageCircle, Ticket, User, UserPlus } from "lucide-react"
 import type { AnswerValue, RegistrationField } from "@/lib/events/fields"
+import type { PublicDaySeats } from "@/lib/events/pax"
 
-/** Public registration form for one event (posts to /api/events/register). */
+/** One day of a multi-day event, as the form lists it ("" while its date isn't set). */
+export type RegisterDay = { day: number; dateLabel: string; time: string }
+
+async function fetchSeats(eventId: string): Promise<PublicDaySeats[]> {
+  const res = await fetch(`/api/events/seats?event=${eventId}`, { cache: "no-store" })
+  if (!res.ok) throw new Error(String(res.status))
+  return ((await res.json()) as { days?: PublicDaySeats[] }).days ?? []
+}
+
+/** "12 seats left" / "Fully booked" / "1 seat left" — nothing when the day has no limit. */
+function seatsText(s: PublicDaySeats | undefined): string | null {
+  if (!s || s.limit === null || s.left === null) return null
+  if (s.full) return "Fully booked"
+  return `${s.left} seat${s.left === 1 ? "" : "s"} left`
+}
+
+/**
+ * Public registration form for one event (posts to /api/events/register).
+ * Pax per date (075): a multi-day event lists its days to tick (at least one;
+ * a full day is shown but can't be picked), a one-day event with a limit shows
+ * its seats left, and when nothing is left the form says the event is fully
+ * booked. Seats load live on open (the page itself may be cached), and only
+ * for an event with a limit.
+ */
 export function EventRegisterForm({
   eventId,
   eventTitle,
   fields = [],
+  days = [],
+  limited = false,
 }: {
   eventId: string
   eventTitle: string
   /** Per-event custom questions, in display order (events.registration_fields). */
   fields?: RegistrationField[]
+  /** A multi-day event's days (071/072), day 1 first; empty for a one-day event. */
+  days?: RegisterDay[]
+  /** Some day has a pax limit — the seats are worth loading. */
+  limited?: boolean
 }) {
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
@@ -23,6 +53,36 @@ export function EventRegisterForm({
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({})
   const [status, setStatus] = useState<"idle" | "sending" | "done">("idle")
   const [error, setError] = useState<string | null>(null)
+
+  // Pax per date: the days ticked, and the live seats per day.
+  const multiDay = days.length > 1
+  const [picked, setPicked] = useState<Set<number>>(new Set())
+  const [seats, setSeats] = useState<PublicDaySeats[] | null>(null)
+  const applySeats = useCallback((s: PublicDaySeats[]) => {
+    setSeats(s)
+    // A day that filled up since it was ticked comes off the selection.
+    setPicked((prev) => new Set([...prev].filter((d) => !s.find((x) => x.day === d)?.full)))
+  }, [])
+  useEffect(() => {
+    if (!limited) return
+    let alive = true
+    fetchSeats(eventId).then(
+      (s) => alive && applySeats(s),
+      () => {},
+    )
+    return () => {
+      alive = false
+    }
+  }, [eventId, limited, applySeats])
+  const seatOf = (day: number) => seats?.find((s) => s.day === day)
+  const allFull = !!seats?.length && seats.every((s) => s.full)
+  const togglePick = (day: number) =>
+    setPicked((prev) => {
+      const next = new Set(prev)
+      if (next.has(day)) next.delete(day)
+      else next.add(day)
+      return next
+    })
 
   const setAnswer = (key: string, value: AnswerValue) => setAnswers((a) => ({ ...a, [key]: value }))
 
@@ -72,22 +132,56 @@ export function EventRegisterForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (multiDay && picked.size === 0) {
+      setError("Please choose the day(s) you'll attend.")
+      return
+    }
     setStatus("sending")
     setError(null)
     try {
       const res = await fetch("/api/events/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId, fullName, email, whatsapp, invitedBy, answers }),
+        body: JSON.stringify({
+          eventId,
+          fullName,
+          email,
+          whatsapp,
+          invitedBy,
+          answers,
+          ...(multiDay ? { days: [...picked].sort((a, b) => a - b) } : {}),
+        }),
       })
-      const data = (await res.json().catch(() => ({}))) as { error?: string }
-      if (!res.ok) throw new Error(data.error ?? "Registration failed — please try again")
+      const data = (await res.json().catch(() => ({}))) as { error?: string; full_day?: number | null }
+      if (!res.ok) {
+        // A day filled up while they were typing: refresh the seats so it shows.
+        if (res.status === 409 && data.full_day !== undefined) fetchSeats(eventId).then(applySeats, () => {})
+        throw new Error(data.error ?? "Registration failed — please try again")
+      }
       setStatus("done")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed — please try again")
       setStatus("idle")
     }
   }
+
+  // Every seat taken: nothing to register for.
+  if (allFull && status !== "done") {
+    return (
+      <div className="text-center py-8">
+        <div className="w-14 h-14 rounded-full bg-[#faf7ee] border border-[#e7d9a8] flex items-center justify-center mx-auto mb-4">
+          <Ticket className="w-6 h-6 text-[#9ca3af]" />
+        </div>
+        <h3 className="font-['Outfit'] text-lg font-bold text-[#0d1117] mb-1.5">Fully booked</h3>
+        <p className="text-sm text-[#6b7280] leading-relaxed max-w-xs mx-auto">
+          Every seat for {multiDay ? "every day of " : ""}
+          <span className="font-semibold text-[#0f2940]">{eventTitle}</span> is taken.
+        </p>
+      </div>
+    )
+  }
+
+  const pickedDays = days.filter((d) => picked.has(d.day))
 
   if (status === "done") {
     return (
@@ -97,15 +191,70 @@ export function EventRegisterForm({
         </div>
         <h3 className="font-['Outfit'] text-xl font-bold text-[#0d1117] mb-2">You&apos;re registered!</h3>
         <p className="text-sm text-[#6b7280] leading-relaxed max-w-xs mx-auto">
-          Thank you for registering for <span className="font-semibold text-[#0f2940]">{eventTitle}</span>.
-          We&apos;ll be in touch — see you there!
+          Thank you for registering for <span className="font-semibold text-[#0f2940]">{eventTitle}</span>
+          {multiDay && pickedDays.length > 0 && pickedDays.length < days.length && (
+            <> — {pickedDays.map((d) => `Day ${d.day}`).join(", ")}</>
+          )}
+          . We&apos;ll be in touch — see you there!
         </p>
       </div>
     )
   }
 
+  // A one-day event with a limit shows what's left above the form.
+  const singleSeats = !multiDay ? seatsText(seatOf(1)) : null
+
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+      {/* Pax per date (075): tick the days you'll attend — a full day can't be picked. */}
+      {multiDay && (
+        <fieldset className="space-y-1.5">
+          <legend className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-[#374151]">
+            Which day(s) will you attend? *
+          </legend>
+          {days.map((d) => {
+            const s = seatOf(d.day)
+            const full = !!s?.full
+            const note = seatsText(s)
+            const on = picked.has(d.day)
+            return (
+              <label
+                key={d.day}
+                className={`flex items-center gap-3 rounded-xl border px-3.5 py-2.5 transition-colors ${
+                  full
+                    ? "cursor-not-allowed border-[#eef0f3] bg-[#f9fafb] opacity-60"
+                    : on
+                      ? "cursor-pointer border-[#001f3f] bg-[#001f3f]/[0.04]"
+                      : "cursor-pointer border-[#e5e7eb] bg-white hover:border-[#d6b357]"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={on}
+                  disabled={full}
+                  onChange={() => togglePick(d.day)}
+                  className="h-4 w-4 shrink-0 rounded border-[#d1d5db] text-[#001f3f] focus:ring-[#001f3f]/30"
+                />
+                <CalendarDays className="h-4 w-4 shrink-0 text-[#d6b357]" />
+                <span className="min-w-0 flex-1 text-sm">
+                  <span className="font-bold text-[#0f2940]">Day {d.day}</span>
+                  {[d.dateLabel, d.time].filter(Boolean).map((part) => (
+                    <span key={part} className="text-[#4b5563]"> · {part}</span>
+                  ))}
+                </span>
+                {note && (
+                  <span className={`shrink-0 text-[11px] font-bold ${full ? "text-rose-600" : "text-[#8a6d2a]"}`}>{note}</span>
+                )}
+              </label>
+            )
+          })}
+        </fieldset>
+      )}
+      {singleSeats && (
+        <p className="flex items-center gap-2 rounded-xl border border-[#e7d9a8] bg-[#faf7ee] px-3.5 py-2 text-xs font-bold text-[#8a6d2a]">
+          <Ticket className="h-3.5 w-3.5" /> {singleSeats}
+        </p>
+      )}
       <div className="space-y-1.5">
         <label className="text-xs font-semibold uppercase tracking-wider text-[#374151]">Full name *</label>
         <div className="relative">

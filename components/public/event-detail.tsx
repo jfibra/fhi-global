@@ -6,8 +6,9 @@ import type { EventHost } from "@/lib/events/host"
 import { ProjectLocationMap } from "@/components/public/project-location-map"
 import { eventBrand } from "@/lib/events/brands"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
-import { eventDateRangeLabel, eventLengthLabel, eventSchedule, eventStartTime, hasCustomDayTimes } from "@/lib/events/dates"
+import { eventDateRangeLabel, eventLengthLabel, eventSchedule, eventStartTime, hasCustomDayTimes, normalizeEventDays } from "@/lib/events/dates"
 import { parseRegistrationFields } from "@/lib/events/fields"
+import { hasPaxLimits } from "@/lib/events/pax"
 import { EventRegisterForm } from "@/components/public/event-register-form"
 import { EventPageQr } from "@/components/public/event-page-qr"
 import { EventHeroQr } from "@/components/public/event-hero-qr"
@@ -46,6 +47,8 @@ export type PublicEvent = {
   event_days?: number | null
   /** Per-day start times (072), day 1 first. */
   day_times?: unknown
+  /** Pax per date (075), day 1 first — null = no limit. */
+  day_pax?: unknown
   venue: string | null
   /** The venue's exact spot (migration 068); null when it was typed, not picked. */
   venue_lat?: number | null
@@ -98,6 +101,14 @@ export function EventDetail({
   const timeLabel = startTime ? `${length ? "From " : ""}${startTime} (GST)${length ? ` · ${length}` : ""}` : null
   // Days that start at different times get their own line each (072).
   const schedule = hasCustomDayTimes(event.event_date, event.event_days, event.day_times) ? eventSchedule(event.event_date, event.event_days, event.day_times) : []
+  // A multi-day sign-up ticks the days it attends (075) — listed even before the dates are set.
+  const dayCount = normalizeEventDays(event.event_days)
+  const daySchedule = dayCount > 1 ? eventSchedule(event.event_date, event.event_days, event.day_times) : []
+  const registerDays = Array.from({ length: dayCount > 1 ? dayCount : 0 }, (_, i) => ({
+    day: i + 1,
+    dateLabel: daySchedule[i]?.dateLabel ?? "",
+    time: daySchedule[i]?.time ?? "",
+  }))
 
   return (
     <>
@@ -316,6 +327,8 @@ export function EventDetail({
                   eventId={event.id}
                   eventTitle={event.title}
                   fields={parseRegistrationFields(event.registration_fields)}
+                  days={registerDays}
+                  limited={hasPaxLimits(event.day_pax, event.event_days)}
                 />
                 <EventPageQr />
               </div>

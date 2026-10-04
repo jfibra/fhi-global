@@ -34,7 +34,7 @@ const getSite = cache((slug: string) => loadSiteBySlug(createAdminSupabase(), sl
 const getEvent = cache(async (agentId: string, key: string): Promise<(PublicEvent & { show_on_main: boolean | null; show_on_website: boolean | null }) | null> => {
   const query = createAdminSupabase()
     .from("events")
-    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, day_times, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate, show_on_main, show_on_website")
+    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, day_times, day_pax, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate, show_on_main, show_on_website")
     .eq("agent_id", agentId)
     .eq("status", "published")
     .is("deleted_at", null)

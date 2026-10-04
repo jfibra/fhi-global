@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { parseRegistrationFields, validateAnswers } from "@/lib/events/fields"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
+import { normalizeEventDays, eventSchedule } from "@/lib/events/dates"
 import { sendEventRegistrationEmail } from "@/lib/mailer"
 import { SITE_URL } from "@/lib/seo"
 import { titleCaseName } from "@/lib/public-profile"
@@ -13,6 +14,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
  * Public event registration (reached from the event page / its QR code).
  * Intentionally unauthenticated — attendees are not portal users. Validates
  * against published events only; the unique index rejects duplicate emails.
+ *
+ * Pax per date (075): a multi-day event's sign-up ticks the days it attends
+ * (`days`, at least one); a one-day event's doesn't. event_register() checks
+ * each chosen day still has room and inserts in one locked step, so a full
+ * date answers 409 and names it.
  */
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
@@ -61,20 +67,43 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: checked.error }, { status: 400 })
   }
 
-  const { error } = await admin.from("event_registrations").insert({
-    event_id: eventId,
-    full_name: fullName,
-    email,
-    whatsapp: whatsapp || null,
-    invited_by: invitedBy || null,
-    answers: checked.answers,
+  // The days this sign-up attends: only a multi-day event asks (NULL = every day).
+  const eventDays = normalizeEventDays(event.event_days)
+  let days: number[] | null = null
+  if (eventDays > 1) {
+    const picked = Array.isArray(body.days) ? body.days.map(Number) : []
+    days = [...new Set(picked.filter((d) => Number.isInteger(d) && d >= 1 && d <= eventDays))].sort((a, b) => a - b)
+    if (days.length === 0) {
+      return NextResponse.json({ error: "Please choose the day(s) you'll attend" }, { status: 400 })
+    }
+  }
+
+  const { data: result, error } = await admin.rpc("event_register", {
+    p_event_id: eventId,
+    p_full_name: fullName,
+    p_email: email,
+    p_whatsapp: whatsapp || null,
+    p_invited_by: invitedBy || null,
+    p_answers: checked.answers,
+    p_days: days,
   })
 
   if (error) {
     if (error.code === "23505") {
       return NextResponse.json({ error: "This email is already registered for the event" }, { status: 409 })
     }
+    console.error("[events/register] insert failed:", error.message)
     return NextResponse.json({ error: "Registration failed — please try again" }, { status: 500 })
+  }
+  const row = (Array.isArray(result) ? result[0] : result) as { registration_id: string | null; full_day: number | null } | null
+  if (!row?.registration_id) {
+    const full = row?.full_day ?? null
+    const when = full ? eventSchedule(event.event_date as string | null, event.event_days, event.day_times)[full - 1] : null
+    const message =
+      eventDays > 1 && full
+        ? `Day ${full}${when ? ` (${when.dateLabel})` : ""} is fully booked — please choose another day.`
+        : "This event is fully booked."
+    return NextResponse.json({ error: message, full_day: full }, { status: 409 })
   }
 
   // Confirmation email — best effort; a mail hiccup must never undo a
@@ -88,6 +117,7 @@ export async function POST(req: NextRequest) {
       eventDays: (event.event_days as number | null) ?? 1,
       dayTimes: event.day_times,
       venue: (event.venue as string | null) ?? null,
+      attendingDays: days,
       eventUrl: `${SITE_URL.replace(/\/$/, "")}/events/${(event.slug as string | null) ?? eventId}`,
     })
   } catch (e) {

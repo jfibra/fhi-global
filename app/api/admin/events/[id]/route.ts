@@ -12,7 +12,7 @@ import { submitToIndexNow } from "@/lib/indexnow"
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 // Fields editors can change via sanitizeEventInput — diffed for the audit trail.
-const EDITABLE = ["title", "description", "brand", "image_url", "venue", "status", "event_date", "event_days", "day_times", "registration_open", "registration_fields", "certificate", "video_url", "show_on_main", "show_on_website", "venue_lat", "venue_lng", "venue_place_id"] as const
+const EDITABLE = ["title", "description", "brand", "image_url", "venue", "status", "event_date", "event_days", "day_times", "day_pax", "registration_open", "registration_fields", "certificate", "video_url", "show_on_main", "show_on_website", "venue_lat", "venue_lng", "venue_place_id"] as const
 
 type ExistingEvent = Record<(typeof EDITABLE)[number], unknown> & { id: string }
 
@@ -37,6 +37,10 @@ function sameValue(key: string, before: unknown, after: unknown): boolean {
   if (key === "event_date" && typeof before === "string" && typeof after === "string") {
     return new Date(before).getTime() === new Date(after).getTime()
   }
+  // jsonb lists (day times, pax per date, fields…) compare by content.
+  if (before && after && typeof before === "object" && typeof after === "object") {
+    return JSON.stringify(before) === JSON.stringify(after)
+  }
   return (before ?? null) === (after ?? null)
 }
 
@@ -56,7 +60,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const admin = createAdminSupabase()
   let existingQuery = admin
     .from("events")
-    .select("id, slug, agent_id, title, description, brand, image_url, venue, status, event_date, event_days, day_times, registration_open, registration_fields, certificate, video_url, show_on_main, show_on_website, venue_lat, venue_lng, venue_place_id")
+    .select("id, slug, agent_id, title, description, brand, image_url, venue, status, event_date, event_days, day_times, day_pax, registration_open, registration_fields, certificate, video_url, show_on_main, show_on_website, venue_lat, venue_lng, venue_place_id")
     .eq("id", id)
     .is("deleted_at", null)
   if (g.scope.kind === "own") existingQuery = existingQuery.eq("agent_id", g.scope.agentId)

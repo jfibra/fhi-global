@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from "next/server"
 import { canAccessEvent, eventNotFound, requireEventAccess } from "@/lib/events/access"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { titleCaseName } from "@/lib/public-profile"
+import { daySeats, registrationDays } from "@/lib/events/pax"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-/** Attendee list for one event — admin only (service role; RLS keeps this table closed otherwise). */
+/**
+ * Attendee list for one event — admin only (service role; RLS keeps this table
+ * closed otherwise). Pax per date (075): each row says which days it attends,
+ * and `seats` gives every day's count against its limit — counted in the
+ * database, so it stays right past the list's 1000-row cap.
+ */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const access = await requireEventAccess()
   if (!access.ok) return access.response
@@ -16,12 +22,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "Invalid event id" }, { status: 400 })
 
   const admin = createAdminSupabase()
-  const { data, error } = await admin
-    .from("event_registrations")
-    .select("id, full_name, email, whatsapp, invited_by, answers, created_at, certificate_sent_at")
-    .eq("event_id", id)
-    .order("created_at", { ascending: false })
-    .limit(1000)
+  const [{ data, error }, { data: event }, { data: counts }] = await Promise.all([
+    admin
+      .from("event_registrations")
+      .select("id, full_name, email, whatsapp, invited_by, answers, days, created_at, certificate_sent_at")
+      .eq("event_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1000),
+    admin.from("events").select("event_days, day_pax").eq("id", id).maybeSingle(),
+    admin.rpc("event_day_counts", { p_event_id: id }),
+  ])
 
   if (error) {
     return NextResponse.json({ error: "Failed to load registrations" }, { status: 500 })
@@ -37,11 +47,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     whatsapp: (r.whatsapp as string | null) ?? null,
     invitedBy: r.invited_by ? titleCaseName(r.invited_by as string) : null,
     answers: (r.answers as Record<string, string | number | boolean> | null) ?? {},
+    days: registrationDays(r.days, event?.event_days),
     createdAt: r.created_at as string,
     certificateSentAt: (r.certificate_sent_at as string | null) ?? null,
   }))
 
-  return NextResponse.json({ registrations })
+  return NextResponse.json({ registrations, seats: daySeats(event?.day_pax, event?.event_days, counts ?? []) })
 }
 
 /** Remove one registration (e.g. test/dummy sign-ups) — hard delete, scoped to the event. */

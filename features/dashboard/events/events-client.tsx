@@ -42,6 +42,7 @@ import { compressImageForUpload } from "@/lib/upload/compress-image"
 import { isPlayableVideoUrl } from "@/lib/video-embed"
 import { VenueAutocomplete, type VenuePin } from "@/components/dashboard/venue-autocomplete"
 import { eventDateRangeLabel, eventSchedule, eventWhenLabel, normalizeEventDays } from "@/lib/events/dates"
+import { MAX_DAY_PAX, daysLabel, normalizeDayPax, type DaySeats } from "@/lib/events/pax"
 
 type AdminEvent = {
   id: string
@@ -59,6 +60,8 @@ type AdminEvent = {
   eventDays: number
   /** Per-day start times, day 1 first (072). */
   dayTimes: (string | null)[]
+  /** Pax per date, day 1 first — null = no limit (075). */
+  dayPax: (number | null)[]
   venue: string | null
   venueLat: number | null
   venueLng: number | null
@@ -94,8 +97,22 @@ type Registration = {
   invitedBy: string | null
   /** Answers to this event's extra fields, keyed by field key. */
   answers: Record<string, AnswerValue>
+  /** The days they attend, day 1 first — every day unless they ticked some (075). */
+  days: number[]
   createdAt: string
   certificateSentAt: string | null
+}
+
+/** A typed pax: a whole number ≥ 1, or null for no limit. */
+const paxOf = (v: string | undefined): number | null => {
+  const n = Math.floor(Number(v))
+  return v?.trim() && Number.isFinite(n) && n >= 1 ? Math.min(MAX_DAY_PAX, n) : null
+}
+
+/** One day's seats after its count changes (a registration removed). */
+const withTaken = (s: DaySeats, taken: number): DaySeats => {
+  const left = s.limit === null ? null : Math.max(0, s.limit - taken)
+  return { ...s, taken, left, full: left === 0 }
 }
 
 type FormState = {
@@ -110,6 +127,8 @@ type FormState = {
   eventDays: number
   /** "HH:MM" start per day, index = day − 1; "" = same as day 1. Index 0 is unused (day 1 is the start above). */
   dayTimes: string[]
+  /** Pax per date as typed, index = day − 1; "" = no limit (075). */
+  dayPax: string[]
   venue: string
   /** The picked place's exact spot, or null when the venue was typed freely. */
   venuePin: VenuePin | null
@@ -130,6 +149,7 @@ const EMPTY_FORM: FormState = {
   eventDate: "",
   eventDays: 1,
   dayTimes: [],
+  dayPax: [],
   venue: "",
   venuePin: null,
   status: "draft",
@@ -223,19 +243,29 @@ export function EventsClient({
   const regFields = regEvent?.registrationFields ?? []
   const [registrations, setRegistrations] = useState<Registration[]>([])
   const [regsLoading, setRegsLoading] = useState(false)
+  // Pax per date (075): each day's count against its limit (counted in the
+  // database), and the day the list is narrowed to — null = everyone.
+  const [regSeats, setRegSeats] = useState<DaySeats[]>([])
+  const [regDay, setRegDay] = useState<number | null>(null)
+  const regMultiDay = (regEvent?.eventDays ?? 1) > 1
 
   // Search + pagination over the registrations table
   const REG_PAGE_SIZE = 10
   const [regQuery, setRegQuery] = useState("")
   const [regPage, setRegPage] = useState(1)
 
+  // The chosen day's attendees — what the table, the export and the raffle use.
+  const dayRegs = useMemo(
+    () => (regDay === null ? registrations : registrations.filter((r) => r.days?.includes(regDay))),
+    [registrations, regDay],
+  )
   const filteredRegs = useMemo(() => {
     const q = regQuery.trim().toLowerCase()
-    if (!q) return registrations
-    return registrations.filter(
+    if (!q) return dayRegs
+    return dayRegs.filter(
       (r) => r.fullName.toLowerCase().includes(q) || r.email.toLowerCase().includes(q),
     )
-  }, [registrations, regQuery])
+  }, [dayRegs, regQuery])
 
   const regTotalPages = Math.max(1, Math.ceil(filteredRegs.length / REG_PAGE_SIZE))
   const regSafePage = Math.min(regPage, regTotalPages)
@@ -306,6 +336,7 @@ export function EventsClient({
       eventDate: toDubaiInput(e.eventDate),
       eventDays: normalizeEventDays(e.eventDays),
       dayTimes: (e.dayTimes ?? []).map((t, i) => (i === 0 ? "" : t ?? "")),
+      dayPax: normalizeDayPax(e.dayPax, e.eventDays).map((v) => (v === null ? "" : String(v))),
       venue: e.venue ?? "",
       venuePin: e.venueLat != null && e.venueLng != null ? { lat: e.venueLat, lng: e.venueLng, placeId: e.venuePlaceId ?? "" } : null,
       status: e.status,
@@ -316,6 +347,28 @@ export function EventsClient({
     setFormError(null)
     setModalOpen(true)
   }
+
+  // Pax box for one day — blank = no limit (075).
+  const paxInput = (day: number) => (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={1}
+      max={MAX_DAY_PAX}
+      step={1}
+      placeholder="No limit"
+      aria-label={form.eventDays > 1 ? `Day ${day} pax` : "Pax"}
+      value={form.dayPax[day - 1] ?? ""}
+      onChange={(e) =>
+        setForm((f) => {
+          const next = Array.from({ length: f.eventDays }, (_, i) => f.dayPax[i] ?? "")
+          next[day - 1] = e.target.value
+          return { ...f, dayPax: next }
+        })
+      }
+      className="w-[120px] shrink-0 border border-[#e5e7eb] bg-white px-2 py-1.5 text-xs text-[#111827] placeholder:text-[#9ca3af] focus:border-[#001f3f] focus:outline-none"
+    />
+  )
 
   // ── Custom registration fields ─────────────────────────────────────────
   // Keys address stored answers, so an existing field's key is never changed
@@ -394,6 +447,7 @@ export function EventsClient({
         event_date: form.eventDate ? fromDubaiInput(form.eventDate) : "",
         event_days: form.eventDays,
         day_times: Array.from({ length: form.eventDays }, (_, i) => (i === 0 ? null : form.dayTimes[i] || null)),
+        day_pax: Array.from({ length: form.eventDays }, (_, i) => paxOf(form.dayPax[i])),
         venue: form.venue,
         status: form.status,
         registration_open: form.registrationOpen,
@@ -506,6 +560,7 @@ export function EventsClient({
   // Attendee lists already loaded this session — reopening an event shows
   // them instantly while a fresh copy loads in the background.
   const regsCacheRef = useRef<Record<string, Registration[]>>({})
+  const seatsCacheRef = useRef<Record<string, DaySeats[]>>({})
   // Which event's registrations the modal is currently showing (guards a slow
   // response for event A from overwriting event B's list).
   const regOpenIdRef = useRef<string | null>(null)
@@ -514,9 +569,11 @@ export function EventsClient({
     setRegEvent(e)
     setRegQuery("")
     setRegPage(1)
+    setRegDay(null)
     regOpenIdRef.current = e.id
 
     const cached = regsCacheRef.current[e.id]
+    setRegSeats(seatsCacheRef.current[e.id] ?? [])
     if (cached) {
       setRegistrations(cached)
       setRegsLoading(false)
@@ -527,10 +584,14 @@ export function EventsClient({
 
     try {
       const res = await fetch(`/api/admin/events/${e.id}/registrations`, { cache: "no-store" })
-      const data = (await res.json()) as { registrations?: Registration[] }
+      const data = (await res.json()) as { registrations?: Registration[]; seats?: DaySeats[] }
       const fresh = data.registrations ?? []
       regsCacheRef.current[e.id] = fresh
-      if (regOpenIdRef.current === e.id) setRegistrations(fresh)
+      seatsCacheRef.current[e.id] = data.seats ?? []
+      if (regOpenIdRef.current === e.id) {
+        setRegistrations(fresh)
+        setRegSeats(data.seats ?? [])
+      }
     } catch {
       // keep whatever is shown (cached list or empty state)
     } finally {
@@ -589,8 +650,11 @@ export function EventsClient({
       })
       if (!res.ok) throw new Error("failed")
       setRegistrations((prev) => prev.filter((x) => x.id !== r.id))
-      // Keep the session cache and the "N registered" card count in sync.
+      // Keep the session cache, each day's seats and the "N registered" card count in sync.
       regsCacheRef.current[regEvent.id] = (regsCacheRef.current[regEvent.id] ?? []).filter((x) => x.id !== r.id)
+      const freed = (seats: DaySeats[]) => seats.map((d) => (r.days?.includes(d.day) ? withTaken(d, Math.max(0, d.taken - 1)) : d))
+      seatsCacheRef.current[regEvent.id] = freed(seatsCacheRef.current[regEvent.id] ?? [])
+      setRegSeats(freed)
       setEvents((prev) =>
         prev.map((e) =>
           e.id === regEvent.id ? { ...e, registrationCount: Math.max(0, e.registrationCount - 1) } : e,
@@ -1178,6 +1242,34 @@ export function EventsClient({
                 </div>
               </div>
 
+              {/* Pax per date (075): the most people each date takes — blank = no limit.
+                  A full date closes on its own; the other dates stay open. */}
+              <div>
+                <p className={labelCls}>{form.eventDays > 1 ? "Pax per date" : "Pax"}</p>
+                {form.eventDays > 1 ? (
+                  <div className="max-w-md border border-[#e5e7eb] bg-[#fafbfc]">
+                    {(form.eventDate
+                      ? eventSchedule(fromDubaiInput(form.eventDate), form.eventDays, null)
+                      : Array.from({ length: form.eventDays }, (_, i) => ({ day: i + 1, dateLabel: "" }))
+                    ).map((d) => (
+                      <div key={d.day} className="flex items-center gap-3 border-b border-[#eef0f3] px-3 py-2 last:border-b-0">
+                        <span className="w-12 shrink-0 text-xs font-bold text-[#001f3f]">Day {d.day}</span>
+                        <span className="min-w-0 flex-1 text-xs text-[#6b7280]">{d.dateLabel}</span>
+                        {paxInput(d.day)}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  paxInput(1)
+                )}
+                <p className="mt-1.5 max-w-md text-[11px] text-[#6b7280]">
+                  {form.eventDays > 1
+                    ? "Each date takes its own sign-ups. A full date closes on the event page and the other dates stay open; someone who picks several dates takes a seat on each."
+                    : "When it’s full, the event page shows “Fully booked”."}{" "}
+                  Blank means no limit. Setting it below who’s already registered only stops new sign-ups.
+                </p>
+              </div>
+
               {/* Where an agent's event appears (074) — the agent's choice, never nowhere.
                   Company events (admins, new or editing one) don't get this: always /events. */}
               {(own || editing?.agentId) && (
@@ -1347,8 +1439,8 @@ export function EventsClient({
       {raffleOpen && regEvent && (
         <EventRaffle
           eventId={regEvent.id}
-          eventTitle={regEvent.title}
-          entries={registrations.map((r) => ({ id: r.id, fullName: r.fullName, email: r.email }))}
+          eventTitle={regDay ? `${regEvent.title} · Day ${regDay}` : regEvent.title}
+          entries={dayRegs.map((r) => ({ id: r.id, fullName: r.fullName, email: r.email }))}
           onClose={() => setRaffleOpen(false)}
         />
       )}
@@ -1359,7 +1451,8 @@ export function EventsClient({
           event={{ title: regEvent.title, slug: regEvent.slug, venue: regEvent.venue, eventDateText: eventDateLabel(regEvent.eventDate, regEvent.eventDays), brand: regEvent.brand }}
           registrations={filteredRegs}
           fields={regFields}
-          filterLabel={regQuery.trim() || undefined}
+          eventDays={regEvent.eventDays}
+          filterLabel={[regDay ? `Day ${regDay}` : "", regQuery.trim()].filter(Boolean).join(" · ") || undefined}
           onClose={() => setExportOpen(false)}
         />
       )}
@@ -1427,8 +1520,8 @@ export function EventsClient({
                 <button
                   type="button"
                   onClick={() => setRaffleOpen(true)}
-                  disabled={regsLoading || registrations.length === 0}
-                  title="Start a live raffle — pick a random winner"
+                  disabled={regsLoading || dayRegs.length === 0}
+                  title={regDay ? `Start a live raffle among Day ${regDay}'s attendees` : "Start a live raffle — pick a random winner"}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#d6b357] text-[#001f3f] text-xs font-bold hover:bg-[#c8a544] transition-colors disabled:opacity-40"
                 >
                   <Trophy className="w-4 h-4" />
@@ -1439,6 +1532,55 @@ export function EventsClient({
                 </button>
               </div>
             </div>
+
+            {/* Pax per date (075): each day's sign-ups against its limit. On a
+                multi-day event the days filter the list — and the export and
+                raffle with it. */}
+            {!regsLoading && regSeats.length > 0 && (regMultiDay || regSeats[0].limit !== null) && (
+              <div className="mb-4 flex flex-wrap items-center gap-1.5">
+                {regMultiDay ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRegDay(null)
+                        setRegPage(1)
+                      }}
+                      className={`border px-3 py-1.5 text-xs font-bold transition-colors ${regDay === null ? "border-[#001f3f] bg-[#001f3f] text-white" : "border-[#e5e7eb] bg-white text-[#374151] hover:border-[#d6b357]"}`}
+                    >
+                      All days · {registrations.length}
+                    </button>
+                    {regSeats.map((d) => {
+                      const date = eventSchedule(regEvent.eventDate, regEvent.eventDays, regEvent.dayTimes)[d.day - 1]?.dateLabel
+                      const on = regDay === d.day
+                      return (
+                        <button
+                          key={d.day}
+                          type="button"
+                          onClick={() => {
+                            setRegDay(d.day)
+                            setRegPage(1)
+                          }}
+                          title={d.limit === null ? `${d.taken} registered — no limit` : `${d.taken} of ${d.limit} seats taken`}
+                          className={`inline-flex items-center gap-1.5 border px-3 py-1.5 text-xs font-bold transition-colors ${on ? "border-[#001f3f] bg-[#001f3f] text-white" : "border-[#e5e7eb] bg-white text-[#374151] hover:border-[#d6b357]"}`}
+                        >
+                          Day {d.day}
+                          {date && <span className={`font-semibold ${on ? "text-white/70" : "text-[#9ca3af]"}`}>{date}</span>}
+                          <span>· {d.limit === null ? d.taken : `${d.taken}/${d.limit}`}</span>
+                          {d.full && <span className={`px-1.5 py-px text-[10px] uppercase tracking-wide ${on ? "bg-white/15 text-white" : "bg-rose-50 text-rose-700"}`}>Full</span>}
+                        </button>
+                      )
+                    })}
+                  </>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs font-bold text-[#374151]">
+                    <Users className="h-3.5 w-3.5 text-[#9ca3af]" />
+                    {regSeats[0].taken} of {regSeats[0].limit} seats taken
+                    {regSeats[0].full && <span className="bg-rose-50 px-1.5 py-px text-[10px] uppercase tracking-wide text-rose-700">Full</span>}
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Search — filters the table, the export follows it */}
             {!regsLoading && registrations.length > 0 && (
@@ -1464,6 +1606,10 @@ export function EventsClient({
               <p className="text-sm text-[#9ca3af] py-8 text-center">
                 No one has registered yet — share the QR code to get sign-ups.
               </p>
+            ) : dayRegs.length === 0 ? (
+              <p className="text-sm text-[#9ca3af] py-8 text-center">
+                No one has registered for Day {regDay} yet.
+              </p>
             ) : filteredRegs.length === 0 ? (
               <p className="text-sm text-[#9ca3af] py-8 text-center">
                 No registrations match <span className="font-semibold text-[#374151]">&ldquo;{regQuery.trim()}&rdquo;</span> — try another name or email.
@@ -1474,6 +1620,7 @@ export function EventsClient({
                   <thead>
                     <tr className="border-b border-[#f0f0f0] text-left text-xs font-bold uppercase tracking-wide text-[#6b7280]">
                       <th className="px-3 py-2">Name</th>
+                      {regMultiDay && <th className="px-3 py-2">Days</th>}
                       <th className="px-3 py-2">Email</th>
                       <th className="px-3 py-2">WhatsApp</th>
                       <th className="px-3 py-2">Invited by</th>
@@ -1489,6 +1636,9 @@ export function EventsClient({
                     {regPageItems.map((r) => (
                       <tr key={r.id} className="border-b border-[#f7f7f7]">
                         <td className="px-3 py-2.5 font-semibold text-[#111827]">{r.fullName}</td>
+                        {regMultiDay && (
+                          <td className="px-3 py-2.5 text-[#374151] whitespace-nowrap">{daysLabel(r.days ?? [], regEvent.eventDays) || "—"}</td>
+                        )}
                         <td className="px-3 py-2.5 text-[#374151]">
                           <a href={`mailto:${r.email}`} className="hover:text-[#001f3f] hover:underline">{r.email}</a>
                         </td>

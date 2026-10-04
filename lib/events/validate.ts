@@ -3,6 +3,7 @@ import { parseRegistrationFields } from "@/lib/events/fields"
 import { parseCertificateSettings } from "@/lib/events/certificate"
 import { isPlayableVideoUrl } from "@/lib/video-embed"
 import { normalizeDayTimes, normalizeEventDays } from "@/lib/events/dates"
+import { normalizeDayPax } from "@/lib/events/pax"
 
 const STATUSES = ["draft", "published", "archived"] as const
 
@@ -27,6 +28,8 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
   const event_days = body.event_days !== undefined ? normalizeEventDays(body.event_days) : undefined
   // A start time per day (migration 072), day 1 mirroring event_date. Only when sent.
   const day_times = body.day_times !== undefined ? normalizeDayTimes(body.day_times, event_date, body.event_days ?? 1) : undefined
+  // Pax per date (075): the most attendees each day takes, null = no limit. Only when sent.
+  const day_pax = body.day_pax !== undefined ? normalizeDayPax(body.day_pax, body.event_days ?? 1) : undefined
   // Manual registration toggle; anything but an explicit false means open.
   const registration_open = body.registration_open !== false
   // Per-event questions. Editable at any time — parseRegistrationFields drops
@@ -68,6 +71,7 @@ export function sanitizeEventInput(body: Record<string, unknown>) {
     event_date,
     ...(event_days !== undefined ? { event_days } : {}),
     ...(day_times !== undefined ? { day_times } : {}),
+    ...(day_pax !== undefined ? { day_pax } : {}),
     registration_open,
     ...(registration_fields !== undefined ? { registration_fields } : {}),
     ...(certificate !== undefined ? { certificate } : {}),

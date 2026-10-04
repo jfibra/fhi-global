@@ -5,6 +5,7 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import { agentWebsite, placementProblem, publishedSiteSlugs, requireEventAccess } from "@/lib/events/access"
 import { eventPublicPath } from "@/lib/events/paths"
 import { sanitizeEventInput } from "@/lib/events/validate"
+import { normalizeDayPax } from "@/lib/events/pax"
 import { parseRegistrationFields } from "@/lib/events/fields"
 import { parseCertificateSettings } from "@/lib/events/certificate"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
@@ -31,7 +32,7 @@ export async function GET() {
   const admin = createAdminSupabase()
   let query = admin
     .from("events")
-    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, day_times, venue, status, registration_open, registration_fields, certificate, created_at, view_count, qr_scan_count, agent_id, show_on_main, show_on_website, venue_lat, venue_lng, venue_place_id, owner:profiles!events_agent_id_fkey(fullname), event_registrations(count)")
+    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, day_times, day_pax, venue, status, registration_open, registration_fields, certificate, created_at, view_count, qr_scan_count, agent_id, show_on_main, show_on_website, venue_lat, venue_lng, venue_place_id, owner:profiles!events_agent_id_fkey(fullname), event_registrations(count)")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
   if (access.scope.kind === "own") query = query.eq("agent_id", access.scope.agentId)
@@ -65,6 +66,8 @@ export async function GET() {
       eventDays: (e.event_days as number | null) ?? 1,
       /** One "HH:MM" Dubai start per day, day 1 first; null = same as day 1 (072). */
       dayTimes: Array.isArray(e.day_times) ? (e.day_times as (string | null)[]) : [],
+      /** Pax per date (075): the most attendees each day takes, null = no limit. */
+      dayPax: normalizeDayPax(e.day_pax, e.event_days),
       venue: (e.venue as string | null) ?? null,
       /** The venue's exact spot (068), when a place suggestion was picked. */
       venueLat: (e.venue_lat as number | null) ?? null,

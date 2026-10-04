@@ -383,17 +383,27 @@ export async function sendEventRegistrationEmail(input: {
   eventDays?: number | null
   /** Per-day start times (072); differing days get a line each. */
   dayTimes?: unknown
+  /** The days this sign-up ticked (075) — only those are listed; null = every day. */
+  attendingDays?: number[] | null
   venue: string | null
   eventUrl: string
 }): Promise<void> {
   const subject = `You're registered — ${input.eventTitle}`
-  const dateLabel = (input.eventDays ?? 1) > 1 ? eventWhenLabel(input.eventDate, input.eventDays, "long") : dubaiDateLabel(input.eventDate)
+  const multi = (input.eventDays ?? 1) > 1
+  const dateLabel = multi ? eventWhenLabel(input.eventDate, input.eventDays, "long") : dubaiDateLabel(input.eventDate)
+  const schedule = multi ? eventSchedule(input.eventDate, input.eventDays, input.dayTimes) : []
+  const chosen = input.attendingDays?.length ? schedule.filter((d) => input.attendingDays!.includes(d.day)) : null
   const rows = [
     detailRow("Event", input.eventTitle),
-    dateLabel ? detailRow("When", dateLabel) : "",
-    ...(hasCustomDayTimes(input.eventDate, input.eventDays, input.dayTimes)
-      ? eventSchedule(input.eventDate, input.eventDays, input.dayTimes).map((d) => detailRow(`Day ${d.day}`, `${d.dateLabel} · ${d.time} (GST)`))
-      : []),
+    // Ticked only some days → those are what they're registered for.
+    chosen && chosen.length < schedule.length
+      ? chosen.map((d) => detailRow(`Day ${d.day}`, `${d.dateLabel} · ${d.time} (GST)`)).join("")
+      : [
+          dateLabel ? detailRow("When", dateLabel) : "",
+          ...(hasCustomDayTimes(input.eventDate, input.eventDays, input.dayTimes)
+            ? schedule.map((d) => detailRow(`Day ${d.day}`, `${d.dateLabel} · ${d.time} (GST)`))
+            : []),
+        ].join(""),
     input.venue ? detailRow("Venue", input.venue) : "",
     detailRow("Name", input.fullName),
     detailRow("Email", input.to),
