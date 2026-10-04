@@ -19,9 +19,9 @@ export default async function JohndorfDashboardPage() {
         <div className="h-1 bg-[#b4241c]" />
         <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-4 px-4 py-2.5 sm:px-6">
           <div className="flex items-center gap-4">
-            <Image src="/johndorf/logo.png" alt="Johndorf Ventures Corporation" width={391} height={186} className="h-auto w-[96px]" />
+            <Image src="/johndorf/logo.png" alt="Johndorf Ventures Corporation" width={391} height={186} className="h-auto w-[96px]" unoptimized />
             <span className="hidden h-8 w-px bg-[#ece5e2] sm:block" />
-            <Image src="/johndorf/montierra-wordmark.png" alt="Montierra" width={462} height={97} className="hidden h-auto w-[120px] sm:block" />
+            <Image src="/johndorf/montierra-wordmark.png" alt="Montierra" width={462} height={97} className="hidden h-auto w-[120px] sm:block" unoptimized />
           </div>
           <form action={signOutJohndorf}>
             <button

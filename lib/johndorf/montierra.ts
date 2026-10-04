@@ -201,7 +201,7 @@ export type HouseModel = {
 export const HOUSE_MODELS: Record<ClusterId, HouseModel> = {
   green: { cluster: "green", name: "Montierra Townhouse", type: "Two-storey · Green scheme", storeys: 2, bedrooms: 3, baths: 2, carport: 1, floorAreaSqm: 64, photos: ["/johndorf/houses/green.jpg"] },
   yellow: { cluster: "yellow", name: "Montierra Townhouse", type: "Two-storey · Yellow scheme", storeys: 2, bedrooms: 3, baths: 2, carport: 1, floorAreaSqm: 64, photos: ["/johndorf/houses/yellow.jpg"] },
-  orange: { cluster: "orange", name: "Montierra Townhouse", type: "Two-storey · Orange scheme", storeys: 2, bedrooms: 3, baths: 2, carport: 1, floorAreaSqm: 64, photos: ["/johndorf/houses/orange.jpg"] },
+  orange: { cluster: "orange", name: "Montierra Townhouse", type: "Two-storey · Orange scheme", storeys: 2, bedrooms: 3, baths: 2, carport: 1, floorAreaSqm: 64, photos: ["/johndorf/houses/townhouse-peach.jpg"] },
 }
 
 export type Lot = { no: number; cluster: ClusterId | null; park: boolean; facility: string | null }
