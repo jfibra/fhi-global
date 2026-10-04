@@ -24,7 +24,7 @@ export async function signInJohndorf(_: JohndorfLoginState, formData: FormData):
     path: "/",
     maxAge: JD_SESSION_SECONDS,
   })
-  redirect("/johndorf/home")
+  redirect("/johndorf/dashboard")
 }
 
 export async function signOutJohndorf(): Promise<void> {

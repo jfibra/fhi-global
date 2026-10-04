@@ -123,7 +123,7 @@ export function News() {
 
 /* ─── Footer ──────────────────────────────────────────────────────────────── */
 
-export function Footer() {
+export function Footer({ signedIn }: { signedIn: boolean }) {
   return (
     <footer className="relative overflow-hidden bg-[#160c0a] text-white">
       <div className="pointer-events-none absolute -left-40 bottom-0 h-[520px] w-[520px] rounded-full bg-[#b4241c]/30 blur-[140px]" />
@@ -157,11 +157,13 @@ export function Footer() {
             <a href={COMPANY.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-semibold text-white/85 hover:text-white">
               <Landmark className="h-4 w-4" /> Official website <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
-            <form action={signOutJohndorf}>
-              <button type="submit" className="inline-flex items-center gap-2 text-sm font-semibold text-white/50 hover:text-white">
-                <LogOut className="h-4 w-4" /> Sign out
-              </button>
-            </form>
+            {signedIn && (
+              <form action={signOutJohndorf}>
+                <button type="submit" className="inline-flex items-center gap-2 text-sm font-semibold text-white/50 hover:text-white">
+                  <LogOut className="h-4 w-4" /> Sign out
+                </button>
+              </form>
+            )}
           </div>
           <div className="flex items-start sm:justify-end">
             <Magnetic strength={0.5}>

@@ -6,9 +6,9 @@ import { JohndorfLoginForm } from "./login-form"
 
 export const dynamic = "force-dynamic"
 
-/** fhiglobal.ae/johndorf — the Johndorf presentation's entrance and sign-in (lib/johndorf/session.ts). */
+/** fhiglobal.ae/johndorf — the entrance and sign-in for the Montierra map (lib/johndorf/session.ts). The landing page, /johndorf/home, is public. */
 export default async function JohndorfLoginPage() {
-  if (isJohndorfSession((await cookies()).get(JD_COOKIE)?.value)) redirect("/johndorf/home")
+  if (isJohndorfSession((await cookies()).get(JD_COOKIE)?.value)) redirect("/johndorf/dashboard")
 
   return (
     <Entrance>

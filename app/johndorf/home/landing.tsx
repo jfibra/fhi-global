@@ -26,7 +26,7 @@ const NAV = [
 /** The intro plays once per visit — coming back from the Montierra map skips it. */
 const intro = { played: false }
 
-export function JohndorfLanding() {
+export function JohndorfLanding({ signedIn }: { signedIn: boolean }) {
   const [showIntro, setShowIntro] = useState(() => !intro.played)
   const finish = useCallback(() => {
     intro.played = true
@@ -38,7 +38,7 @@ export function JohndorfLanding() {
       <ScrollLine />
       <CursorFollower />
       <div aria-hidden className="jd-grain pointer-events-none fixed z-[70]" />
-      <TopBar />
+      <TopBar signedIn={signedIn} />
       <Hero ready={!showIntro} />
       <Manifesto />
       <Footprint />
@@ -52,7 +52,7 @@ export function JohndorfLanding() {
       <ValuesMarquee />
       <Buying />
       <News />
-      <Footer />
+      <Footer signedIn={signedIn} />
     </div>
   )
 }
@@ -120,7 +120,7 @@ function ScrollLine() {
 
 /* ─── Navigation ─────────────────────────────────────────────────────────── */
 
-function TopBar() {
+function TopBar({ signedIn }: { signedIn: boolean }) {
   const { scrollY } = useScroll()
   const [solid, setSolid] = useState(false)
   const [open, setOpen] = useState(false)
@@ -152,11 +152,13 @@ function TopBar() {
             >
               <Compass className="h-4 w-4" /> Montierra map
             </Link>
-            <form action={signOutJohndorf} className="hidden sm:block">
-              <button type="submit" aria-label="Sign out" title="Sign out" className={`rounded-full p-2.5 transition-colors ${solid ? "text-[#6b5a56] hover:bg-[#f3ece9]" : "text-white/80 hover:bg-white/10"}`}>
-                <LogOut className="h-4 w-4" />
-              </button>
-            </form>
+            {signedIn && (
+              <form action={signOutJohndorf} className="hidden sm:block">
+                <button type="submit" aria-label="Sign out" title="Sign out" className={`rounded-full p-2.5 transition-colors ${solid ? "text-[#6b5a56] hover:bg-[#f3ece9]" : "text-white/80 hover:bg-white/10"}`}>
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </form>
+            )}
             <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" className={`rounded-full p-2.5 lg:hidden ${solid ? "text-[#2a1d1b]" : "text-white"}`}>
               <Menu className="h-5 w-5" />
             </button>
@@ -194,11 +196,13 @@ function TopBar() {
               <Link href="/johndorf/dashboard" className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#b4241c] px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-white">
                 <Compass className="h-4 w-4" /> Montierra map
               </Link>
-              <form action={signOutJohndorf}>
-                <button type="submit" className="text-sm font-semibold uppercase tracking-[0.14em] text-white/60">
-                  Sign out
-                </button>
-              </form>
+              {signedIn && (
+                <form action={signOutJohndorf}>
+                  <button type="submit" className="text-sm font-semibold uppercase tracking-[0.14em] text-white/60">
+                    Sign out
+                  </button>
+                </form>
+              )}
             </nav>
           </motion.div>
         )}
