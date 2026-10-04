@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { ImageResponse } from "next/og"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { ogPicture } from "@/lib/og-picture"
+import { ogJpeg, ogPicture } from "@/lib/og-picture"
 
 export const runtime = "nodejs"
 
@@ -39,7 +39,7 @@ async function logo(): Promise<string> {
 // request, the constant is safe to share.)
 const CACHE_HEADERS = { "cache-control": "public, max-age=300, s-maxage=300" }
 
-export async function GET(_: Request, context: { params: Promise<{ slug: string }> }) {
+async function render(_: Request, context: { params: Promise<{ slug: string }> }) {
   const { slug } = await context.params
   const supabase = createAdminSupabase()
 
@@ -119,4 +119,9 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
     ),
     { width: 1200, height: 630, headers: CACHE_HEADERS },
   )
+}
+
+/** Out as JPEG — a fraction of the PNG's size, so WhatsApp shows the preview (lib/og-picture.ts). */
+export async function GET(req: Request, context: { params: Promise<{ slug: string }> }) {
+  return ogJpeg(await render(req, context))
 }

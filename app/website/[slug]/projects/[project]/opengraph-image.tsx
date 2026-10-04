@@ -4,7 +4,7 @@ import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { loadSiteBySlug } from "@/lib/website-builder-service"
 import { formatPrice, priceFromValue } from "@/lib/project-seo"
 import { loadShareContact } from "@/lib/website-project-share"
-import { ogPicture } from "@/lib/og-picture"
+import { ogJpeg, ogPicture } from "@/lib/og-picture"
 import { loadOgFonts, OG_SIZE } from "../../../_components/og-hero"
 
 // The link preview for a project shared from an agent's website — what a
@@ -19,7 +19,7 @@ import { loadOgFonts, OG_SIZE } from "../../../_components/og-hero"
 export const runtime = "nodejs"
 export const alt = "Project shared by an FHI Global property advisor"
 export const size = OG_SIZE
-export const contentType = "image/png"
+export const contentType = "image/jpeg"
 
 const STATUS: Record<string, string> = {
   pre_launch: "PRE-LAUNCH",
@@ -28,7 +28,7 @@ const STATUS: Record<string, string> = {
   completed: "READY TO MOVE IN",
 }
 
-export default async function Image({ params }: { params: Promise<{ slug: string; project: string }> }) {
+async function render({ params }: { params: Promise<{ slug: string; project: string }> }) {
   const { slug, project: key } = await params
   const admin = createAdminSupabase()
   const [site, { data: p }] = await Promise.all([
@@ -135,4 +135,9 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     ),
     { ...OG_SIZE, fonts: await loadOgFonts() },
   )
+}
+
+/** Out as JPEG — a fraction of the PNG's size, so WhatsApp shows the preview (lib/og-picture.ts). */
+export default async function Image(props: { params: Promise<{ slug: string; project: string }> }) {
+  return ogJpeg(await render(props))
 }

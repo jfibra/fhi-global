@@ -1,3 +1,4 @@
+import { eventOgImage } from "@/lib/events/og"
 import { cache } from "react"
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
@@ -96,7 +97,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return createPageMetadata({
       title: event.title,
       description: truncateDescription(event.description) || `Register for ${event.title}.`,
-      imageUrl: event.image_url,
+      ...eventOgImage(event),
       pathname: home.path,
       robots: { index: false, follow: true },
     })
@@ -107,7 +108,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description:
       truncateDescription(event.description) ||
       `Register for ${event.title}${dateLabel ? ` on ${dateLabel}` : ""}${event.venue ? ` at ${event.venue}` : ""}${host ? ` — hosted by ${host.name}` : ""}.`,
-    imageUrl: event.image_url,
+    ...eventOgImage(event),
     pathname: `/events/${event.slug ?? event.id}`,
     keywords: [event.title, ...(host ? [host.name] : []), "FHI Global event", "Dubai real estate event"],
   })

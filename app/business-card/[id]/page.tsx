@@ -212,6 +212,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       // the honest "no description".
       description: og.description || undefined,
       imageUrl: previewImage,
+      ...(data.ogCard.image ? {} : { imageWidth: 1200, imageHeight: 630 }),
       // og:url carries the same version stamp the share buttons append.
       // Facebook treats og:url as the canonical and reuses its cached metadata
       // for it — a clean canonical here would collapse every versioned share

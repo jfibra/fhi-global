@@ -206,6 +206,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description,
     pathname: `/listings/${row.slug ?? row.id}`,
     imageUrl: `${SITE_URL.replace(/\/$/, "")}/og/listing/${row.id}?v=${ogImageVersion}`,
+    imageWidth: 1200,
+    imageHeight: 630,
     keywords: [row.title, "UAE property", kindLabel, "FHI Global"],
   })
 }

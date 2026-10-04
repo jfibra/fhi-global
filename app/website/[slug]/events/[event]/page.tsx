@@ -1,3 +1,4 @@
+import { eventOgImage } from "@/lib/events/og"
 import { cache } from "react"
 import type { Metadata } from "next"
 import { notFound, permanentRedirect, redirect } from "next/navigation"
@@ -67,7 +68,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description:
       truncateDescription(event.description) ||
       `Register for ${event.title}${event.venue ? ` at ${event.venue}` : ""}${host ? ` — hosted by ${host}` : ""}.`,
-    imageUrl: event.image_url,
+    ...eventOgImage(event),
     // Also on fhiglobal.ae (074) → that page is the one Google should rank;
     // this copy stays for the agent's own visitors and shared links.
     pathname: event.show_on_main ? mainEventPath(event) : eventPublicPath(event, site.slug),

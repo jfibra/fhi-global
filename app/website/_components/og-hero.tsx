@@ -93,7 +93,7 @@ export function OgHero({ data, base }: { data: WebsiteData; base: string }) {
   const posX = Math.min(100, Math.max(0, hero.posX ?? 50))
   const posY = Math.min(100, Math.max(0, hero.posY ?? 50))
   const zoom = Math.min(300, Math.max(100, hero.zoom ?? 100)) / 100
-  const image = hero.image ? (hero.image.startsWith("http") ? hero.image : `${base}${hero.image}`) : null
+  const image = hero.image ? (/^(https?:|data:)/.test(hero.image) ? hero.image : `${base}${hero.image}`) : null
   // Zoom emulation (Satori has no transform-origin scale): oversize the image
   // by the zoom factor and shift it so the focal point stays put — identical
   // math to the page's `scale()` with `transformOrigin: posX% posY%`.

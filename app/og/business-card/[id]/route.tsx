@@ -1,3 +1,4 @@
+import { ogJpeg } from "@/lib/og-picture"
 import { ImageResponse } from "next/og"
 import fs from "node:fs/promises"
 import path from "node:path"
@@ -84,7 +85,7 @@ async function fallbackBrandCard() {
   )
 }
 
-export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
+async function render(_: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
   const trimmed = (id ?? "").trim()
   if (!UUID_RE.test(trimmed)) return fallbackBrandCard()
@@ -141,4 +142,9 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     ),
     { width: PROFILE_OG_W, height: PROFILE_OG_H, headers: CACHE_HEADERS },
   )
+}
+
+/** Out as JPEG — a fraction of the PNG's size, so WhatsApp shows the preview (lib/og-picture.ts). */
+export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
+  return ogJpeg(await render(req, context))
 }

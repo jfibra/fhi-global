@@ -3,7 +3,7 @@ import path from "node:path"
 import { ImageResponse } from "next/og"
 import { fetchArticleBySlug } from "@/lib/news-service"
 import { DEFAULT_PREVIEW_IMAGE_URL, LEGACY_PREVIEW_IMAGE_URL } from "@/lib/seo"
-import { ogPicture } from "@/lib/og-picture"
+import { ogJpeg, ogPicture } from "@/lib/og-picture"
 
 // Social link-preview card for a news article: the story's photo, a soft navy
 // scrim and the white FHI Global mark, so a shared story is recognisably ours
@@ -36,7 +36,7 @@ const CACHE_HEADERS = { "cache-control": "public, max-age=300, s-maxage=300" }
 
 const isPlaceholder = (u: string | null | undefined) => !u || u === DEFAULT_PREVIEW_IMAGE_URL || u === LEGACY_PREVIEW_IMAGE_URL
 
-export async function GET(_: Request, context: { params: Promise<{ slug: string }> }) {
+async function render(_: Request, context: { params: Promise<{ slug: string }> }) {
   const { slug } = await context.params
   const article = await fetchArticleBySlug(slug).catch(() => null)
   const photoUrl = !isPlaceholder(article?.featuredImage) ? article?.featuredImage : !isPlaceholder(article?.img) ? article?.img : undefined
@@ -92,4 +92,9 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
     ),
     { width: W, height: H, headers: CACHE_HEADERS },
   )
+}
+
+/** Out as JPEG — a fraction of the PNG's size, so WhatsApp shows the preview (lib/og-picture.ts). */
+export async function GET(req: Request, context: { params: Promise<{ slug: string }> }) {
+  return ogJpeg(await render(req, context))
 }

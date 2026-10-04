@@ -197,6 +197,10 @@ const nextConfig = {
     "/projects/*/opengraph-image": SHARP_LINUX_LIBS,
     "/og/project/": SHARP_LINUX_LIBS,
     "/og/news/": SHARP_LINUX_LIBS,
+    // Agent-site thumbnail (banner via ogPicture) and the event thumbnail (poster card).
+    "/website/*/opengraph-image": SHARP_LINUX_LIBS,
+    "/og/event/": SHARP_LINUX_LIBS,
+    "/og/business-card/": SHARP_LINUX_LIBS,
   },
   typescript: {
     ignoreBuildErrors: true,

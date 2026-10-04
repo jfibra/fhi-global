@@ -100,6 +100,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraphTitle: data.name,
     openGraphDescription: description,
     imageUrl: ogImage || data.logo_url,
+    imageWidth: 1200,
+    imageHeight: 630,
     pathname: `/${slug}`,
     keywords,
   })

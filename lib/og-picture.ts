@@ -8,7 +8,13 @@
 // costs the photo, never the card: the file is then used as-is when it is
 // already JPEG/PNG, otherwise null and the caller falls back.
 
-export async function ogPicture(url: string | null | undefined, width: number, height: number): Promise<string | null> {
+export async function ogPicture(
+  url: string | null | undefined,
+  width: number,
+  height: number,
+  /** "inside" scales the whole picture to fit the box (no crop) — for callers that frame it themselves. */
+  fit: "cover" | "inside" = "cover",
+): Promise<string | null> {
   if (!url) return null
   try {
     const res = await fetch(url, { cache: "force-cache" })
@@ -17,7 +23,10 @@ export async function ogPicture(url: string | null | undefined, width: number, h
     const buf = Buffer.from(await res.arrayBuffer())
     try {
       const { default: sharp } = await import("sharp")
-      const out = await sharp(buf).resize(width, height, { fit: "cover", position: "attention" }).jpeg({ quality: 82 }).toBuffer()
+      const out = await sharp(buf)
+        .resize(width, height, fit === "cover" ? { fit: "cover", position: "attention" } : { fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 82 })
+        .toBuffer()
       return `data:image/jpeg;base64,${out.toString("base64")}`
     } catch {
       const passthrough = type === "image/jpeg" || type === "image/png" || /\.(jpe?g|png)(\?|$)/i.test(url)
@@ -25,5 +34,27 @@ export async function ogPicture(url: string | null | undefined, width: number, h
     }
   } catch {
     return null
+  }
+}
+
+/**
+ * A rendered thumbnail (ImageResponse PNG) re-encoded as JPEG. Photo cards come
+ * out of Satori as 0.7–1.4 MB PNGs; WhatsApp is widely reported to skip link
+ * previews whose picture is much over ~300 KB, so a share showed no thumbnail
+ * there (2026-10-04). As JPEG they're ~100–250 KB. sharp loads on demand; if it
+ * can't, the PNG goes out unchanged — never a broken card.
+ */
+export async function ogJpeg(res: Response, quality = 82): Promise<Response> {
+  if (!res.ok) return res
+  try {
+    const png = Buffer.from(await res.clone().arrayBuffer())
+    const { default: sharp } = await import("sharp")
+    const jpg = await sharp(png).flatten({ background: "#ffffff" }).jpeg({ quality, mozjpeg: true }).toBuffer()
+    const headers = new Headers(res.headers)
+    headers.set("Content-Type", "image/jpeg")
+    headers.delete("Content-Length")
+    return new Response(new Uint8Array(jpg), { status: res.status, headers })
+  } catch {
+    return res
   }
 }

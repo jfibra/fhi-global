@@ -98,6 +98,9 @@ export function createPageMetadata({
   keywords,
 }: CreatePageMetadataOptions): Metadata {
   const finalImageUrl = imageUrl ?? DEFAULT_PREVIEW_IMAGE_URL
+  // The default card (og-default.jpg) is 1200×630; declared, or Facebook can skip it on a first share.
+  const finalWidth = imageUrl ? imageWidth : (imageWidth ?? 1200)
+  const finalHeight = imageUrl ? imageHeight : (imageHeight ?? 630)
   const ogTitle = openGraphTitle ?? (typeof title === "string" ? title : title.absolute)
   const ogDescription = openGraphDescription ?? description
   const canonical = buildCanonical(pathname)
@@ -116,7 +119,7 @@ export function createPageMetadata({
       type: ogType,
       url: canonical,
       images: finalImageUrl
-        ? [{ url: finalImageUrl, width: imageWidth, height: imageHeight, alt: imageAlt ?? ogTitle }]
+        ? [{ url: finalImageUrl, width: finalWidth, height: finalHeight, alt: imageAlt ?? ogTitle }]
         : undefined,
     },
     twitter: {
