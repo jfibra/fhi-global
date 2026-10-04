@@ -56,6 +56,8 @@ export async function GET(req: NextRequest) {
   // Referral/invite id — threaded through from the register page's Google button
   // so the continue → finalize step can credit the inviter.
   const ref = url.searchParams.get("ref") ?? ""
+  // Account type from the register page ("global_partner") — finalize applies it.
+  const type = url.searchParams.get("type") ?? ""
   const oauthError = url.searchParams.get("error_description") || url.searchParams.get("error")
 
   if (oauthError) {
@@ -98,5 +100,6 @@ export async function GET(req: NextRequest) {
   const continueUrl = new URL("/auth/google/continue", url.origin)
   if (next) continueUrl.searchParams.set("next", next)
   if (ref) continueUrl.searchParams.set("ref", ref)
+  if (type) continueUrl.searchParams.set("type", type)
   return NextResponse.redirect(continueUrl)
 }

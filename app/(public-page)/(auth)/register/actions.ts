@@ -9,6 +9,7 @@ import { generateOtpCode, storeOtpChallenge, checkOtpChallenge, clearOtpChalleng
 import { DEFAULT_ACCOUNT_PASSWORD } from "@/lib/account-password"
 import { emailTypoMessage } from "@/lib/email-typo"
 import { checkEmailDeliverable } from "@/lib/email-validate"
+import { checkPartnerSignupInfo, partnerInfoMetadata, type PartnerSignupInfo } from "@/lib/partner-signup"
 
 /**
  * Result of the two OTP steps (email → code). `challenge` is an opaque id the
@@ -36,6 +37,8 @@ export async function sendRegisterOtp(
   emailRaw: string,
   accountTypeRaw?: string,
   refRaw?: string,
+  /** Global Partner "Where are you based?" answers — required on that path. */
+  partnerInfoRaw?: PartnerSignupInfo,
 ): Promise<RegisterOtpResult> {
   if (!hasServerSupabaseEnv()) {
     return { error: "Supabase environment variables are not configured." }
@@ -51,6 +54,11 @@ export async function sendRegisterOtp(
 
   const accountType = normalizeAccountType(accountTypeRaw)
   const ref = String(refRaw ?? "").trim()
+  // Checked before a code goes out, so a partner never verifies only to be stopped.
+  if (accountType === "global_partner") {
+    const partner = checkPartnerSignupInfo(partnerInfoRaw)
+    if (!partner.ok) return { error: partner.error }
+  }
 
   const admin = createAdminSupabase()
 
@@ -111,6 +119,8 @@ export async function verifyRegisterOtp(
   challengeRaw?: string,
   accountTypeRaw?: string,
   refRaw?: string,
+  /** Global Partner "Where are you based?" answers — saved on the profile. */
+  partnerInfoRaw?: PartnerSignupInfo,
 ): Promise<RegisterOtpResult> {
   if (!hasServerSupabaseEnv()) {
     return { error: "Supabase environment variables are not configured." }
@@ -127,6 +137,14 @@ export async function verifyRegisterOtp(
   // valid ref they fall back to member like everyone else.
   const ref = String(refRaw ?? "").trim()
   const role = accountType === "developer" ? "developer" : accountType === "global_partner" && UUID_RE.test(ref) ? "global_partner" : "member"
+  // Where a partner lives + their WhatsApp (lib/partner-signup.ts), checked
+  // again here before the code is used up.
+  let partnerInfo: PartnerSignupInfo | null = null
+  if (accountType === "global_partner") {
+    const partner = checkPartnerSignupInfo(partnerInfoRaw)
+    if (!partner.ok) return { error: partner.error }
+    partnerInfo = partner.info
+  }
 
   const check = await checkOtpChallenge(challenge, code)
   if ("error" in check) return { error: check.error }
@@ -192,6 +210,7 @@ export async function verifyRegisterOtp(
     ...(current?.metadata ?? {}),
     ...(invitedBy ? { invited_by: invitedBy } : {}),
     ...(invitedByName ? { invited_by_name: invitedByName } : {}),
+    ...(partnerInfo ? partnerInfoMetadata(partnerInfo) : {}),
   }
 
   const { error: profileError } = await admin

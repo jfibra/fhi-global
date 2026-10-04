@@ -3,9 +3,11 @@
 import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
 import {
-  ArrowRight, ArrowLeft, Loader2, CheckCircle2, Mail, AlertCircle, Info, Phone,
+  ArrowRight, ArrowLeft, Loader2, CheckCircle2, Mail, AlertCircle, Info, Phone, MapPin, ChevronDown, MessageCircle,
 } from "lucide-react"
-import { nationalityFlag } from "@/lib/nationalities"
+import { isoFlagEmoji, nationalityFlag } from "@/lib/nationalities"
+import { COUNTRIES, countryByIso, countryByName, countryFlag } from "@/lib/countries"
+import { checkPartnerSignupInfo, type PartnerSignupInfo } from "@/lib/partner-signup"
 import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
 import { OtpInput } from "@/components/auth/otp-input"
 import { sendRegisterOtp, verifyRegisterOtp } from "@/app/(public-page)/(auth)/register/actions"
@@ -85,6 +87,11 @@ function ConfirmSponsorModal({ referrer, onConfirm }: { referrer: NonNullable<Re
  * Full-page registration (invite links: /register?ref=<id>, and direct sign-up).
  * Passwordless email 6-digit OTP; a valid inviter is shown and stamped for
  * referral tracking. Minimal single-column layout — no split-screen hero.
+ *
+ * The Global Partner invite starts one step earlier (boss, 2026-10-04): "Where
+ * are you based?" — the country they live in now and their WhatsApp — so the
+ * admins approving them can see where they came from (lib/partner-signup.ts).
+ * Both the email code and Google sign-up come after it and carry it along.
  */
 export function RegisterUI({
   defaultAccountType = "member",
@@ -95,7 +102,8 @@ export function RegisterUI({
   inviteRef?: string | null
   referrer?: Referrer
 }) {
-  const [step, setStep]         = useState<"email" | "code">("email")
+  const isPartner = defaultAccountType === "global_partner"
+  const [step, setStep]         = useState<"info" | "email" | "code">(isPartner ? "info" : "email")
   const [email, setEmail]       = useState("")
   const [code, setCode]         = useState("")
   const [challenge, setChallenge] = useState("")
@@ -104,6 +112,25 @@ export function RegisterUI({
   const [cooldown, setCooldown] = useState(0)
   const [sponsorConfirmed, setSponsorConfirmed] = useState(false)
   const [pending, startTransition] = useTransition()
+
+  // Global Partner "Where are you based?" — the WhatsApp code follows the
+  // country until they pick another one (kept as an ISO: +1 is shared).
+  const [country, setCountry]   = useState("")
+  const [waIso, setWaIso]       = useState("")
+  const [waNumber, setWaNumber] = useState("")
+  const [partnerInfo, setPartnerInfo] = useState<PartnerSignupInfo | null>(null)
+  const waCountry = countryByIso(waIso)
+
+  const continueFromInfo = () => {
+    const res = checkPartnerSignupInfo({ country, whatsappCode: waCountry?.dial ?? "", whatsappNumber: waNumber })
+    if (!res.ok) {
+      setError(res.error)
+      return
+    }
+    setError("")
+    setPartnerInfo(res.info)
+    setStep("email")
+  }
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -115,7 +142,7 @@ export function RegisterUI({
     if (pending) return
     startTransition(async () => {
       setError("")
-      const res = await sendRegisterOtp(email, defaultAccountType, inviteRef ?? undefined)
+      const res = await sendRegisterOtp(email, defaultAccountType, inviteRef ?? undefined, partnerInfo ?? undefined)
       if (res?.error) {
         setError(res.error)
       } else {
@@ -131,7 +158,7 @@ export function RegisterUI({
     if (pending) return
     startTransition(async () => {
       setError("")
-      const res = await verifyRegisterOtp(email, code, challenge, defaultAccountType, inviteRef ?? undefined)
+      const res = await verifyRegisterOtp(email, code, challenge, defaultAccountType, inviteRef ?? undefined, partnerInfo ?? undefined)
       if (res?.error) setError(res.error)
       else if (res?.success) setSuccess(true)
     })
@@ -177,7 +204,7 @@ export function RegisterUI({
           ) : (
             <>
               <h1 className="font-['Outfit'] text-[26px] font-bold text-[#0d1117] leading-tight mb-4 text-left">
-                {step === "email" ? (defaultAccountType === "global_partner" ? "Join as a Global Partner" : "Create your account") : "Enter your code"}
+                {step === "code" ? "Enter your code" : isPartner ? "Join as a Global Partner" : "Create your account"}
               </h1>
 
               {/* Info box */}
@@ -186,6 +213,8 @@ export function RegisterUI({
                 <p className="text-[13px] text-[#3a5a78] leading-relaxed">
                   {step === "code"
                     ? <>Enter the 6-digit code we sent to <span className="font-semibold">{email}</span>.</>
+                    : step === "info"
+                      ? <>{referrer ? <>You&apos;re joining <span className="font-semibold">{referrer.name}</span>&apos;s network as an FHI Global Partner. </> : null}First, tell us where you&apos;re based and your WhatsApp number.</>
                     : referrer && defaultAccountType === "global_partner"
                       ? <>You&apos;re joining <span className="font-semibold">{referrer.name}</span>&apos;s network as an FHI Global Partner — enter your email and we&apos;ll send you a code.</>
                     : referrer
@@ -194,8 +223,95 @@ export function RegisterUI({
                 </p>
               </div>
 
-              {step === "email" ? (
+              {step === "info" ? (
+                <form onSubmit={(e) => { e.preventDefault(); continueFromInfo() }} className="space-y-4" noValidate>
+                  <div>
+                    <label htmlFor="partner-country" className="mb-1.5 block text-xs font-semibold text-[#374151]">Country you live in</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+                      <select
+                        id="partner-country"
+                        value={country}
+                        onChange={(e) => {
+                          setCountry(e.target.value)
+                          const c = countryByName(e.target.value)
+                          if (c) setWaIso(c.iso)
+                          setError("")
+                        }}
+                        className={`${inputCls} appearance-none pl-10 pr-9 ${country ? "" : "text-[#9ca3af]"}`}
+                      >
+                        <option value="" disabled>Select your country</option>
+                        {COUNTRIES.map((c) => (
+                          <option key={c.iso} value={c.name} className="text-[#111827]">{isoFlagEmoji(c.iso)} {c.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="partner-whatsapp" className="mb-1.5 block text-xs font-semibold text-[#374151]">WhatsApp number</label>
+                    <div className="flex items-stretch gap-2">
+                      {/* The code: a native picker under a "🇵🇭 +63" face — easy to use on a phone. */}
+                      <div className="relative w-[104px] shrink-0">
+                        <select
+                          aria-label="WhatsApp country code"
+                          value={waIso}
+                          onChange={(e) => {
+                            setWaIso(e.target.value)
+                            setError("")
+                          }}
+                          className="peer absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                        >
+                          <option value="" disabled>Code</option>
+                          {COUNTRIES.map((c) => (
+                            <option key={c.iso} value={c.iso}>{c.name} ({c.dial})</option>
+                          ))}
+                        </select>
+                        <span className="flex h-full items-center gap-1.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] pl-3 pr-7 text-sm tabular-nums text-[#111827] transition-all peer-focus-visible:border-[#001f3f] peer-focus-visible:bg-white peer-focus-visible:ring-4 peer-focus-visible:ring-[#001f3f]/6" aria-hidden>
+                          {waCountry ? <>{isoFlagEmoji(waCountry.iso)} {waCountry.dial}</> : <span className="text-[#9ca3af]">Code</span>}
+                        </span>
+                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#9ca3af] pointer-events-none" />
+                      </div>
+                      <div className="relative min-w-0 flex-1">
+                        <MessageCircle className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
+                        <input
+                          id="partner-whatsapp"
+                          type="tel"
+                          inputMode="tel"
+                          value={waNumber}
+                          onChange={(e) => {
+                            setWaNumber(e.target.value)
+                            setError("")
+                          }}
+                          placeholder="917 123 4567"
+                          autoComplete="tel-national"
+                          maxLength={24}
+                          className={`${inputCls} pl-10`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {error && <ErrorBox message={error} />}
+
+                  <SubmitButton pending={false} label="Continue" busy="" />
+                </form>
+              ) : step === "email" ? (
                 <form onSubmit={(e) => { e.preventDefault(); sendCode() }} className="space-y-4">
+                  {/* A partner's answers from the step before, with a way back to fix them. */}
+                  {isPartner && partnerInfo && (
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-[#e8eaed] bg-[#f9fafb] px-3.5 py-2.5 text-xs text-[#4b5563]">
+                      <span className="min-w-0">
+                        {countryFlag(partnerInfo.country)} Based in <span className="font-semibold text-[#111827]">{partnerInfo.country}</span>
+                        <span className="mx-1.5 text-[#d1d5db]">·</span>
+                        WhatsApp <span className="tabular-nums">{partnerInfo.whatsappCode} {partnerInfo.whatsappNumber}</span>
+                      </span>
+                      <button type="button" onClick={() => { setStep("info"); setError("") }} className="shrink-0 font-semibold text-[#001f3f] hover:underline">
+                        Edit
+                      </button>
+                    </div>
+                  )}
                   <div className="relative">
                     <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
                     <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email Address" required autoFocus autoComplete="email" className={`${inputCls} pl-10`} />
@@ -224,13 +340,23 @@ export function RegisterUI({
                 </form>
               )}
 
-              <div className="flex items-center gap-3 my-5">
-                <div className="flex-1 h-px bg-[#eceef1]" />
-                <span className="text-[10px] text-[#adb5bd] uppercase tracking-widest font-semibold">or</span>
-                <div className="flex-1 h-px bg-[#eceef1]" />
-              </div>
+              {/* Google comes after the partner step too, and carries it along. */}
+              {step !== "info" && (
+                <>
+                  <div className="flex items-center gap-3 my-5">
+                    <div className="flex-1 h-px bg-[#eceef1]" />
+                    <span className="text-[10px] text-[#adb5bd] uppercase tracking-widest font-semibold">or</span>
+                    <div className="flex-1 h-px bg-[#eceef1]" />
+                  </div>
 
-              <GoogleAuthFlow variant="register" inviteRef={inviteRef} />
+                  <GoogleAuthFlow
+                    variant="register"
+                    inviteRef={inviteRef}
+                    accountType={isPartner ? "global_partner" : null}
+                    signupInfo={isPartner ? partnerInfo : null}
+                  />
+                </>
+              )}
 
               <p className="text-center text-sm text-[#6b7280] mt-6">
                 Already have an account?{" "}

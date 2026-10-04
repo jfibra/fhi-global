@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { PARTNER_SIGNUP_STORAGE_KEY } from "@/lib/partner-signup"
 
 /**
  * Post-OAuth landing: finish provisioning immediately and redirect. Every new
@@ -13,9 +14,12 @@ import { createClient } from "@/lib/supabase/client"
 export default function GoogleContinuePanel({
   next,
   inviteRef,
+  accountType,
 }: {
   next: string | null
   inviteRef: string | null
+  /** "global_partner" from the Global Partner invite — finalize applies it. */
+  accountType: string | null
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -23,23 +27,37 @@ export default function GoogleContinuePanel({
 
   const finalize = useCallback(async () => {
     setError(null)
+    // The Global Partner step's answers, saved before leaving for Google — only
+    // for this same invite.
+    let partnerInfo: unknown = null
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(PARTNER_SIGNUP_STORAGE_KEY) ?? "null") as { ref?: string | null } | null
+      if (saved && (saved.ref ?? null) === (inviteRef ?? null)) partnerInfo = saved
+    } catch {
+      // nothing saved, or storage blocked
+    }
     try {
       const res = await fetch("/api/auth/google/finalize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ next, ref: inviteRef }),
+        body: JSON.stringify({ next, ref: inviteRef, type: accountType, partnerInfo }),
       })
       const json = (await res.json()) as { redirect?: string; error?: string }
       if (!res.ok || !json.redirect) {
         setError(json.error ?? "Could not finish setting up your account.")
         return
       }
+      try {
+        sessionStorage.removeItem(PARTNER_SIGNUP_STORAGE_KEY)
+      } catch {
+        // storage blocked
+      }
       router.push(json.redirect)
       router.refresh()
     } catch {
       setError("Something went wrong. Please try again.")
     }
-  }, [next, inviteRef, router])
+  }, [next, inviteRef, accountType, router])
 
   useEffect(() => {
     if (startedRef.current) return

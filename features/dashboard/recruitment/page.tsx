@@ -10,6 +10,7 @@ import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { isAdminStaffRole } from "@/lib/app-roles"
 import { getDashboardRouteByRole, roleToLabel } from "@/lib/auth"
 import { STATUS_COLORS } from "@/lib/user-service"
+import { countryFlag } from "@/lib/countries"
 import type { RecruitmentDeal, RecruitmentPerson } from "@/app/api/admin/recruitment/route"
 
 /**
@@ -615,6 +616,27 @@ function PendingList({
                 <span className="mx-1.5 text-[#d1d5db]">·</span>
                 Joined {fmtDate(p.joinedAt)}
               </p>
+              {/* Where they said they live + their WhatsApp (Global Partner sign-up) — to check before approving. */}
+              {(p.basedIn || p.whatsapp) && (
+                <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-[#6b7280]">
+                  {p.basedIn && (
+                    <span>
+                      {countryFlag(p.basedIn)} Based in <span className="font-semibold text-[#374151]">{p.basedIn}</span>
+                    </span>
+                  )}
+                  {p.basedIn && p.whatsapp && <span className="text-[#d1d5db]">·</span>}
+                  {p.whatsapp && (
+                    <a
+                      href={`https://wa.me/${p.whatsapp.replace(/\D/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="tabular-nums hover:text-[#166534] hover:underline"
+                    >
+                      WhatsApp {p.whatsapp}
+                    </a>
+                  )}
+                </p>
+              )}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Link href={profileHref(p.id)} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 text-xs font-bold text-[#374151] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]">

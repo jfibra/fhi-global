@@ -28,6 +28,10 @@ export type RecruitmentPerson = {
   /** Their own VALIDATED sales (partner shares respected), all time. */
   deals: number
   sales: number
+  /** The country they said they live in (Global Partner sign-up, lib/partner-signup.ts). */
+  basedIn: string | null
+  /** "+63 9171234567" — only for accounts waiting for approval, where it's shown. */
+  whatsapp: string | null
 }
 
 /** One agent's credit on one validated sale — what a sales figure is made of. */
@@ -82,16 +86,21 @@ export async function GET() {
     const meta = (p.metadata ?? {}) as Record<string, unknown>
     const invitedBy = typeof meta.invited_by === "string" && meta.invited_by && !meta.developer_invite_id ? meta.invited_by : null
     const raw = (typeof p.fullname === "string" && p.fullname.trim()) || [p.fname, p.lname].filter((v) => typeof v === "string" && v).join(" ")
+    const status = ((p.status as string | null) ?? "pending").toLowerCase()
+    const waNumber = typeof meta.whatsapp_number === "string" ? meta.whatsapp_number.trim() : ""
+    const waCode = typeof meta.whatsapp_country_code === "string" ? meta.whatsapp_country_code.trim() : ""
     return {
       id: String(p.id),
       name: titleCaseName(raw) || "Unnamed account",
       role: (p.role as string | null) ?? null,
-      status: ((p.status as string | null) ?? "pending").toLowerCase(),
+      status,
       photo: (p.profile_url as string | null) || null,
       joinedAt: (p.joined_at as string | null) ?? null,
       invitedBy,
       deals: sold.get(String(p.id))?.deals ?? 0,
       sales: Math.round(sold.get(String(p.id))?.value ?? 0),
+      basedIn: typeof meta.residence_country === "string" && meta.residence_country ? meta.residence_country : null,
+      whatsapp: status === "pending" && waNumber ? `${waCode} ${waNumber}`.trim() : null,
     }
   })
 

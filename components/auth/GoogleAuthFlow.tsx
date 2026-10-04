@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { PARTNER_SIGNUP_STORAGE_KEY, type PartnerSignupInfo } from "@/lib/partner-signup"
 
 // Redirect-based Google sign-in. Navigates the whole page to Google via
 // Supabase OAuth (no popup / no third-party cookies — reliable across
@@ -24,6 +25,8 @@ export default function GoogleAuthFlow({
   variant,
   nextRedirect,
   inviteRef,
+  accountType = null,
+  signupInfo = null,
 }: {
   variant: "login" | "register"
   nextRedirect?: string
@@ -31,6 +34,10 @@ export default function GoogleAuthFlow({
   // Threaded through the OAuth round-trip so /api/auth/google/finalize can
   // credit the inviter (mirrors the email/password register flow).
   inviteRef?: string | null
+  /** The register page's account type ("global_partner") — finalize applies it to a brand-new account. */
+  accountType?: string | null
+  /** The Global Partner "Where are you based?" answers — kept in this tab's sessionStorage, never in a URL. */
+  signupInfo?: PartnerSignupInfo | null
 }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,6 +51,13 @@ export default function GoogleAuthFlow({
       const qs = new URLSearchParams()
       if (nextRedirect) qs.set("next", nextRedirect)
       if (inviteRef) qs.set("ref", inviteRef)
+      if (accountType) qs.set("type", accountType)
+      try {
+        if (signupInfo) sessionStorage.setItem(PARTNER_SIGNUP_STORAGE_KEY, JSON.stringify({ ref: inviteRef ?? null, ...signupInfo }))
+        else sessionStorage.removeItem(PARTNER_SIGNUP_STORAGE_KEY)
+      } catch {
+        // Storage blocked — the profile form still asks for the WhatsApp number.
+      }
       const query = qs.toString()
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",

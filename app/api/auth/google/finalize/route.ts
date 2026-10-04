@@ -7,13 +7,15 @@ import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 import { inviterAutoApproves } from "@/lib/auto-approve"
 import { joinInvitersTeam } from "@/lib/recruit-team"
 import { sendWelcomeEmail } from "@/lib/welcome-email"
+import { checkPartnerSignupInfo, partnerInfoMetadata } from "@/lib/partner-signup"
 
 // Completes Google sign-in AFTER the client established the Supabase session.
 // Runs as the newly-signed-in user (cookie session) and — only on the first
 // link — provisions the profile (name/avatar/metadata) with the service-role
 // client (RLS blocks client writes to role/status). Every new Google account
-// is member + pending, exactly like self-registration; an existing role or
-// status assigned by an admin is preserved. Idempotent and safe for returning
+// is member + pending, exactly like self-registration (a Global Partner invite
+// makes it global_partner + pending, as the email-code path does); an existing
+// role or status assigned by an admin is preserved. Idempotent and safe for returning
 // users and for pre-existing email/password accounts.
 
 export const runtime = "nodejs"
@@ -30,11 +32,15 @@ type ProfileRow = {
 }
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => null)) as { next?: unknown; ref?: unknown } | null
+  const body = (await req.json().catch(() => null)) as { next?: unknown; ref?: unknown; type?: unknown; partnerInfo?: unknown } | null
   const nextRaw = typeof body?.next === "string" ? body.next : null
   // Referral/invite id from the register page's Google button. Attribution is
   // best-effort and only applied on first provision (see below).
   const refRaw = typeof body?.ref === "string" ? body.ref.trim() : ""
+  // The Global Partner invite: its account type, and the "Where are you based?"
+  // answers (country they live in + WhatsApp) the page kept for this sign-in.
+  const isPartnerInvite = typeof body?.type === "string" && body.type.trim().toLowerCase().replace(/-/g, "_") === "global_partner"
+  const partner = isPartnerInvite ? checkPartnerSignupInfo(body?.partnerInfo) : null
 
   // Must be signed in (the client just established the session).
   const supabase = await createClient()
@@ -73,7 +79,7 @@ export async function POST(req: NextRequest) {
 
   // Least privilege: a brand-new account stays member + pending (the DB
   // defaults); a role/status an admin already assigned is kept as-is.
-  const finalRole = profile.role?.trim() || "member"
+  let finalRole = profile.role?.trim() || "member"
   let finalStatus = profile.status?.trim() || "pending"
 
   const googleName = typeof user.user_metadata?.name === "string" ? user.user_metadata.name : null
@@ -105,6 +111,12 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
     if (inviter) invitedBy = refRaw
   }
+  // The Global Partner invite makes a brand-new account a global_partner, the
+  // same as the email-code sign-up (a real inviter required). An account an
+  // admin already gave a role, or an active one, is never changed.
+  if (isPartnerInvite && invitedBy && finalRole === "member" && finalStatus === "pending") {
+    finalRole = "global_partner"
+  }
   // A pre-approved inviter's recruits (the CEO's link) start active — only a
   // brand-new, still-pending account; a status an admin set is never touched.
   let autoApproved = false
@@ -118,6 +130,7 @@ export async function POST(req: NextRequest) {
     google_linked: true,
     google_provisioned: true,
     ...(invitedBy ? { invited_by: invitedBy } : {}),
+    ...(partner?.ok ? partnerInfoMetadata(partner.info) : {}),
   }
 
   const { error: updateError } = await admin
