@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useSyncExternalStore } from "react"
 import { usePathname } from "next/navigation"
 import { gaEvent } from "@/lib/ga"
 
@@ -10,20 +11,47 @@ import { gaEvent } from "@/lib/ga"
  * Not on a Buyers or Sellers Link (/buy-with/<name>, /sell-with/<name>, and
  * the old /b/ and /s/ addresses): that client belongs to the agent who sent
  * it, and the page carries the agent's own WhatsApp buttons.
+ *
+ * A page can point the button at someone else while it's open — an agent's
+ * event on /events/<slug> hands it the host's number (<WhatsAppFabTarget>),
+ * so that lead reaches the agent, not the company (2026-10-04).
  */
 const AGENT_PAGES = ["/buy-with/", "/sell-with/", "/b/", "/s/"]
+const COMPANY = { number: "971567428288", text: "Hi! I'm interested in a property with FHI Global.", label: "Chat with FHI Global on WhatsApp" }
+
+type FabTarget = { number: string; text: string; label: string }
+let target: FabTarget | null = null
+const listeners = new Set<() => void>()
+const subscribe = (fn: () => void) => {
+  listeners.add(fn)
+  return () => listeners.delete(fn)
+}
+const setTarget = (t: FabTarget | null) => {
+  target = t
+  listeners.forEach((fn) => fn())
+}
+
+/** While mounted, the floating button chats with this number instead of the company's. */
+export function WhatsAppFabTarget({ number, text, label }: FabTarget) {
+  useEffect(() => {
+    setTarget({ number, text, label })
+    return () => setTarget(null)
+  }, [number, text, label])
+  return null
+}
 
 export function WhatsAppFab() {
   const pathname = usePathname()
+  const override = useSyncExternalStore(subscribe, () => target, () => null)
   if (pathname && AGENT_PAGES.some((p) => pathname.startsWith(p))) return null
-  const text = encodeURIComponent("Hi! I'm interested in a property with FHI Global.")
+  const to = override ?? COMPANY
   return (
     <a
-      href={`https://wa.me/971567428288?text=${text}`}
+      href={`https://wa.me/${to.number}?text=${encodeURIComponent(to.text)}`}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Chat with FHI Global on WhatsApp"
-      onClick={() => gaEvent("click_whatsapp", { location: "floating_button" })}
+      aria-label={to.label}
+      onClick={() => gaEvent("click_whatsapp", { location: "floating_button", ...(override ? { recipient: "agent" } : {}) })}
       className="wa-fab fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#25d366] text-white shadow-[0_10px_28px_-6px_rgba(15,60,30,0.5)] transition-transform duration-200 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#25d366]"
     >
       <svg className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden>

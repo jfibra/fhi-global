@@ -2,6 +2,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { ArrowLeft, ArrowRight, CalendarDays, ChevronRight, Clock, MapPin, Phone, Ticket } from "lucide-react"
 import { WhatsAppLogo } from "@/components/brand-icons"
+import { WhatsAppFabTarget } from "@/components/public/whatsapp-fab"
 import type { EventHost } from "@/lib/events/host"
 import { ProjectLocationMap } from "@/components/public/project-location-map"
 import { eventBrand } from "@/lib/events/brands"
@@ -112,6 +113,14 @@ export function EventDetail({
 
   return (
     <>
+      {/* An agent's event: the floating WhatsApp button chats with the host, not the company. */}
+      {host?.whatsapp && (
+        <WhatsAppFabTarget
+          number={host.whatsapp}
+          text={`Hi ${host.first}, I saw your event "${event.title}" on fhiglobal.ae.`}
+          label={`Chat with ${host.first} on WhatsApp`}
+        />
+      )}
       {/* ── Hero — the WHOLE poster shown (contained) over a blurred backdrop ── */}
       <div className="relative">
         <div className="relative h-[360px] sm:h-[480px] lg:h-[560px] bg-[#001428] overflow-hidden">
