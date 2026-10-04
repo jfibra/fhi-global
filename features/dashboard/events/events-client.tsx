@@ -14,7 +14,7 @@
  * point at the right page.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import {
   Check,
   Award, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Eye, ImagePlus, Loader2,
@@ -197,6 +197,17 @@ export function EventsClient({
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+
+  // The description box grows with its text — typing, or opening an event
+  // whose description is long — so the whole of it is always in view (the
+  // modal scrolls, not the box). Before paint, so it never flickers.
+  const descRef = useRef<HTMLTextAreaElement>(null)
+  useLayoutEffect(() => {
+    const el = descRef.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`
+  }, [form.description, modalOpen])
 
   // Flyer generator modal (carries the registration QR)
   const [origin, setOrigin] = useState("")
@@ -990,7 +1001,8 @@ export function EventsClient({
               <div>
                 <label className={labelCls}>Description</label>
                 <textarea
-                  className={`${inputCls} resize-none`}
+                  ref={descRef}
+                  className={`${inputCls} resize-y overflow-y-auto`}
                   rows={4}
                   value={form.description}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
