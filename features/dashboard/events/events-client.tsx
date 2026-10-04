@@ -109,6 +109,16 @@ const paxOf = (v: string | undefined): number | null => {
   return v?.trim() && Number.isFinite(n) && n >= 1 ? Math.min(MAX_DAY_PAX, n) : null
 }
 
+/** Every day of an event for a day picker — with its date and time once the start is set. */
+const eventDayList = (e: Pick<AdminEvent, "eventDate" | "eventDays" | "dayTimes">) => {
+  const schedule = eventSchedule(e.eventDate, e.eventDays, e.dayTimes)
+  return Array.from({ length: normalizeEventDays(e.eventDays) }, (_, i) => ({
+    day: i + 1,
+    dateLabel: schedule[i]?.dateLabel ?? "",
+    time: schedule[i]?.time ?? "",
+  }))
+}
+
 /** One day's seats after its count changes (a registration removed). */
 const withTaken = (s: DaySeats, taken: number): DaySeats => {
   const left = s.limit === null ? null : Math.max(0, s.limit - taken)
@@ -286,6 +296,12 @@ export function EventsClient({
   const [regEditForm, setRegEditForm] = useState({ fullName: "", email: "", whatsapp: "", invitedBy: "" })
   const [regEditSaving, setRegEditSaving] = useState(false)
   const [regEditError, setRegEditError] = useState<string | null>(null)
+
+  // Change days (076): re-pick which days of a multi-day event one person attends.
+  const [daysReg, setDaysReg] = useState<Registration | null>(null)
+  const [daysPick, setDaysPick] = useState<Set<number>>(() => new Set())
+  const [daysSaving, setDaysSaving] = useState(false)
+  const [daysError, setDaysError] = useState<string | null>(null)
 
   useEffect(() => {
     setOrigin(window.location.origin)
@@ -677,6 +693,45 @@ export function EventsClient({
     })
     setRegEditError(null)
     setRegMenu(null)
+  }
+
+  const openChangeDays = (r: Registration) => {
+    setDaysReg(r)
+    setDaysPick(new Set(r.days ?? []))
+    setDaysError(null)
+    setRegMenu(null)
+  }
+
+  const saveChangeDays = async () => {
+    if (!regEvent || !daysReg) return
+    setDaysSaving(true)
+    setDaysError(null)
+    try {
+      const res = await fetch(`/api/admin/events/${regEvent.id}/registrations`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registrationId: daysReg.id, days: [...daysPick].sort((a, b) => a - b) }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { error?: string; days?: number[]; seats?: DaySeats[] }
+      const days = data.days
+      if (!res.ok || !days) {
+        setDaysError(data.error ?? "Could not save — try again.")
+        return
+      }
+      // The person's new days, and every day's count straight from the database.
+      const apply = (x: Registration): Registration => (x.id === daysReg.id ? { ...x, days } : x)
+      setRegistrations((prev) => prev.map(apply))
+      regsCacheRef.current[regEvent.id] = (regsCacheRef.current[regEvent.id] ?? []).map(apply)
+      if (data.seats) {
+        setRegSeats(data.seats)
+        seatsCacheRef.current[regEvent.id] = data.seats
+      }
+      setDaysReg(null)
+    } catch {
+      setDaysError("Could not save — check your connection and try again.")
+    } finally {
+      setDaysSaving(false)
+    }
   }
 
   const saveRegEdit = async () => {
@@ -1797,6 +1852,16 @@ export function EventsClient({
               >
                 <Pencil className="w-4 h-4" /> Edit
               </button>
+              {regMultiDay && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => openChangeDays(row)}
+                  className="w-full flex items-center gap-2 px-3.5 py-2 text-left text-sm font-semibold text-[#374151] hover:bg-[#f9fafb] hover:text-[#001f3f] transition-colors"
+                >
+                  <CalendarDays className="w-4 h-4" /> Change days
+                </button>
+              )}
               <button
                 type="button"
                 role="menuitem"
@@ -1908,6 +1973,107 @@ export function EventsClient({
           </div>
         </div>
       )}
+
+      {/* ── Change days (076): which days of a multi-day event one person attends ── */}
+      {daysReg && regEvent && (() => {
+        const had = new Set(daysReg.days ?? [])
+        const changed = daysPick.size !== had.size || [...daysPick].some((d) => !had.has(d))
+        return (
+          <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/45 backdrop-blur-sm"
+              aria-label="Close"
+              onClick={() => setDaysReg(null)}
+            />
+            <div className="relative bg-white border border-[#e8eaed] shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6">
+              <div className="flex items-start justify-between gap-3 mb-5">
+                <div className="min-w-0">
+                  <h3 className="font-['Outfit'] font-bold text-[#001f3f]">Change days</h3>
+                  <p className="text-xs text-[#6b7280] mt-0.5 truncate">
+                    {daysReg.fullName} · {daysReg.email}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDaysReg(null)}
+                  aria-label="Close"
+                  className="shrink-0 p-1.5 text-[#6b7280] hover:text-[#111827] transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="border border-[#e5e7eb]">
+                {eventDayList(regEvent).map((d) => {
+                  const seat = regSeats.find((x) => x.day === d.day)
+                  // A full day can't be added; one they already hold stays theirs.
+                  const blocked = !had.has(d.day) && !!seat?.full
+                  return (
+                    <label
+                      key={d.day}
+                      className={`flex items-center gap-3 border-b border-[#eef0f3] px-3.5 py-2.5 last:border-b-0 ${
+                        blocked ? "cursor-not-allowed bg-[#f9fafb] opacity-60" : "cursor-pointer hover:bg-[#fafbfc]"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={daysPick.has(d.day)}
+                        disabled={blocked || daysSaving}
+                        onChange={() =>
+                          setDaysPick((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(d.day)) next.delete(d.day)
+                            else next.add(d.day)
+                            return next
+                          })
+                        }
+                        className="h-4 w-4 shrink-0 rounded border-[#d1d5db] text-[#001f3f] focus:ring-[#001f3f]/30"
+                      />
+                      <span className="w-12 shrink-0 text-xs font-bold text-[#001f3f]">Day {d.day}</span>
+                      <span className="min-w-0 flex-1 text-xs text-[#6b7280]">
+                        {[d.dateLabel, d.time].filter(Boolean).join(" · ")}
+                      </span>
+                      {seat && (
+                        <span className={`shrink-0 text-[11px] font-bold ${blocked ? "text-rose-600" : "text-[#6b7280]"}`}>
+                          {blocked ? "Full" : seat.limit === null ? `${seat.taken} registered` : `${seat.taken}/${seat.limit} taken`}
+                        </span>
+                      )}
+                    </label>
+                  )
+                })}
+              </div>
+              <p className="mt-2 text-[11px] leading-snug text-[#6b7280]">
+                Each day they&apos;re on takes one seat. A full day can&apos;t be added — raise its pax in Edit event first.
+              </p>
+
+              {daysError && (
+                <p className="mt-4 text-sm font-semibold text-rose-600" role="alert">{daysError}</p>
+              )}
+
+              <div className="mt-6 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setDaysReg(null)}
+                  disabled={daysSaving}
+                  className="px-4 py-2.5 border border-[#e5e5e5] text-sm font-bold text-[#374151] hover:border-[#001f3f] hover:text-[#001f3f] transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveChangeDays()}
+                  disabled={daysSaving || daysPick.size === 0 || !changed}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#001f3f] text-sm font-bold text-white hover:bg-[#00356b] transition-colors disabled:opacity-50"
+                >
+                  {daysSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Save days
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </>
   )
 }

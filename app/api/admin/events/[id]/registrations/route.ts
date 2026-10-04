@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { canAccessEvent, eventNotFound, requireEventAccess } from "@/lib/events/access"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { titleCaseName } from "@/lib/public-profile"
-import { daySeats, registrationDays } from "@/lib/events/pax"
+import { daySeats, registrationDays, type DaySeats } from "@/lib/events/pax"
+import { eventSchedule, normalizeEventDays } from "@/lib/events/dates"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -89,6 +90,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
  * Edit one registration's details. Only the fields present in the body change,
  * so the inline "Invited by" editor (which sends invitedBy alone) and the full
  * edit form share this handler. Empty invitedBy/whatsapp clear the value.
+ *
+ * `days` (Change days, 076) re-picks which days of a multi-day event the
+ * person attends — through event_registration_set_days(), which locks the
+ * event like a sign-up does and refuses a day being added that is full.
+ * Answers with the person's days and every day's fresh seat count.
  */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const access = await requireEventAccess()
@@ -103,11 +109,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     fullName?: unknown
     email?: unknown
     whatsapp?: unknown
+    days?: unknown
   }
   const registrationId = typeof body.registrationId === "string" ? body.registrationId : ""
   if (!UUID_RE.test(id) || !UUID_RE.test(registrationId)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 })
   }
+
+  const admin = createAdminSupabase()
 
   const clean = (v: unknown, max: number) =>
     typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : ""
@@ -131,22 +140,64 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     update.whatsapp = clean(body.whatsapp, 40) || null
   }
 
-  if (Object.keys(update).length === 0) {
+  // Change days (after the fields above are checked, so a bad field never
+  // leaves the days half-saved): only a multi-day event has days to pick.
+  let days: number[] | undefined
+  let seats: DaySeats[] | undefined
+  if ("days" in body) {
+    const { data: event } = await admin
+      .from("events")
+      .select("event_date, event_days, day_times, day_pax")
+      .eq("id", id)
+      .maybeSingle()
+    const eventDays = normalizeEventDays(event?.event_days)
+    if (!event || eventDays < 2) {
+      return NextResponse.json({ error: "Only a multi-day event has days to change" }, { status: 400 })
+    }
+    const picked = Array.isArray(body.days) ? body.days.map(Number) : []
+    days = [...new Set(picked.filter((d) => Number.isInteger(d) && d >= 1 && d <= eventDays))].sort((a, b) => a - b)
+    if (days.length === 0) return NextResponse.json({ error: "Pick at least one day" }, { status: 400 })
+
+    const { data: result, error: daysError } = await admin.rpc("event_registration_set_days", {
+      p_event_id: id,
+      p_registration_id: registrationId,
+      p_days: days,
+    })
+    if (daysError) {
+      console.error("[events/registrations] change days failed:", daysError.message)
+      return NextResponse.json({ error: "Failed to change days" }, { status: 500 })
+    }
+    const row = (Array.isArray(result) ? result[0] : result) as { ok: boolean; full_day: number | null } | null
+    if (!row?.ok) {
+      if (!row?.full_day) return NextResponse.json({ error: "Registration not found" }, { status: 404 })
+      const when = eventSchedule(event.event_date as string | null, event.event_days, event.day_times)[row.full_day - 1]
+      return NextResponse.json(
+        { error: `Day ${row.full_day}${when ? ` (${when.dateLabel})` : ""} is full — raise its pax in Edit event to add more people.`, full_day: row.full_day },
+        { status: 409 },
+      )
+    }
+    const { data: counts } = await admin.rpc("event_day_counts", { p_event_id: id })
+    seats = daySeats(event.day_pax, event.event_days, counts ?? [])
+  }
+
+  if (Object.keys(update).length === 0 && days === undefined) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 })
   }
 
-  const admin = createAdminSupabase()
-  const { error } = await admin
-    .from("event_registrations")
-    .update(update)
-    .eq("id", registrationId)
-    .eq("event_id", id)
+  if (Object.keys(update).length > 0) {
+    const { error } = await admin
+      .from("event_registrations")
+      .update(update)
+      .eq("id", registrationId)
+      .eq("event_id", id)
 
-  if (error) {
-    return NextResponse.json({ error: "Failed to update registration" }, { status: 500 })
+    if (error) {
+      return NextResponse.json({ error: "Failed to update registration" }, { status: 500 })
+    }
   }
   return NextResponse.json({
     ok: true,
+    ...(days !== undefined ? { days, seats } : {}),
     ...(update.invited_by !== undefined ? { invitedBy: update.invited_by ? titleCaseName(update.invited_by) : null } : {}),
     ...(update.full_name !== undefined ? { fullName: update.full_name } : {}),
     ...(update.email !== undefined ? { email: update.email } : {}),

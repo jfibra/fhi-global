@@ -209,9 +209,13 @@ export function EventRegisterForm({
       {/* Pax per date (075): tick the days you'll attend — a full day can't be picked. */}
       {multiDay && (
         <fieldset className="space-y-1.5">
-          <legend className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-[#374151]">
+          <legend className="text-xs font-semibold uppercase tracking-wider text-[#374151]">
             Which day(s) will you attend? *
           </legend>
+          {/* One registration per email per event — pick every day now (the organizer can change them later). */}
+          <p className="pb-1 text-[11px] leading-snug text-[#6b7280]">
+            Tick every day you plan to attend — you can register only once with your email.
+          </p>
           {days.map((d) => {
             const s = seatOf(d.day)
             const full = !!s?.full

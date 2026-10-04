@@ -90,7 +90,12 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     if (error.code === "23505") {
-      return NextResponse.json({ error: "This email is already registered for the event" }, { status: 409 })
+      // One registration per email: on a multi-day event, a new day is added by the organizer (Change days).
+      const message =
+        eventDays > 1
+          ? "This email is already registered for this event. To add or change your days, please contact the organizer."
+          : "This email is already registered for the event"
+      return NextResponse.json({ error: message }, { status: 409 })
     }
     console.error("[events/register] insert failed:", error.message)
     return NextResponse.json({ error: "Registration failed — please try again" }, { status: 500 })
