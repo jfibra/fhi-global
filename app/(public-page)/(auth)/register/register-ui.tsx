@@ -3,10 +3,11 @@
 import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
 import {
-  ArrowRight, ArrowLeft, Loader2, CheckCircle2, Mail, AlertCircle, Info, Phone, MapPin, ChevronDown, MessageCircle,
+  ArrowRight, ArrowLeft, Loader2, CheckCircle2, Mail, AlertCircle, Info, Phone,
 } from "lucide-react"
-import { isoFlagEmoji, nationalityFlag } from "@/lib/nationalities"
-import { COUNTRIES, countryByIso, countryByName, countryFlag } from "@/lib/countries"
+import { nationalityFlag } from "@/lib/nationalities"
+import { countryByIso, countryByName, countryFlag } from "@/lib/countries"
+import { PartnerLocationFields } from "@/components/auth/partner-location-fields"
 import { checkPartnerSignupInfo, type PartnerSignupInfo } from "@/lib/partner-signup"
 import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
 import { OtpInput } from "@/components/auth/otp-input"
@@ -225,73 +226,26 @@ export function RegisterUI({
 
               {step === "info" ? (
                 <form onSubmit={(e) => { e.preventDefault(); continueFromInfo() }} className="space-y-4" noValidate>
-                  <div>
-                    <label htmlFor="partner-country" className="mb-1.5 block text-xs font-semibold text-[#374151]">Country you live in</label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
-                      <select
-                        id="partner-country"
-                        value={country}
-                        onChange={(e) => {
-                          setCountry(e.target.value)
-                          const c = countryByName(e.target.value)
-                          if (c) setWaIso(c.iso)
-                          setError("")
-                        }}
-                        className={`${inputCls} appearance-none pl-10 pr-9 ${country ? "" : "text-[#9ca3af]"}`}
-                      >
-                        <option value="" disabled>Select your country</option>
-                        {COUNTRIES.map((c) => (
-                          <option key={c.iso} value={c.name} className="text-[#111827]">{isoFlagEmoji(c.iso)} {c.name}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="partner-whatsapp" className="mb-1.5 block text-xs font-semibold text-[#374151]">WhatsApp number</label>
-                    <div className="flex items-stretch gap-2">
-                      {/* The code: a native picker under a "🇵🇭 +63" face — easy to use on a phone. */}
-                      <div className="relative w-[104px] shrink-0">
-                        <select
-                          aria-label="WhatsApp country code"
-                          value={waIso}
-                          onChange={(e) => {
-                            setWaIso(e.target.value)
-                            setError("")
-                          }}
-                          className="peer absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-                        >
-                          <option value="" disabled>Code</option>
-                          {COUNTRIES.map((c) => (
-                            <option key={c.iso} value={c.iso}>{c.name} ({c.dial})</option>
-                          ))}
-                        </select>
-                        <span className="flex h-full items-center gap-1.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] pl-3 pr-7 text-sm tabular-nums text-[#111827] transition-all peer-focus-visible:border-[#001f3f] peer-focus-visible:bg-white peer-focus-visible:ring-4 peer-focus-visible:ring-[#001f3f]/6" aria-hidden>
-                          {waCountry ? <>{isoFlagEmoji(waCountry.iso)} {waCountry.dial}</> : <span className="text-[#9ca3af]">Code</span>}
-                        </span>
-                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#9ca3af] pointer-events-none" />
-                      </div>
-                      <div className="relative min-w-0 flex-1">
-                        <MessageCircle className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none" />
-                        <input
-                          id="partner-whatsapp"
-                          type="tel"
-                          inputMode="tel"
-                          value={waNumber}
-                          onChange={(e) => {
-                            setWaNumber(e.target.value)
-                            setError("")
-                          }}
-                          placeholder="917 123 4567"
-                          autoComplete="tel-national"
-                          maxLength={24}
-                          className={`${inputCls} pl-10`}
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  <PartnerLocationFields
+                    idPrefix="partner"
+                    country={country}
+                    onCountry={(name) => {
+                      setCountry(name)
+                      const c = countryByName(name)
+                      if (c) setWaIso(c.iso)
+                      setError("")
+                    }}
+                    waIso={waIso}
+                    onWaIso={(iso) => {
+                      setWaIso(iso)
+                      setError("")
+                    }}
+                    waNumber={waNumber}
+                    onWaNumber={(value) => {
+                      setWaNumber(value)
+                      setError("")
+                    }}
+                  />
 
                   {error && <ErrorBox message={error} />}
 

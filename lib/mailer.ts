@@ -310,6 +310,102 @@ export async function sendEmailChangedNotice(oldEmail: string, newEmail: string,
   })
 }
 
+/**
+ * Global Partner reminder (boss, 2026-10-04): partners who joined before the
+ * invite asked "Where are you based?" are asked to sign in and answer it — the
+ * dashboard shows them the question (PartnerInfoGate). Sent one at a time from
+ * the admin Global Partners page.
+ */
+export async function sendPartnerInfoReminderEmail(input: { to: string; name: string | null }): Promise<void> {
+  const { subject, text, html } = partnerInfoReminderContent(input.name)
+  await deliver("PartnerInfoReminderMailer", {
+    from: fromAddress(),
+    to: input.to,
+    subject,
+    text,
+    html,
+  })
+}
+
+/** The reminder's subject + bodies — kept apart from sending so it can be previewed. */
+export function partnerInfoReminderContent(name: string | null): { subject: string; text: string; html: string } {
+  const first = (name ?? "").trim().split(/\s+/)[0] ?? ""
+  const subject = "Where are you based? A quick update for your FHI Global account"
+  const signIn = `${SITE_URL.replace(/\/$/, "")}/staff-login`
+  const text = `Hi${first ? ` ${first}` : ""},\n\nWe're getting to know our Global Partners around the world. Please sign in to your FHI Global account and tell us the country you live in now and your WhatsApp number — it takes less than a minute.\n\nSign in: ${signIn}\n\nThank you!\nFHI Global\n\n© ${new Date().getFullYear()} FHI Global · Dubai, UAE`
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light only">
+  <title>${subject}</title>
+</head>
+<body style="margin:0;padding:0;background:#eef1f5;-webkit-font-smoothing:antialiased;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+    Tell us the country you live in and your WhatsApp — it takes less than a minute.
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;padding:32px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 12px 40px -16px rgba(0,20,45,0.35);">
+
+        <tr>
+          <td align="center" bgcolor="${NAVY}" style="background:${NAVY};padding:30px 32px 26px;border-bottom:3px solid ${GOLD};">
+            <img src="${LOGO_URL}" alt="FHI Global" height="40" style="height:40px;width:auto;display:block;border:0;outline:none;text-decoration:none;">
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:36px 40px 8px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">Global Partner</p>
+            <h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;font-weight:700;color:#0d1117;">Where are you based${first ? `, ${esc(first)}` : ""}?</h1>
+            <p style="margin:0 0 4px;font-size:15px;line-height:1.65;color:#4b5563;">
+              We&rsquo;re getting to know our Global Partners around the world. Please sign in to your FHI Global account and tell us
+              <strong style="color:#0d1117;">the country you live in now</strong> and <strong style="color:#0d1117;">your WhatsApp number</strong> &mdash; it takes less than a minute.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:22px 40px 8px;">
+            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+              <td bgcolor="${GOLD}" style="background:${GOLD};border-radius:10px;">
+                <a href="${signIn}" style="display:inline-block;padding:14px 30px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:${NAVY};text-decoration:none;">Sign in to FHI Global</a>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:20px 40px 32px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr><td style="border-top:1px solid #eef0f3;padding-top:18px;">
+                <p style="margin:0;font-size:12.5px;line-height:1.6;color:#9ca3af;">
+                  You&rsquo;re receiving this because you&rsquo;re an FHI Global Partner. Once you&rsquo;re signed in, the question appears right away.
+                </p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" bgcolor="#fafbfc" style="background:#fafbfc;border-top:1px solid #eef0f3;padding:22px 32px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <p style="margin:10px 0 0;font-size:11px;color:#b6bdc7;">© ${new Date().getFullYear()} FHI Global Property. All rights reserved.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+
+  return { subject, text, html }
+}
+
 // ─── Event emails (registration confirmation + raffle winner) ─────────────────
 
 /** User-provided values land in HTML — always escape them. */

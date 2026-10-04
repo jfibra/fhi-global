@@ -166,6 +166,8 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { ...INVITE,                                            description: "Invite links for onboarding new accounts." },
       // Who is waiting for approval, who recruits most, and each recruiter's downline.
       { icon: UserPlus, label: "Recruitment", to: "recruitment", description: "Accounts waiting for approval, top recruiters and their downlines." },
+      // Every Global Partner grouped by the country they live in (lib/partner-signup.ts).
+      { icon: Globe, label: "Global Partners", to: "global-partners", description: "Every Global Partner, grouped by the country they live in." },
     ],
   },
   { icon: Network, label: "Teams", to: "teams" },

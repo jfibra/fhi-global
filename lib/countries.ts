@@ -217,5 +217,20 @@ export const countryByIso = (iso: string | null | undefined): Country | undefine
 export const countryByName = (name: string | null | undefined): Country | undefined =>
   COUNTRIES.find((c) => c.name === (name ?? "").trim())
 
+// A calling code several countries share → the one to show for it.
+const SHARED_DIALS: Record<string, string> = { "+1": "US", "+7": "RU", "+39": "IT" }
+
+/**
+ * The country to show for a stored calling code — the profile picker saves
+ * "+63", or "+1-CA" for Canada (COUNTRY_CODES in lib/user-service.ts).
+ */
+export function countryForDial(code: string | null | undefined): Country | undefined {
+  const c = (code ?? "").trim()
+  if (!c) return undefined
+  const [dial, iso] = c.split("-")
+  if (iso) return countryByIso(iso)
+  return countryByIso(SHARED_DIALS[dial]) ?? COUNTRIES.find((x) => x.dial === dial)
+}
+
 /** Flag emoji for a stored country name ("" when unknown). */
 export const countryFlag = (name: string | null | undefined): string => isoFlagEmoji(countryByName(name)?.iso)

@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/client"
 import { AuthProvider } from "@/context/auth-context"
 import { DashboardShell } from "@/components/dashboard/shell"
 import { ProfilePhotoGate } from "@/components/dashboard/profile-photo-gate"
+import { PartnerInfoGate } from "@/components/dashboard/partner-info-gate"
+import { partnerInfoMetadata } from "@/lib/partner-signup"
 import { PageLoader } from "@/components/ui/PageLoader"
 import { getProfileByUserId, googleAvatarUrl, hasProfilePhoto, isInactiveProfile, type AppProfile, type AppUser } from "@/lib/auth"
 import { isAdminStaffRole, isKnownAppRoleId } from "@/lib/app-roles"
@@ -89,6 +91,13 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
   // rule, still governs spots where headshot quality specifically matters.)
   const needsPhoto = !hasProfilePhoto(session.profile.profile_url)
 
+  // A Global Partner who joined before the invite asked where they live answers
+  // it once here (lib/partner-signup.ts) — after the photo, never two at once.
+  // Their real role only: an admin viewing as a partner isn't asked.
+  const meta = (session.profile.metadata ?? {}) as Record<string, unknown>
+  const needsPartnerInfo =
+    session.profile.role === "global_partner" && !(typeof meta.residence_country === "string" && meta.residence_country)
+
   // Admin "view as role": honor the view-as cookie only for a real admin-staff
   // account (mirrors proxy.ts). Everyone else sees their real role.
   const cookieRole = readViewAsCookie()
@@ -109,6 +118,23 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
           }
           onSaved={(url) =>
             setSession((prev) => (prev ? { ...prev, profile: { ...prev.profile, profile_url: url } } : prev))
+          }
+        />
+      )}
+      {!needsPhoto && needsPartnerInfo && (
+        <PartnerInfoGate
+          displayName={
+            session.profile.fullname
+            ?? [session.profile.fname, session.profile.lname].filter(Boolean).join(" ")
+          }
+          whatsappCode={typeof meta.whatsapp_country_code === "string" ? meta.whatsapp_country_code : null}
+          whatsappNumber={typeof meta.whatsapp_number === "string" ? meta.whatsapp_number : null}
+          onSaved={(info) =>
+            setSession((prev) =>
+              prev
+                ? { ...prev, profile: { ...prev.profile, metadata: { ...(prev.profile.metadata ?? {}), ...partnerInfoMetadata(info) } } }
+                : prev,
+            )
           }
         />
       )}
