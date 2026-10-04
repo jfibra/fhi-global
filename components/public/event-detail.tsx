@@ -1,6 +1,8 @@
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, CalendarDays, ChevronRight, Clock, MapPin, Ticket } from "lucide-react"
+import { ArrowLeft, ArrowRight, CalendarDays, ChevronRight, Clock, MapPin, Phone, Ticket } from "lucide-react"
+import { WhatsAppLogo } from "@/components/brand-icons"
+import type { EventHost } from "@/lib/events/host"
 import { ProjectLocationMap } from "@/components/public/project-location-map"
 import { eventBrand } from "@/lib/events/brands"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
@@ -12,6 +14,22 @@ import { EventHeroQr } from "@/components/public/event-hero-qr"
 import { EventShare } from "@/components/public/event-share"
 import { EventVideo } from "@/components/public/event-video"
 import { isPlayableVideoUrl } from "@/lib/video-embed"
+
+/** The host's round photo, or their initial on navy when there's none. */
+function HostPhoto({ host, size }: { host: EventHost; size: number }) {
+  return host.photo ? (
+    // eslint-disable-next-line @next/next/no-img-element -- S3 portraits and Google avatars, already sized small
+    <img src={host.photo} alt={host.name} width={size} height={size} className="shrink-0 rounded-full object-cover" style={{ width: size, height: size }} />
+  ) : (
+    <span
+      className="flex shrink-0 items-center justify-center rounded-full bg-[#001f3f] font-['Outfit'] font-bold text-[#d6b357]"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
+      aria-hidden="true"
+    >
+      {host.name.charAt(0).toUpperCase()}
+    </span>
+  )
+}
 
 /** The public columns an event page needs. */
 export type PublicEvent = {
@@ -44,7 +62,8 @@ export type PublicEvent = {
  * from the venue QR poster in the dashboard's certificate section. Shared by
  * the company page (/events/<slug>) and an agent's own event on their website
  * (/website/<site>/events/<slug>, migration 057), which differ only in where
- * "back", the breadcrumb and "more events" point and which URL is shared.
+ * "back", the breadcrumb and "more events" point and which URL is shared —
+ * and an agent's event on the company page names its host (074).
  */
 export function EventDetail({
   event,
@@ -53,10 +72,13 @@ export function EventDetail({
   breadcrumbs,
   moreEventsHref,
   mapsKey,
+  host = null,
 }: {
   event: PublicEvent
   /** Google Maps browser key; the venue map shows only with it and a pinned venue. */
   mapsKey?: string
+  /** The agent running it, on fhiglobal.ae — a "Hosted by" line and box (lib/events/host.ts). */
+  host?: EventHost | null
   /** Page this event lives at — what the share button hands out. */
   sharePath: string
   back: { href: string; label: string }
@@ -157,6 +179,16 @@ export function EventDetail({
             </h1>
             <span className="block w-16 h-[3px] bg-[#d6b357] mb-6" aria-hidden="true" />
 
+            {/* Whose event it is, straight away — the full box is further down. */}
+            {host && (
+              <a href="#host" className="-mt-2 mb-6 inline-flex items-center gap-2.5 text-sm text-[#4b5563] transition-colors hover:text-[#001f3f]">
+                <HostPhoto host={host} size={30} />
+                <span>
+                  Hosted by <strong className="font-bold text-[#0f2940]">{host.name}</strong>
+                </span>
+              </a>
+            )}
+
             {/* Date / time / venue chips */}
             <div className="flex flex-wrap gap-3 mb-7">
               <span className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#001f3f] text-white text-sm font-semibold">
@@ -210,6 +242,53 @@ export function EventDetail({
                   <MapPin className="w-4 h-4" /> Where it is
                 </h2>
                 <ProjectLocationMap apiKey={mapsKey} projectName={event.venue ?? event.title} address={event.venue ?? ""} lat={event.venue_lat} lng={event.venue_lng} />
+              </section>
+            )}
+
+            {/* The agent behind it: credit and a direct line, so the lead stays theirs
+                while the visitor stays on fhiglobal.ae. */}
+            {host && (
+              <section id="host" className="mt-8 scroll-mt-24 border border-[#e5e8ec] bg-[#fafbfc] p-5 sm:p-6">
+                <h2 className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#b8913f]">Hosted by</h2>
+                <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-4">
+                    <HostPhoto host={host} size={64} />
+                    <div className="min-w-0">
+                      <p className="font-['Outfit'] text-lg font-bold leading-tight text-[#001f3f]">{host.name}</p>
+                      <p className="mt-0.5 text-sm text-[#6b7280]">FHI Global advisor</p>
+                    </div>
+                  </div>
+                  {(host.whatsapp || host.phone || host.websiteHref) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {host.whatsapp && (
+                        <a
+                          href={`https://wa.me/${host.whatsapp}?text=${encodeURIComponent(`Hi ${host.first}, I saw your event "${event.title}" on fhiglobal.ae.`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 bg-[#001f3f] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#00356b]"
+                        >
+                          <WhatsAppLogo className="h-4 w-4" /> WhatsApp {host.first}
+                        </a>
+                      )}
+                      {host.phone && (
+                        <a
+                          href={`tel:+${host.phone}`}
+                          className="inline-flex items-center gap-2 border border-[#e5e8ec] bg-white px-4 py-2.5 text-sm font-bold text-[#0f2940] transition-colors hover:border-[#001f3f]"
+                        >
+                          <Phone className="h-4 w-4" /> Call
+                        </a>
+                      )}
+                      {host.websiteHref && (
+                        <Link
+                          href={host.websiteHref}
+                          className="inline-flex items-center gap-1.5 px-1 py-2.5 text-sm font-bold text-[#0f2940] transition-colors hover:text-[#b8913f]"
+                        >
+                          Visit {host.first}&apos;s website <ArrowRight className="h-4 w-4" />
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                </div>
               </section>
             )}
 

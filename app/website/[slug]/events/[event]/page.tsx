@@ -31,16 +31,16 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const getSite = cache((slug: string) => loadSiteBySlug(createAdminSupabase(), slug))
 
 /** A live, published event owned by this site's agent — by slug or legacy id. */
-const getEvent = cache(async (agentId: string, key: string): Promise<(PublicEvent & { show_on_website: boolean | null }) | null> => {
+const getEvent = cache(async (agentId: string, key: string): Promise<(PublicEvent & { show_on_main: boolean | null; show_on_website: boolean | null }) | null> => {
   const query = createAdminSupabase()
     .from("events")
-    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, day_times, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate, show_on_website")
+    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, day_times, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate, show_on_main, show_on_website")
     .eq("agent_id", agentId)
     .eq("status", "published")
     .is("deleted_at", null)
   const { data, error } = UUID_RE.test(key) ? await query.eq("id", key).maybeSingle() : await query.eq("slug", key).maybeSingle()
   if (error) throw new Error("Failed to load event")
-  return (data as (PublicEvent & { show_on_website: boolean | null }) | null) ?? null
+  return (data as (PublicEvent & { show_on_main: boolean | null; show_on_website: boolean | null }) | null) ?? null
 })
 
 /** The fhiglobal.ae page of an event the agent put on the main site only (074). */
@@ -68,7 +68,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       truncateDescription(event.description) ||
       `Register for ${event.title}${event.venue ? ` at ${event.venue}` : ""}${host ? ` — hosted by ${host}` : ""}.`,
     imageUrl: event.image_url,
-    pathname: eventPublicPath(event, site.slug),
+    // Also on fhiglobal.ae (074) → that page is the one Google should rank;
+    // this copy stays for the agent's own visitors and shared links.
+    pathname: event.show_on_main ? mainEventPath(event) : eventPublicPath(event, site.slug),
     keywords: [event.title, host, "Dubai real estate event"].filter(Boolean) as string[],
   })
 }
@@ -116,7 +118,8 @@ export default async function AgentEventPage({ params, searchParams }: Props) {
           eventSchema({
             title: event.title,
             description: event.description,
-            path,
+            // The canonical copy: fhiglobal.ae when the event is also there (074).
+            path: event.show_on_main ? mainEventPath(event) : path,
             imageUrl: event.image_url,
             eventDate: event.event_date,
             eventDays: event.event_days,

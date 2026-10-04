@@ -48,7 +48,7 @@ const SECTION_SELECT: Record<SupabaseSection, string> = {
 }
 
 /** Same published-only filters the public routes use, per section. */
-function sectionFilters(section: SupabaseSection): Array<["eq" | "is", string, unknown]> {
+function sectionFilters(section: SupabaseSection): Array<["eq" | "is" | "or", string, unknown]> {
   switch (section) {
     case "projects":
       return [["eq", "is_active", true], ["eq", "is_published", true], ["is", "deleted_at", null]]
@@ -57,9 +57,11 @@ function sectionFilters(section: SupabaseSection): Array<["eq" | "is", string, u
     case "listings":
       return [["eq", "status", "published"], ["is", "deleted_at", null]]
     case "events":
-      // Company events only: an agent's own event (057) lives on their
-      // website, and its /events/<slug> URL only forwards there.
-      return [["eq", "status", "published"], ["is", "deleted_at", null], ["is", "agent_id", null]]
+      // Every event whose page renders on fhiglobal.ae: company events, and
+      // agents' events placed on the main page (074 — /events/<slug> is their
+      // canonical). A website-only agent event's /events URL just forwards, so
+      // it's listed by its website URL instead (fetchAgentEventPaths).
+      return [["eq", "status", "published"], ["is", "deleted_at", null], ["or", "agent_id.is.null,show_on_main.eq.true", null]]
     case "gallery":
       // gallery_albums has no deleted_at or status columns (migration 038) —
       // is_published is the whole publish state.
@@ -73,7 +75,7 @@ export async function countSection(section: SupabaseSection): Promise<number | n
     const supabase = createPublicSupabaseClient()
     let query = supabase.from(SECTION_TABLE[section]).select("id", { count: "exact", head: true })
     for (const [op, column, value] of sectionFilters(section)) {
-      query = op === "eq" ? query.eq(column, value) : query.is(column, value as null)
+      query = op === "eq" ? query.eq(column, value) : op === "or" ? query.or(column) : query.is(column, value as null)
     }
     const { count, error } = await query
     if (error) return null
@@ -96,7 +98,7 @@ export async function fetchSectionPage(
     const supabase = createPublicSupabaseClient()
     let query = supabase.from(SECTION_TABLE[section]).select(SECTION_SELECT[section])
     for (const [op, column, value] of sectionFilters(section)) {
-      query = op === "eq" ? query.eq(column, value) : query.is(column, value as null)
+      query = op === "eq" ? query.eq(column, value) : op === "or" ? query.or(column) : query.is(column, value as null)
     }
     const from = (page - 1) * SUPABASE_PER_PAGE
     const { data, error } = await query
@@ -110,9 +112,10 @@ export async function fetchSectionPage(
 }
 
 /**
- * Agents' own published events (migration 057), as their website URLs — the
- * events section above is company events only. Only events whose agent has a
- * published site are listed (that's where they live). Null on a failed read.
+ * Agents' own published events shown on their website only (057 + 074), as
+ * their website URLs — the events section above lists everything that renders
+ * on fhiglobal.ae. Only events whose agent has a published site are listed
+ * (that's where they live). Null on a failed read.
  */
 export async function fetchAgentEventPaths(): Promise<Array<{ path: string; updated_at: string | null }> | null> {
   try {
@@ -123,8 +126,11 @@ export async function fetchAgentEventPaths(): Promise<Array<{ path: string; upda
       .eq("status", "published")
       .is("deleted_at", null)
       .not("agent_id", "is", null)
-      // Shown on the website (074) — a fhiglobal.ae-only event's site URL just forwards.
+      // Website-only events (074): one on fhiglobal.ae is listed by its
+      // /events URL (the events section), and a fhiglobal.ae-only event's
+      // site URL just forwards.
       .eq("show_on_website", true)
+      .eq("show_on_main", false)
       .order("id", { ascending: true })
       .limit(SUPABASE_PER_PAGE)
     if (error || !events) return null

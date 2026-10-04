@@ -1,3 +1,4 @@
+import { cache } from "react"
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
@@ -10,6 +11,8 @@ import { EventViewPing } from "@/components/public/event-view-ping"
 import { EventDetail } from "@/components/public/event-detail"
 import { EventMovedRedirect } from "@/components/public/event-moved-redirect"
 import { eventPublicPath } from "@/lib/events/paths"
+import { createAdminSupabase } from "@/lib/admin-supabase"
+import { loadEventHost } from "@/lib/events/host"
 
 export const revalidate = 120
 
@@ -42,7 +45,7 @@ async function fetchEvent(idOrSlug: string) {
   const supabase = createPublicSupabaseClient()
   const query = supabase
     .from("events")
-    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, day_times, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate, agent_id, show_on_website")
+    .select("id, slug, title, description, brand, image_url, video_url, event_date, event_days, day_times, venue, venue_lat, venue_lng, registration_open, registration_fields, certificate, agent_id, show_on_main, show_on_website")
     .eq("status", "published")
     .is("deleted_at", null)
   const { data, error } = UUID_RE.test(idOrSlug)
@@ -55,14 +58,15 @@ async function fetchEvent(idOrSlug: string) {
 }
 
 /**
- * An agent's own event (migration 057) shown on their website lives there —
- * where this page forwards, with the host's name for the interstitial. Null
- * for a company event, for an agent's event on fhiglobal.ae only (074 — it
- * renders right here), or when the agent's site isn't published (the event
+ * An agent's event on their website ONLY (not placed on the main page, 074)
+ * lives there — where this page forwards, with the host's name for the
+ * interstitial. Null for a company event and for any agent's event on
+ * fhiglobal.ae (it renders right here with a "Hosted by" box, and this URL is
+ * the one Google indexes), or when the agent's site isn't published (the event
  * then keeps rendering here, so a link never dies).
  */
-async function agentHome(event: { id: string; slug: string | null; agent_id: string | null; show_on_website?: boolean | null }) {
-  if (!event.agent_id || event.show_on_website === false) return null
+async function agentHome(event: { id: string; slug: string | null; agent_id: string | null; show_on_main?: boolean | null; show_on_website?: boolean | null }) {
+  if (!event.agent_id || event.show_on_main === true || event.show_on_website === false) return null
   const { data } = await createPublicSupabaseClient()
     .from("website_builder")
     .select("slug, contact")
@@ -76,6 +80,9 @@ async function agentHome(event: { id: string; slug: string | null; agent_id: str
     hostName: typeof contact.name === "string" && contact.name.trim() ? contact.name.trim() : null,
   }
 }
+
+/** The agent behind an agent's event shown here — shared by metadata and the page. */
+const getHost = cache((agentId: string) => loadEventHost(createAdminSupabase(), agentId))
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
@@ -94,14 +101,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       robots: { index: false, follow: true },
     })
   }
+  const host = event.agent_id ? await getHost(event.agent_id) : null
   return createPageMetadata({
     title: event.title,
     description:
       truncateDescription(event.description) ||
-      `Register for ${event.title}${dateLabel ? ` on ${dateLabel}` : ""}${event.venue ? ` at ${event.venue}` : ""}.`,
+      `Register for ${event.title}${dateLabel ? ` on ${dateLabel}` : ""}${event.venue ? ` at ${event.venue}` : ""}${host ? ` — hosted by ${host.name}` : ""}.`,
     imageUrl: event.image_url,
     pathname: `/events/${event.slug ?? event.id}`,
-    keywords: [event.title, "FHI Global event", "Dubai real estate event"],
+    keywords: [event.title, ...(host ? [host.name] : []), "FHI Global event", "Dubai real estate event"],
   })
 }
 
@@ -113,6 +121,10 @@ export default async function EventDetailPage({ params }: Props) {
   const home = await agentHome(event)
   if (home) return <EventMovedRedirect to={home.path} title={event.title} hostName={home.hostName} />
 
+  // An agent's event placed on the main page (074) renders here with its host.
+  const host = event.agent_id ? await getHost(event.agent_id) : null
+  const path = `/events/${event.slug ?? event.id}`
+
   return (
     <div className="relative min-h-screen bg-[#fafafa] font-sans overflow-x-hidden">
       {/* Event entity (rich-result eligible) + the visible trail below. */}
@@ -121,12 +133,17 @@ export default async function EventDetailPage({ params }: Props) {
           eventSchema({
             title: event.title,
             description: event.description,
-            path: `/events/${event.slug ?? event.id}`,
+            path,
             imageUrl: event.image_url,
             eventDate: event.event_date,
             eventDays: event.event_days,
             dayTimes: event.day_times,
             venue: event.venue,
+            // An agent's event names them as organiser — and, like on their
+            // website, claims no country (agents run roadshows abroad too).
+            ...(event.agent_id
+              ? { organizer: host ? { name: host.name, path: host.websiteHref ?? path } : null, country: null }
+              : {}),
           }),
           breadcrumbList([
             { name: "Home", path: "/" },
@@ -138,8 +155,9 @@ export default async function EventDetailPage({ params }: Props) {
       <EventViewPing eventId={event.id} />
       <EventDetail
         event={event}
+        host={host}
         mapsKey={process.env.GOOGLE_MAPS_API_KEY?.trim() || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || ""}
-        sharePath={`/events/${event.slug ?? event.id}`}
+        sharePath={path}
         back={{ href: "/events", label: "All Events" }}
         breadcrumbs={[
           { href: "/", label: "Home" },

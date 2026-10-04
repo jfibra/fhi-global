@@ -183,12 +183,17 @@ export async function POST(req: NextRequest) {
     { id: String(result.data.id), slug },
     input.show_on_website && site?.isPublished ? site.slug : null,
   )
+  // The URL Google should index: /events/<slug> whenever the event is on the
+  // main page (company events always), else the agent's website page.
+  const mainPath = `/events/${slug ?? String(result.data.id)}`
+  const canonicalPath = !ownerId || input.show_on_main ? mainPath : publicPath
   if (ownerId && input.show_on_main) revalidatePath("/events")
   if (input.status === "published") {
-    const loc = `${SITE_URL.replace(/\/$/, "")}${publicPath}`
+    const loc = `${SITE_URL.replace(/\/$/, "")}${canonicalPath}`
     after(() => submitToIndexNow([loc]))
   }
   revalidatePath(publicPath)
+  if (canonicalPath !== publicPath) revalidatePath(canonicalPath)
 
   return NextResponse.json({ id: result.data.id })
 }

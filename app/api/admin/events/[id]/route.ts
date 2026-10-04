@@ -128,13 +128,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // page forwards to it; one on fhiglobal.ae only renders at /events/<slug> —
   // purge both, since the choice may just have changed.
   const onWebsiteNow = (input.show_on_website ?? existing.show_on_website) !== false
+  const onMainNow = !existing.agent_id || (input.show_on_main ?? existing.show_on_main) === true
   const publicPath = eventPublicPath(existing, onWebsiteNow && site?.isPublished ? site.slug : null)
+  const mainPath = `/events/${existing.slug ?? id}`
   revalidatePath(publicPath)
-  if (publicPath !== `/events/${existing.slug ?? id}`) revalidatePath(`/events/${existing.slug ?? id}`)
+  if (publicPath !== mainPath) revalidatePath(mainPath)
   // The list page decides by status and show_on_main — both may have just changed.
   revalidatePath("/events")
   if (input.status === "published") {
-    const loc = `${SITE_URL.replace(/\/$/, "")}${publicPath}`
+    // The URL Google should index: /events/<slug> whenever it's on the main page.
+    const loc = `${SITE_URL.replace(/\/$/, "")}${onMainNow ? mainPath : publicPath}`
     after(() => submitToIndexNow([loc]))
   }
 
