@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { Montserrat, Playfair_Display } from "next/font/google"
+import "./johndorf.css"
 
 // Johndorf's own look for the presentation — no FHI branding anywhere under /johndorf.
 const serif = Playfair_Display({ subsets: ["latin"], variable: "--font-jd-serif", display: "swap" })
