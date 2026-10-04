@@ -46,10 +46,88 @@
   animation: jd-shine 1.6s ease-out 0.4s 1 both;
 }
 
+/* Landing page: a faint film grain over everything. */
+@keyframes jd-grain {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-4%, 3%);
+  }
+  50% {
+    transform: translate(3%, -4%);
+  }
+  75% {
+    transform: translate(-2%, -2%);
+  }
+}
+.jd-grain {
+  inset: -20%;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation: jd-grain 1s steps(4) infinite;
+}
+
+/* Footprint map: dots fall in row by row, pins pop, rings pulse. */
+@keyframes jd-dot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes jd-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes jd-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(3.4);
+    opacity: 0;
+  }
+}
+.jd-dot,
+.jd-pin {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.jd-on .jd-dot {
+  animation: jd-dot-in 0.7s ease-out both;
+}
+.jd-on .jd-pin {
+  animation: jd-fade-in 0.6s ease-out both;
+}
+.jd-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: jd-ring 2.4s ease-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .jd-breathe,
   .jd-kenburns,
-  .jd-shine::after {
+  .jd-shine::after,
+  .jd-grain,
+  .jd-ring,
+  .jd-on .jd-dot,
+  .jd-on .jd-pin {
     animation: none;
+  }
+  .jd-dot,
+  .jd-pin {
+    opacity: 1;
   }
 }

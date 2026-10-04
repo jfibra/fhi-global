@@ -2,9 +2,10 @@
  * Johndorf Ventures Corporation — the facts the presentation's landing page
  * (/johndorf/home) shows. Every line comes from Johndorf's own site
  * (sitedev.johndorfventures.com: About Us, Our Projects, Residential, Buyer's
- * Guide, the 2025 news posts) or the press it cites (BusinessWorld, SunStar),
- * read 2026-10-04. Photos are Johndorf's own, saved under public/johndorf/site/.
- * Nothing here is invented — keep it that way when adding to it.
+ * Guide, the 2025 news posts) or the press (BusinessWorld, SunStar, Manila
+ * Standard, Metro Cebu, Philstar Property, Filipinohomes), read 2026-10-04.
+ * Photos are Johndorf's own or the press's (credited where shown), saved under
+ * public/johndorf/site/. Nothing here is invented — keep it that way.
  */
 
 export const COMPANY = {
@@ -27,13 +28,23 @@ export const STATS = [
 
 export const CITIES = ["Cebu", "Cagayan de Oro", "Davao", "Iligan", "Butuan"]
 
+/** The five cities on the footprint map (city-centre coordinates). */
+export const FOOTPRINT: { city: string; region: string; lat: number; lng: number; label: "left" | "right" }[] = [
+  { city: "Cebu", region: "Central Visayas", lat: 10.3157, lng: 123.8854, label: "left" },
+  { city: "Butuan", region: "Caraga", lat: 8.9475, lng: 125.5406, label: "right" },
+  { city: "Cagayan de Oro", region: "Northern Mindanao", lat: 8.4542, lng: 124.6319, label: "left" },
+  { city: "Iligan", region: "Northern Mindanao · where it began", lat: 8.228, lng: 124.2452, label: "left" },
+  { city: "Davao", region: "Davao Region", lat: 7.1907, lng: 125.4553, label: "right" },
+]
+
+/** Each step's photo is a real Johndorf place, captioned with what it is (not a photo of the year itself). */
 export const TIMELINE = [
-  { year: "1986", title: "Founded in Iligan", text: "A home-grown company started by the Lim family in Iligan City." },
-  { year: "Then", title: "Into Cagayan de Oro", text: "Its first project there: the PN ROA Low-Cost Housing Subdivision." },
-  { year: "2001", title: "Growing with CDO", text: "The city's infrastructure push opened the way for more Johndorf communities." },
-  { year: "Cebu", title: "Branches in Cebu", text: "Trusted for workmanship, Johndorf became one of the region's leading developers." },
-  { year: "2013+", title: "On to Davao", text: "Expansion into one of Mindanao's most progressive cities." },
-  { year: "2025", title: "Johndorf Tower & the world", text: "Its own LEED Gold office tower in Cebu Business Park, and a global debut in Bangkok." },
+  { year: "1986", title: "Founded in Iligan", text: "A home-grown company started by the Lim family in Iligan City.", image: "/johndorf/site/villa-castena.jpg", caption: "Villa Castena · Iligan City" },
+  { year: "Then", title: "Into Cagayan de Oro", text: "Its first project there: the PN ROA Low-Cost Housing Subdivision.", image: "/johndorf/site/arvesa.jpg", caption: "Arvesa Village · Cagayan de Oro" },
+  { year: "2001", title: "Growing with CDO", text: "The city's infrastructure push opened the way for more Johndorf communities.", image: "/johndorf/site/tierranava-lumbia.jpg", caption: "TierraNava Lumbia · Cagayan de Oro" },
+  { year: "Cebu", title: "Branches in Cebu", text: "Trusted for workmanship, Johndorf became one of the region's leading developers.", image: "/johndorf/site/tierranava-carcar.jpg", caption: "TierraNava Carcar · Cebu" },
+  { year: "2013+", title: "On to Davao", text: "Expansion into one of Mindanao's most progressive cities.", image: "/johndorf/site/family.jpg", caption: "Homes for every Filipino family" },
+  { year: "2025", title: "Johndorf Tower & the world", text: "Its own LEED Gold office tower in Cebu Business Park, and a global debut in Bangkok.", image: "/johndorf/site/tower.jpg", caption: "Johndorf Tower · Cebu Business Park" },
 ]
 
 export const FLAGSHIPS = [
@@ -42,8 +53,8 @@ export const FLAGSHIPS = [
     name: "Palmava",
     place: "Poblacion, Cordova, Cebu",
     image: "/johndorf/site/palmava.jpg",
-    /** The render carries its own logo bottom-left — keep it out from under the caption. */
-    focus: "100% 50%",
+    /** Centre the main tower (the render fades a second one in on the right). */
+    focus: "28% 50%",
     kicker: "The new flagship",
     text: "Johndorf's mid-to-high-end vertical development — introduced to more than 900 agents at the Asian Real Estate Summit 2025 in Bangkok.",
     facts: ["Mid-to-high-end", "For OFWs & investors", "Vertical living"],
@@ -52,7 +63,7 @@ export const FLAGSHIPS = [
     id: "tower",
     name: "Johndorf Tower",
     place: "Cebu Business Park",
-    image: "/johndorf/site/tower-inauguration.jpg",
+    image: "/johndorf/site/tower.jpg",
     kicker: "Best CBD Development",
     text: "21 storeys of LEED Gold-certified workspace across from Ayala Center Cebu — and Johndorf's corporate home.",
     facts: ["21 storeys", "LEED Gold", "16,000+ sqm"],
@@ -105,6 +116,12 @@ export const AWARDS = [
   },
 ]
 
+/** Award photos, with where each was published. */
+export const AWARD_PHOTOS = {
+  stage: { src: "/johndorf/site/awards-night.jpg", alt: "Richard Lim and Abi Lim receiving Best CBD Development", caption: "Richard Lim and Abi Lim receive Best CBD Development · Aug 15, 2025, Shangri-La The Fort", credit: "Metro Cebu" },
+  sign: { src: "/johndorf/site/tower-winner.jpg", alt: "The PropertyGuru winner's banner at Johndorf Tower", caption: "Winner's banner at the Johndorf Tower entrance", credit: "Filipinohomes" },
+}
+
 export const RECOGNITION = {
   title: "Top 4 Developer in the Philippines",
   by: "Filipino Homes · National Real Estate Convention",
@@ -114,12 +131,42 @@ export const RECOGNITION = {
 
 export const VALUES = ["Commitment", "Customer-Centric", "Innovation", "Leadership", "Excellence", "Respect"] as const
 
-export const LEADERS = [
-  { name: "Richard Lim", role: "Chief Executive Officer" },
-  { name: "Norma Lim", role: "Executive Vice President & Treasurer" },
-  { name: "Abi Lim", role: "AVP, Business Development" },
-  { name: "Francis Icamen", role: "AVP, Sales & Marketing" },
+/**
+ * The Lim family at the Johndorf Tower opening (Feb 2025), left to right exactly
+ * as Manila Standard's caption names them. x/y = head position in
+ * public/johndorf/site/family-launch.jpg (percent). Titles: that caption, except
+ * Richard (Filipinohomes, May 2026) and Norma (Johndorf's own post, Nov 2025).
+ */
+export const FAMILY_PHOTO = { src: "/johndorf/site/family-launch.jpg", width: 2000, height: 1432, caption: "The Johndorf Tower opening, February 2025", credit: "Manila Standard" }
+export const FAMILY = [
+  { name: "Genevieve Lim", role: "Manager, Leasing & Commercial", x: 13.3, y: 25 },
+  { name: "Frances Dominique Lim", role: "Daughter of Richard & Norma Lim", x: 26, y: 23.5 },
+  { name: "Abi Lim", role: "AVP, Business Development", x: 35.8, y: 23 },
+  { name: "Norma Lim", role: "EVP & Treasurer", x: 44, y: 24 },
+  { name: "Richard Lim", role: "President & CEO", x: 57, y: 21 },
+  { name: "Patrick Lim", role: "AVP, Finance & Accounting", x: 68.5, y: 23 },
+  { name: "Raymond Lim", role: "AVP, Construction Management", x: 82.3, y: 20 },
 ]
+export const ALSO_LEADING = [{ name: "Francis Icamen", role: "AVP, Sales & Marketing" }]
+
+/** Said at the 13th PropertyGuru Philippines Property Awards (Metro Cebu, Aug 2025). */
+export const QUOTES = [
+  {
+    name: "Richard Lim",
+    role: "President & CEO",
+    photo: "/johndorf/site/richard-lim.jpg",
+    text: "Johndorf has always believed that Cebu deserves developments that combine functionality, sustainability, and accessibility.",
+    more: "These awards are a validation of our vision to contribute to the growth of Cebu as a global hub while staying true to our roots as a homegrown developer.",
+  },
+  {
+    name: "Abi Lim",
+    role: "AVP, Business Development",
+    photo: "/johndorf/site/abi-lim.jpg",
+    text: "Plumera Mactan and Johndorf Tower represent how we are broadening our portfolio while keeping the values of quality and affordability.",
+    more: "These recognitions challenge us to continue innovating for both the business community and Filipino families seeking better living spaces.",
+  },
+]
+export const QUOTES_SOURCE = "Metro Cebu · August 2025"
 
 export const BUYING = {
   steps: ["Select a property and unit type", "Reserve the unit", "Complete and manage it in the Customer Portal"],
@@ -128,6 +175,7 @@ export const BUYING = {
 }
 
 export const NEWS = [
+  { date: "May 15, 2026", title: "Filipinohomes CEO Anthony Leuterio meets Johndorf's Richard and Abi Lim for strategic planning", image: "/johndorf/site/planning-session.jpg", href: "https://filipinohomes.com/news/filipinohomes-ceo-anthony-leuterio-meets-johndorfs-owners-richard-and-abigail-lim-for-strategic-planning-celebrating-a-banner-year-after-five-propertyguru-awards" },
   { date: "December 18, 2025", title: "Cebu City, Johndorf explore collaboration in urban programs", image: "/johndorf/site/cebu-city.jpg", href: "https://sitedev.johndorfventures.com/2025/12/18/cebu-city-johndorf-explore-collaboration-in-urban-programs/" },
   { date: "November 12, 2025", title: "Filipino Homes cites Johndorf as Top 4 Developer in 2025", image: "/johndorf/site/award-stage.jpg", href: "https://sitedev.johndorfventures.com/2025/11/12/filipino-homes-cites-johndorf-as-top-4-developer-in-2025/" },
   { date: "September 16, 2025", title: "Johndorf Ventures wins big for Johndorf Tower, Plumera Mactan", image: "/johndorf/site/tower-inauguration.jpg", href: "https://sitedev.johndorfventures.com/2025/09/16/johndorf-ventures-wins-big-for-johndorf-tower-plumera-mactan/" },
