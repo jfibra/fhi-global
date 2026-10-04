@@ -1,7 +1,8 @@
 import Image from "next/image"
+import Link from "next/link"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { LogOut } from "lucide-react"
+import { ArrowLeft, LogOut } from "lucide-react"
 import { JD_COOKIE, isJohndorfSession } from "@/lib/johndorf/session"
 import { signOutJohndorf } from "../actions"
 import { MontierraMap } from "./montierra-map"
@@ -19,6 +20,9 @@ export default async function JohndorfDashboardPage() {
         <div className="h-1 bg-[#b4241c]" />
         <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-4 px-4 py-2.5 sm:px-6">
           <div className="flex items-center gap-4">
+            <Link href="/johndorf/home" aria-label="Back to the Johndorf home page" title="Johndorf home" className="-ml-1 rounded-full p-2 text-[#6b5a56] transition-colors hover:bg-[#f3ece9] hover:text-[#b4241c]">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
             <Image src="/johndorf/logo.png" alt="Johndorf Ventures Corporation" width={391} height={186} className="h-auto w-[96px]" unoptimized />
             <span className="hidden h-8 w-px bg-[#ece5e2] sm:block" />
             <Image src="/johndorf/montierra-wordmark.png" alt="Montierra" width={462} height={97} className="hidden h-auto w-[120px] sm:block" unoptimized />
