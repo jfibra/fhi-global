@@ -1403,3 +1403,11 @@ html.film-open { overflow: hidden; }
 .fhi-pdf-page .annotationLayer .textWidgetAnnotation input.comb:focus { width: 103%; }
 .fhi-pdf-page .annotationLayer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input { appearance: none; }
 .fhi-pdf-page .annotationLayer .popupAnnotation { display: none; }
+
+/* ─── Square corners, scoped (Real Estate Data → Developers / Projects Breakdown) ─────
+   The tab reuses the shared rounded cards/tiles/buttons; this flattens every
+   corner inside it without touching the other tabs. */
+.fhi-no-radius,
+.fhi-no-radius * {
+  border-radius: 0 !important;
+}

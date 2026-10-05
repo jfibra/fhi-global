@@ -17,8 +17,8 @@ import { useMemo, useRef, useState } from "react"
 import { ChevronDown, Loader2, Search } from "lucide-react"
 import { FilterSelect } from "@/components/ui/filter-select"
 import { DLD_CHART_TOP_N, type DldChartBucket } from "@/lib/dld-open-data"
-import { ChartCard, CoverageLine, ErrorBox, MiniStat, RefreshButton, Skeleton, longDate, toBuckets, useBatchJob, type BatchJob } from "./market-charts"
-import { GROUPS, jobFor, last30Days, pctOf, relabel, textPx, titleCase, useWidth } from "./developers-breakdown"
+import { ChartCard, CoverageLine, ErrorBox, RefreshButton, Skeleton, longDate, toBuckets, useBatchJob, type BatchJob } from "./market-charts"
+import { GROUPS, StatTile, TILE, jobFor, last30Days, pctOf, relabel, textPx, titleCase, useWidth } from "./developers-breakdown"
 
 const int = new Intl.NumberFormat("en-AE", { maximumFractionDigits: 0 })
 const compact = new Intl.NumberFormat("en-AE", { notation: "compact", maximumFractionDigits: 1 })
@@ -109,6 +109,15 @@ export function ProjectsBreakdownSection() {
   const withDeveloperValue = withDeveloper.reduce((s, p) => s + p.value, 0)
   const withProjectValue = projects.reduce((s, p) => s + p.value, 0)
   const aed = (v: number) => `AED ${compact.format(v)}`
+  // Daily series across the range (oldest first) — the tiles' background charts.
+  const dailyCounts = useMemo(() => (acc ? Object.entries(acc.daily).sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v.count) : []), [acc])
+  const dailyValues = useMemo(() => (acc ? Object.entries(acc.daily).sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v.value) : []), [acc])
+  // Transactions by weekday, Monday first — the radar's seven spokes.
+  const weekdayCounts = useMemo(() => {
+    const out = [0, 0, 0, 0, 0, 0, 0]
+    for (const [day, v] of Object.entries(acc?.daily ?? {})) out[(new Date(`${day}T00:00:00`).getDay() + 6) % 7] += v.count
+    return out
+  }, [acc])
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -119,14 +128,7 @@ export function ProjectsBreakdownSection() {
   }
 
   return (
-    <section>
-      <div className="mb-4">
-        <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Projects Breakdown</h2>
-        <p className="text-sm text-[#6b7280]">
-          Which projects are transacting. Every DLD transaction in the range is grouped by the project DLD names on it, with the developer
-          each project resolved to — or a note that none is on record yet. Rows naming no project are counted but not ranked.
-        </p>
-      </div>
+    <section className="fhi-no-radius">
 
       <form onSubmit={submit} className="bg-white rounded-2xl border border-[#e8eaed] p-5 mb-4">
         <div className="flex flex-wrap items-end gap-3">
@@ -182,6 +184,15 @@ export function ProjectsBreakdownSection() {
           )}
         </CoverageLine>
 
+        {/* Totals at a glance. */}
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+          <StatTile color={TILE.navy} label="Transactions" value={acc ? int.format(total) : null} hint={acc ? `${groupLabel} in the range` : undefined} chart={{ kind: "combo", values: dailyCounts }} />
+          <StatTile color={TILE.gold} label="Total Value" value={acc ? aed(totalValue) : null} hint={acc && total > 0 ? `${int.format(Math.round(totalValue / total))} AED per transaction` : undefined} chart={{ kind: "bars", values: dailyValues }} />
+          <StatTile color={TILE.green} label="Projects Named" value={acc ? int.format(projects.length) : null} hint={acc ? `${pctOf(withProjectRows, total)} · ${aed(withProjectValue)}` : undefined} share={total ? (withProjectRows / total) * 100 : null} chart={{ kind: "ring", share: total ? (withProjectRows / total) * 100 : 0 }} />
+          <StatTile color={TILE.amber} label="With a Developer" value={acc ? int.format(withDeveloper.length) : null} hint={acc ? `${pctOf(withDeveloperRows, total)} · ${aed(withDeveloperValue)}` : undefined} share={total ? (withDeveloperRows / total) * 100 : null} chart={{ kind: "pie", share: total ? (withDeveloperRows / total) * 100 : 0 }} />
+          <StatTile color={TILE.slate} label="No Project" value={acc ? int.format(noProjectRows) : null} hint={acc ? `${pctOf(noProjectRows, total)} · ${aed(Math.max(0, totalValue - withProjectValue))}` : undefined} share={total ? (noProjectRows / total) * 100 : null} chart={{ kind: "polar", values: weekdayCounts }} />
+        </div>
+
         {/* 1. Overall projects — by count on the left, by AED on the right. */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {MEASURES.map((m) => (
@@ -201,14 +212,6 @@ export function ProjectsBreakdownSection() {
           ))}
         </div>
 
-        {/* Totals at a glance. */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-          <MiniStat label="Number of transactions" value={acc ? int.format(total) : null} hint={acc ? `${groupLabel} in the range` : undefined} />
-          <MiniStat label="Total value (AED)" value={acc ? aed(totalValue) : null} hint={acc && total > 0 ? `${int.format(Math.round(totalValue / total))} AED per transaction` : undefined} />
-          <MiniStat label="Projects named" value={acc ? int.format(projects.length) : null} hint={acc ? `${pctOf(withProjectRows, total)} · ${aed(withProjectValue)}` : undefined} />
-          <MiniStat label="With a developer on record" value={acc ? int.format(withDeveloper.length) : null} hint={acc ? `${pctOf(withDeveloperRows, total)} · ${aed(withDeveloperValue)}` : undefined} />
-          <MiniStat label="No project on the row" value={acc ? int.format(noProjectRows) : null} hint={acc ? `${pctOf(noProjectRows, total)} · ${aed(Math.max(0, totalValue - withProjectValue))}` : undefined} />
-        </div>
 
         {/* 2. Areas (pick one) | that area's projects — one row by count, one by AED. The pick is shared. */}
         {MEASURES.map((m) => {
@@ -293,8 +296,8 @@ function ProjectRankList({ rows, measure, totalOf }: { rows: ProjectRow[]; measu
                   <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-[#9ca3af] transition-transform ${isOpen ? "rotate-180" : ""}`} />
                   <span className="truncate">{r.label}</span>
                 </span>
-                <span className="h-[14px] rounded-r bg-[#eef1f5] overflow-hidden">
-                  <span className="block h-full rounded-r" style={{ width: `${Math.max(1, (r[measure] / max) * 100)}%`, background: color }} />
+                <span className="h-[14px] bg-[#eef1f5] overflow-hidden">
+                  <span className="block h-full" style={{ width: `${Math.max(1, (r[measure] / max) * 100)}%`, background: color }} />
                 </span>
                 <span className="text-xs tabular-nums text-[#374151] whitespace-nowrap text-right">
                   {fmt(r[measure])} <span className="text-[#9ca3af]">· {pctOfTotal(r[measure])}</span>
@@ -383,8 +386,8 @@ function AreaPickList({
                 style={{ gridTemplateColumns: `${labelW}px minmax(0,1fr) ${numW}px` }}
               >
                 <span className={`truncate text-xs ${active ? "font-semibold text-[#001f3f]" : "text-[#374151]"}`}>{r.label}</span>
-                <span className="h-[14px] rounded-r bg-[#eef1f5] overflow-hidden">
-                  <span className="block h-full rounded-r" style={{ width: `${Math.max(1, (r[measure] / max) * 100)}%`, background: active ? "#001f3f" : color }} />
+                <span className="h-[14px] bg-[#eef1f5] overflow-hidden">
+                  <span className="block h-full" style={{ width: `${Math.max(1, (r[measure] / max) * 100)}%`, background: active ? "#001f3f" : color }} />
                 </span>
                 <span className="text-xs tabular-nums text-[#374151] whitespace-nowrap text-right">
                   {fmt(r[measure])} <span className="text-[#9ca3af]">· {pctOfTotal(r[measure])}</span>

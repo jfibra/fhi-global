@@ -26,7 +26,6 @@ import {
   CoverageLine,
   ErrorBox,
   RefreshButton,
-  MiniStat,
   ShareBars,
   Skeleton,
   longDate,
@@ -52,6 +51,236 @@ export function last30Days(): { from: string; to: string } {
 /** Sales only by default — mortgages and gifts say nothing about who is selling. */
 const MEASURES = ["count", "value"] as const
 
+/** Tile colours: one per meaning, reused on the Projects tab so the two read alike. */
+export const TILE = {
+  navy: "#001f3f",
+  gold: "#b8913f",
+  green: "#177a51",
+  amber: "#b45309",
+  slate: "#64748b",
+} as const
+
+export type TileChart =
+  | { kind: "area"; values: number[] }
+  | { kind: "bars"; values: number[] }
+  /** Bars with a smooth line over their tops. */
+  | { kind: "combo"; values: number[] }
+  | { kind: "curve"; values: number[] }
+  | { kind: "dots"; values: number[] }
+  | { kind: "ring"; share: number }
+  | { kind: "pie"; share: number }
+  /** One point per day: x = that day's count, y = that day's AED — a real scatter, not a line of dots. */
+  | { kind: "scatter"; x: number[]; y: number[] }
+  /** A radar: one spoke per value (3 or more), e.g. transactions by day of the week. */
+  | { kind: "radar"; values: number[] }
+  /** A polar area chart: equal-angle wedges whose radius grows with the value (3 or more). */
+  | { kind: "polar"; values: number[] }
+
+/** Points in a 100 × 32 box for a daily series (oldest first); null below two points. */
+function sparkPoints(values: number[]): Array<readonly [number, number]> | null {
+  const pts = values.filter((v) => Number.isFinite(v))
+  if (pts.length < 2) return null
+  const max = Math.max(...pts, 1)
+  const step = 100 / (pts.length - 1)
+  return pts.map((v, i) => [i * step, 32 - (v / max) * 28] as const)
+}
+
+/** A smooth path through the points (Catmull-Rom → cubic Béziers), so the line bends instead of zig-zagging. */
+function smoothPath(pts: Array<readonly [number, number]>): string {
+  if (pts.length < 2) return ""
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i]
+    const p1 = pts[i]
+    const p2 = pts[i + 1]
+    const p3 = pts[i + 2] ?? p2
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6
+    d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`
+  }
+  return d
+}
+
+/** The faint chart behind a tile — one kind per tile so the row reads as five different things, not one shape repeated. */
+function TileBackground({ chart, color }: { chart: TileChart; color: string }) {
+  if (chart.kind === "ring") {
+    // Share as a ring, tucked into the tile's right edge.
+    const r = 13
+    const c = 2 * Math.PI * r
+    const share = Math.min(100, Math.max(0, chart.share))
+    return (
+      <svg className="pointer-events-none absolute right-3 top-1/2 h-16 w-16 -translate-y-1/2" viewBox="0 0 36 36" aria-hidden>
+        <circle cx="18" cy="18" r={r} fill="none" stroke={color} strokeOpacity={0.12} strokeWidth={5} />
+        <circle cx="18" cy="18" r={r} fill="none" stroke={color} strokeOpacity={0.4} strokeWidth={5} strokeDasharray={`${(share / 100) * c} ${c}`} strokeLinecap="butt" transform="rotate(-90 18 18)" />
+      </svg>
+    )
+  }
+  if (chart.kind === "pie") {
+    // Share as a solid wedge — no hole, unlike the ring.
+    const share = Math.min(100, Math.max(0, chart.share))
+    const a = (share / 100) * 2 * Math.PI
+    const r = 15
+    const x = 18 + r * Math.sin(a)
+    const y = 18 - r * Math.cos(a)
+    const wedge = share >= 100 ? null : `M18,18 L18,${18 - r} A${r},${r} 0 ${a > Math.PI ? 1 : 0} 1 ${x.toFixed(2)},${y.toFixed(2)} Z`
+    return (
+      <svg className="pointer-events-none absolute right-3 top-1/2 h-16 w-16 -translate-y-1/2" viewBox="0 0 36 36" aria-hidden>
+        <circle cx="18" cy="18" r={r} fill={color} fillOpacity={0.12} />
+        {wedge ? <path d={wedge} fill={color} fillOpacity={0.4} /> : <circle cx="18" cy="18" r={r} fill={color} fillOpacity={0.4} />}
+      </svg>
+    )
+  }
+  if (chart.kind === "radar") {
+    const vals = chart.values.filter((v) => Number.isFinite(v))
+    if (vals.length < 3) return null
+    const max = Math.max(...vals, 1)
+    const R = 15
+    const pt = (i: number, r: number) => {
+      const a = (i / vals.length) * 2 * Math.PI - Math.PI / 2
+      return [18 + r * Math.cos(a), 18 + r * Math.sin(a)] as const
+    }
+    const poly = (r: (i: number) => number) => vals.map((_, i) => pt(i, r(i)).map((n) => n.toFixed(2)).join(",")).join(" ")
+    return (
+      <svg className="pointer-events-none absolute right-3 top-1/2 h-16 w-16 -translate-y-1/2" viewBox="0 0 36 36" aria-hidden>
+        {[1 / 3, 2 / 3, 1].map((f) => (
+          <polygon key={f} points={poly(() => R * f)} fill="none" stroke={color} strokeOpacity={0.15} strokeWidth={0.6} />
+        ))}
+        {vals.map((_, i) => {
+          const [x, y] = pt(i, R)
+          return <line key={i} x1="18" y1="18" x2={x.toFixed(2)} y2={y.toFixed(2)} stroke={color} strokeOpacity={0.15} strokeWidth={0.6} />
+        })}
+        <polygon points={poly((i) => (vals[i] / max) * R)} fill={color} fillOpacity={0.2} stroke={color} strokeOpacity={0.5} strokeWidth={0.9} />
+      </svg>
+    )
+  }
+  if (chart.kind === "polar") {
+    const vals = chart.values.filter((v) => Number.isFinite(v))
+    if (vals.length < 3) return null
+    const max = Math.max(...vals, 1)
+    const R = 15
+    const step = (2 * Math.PI) / vals.length
+    const wedge = (i: number, r: number) => {
+      const a0 = i * step - Math.PI / 2
+      const a1 = a0 + step
+      const x0 = 18 + r * Math.cos(a0)
+      const y0 = 18 + r * Math.sin(a0)
+      const x1 = 18 + r * Math.cos(a1)
+      const y1 = 18 + r * Math.sin(a1)
+      return `M18,18 L${x0.toFixed(2)},${y0.toFixed(2)} A${r},${r} 0 0 1 ${x1.toFixed(2)},${y1.toFixed(2)} Z`
+    }
+    return (
+      <svg className="pointer-events-none absolute right-3 top-1/2 h-16 w-16 -translate-y-1/2" viewBox="0 0 36 36" aria-hidden>
+        {[1 / 3, 2 / 3, 1].map((f) => (
+          <circle key={f} cx="18" cy="18" r={R * f} fill="none" stroke={color} strokeOpacity={0.15} strokeWidth={0.6} />
+        ))}
+        {vals.map((v, i) => (
+          <path key={i} d={wedge(i, Math.max(1.5, (v / max) * R))} fill={color} fillOpacity={0.12 + 0.25 * (v / max)} stroke="#fff" strokeOpacity={0.8} strokeWidth={0.5} />
+        ))}
+      </svg>
+    )
+  }
+  if (chart.kind === "scatter") {
+    const n = Math.min(chart.x.length, chart.y.length)
+    if (n < 2) return null
+    const maxX = Math.max(...chart.x.slice(0, n), 1)
+    const maxY = Math.max(...chart.y.slice(0, n), 1)
+    return (
+      <svg className="pointer-events-none absolute inset-x-0 bottom-0 h-14 w-full" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden>
+        {Array.from({ length: n }, (_, i) => (
+          <circle key={i} cx={4 + (chart.x[i] / maxX) * 92} cy={30 - (chart.y[i] / maxY) * 26} r={1.3} fill={color} fillOpacity={0.35} />
+        ))}
+      </svg>
+    )
+  }
+  const pts = sparkPoints(chart.values)
+  if (!pts) return null
+  const common = { className: "pointer-events-none absolute inset-x-0 bottom-0 h-14 w-full", viewBox: "0 0 100 32", preserveAspectRatio: "none" as const, "aria-hidden": true as const }
+  if (chart.kind === "bars" || chart.kind === "combo") {
+    const w = Math.max(0.6, 100 / pts.length - 1.2)
+    return (
+      <svg {...common}>
+        {pts.map(([x, y], i) => (
+          <rect key={i} x={x - w / 2} y={y} width={w} height={32 - y} fill={color} fillOpacity={chart.kind === "combo" ? 0.12 : 0.16} />
+        ))}
+        {chart.kind === "combo" && <path d={smoothPath(pts)} fill="none" stroke={color} strokeOpacity={0.5} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />}
+      </svg>
+    )
+  }
+  if (chart.kind === "dots") {
+    return (
+      <svg {...common} preserveAspectRatio="none">
+        {pts.map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r={1.1} fill={color} fillOpacity={0.35} />
+        ))}
+      </svg>
+    )
+  }
+  // "area" and "curve" both bend smoothly; area fills under the line, curve is the line alone (a touch heavier).
+  const line = smoothPath(pts)
+  return (
+    <svg {...common}>
+      {chart.kind === "area" && <path d={`${line} L100,32 L0,32 Z`} fill={color} fillOpacity={0.09} />}
+      <path d={line} fill="none" stroke={color} strokeOpacity={chart.kind === "curve" ? 0.45 : 0.35} strokeWidth={chart.kind === "curve" ? 1.2 : 0.8} vectorEffect="non-scaling-stroke" />
+    </svg>
+  )
+}
+
+/**
+ * A stat tile with a colour accent: a tinted top edge and label, the figure
+ * large, a one-line hint, (when `share` is given) a thin bar showing the
+ * figure's share of the whole, and (when `spark` is given) a faint area
+ * chart of the range's daily series behind everything — decoration that
+ * still means something. Replaces the plain MiniStat on these tabs.
+ */
+export function StatTile({
+  label,
+  value,
+  hint,
+  color,
+  share,
+  chart,
+}: {
+  label: string
+  value: string | null
+  hint?: string
+  color: string
+  /** 0–100; draws the share bar. */
+  share?: number | null
+  /** The faint chart behind the tile (see TileChart) — a different kind per tile. */
+  chart?: TileChart
+}) {
+  return (
+    <div className="relative overflow-hidden border border-[#e8eaed] bg-white px-4 pb-3.5 pt-3" style={{ borderTop: `3px solid ${color}` }}>
+      {chart && <TileBackground chart={chart} color={color} />}
+      <div className="relative flex items-center gap-2">
+        <span className="h-2 w-2 shrink-0" style={{ background: color }} aria-hidden />
+        <span className="truncate text-[11px] font-bold uppercase tracking-wider" style={{ color }} title={label}>
+          {label}
+        </span>
+      </div>
+      {value === null ? (
+        <div className="relative mt-2.5 h-7 w-28 animate-pulse bg-[#eef1f5]" />
+      ) : (
+        <div className="relative mt-2 truncate font-['Outfit'] text-[26px] font-bold leading-none tabular-nums text-[#0d1117]" title={value}>
+          {value}
+        </div>
+      )}
+      {hint && (
+        <div className="relative mt-1.5 truncate text-[11px] text-[#6b7280]" title={hint}>
+          {hint}
+        </div>
+      )}
+      {typeof share === "number" && Number.isFinite(share) && (
+        <div className="relative mt-2 h-1 w-full bg-[#eef1f5]">
+          <div className="h-full" style={{ width: `${Math.min(100, Math.max(0, share))}%`, background: color }} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export const GROUPS = [
   { value: "1", label: "Sales" },
   { value: "", label: "All transactions" },
@@ -75,7 +304,7 @@ const tagOf = (p: ProjectRow) => (p.guessed ? "(by name)" : "(matched)")
 
 
 /** Company-form abbreviations DLD writes in caps that would read wrong title-cased. */
-const KEEP_UPPER = new Set(["LLC", "L.L.C", "L.L.C.", "FZE", "FZCO", "FZ-LLC", "PJSC", "PSC", "LLP", "DMCC", "JLT", "SPV", "UAE"])
+const KEEP_UPPER = new Set(["LLC", "L.L.C", "L.L.C.", "FZE", "FZCO", "FZ-LLC", "PJSC", "PSC", "LLP", "DMCC", "JLT", "SPV", "UAE", "AED", "(AED)", "DLD"])
 
 /**
  * "IMTIAZ JA REAL ESTATE DEVELOPMENT L.L.C" → "Imtiaz Ja Real Estate Development L.L.C".
@@ -120,6 +349,8 @@ export function DevelopersBreakdownSection() {
   const byCount = (a: DldChartBucket, b: DldChartBucket) => b.count - a.count || a.label.localeCompare(b.label)
   const byValue = (a: DldChartBucket, b: DldChartBucket) => b.value - a.value || a.label.localeCompare(b.label)
   const sorter = (m: "count" | "value") => (m === "value" ? byValue : byCount)
+  // Plain-language names for the two measures, used in every title.
+  const measureTitle = (m: "count" | "value") => (m === "value" ? `by ${groupLabel} value (AED)` : `by number of ${groupLabel}`)
   const [submitted, setSubmitted] = useState<BatchJob>(() => jobFor(range, group))
   const job = useBatchJob(CACHE_KEY, submitted, true)
   const { acc, loading } = job
@@ -187,7 +418,17 @@ export function DevelopersBreakdownSection() {
   const totalValue = acc?.value ?? 0
   const unknownValue = Math.max(0, totalValue - matchedValue - guessedValue - unmatchedValue)
   const aed = (v: number) => `AED ${compact.format(v)}`
+  // Daily series across the range (oldest first) — the tiles' background charts.
+  const dailyCounts = useMemo(() => (acc ? Object.entries(acc.daily).sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v.count) : []), [acc])
+  const dailyValues = useMemo(() => (acc ? Object.entries(acc.daily).sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v.value) : []), [acc])
+  // Transactions by weekday, Monday first — the radar's seven spokes.
+  const weekdayCounts = useMemo(() => {
+    const out = [0, 0, 0, 0, 0, 0, 0]
+    for (const [day, v] of Object.entries(acc?.daily ?? {})) out[(new Date(`${day}T00:00:00`).getDay() + 6) % 7] += v.count
+    return out
+  }, [acc])
   const groupLabel = GROUPS.find((g) => g.value === group)?.label.toLowerCase() ?? "rows"
+  const rangeText = `${longDate(submitted.values.P_FROM_DATE ?? "")} – ${longDate(submitted.values.P_TO_DATE ?? "")}`
 
   const sourceBuckets: DldChartBucket[] = sources
     ? (["dld", "fhi", "name", "unmatched", "unknown"] as const).filter((k) => (sources[k] ?? 0) > 0).map((k) => ({ label: SOURCE_LABEL[k], count: sources[k] ?? 0, value: 0 }))
@@ -202,16 +443,7 @@ export function DevelopersBreakdownSection() {
   }
 
   return (
-    <section>
-      <div className="mb-4">
-        <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Developers Breakdown</h2>
-        <p className="text-sm text-[#6b7280]">
-          Which developers&rsquo; projects are transacting. Every DLD transaction in the range is credited to the developer behind its project —
-          from DLD&rsquo;s register or FHI&rsquo;s catalogue, or — only when the project&rsquo;s first word is a developer those already know — a
-          guess marked &ldquo;(by name)&rdquo;. Projects nobody recognises are &ldquo;Unmatched project&rdquo;; rows naming no project are
-          &ldquo;Unknown&rdquo;.
-        </p>
-      </div>
+    <section className="fhi-no-radius">
 
       <form onSubmit={submit} className="bg-white rounded-2xl border border-[#e8eaed] p-5 mb-4">
         <div className="flex flex-wrap items-end gap-3">
@@ -268,16 +500,36 @@ export function DevelopersBreakdownSection() {
           )}
         </CoverageLine>
 
+        {/* Totals at a glance — how the rows loaded so far split by how (or whether) a developer was found. */}
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+          <StatTile color={TILE.navy} label="Transactions" value={acc ? int.format(total) : null} hint={acc ? `${groupLabel}, ${rangeText}` : undefined} chart={{ kind: "combo", values: dailyCounts }} />
+          <StatTile
+            color={TILE.gold}
+            label="Total Value"
+            value={acc ? aed(totalValue) : null}
+            hint={acc && total > 0 ? `${int.format(Math.round(totalValue / total))} AED per transaction` : undefined}
+            chart={{ kind: "bars", values: dailyValues }}
+          />
+          <StatTile color={TILE.green} label="Confirmed" value={acc ? int.format(known) : null} hint={acc ? `${pctOf(known, total)} · ${aed(matchedValue)}` : undefined} share={total ? (known / total) * 100 : null} chart={{ kind: "ring", share: total ? (known / total) * 100 : 0 }} />
+          <StatTile color={TILE.amber} label="Guessed" value={acc ? int.format(guessedRows) : null} hint={acc ? `${pctOf(guessedRows, total)} · ${aed(guessedValue)}` : undefined} share={total ? (guessedRows / total) * 100 : null} chart={{ kind: "pie", share: total ? (guessedRows / total) * 100 : 0 }} />
+          <StatTile
+            color={TILE.slate}
+            label="No Developer"
+            value={acc ? int.format(unmatchedRows + unknownRows) : null}
+            hint={acc && total > 0 ? `${pctOf(unmatchedRows + unknownRows, total)} · ${aed(unmatchedValue + unknownValue)}` : undefined}
+            share={total ? ((unmatchedRows + unknownRows) / total) * 100 : null}
+            chart={{ kind: "polar", values: weekdayCounts }}
+          />
+        </div>
+
         {/* 1. Combined — every source together, one developer per bar; by count on the left, by AED on the right. */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {MEASURES.map((m) => (
             <ChartCard
               key={m}
-              title={`Top ${DLD_CHART_TOP_N} developers by ${m} — all ${groupLabel}`}
-              subtitle={`${longDate(submitted.values.P_FROM_DATE ?? "")} – ${longDate(submitted.values.P_TO_DATE ?? "")}. One bar per developer: register matches and name guesses added together (open a row for the split), ranked by ${m === "value" ? "total AED" : "sales count"}. ${
-                sources && total > 0
-                  ? `Covers ${int.format(attributedRows)} of ${int.format(total)} rows (${((attributedRows / total) * 100).toFixed(0)}%) — the other ${int.format(unmatchedRows)} name a project nobody has on record and ${int.format(unknownRows)} name no project.`
-                  : ""
+              title={titleCase(`Top ${DLD_CHART_TOP_N} developers ${measureTitle(m)}`)}
+              subtitle={`Confirmed + guessed, ${rangeText}. Open a developer for the split and its projects.${
+                sources && total > 0 ? ` Covers ${((attributedRows / total) * 100).toFixed(0)}% of ${groupLabel}.` : ""
               }`}
               table={{
                 head: ["Developer", "Rows", "Matched", "Guessed", "AED"],
@@ -293,27 +545,11 @@ export function DevelopersBreakdownSection() {
           ))}
         </div>
 
-        {/* Totals at a glance — how the rows loaded so far split by how (or whether) a developer was found. */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-          <MiniStat label="Number of transactions" value={acc ? int.format(total) : null} hint={acc ? `${groupLabel} in the range` : undefined} />
-          <MiniStat
-            label="Total value (AED)"
-            value={acc ? aed(totalValue) : null}
-            hint={acc && total > 0 ? `${int.format(Math.round(totalValue / total))} AED per transaction` : undefined}
-          />
-          <MiniStat label="Matched" value={acc ? int.format(known) : null} hint={acc ? `${pctOf(known, total)} · ${aed(matchedValue)}` : undefined} />
-          <MiniStat label="Guessed by name" value={acc ? int.format(guessedRows) : null} hint={acc ? `${pctOf(guessedRows, total)} · ${aed(guessedValue)}` : undefined} />
-          <MiniStat
-            label="No developer"
-            value={acc ? int.format(unmatchedRows + unknownRows) : null}
-            hint={acc && total > 0 ? `${pctOf(unmatchedRows + unknownRows, total)} · ${aed(unmatchedValue + unknownValue)} · ${int.format(unmatchedRows)} unmatched project, ${int.format(unknownRows)} no project` : undefined}
-          />
-        </div>
 
         {/* Full width, on its own row — one share bar per source. */}
         <ChartCard
-          title="How the developer was found"
-          subtitle="“Guessed by name” feeds the guessed card; “project not on record” is the Unmatched project bucket; “no project on the row” is Unknown."
+          title="Where Each Developer Name Came From"
+          subtitle="Share of all transactions by how the developer was identified."
           table={{ head: ["Source", "Rows", ""], rows: sourceBuckets.map((b) => [b.label, b.count, ""]) }}
         >
           {!acc ? <Skeleton h={160} /> : <ShareBars buckets={sourceBuckets} total={total} />}
@@ -324,8 +560,8 @@ export function DevelopersBreakdownSection() {
           {MEASURES.map((m) => (
             <ChartCard
               key={m}
-              title={`Top ${DLD_CHART_TOP_N} by ${m} — matched through the project`}
-              subtitle={`${sources ? `${int.format(known)} of ${int.format(total)} rows (${total ? ((known / total) * 100).toFixed(0) : 0}%). ` : ""}Developer taken from the DLD projects register or FHI's catalogue — not guessed.`}
+              title={titleCase(`Confirmed developers ${measureTitle(m)}`)}
+              subtitle={`Project found in DLD's register or our catalogue.${sources ? ` ${total ? ((known / total) * 100).toFixed(0) : 0}% of ${groupLabel}.` : ""}`}
               table={{ head: ["Developer", "Rows", "AED"], rows: [...matched].sort(sorter(m)).map((b) => [b.label, b.count, int.format(b.value)]) }}
             >
               {!acc ? <Skeleton h={300} /> : <DeveloperRankList rows={[...matched].sort(sorter(m)).slice(0, DLD_CHART_TOP_N)} measure={m} projectsFor={(d) => projectsFor(d, "matched", m)} totalOf={{ count: total, value: totalValue }} />}
@@ -338,8 +574,8 @@ export function DevelopersBreakdownSection() {
           {MEASURES.map((m) => (
             <ChartCard
               key={m}
-              title={`Top ${DLD_CHART_TOP_N} by ${m} — guessed by name only`}
-              subtitle={`${sources ? `${int.format(guessedRows)} of ${int.format(total)} rows (${total ? ((guessedRows / total) * 100).toFixed(0) : 0}%). ` : ""}No register match for the project, but its name says who built it (“… by Azizi”, or a leading “Binghatti …”) and that developer is already known — a GUESS. Treat as indicative only.`}
+              title={titleCase(`Guessed developers ${measureTitle(m)}`)}
+              subtitle={`Developer read from the project name, e.g. “Arian by Azizi”. An estimate.${sources ? ` ${total ? ((guessedRows / total) * 100).toFixed(0) : 0}% of ${groupLabel}.` : ""}`}
               table={{ head: ["Developer (guess)", "Rows", "AED"], rows: [...guessed].sort(sorter(m)).map((b) => [b.label, b.count, int.format(b.value)]) }}
             >
               {!acc ? <Skeleton h={300} /> : <DeveloperRankList rows={[...guessed].sort(sorter(m)).slice(0, DLD_CHART_TOP_N)} measure={m} projectsFor={(d) => projectsFor(d, "guessed", m)} totalOf={{ count: total, value: totalValue }} />}
@@ -448,8 +684,8 @@ export function DeveloperRankList({
                   <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-[#9ca3af] transition-transform ${isOpen ? "rotate-180" : ""}`} />
                   <span className="truncate">{r.label}</span>
                 </span>
-                <span className="h-[14px] rounded-r bg-[#eef1f5] overflow-hidden">
-                  <span className="block h-full rounded-r" style={{ width: `${Math.max(1, (r[measure] / max) * 100)}%`, background: color }} />
+                <span className="h-[14px] bg-[#eef1f5] overflow-hidden">
+                  <span className="block h-full" style={{ width: `${Math.max(1, (r[measure] / max) * 100)}%`, background: color }} />
                 </span>
                 <span className="text-xs tabular-nums text-[#374151] whitespace-nowrap text-right">
                   {fmt(r[measure])} <span className="text-[#9ca3af]">· {pctOfTotal(r[measure])}</span>
@@ -481,8 +717,8 @@ export function DeveloperRankList({
                               {pr.label}
                               {showTags && <span className={pr.guessed ? "text-amber-700" : "text-[#9ca3af]"}> {tagOf(pr)}</span>}
                             </span>
-                            <span className="h-[8px] rounded-r bg-white border border-[#eef1f5] overflow-hidden">
-                              <span className="block h-full rounded-r opacity-70" style={{ width: `${Math.max(1, share)}%`, background: color }} />
+                            <span className="h-[8px] bg-white border border-[#eef1f5] overflow-hidden">
+                              <span className="block h-full opacity-70" style={{ width: `${Math.max(1, share)}%`, background: color }} />
                             </span>
                             <span className="tabular-nums text-[#6b7280] whitespace-nowrap text-right">
                               {fmt(pr[measure])} <span className="text-[#9ca3af]">· {share.toFixed(0)}%</span>
