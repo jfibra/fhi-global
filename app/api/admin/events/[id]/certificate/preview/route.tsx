@@ -32,16 +32,24 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const regId = q.get("registrationId")
   const registration = regId && UUID_RE.test(regId) ? await loadCertificateRegistration(admin, id, regId) : null
 
-  const hasOverride = ["heading", "line", "note", "s1n", "s1t", "s2n", "s2t"].some((k) => q.has(k))
+  // Any value in the query overrides the saved one; the rest stay as saved.
+  const saved = parseCertificateSettings(event.certificate)
+  const has = (k: string) => q.has(k)
+  const hasOverride = ["design", "heading", "line", "note", "s1n", "s1t", "s2n", "s2t"].some(has)
   const settingsOverride = hasOverride
     ? parseCertificateSettings({
-        heading: q.get("heading"),
-        line: q.get("line"),
-        note: q.get("note"),
-        signatories: [
-          { name: q.get("s1n"), title: q.get("s1t") },
-          { name: q.get("s2n"), title: q.get("s2t") },
-        ],
+        ...saved,
+        design: has("design") ? q.get("design") : saved.design,
+        heading: has("heading") ? q.get("heading") : saved.heading,
+        line: has("line") ? q.get("line") : saved.line,
+        note: has("note") ? q.get("note") : saved.note,
+        signatories:
+          has("s1n") || has("s2n")
+            ? [
+                { name: q.get("s1n"), title: q.get("s1t") },
+                { name: q.get("s2n"), title: q.get("s2t") },
+              ]
+            : saved.signatories,
       })
     : undefined
 

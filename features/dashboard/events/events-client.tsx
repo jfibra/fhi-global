@@ -21,6 +21,7 @@ import {
   Globe, MapPin, MoreVertical, Pencil, Plus, QrCode, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
 } from "lucide-react"
 import { EventCertificateModal } from "./event-certificate-modal"
+import { CertificateDesignPicker } from "./certificate-design-picker"
 import { InlineInviterEdit } from "@/components/dashboard/inline-inviter-edit"
 import { EventExportModal } from "./event-export-modal"
 import { EventFlyerModal } from "./event-flyer-modal"
@@ -37,7 +38,7 @@ import {
   type FieldType,
   type RegistrationField,
 } from "@/lib/events/fields"
-import type { CertificateSettings } from "@/lib/events/certificate"
+import { CERTIFICATE_DEFAULTS, type CertificateDesign, type CertificateSettings } from "@/lib/events/certificate"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 import { isPlayableVideoUrl } from "@/lib/video-embed"
 import { VenueAutocomplete, type VenuePin } from "@/components/dashboard/venue-autocomplete"
@@ -148,6 +149,8 @@ type FormState = {
   registrationFields: RegistrationField[]
   /** Agents' events only: fhiglobal.ae/events, their website, or both. */
   placement: Placement
+  /** Which of the four certificate designs this event's certificates use. */
+  certificateDesign: CertificateDesign
 }
 
 const EMPTY_FORM: FormState = {
@@ -166,6 +169,7 @@ const EMPTY_FORM: FormState = {
   registrationOpen: true,
   registrationFields: [],
   placement: "both",
+  certificateDesign: "classic",
 }
 
 // Event times are always Dubai time (GST, UTC+4 — no DST), regardless of the
@@ -227,6 +231,23 @@ export function EventsClient({
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  // Full-size certificate preview from the form (the event may not be saved yet).
+  const [certPreview, setCertPreview] = useState<string | null>(null)
+  const [certPreviewLoading, setCertPreviewLoading] = useState(false)
+  const openCertPreview = () => {
+    const p = new URLSearchParams({
+      design: form.certificateDesign,
+      brand: form.brand,
+      title: form.title,
+      venue: form.venue,
+      days: String(form.eventDays),
+    })
+    if (form.eventDate) p.set("date", fromDubaiInput(form.eventDate))
+    if (editing) p.set("eventId", editing.id)
+    p.set("t", String(Date.now()))
+    setCertPreviewLoading(true)
+    setCertPreview(`/api/admin/events/certificate-sample?${p.toString()}`)
+  }
 
   // The description box grows with its text — typing, or opening an event
   // whose description is long — so the whole of it is always in view (the
@@ -359,6 +380,7 @@ export function EventsClient({
       registrationOpen: e.registrationOpen,
       registrationFields: e.registrationFields ?? [],
       placement: placementOf(e),
+      certificateDesign: e.certificate?.design ?? "classic",
     })
     setFormError(null)
     setModalOpen(true)
@@ -475,6 +497,13 @@ export function EventsClient({
         ...(own || editing?.agentId
           ? { show_on_main: form.placement !== "website", show_on_website: form.placement !== "main" }
           : {}),
+        // The certificate design: a new event starts from the defaults; an edit sends the
+        // saved settings with the new design only when it changed (heading, signatories stay).
+        ...(!editing
+          ? { certificate: { ...CERTIFICATE_DEFAULTS, design: form.certificateDesign } }
+          : form.certificateDesign !== (editing.certificate?.design ?? "classic")
+            ? { certificate: { ...(editing.certificate ?? CERTIFICATE_DEFAULTS), design: form.certificateDesign } }
+            : {}),
       }
       const res = editing
         ? await fetch(`/api/admin/events/${editing.id}`, {
@@ -1462,6 +1491,24 @@ export function EventsClient({
                 )}
               </div>
 
+              {/* Certificate design — one of four looks for this event's certificates */}
+              <div className="border-t border-[#f0f0f0] pt-4">
+                <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <p className={labelCls}>Certificate design</p>
+                    <p className="text-xs text-[#6b7280] -mt-0.5">Attendees&apos; certificates use this look. You can change it later in Certificates.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={openCertPreview}
+                    className="inline-flex items-center gap-1.5 border border-[#e5e5e5] px-3 py-1.5 text-xs font-bold text-[#001f3f] hover:border-[#001f3f]"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> Preview with this event
+                  </button>
+                </div>
+                <CertificateDesignPicker value={form.certificateDesign} onChange={(certificateDesign) => setForm((f) => ({ ...f, certificateDesign }))} />
+              </div>
+
               {formError && (
                 <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{formError}</p>
               )}
@@ -1480,6 +1527,38 @@ export function EventsClient({
                   {editing ? "Save changes" : "Create event"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Certificate preview from the event form ── */}
+      {certPreview && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center p-4 sm:p-8">
+          <button type="button" className="absolute inset-0 bg-black/70 backdrop-blur-sm" aria-label="Close preview" onClick={() => setCertPreview(null)} />
+          <div className="relative w-full max-w-5xl">
+            <div className="mb-2 flex items-center justify-between gap-3 text-white">
+              <p className="text-sm font-semibold">
+                Certificate preview <span className="font-normal text-white/70">· sample attendee name</span>
+              </p>
+              <button type="button" onClick={() => setCertPreview(null)} className="p-1.5 hover:bg-white/10" aria-label="Close preview">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="relative aspect-[1754/1240] bg-[#0b1d33] shadow-2xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={certPreview}
+                alt="Certificate preview"
+                className={`h-full w-full object-contain transition-opacity ${certPreviewLoading ? "opacity-0" : "opacity-100"}`}
+                onLoad={() => setCertPreviewLoading(false)}
+                onError={() => setCertPreviewLoading(false)}
+              />
+              {certPreviewLoading && (
+                <div className="absolute inset-0 flex items-center justify-center text-white/80">
+                  <Loader2 className="w-7 h-7 animate-spin" />
+                </div>
+              )}
             </div>
           </div>
         </div>

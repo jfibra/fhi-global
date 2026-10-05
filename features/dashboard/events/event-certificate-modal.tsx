@@ -11,7 +11,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { QRCodeCanvas } from "qrcode.react"
 import { Award, CheckCircle2, Copy, Download, Loader2, Mail, QrCode, Save, X } from "lucide-react"
-import { CERTIFICATE_DEFAULTS, parseCertificateSettings, type CertificateSettings } from "@/lib/events/certificate"
+import { CERTIFICATE_DEFAULTS, parseCertificateSettings, type CertificateDesign, type CertificateSettings } from "@/lib/events/certificate"
+import { CertificateDesignPicker } from "./certificate-design-picker"
 import { renderCertificateQrPoster, type PosterSize } from "./event-certificate-poster"
 
 export type CertificateRegistration = {
@@ -43,6 +44,7 @@ export function EventCertificateModal({
 }) {
   // ── design ──
   const saved = event.certificate ?? CERTIFICATE_DEFAULTS
+  const [design, setDesign] = useState<CertificateDesign>(saved.design ?? "classic")
   const [heading, setHeading] = useState(saved.heading)
   const [line, setLine] = useState(saved.line)
   const [note, setNote] = useState(saved.note)
@@ -60,6 +62,8 @@ export function EventCertificateModal({
   const draft = useMemo<CertificateSettings>(
     () =>
       parseCertificateSettings({
+        ...saved,
+        design,
         heading,
         line,
         note,
@@ -68,7 +72,8 @@ export function EventCertificateModal({
           { name: s2n, title: s2t },
         ],
       }),
-    [heading, line, note, s1n, s1t, s2n, s2t],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `saved` only seeds fields the form doesn't edit (selfService)
+    [design, heading, line, note, s1n, s1t, s2n, s2t],
   )
   const dirty = JSON.stringify(draft) !== JSON.stringify(parseCertificateSettings(saved))
 
@@ -100,14 +105,14 @@ export function EventCertificateModal({
   useEffect(() => {
     clearTimeout(previewTimer.current)
     previewTimer.current = setTimeout(() => {
-      const p = new URLSearchParams({ heading, line, note, s1n, s1t, s2n, s2t })
+      const p = new URLSearchParams({ design, heading, line, note, s1n, s1t, s2n, s2t })
       if (previewFor) p.set("registrationId", previewFor)
       p.set("t", String(Date.now()))
       setPreviewLoading(true)
       setPreviewUrl(`/api/admin/events/${event.id}/certificate/preview?${p.toString()}`)
     }, 450)
     return () => clearTimeout(previewTimer.current)
-  }, [event.id, heading, line, note, s1n, s1t, s2n, s2t, previewFor])
+  }, [event.id, design, heading, line, note, s1n, s1t, s2n, s2t, previewFor])
 
   const selfServiceUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/events/${event.slug ?? event.id}/certificate`
 
@@ -229,6 +234,10 @@ export function EventCertificateModal({
         {/* ── Design + preview ── */}
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
           <div className="space-y-3">
+            <div>
+              <p className={labelCls}>Design</p>
+              <CertificateDesignPicker value={design} onChange={setDesign} compact />
+            </div>
             <div>
               <label className={labelCls}>Heading</label>
               <input className={inputCls} value={heading} onChange={(e) => setHeading(e.target.value)} maxLength={60} placeholder="Certificate of Attendance" />

@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og"
-import { eventBrand } from "@/lib/events/brands"
+import { eventBrand, type EventBrand } from "@/lib/events/brands"
+import { ArabesqueSheet, RoyalSheet, SkylineSheet } from "@/lib/events/certificate-designs"
 import { eventDateRangeLabel } from "@/lib/events/dates"
 import type { CertificateSettings } from "@/lib/events/certificate"
 
@@ -8,9 +9,9 @@ import type { CertificateSettings } from "@/lib/events/certificate"
  * (Satori), so the preview in the admin and the PDF emailed to the attendee
  * come from the same code and look identical.
  *
- * A4 landscape at 150 dpi. Design: white sheet, thin gold frame with corner
- * marks, brand logo top-left, certificate number top-right, the attendee's
- * name in Playfair Display, and up to two signature blocks.
+ * A4 landscape at 150 dpi. Four designs (settings.design): the original
+ * "classic" below, and Royal Navy / Arabesque / Skyline in
+ * certificate-designs.tsx — same facts, different art.
  */
 
 export const CERT_WIDTH = 1754
@@ -24,7 +25,7 @@ const MUTED = "#6b7280"
 export type CertificateFont = {
   name: string
   data: ArrayBuffer
-  weight: 400 | 600 | 700
+  weight: 400 | 500 | 600 | 700
   style: "normal" | "italic"
 }
 
@@ -34,6 +35,11 @@ export const CERTIFICATE_FONT_FILES: Array<Omit<CertificateFont, "data"> & { fil
   { name: "Outfit", file: "Outfit-700.woff", weight: 700, style: "normal" },
   { name: "Playfair Display", file: "PlayfairDisplay-700.woff", weight: 700, style: "normal" },
   { name: "Playfair Display", file: "PlayfairDisplay-400i.woff", weight: 400, style: "italic" },
+  // Royal Navy / Arabesque / Skyline (OFL, static WOFF from @fontsource like the rest)
+  { name: "Cinzel", file: "Cinzel-600.woff", weight: 600, style: "normal" },
+  { name: "Cinzel", file: "Cinzel-700.woff", weight: 700, style: "normal" },
+  { name: "Great Vibes", file: "GreatVibes-400.woff", weight: 400, style: "normal" },
+  { name: "Cormorant Garamond", file: "CormorantGaramond-500i.woff", weight: 500, style: "italic" },
 ]
 
 export type CertificateInput = {
@@ -45,6 +51,8 @@ export type CertificateInput = {
   brandKey: string
   /** Absolute URL of the brand logo (Satori fetches it). */
   logoSrc: string
+  /** Absolute URL of a logo that reads on a dark background, when the brand has one (dark designs). */
+  logoOnDarkSrc?: string | null
   /** Shown top-right when present; self-service certificates have none. */
   certificateNo: string | null
   /** Absolute URL of the brand's gold emblem, used as a faint watermark; null → none. */
@@ -157,8 +165,7 @@ function Signature({ name, title }: { name: string; title: string }) {
   )
 }
 
-export function renderCertificate(input: CertificateInput): ImageResponse {
-  const brand = eventBrand(input.brandKey)
+function ClassicSheet({ input, brand }: { input: CertificateInput; brand: EventBrand }) {
   const { settings } = input
   const sigs = settings.signatories
   const details = [input.dateLabel, input.venue].filter(Boolean)
@@ -166,8 +173,7 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
   const [headWord, ...rest] = settings.heading.split(" ")
   const headTail = rest.join(" ")
 
-  return new ImageResponse(
-    (
+  return (
       <div
         style={{
           width: "100%", height: "100%", display: "flex", position: "relative", overflow: "hidden",
@@ -243,7 +249,19 @@ export function renderCertificate(input: CertificateInput): ImageResponse {
           <Seal src={input.sealSrc} />
         </div>
       </div>
-    ),
+  )
+}
+
+export function renderCertificate(input: CertificateInput): ImageResponse {
+  const brand = eventBrand(input.brandKey)
+  const design = input.settings.design
+  const sheet =
+    design === "royal" ? <RoyalSheet input={input} brand={brand} />
+    : design === "arabesque" ? <ArabesqueSheet input={input} brand={brand} />
+    : design === "skyline" ? <SkylineSheet input={input} brand={brand} />
+    : <ClassicSheet input={input} brand={brand} />
+  return new ImageResponse(
+    sheet,
     {
       width: CERT_WIDTH,
       height: CERT_HEIGHT,

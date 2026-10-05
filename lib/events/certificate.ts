@@ -15,7 +15,27 @@ export type Signatory = { name: string; title: string }
 export type SelfService = "off" | "registered" | "open"
 export const SELF_SERVICE_MODES: SelfService[] = ["off", "registered", "open"]
 
+/**
+ * The certificate's look, picked when the event is created (and changeable in
+ * the Certificates window). Every design shows the same facts; only the art
+ * differs. "classic" is the original design — events saved before designs
+ * existed have no `design` and keep it.
+ */
+export type CertificateDesign = "classic" | "royal" | "arabesque" | "skyline"
+
+export const CERTIFICATE_DESIGNS: { key: CertificateDesign; name: string; blurb: string }[] = [
+  { key: "classic", name: "Classic Gold", blurb: "Ivory sheet, navy corner bands and the gold seal" },
+  { key: "royal", name: "Royal Navy", blurb: "Midnight navy, gold lettering and a calligraphy name" },
+  { key: "arabesque", name: "Arabesque", blurb: "Parchment framed in Arabic geometry under a gold arch" },
+  { key: "skyline", name: "Skyline", blurb: "A modern split with the Dubai skyline in gold" },
+]
+
+const DESIGN_KEYS = CERTIFICATE_DESIGNS.map((d) => d.key)
+
+export const isCertificateDesign = (v: unknown): v is CertificateDesign => DESIGN_KEYS.includes(v as CertificateDesign)
+
 export type CertificateSettings = {
+  design: CertificateDesign
   /** Big heading, e.g. "Certificate of Attendance" / "Certificate of Participation". */
   heading: string
   /** Connecting line between the attendee's name and the event title. */
@@ -28,6 +48,7 @@ export type CertificateSettings = {
 }
 
 export const CERTIFICATE_DEFAULTS: CertificateSettings = {
+  design: "classic",
   heading: "Certificate of Attendance",
   line: "for attending",
   note: "",
@@ -56,6 +77,7 @@ export function parseCertificateSettings(raw: unknown): CertificateSettings {
         .slice(0, MAX_SIGNATORIES)
     : []
   return {
+    design: isCertificateDesign(r.design) ? r.design : "classic",
     heading: str(r.heading, MAX_HEADING) || CERTIFICATE_DEFAULTS.heading,
     line: str(r.line, MAX_LINE) || CERTIFICATE_DEFAULTS.line,
     note: str(r.note, MAX_NOTE),
