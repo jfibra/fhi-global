@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { allowRequest, clientIp } from "@/lib/rate-limit"
 
 /**
  * POST /api/ocr
@@ -14,11 +15,17 @@ import { NextRequest, NextResponse } from "next/server"
  * Response: { name, idNumber, dateOfBirth, expiryDate, countryCode, warning? }
  */
 export async function POST(req: NextRequest) {
+  if (!allowRequest(`ocr:${clientIp(req.headers)}`, 10, 10 * 60_000)) {
+    return NextResponse.json({ error: "Too many requests — please try again in a few minutes." }, { status: 429 })
+  }
   try {
     const { imageBase64, mimeType } = await req.json() as { imageBase64?: string; mimeType?: string }
 
     if (!imageBase64) {
       return NextResponse.json({ warning: "No image provided. Please fill in your details manually." }, { status: 200 })
+    }
+    if (imageBase64.length > 8 * 1024 * 1024) {
+      return NextResponse.json({ warning: "The photo is too large to read. Please fill in your details manually." }, { status: 200 })
     }
 
     // ── If a real OCR service API key is configured, use it ──────────────────

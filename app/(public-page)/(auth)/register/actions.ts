@@ -1,6 +1,8 @@
 "use server"
 
 import { redirect } from "next/navigation"
+import { headers } from "next/headers"
+import { allowRequest, clientIp } from "@/lib/rate-limit"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromHeaders } from "@/lib/audit-log"
@@ -33,6 +35,12 @@ function normalizeAccountType(v: string | null | undefined): AccountType {
  * built-in email. The account type + inviter ride along in user_metadata and
  * are applied to the profile once the code is verified (see verifyRegisterOtp).
  */
+/** Per-IP (and per-email) caps for these public actions — see lib/rate-limit.ts. */
+async function overLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
+  const ip = clientIp(new Headers(await headers()))
+  return !allowRequest(`${key}:${ip}`, limit, windowMs)
+}
+
 export async function sendRegisterOtp(
   emailRaw: string,
   accountTypeRaw?: string,
@@ -47,6 +55,9 @@ export async function sendRegisterOtp(
   const email = String(emailRaw ?? "").trim().toLowerCase()
   if (!email) return { error: "Email is required." }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email address." }
+  if ((await overLimit("register-otp-send", 5, 10 * 60_000)) || !allowRequest(`register-otp-email:${email}`, 3, 10 * 60_000)) {
+    return { error: "Too many codes requested — please wait a few minutes and try again." }
+  }
   const typo = emailTypoMessage(email)
   if (typo) return { error: typo }
   const undeliverable = await checkEmailDeliverable(email)
@@ -125,6 +136,7 @@ export async function verifyRegisterOtp(
   if (!hasServerSupabaseEnv()) {
     return { error: "Supabase environment variables are not configured." }
   }
+  if (await overLimit("register-otp-verify", 20, 10 * 60_000)) return { error: "Too many attempts — please wait a few minutes and try again." }
 
   const email = String(emailRaw ?? "").trim().toLowerCase()
   const code = String(codeRaw ?? "").trim()

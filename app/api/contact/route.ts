@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
+import { allowRequest, clientIp } from "@/lib/rate-limit"
 
 // Public contact form endpoint. Unauthenticated by design; inserts run through
 // the service-role client (the contact_submissions table has no client write
@@ -22,6 +23,9 @@ const ContactSchema = z.object({
 })
 
 export async function POST(req: NextRequest) {
+  if (!allowRequest(`contact:${clientIp(req.headers)}`, 5, 10 * 60_000)) {
+    return NextResponse.json({ error: "Too many messages — please try again later." }, { status: 429 })
+  }
   let body: unknown
   try {
     body = await req.json()

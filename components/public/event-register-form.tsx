@@ -50,6 +50,7 @@ export function EventRegisterForm({
   const [email, setEmail] = useState("")
   const [whatsapp, setWhatsapp] = useState("")
   const [invitedBy, setInvitedBy] = useState("")
+  const [website, setWebsite] = useState("") // honeypot — never shown, must stay empty
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({})
   const [status, setStatus] = useState<"idle" | "sending" | "done">("idle")
   const [error, setError] = useState<string | null>(null)
@@ -148,6 +149,7 @@ export function EventRegisterForm({
           email,
           whatsapp,
           invitedBy,
+          website,
           answers,
           ...(multiDay ? { days: [...picked].sort((a, b) => a - b) } : {}),
         }),
@@ -481,6 +483,8 @@ export function EventRegisterForm({
       <p className="text-[11px] text-[#9ca3af] text-center leading-relaxed">
         Your details go only to the FHI Global events team and are never shared.
       </p>
+          {/* Honeypot — hidden from people (and from screen readers); bots that fill it are dropped quietly. */}
+      <input type="text" name="website" value={website} onChange={(e) => setWebsite(e.target.value)} tabIndex={-1} autoComplete="off" aria-hidden="true" className="absolute -left-[9999px] h-px w-px opacity-0" />
     </form>
   )
 }

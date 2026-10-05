@@ -4,6 +4,7 @@ import { parseRegistrationFields, validateAnswers } from "@/lib/events/fields"
 import { isEventRegistrationOpen } from "@/lib/events/registration"
 import { normalizeEventDays, eventSchedule } from "@/lib/events/dates"
 import { sendEventRegistrationEmail } from "@/lib/mailer"
+import { allowRequest, clientIp } from "@/lib/rate-limit"
 import { SITE_URL } from "@/lib/seo"
 import { titleCaseName } from "@/lib/public-profile"
 
@@ -21,7 +22,12 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
  * date answers 409 and names it.
  */
 export async function POST(req: NextRequest) {
+  if (!allowRequest(`event-register:${clientIp(req.headers)}`, 10, 10 * 60_000)) {
+    return NextResponse.json({ error: "Too many sign-ups from this connection — please try again later." }, { status: 429 })
+  }
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
+  // Honeypot: the form's hidden "website" field stays empty for people; bots fill it in.
+  if (typeof body.website === "string" && body.website.trim() !== "") return NextResponse.json({ ok: true })
 
   const eventId = typeof body.eventId === "string" ? body.eventId.trim() : ""
   const fullName = typeof body.fullName === "string" ? body.fullName.trim().slice(0, 120) : ""

@@ -1,6 +1,8 @@
 "use server"
 
 import { redirect } from "next/navigation"
+import { headers } from "next/headers"
+import { allowRequest, clientIp } from "@/lib/rate-limit"
 import { ensureProfileForUser, isInactiveProfile, isProfileMissingMinimumFields, pickSafePostLoginRedirect } from "@/lib/auth"
 import { isAdminStaffRole } from "@/lib/app-roles"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
@@ -30,6 +32,12 @@ export type OtpResult = { error?: string; ok?: boolean; challenge?: string }
  * verified (see lib/auth-otp.ts). A missing user surfaces as "no account" —
  * login never provisions accounts.
  */
+/** Per-IP (and per-email) caps for these public actions — see lib/rate-limit.ts. */
+async function overLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
+  const ip = clientIp(new Headers(await headers()))
+  return !allowRequest(`${key}:${ip}`, limit, windowMs)
+}
+
 export async function sendLoginOtp(emailRaw: string): Promise<OtpResult> {
   if (!hasServerSupabaseEnv()) {
     return { error: "Supabase environment variables are not configured." }
@@ -37,6 +45,9 @@ export async function sendLoginOtp(emailRaw: string): Promise<OtpResult> {
 
   const email = String(emailRaw ?? "").trim().toLowerCase()
   if (!email) return { error: "Email is required." }
+  if ((await overLimit("otp-send", 5, 10 * 60_000)) || !allowRequest(`otp-send-email:${email}`, 3, 10 * 60_000)) {
+    return { error: "Too many codes requested — please wait a few minutes and try again." }
+  }
 
   const admin = createAdminSupabase()
   // magiclink only generates a token for an EXISTING user; unknown emails
@@ -76,6 +87,9 @@ export async function sendAuthOtp(emailRaw: string): Promise<OtpResult> {
   const email = String(emailRaw ?? "").trim().toLowerCase()
   if (!email) return { error: "Email is required." }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email address." }
+  if ((await overLimit("otp-send", 5, 10 * 60_000)) || !allowRequest(`otp-send-email:${email}`, 3, 10 * 60_000)) {
+    return { error: "Too many codes requested — please wait a few minutes and try again." }
+  }
   const typo = emailTypoMessage(email)
   if (typo) return { error: typo }
   const undeliverable = await checkEmailDeliverable(email)
@@ -132,6 +146,7 @@ export async function verifyLoginOtp(
   const code = String(codeRaw ?? "").trim()
   const challenge = String(challengeRaw ?? "").trim()
   if (!email || !code) return { error: "Enter the code we emailed you." }
+  if (await overLimit("otp-verify", 20, 10 * 60_000)) return { error: "Too many attempts — please wait a few minutes and try again." }
   if (!challenge) return { error: "This code is no longer valid. Request a new one." }
 
   const check = await checkOtpChallenge(challenge, code)
@@ -222,6 +237,7 @@ export async function passwordLoginAction(_: LoginState, formData: FormData): Pr
   const email = String(formData.get("email") ?? "").trim().toLowerCase()
   const password = String(formData.get("password") ?? "")
   if (!email || !password) return { error: "Email and password are required." }
+  if (await overLimit("password-login", 10, 10 * 60_000)) return { error: "Too many sign-in attempts — please wait a few minutes and try again." }
 
   const supabase = await createClient()
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })

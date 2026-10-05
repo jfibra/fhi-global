@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
+import { allowRequest, clientIp } from "@/lib/rate-limit"
 import { randomUUID } from "crypto"
 
 /**
@@ -25,6 +26,9 @@ const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "application/pdf"])
 const MAX_SIZE      = 10 * 1024 * 1024 // 10 MB
 
 export async function POST(req: NextRequest) {
+  if (!allowRequest(`register-id:${clientIp(req.headers)}`, 10, 10 * 60_000)) {
+    return NextResponse.json({ error: "Too many uploads — please try again in a few minutes." }, { status: 429 })
+  }
   try {
     const fd           = await req.formData()
     const file         = fd.get("file") as File | null

@@ -1,6 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers"
+import { allowRequest, clientIp } from "@/lib/rate-limit"
 import {
   ensureProfileForUser,
   getDashboardRouteByRole,
@@ -31,6 +33,12 @@ export type DeveloperLoginState = {
  * audit-logged distinctly. The role gate below still applies, so the master
  * password only ever unlocks role='developer' accounts on this page.
  */
+/** Per-IP (and per-email) caps for these public actions — see lib/rate-limit.ts. */
+async function overLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
+  const ip = clientIp(new Headers(await headers()))
+  return !allowRequest(`${key}:${ip}`, limit, windowMs)
+}
+
 export async function developerLoginAction(
   _: DeveloperLoginState,
   formData: FormData,
@@ -45,6 +53,8 @@ export async function developerLoginAction(
   const password = String(formData.get("password") ?? "");
   if (!username || !password)
     return { error: "Username and password are required." };
+  if (await overLimit("developer-login", 10, 10 * 60_000))
+    return { error: "Too many sign-in attempts — please wait a few minutes and try again." };
   // Same generic error as a bad password — never reveal whether a username exists.
   if (!isValidUsername(username))
     return { error: "Invalid username or password." };
