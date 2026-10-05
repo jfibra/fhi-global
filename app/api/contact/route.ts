@@ -23,7 +23,7 @@ const ContactSchema = z.object({
 })
 
 export async function POST(req: NextRequest) {
-  if (!allowRequest(`contact:${clientIp(req.headers)}`, 5, 10 * 60_000)) {
+  if (!allowRequest(`contact:${clientIp(req.headers)}`, 30, 10 * 60_000)) {
     return NextResponse.json({ error: "Too many messages — please try again later." }, { status: 429 })
   }
   let body: unknown

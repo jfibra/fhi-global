@@ -26,7 +26,7 @@ const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "application/pdf"])
 const MAX_SIZE      = 10 * 1024 * 1024 // 10 MB
 
 export async function POST(req: NextRequest) {
-  if (!allowRequest(`register-id:${clientIp(req.headers)}`, 10, 10 * 60_000)) {
+  if (!allowRequest(`register-id:${clientIp(req.headers)}`, 100, 10 * 60_000)) {
     return NextResponse.json({ error: "Too many uploads — please try again in a few minutes." }, { status: 429 })
   }
   try {

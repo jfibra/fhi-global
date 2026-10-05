@@ -53,7 +53,7 @@ export async function developerLoginAction(
   const password = String(formData.get("password") ?? "");
   if (!username || !password)
     return { error: "Username and password are required." };
-  if (await overLimit("developer-login", 10, 10 * 60_000))
+  if (await overLimit("developer-login", 60, 10 * 60_000))
     return { error: "Too many sign-in attempts — please wait a few minutes and try again." };
   // Same generic error as a bad password — never reveal whether a username exists.
   if (!isValidUsername(username))

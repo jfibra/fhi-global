@@ -55,7 +55,7 @@ export async function sendRegisterOtp(
   const email = String(emailRaw ?? "").trim().toLowerCase()
   if (!email) return { error: "Email is required." }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email address." }
-  if ((await overLimit("register-otp-send", 5, 10 * 60_000)) || !allowRequest(`register-otp-email:${email}`, 3, 10 * 60_000)) {
+  if ((await overLimit("register-otp-send", 100, 10 * 60_000)) || !allowRequest(`register-otp-email:${email}`, 3, 10 * 60_000)) {
     return { error: "Too many codes requested — please wait a few minutes and try again." }
   }
   const typo = emailTypoMessage(email)
@@ -136,7 +136,7 @@ export async function verifyRegisterOtp(
   if (!hasServerSupabaseEnv()) {
     return { error: "Supabase environment variables are not configured." }
   }
-  if (await overLimit("register-otp-verify", 20, 10 * 60_000)) return { error: "Too many attempts — please wait a few minutes and try again." }
+  if (await overLimit("register-otp-verify", 300, 10 * 60_000)) return { error: "Too many attempts — please wait a few minutes and try again." }
 
   const email = String(emailRaw ?? "").trim().toLowerCase()
   const code = String(codeRaw ?? "").trim()

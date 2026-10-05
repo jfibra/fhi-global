@@ -45,7 +45,7 @@ export async function sendLoginOtp(emailRaw: string): Promise<OtpResult> {
 
   const email = String(emailRaw ?? "").trim().toLowerCase()
   if (!email) return { error: "Email is required." }
-  if ((await overLimit("otp-send", 5, 10 * 60_000)) || !allowRequest(`otp-send-email:${email}`, 3, 10 * 60_000)) {
+  if ((await overLimit("otp-send", 100, 10 * 60_000)) || !allowRequest(`otp-send-email:${email}`, 3, 10 * 60_000)) {
     return { error: "Too many codes requested — please wait a few minutes and try again." }
   }
 
@@ -87,7 +87,7 @@ export async function sendAuthOtp(emailRaw: string): Promise<OtpResult> {
   const email = String(emailRaw ?? "").trim().toLowerCase()
   if (!email) return { error: "Email is required." }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email address." }
-  if ((await overLimit("otp-send", 5, 10 * 60_000)) || !allowRequest(`otp-send-email:${email}`, 3, 10 * 60_000)) {
+  if ((await overLimit("otp-send", 100, 10 * 60_000)) || !allowRequest(`otp-send-email:${email}`, 3, 10 * 60_000)) {
     return { error: "Too many codes requested — please wait a few minutes and try again." }
   }
   const typo = emailTypoMessage(email)
@@ -146,7 +146,7 @@ export async function verifyLoginOtp(
   const code = String(codeRaw ?? "").trim()
   const challenge = String(challengeRaw ?? "").trim()
   if (!email || !code) return { error: "Enter the code we emailed you." }
-  if (await overLimit("otp-verify", 20, 10 * 60_000)) return { error: "Too many attempts — please wait a few minutes and try again." }
+  if (await overLimit("otp-verify", 300, 10 * 60_000)) return { error: "Too many attempts — please wait a few minutes and try again." }
   if (!challenge) return { error: "This code is no longer valid. Request a new one." }
 
   const check = await checkOtpChallenge(challenge, code)
@@ -237,7 +237,7 @@ export async function passwordLoginAction(_: LoginState, formData: FormData): Pr
   const email = String(formData.get("email") ?? "").trim().toLowerCase()
   const password = String(formData.get("password") ?? "")
   if (!email || !password) return { error: "Email and password are required." }
-  if (await overLimit("password-login", 10, 10 * 60_000)) return { error: "Too many sign-in attempts — please wait a few minutes and try again." }
+  if (await overLimit("password-login", 60, 10 * 60_000)) return { error: "Too many sign-in attempts — please wait a few minutes and try again." }
 
   const supabase = await createClient()
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })

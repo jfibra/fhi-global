@@ -10,7 +10,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
  * forget from the client — always answers 204 so it never breaks the page.
  */
 export async function POST(req: NextRequest) {
-  if (!allowRequest(`event-visit:${clientIp(req.headers)}`, 30, 60_000)) return new NextResponse(null, { status: 204 })
+  if (!allowRequest(`event-visit:${clientIp(req.headers)}`, 300, 60_000)) return new NextResponse(null, { status: 204 })
   const body = (await req.json().catch(() => ({}))) as { eventId?: unknown; fromQr?: unknown }
   const eventId = typeof body.eventId === "string" ? body.eventId : ""
   if (!UUID_RE.test(eventId)) {

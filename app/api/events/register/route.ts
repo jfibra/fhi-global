@@ -22,7 +22,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
  * date answers 409 and names it.
  */
 export async function POST(req: NextRequest) {
-  if (!allowRequest(`event-register:${clientIp(req.headers)}`, 10, 10 * 60_000)) {
+  if (!allowRequest(`event-register:${clientIp(req.headers)}`, 150, 10 * 60_000)) {
     return NextResponse.json({ error: "Too many sign-ups from this connection — please try again later." }, { status: 429 })
   }
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>

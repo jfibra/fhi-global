@@ -15,7 +15,7 @@ import { allowRequest, clientIp } from "@/lib/rate-limit"
  * Response: { name, idNumber, dateOfBirth, expiryDate, countryCode, warning? }
  */
 export async function POST(req: NextRequest) {
-  if (!allowRequest(`ocr:${clientIp(req.headers)}`, 10, 10 * 60_000)) {
+  if (!allowRequest(`ocr:${clientIp(req.headers)}`, 100, 10 * 60_000)) {
     return NextResponse.json({ error: "Too many requests — please try again in a few minutes." }, { status: 429 })
   }
   try {

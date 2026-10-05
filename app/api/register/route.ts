@@ -9,7 +9,7 @@ import { allowRequest, clientIp } from "@/lib/rate-limit"
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export async function POST(req: NextRequest) {
-  if (!allowRequest(`register:${clientIp(req.headers)}`, 5, 60 * 60_000)) {
+  if (!allowRequest(`register:${clientIp(req.headers)}`, 100, 60 * 60_000)) {
     return NextResponse.json({ error: "Too many registration attempts — please try again later." }, { status: 429 })
   }
   try {
