@@ -26,6 +26,8 @@ export function TransitionLink({
   imageSelector = "[data-vt-img]",
   name = "project-hero",
   prefetch,
+  "aria-hidden": ariaHidden,
+  tabIndex,
 }: {
   href: string
   className?: string
@@ -34,6 +36,9 @@ export function TransitionLink({
   imageSelector?: string
   name?: string
   prefetch?: boolean | null
+  /** For decorative duplicates (marquee clones): hidden from assistive tech and the tab order. */
+  "aria-hidden"?: boolean
+  tabIndex?: number
 }) {
   const router = useRouter()
 
@@ -71,7 +76,7 @@ export function TransitionLink({
   }
 
   return (
-    <Link href={href} className={className} style={style} onClick={onClick} prefetch={prefetch}>
+    <Link href={href} className={className} style={style} onClick={onClick} prefetch={prefetch} aria-hidden={ariaHidden} tabIndex={tabIndex}>
       {children}
     </Link>
   )

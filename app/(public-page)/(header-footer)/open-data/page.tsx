@@ -4,6 +4,12 @@ import { createPageMetadata } from "@/lib/seo"
 import { breadcrumbList } from "@/lib/structured-data"
 import { JsonLd } from "@/components/json-ld"
 import { PriceIndexChart } from "@/components/public/price-index-chart"
+import { fetchPriceIndex } from "@/lib/dld-price-index"
+
+// The index is read from the shared six-hour cache (lib/dld-price-index.ts) at render time, so
+// the chart arrives drawn instead of as a skeleton that is swapped out (a visible jump). Refreshed
+// every 30 minutes, like the public API route's Cache-Control.
+export const revalidate = 1800
 
 export const metadata: Metadata = createPageMetadata({
   title: "Dubai Property Price Index — Open Data",
@@ -27,7 +33,11 @@ const FACTS = [
   { label: "Frequency", value: "Quarterly & Annual" },
 ]
 
-export default function OpenDataPage() {
+export default async function OpenDataPage() {
+  // On any failure the chart loads client-side as before (and shows its own Retry).
+  const initialSeries = await fetchPriceIndex(false)
+    .then((r) => (r.ok ? r.data.series : null))
+    .catch(() => null)
   return (
     <div className="min-h-screen bg-[#fafafa]">
       <JsonLd schema={[breadcrumbList([{ name: "Home", path: "/" }, { name: "Open Data" }])]} />
@@ -61,7 +71,7 @@ export default function OpenDataPage() {
       </section>
 
       <section className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-        <PriceIndexChart />
+        <PriceIndexChart initialSeries={initialSeries} />
         <p className="mt-5 flex items-start gap-2 text-xs text-[#9ca3af]">
           <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           Source: Dubai Land Department open data (gateway.dubailand.gov.ae). Figures are as published by DLD and may lag by

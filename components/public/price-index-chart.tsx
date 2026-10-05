@@ -138,10 +138,10 @@ function ChartHead({ period, context, point }: { period: string; context: string
   )
 }
 
-export function PriceIndexChart() {
+export function PriceIndexChart({ initialSeries = null }: { initialSeries?: DldPriceIndexSeries[] | null }) {
   const narrow = useIsNarrowScreen()
   const [attempt, setAttempt] = useState(0)
-  const [state, setState] = useState<{ series: DldPriceIndexSeries[] | null; error: string | null }>({ series: null, error: null })
+  const [state, setState] = useState<{ series: DldPriceIndexSeries[] | null; error: string | null }>({ series: initialSeries, error: null })
   const [categoryCode, setCategoryCode] = useState("")
   const [subCode, setSubCode] = useState("")
 
@@ -159,6 +159,8 @@ export function PriceIndexChart() {
     })
 
   useEffect(() => {
+    // Server-provided data covers the first render; the fetch is for Retry (and pages without it).
+    if (attempt === 0 && initialSeries) return
     let cancelled = false
     void (async () => {
       try {
@@ -174,7 +176,7 @@ export function PriceIndexChart() {
     return () => {
       cancelled = true
     }
-  }, [attempt])
+  }, [attempt, initialSeries])
 
   const loading = !state.series && !state.error
   const series = state.series ?? []
