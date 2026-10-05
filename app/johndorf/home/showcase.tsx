@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { motion, useMotionValue, useMotionValueEvent, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion"
+import { AnimatePresence, motion, useMotionValue, useMotionValueEvent, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion"
 import { ArrowRight, ArrowUpRight, MapPin, Sparkles } from "lucide-react"
 import { FLAGSHIPS, PROJECTS } from "@/lib/johndorf/company"
 import { BLOCKS, TOTALS } from "@/lib/johndorf/montierra"
+import { PROJECT_DETAILS } from "@/lib/johndorf/projects"
+import { ProjectDetail } from "./project-detail"
 import { Eyebrow, Magnetic, Odometer, Reveal, RiseWords, ease, serif } from "./ui"
 
 /* ─── Flagships: full cards that stack as you scroll ──────────────────────── */
@@ -103,6 +105,16 @@ export function Portfolio() {
   const bar = useTransform(scrollYProgress, [0, 1], ["0%", "100%"])
   const [idx, setIdx] = useState(0)
   useMotionValueEvent(scrollYProgress, "change", (v) => setIdx(Math.min(PROJECTS.length - 1, Math.round(v * (PROJECTS.length - 1)))))
+  // The project whose sheet is open (house types, amenities, photos).
+  const [openName, setOpenName] = useState<string | null>(null)
+  const openProject = PROJECTS.find((p) => p.name === openName)
+  const openDetail = openProject?.slug ? PROJECT_DETAILS[openProject.slug] : undefined
+  // Rendered outside the sliding track: a transformed parent would trap a fixed overlay.
+  const sheet = (
+    <AnimatePresence>
+      {openProject && openDetail && <ProjectDetail key={openProject.name} project={openProject} detail={openDetail} onClose={() => setOpenName(null)} />}
+    </AnimatePresence>
+  )
 
   if (reduce) {
     return (
@@ -110,9 +122,10 @@ export function Portfolio() {
         <PortfolioHeader idx={0} />
         <div className="mx-auto mt-10 grid max-w-[1400px] gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {PROJECTS.map((p, n) => (
-            <ProjectCard key={p.name} p={p} n={n} />
+            <ProjectCard key={p.name} p={p} n={n} onOpen={setOpenName} />
           ))}
         </div>
+        {sheet}
       </section>
     )
   }
@@ -125,7 +138,7 @@ export function Portfolio() {
         </div>
         <motion.div ref={track} style={{ x }} className="mt-8 flex w-max gap-5 px-5 sm:mt-10 sm:gap-7 sm:px-8">
           {PROJECTS.map((p, n) => (
-            <ProjectCard key={p.name} p={p} n={n} strip />
+            <ProjectCard key={p.name} p={p} n={n} strip onOpen={setOpenName} />
           ))}
           <div className="flex w-[70vw] shrink-0 flex-col justify-center sm:w-[36vw] lg:w-[26vw]">
             <p className={`${serif} text-4xl font-semibold leading-tight sm:text-5xl`}>
@@ -137,6 +150,7 @@ export function Portfolio() {
           <motion.div style={{ width: bar }} className="h-px bg-[#b4241c]" />
         </div>
       </div>
+      {sheet}
     </section>
   )
 }
@@ -157,9 +171,10 @@ function PortfolioHeader({ idx }: { idx: number }) {
   )
 }
 
-function ProjectCard({ p, n, strip = false }: { p: (typeof PROJECTS)[number]; n: number; strip?: boolean }) {
+function ProjectCard({ p, n, strip = false, onOpen }: { p: (typeof PROJECTS)[number]; n: number; strip?: boolean; onOpen: (name: string) => void }) {
+  const hasSheet = Boolean(p.slug && PROJECT_DETAILS[p.slug])
   const body = (
-    <article className={`group ${strip ? "w-[78vw] shrink-0 sm:w-[44vw] lg:w-[31vw]" : ""}`} data-cursor={p.interactive ? "Open map" : undefined}>
+    <article className={`group text-left ${strip ? "w-[78vw] shrink-0 sm:w-[44vw] lg:w-[31vw]" : ""}`} data-cursor={hasSheet ? "View" : undefined}>
       <div className={`relative overflow-hidden rounded-[24px] ${strip ? "h-[42svh] sm:h-[46vh]" : "aspect-[16/11]"}`}>
         <Image src={p.image} alt={p.name} fill sizes="(min-width:1024px) 31vw, (min-width:640px) 44vw, 78vw" className="object-cover transition-transform duration-[1.4s] ease-out group-hover:scale-[1.08]" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
@@ -184,18 +199,18 @@ function ProjectCard({ p, n, strip = false }: { p: (typeof PROJECTS)[number]; n:
             <MapPin className="h-3.5 w-3.5 shrink-0 text-[#b4241c]" /> {p.place}
           </p>
         </div>
-        {p.interactive && (
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#b4241c] text-white transition-transform group-hover:rotate-45">
+        {hasSheet && (
+          <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all group-hover:rotate-45 ${p.interactive ? "bg-[#b4241c] text-white" : "bg-[#f6efec] text-[#b4241c] group-hover:bg-[#b4241c] group-hover:text-white"}`}>
             <ArrowUpRight className="h-4 w-4" />
           </span>
         )}
       </div>
     </article>
   )
-  return p.interactive ? (
-    <Link href="/johndorf/dashboard" className="contents">
+  return hasSheet ? (
+    <button type="button" onClick={() => onOpen(p.name)} aria-label={`${p.name} — house types, amenities and photos`} className="contents cursor-pointer">
       {body}
-    </Link>
+    </button>
   ) : (
     body
   )

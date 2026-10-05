@@ -79,7 +79,7 @@ export const FLAGSHIPS = [
   },
 ]
 
-export type Region = "Cebu" | "Cagayan de Oro" | "Iligan"
+export type Region = "Cebu" | "Cagayan de Oro" | "Davao" | "Iligan"
 
 export const PROJECTS: {
   name: string
@@ -89,19 +89,29 @@ export const PROJECTS: {
   status?: "Ongoing" | "Completed"
   /** Opens the clickable site plan (/johndorf/dashboard). */
   interactive?: true
+  /** Johndorf's project-page slug — its sheet in lib/johndorf/projects.ts (house types, amenities, photos). */
+  slug?: string
 }[] = [
-  { name: "Montierra", place: "Cagayan de Oro", region: "Cagayan de Oro", image: "/johndorf/site/montierra.jpg", interactive: true },
+  { name: "Montierra", slug: "montierra", place: "Cagayan de Oro", region: "Cagayan de Oro", image: "/johndorf/site/montierra.jpg", interactive: true },
   { name: "Costa Liya", place: "Suba-Basbas, Lapu-Lapu City", region: "Cebu", image: "/johndorf/site/costa-liya.jpg" },
-  { name: "Arvesa Village", place: "Lumbia, Cagayan de Oro", region: "Cagayan de Oro", image: "/johndorf/site/arvesa.jpg" },
-  { name: "TierraNava Carcar", place: "Poblacion I, Carcar City", region: "Cebu", image: "/johndorf/site/tierranava-carcar.jpg", status: "Completed" },
-  { name: "Villa Castena", place: "Dalipuga, Iligan City", region: "Iligan", image: "/johndorf/site/villa-castena.jpg", status: "Ongoing" },
-  { name: "Navona Lumbia", place: "Lumbia, Cagayan de Oro", region: "Cagayan de Oro", image: "/johndorf/site/navona-lumbia.jpg" },
-  { name: "TierraNava Lumbia", place: "Lumbia, Cagayan de Oro", region: "Cagayan de Oro", image: "/johndorf/site/tierranava-lumbia.jpg", status: "Ongoing" },
-  { name: "TierraNava Opol", place: "Opol, Misamis Oriental", region: "Cagayan de Oro", image: "/johndorf/site/tierranava-opol.jpg", status: "Ongoing" },
-  { name: "TierraNava Tagoloan", place: "Tagoloan, Misamis Oriental", region: "Cagayan de Oro", image: "/johndorf/site/tierranava-tagoloan.jpg", status: "Ongoing" },
-  { name: "Pich 4B", place: "Opol, Misamis Oriental", region: "Cagayan de Oro", image: "/johndorf/site/pich-4b.jpg" },
-  { name: "Plumera Mactan", place: "Basak, Lapu-Lapu City", region: "Cebu", image: "/johndorf/site/plumera.jpg", status: "Ongoing" },
+  { name: "Arvesa Village", slug: "arvesa-village", place: "Lumbia, Cagayan de Oro", region: "Cagayan de Oro", image: "/johndorf/site/arvesa.jpg" },
+  { name: "TierraNava Carcar", slug: "tierranava-carcar", place: "Poblacion I, Carcar City", region: "Cebu", image: "/johndorf/site/tierranava-carcar.jpg", status: "Completed" },
+  { name: "Villa Castena", slug: "villa-castena", place: "Dalipuga, Iligan City", region: "Iligan", image: "/johndorf/site/villa-castena.jpg", status: "Ongoing" },
+  { name: "Navona Lumbia", slug: "navona-lumbia", place: "Lumbia, Cagayan de Oro", region: "Cagayan de Oro", image: "/johndorf/site/navona-lumbia.jpg" },
+  { name: "TierraNava Lumbia", slug: "tierranava-lumbia", place: "Lumbia, Cagayan de Oro", region: "Cagayan de Oro", image: "/johndorf/site/tierranava-lumbia.jpg", status: "Ongoing" },
+  { name: "TierraNava Opol", slug: "tierranava-opol", place: "Opol, Misamis Oriental", region: "Cagayan de Oro", image: "/johndorf/site/tierranava-opol.jpg", status: "Ongoing" },
+  { name: "TierraNava Tagoloan", slug: "tierranava-tagoloan", place: "Tagoloan, Misamis Oriental", region: "Cagayan de Oro", image: "/johndorf/site/tierranava-tagoloan.jpg", status: "Ongoing" },
+  { name: "Pich 4B", slug: "pich-4b", place: "Opol, Misamis Oriental", region: "Cagayan de Oro", image: "/johndorf/site/pich-4b.jpg" },
+  { name: "Plumera Mactan", slug: "plumera", place: "Basak, Lapu-Lapu City", region: "Cebu", image: "/johndorf/site/plumera.jpg", status: "Ongoing" },
   { name: "Palmava", place: "Cordova, Cebu", region: "Cebu", image: "/johndorf/site/palmava.jpg" },
+  { name: "Navona Court", slug: "navona-court", place: "Lumbia, Cagayan de Oro", region: "Cagayan de Oro", image: "/johndorf/site/projects/navona-court/main.jpg" },
+  { name: "Coral Village", slug: "coral-village", place: "Suba-Basbas, Lapu-Lapu City", region: "Cebu", image: "/johndorf/site/projects/coral-village/main.jpg" },
+  { name: "Evissa Lapu-Lapu", slug: "evissa-lapu-lapu", place: "Lapu-Lapu City", region: "Cebu", image: "/johndorf/site/projects/evissa-lapu-lapu/main.jpg" },
+  { name: "Mimosa Cebu", slug: "mimosa-cebu", place: "Labangon, Cebu City", region: "Cebu", image: "/johndorf/site/projects/mimosa-cebu/main.jpg" },
+  { name: "Mimosa Minglanilla", slug: "mimosa-minglanilla", place: "Minglanilla, Cebu", region: "Cebu", image: "/johndorf/site/projects/mimosa-minglanilla/main.jpg" },
+  { name: "Astana Davao", slug: "astana-davao", place: "Davao", region: "Davao", image: "/johndorf/site/projects/astana-davao/main.jpg" },
+  { name: "Navona Davao", slug: "navona-davao", place: "Davao", region: "Davao", image: "/johndorf/site/projects/navona-davao/main.jpg" },
+  { name: "Evissa Davao", slug: "evissa-davao", place: "Davao", region: "Davao", image: "/johndorf/site/projects/evissa-davao/main.jpg" },
 ]
 
 export const AWARDS = [
