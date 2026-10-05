@@ -181,7 +181,7 @@ export default async function AboutPage() {
     },
   ].filter((n) => n.value > 0)
   numbers.push({
-    value: 0, label: "Fees charged to buyers", accent: true,
+    value: 0, display: "Free", label: "For buyers", accent: true,
     note: "The developer pays our commission. Never you. Consultations, shortlists and site visits cost nothing.",
     backdrop: bd({ kind: "photo" as const, src: PHOTOS.celebrate.url, alt: PHOTOS.celebrate.alt }),
   })

@@ -24,6 +24,8 @@ export type ReelItem = {
   backdrop: ReelBackdrop
   /** Set the figure in gold (for the one that is a promise, not a count). */
   accent?: boolean
+  /** Words shown instead of the number (e.g. "Free") — never counted. */
+  display?: string
 }
 
 /**
@@ -146,7 +148,7 @@ export function NumbersReel({
       zone.dataset.static = "true"
       items.forEach((it, i) => {
         const el = numRefs.current[i]
-        if (el) el.textContent = fmt(it.value)
+        if (el) el.textContent = it.display ?? fmt(it.value)
       })
       return
     }
@@ -196,6 +198,7 @@ export function NumbersReel({
     const el = numRefs.current[active]
     if (!seen || !el || counted.current.has(active)) return
     counted.current.add(active)
+    if (items[active].display) return
     const target = items[active].value
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       el.textContent = fmt(target)
@@ -244,7 +247,7 @@ export function NumbersReel({
               <div className="relative mx-auto flex h-full max-w-[1440px] flex-col justify-center px-4 sm:px-6 lg:px-8 lg:pl-[26rem]">
                 <p className="nr-figure font-['Outfit'] text-[clamp(96px,22vw,260px)] font-bold leading-[0.9] tracking-[-0.04em]">
                   <span ref={(el) => { numRefs.current[i] = el }} className={it.accent ? "text-[#d6b357]" : "text-white"}>
-                    {fmt(it.value)}
+                    {it.display ?? fmt(it.value)}
                   </span>
                 </p>
                 <p className="nr-label mt-4 font-['Outfit'] text-[28px] font-bold leading-tight sm:text-[40px]">{it.label}</p>
