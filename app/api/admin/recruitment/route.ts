@@ -62,11 +62,9 @@ export type RecruitmentDeal = {
 
 const PAGE = 1000
 
-export async function GET() {
-  const guard = await requireRole([...ROLES_ADMIN_STAFF])
-  if (!guard.ok) return guard.response
+type Admin = ReturnType<typeof createAdminSupabase>
 
-  const admin = createAdminSupabase()
+async function loadProfiles(admin: Admin): Promise<Record<string, unknown>[] | null> {
   const rows: Record<string, unknown>[] = []
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await admin
@@ -75,14 +73,54 @@ export async function GET() {
       .not("is_deleted", "is", true)
       .order("joined_at", { ascending: false })
       .range(from, from + PAGE - 1)
-    if (error) return NextResponse.json({ error: "Couldn't load the accounts." }, { status: 500 })
+    if (error) return null
     rows.push(...((data ?? []) as Record<string, unknown>[]))
     if (!data || data.length < PAGE) break
   }
+  return rows
+}
+
+/**
+ * Every login's email and the inviter noted at sign-up — a few bulk pages (≈0.25 s for 700
+ * accounts) instead of one request per account. On failure the page still loads; unfinished
+ * sign-ups just fall back to "Unnamed account".
+ */
+async function loadLogins(admin: Admin): Promise<Map<string, { email: string | null; inviter: string | null }>> {
+  const out = new Map<string, { email: string | null; inviter: string | null }>()
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: PAGE })
+    if (error || !data) break
+    for (const u of data.users) {
+      const inviter = u.user_metadata?.invited_by
+      out.set(u.id, { email: u.email ?? null, inviter: typeof inviter === "string" && inviter.trim() ? inviter.trim() : null })
+    }
+    if (data.users.length < PAGE) break
+  }
+  return out
+}
+
+export async function GET() {
+  const guard = await requireRole([...ROLES_ADMIN_STAFF])
+  if (!guard.ok) return guard.response
+
+  const admin = createAdminSupabase()
+  // The four reads are independent — run them together, so the page waits for the slowest only.
+  const [rows, allSales, logins, { data: saleRows }] = await Promise.all([
+    loadProfiles(admin),
+    fetchAllSales(admin),
+    loadLogins(admin),
+    admin
+      .from("sales_reports")
+      .select("id, agent_id, contract_price, reservation_date, created_at, sale_type, unit_number, partners, projects(name), developers(name)")
+      .eq("validation_status", "validated")
+      .order("reservation_date", { ascending: false })
+      .limit(5000),
+  ])
+  if (!rows) return NextResponse.json({ error: "Couldn't load the accounts." }, { status: 500 })
 
   // Own validated sales per account — the leaderboard sums them over a downline.
   const sold = new Map<string, { deals: number; value: number }>()
-  for (const s of await fetchAllSales(admin)) {
+  for (const s of allSales) {
     if (s.validation_status !== "validated") continue
     for (const c of saleCredits(s)) {
       const t = sold.get(c.agentId) ?? { deals: 0, value: 0 }
@@ -96,25 +134,15 @@ export async function GET() {
     (typeof p.fullname === "string" && p.fullname.trim()) || [p.fname, p.lname].filter((v) => typeof v === "string" && v).join(" ")
 
   // Unfinished sign-ups (pending, never named): their email and the inviter noted at sign-up live on
-  // the login, not the profile — look those up for just these accounts, a few at a time.
-  const unfinishedIds = rows.filter((p) => ((p.status as string | null) ?? "pending").toLowerCase() === "pending" && !nameOf(p).trim()).map((p) => String(p.id))
-  const login = new Map<string, { email: string | null; inviter: string | null }>()
-  for (let i = 0; i < unfinishedIds.length; i += 15) {
-    await Promise.all(
-      unfinishedIds.slice(i, i + 15).map(async (id) => {
-        const { data } = await admin.auth.admin.getUserById(id)
-        const inviter = data?.user?.user_metadata?.invited_by
-        login.set(id, { email: data?.user?.email ?? null, inviter: typeof inviter === "string" && inviter.trim() ? inviter.trim() : null })
-      }),
-    )
-  }
+  // the login, not the profile.
+  const isUnfinished = (p: Record<string, unknown>) => ((p.status as string | null) ?? "pending").toLowerCase() === "pending" && !nameOf(p).trim()
 
   const people: RecruitmentPerson[] = rows.map((p) => {
     const meta = (p.metadata ?? {}) as Record<string, unknown>
     const invitedBy = typeof meta.invited_by === "string" && meta.invited_by && !meta.developer_invite_id ? meta.invited_by : null
     const raw = nameOf(p)
     const status = ((p.status as string | null) ?? "pending").toLowerCase()
-    const unfinished = login.get(String(p.id))
+    const unfinished = isUnfinished(p) ? logins.get(String(p.id)) ?? { email: null, inviter: null } : null
     const waNumber = typeof meta.whatsapp_number === "string" ? meta.whatsapp_number.trim() : ""
     const waCode = typeof meta.whatsapp_country_code === "string" ? meta.whatsapp_country_code.trim() : ""
     return {
@@ -129,20 +157,14 @@ export async function GET() {
       sales: Math.round(sold.get(String(p.id))?.value ?? 0),
       basedIn: typeof meta.residence_country === "string" && meta.residence_country ? meta.residence_country : null,
       whatsapp: status === "pending" && waNumber ? `${waCode} ${waNumber}`.trim() : null,
-      unfinished: Boolean(unfinished),
+      unfinished: unfinished !== null,
       email: unfinished?.email ?? null,
       signupInviter: !invitedBy && unfinished?.inviter && !meta.developer_invite_id ? unfinished.inviter : null,
     }
   })
 
-  // The validated sales themselves, one line per credited agent, so a figure
+  // The validated sales themselves (loaded above), one line per credited agent, so a figure
   // on the page can open into "which agent, which project, how much".
-  const { data: saleRows } = await admin
-    .from("sales_reports")
-    .select("id, agent_id, contract_price, reservation_date, created_at, sale_type, unit_number, partners, projects(name), developers(name)")
-    .eq("validation_status", "validated")
-    .order("reservation_date", { ascending: false })
-    .limit(5000)
   const deals: RecruitmentDeal[] = []
   for (const row of (saleRows ?? []) as Array<Record<string, unknown>>) {
     const price = Number(row.contract_price ?? 0)
