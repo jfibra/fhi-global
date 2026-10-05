@@ -32,11 +32,13 @@ export type ReelItem = {
  * Each figure fills the screen in huge type over the evidence for it: a
  * drifting wall of the real project renders, the real developer logos, the
  * emirates lit by count, the agents' own portraits. The figure counts up as
- * its slide arrives. A rail of chapters on the left tracks the position and
- * jumps on click; a gold line along the bottom fills with progress.
+ * its slide arrives — on a short timer, not tied to the scroll, so a reader
+ * who stops scrolling never sits on a "0" (each figure counts once; coming
+ * back shows it whole). A rail of chapters on the left tracks the position
+ * and jumps on click; a gold line along the bottom fills with progress.
  *
- * Progress is written on an animation frame to CSS variables and to the
- * number text; React state changes only when the active slide changes.
+ * Progress is written on an animation frame to a CSS variable; React state
+ * changes only when the active slide changes.
  * Reduced-motion readers get the slides stacked and every figure complete.
  */
 /** Cycle a short list until the wall has enough tiles to cover the stage. */
@@ -131,7 +133,9 @@ export function NumbersReel({
   const stageRef = useRef<HTMLDivElement>(null)
   const numRefs = useRef<(HTMLElement | null)[]>([])
   const activeRef = useRef(0)
+  const counted = useRef(new Set<number>())
   const [active, setActive] = useState(0)
+  const [seen, setSeen] = useState(false)
   const n = items.length
 
   useEffect(() => {
@@ -153,17 +157,8 @@ export function NumbersReel({
       const r = zone.getBoundingClientRect()
       const travel = Math.max(1, r.height - window.innerHeight)
       const p = clamp01(-r.top / travel)
-      const pos = p * n
-      const idx = Math.min(n - 1, Math.floor(pos))
-      const local = pos - idx
+      const idx = Math.min(n - 1, Math.floor(p * n))
       stage.style.setProperty("--p", p.toFixed(4))
-      // The count runs over the first 55% of a slide's dwell, then holds.
-      for (let i = 0; i < n; i++) {
-        const el = numRefs.current[i]
-        if (!el) continue
-        const v = i < idx ? items[i].value : i > idx ? 0 : items[i].value * easeOut(clamp01(local / 0.55))
-        el.textContent = fmt(v)
-      }
       if (idx !== activeRef.current) {
         activeRef.current = idx
         setActive(idx)
@@ -178,23 +173,54 @@ export function NumbersReel({
       if (on) onScroll()
     }, { rootMargin: "20% 0px 20% 0px" })
     io.observe(zone)
+    // The first figure starts counting as the stage's top edge comes into view,
+    // so it has finished by the time the reader reaches it.
+    const enter = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) setSeen(true)
+    })
+    enter.observe(stage)
     window.addEventListener("scroll", onScroll, { passive: true })
     window.addEventListener("resize", onScroll)
     update()
     return () => {
       io.disconnect()
+      enter.disconnect()
       window.removeEventListener("scroll", onScroll)
       window.removeEventListener("resize", onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
   }, [items, n])
 
+  // Count the arriving figure up from zero over ~1.2s, once per figure.
+  useEffect(() => {
+    const el = numRefs.current[active]
+    if (!seen || !el || counted.current.has(active)) return
+    counted.current.add(active)
+    const target = items[active].value
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      el.textContent = fmt(target)
+      return
+    }
+    const start = performance.now()
+    let raf = 0
+    const tick = (t: number) => {
+      const k = clamp01((t - start) / 1200)
+      el.textContent = fmt(target * easeOut(k))
+      if (k < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => {
+      cancelAnimationFrame(raf)
+      el.textContent = fmt(target)
+    }
+  }, [active, seen, items])
+
   const jumpTo = (i: number) => {
     const zone = zoneRef.current
     if (!zone) return
     const top = zone.getBoundingClientRect().top + window.scrollY
     const travel = zone.offsetHeight - window.innerHeight
-    // Land a third of the way into the slide, where the count has settled.
+    // Land a third of the way into the slide.
     window.scrollTo({ top: top + ((i + 0.34) / n) * travel, behavior: "smooth" })
   }
 
