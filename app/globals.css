@@ -686,12 +686,18 @@
    the horizon when data-phase flips to "open". */
 .intro { position: fixed; inset: 0; z-index: 1000; pointer-events: none; }
 .intro-half { position: absolute; left: 0; right: 0; height: 50.5%; background: #06182e; transition: transform 950ms cubic-bezier(0.77, 0, 0.175, 1); }
-.intro-half--top { top: 0; }
-.intro-half--bottom { bottom: 0; }
+.intro-half--top { top: 0; animation: intro-part-top 950ms cubic-bezier(0.77, 0, 0.175, 1) 950ms forwards; }
+.intro-half--bottom { bottom: 0; animation: intro-part-bottom 950ms cubic-bezier(0.77, 0, 0.175, 1) 950ms forwards; }
 .intro[data-phase="open"] .intro-half--top { transform: translateY(-101%); }
 .intro[data-phase="open"] .intro-half--bottom { transform: translateY(101%); }
-.intro-center { position: absolute; left: 50%; top: 50%; display: flex; flex-direction: column; align-items: center; gap: 18px; transform: translate(-50%, -50%); transition: opacity 260ms ease, transform 500ms cubic-bezier(0.16, 1, 0.3, 1); }
+/* The halves part on a CSS timer that starts at first paint — on a slow phone React hydrates
+   late, and the hero (the page's largest paint) must not wait for it. The JS phase change at
+   the same 950ms agrees with these, so nothing jumps. */
+@keyframes intro-part-top { to { transform: translateY(-101%); } }
+@keyframes intro-part-bottom { to { transform: translateY(101%); } }
+.intro-center { position: absolute; left: 50%; top: 50%; display: flex; flex-direction: column; align-items: center; gap: 18px; transform: translate(-50%, -50%); transition: opacity 260ms ease, transform 500ms cubic-bezier(0.16, 1, 0.3, 1); animation: intro-center-out 500ms cubic-bezier(0.16, 1, 0.3, 1) 950ms forwards; }
 .intro[data-phase="open"] .intro-center { opacity: 0; transform: translate(-50%, -50%) scale(1.08); }
+@keyframes intro-center-out { to { opacity: 0; transform: translate(-50%, -50%) scale(1.08); } }
 .intro-mark { opacity: 0; transform: scale(0.86) translateY(6px); animation: intro-mark 700ms cubic-bezier(0.16, 1, 0.3, 1) 80ms forwards; filter: drop-shadow(0 0 28px rgba(214, 179, 87, 0.35)); }
 @keyframes intro-mark { to { opacity: 1; transform: scale(1) translateY(0); } }
 .intro-rule { display: block; height: 2px; width: 0; background: #d6b357; animation: intro-rule 520ms cubic-bezier(0.16, 1, 0.3, 1) 420ms forwards; }

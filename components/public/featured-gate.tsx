@@ -141,7 +141,7 @@ export function FeaturedGate({ count, images = [] }: { count: number; images?: W
                   <div className="gate-wall-grid grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-7">
                     {wall.map((im, i) => (
                       <div key={`${side}-${i}`} className="relative aspect-[4/3] overflow-hidden bg-[#0a1f38]">
-                        <Image src={im.src} alt="" fill sizes="(min-width: 1024px) 15vw, 25vw" className="object-cover" />
+                        <Image src={im.src} alt="" width={320} height={240} className="absolute inset-0 h-full w-full object-cover" />
                       </div>
                     ))}
                   </div>

@@ -122,6 +122,7 @@ function ChartHead({ period, context, point }: { period: string; context: string
         <span className="sr-only">{context} — </span>
         {period}
       </h3>
+      {!(point && point.actual !== null) && <p aria-hidden="true" className="h-[22px]" />}
       {point && point.actual !== null && (
         <p className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 tabular-nums">
           <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9ca3af]">{xLabel(point.x)}</span>
@@ -275,7 +276,7 @@ export function PriceIndexChart() {
           <div className="p-5 sm:p-6">
             <ChartHead period="Quarterly" context={context} point={latestQ} />
             {loading ? (
-              <Skeleton />
+              <Skeleton h={narrow ? 260 : 340} />
             ) : (
               <>
                 <ResponsiveContainer width="100%" height={narrow ? 260 : 340}>
@@ -344,7 +345,7 @@ export function PriceIndexChart() {
           <div className="min-w-0 border-t border-[#eef0f3] p-5 sm:p-6 xl:border-t-0">
             <ChartHead period="Annual" context={context} point={latestA} />
             {loading ? (
-              <Skeleton />
+              <Skeleton h={narrow ? 260 : 340} />
             ) : (
               <>
                 <ResponsiveContainer width="100%" height={narrow ? 260 : 340}>

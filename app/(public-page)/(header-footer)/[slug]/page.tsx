@@ -138,6 +138,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
     .eq("developer_id", developer.id)
     .eq("is_active", true)
     .eq("is_published", true)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
 
   // A project with no picture doesn't appear on the public page — a grid of
@@ -674,6 +675,7 @@ async function fetchSeoInventory(filter: SeoPageFilter): Promise<SeoGridRow[]> {
     .select(select)
     .eq("is_active", true)
     .eq("is_published", true)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
 
   if (filter.cityLike) {
@@ -1076,6 +1078,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
       .select("name, slug, main_image, developers(slug)")
       .eq("is_active", true)
       .eq("is_published", true)
+      .is("deleted_at", null)
       .not("main_image", "is", null)
       .neq("main_image", "")
       .not("name", "ilike", "%test%")
@@ -1092,6 +1095,7 @@ async function SeoGuidePage({ seo }: { seo: SeoPage }) {
       .select("name, slug, main_image, developers(slug)")
       .eq("is_active", true)
       .eq("is_published", true)
+      .is("deleted_at", null)
       .not("main_image", "is", null)
       .neq("main_image", "")
       .not("name", "ilike", "%test%")

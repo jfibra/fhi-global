@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
       .select("city")
       .eq("is_active", true)
       .eq("is_published", true)
+      .is("deleted_at", null)
       .ilike("city", like)
       .limit(40),
   ])

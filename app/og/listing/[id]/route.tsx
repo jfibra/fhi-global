@@ -5,6 +5,7 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import { assembleListingMarketingData, type MarketingListingRow } from "@/lib/flyer/marketing-data"
 import { sanitizeOgCardOptions, OG_CARD_W, OG_CARD_H } from "@/lib/flyer/og-card"
 import { isSafeRemoteImageUrl } from "@/lib/image-hosts"
+import { ogJpeg } from "@/lib/og-picture"
 import ListingShareCard from "@/components/dashboard/listings/marketing/ListingShareCard"
 
 // Social link-preview image for a public agent listing. Renders the same
@@ -36,7 +37,7 @@ async function logoDataUrl(): Promise<string> {
 
 async function fallbackBrandCard() {
   const logo = await logoDataUrl()
-  return new ImageResponse(
+  return ogJpeg(new ImageResponse(
     (
       <div
         style={{
@@ -59,7 +60,7 @@ async function fallbackBrandCard() {
       </div>
     ),
     { width: OG_CARD_W, height: OG_CARD_H, headers: CACHE_HEADERS },
-  )
+  ))
 }
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -96,8 +97,8 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   const photoCandidate = options.photo ?? card.gallery[0] ?? null
   const photoSrc = photoCandidate && isSafeRemoteImageUrl(photoCandidate) ? photoCandidate : null
 
-  return new ImageResponse(
+  return ogJpeg(new ImageResponse(
     <ListingShareCard data={card} options={options} photoSrc={photoSrc} logoSrc={await logoDataUrl()} />,
     { width: OG_CARD_W, height: OG_CARD_H, headers: CACHE_HEADERS },
-  )
+  ))
 }

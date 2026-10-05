@@ -201,6 +201,7 @@ const nextConfig = {
     "/website/*/opengraph-image": SHARP_LINUX_LIBS,
     "/og/event/": SHARP_LINUX_LIBS,
     "/og/business-card/": SHARP_LINUX_LIBS,
+    "/og/listing/": SHARP_LINUX_LIBS,
   },
   typescript: {
     ignoreBuildErrors: true,

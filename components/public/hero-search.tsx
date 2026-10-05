@@ -177,6 +177,7 @@ export function HeroSearch() {
         </div>
         <button
           type="button"
+          aria-label="Search"
           onClick={() => term.trim() && go(allHref)}
           className="flex shrink-0 items-center gap-2 bg-[#d6b357] px-7 text-xs font-bold uppercase tracking-[0.18em] text-[#001f3f] transition-colors duration-300 hover:bg-[#c8a544]"
         >

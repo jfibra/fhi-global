@@ -91,7 +91,7 @@ const getProjectFacets = unstable_cache(
     const supabase = createPublicSupabaseClient()
     const [{ data: devOptions }, { data: cityOptions }, { data: live }] = await Promise.all([
       supabase.from("developers").select("id, name").eq("is_active", true).order("name"),
-      supabase.from("projects").select("city").eq("is_active", true).not("city", "is", null),
+      supabase.from("projects").select("city").eq("is_active", true).eq("is_published", true).is("deleted_at", null).not("city", "is", null),
       // The published catalogue, for the masthead counters and the quick
       // picks' live counts. Same rows the grid draws from.
       supabase
@@ -254,7 +254,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
       )}
 
       {/* Filter bar — sticks under the slim header on wide screens */}
-      <Suspense>
+      <Suspense fallback={<div className="h-[371px] sm:h-[296px] lg:h-[148px] xl:h-[110px]" aria-hidden="true" />}>
         <ProjectFilters
           developers={(devOptions ?? []).map((d) => ({ value: d.id, label: d.name }))}
           cities={uniqueCities.map((c) => ({ value: c, label: c }))}

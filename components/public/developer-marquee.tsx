@@ -90,7 +90,7 @@ export function DeveloperMarquee({ developers }: { developers: DeveloperTileItem
         name="developer-logo"
         className="dv-tile block shrink-0"
         style={{ ["--i" as string]: clone ? developers.length : i }}
-        {...(clone ? { prefetch: false } : {})}
+        {...(clone ? { prefetch: false, "aria-hidden": true, tabIndex: -1 } : {})}
       >
         <span
           className="dv-tile-in group relative flex h-[172px] w-[232px] items-center justify-center overflow-hidden border border-[#e5e8ec] bg-white p-7 sm:w-[248px]"

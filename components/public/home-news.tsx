@@ -137,6 +137,7 @@ export function HomeNews({ items }: { items: HomeNewsItem[] }) {
               )}
               <Link
                 href="/news"
+                aria-label="All news"
                 className="inline-flex items-center gap-2 text-sm font-bold text-[#0d1117] hover:text-[#b8913f] transition-colors sm:ml-2"
               >
                 <span className="hidden sm:inline">All news</span>
