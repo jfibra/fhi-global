@@ -47,10 +47,36 @@ function StatusChip({ status }: { status: string }) {
   )
 }
 
+/** Long lists open at 50 rows; "Show 50 more" reveals the next 50. Remount (key) to start over. */
+const PAGE_STEP = 50
+
+function usePaged<T>(items: T[]) {
+  const [shown, setShown] = useState(PAGE_STEP)
+  return { visible: items.slice(0, shown), shown: Math.min(shown, items.length), total: items.length, more: () => setShown((n) => n + PAGE_STEP) }
+}
+
+function ShowMore({ shown, total, onMore }: { shown: number; total: number; onMore: () => void }) {
+  if (shown >= total) return null
+  return (
+    <div className="mt-1 flex flex-col items-center gap-1.5 border-t border-[#f0f2f5] pt-4">
+      <button
+        type="button"
+        onClick={onMore}
+        className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-5 text-sm font-bold text-[#001f3f] transition-colors hover:border-[#001f3f]"
+      >
+        <ChevronDown className="h-4 w-4" /> Show {Math.min(PAGE_STEP, total - shown)} more
+      </button>
+      <p className="text-xs tabular-nums text-[#9ca3af]">
+        Showing {shown} of {total}
+      </p>
+    </div>
+  )
+}
+
 function Avatar({ p, size = "h-9 w-9 text-sm" }: { p: RecruitmentPerson; size?: string }) {
+  // Lazy: long lists (Direct sign-ups, Downline) only fetch the photos scrolled into view.
   return p.photo ? (
     // eslint-disable-next-line @next/next/no-img-element
-    // Lazy: long lists (Direct sign-ups, Downline) only fetch the photos scrolled into view.
     <img src={p.photo} alt="" loading="lazy" decoding="async" className={`${size} shrink-0 rounded-full object-cover`} />
   ) : (
     <span className={`${size} flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#001f3f] to-[#003366] font-bold text-white`}>
@@ -426,11 +452,12 @@ export default function RecruitmentPage() {
         ) : error ? (
           <p className="py-8 text-sm text-[#9ca3af]">Couldn&apos;t load the accounts right now. {error}</p>
         ) : tab === "pending" ? (
-          <PendingList items={pending.filter(match)} byId={byId} busy={busy} onActivate={activate} profileHref={profileHref} empty={q ? "Nobody matches." : "Nobody is waiting — every account is approved."} />
+          <PendingList key={`pending:${q}`} items={pending.filter(match)} byId={byId} busy={busy} onActivate={activate} profileHref={profileHref} empty={q ? "Nobody matches." : "Nobody is waiting — every account is approved."} />
         ) : tab === "direct" ? (
-          <DirectList items={direct.filter(match)} profileHref={profileHref} empty={q ? "Nobody matches." : "Everyone came through an invite link."} />
+          <DirectList key={`direct:${q}`} items={direct.filter(match)} profileHref={profileHref} empty={q ? "Nobody matches." : "Everyone came through an invite link."} />
         ) : tab === "recruiters" ? (
           <RecruiterTable
+            key={`recruiters:${q}`}
             rows={recruiters.filter((r) => match(r.person))}
             profileHref={profileHref}
             onDownline={(id) => {
@@ -597,85 +624,90 @@ function PendingList({
   profileHref: (id: string) => string
   empty: string
 }) {
+  const page = usePaged(items)
   if (items.length === 0) return <p className="py-8 text-sm text-[#9ca3af]">{empty}</p>
   return (
-    <ul className="mt-4 divide-y divide-[#f0f2f5]">
-      {items.map((p) => {
-        const inviterId = p.invitedBy ?? p.signupInviter
-        const inviter = inviterId ? byId.get(inviterId) : null
-        return (
-          <li key={p.id} className="flex flex-wrap items-center gap-3 py-3">
-            <Avatar p={p} />
-            <div className="min-w-0 flex-1">
-              <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-[#111827]">
-                <span className="truncate">{p.name}</span>
-                <span className="rounded-full bg-[#001f3f]/5 px-2 py-0.5 text-[10.5px] font-bold text-[#001f3f]">{roleToLabel(p.role)}</span>
-                {p.unfinished && (
-                  <span
-                    className="rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] font-bold text-amber-700"
-                    title="They entered their email code but never filled in their name — they stopped at Complete profile."
-                  >
-                    Didn&apos;t finish sign-up
-                  </span>
-                )}
-              </p>
-              <p className="mt-0.5 text-xs text-[#6b7280]">
-                {inviter ? (
-                  <>
-                    Invited by <span className="font-semibold text-[#374151]">{inviter.name}</span>
-                  </>
-                ) : (
-                  <span className="text-[#9ca3af]">No inviter on record</span>
-                )}
-                <span className="mx-1.5 text-[#d1d5db]">·</span>
-                Joined {fmtDate(p.joinedAt)}
-              </p>
-              {/* Where they said they live + their WhatsApp (Global Partner sign-up) — to check before approving. */}
-              {(p.basedIn || p.whatsapp) && (
-                <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-[#6b7280]">
-                  {p.basedIn && (
-                    <span>
-                      {countryFlag(p.basedIn)} Based in <span className="font-semibold text-[#374151]">{p.basedIn}</span>
+    <>
+      <ul className="mt-4 divide-y divide-[#f0f2f5]">
+        {page.visible.map((p) => {
+          const inviterId = p.invitedBy ?? p.signupInviter
+          const inviter = inviterId ? byId.get(inviterId) : null
+          return (
+            <li key={p.id} className="flex flex-wrap items-center gap-3 py-3">
+              <Avatar p={p} />
+              <div className="min-w-0 flex-1">
+                <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-[#111827]">
+                  <span className="truncate">{p.name}</span>
+                  <span className="rounded-full bg-[#001f3f]/5 px-2 py-0.5 text-[10.5px] font-bold text-[#001f3f]">{roleToLabel(p.role)}</span>
+                  {p.unfinished && (
+                    <span
+                      className="rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] font-bold text-amber-700"
+                      title="They entered their email code but never filled in their name — they stopped at Complete profile."
+                    >
+                      Didn&apos;t finish sign-up
                     </span>
                   )}
-                  {p.basedIn && p.whatsapp && <span className="text-[#d1d5db]">·</span>}
-                  {p.whatsapp && (
-                    <a
-                      href={`https://wa.me/${p.whatsapp.replace(/\D/g, "")}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="tabular-nums hover:text-[#166534] hover:underline"
-                    >
-                      WhatsApp {p.whatsapp}
-                    </a>
-                  )}
                 </p>
-              )}
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Link href={profileHref(p.id)} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 text-xs font-bold text-[#374151] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]">
-                <ExternalLink className="h-3.5 w-3.5" /> Profile
-              </Link>
-              <button
-                type="button"
-                onClick={() => onActivate(p)}
-                disabled={busy.has(p.id)}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
-              >
-                {busy.has(p.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                Activate
-              </button>
-            </div>
-          </li>
-        )
-      })}
-    </ul>
+                <p className="mt-0.5 text-xs text-[#6b7280]">
+                  {inviter ? (
+                    <>
+                      Invited by <span className="font-semibold text-[#374151]">{inviter.name}</span>
+                    </>
+                  ) : (
+                    <span className="text-[#9ca3af]">No inviter on record</span>
+                  )}
+                  <span className="mx-1.5 text-[#d1d5db]">·</span>
+                  Joined {fmtDate(p.joinedAt)}
+                </p>
+                {/* Where they said they live + their WhatsApp (Global Partner sign-up) — to check before approving. */}
+                {(p.basedIn || p.whatsapp) && (
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-[#6b7280]">
+                    {p.basedIn && (
+                      <span>
+                        {countryFlag(p.basedIn)} Based in <span className="font-semibold text-[#374151]">{p.basedIn}</span>
+                      </span>
+                    )}
+                    {p.basedIn && p.whatsapp && <span className="text-[#d1d5db]">·</span>}
+                    {p.whatsapp && (
+                      <a
+                        href={`https://wa.me/${p.whatsapp.replace(/\D/g, "")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="tabular-nums hover:text-[#166534] hover:underline"
+                      >
+                        WhatsApp {p.whatsapp}
+                      </a>
+                    )}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Link href={profileHref(p.id)} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 text-xs font-bold text-[#374151] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]">
+                  <ExternalLink className="h-3.5 w-3.5" /> Profile
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => onActivate(p)}
+                  disabled={busy.has(p.id)}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {busy.has(p.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  Activate
+                </button>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+      <ShowMore shown={page.shown} total={page.total} onMore={page.more} />
+    </>
   )
 }
 
 // ─── Direct sign-ups ─────────────────────────────────────────────────────────
 
 function DirectList({ items, profileHref, empty }: { items: RecruitmentPerson[]; profileHref: (id: string) => string; empty: string }) {
+  const page = usePaged(items)
   if (items.length === 0) return <p className="py-8 text-sm text-[#9ca3af]">{empty}</p>
   return (
     <>
@@ -683,7 +715,7 @@ function DirectList({ items, profileHref, empty }: { items: RecruitmentPerson[];
         <UserRound className="h-3.5 w-3.5 text-[#b8913f]" /> Registered on the website without an invite link — nobody&apos;s recruits. An admin can set their inviter from the account editor.
       </p>
       <ul className="mt-2 divide-y divide-[#f0f2f5]">
-        {items.map((p) => (
+        {page.visible.map((p) => (
           <li key={p.id} className="flex flex-wrap items-center gap-3 py-3">
             <Avatar p={p} />
             <div className="min-w-0 flex-1">
@@ -700,6 +732,7 @@ function DirectList({ items, profileHref, empty }: { items: RecruitmentPerson[];
           </li>
         ))}
       </ul>
+      <ShowMore shown={page.shown} total={page.total} onMore={page.more} />
     </>
   )
 }
@@ -721,78 +754,82 @@ function RecruiterTable({
   onOwnDeals: (p: RecruitmentPerson) => void
   onNetworkDeals: (p: RecruitmentPerson) => void
 }) {
+  const page = usePaged(rows)
   if (rows.length === 0) return <p className="py-8 text-sm text-[#9ca3af]">No recruiters match.</p>
   const th = "px-3 py-2 text-left text-[10.5px] font-bold uppercase tracking-wide text-[#9ca3af]"
   const num = "px-3 py-3 text-right text-sm font-semibold tabular-nums text-[#111827]"
   return (
-    <div className="mt-4 overflow-x-auto">
-      <table className="w-full min-w-[960px]">
-        <thead>
-          <tr className="border-b border-[#f0f2f5]">
-            <th className={th}>#</th>
-            <th className={th}>Recruiter</th>
-            <th className={`${th} text-right`}>Recruits</th>
-            <th className={`${th} text-right`}>Active</th>
-            <th className={`${th} text-right`}>Pending</th>
-            <th className={`${th} text-right`}>Last 30 days</th>
-            <th className={`${th} text-right`}>Whole network</th>
-            <th className={`${th} text-right`} title="The recruiter's own validated sales, all time">Own sales</th>
-            <th className={`${th} text-right`} title="Validated sales of everyone in the network (not the recruiter's own), all time">Network sales</th>
-            <th className={th} />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[#f0f2f5]">
-          {rows.map((r, i) => (
-            <tr key={r.person.id} className="hover:bg-[#fafbfc]">
-              <td className="px-3 py-3 text-sm font-bold tabular-nums text-[#d6b357]">{String(i + 1).padStart(2, "0")}</td>
-              <td className="px-3 py-3">
-                <div className="flex items-center gap-3">
-                  <Avatar p={r.person} size="h-8 w-8 text-xs" />
-                  <div className="min-w-0">
-                    <Link href={profileHref(r.person.id)} className="block truncate text-sm font-bold text-[#111827] hover:text-[#001f3f] hover:underline">
-                      {r.person.name}
-                    </Link>
-                    <p className="text-[11px] text-[#6b7280]">{roleToLabel(r.person.role)}</p>
-                  </div>
-                </div>
-              </td>
-              <td className={num}>{r.total}</td>
-              <td className={`${num} text-emerald-700`}>{r.active}</td>
-              <td className={`${num} ${r.pending ? "text-amber-700" : "text-[#9ca3af]"}`}>{r.pending}</td>
-              <td className={num}>{r.last30}</td>
-              <td className={num}>{r.network}</td>
-              <td className={num}>
-                {r.ownSales ? (
-                  <button type="button" onClick={() => onOwnDeals(r.person)} title={`${r.person.deals} validated deal${r.person.deals === 1 ? "" : "s"} · ${fmtAed(r.ownSales)} — click for the deals`} className="underline decoration-dotted underline-offset-4 hover:text-[#001f3f]">
-                    {fmtAedShort(r.ownSales)}
-                  </button>
-                ) : (
-                  <span className="text-[#9ca3af]" title="No validated sales">—</span>
-                )}
-              </td>
-              <td className={num}>
-                {r.netSales.value ? (
-                  <button type="button" onClick={() => onNetworkDeals(r.person)} title={`${r.netSales.deals} validated deal${r.netSales.deals === 1 ? "" : "s"} across the network · ${fmtAed(r.netSales.value)} — click for who sold what`} className="text-[#001f3f] underline decoration-dotted underline-offset-4">
-                    {fmtAedShort(r.netSales.value)}
-                  </button>
-                ) : (
-                  <span className="text-[#9ca3af]" title="No validated sales in the network">—</span>
-                )}
-              </td>
-              <td className="px-3 py-3 text-right">
-                <button
-                  type="button"
-                  onClick={() => onDownline(r.person.id)}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-2.5 text-xs font-bold text-[#374151] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]"
-                >
-                  <Network className="h-3.5 w-3.5" /> Downline
-                </button>
-              </td>
+    <>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[960px]">
+          <thead>
+            <tr className="border-b border-[#f0f2f5]">
+              <th className={th}>#</th>
+              <th className={th}>Recruiter</th>
+              <th className={`${th} text-right`}>Recruits</th>
+              <th className={`${th} text-right`}>Active</th>
+              <th className={`${th} text-right`}>Pending</th>
+              <th className={`${th} text-right`}>Last 30 days</th>
+              <th className={`${th} text-right`}>Whole network</th>
+              <th className={`${th} text-right`} title="The recruiter's own validated sales, all time">Own sales</th>
+              <th className={`${th} text-right`} title="Validated sales of everyone in the network (not the recruiter's own), all time">Network sales</th>
+              <th className={th} />
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-[#f0f2f5]">
+            {page.visible.map((r, i) => (
+              <tr key={r.person.id} className="hover:bg-[#fafbfc]">
+                <td className="px-3 py-3 text-sm font-bold tabular-nums text-[#d6b357]">{String(i + 1).padStart(2, "0")}</td>
+                <td className="px-3 py-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar p={r.person} size="h-8 w-8 text-xs" />
+                    <div className="min-w-0">
+                      <Link href={profileHref(r.person.id)} className="block truncate text-sm font-bold text-[#111827] hover:text-[#001f3f] hover:underline">
+                        {r.person.name}
+                      </Link>
+                      <p className="text-[11px] text-[#6b7280]">{roleToLabel(r.person.role)}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className={num}>{r.total}</td>
+                <td className={`${num} text-emerald-700`}>{r.active}</td>
+                <td className={`${num} ${r.pending ? "text-amber-700" : "text-[#9ca3af]"}`}>{r.pending}</td>
+                <td className={num}>{r.last30}</td>
+                <td className={num}>{r.network}</td>
+                <td className={num}>
+                  {r.ownSales ? (
+                    <button type="button" onClick={() => onOwnDeals(r.person)} title={`${r.person.deals} validated deal${r.person.deals === 1 ? "" : "s"} · ${fmtAed(r.ownSales)} — click for the deals`} className="underline decoration-dotted underline-offset-4 hover:text-[#001f3f]">
+                      {fmtAedShort(r.ownSales)}
+                    </button>
+                  ) : (
+                    <span className="text-[#9ca3af]" title="No validated sales">—</span>
+                  )}
+                </td>
+                <td className={num}>
+                  {r.netSales.value ? (
+                    <button type="button" onClick={() => onNetworkDeals(r.person)} title={`${r.netSales.deals} validated deal${r.netSales.deals === 1 ? "" : "s"} across the network · ${fmtAed(r.netSales.value)} — click for who sold what`} className="text-[#001f3f] underline decoration-dotted underline-offset-4">
+                      {fmtAedShort(r.netSales.value)}
+                    </button>
+                  ) : (
+                    <span className="text-[#9ca3af]" title="No validated sales in the network">—</span>
+                  )}
+                </td>
+                <td className="px-3 py-3 text-right">
+                  <button
+                    type="button"
+                    onClick={() => onDownline(r.person.id)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-2.5 text-xs font-bold text-[#374151] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]"
+                  >
+                    <Network className="h-3.5 w-3.5" /> Downline
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <ShowMore shown={page.shown} total={page.total} onMore={page.more} />
+    </>
   )
 }
 
