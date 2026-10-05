@@ -50,7 +50,8 @@ function StatusChip({ status }: { status: string }) {
 function Avatar({ p, size = "h-9 w-9 text-sm" }: { p: RecruitmentPerson; size?: string }) {
   return p.photo ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={p.photo} alt="" className={`${size} shrink-0 rounded-full object-cover`} />
+    // Lazy: long lists (Direct sign-ups, Downline) only fetch the photos scrolled into view.
+    <img src={p.photo} alt="" loading="lazy" decoding="async" className={`${size} shrink-0 rounded-full object-cover`} />
   ) : (
     <span className={`${size} flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#001f3f] to-[#003366] font-bold text-white`}>
       {p.name.charAt(0).toUpperCase()}
