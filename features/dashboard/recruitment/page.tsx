@@ -293,7 +293,11 @@ export default function RecruitmentPage() {
   }, [childrenOf, byId, networkSize, networkSales, recent])
 
   const q = query.trim().toLowerCase()
-  const match = (p: RecruitmentPerson) => !q || p.name.toLowerCase().includes(q) || (p.invitedBy ? (byId.get(p.invitedBy)?.name.toLowerCase().includes(q) ?? false) : false)
+  const match = (p: RecruitmentPerson) => {
+    if (!q || p.name.toLowerCase().includes(q)) return true
+    const inviterId = p.invitedBy ?? p.signupInviter
+    return inviterId ? (byId.get(inviterId)?.name.toLowerCase().includes(q) ?? false) : false
+  }
 
   const activate = async (p: RecruitmentPerson) => {
     setBusy((s) => new Set(s).add(p.id))
@@ -596,7 +600,8 @@ function PendingList({
   return (
     <ul className="mt-4 divide-y divide-[#f0f2f5]">
       {items.map((p) => {
-        const inviter = p.invitedBy ? byId.get(p.invitedBy) : null
+        const inviterId = p.invitedBy ?? p.signupInviter
+        const inviter = inviterId ? byId.get(inviterId) : null
         return (
           <li key={p.id} className="flex flex-wrap items-center gap-3 py-3">
             <Avatar p={p} />
@@ -604,6 +609,14 @@ function PendingList({
               <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-[#111827]">
                 <span className="truncate">{p.name}</span>
                 <span className="rounded-full bg-[#001f3f]/5 px-2 py-0.5 text-[10.5px] font-bold text-[#001f3f]">{roleToLabel(p.role)}</span>
+                {p.unfinished && (
+                  <span
+                    className="rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] font-bold text-amber-700"
+                    title="They entered their email code but never filled in their name — they stopped at Complete profile."
+                  >
+                    Didn&apos;t finish sign-up
+                  </span>
+                )}
               </p>
               <p className="mt-0.5 text-xs text-[#6b7280]">
                 {inviter ? (

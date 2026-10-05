@@ -32,6 +32,16 @@ export type RecruitmentPerson = {
   basedIn: string | null
   /** "+63 9171234567" — only for accounts waiting for approval, where it's shown. */
   whatsapp: string | null
+  /** Waiting for approval but never finished sign-up: no name was ever saved (they stopped at Complete profile). */
+  unfinished: boolean
+  /** Their login email — only for unfinished sign-ups, where it stands in for the missing name. */
+  email: string | null
+  /**
+   * Who invited an unfinished sign-up, from the note saved with their login at the email-code step.
+   * The profile's own `invitedBy` is only stamped when they finish, so this is display-only:
+   * downlines and recruiter counts keep using `invitedBy`.
+   */
+  signupInviter: string | null
 }
 
 /** One agent's credit on one validated sale — what a sales figure is made of. */
@@ -82,16 +92,34 @@ export async function GET() {
     }
   }
 
+  const nameOf = (p: Record<string, unknown>) =>
+    (typeof p.fullname === "string" && p.fullname.trim()) || [p.fname, p.lname].filter((v) => typeof v === "string" && v).join(" ")
+
+  // Unfinished sign-ups (pending, never named): their email and the inviter noted at sign-up live on
+  // the login, not the profile — look those up for just these accounts, a few at a time.
+  const unfinishedIds = rows.filter((p) => ((p.status as string | null) ?? "pending").toLowerCase() === "pending" && !nameOf(p).trim()).map((p) => String(p.id))
+  const login = new Map<string, { email: string | null; inviter: string | null }>()
+  for (let i = 0; i < unfinishedIds.length; i += 15) {
+    await Promise.all(
+      unfinishedIds.slice(i, i + 15).map(async (id) => {
+        const { data } = await admin.auth.admin.getUserById(id)
+        const inviter = data?.user?.user_metadata?.invited_by
+        login.set(id, { email: data?.user?.email ?? null, inviter: typeof inviter === "string" && inviter.trim() ? inviter.trim() : null })
+      }),
+    )
+  }
+
   const people: RecruitmentPerson[] = rows.map((p) => {
     const meta = (p.metadata ?? {}) as Record<string, unknown>
     const invitedBy = typeof meta.invited_by === "string" && meta.invited_by && !meta.developer_invite_id ? meta.invited_by : null
-    const raw = (typeof p.fullname === "string" && p.fullname.trim()) || [p.fname, p.lname].filter((v) => typeof v === "string" && v).join(" ")
+    const raw = nameOf(p)
     const status = ((p.status as string | null) ?? "pending").toLowerCase()
+    const unfinished = login.get(String(p.id))
     const waNumber = typeof meta.whatsapp_number === "string" ? meta.whatsapp_number.trim() : ""
     const waCode = typeof meta.whatsapp_country_code === "string" ? meta.whatsapp_country_code.trim() : ""
     return {
       id: String(p.id),
-      name: titleCaseName(raw) || "Unnamed account",
+      name: titleCaseName(raw) || unfinished?.email || "Unnamed account",
       role: (p.role as string | null) ?? null,
       status,
       photo: (p.profile_url as string | null) || null,
@@ -101,6 +129,9 @@ export async function GET() {
       sales: Math.round(sold.get(String(p.id))?.value ?? 0),
       basedIn: typeof meta.residence_country === "string" && meta.residence_country ? meta.residence_country : null,
       whatsapp: status === "pending" && waNumber ? `${waCode} ${waNumber}`.trim() : null,
+      unfinished: Boolean(unfinished),
+      email: unfinished?.email ?? null,
+      signupInviter: !invitedBy && unfinished?.inviter && !meta.developer_invite_id ? unfinished.inviter : null,
     }
   })
 
