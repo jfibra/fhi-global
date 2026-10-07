@@ -10,7 +10,7 @@ import { loadSiteBySlug } from "@/lib/website-builder-service"
 import { loadAgentWebsiteEvents } from "@/lib/events/website-events"
 import { loadAgentWebsiteReviews } from "@/lib/website-reviews"
 import { SITE_URL } from "@/lib/seo"
-import { formatPrice, parsePaymentPlan, priceFromValue, projectSubtitle, type ProjectSeoInput } from "@/lib/project-seo"
+import { formatPrice, isHandoverOverdue, parsePaymentPlan, priceFromValue, projectSubtitle, type ProjectSeoInput } from "@/lib/project-seo"
 import { agentProjectPath, loadShareContact, shareCopy, withDialableNumbers } from "@/lib/website-project-share"
 import { ProjectGallery } from "@/components/public/project-gallery"
 import { ReadMore } from "@/components/public/read-more"
@@ -134,7 +134,10 @@ function facts(p: Row) {
   const area = [p.community, p.location].map((v) => v?.trim()).find(Boolean) ?? null
   const city = p.city?.trim() || null
   const where = area ? (city && !area.toLowerCase().includes(city.toLowerCase()) ? `${area}, ${city}` : area) : city
-  const handover = p.delivery_quarter?.trim() || (p.expected_completion_date ? String(p.expected_completion_date).slice(0, 4) : null)
+  // A quarter that has already ended on a project still being built is not announced as upcoming.
+  const handover = isHandoverOverdue(seo)
+    ? null
+    : p.delivery_quarter?.trim() || (p.expected_completion_date ? String(p.expected_completion_date).slice(0, 4) : null)
   const bedsOf = (u: (typeof units)[number]) => (u.bedrooms != null ? u.bedrooms : /studio/i.test(u.unit_type ?? "") ? 0 : null)
   const beds = [...new Set(units.map(bedsOf).filter((b): b is number => b != null))].sort((a, b) => a - b)
   const bedLabel = (b: number) => (b === 0 ? "Studio" : `${b} BR`)

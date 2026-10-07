@@ -4,11 +4,13 @@
 import { IMG, NAVY, SAMPLE_DATA, TEST_AREAS, type WebsiteData } from "../../_data"
 import { FancyEyebrow } from "../ui"
 
-export function ServiceAreasSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
-  // Agent-added areas take over; until then the fixed samples fill the section.
-  // Rows with no name and no photo (a freshly added blank) don't count.
+export function ServiceAreasSection({ data = SAMPLE_DATA, placeholders = true }: { data?: WebsiteData; placeholders?: boolean }) {
+  // Agent-added areas take over; until then the fixed samples fill the section — in the editor preview and on
+  // /website/sample (`placeholders`), never on a live site, where six tiles labelled "Sample 1…6" under "Areas I
+  // Specialize In" are not the agent's. Rows with no name and no photo (a freshly added blank) don't count.
   const real = data.areas.filter((a) => a.label.trim() !== "" || a.image.trim() !== "")
-  const areas = real.length > 0 ? real : TEST_AREAS
+  const areas = real.length > 0 ? real : placeholders ? TEST_AREAS : []
+  if (areas.length === 0) return null
   return (
     <section id="areas" className="relative scroll-mt-[72px] overflow-hidden">
       {/* Background photo + white wash */}

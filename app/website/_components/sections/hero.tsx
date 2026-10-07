@@ -7,10 +7,14 @@
 import { useState } from "react"
 import { Building2, Play } from "lucide-react"
 import { VideoModal } from "@/components/public/video-modal"
+import { agentDisplayName } from "@/lib/agent-site"
 import { BRAND_GLASS_SOFT, BRAND_GRADIENT, BRAND_TO, BRAND_TO_A0, BRAND_TO_A90, GOLD, GOLD_A50, HERO_STAT_ICON_FALLBACK, INK, NAVY, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
 
 export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   const { hero } = data
+  // A site with no headline of its own used to render an EMPTY <h1> (8 of the 23 live sites):
+  // the page's one main heading is then the agent's name and title.
+  const hasHeadline = hero.headline.trim() !== "" || hero.headlineAccent.trim() !== ""
   const video = (hero.video ?? "").trim()
   const [videoOpen, setVideoOpen] = useState(false)
   const closeVideo = () => setVideoOpen(false)
@@ -64,8 +68,21 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
           {/* Left: headline */}
           <div className="w-full max-w-xl">
             <h1 className="font-serif text-[34px] leading-[1.14] font-bold tracking-tight sm:text-[54px] sm:leading-[1.1]" style={{ color: hero.headlineColor || NAVY }}>
-              <span className="whitespace-pre-line">{hero.headline}</span>{" "}
-              <span style={{ color: hero.headlineAccentColor || GOLD }}>{hero.headlineAccent}</span>
+              {hasHeadline ? (
+                <>
+                  <span className="whitespace-pre-line">{hero.headline}</span>{" "}
+                  <span style={{ color: hero.headlineAccentColor || GOLD }}>{hero.headlineAccent}</span>
+                </>
+              ) : (
+                <>
+                  {agentDisplayName(data.agent.name)}
+                  {data.agent.title.trim() && (
+                    <span className="mt-2 block text-[0.45em] font-semibold" style={{ color: hero.headlineAccentColor || GOLD }}>
+                      {data.agent.title}
+                    </span>
+                  )}
+                </>
+              )}
             </h1>
             <p className="mt-5 max-w-sm text-[14.5px] leading-relaxed" style={{ color: hero.descriptionColor || "#3d4451" }}>
               {hero.description}

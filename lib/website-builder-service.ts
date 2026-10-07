@@ -2,11 +2,16 @@
 //
 // The editor works with the template's WebsiteData shape (app/website/_data);
 // this module translates that to/from the normalized tables — website_builder
-// (title mirrors the hero headline, slug re-minted from the title on save,
-// contact + cta jsonb), hero_section / website_stats / about_section (1:1),
-// and featured_section / service_areas_section / gallery_section (1:N).
-// Featured items are stored as IDs only and re-resolved to card data on every
-// load, so unpublished projects/listings drop off automatically.
+// (title mirrors the hero headline, slug minted ONCE from the agent's name and
+// stable since migration 058, contact + cta jsonb), hero_section /
+// website_stats / about_section (1:1), and featured_section /
+// service_areas_section / gallery_section (1:N). Featured items are stored as
+// IDs only and re-resolved to card data on every load, so unpublished
+// projects/listings drop off automatically.
+//
+// Loading THROWS on any failed read and returns null only for a site that does
+// not exist: the public site is ISR, and a failure read as "empty" would be
+// cached over a live page. Hero and about start blank, never from the sample.
 //
 // Server-only: always called with the service-role client (lib/admin-supabase)
 // after the caller has checked the session/role.
@@ -17,6 +22,18 @@ import {
   type EditableStat, type GalleryCategory, type Project, type ProjectStatus, type Property,
   type StatIconKey, type WebsiteData,
 } from "@/app/website/_data"
+import {
+  BLANK_ABOUT,
+  BLANK_AGENT,
+  BLANK_HERO,
+  PUBLIC_BANNER_FALLBACK,
+  agentSiteMissing,
+  dropSampleStats,
+  isSampleBanner,
+  isSamplePortrait,
+  sanitizeAgentCredentials,
+} from "@/lib/agent-site"
+import { isLiveProject, isTestRecord, type ProjectLiveFlags } from "@/lib/listing-publish-checks"
 
 // ─── Shared card mapping (also used by the picker API routes) ─────────────────
 
@@ -158,7 +175,7 @@ type UnitFacts = {
 }
 
 const LISTING_CARD_SELECT =
-  "id, title, listing_kind, price, currency, unit_type, projects ( name, city, location, community, launch_price_from, currency, project_units ( unit_type, bedrooms, bathrooms, size_sqft ) ), agent_listing_images ( url, sort_order )"
+  "id, title, listing_kind, price, currency, unit_type, projects ( name, city, location, community, launch_price_from, currency, is_published, is_active, deleted_at, project_units ( unit_type, bedrooms, bathrooms, size_sqft ) ), agent_listing_images ( url, sort_order )"
 
 /** Published listings mapped to the template's PropertyCard shape. Filter by
  *  `agentId` for "own listings" pickers, or by `ids` (returned in order). */
@@ -181,18 +198,28 @@ export async function fetchListingCards(
   const { data, error } = await query
   if (error) throw new Error("Failed to load listings")
 
-  const cards: Property[] = (data ?? []).map((row) => {
-    const project = (Array.isArray(row.projects) ? row.projects[0] : row.projects) as
-      | {
-          name: string | null
-          city: string | null
-          location: string | null
-          community: string | null
-          launch_price_from: number | string | null
-          currency: string | null
-          project_units: UnitFacts[] | null
-        }
-      | null
+  type CardProject = {
+    name: string | null
+    city: string | null
+    location: string | null
+    community: string | null
+    launch_price_from: number | string | null
+    currency: string | null
+    project_units: UnitFacts[] | null
+  } & ProjectLiveFlags
+  const projectOf = (row: { projects?: unknown }) =>
+    (Array.isArray(row.projects) ? row.projects[0] : row.projects) as CardProject | null | undefined
+
+  // Test data never reaches a public site (the listing page itself answers 404 for it). Judged on the raw
+  // row, before a retired project is dropped from it below.
+  const visible = (data ?? []).filter(
+    (row) => !isTestRecord({ title: row.title as string, projectName: projectOf(row)?.name }),
+  )
+
+  const cards: Property[] = visible.map((row) => {
+    // A retired project's price and facts stop advertising, exactly as on the public listing page.
+    const linked = projectOf(row) ?? null
+    const project = linked && isLiveProject(linked) ? linked : null
 
     const images = ((row.agent_listing_images ?? []) as { url: string; sort_order: number | null }[])
       .slice()
@@ -567,8 +594,20 @@ export type LoadedSite = {
   slug: string
   title: string
   data: WebsiteData
+  /** When the site was last saved (website_builder.updated_at) — a page's dateModified. */
+  updatedAt: string | null
+  /** Offered to search engines: robots index + a sitemap entry (lib/agent-site.ts). */
+  complete: boolean
+  /** What the agent still has to add, in their words, when `complete` is false. */
+  missing: string[]
 }
 
+/**
+ * THROWS on a failed query and returns null only for a site that does not exist:
+ * the public site is ISR, and a transient error read as "no such site" would cache
+ * a hard 404 over a live page. Callers that can afford to fail loudly (pages, OG
+ * cards) let it propagate; the editor's GET route turns it into a 500.
+ */
 async function loadSite(
   admin: SupabaseClient,
   by: { agentId?: string; slug?: string },
@@ -576,7 +615,7 @@ async function loadSite(
   let site: Record<string, unknown> | null = null
   if (by.agentId) {
     const { data, error } = await admin.from("website_builder").select("*").eq("agent_id", by.agentId).maybeSingle()
-    if (error) return null
+    if (error) throw new Error("Failed to load website")
     site = data
   } else if (by.slug) {
     // The current slug, or one the site had before (migration 058) — the
@@ -588,7 +627,7 @@ async function loadSite(
       .or(`slug.eq.${by.slug},previous_slugs.cs.{${by.slug}}`)
       .eq("is_published", true)
       .limit(2)
-    if (error) return null
+    if (error) throw new Error("Failed to load website")
     site = (data ?? []).find((r) => r.slug === by.slug) ?? data?.[0] ?? null
   }
   if (!site) return null
@@ -596,8 +635,13 @@ async function loadSite(
   const websiteId = site.id as string
   const data = structuredClone(SAMPLE_DATA)
 
+  // The agent block is merged over BLANK, never over the sample: a saved site
+  // that lacked a key used to inherit the sample's phone, e-mail and — worse —
+  // its "BRN: 123456 / ORN: 98765". Credentials that fail the plausibility
+  // checks (the sample's own values stored by older sites, junk like "123")
+  // are blanked so no page, share card or editor ever shows them.
   const contact = (site.contact ?? {}) as Partial<WebsiteData["agent"]>
-  data.agent = { ...data.agent, ...contact }
+  data.agent = sanitizeAgentCredentials({ ...BLANK_AGENT, ...contact })
   const cta = (site.cta ?? {}) as Partial<WebsiteData["cta"]>
   data.cta = { ...data.cta, ...cta }
   const theme = (site.theme ?? {}) as { gold?: unknown; brand?: unknown }
@@ -608,13 +652,39 @@ async function loadSite(
     }
   }
 
-  const [{ data: hero }, { data: about }, { data: featured }, { data: areas }, { data: gallery }] = await Promise.all([
-    admin.from("hero_section").select("*, website_stats ( hero_stats, stats_section )").eq("id", site.hero_id as string).maybeSingle(),
-    admin.from("about_section").select("*").eq("id", site.about_id as string).maybeSingle(),
+  // The template's invented numbers ("150+ Properties Sold", "AED 500M+", "TOP 5%") are not shown for
+  // a site that has no stats of its own: they are claims about a real person that nobody made.
+  data.hero.stats = []
+  data.bandStats = []
+
+  // hero_id / about_id are nullable (migration 035: ON DELETE SET NULL) and `.eq("id", null)` is an invalid-uuid
+  // ERROR, so a site without one skips that read instead of failing forever.
+  const none = Promise.resolve({ data: null, error: null })
+  const [heroRes, aboutRes, featuredRes, areasRes, galleryRes] = await Promise.all([
+    site.hero_id
+      ? admin.from("hero_section").select("*, website_stats ( hero_stats, stats_section )").eq("id", site.hero_id as string).maybeSingle()
+      : none,
+    site.about_id ? admin.from("about_section").select("*").eq("id", site.about_id as string).maybeSingle() : none,
     admin.from("featured_section").select("project_id, listing_id, rank").eq("website_id", websiteId).order("rank"),
     admin.from("service_areas_section").select("rank, service_areas ( name, photo )").eq("website_id", websiteId).order("rank"),
     admin.from("gallery_section").select("photos, category").eq("website_id", websiteId),
   ])
+  // Any failed read throws: the public site is ISR, so a section silently read as "empty" would cache a site
+  // without its hero, about or featured items for the whole revalidate window (and the gate would read an
+  // empty bio as "not listed"). The previous copy keeps serving instead.
+  for (const result of [heroRes, aboutRes, featuredRes, areasRes, galleryRes]) {
+    if (result.error) throw new Error("Failed to load website")
+  }
+  const { data: hero } = heroRes
+  const { data: about } = aboutRes
+  const { data: featured } = featuredRes
+  const { data: areas } = areasRes
+  const { data: gallery } = galleryRes
+
+  // Hero and about start BLANK, never from the template: a site whose hero or about row is missing renders
+  // blank sections rather than the sample's headline, description and bio.
+  data.hero = { ...BLANK_HERO, stats: [] }
+  data.about = { ...BLANK_ABOUT, socials: { ...BLANK_ABOUT.socials } }
 
   if (hero) {
     const h = (hero.headline ?? {}) as Record<string, unknown>
@@ -628,21 +698,22 @@ async function loadSite(
     if (typeof h.banner_pos_y === "number") data.hero.posY = h.banner_pos_y
     if (typeof h.banner_zoom === "number") data.hero.zoom = h.banner_zoom
     data.hero.description = (hero.description as string) ?? ""
-    data.hero.image = (hero.banner as string) || data.hero.image
+    data.hero.image = (hero.banner as string) || ''
     data.hero.overlay = (hero.overlay as number) ?? 0
     const stats = (Array.isArray(hero.website_stats) ? hero.website_stats[0] : hero.website_stats) as
       | { hero_stats: unknown; stats_section: unknown }
       | null
     if (stats) {
-      data.hero.stats = statsFromDb(stats.hero_stats)
-      data.bandStats = statsFromDb(stats.stats_section)
+      data.hero.stats = dropSampleStats(statsFromDb(stats.hero_stats))
+      data.bandStats = dropSampleStats(statsFromDb(stats.stats_section))
     }
   }
 
   if (about) {
     data.about.heading = (about.heading as string) ?? ""
     data.about.bio = (about.bio as string) ?? ""
-    data.about.portrait = (about.photo as string) || data.about.portrait
+    // No sample portrait fallback: a stranger's photo under the agent's name is worse than no photo.
+    data.about.portrait = (about.photo as string) || ""
     data.about.views = (about.views as string) ?? ""
     data.about.listings = (about.listing_count as string) ?? ""
     data.about.rating = (about.rating as string) ?? ""
@@ -654,6 +725,13 @@ async function loadSite(
       youtube: typeof s.youtube === "string" ? s.youtube : "",
     }
   }
+
+  // Stored sample identity: sites created before the editor started blank saved the template's portrait and
+  // banner — the SAME stranger in a suit. No portrait is better than someone else's face under the agent's name,
+  // and a site with no banner of its own shows a neutral skyline. (The listing gate reads the RAW about row, so it
+  // is unaffected; the agent's next save writes the cleaned values back.)
+  if (isSamplePortrait(data.about.portrait)) data.about.portrait = ""
+  if (!data.hero.image || isSampleBanner(data.hero.image)) data.hero.image = PUBLIC_BANNER_FALLBACK
 
   const projectIds = (featured ?? []).filter((f) => f.project_id != null).map((f) => f.project_id as number)
   const listingIds = (featured ?? []).filter((f) => f.listing_id != null).map((f) => f.listing_id as string)
@@ -679,7 +757,24 @@ async function loadSite(
     data.gallery[cat] = photos.filter((p): p is string => typeof p === "string" && !!p)
   }
 
-  return { websiteId, agentId: site.agent_id as string, slug: site.slug as string, title: site.title as string, data }
+  // Listed in search only when the site is really the agent's — judged on the RAW stored
+  // name / bio / portrait, the same three fields the sitemap shard reads.
+  const missing = agentSiteMissing({
+    name: data.agent.name,
+    bio: typeof about?.bio === "string" ? about.bio : "",
+    portrait: typeof about?.photo === "string" ? about.photo : "",
+  })
+
+  return {
+    websiteId,
+    agentId: site.agent_id as string,
+    slug: site.slug as string,
+    title: site.title as string,
+    data,
+    updatedAt: (site.updated_at as string | null) ?? null,
+    complete: missing.length === 0,
+    missing,
+  }
 }
 
 export const loadSiteByAgent = (admin: SupabaseClient, agentId: string) => loadSite(admin, { agentId })

@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import Image from "next/image"
+import { createPageMetadata } from "@/lib/seo"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { listPublishedSites } from "@/lib/website-builder-service"
 
@@ -10,10 +11,12 @@ import { listPublishedSites } from "@/lib/website-builder-service"
 
 export const revalidate = 300
 
-export const metadata: Metadata = {
+// createPageMetadata, not a bare object: the bare one had no canonical at all.
+export const metadata: Metadata = createPageMetadata({
   title: "Agent Websites",
   description: "Browse the personal websites of FHI Global's real estate agents in Dubai.",
-}
+  pathname: "/agent-websites",
+})
 
 export default async function AgentWebsitesPage() {
   let sites: Awaited<ReturnType<typeof listPublishedSites>> = []

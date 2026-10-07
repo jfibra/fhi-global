@@ -29,6 +29,8 @@ export async function loadAgentWebsiteEvents(
   admin: SupabaseClient,
   agentId: string,
   limit = 12,
+  /** `strict`: a failed read throws instead of returning "no events" (an ISR page would cache the empty section). */
+  opts: { strict?: boolean } = {},
 ): Promise<{ upcoming: WebsiteEventCard[]; past: WebsiteEventCard[] }> {
   const { data, error } = await admin
     .from("events")
@@ -39,6 +41,7 @@ export async function loadAgentWebsiteEvents(
     .is("deleted_at", null)
     .order("event_date", { ascending: true, nullsFirst: false })
     .limit(50)
+  if (error && opts.strict) throw new Error("Failed to load agent events")
   if (error || !data) return { upcoming: [], past: [] }
 
   const now = Date.now()

@@ -197,6 +197,8 @@ export async function POST(req: NextRequest) {
   }
   revalidatePath(publicPath)
   if (canonicalPath !== publicPath) revalidatePath(canonicalPath)
+  // The agent's site lists their events — refresh its main page too.
+  if (site?.isPublished) revalidatePath(`/website/${site.slug}`)
 
   return NextResponse.json({ id: result.data.id })
 }

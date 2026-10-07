@@ -44,8 +44,12 @@ export async function loadShareContact(
   agentId: string,
   agent: AgentFields,
   portrait: string | null,
+  /** `strict`: a failed read throws instead of quietly using the default +971 code. For ISR pages, where a
+   *  transient error would otherwise cache wrong dial codes (a +971 glued onto a +63 number) for minutes. */
+  opts: { strict?: boolean } = {},
 ): Promise<ShareContact> {
-  const { data } = await admin.from("profiles").select("metadata").eq("id", agentId).maybeSingle<{ metadata: Record<string, unknown> | null }>()
+  const { data, error } = await admin.from("profiles").select("metadata").eq("id", agentId).maybeSingle<{ metadata: Record<string, unknown> | null }>()
+  if (error && opts.strict) throw new Error("Failed to load agent contact")
   const meta = data?.metadata ?? {}
   const code = (k: string) => (typeof meta[k] === "string" && /^\+\d{1,4}$/.test((meta[k] as string).trim()) ? (meta[k] as string).trim() : "")
   const phoneCode = code("phone_country_code") || "+971"

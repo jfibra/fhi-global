@@ -48,7 +48,13 @@ export function feedbackToTestimonial(row: ReviewRow): Testimonial | null {
  * service-role client; the Website Builder passes the browser client, which
  * RLS limits to the agent's own rows.
  */
-export async function loadAgentWebsiteReviews(supabase: SupabaseClient, agentId: string, limit = 12): Promise<Testimonial[]> {
+export async function loadAgentWebsiteReviews(
+  supabase: SupabaseClient,
+  agentId: string,
+  limit = 12,
+  /** `strict`: a failed read throws instead of returning "no reviews" (an ISR page would cache the empty section). */
+  opts: { strict?: boolean } = {},
+): Promise<Testimonial[]> {
   const { data, error } = await supabase
     .from("agent_feedback")
     .select("client_name, did_well, overall_rating, transaction_type")
@@ -56,6 +62,7 @@ export async function loadAgentWebsiteReviews(supabase: SupabaseClient, agentId:
     .eq("status", "approved")
     .order("created_at", { ascending: false })
     .limit(limit)
+  if (error && opts.strict) throw new Error("Failed to load agent reviews")
   if (error || !data) return []
   return (data as ReviewRow[]).map(feedbackToTestimonial).filter((t): t is Testimonial => t !== null)
 }

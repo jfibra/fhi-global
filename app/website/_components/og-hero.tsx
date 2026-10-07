@@ -10,6 +10,7 @@ import {
   DEFAULT_THEME, HERO_STAT_ICON_FALLBACK, NAVY, resolveThemeColors,
   type WebsiteData,
 } from "../_data"
+import { isPlausibleBrn, isPlausibleOrn } from "@/lib/agent-site"
 import { OG_ICON_NODES } from "./og-icon-nodes"
 
 export const OG_SIZE = { width: 1200, height: 630 }
@@ -108,11 +109,11 @@ export function OgHero({ data, base }: { data: WebsiteData; base: string }) {
   const LEFT = u(52)
 
   const glass = rgba(t.brandTo, 0.35)
-  const contactRows: { icon: "wa" | "phone" | "mail"; text: string }[] = [
+  const contactRows = ([
     { icon: "wa", text: agent.whatsapp },
     { icon: "phone", text: agent.phone },
     { icon: "mail", text: agent.email },
-  ]
+  ] as { icon: "wa" | "phone" | "mail"; text: string }[]).filter((row) => row.text.trim() !== "")
 
   return (
     <div
@@ -329,13 +330,13 @@ export function OgHero({ data, base }: { data: WebsiteData; base: string }) {
           ))}
         </div>
         <div style={{ display: "flex", marginTop: u(16), height: 1, width: "100%", backgroundColor: "rgba(255,255,255,0.15)" }} />
-        {agent.brn && (
+        {isPlausibleBrn(agent.brn) && (
           <div style={{ display: "flex", alignItems: "center", gap: u(8), marginTop: u(14) }}>
             <OgIcon name="shield-check" size={u(16)} color={t.gold} />
             <span style={{ fontSize: u(11.5), fontWeight: 700, letterSpacing: u(1.2), color: t.gold }}>RERA BRN: {agent.brn}</span>
           </div>
         )}
-        {agent.orn && (
+        {isPlausibleOrn(agent.orn) && (
           <div style={{ display: "flex", alignItems: "center", gap: u(8), marginTop: u(14) }}>
             <OgIcon name="file-text" size={u(16)} color={t.gold} />
             <span style={{ fontSize: u(11.5), fontWeight: 700, letterSpacing: u(1.2), color: t.gold }}>RERA ORN: {agent.orn}</span>

@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { loadSiteBySlug } from "@/lib/website-builder-service"
-import { formatPrice, priceFromValue } from "@/lib/project-seo"
+import { formatPrice, isHandoverOverdue, priceFromValue } from "@/lib/project-seo"
 import { loadShareContact } from "@/lib/website-project-share"
 import { ogJpeg, ogPicture } from "@/lib/og-picture"
 import { loadOgFonts, OG_SIZE } from "../../../_components/og-hero"
@@ -62,7 +62,8 @@ async function render({ params }: { params: Promise<{ slug: string; project: str
   // unit table contradicts gives way to the cheapest credible unit.
   const from = p ? formatPrice(priceFromValue({ name: p.name, status: p.status, launch_price_from: p.launch_price_from, currency: p.currency, units: p.project_units ?? [] }), null, p.currency) : null
   const where = [p?.community, p?.location].map((v) => v?.trim()).find(Boolean) ?? p?.city?.trim() ?? ""
-  const line = [from ? `From ${from}` : null, p?.delivery_quarter ? `Handover ${p.delivery_quarter}` : null].filter(Boolean).join("   ·   ")
+  const overdue = p ? isHandoverOverdue({ status: p.status, delivery_quarter: p.delivery_quarter }) : false
+  const line = [from ? `From ${from}` : null, p?.delivery_quarter && !overdue ? `Handover ${p.delivery_quarter}` : null].filter(Boolean).join("   ·   ")
   const status = p?.status ? STATUS[p.status] ?? "" : ""
   const nameSize = name.length > 26 ? 56 : name.length > 18 ? 66 : 76
 

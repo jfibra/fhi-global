@@ -139,6 +139,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (publicPath !== mainPath) revalidatePath(mainPath)
   // The list page decides by status and show_on_main — both may have just changed.
   revalidatePath("/events")
+  // The agent's site lists their events — refresh its main page too.
+  if (site?.isPublished) revalidatePath(`/website/${site.slug}`)
   if (input.status === "published") {
     // The URL Google should index: /events/<slug> whenever it's on the main page.
     const loc = `${SITE_URL.replace(/\/$/, "")}${onMainNow ? mainPath : publicPath}`
@@ -159,11 +161,17 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const admin = createAdminSupabase()
   let existingQuery = admin
     .from("events")
-    .select("id, title")
+    .select("id, title, slug, agent_id, show_on_website")
     .eq("id", id)
     .is("deleted_at", null)
   if (g.scope.kind === "own") existingQuery = existingQuery.eq("agent_id", g.scope.agentId)
-  const { data: existing, error: fetchErr } = await existingQuery.maybeSingle<{ id: string; title: string }>()
+  const { data: existing, error: fetchErr } = await existingQuery.maybeSingle<{
+    id: string
+    title: string
+    slug: string | null
+    agent_id: string | null
+    show_on_website: boolean | null
+  }>()
 
   if (fetchErr) return NextResponse.json({ error: "Failed to delete event" }, { status: 500 })
   if (!existing) return NextResponse.json({ error: "Event not found" }, { status: 404 })
@@ -188,6 +196,19 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     description: `Deleted event "${existing.title}"`,
     ...requestContextFromRequest(req),
   })
+
+  // Gone from every place it was shown, at once — the event's own page(s) must 404, the
+  // /events list and the agent's site stop listing it (all ISR), and IndexNow is told the
+  // URL is gone. The page may live at /events/<slug> and/or on the agent's website.
+  const site = existing.agent_id ? await agentWebsite(admin, existing.agent_id) : null
+  const mainPath = `/events/${existing.slug ?? id}`
+  const sitePath = site?.isPublished ? eventPublicPath(existing, site.slug) : null
+  revalidatePath(mainPath)
+  if (sitePath && sitePath !== mainPath) revalidatePath(sitePath)
+  revalidatePath("/events")
+  if (site?.isPublished) revalidatePath(`/website/${site.slug}`)
+  const origin = SITE_URL.replace(/\/$/, "")
+  after(() => submitToIndexNow([...new Set([mainPath, sitePath].filter((p): p is string => Boolean(p)))].map((p) => `${origin}${p}`)))
 
   return NextResponse.json({ ok: true })
 }

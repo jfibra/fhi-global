@@ -1,10 +1,11 @@
 import { ImageResponse } from "next/og"
 import { headers } from "next/headers"
+import { notFound } from "next/navigation"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { loadSiteBySlug } from "@/lib/website-builder-service"
 import { SITE_URL } from "@/lib/seo"
+import { agentDisplayName } from "@/lib/agent-site"
 import { ogJpeg, ogPicture } from "@/lib/og-picture"
-import { SAMPLE_DATA } from "../_data"
 import { loadOgFonts, OG_SIZE, OgHero } from "../_components/og-hero"
 
 // Link-share thumbnail for a published agent site — the hero exactly as the
@@ -24,7 +25,9 @@ export const contentType = "image/jpeg"
 async function render({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const site = await loadSiteBySlug(createAdminSupabase(), slug)
-  const data = site?.data ?? SAMPLE_DATA
+  // No such site: a 404, not the sample agent's card (name, number and all) under someone else's URL.
+  if (!site) notFound()
+  const data = site.data
 
   let base = SITE_URL
   try {
@@ -41,7 +44,13 @@ async function render({ params }: { params: Promise<{ slug: string }> }) {
   const zoom = Math.min(300, Math.max(100, data.hero.zoom ?? 100)) / 100
   const side = Math.min(2400, Math.round(1300 * zoom))
   const picture = bannerUrl ? await ogPicture(bannerUrl, side, side, "inside") : null
-  const ogData = { ...data, hero: { ...data.hero, image: picture ?? "" } }
+  // A site with no headline of its own (12 of the 23 had none) gets the agent's name and title, as its page's H1 does —
+  // otherwise the share card carries no headline at all.
+  const hasHeadline = Boolean(data.hero.headline.trim() || data.hero.headlineAccent.trim())
+  const hero = hasHeadline
+    ? data.hero
+    : { ...data.hero, headline: agentDisplayName(data.agent.name), headlineAccent: data.agent.title.trim() }
+  const ogData = { ...data, hero: { ...hero, image: picture ?? "" } }
   return new ImageResponse(<OgHero data={ogData} base={base} />, { ...OG_SIZE, fonts: await loadOgFonts() })
 }
 

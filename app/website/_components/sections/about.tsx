@@ -11,6 +11,7 @@ import {
   Linkedin, MessageCircle, ShieldCheck, Star, Youtube,
 } from "lucide-react"
 import { BRAND_GRADIENT, GOLD, GOLD_A40, GOLD_A50, GOLD_A60, GOLD_SOFT, GOLD_SOFT_A80, IMG, INK, NAVY, SAMPLE_DATA, type WebsiteData } from "../../_data"
+import { agentCredentials } from "@/lib/agent-site"
 import { buildContactChannels } from "../contact-channels"
 import { Eyebrow } from "../ui"
 
@@ -81,11 +82,10 @@ export function AboutSection({
   const [contactOpen, setContactOpen] = useState(false)
   const contactChannels = buildContactChannels(data)
 
-  const credentials = [
-    { icon: ShieldCheck, label: "RERA Licensed Broker", value: `BRN: ${agent.brn}` },
-    { icon: Building2, label: "Brokerage", value: agent.brokerage },
-    { icon: FileText, label: "Office Registration", value: `ORN: ${agent.orn}` },
-  ]
+  // Only credentials that look like real registrations (lib/agent-site.ts) —
+  // the "RERA Licensed Broker" tile never appears without a valid BRN behind it.
+  const CREDENTIAL_ICONS = { brn: ShieldCheck, brokerage: Building2, orn: FileText } as const
+  const credentials = agentCredentials(agent).map(({ kind, label, value }) => ({ icon: CREDENTIAL_ICONS[kind], label, value }))
 
   return (
     <section id="about" className="relative scroll-mt-[72px] overflow-hidden">

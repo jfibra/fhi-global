@@ -29,19 +29,22 @@ export function buildContactChannels(data: WebsiteData): ContactChannel[] {
   const { agent, about } = data
   const fbHandle = about.socials.facebook ? handleFrom(about.socials.facebook) : null
   const igHandle = about.socials.instagram ? handleFrom(about.socials.instagram) : null
+  // A channel exists only when the agent gave the value: a blank number or
+  // address must not become a dead wa.me/ , mailto: or tel: link.
+  const waDigits = agent.whatsapp.replace(/\D/g, "")
+  const email = agent.email.trim()
+  const phone = agent.phone.trim()
   return [
-    {
-      icon: WhatsAppIcon,
-      label: "WhatsApp",
-      href: `https://wa.me/${agent.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(DEFAULT_WA_MESSAGE)}`,
-    },
+    ...(waDigits
+      ? [{ icon: WhatsAppIcon, label: "WhatsApp", href: `https://wa.me/${waDigits}?text=${encodeURIComponent(DEFAULT_WA_MESSAGE)}` }]
+      : []),
     ...(igHandle ? [{ icon: Instagram, label: "Instagram", href: `https://ig.me/m/${igHandle}` }] : []),
-    { icon: Mail, label: "Email", href: `mailto:${agent.email}` },
+    ...(email ? [{ icon: Mail, label: "Email", href: `mailto:${email}` }] : []),
     // m.me: on MOBILE (most visitors) it opens the Messenger app straight
     // into the chat. Desktop web hits Meta's E2EE "Continue" flow, which
     // drops the recipient for personal profiles with no prior thread — a
     // Meta-side quirk no URL form avoids; only Pages get the clean web flow.
     ...(fbHandle ? [{ icon: MessengerIcon, label: "Messenger", href: `https://m.me/${fbHandle}` }] : []),
-    { icon: Phone, label: "Call", href: `tel:${agent.phone}` },
+    ...(phone ? [{ icon: Phone, label: "Call", href: `tel:${phone}` }] : []),
   ]
 }

@@ -126,7 +126,8 @@ export default async function AgentEventPage({ params, searchParams }: Props) {
             eventDays: event.event_days,
             dayTimes: event.day_times,
             venue: event.venue,
-            // The agent as a Person (an Organization for a couple or team name), linked to their site.
+            latitude: event.venue_lat,
+            longitude: event.venue_lng,
             organizer: personOrganizer(host, home),
           }),
           breadcrumbList([

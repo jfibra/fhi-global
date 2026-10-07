@@ -27,6 +27,7 @@ import { SiteFooter } from "@/app/website/_components/footer"
 import { HeroSection } from "@/app/website/_components/sections/hero"
 import { AboutSection } from "@/app/website/_components/sections/about"
 import { FeaturedSection } from "@/app/website/_components/sections/featured"
+import { BLANK_ABOUT, BLANK_AGENT, BLANK_HERO, agentSiteMissing, isPlausibleBrn, isPlausibleOrn, sanitizeAgentCredentials } from "@/lib/agent-site"
 import { StatsBandSection } from "@/app/website/_components/sections/stats"
 import { ServiceAreasSection } from "@/app/website/_components/sections/service-areas"
 import { GallerySection } from "@/app/website/_components/sections/gallery"
@@ -53,9 +54,12 @@ function loadDraft(key: string): WebsiteData | null {
     return {
       ...structuredClone(SAMPLE_DATA),
       ...parsed,
-      agent: { ...SAMPLE_DATA.agent, ...parsed.agent },
-      hero: { ...structuredClone(SAMPLE_DATA.hero), ...parsed.hero },
-      about: { ...structuredClone(SAMPLE_DATA.about), ...parsed.about },
+      // Over a BLANK agent, never the sample: an old draft that lacks a key must not
+      // inherit the sample's phone/e-mail or its "BRN: 123456 / ORN: 98765".
+      agent: sanitizeAgentCredentials({ ...BLANK_AGENT, ...parsed.agent }),
+      // Hero and about over BLANK too: an old draft missing a key must never regain the sample's bio, portrait or headline.
+      hero: { ...structuredClone(BLANK_HERO), ...parsed.hero },
+      about: { ...structuredClone(BLANK_ABOUT), ...parsed.about },
       cta: { ...SAMPLE_DATA.cta, ...parsed.cta },
       gallery: { ...structuredClone(SAMPLE_DATA.gallery), ...parsed.gallery },
     }
@@ -96,7 +100,10 @@ function seededSample(seed: ProfileSeed): WebsiteData {
  *  survive. (The sample content stays viewable at /website/sample.) */
 function emptySite(seed: ProfileSeed): WebsiteData {
   const d = seededSample(seed)
-  d.agent = { ...d.agent, title: "", brn: "", orn: "", brokerage: "" }
+  // Blank, then only what the profile supplies: the sample's phone, e-mail and
+  // "Business Bay" office must not survive when the profile lacks them — they
+  // were saved onto live sites that way.
+  d.agent = { ...BLANK_AGENT, name: seed.name, phone: seed.phone, whatsapp: seed.whatsapp, email: seed.email }
   d.hero = { headline: "", headlineAccent: "", description: "", image: "", overlay: 0, stats: [] }
   d.about = { ...d.about, heading: "", bio: "", portrait: "", views: "", listings: "", rating: "" }
   d.projects = []
@@ -130,7 +137,9 @@ function useMounted() {
 
 // ─── Small form primitives ────────────────────────────────────────────────────
 
-function Field({ label, action, children }: { label: string; action?: React.ReactNode; children: React.ReactNode }) {
+function Field({
+  label, action, hint, invalid = false, children,
+}: { label: string; action?: React.ReactNode; hint?: string; invalid?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1 flex items-center justify-between gap-2">
@@ -138,6 +147,7 @@ function Field({ label, action, children }: { label: string; action?: React.Reac
         {action}
       </span>
       {children}
+      {hint && <span className={`mt-1 block text-[11px] leading-snug ${invalid ? "text-[#b42318]" : "text-[#9ca3af]"}`}>{hint}</span>}
     </label>
   )
 }
@@ -680,6 +690,9 @@ export function WebsiteBuilderClient() {
   const [siteSlug, setSiteSlug] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // Whether the SAVED site is offered to search engines (the server's verdict on the last
+  // load/save); null until known. The line in the footer compares it with the live draft.
+  const [savedComplete, setSavedComplete] = useState<boolean | null>(null)
 
   useEffect(() => {
     if (!mounted || !userId) return
@@ -691,9 +704,10 @@ export function WebsiteBuilderClient() {
       .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
       .then(({ ok, j }) => {
         if (!alive || !ok) return
-        const site = j as { exists?: boolean; slug?: string; data?: WebsiteData }
+        const site = j as { exists?: boolean; slug?: string; data?: WebsiteData; complete?: boolean }
         if (!site.exists || !site.slug || !site.data) return
         setSiteSlug(site.slug)
+        setSavedComplete(site.complete === true)
         if (!draft) setData(site.data)
       })
       .catch(() => {
@@ -713,6 +727,9 @@ export function WebsiteBuilderClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted, userId])
 
+  // What the draft still lacks before search engines are offered the site — live, as the agent types.
+  const listingMissing = agentSiteMissing({ name: data.agent.name, bio: data.about.bio, portrait: data.about.portrait })
+
   const save = async () => {
     setSaving(true)
     setSaveError(null)
@@ -722,9 +739,10 @@ export function WebsiteBuilderClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       })
-      const json = (await res.json().catch(() => ({}))) as { slug?: string; error?: string }
+      const json = (await res.json().catch(() => ({}))) as { slug?: string; error?: string; complete?: boolean }
       if (!res.ok || !json.slug) throw new Error(json.error || "Failed to save")
       setSiteSlug(json.slug)
+      setSavedComplete(json.complete === true)
       // Saved = the DB is now the truth; drop the draft so a stale copy can't
       // shadow the live site on the next visit. Autosave re-creates it on the
       // next edit.
@@ -819,10 +837,11 @@ export function WebsiteBuilderClient() {
     try {
       if (userId) localStorage.removeItem(draftKey(userId))
       const res = await fetch("/api/website-builder/site")
-      const json = (await res.json().catch(() => ({}))) as { exists?: boolean; slug?: string; data?: WebsiteData }
+      const json = (await res.json().catch(() => ({}))) as { exists?: boolean; slug?: string; data?: WebsiteData; complete?: boolean }
       if (res.ok && json.exists && json.data) {
         setData(json.data)
         if (json.slug) setSiteSlug(json.slug)
+        setSavedComplete(json.complete === true)
       } else {
         setData(emptySite(seed))
       }
@@ -966,8 +985,24 @@ export function WebsiteBuilderClient() {
               <Field label="Full name"><TInput value={data.agent.name} onChange={(v) => update((d) => { d.agent.name = v })} /></Field>
               <Field label="Professional Title"><TInput value={data.agent.title} onChange={(v) => update((d) => { d.agent.title = v })} /></Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="RERA BRN"><TInput value={data.agent.brn} onChange={(v) => update((d) => { d.agent.brn = v })} /></Field>
-                <Field label="RERA ORN"><TInput value={data.agent.orn} onChange={(v) => update((d) => { d.agent.orn = v })} /></Field>
+                <Field
+                  label="RERA BRN"
+                  invalid={data.agent.brn.trim() !== "" && !isPlausibleBrn(data.agent.brn)}
+                  hint={data.agent.brn.trim() !== "" && !isPlausibleBrn(data.agent.brn)
+                    ? "Use the 4–7 digit number on your RERA broker card."
+                    : "Shown on your site only when it is a real BRN."}
+                >
+                  <TInput value={data.agent.brn} onChange={(v) => update((d) => { d.agent.brn = v })} />
+                </Field>
+                <Field
+                  label="RERA ORN"
+                  invalid={data.agent.orn.trim() !== "" && !isPlausibleOrn(data.agent.orn)}
+                  hint={data.agent.orn.trim() !== "" && !isPlausibleOrn(data.agent.orn)
+                    ? "Use the office registration number (2–6 digits)."
+                    : "Leave blank if you do not have one."}
+                >
+                  <TInput value={data.agent.orn} onChange={(v) => update((d) => { d.agent.orn = v })} />
+                </Field>
               </div>
               <Field label="Brokerage"><TInput value={data.agent.brokerage} onChange={(v) => update((d) => { d.agent.brokerage = v })} /></Field>
               <div className="grid grid-cols-2 gap-3">
@@ -1443,6 +1478,15 @@ export function WebsiteBuilderClient() {
             </div>
           </div>
           {saveError && <p className="mt-2 text-[11px] font-semibold text-red-600">{saveError}</p>}
+          {/* Search listing: a site is offered to Google only when it is really the agent's (lib/agent-site.ts) */}
+          <p className={`mt-2 text-[11px] leading-relaxed ${listingMissing.length === 0 && savedComplete ? "text-emerald-700" : "text-[#8a6d1d]"}`}>
+            <span className="font-semibold">Listed for Google:</span>{" "}
+            {listingMissing.length > 0
+              ? `not yet — still needed: ${listingMissing.join(" · ")}.`
+              : savedComplete
+                ? "yes — your site is in our sitemap and open to search engines."
+                : "ready — Save to list your site."}
+          </p>
         </div>
       </div>
 

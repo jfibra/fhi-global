@@ -102,12 +102,14 @@ function PhotoCarousel({ category, images, interval = 2500 }: { category: Galler
   )
 }
 
-export function GallerySection({ data: incoming = SAMPLE_DATA }: { data?: WebsiteData }) {
+export function GallerySection({ data: incoming = SAMPLE_DATA, placeholders = true }: { data?: WebsiteData; placeholders?: boolean }) {
   // null = overview (an auto-sliding labeled row per category).
   const [category, setCategory] = useState<GalleryCategory | null>(null)
-  // Sample event photos fill the gallery until the agent adds their own.
+  // Sample photos fill the gallery until the agent adds their own — in the editor preview and on /website/sample
+  // only (`placeholders`). A live site with no photos renders nothing: the sample "Certificates" and "Awards"
+  // were hot-linked thumbnails of other people's pictures, presented as the agent's credentials.
   const blank = GALLERY_CATEGORIES.every((c) => (incoming.gallery[c] ?? []).filter((src) => src.trim() !== "").length === 0)
-  const data = blank ? { ...incoming, gallery: { "Event Photos": TEST_GALLERY_EVENTS, Certificates: TEST_GALLERY_CERTIFICATES, "Awards & Recognition": TEST_GALLERY_AWARDS } } : incoming
+  const data = blank && placeholders ? { ...incoming, gallery: { "Event Photos": TEST_GALLERY_EVENTS, Certificates: TEST_GALLERY_CERTIFICATES, "Awards & Recognition": TEST_GALLERY_AWARDS } } : incoming
   const withPhotos = GALLERY_CATEGORIES.filter((c) => (data.gallery[c] ?? []).length > 0)
   if (withPhotos.length === 0) return null
 

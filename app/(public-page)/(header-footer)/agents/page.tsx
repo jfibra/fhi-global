@@ -1,3 +1,4 @@
+import { Fragment } from "react"
 import type { Metadata } from "next"
 import Image from "next/image"
 import { ArrowDown, MessageCircle } from "lucide-react"
@@ -6,6 +7,8 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import { createPageMetadata } from "@/lib/seo"
 import { titleCaseName } from "@/lib/public-profile"
 import { breadcrumbList, personListSchema } from "@/lib/structured-data"
+import { agentSiteSignalsFromRow, isAgentSiteComplete } from "@/lib/agent-site"
+import { companyWhatsappHref } from "@/lib/company"
 import { JsonLd } from "@/components/json-ld"
 import { InView } from "@/components/public/in-view"
 import { CountUp } from "@/components/public/count-up"
@@ -23,7 +26,7 @@ export const metadata: Metadata = createPageMetadata({
   keywords: ["Dubai real estate agents", "property consultants Dubai", "FHI Global team"],
 })
 
-const COMPANY_WHATSAPP = "https://wa.me/971567428288"
+const COMPANY_WHATSAPP = companyWhatsappHref()
 
 /** Joins a stored country code with its number, tolerating either being blank. */
 function contact(meta: Record<string, unknown> | null, key: "phone" | "whatsapp"): string | null {
@@ -49,7 +52,10 @@ const isUploaded = (url: string) => /\.amazonaws\.com\//.test(url)
 /** A stable shuffle (same order every render, so no hydration mismatch): the wall shouldn't read A to Z. */
 const mix = (id: string) => [...id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7)
 
-type Roster = { agents: PublicAgent[]; wall: WallPerson[]; liveProjects: number }
+/** One Person in the roster's structured data; `path` only for an agent whose site is offered to search engines. */
+type SchemaPerson = { name: string; image: string | null; path: string | null }
+
+type Roster = { agents: PublicAgent[]; wall: WallPerson[]; liveProjects: number; people: SchemaPerson[] }
 
 async function fetchRoster(): Promise<Roster> {
   // Service role, server-side, with an explicit column list — the same pattern
@@ -69,17 +75,23 @@ async function fetchRoster(): Promise<Roster> {
       .eq("status", "active")
       .not("is_deleted", "is", true)
       .order("fullname", { ascending: true }),
-    admin.from("website_builder").select("agent_id, slug").eq("is_published", true).not("slug", "is", null),
+    admin.from("website_builder").select("agent_id, slug, contact, about:about_id(bio, photo)").eq("is_published", true).not("slug", "is", null),
     admin.from("agent_feedback").select("agent_id, overall_rating").eq("status", "approved"),
     admin.from("projects").select("id", { count: "exact", head: true }).eq("is_active", true).eq("is_published", true).is("deleted_at", null),
   ])
 
   if (profiles.error) {
     console.error("[agents] query failed:", profiles.error.message)
-    return { agents: [], wall: [], liveProjects: projects.count ?? 0 }
+    return { agents: [], wall: [], liveProjects: projects.count ?? 0, people: [] }
   }
 
   const siteOf = new Map((sites.data ?? []).map((s) => [String(s.agent_id), String(s.slug)]))
+  // A Person links to their site only when that site is open to search engines — the same
+  // predicate as its robots tag and the sitemap (lib/agent-site.ts), so no structured-data
+  // link points at a noindex page.
+  const listedOf = new Map(
+    (sites.data ?? []).filter((s) => isAgentSiteComplete(agentSiteSignalsFromRow(s))).map((s) => [String(s.agent_id), String(s.slug)]),
+  )
   const scores = new Map<string, number[]>()
   for (const r of reviews.data ?? []) {
     const k = String(r.agent_id)
@@ -121,23 +133,30 @@ async function fetchRoster(): Promise<Roster> {
     .sort((a, b) => mix(a.id) - mix(b.id))
     .map((a) => ({ src: a.photo as string, name: a.name, role: a.leader ? "Team leader" : "Property advisor" }))
 
-  return { agents, wall, liveProjects: projects.count ?? 0 }
+  const people = agents.map((a) => {
+    const listed = listedOf.get(a.id)
+    return { name: a.name, image: a.photo, path: listed ? `/website/${listed}` : null }
+  })
+
+  return { agents, wall, liveProjects: projects.count ?? 0, people }
 }
 
 function Words({ text, start = 0, gold = false }: { text: string; start?: number; gold?: boolean }) {
   return (
     <>
       {text.split(" ").map((w, i) => (
-        <span key={`${w}-${i}`} className="wf-word mr-[0.24em]">
-          <span style={{ ["--i" as string]: start + i }} className={gold ? "wf-gold" : undefined}>{w}</span>
-        </span>
+        <Fragment key={`${w}-${i}`}>
+          <span className="wf-word">
+            <span style={{ ["--i" as string]: start + i }} className={gold ? "wf-gold" : undefined}>{w}</span>
+          </span>{" "}
+        </Fragment>
       ))}
     </>
   )
 }
 
 export default async function AgentsPage() {
-  const { agents, wall, liveProjects } = await fetchRoster()
+  const { agents, wall, liveProjects, people } = await fetchRoster()
   const faces = wall.slice(0, 7)
   const stats = [
     { value: agents.length, label: "Property advisors" },
@@ -152,7 +171,7 @@ export default async function AgentsPage() {
       {/* The visible roster below, as Person entities. */}
       <JsonLd
         schema={[
-          personListSchema(agents.map((a) => ({ name: a.name, image: a.photo }))),
+          personListSchema(people),
           breadcrumbList([{ name: "Home", path: "/" }, { name: "Agents" }]),
         ]}
       />
@@ -165,7 +184,7 @@ export default async function AgentsPage() {
         {wall.length >= 6 ? (
           <AgentWall people={wall} />
         ) : (
-          <Image src="/background/dubai.webp" alt="" fill priority sizes="100vw" className="object-cover" aria-hidden="true" />
+          <Image src="/background/dubai.webp" alt="" fill preload fetchPriority="high" sizes="100vw" className="object-cover" aria-hidden="true" />
         )}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#06182e] via-[#06182e]/80 to-[#06182e]/25 lg:bg-gradient-to-r lg:from-[#06182e] lg:via-[#06182e]/85 lg:to-[#06182e]/15" aria-hidden="true" />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#06182e]/30 via-transparent to-[#06182e]/70 lg:from-[#06182e]/60" aria-hidden="true" />
