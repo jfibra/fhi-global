@@ -1,3 +1,4 @@
+import { Fragment } from "react"
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -13,6 +14,7 @@ import { countByEmirate } from "@/lib/emirates";
 import { InvestCta, type CtaStat } from "@/components/public/invest-cta";
 import { faqPageSchema } from "@/lib/faqs";
 import { fhiOrganizationSchema, webSiteSchema } from "@/lib/structured-data";
+import { companyReraLine } from "@/lib/company";
 import { JsonLd } from "@/components/json-ld";
 import { DeveloperMarquee, type DeveloperTileItem } from "@/components/public/developer-marquee";
 import { HomeNews } from "@/components/public/home-news";
@@ -42,10 +44,10 @@ export const metadata: Metadata = createPageMetadata({
   // schema and the site name Google shows separately.
   title: { absolute: "Dubai Properties for Sale — Off-Plan & Ready | FHI Global" },
   description:
-    "Dubai properties for sale: off-plan launches and ready apartments, villas & penthouses from verified developers — prices, payment plans & handover dates.",
+    "Dubai properties for sale: off-plan launches and ready apartments, villas & penthouses from verified developers — prices, unit types & handover dates.",
   openGraphTitle: "FHI Global — Dubai Properties for Sale",
   openGraphDescription:
-    "Off-plan and ready properties for sale in Dubai from verified developers — prices, payment plans and handover dates.",
+    "Off-plan and ready properties for sale in Dubai from verified developers — prices, unit types and handover dates.",
   pathname: "/",
   keywords: [
     "Dubai properties for sale",
@@ -176,6 +178,7 @@ export default async function HomePage() {
     .map((p) => ({
       name: p.name,
       slug: p.slug ?? null,
+      developerSlug: (p.developers as unknown as { slug?: string | null } | null)?.slug ?? null,
       image: p.main_image as string,
       location: p.location || p.city || null,
       priceLabel: heroPrice(p.launch_price_from, p.currency),
@@ -207,7 +210,9 @@ export default async function HomePage() {
         facts={[
           `${cityRows.length} live projects`,
           `${developerCounts.size} developers`,
-          "RERA licensed",
+          // The brokerage's published RERA registration — the same number the
+          // footer, /contact and /about print. Skipped until one is published.
+          ...(companyReraLine() ? [companyReraLine()] : []),
           "Dubai · United Arab Emirates",
         ]}
       />
@@ -273,13 +278,13 @@ export default async function HomePage() {
                   <h2 className="font-['Outfit'] text-3xl md:text-[42px] font-bold tracking-tight leading-[1.12] mt-3">
                     <span className="block text-[#0d1117]">
                       {["Trusted", "Developers,"].map((w, i) => (
-                        <span key={w} className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: i }}>{w}</span></span>
+                        <Fragment key={w}><span className="wf-word"><span style={{ ["--i" as string]: i }}>{w}</span></span>{" "}</Fragment>
                       ))}
                     </span>
                     <span className="block">
-                      <span className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 2 }} className="text-[#0d1117]">Building</span></span>
+                      <span className="wf-word"><span style={{ ["--i" as string]: 2 }} className="text-[#0d1117]">Building</span></span>{" "}
                       {["Dubai\u2019s", "Future"].map((w, i) => (
-                        <span key={w} className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 3 + i }} className="wf-gold">{w}</span></span>
+                        <Fragment key={w}><span className="wf-word"><span style={{ ["--i" as string]: 3 + i }} className="wf-gold">{w}</span></span>{" "}</Fragment>
                       ))}
                     </span>
                   </h2>
@@ -366,7 +371,12 @@ export default async function HomePage() {
       {/* ----------------------------------------------- */}
       {/* WHERE WE BUILD — the UAE lit by live counts     */}
       {/* ----------------------------------------------- */}
-      <UaeMap counts={emirateCounts} />
+      {/* Dubai and Abu Dhabi have landing pages that can rank; the other emirates
+          fall back to the filtered catalogue. */}
+      <UaeMap
+        counts={emirateCounts}
+        hrefOverrides={{ Dubai: "/off-plan-projects-in-dubai", "Abu Dhabi": "/new-projects-in-abu-dhabi" }}
+      />
 
       {/* ----------------------------------------------- */}
       {/* WHY FHI — "We connect serious investors…"        */}

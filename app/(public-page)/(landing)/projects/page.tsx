@@ -14,11 +14,14 @@ import { ProjectCard, formatProjectPrice, type ProjectCardData } from "@/compone
 import { ProjectsMap, type MapProject } from "@/components/public/projects-map"
 import { ProjectFilters, type QuickPick } from "@/components/public/project-filters"
 import { InView } from "@/components/public/in-view"
+import { Pager } from "@/components/public/pager"
 import { CountUp } from "@/components/public/count-up"
 import { MagneticLink } from "@/components/public/magnetic-link"
 import { countByEmirate } from "@/lib/emirates"
-import { ArrowLeft, ArrowRight, ArrowUpRight, Building2 } from "lucide-react"
-import { Suspense } from "react"
+import { handoverDisplay } from "@/lib/project-seo"
+import { normalizeCommunity } from "@/lib/communities"
+import { ArrowUpRight, Building2 } from "lucide-react"
+import { Suspense, Fragment } from "react"
 
 // The full catalog rendered on one page shipped ~1.9 MB of HTML (half of it
 // RSC flight data duplicating the markup). 24 cards keeps the document a
@@ -45,9 +48,35 @@ function parsePage(raw: string | undefined): number {
   return Number.isInteger(n) && n >= 1 ? n : 1
 }
 
+/** Every param as a single string: a repeated param (?city=a&city=b) arrives as an array, which the queries below must never see. */
+function normalizeSearchParams(raw: Record<string, string | string[] | undefined>): SpValues {
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
+  return {
+    q: one(raw.q),
+    // Lower-cased: ?developer=ABC… and ?developer=abc… are one view, not two self-canonical duplicates.
+    developer: one(raw.developer)?.toLowerCase(),
+    status: one(raw.status),
+    city: one(raw.city),
+    featured: one(raw.featured),
+    price_min: one(raw.price_min),
+    price_max: one(raw.price_max),
+    page: one(raw.page),
+    view: one(raw.view),
+  }
+}
+
 /** The filters pagination links carry forward — a whitelist, so arbitrary or
  *  array-valued query params can never propagate into crawlable hrefs. */
 const FILTER_KEYS = ["q", "developer", "status", "city", "featured", "price_min", "price_max"] as const
+
+// Plain 8-4-4-4-12 hex: the shape that keeps Postgres from throwing on the cast. Whether the id exists is
+// decided by membership in the facet list, which is the real gate.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** True when any whitelisted filter is set (page and view are not filters). */
+function hasFilters(sp: SpValues): boolean {
+  return FILTER_KEYS.some((k) => typeof sp[k] === "string" && sp[k] !== "")
+}
 
 /** Pagination href that keeps every active filter and drops page=1. */
 function pageHref(sp: SpValues, page: number): string {
@@ -61,26 +90,51 @@ function pageHref(sp: SpValues, page: number): string {
   return qs ? `/projects?${qs}` : "/projects"
 }
 
+/** This exact view's own path: the filters, the page number and the map flag. */
+function selfHref(sp: SpValues, page: number): string {
+  const base = pageHref(sp, page)
+  if (sp.view !== "map") return base
+  return base.includes("?") ? `${base}&view=map` : "/projects?view=map"
+}
+
+/**
+ * A ?developer= value must be an active developer's id. Anything else — not a
+ * uuid, or a uuid nobody has — is a URL that cannot show a catalogue, so it is
+ * a real 404 instead of a Postgres "invalid input syntax for type uuid" that
+ * surfaced as a 500 (and let crawlers mint endless junk URLs).
+ */
+async function assertKnownDeveloper(developer: string | undefined) {
+  if (developer === undefined || developer === "") return
+  if (!UUID_RE.test(developer)) notFound()
+  // The cached facet list is only read when a developer is actually asked for.
+  const { devOptions } = await getProjectFacets()
+  if (!devOptions.some((d) => String(d.id).toLowerCase() === developer)) notFound()
+}
+
 export async function generateMetadata({ searchParams }: { searchParams: SearchParams }): Promise<Metadata> {
-  const { page, view } = await searchParams
-  const pageNum = parsePage(page)
-  // The map is another way of looking at the same catalogue: kept out of the
-  // index (follow stays on) with the grid as its canonical.
-  if (view === "map") {
-    return createPageMetadata({
-      title: "Real Estate Projects in Dubai on the Map",
-      description: "Browse premium off-plan and ready residential projects from top Dubai developers on the map.",
-      pathname: "/projects",
-      robots: { index: false, follow: true },
-    })
-  }
-  // Self-canonical per page: canonicalizing everything to page 1 would orphan
-  // every project card beyond the first 24 from the crawl graph.
+  const sp = normalizeSearchParams(await searchParams)
+  const pageNum = parsePage(sp.page)
+  await assertKnownDeveloper(sp.developer)
+  const map = sp.view === "map"
+  // The unfiltered catalogue is the one indexable view (its pages 2, 3… are
+  // self-canonical so every card stays reachable). Every filtered or map view is
+  // another way of looking at the same rows: kept out of the index (links are
+  // still followed) and canonical to ITSELF — a noindex page that canonicalises
+  // somewhere else sends two opposing signals, and a canonical that drops the
+  // filters points Google at a page whose content differs.
+  const keepOut = map || hasFilters(sp)
   return createPageMetadata({
-    title: pageNum > 1 ? `Real Estate Projects in Dubai — Page ${pageNum}` : "Real Estate Projects in Dubai",
-    description: "Browse premium off-plan and ready residential projects from top Dubai developers.",
-    pathname: pageNum > 1 ? `/projects?page=${pageNum}` : "/projects",
-    keywords: ["Dubai projects", "off-plan properties Dubai", "ready properties UAE", "Dubai investment properties"],
+    title: map
+      ? "Real Estate Projects in Dubai on the Map"
+      : pageNum > 1
+        ? `Real Estate Projects in Dubai — Page ${pageNum}`
+        : "Real Estate Projects in Dubai",
+    description: map
+      ? "Browse premium off-plan and ready residential projects from top Dubai developers on the map."
+      : "Browse premium off-plan and ready residential projects from top Dubai developers.",
+    pathname: selfHref(sp, pageNum),
+    robots: keepOut ? { index: false, follow: true } : undefined,
+    keywords: map ? undefined : ["Dubai projects", "off-plan properties Dubai", "ready properties UAE", "Dubai investment properties"],
   })
 }
 
@@ -89,8 +143,8 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
 const getProjectFacets = unstable_cache(
   async () => {
     const supabase = createPublicSupabaseClient()
-    const [{ data: devOptions }, { data: cityOptions }, { data: live }] = await Promise.all([
-      supabase.from("developers").select("id, name").eq("is_active", true).order("name"),
+    const [{ data: devOptions, error: devError }, { data: cityOptions, error: cityError }, { data: live, error: liveError }] = await Promise.all([
+      supabase.from("developers").select("id, name").eq("is_active", true).is("deleted_at", null).order("name"),
       supabase.from("projects").select("city").eq("is_active", true).eq("is_published", true).is("deleted_at", null).not("city", "is", null),
       // The published catalogue, for the masthead counters and the quick
       // picks' live counts. Same rows the grid draws from.
@@ -102,6 +156,10 @@ const getProjectFacets = unstable_cache(
         .is("deleted_at", null)
         .limit(4000),
     ])
+    // THROW rather than cache a partial answer: unstable_cache never stores a throw, so one Supabase blip can no
+    // longer pin an empty developer list for 120 s — which assertKnownDeveloper would read as "every
+    // ?developer= link is unknown" and 404 them all. (A failure here is a 5xx; crawlers retry a 5xx.)
+    if (devError || cityError || liveError) throw new Error("Failed to load project facets")
     const uniqueCities = Array.from(new Set((cityOptions ?? []).map((r) => r.city).filter(Boolean))) as string[]
     const rows = (live ?? []) as { city: string | null; developer_id: string | null; status: string; launch_price_from: number | string | null; is_featured: boolean | null }[]
     const stats = {
@@ -118,21 +176,33 @@ const getProjectFacets = unstable_cache(
   { revalidate: 120, tags: ["projects"] },
 )
 
-export default async function ProjectsPage({ searchParams }: { searchParams: SearchParams }) {
-  const sp = await searchParams
-  const { q, developer, status, city, featured, price_min, price_max } = sp
-  const pageNum = parsePage(sp.page)
+// The columns the list cards and the map pins read — the same rows either way.
+const LIST_COLUMNS =
+  "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)"
+const MAP_COLUMNS =
+  "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, currency, status, latitude, longitude, developers(name, slug, logo_url, logo_bg)"
+
+type GridArgs = {
+  view: "list" | "map"
+  /** Row offset of the page (list view). */
+  from: number
+  q: string
+  developer: string
+  status: string
+  city: string
+  featured: boolean
+  priceMin: number | null
+  priceMax: number | null
+}
+
+/**
+ * One page of the published catalogue with the page's filters applied — the
+ * grid (a page of cards + the exact total for the pager) or, for the map, every
+ * filtered project with its coordinates. Throws on a failed query so an error is
+ * never cached or read as "no results".
+ */
+async function fetchProjectsView(a: GridArgs): Promise<{ rows: unknown[]; count: number; outOfRange: boolean }> {
   const supabase = createPublicSupabaseClient()
-
-  const priceMin = price_min ? Number(price_min) : null
-  const priceMax = price_max ? Number(price_max) : null
-  const hasPriceMin = Number.isFinite(priceMin)
-  const hasPriceMax = Number.isFinite(priceMax)
-
-  const { devOptions, uniqueCities, stats } = await getProjectFacets()
-  const view = sp.view === "map" ? "map" : "list"
-
-  /** The published catalogue with the page's filters applied — the grid and the map read the same rows. */
   const filtered = (columns: string, count?: "exact") => {
     let query = supabase
       .from("projects")
@@ -140,46 +210,96 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
       .eq("is_active", true)
       .eq("is_published", true)
       .is("deleted_at", null)
-    if (featured === "true") query = query.eq("is_featured", true)
-    if (q) query = query.ilike("name", `%${q}%`)
-    if (developer) query = query.eq("developer_id", developer)
+    if (a.featured) query = query.eq("is_featured", true)
+    if (a.q) query = query.ilike("name", `%${a.q}%`)
+    if (a.developer) query = query.eq("developer_id", a.developer)
     // "off_plan" is the buyer's word, not a database value: everything that
     // has not completed.
-    if (status === "off_plan") query = query.neq("status", "completed")
-    else if (status) query = query.eq("status", status)
-    if (city) query = query.eq("city", city)
-    if (hasPriceMin && priceMin !== null) query = query.gte("launch_price_from", priceMin)
-    if (hasPriceMax && priceMax !== null) query = query.lte("launch_price_from", priceMax)
+    if (a.status === "off_plan") query = query.neq("status", "completed")
+    else if (a.status) query = query.eq("status", a.status)
+    if (a.city) query = query.eq("city", a.city)
+    if (a.priceMin !== null) query = query.gte("launch_price_from", a.priceMin)
+    if (a.priceMax !== null) query = query.lte("launch_price_from", a.priceMax)
     return query
   }
 
-  const from = (pageNum - 1) * PAGE_SIZE
-  // Grid: one page of projects (+ the exact total for the pager). Map: every
-  // filtered project, light columns only, with its coordinates.
-  const [{ data: projects, count, error }, mapResult] = await Promise.all([
-    view === "list"
-      ? filtered(
-          "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)",
-          "exact",
-        )
-          .order("created_at", { ascending: false })
-          .range(from, from + PAGE_SIZE - 1)
-      : Promise.resolve({ data: [] as unknown[], count: 0, error: null }),
-    view === "map"
-      ? filtered("id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, currency, status, latitude, longitude, developers(name, slug, logo_url, logo_bg)")
-          .order("is_featured", { ascending: false })
-          .order("created_at", { ascending: false })
-          .limit(1000)
-      : Promise.resolve({ data: [] as unknown[], error: null }),
-  ])
+  if (a.view === "map") {
+    const { data, error } = await filtered(MAP_COLUMNS)
+      .order("is_featured", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1000)
+    if (error) throw new Error("Failed to load projects")
+    return { rows: (data ?? []) as unknown[], count: (data ?? []).length, outOfRange: false }
+  }
 
+  const { data, count, error } = await filtered(LIST_COLUMNS, "exact")
+    .order("created_at", { ascending: false })
+    .range(a.from, a.from + PAGE_SIZE - 1)
   // A page past the end comes back from PostgREST as PGRST103 ("range not
   // satisfiable"), not as an empty page: that's the 404 below, not a failure.
   const outOfRange = (error as { code?: string } | null)?.code === "PGRST103"
   // Transient failure → 5xx; a query error must not read as "empty page"
   // and 404 the archive (ISR would cache it).
-  if ((error && !outOfRange) || mapResult.error) throw new Error("Failed to load projects")
+  if (error && !outOfRange) throw new Error("Failed to load projects")
+  return { rows: outOfRange ? [] : ((data ?? []) as unknown[]), count: count ?? 0, outOfRange }
+}
 
+// Cached at the data layer for 2 minutes (the route itself stays dynamic — it
+// reads searchParams — so `export const revalidate` cannot do this), keyed by
+// the arguments, i.e. by filters + page. Only a WHITELIST is cached (below): free-text
+// search, price bounds, deep pages and values that are not real cities/statuses take the
+// live query, so a crawler cannot mint an unbounded number of cache entries. The "projects"
+// tag is the one the facets use, and publishing a project drops it (/api/seo/revalidate and
+// the developer company route call revalidateTag("projects", { expire: 0 })).
+const fetchProjectsViewCached = unstable_cache(fetchProjectsView, ["projects-view-v1"], {
+  revalidate: 120,
+  tags: ["projects"],
+})
+
+/** Deepest page whose result is cached — beyond it a visitor (or a bot) is off the beaten path. */
+const MAX_CACHED_PAGE = 20
+const KNOWN_STATUSES = new Set(["off_plan", "pre_launch", "launch", "under_construction", "completed"])
+
+export default async function ProjectsPage({ searchParams }: { searchParams: SearchParams }) {
+  const sp = normalizeSearchParams(await searchParams)
+  const { q, developer, status, city, featured, price_min, price_max } = sp
+  const pageNum = parsePage(sp.page)
+
+  const priceMin = price_min ? Number(price_min) : null
+  const priceMax = price_max ? Number(price_max) : null
+  const hasPriceMin = Number.isFinite(priceMin)
+  const hasPriceMax = Number.isFinite(priceMax)
+
+  const { devOptions, uniqueCities, stats } = await getProjectFacets()
+  await assertKnownDeveloper(developer)
+  const view = sp.view === "map" ? "map" : "list"
+
+  const from = (pageNum - 1) * PAGE_SIZE
+  const args: GridArgs = {
+    view,
+    // The map ignores the page, so ?view=map&page=N must not mint a cache key per N.
+    from: view === "map" ? 0 : from,
+    q: q ?? "",
+    developer: developer ?? "",
+    status: status ?? "",
+    city: city ?? "",
+    featured: featured === "true",
+    priceMin: hasPriceMin ? priceMin : null,
+    priceMax: hasPriceMax ? priceMax : null,
+  }
+  const cacheable =
+    !args.q &&
+    args.priceMin === null &&
+    args.priceMax === null &&
+    pageNum <= MAX_CACHED_PAGE &&
+    (!args.city || uniqueCities.includes(args.city)) &&
+    (!args.status || KNOWN_STATUSES.has(args.status))
+  const result = await (cacheable ? fetchProjectsViewCached : fetchProjectsView)(args)
+  const { outOfRange } = result
+
+  const projects = view === "list" ? result.rows : []
+  const mapResult = { data: view === "map" ? result.rows : [] }
+  const count = result.count
   const gridProjects = (projects ?? []) as unknown as ProjectCardData[]
   const mapRows = (mapResult.data ?? []) as unknown as MapRow[]
   const mapProjects = mapRows.map(toMapProject).filter((m): m is MapProject => m !== null)
@@ -205,6 +325,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
       <JsonLd schema={breadcrumbList([{ name: "Home", path: "/" }, { name: "Projects" }])} />
       <TopBar />
       <Header />
+      <main>
 
       {/* Masthead — short, because the visitor came for the grid, but with
           the site's entrance: the rule draws, the title rises word by word,
@@ -214,7 +335,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
       {view === "list" && (
       <section className="relative overflow-hidden bg-[#06182e] text-white">
         <div className="absolute inset-0" aria-hidden="true">
-          <Image src="/background/dubai.webp" alt="" fill priority sizes="100vw" className="object-cover object-center" />
+          <Image src="/background/dubai.webp" alt="" fill preload fetchPriority="high" sizes="100vw" className="object-cover object-center" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#06182e]/95 via-[#06182e]/70 to-[#06182e]/30" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#06182e]/80 via-transparent to-transparent" />
         </div>
@@ -226,10 +347,10 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
                 <span className="wf-fade" style={{ ["--d" as string]: "200ms" }}>FHI Global · {anyFilter ? "Filtered" : "All projects"}</span>
               </p>
               <h1 className="mt-3 font-['Outfit'] text-[34px] font-bold leading-[1.06] tracking-tight drop-shadow-[0_2px_16px_rgba(0,10,30,0.5)] sm:text-[44px] lg:text-[52px]">
-                <span className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 0 }}>Discover</span></span>
-                <span className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 1 }}>Premium</span></span>
+                <span className="wf-word"><span style={{ ["--i" as string]: 0 }}>Discover</span></span>{" "}
+                <span className="wf-word"><span style={{ ["--i" as string]: 1 }}>Premium</span></span>{" "}
                 {headline.split(" ").map((w, i) => (
-                  <span key={`${w}-${i}`} className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 2 + i }} className="wf-gold">{w}</span></span>
+                  <Fragment key={`${w}-${i}`}><span className="wf-word"><span style={{ ["--i" as string]: 2 + i }} className="wf-gold">{w}</span></span>{" "}</Fragment>
                 ))}
               </h1>
             </div>
@@ -314,39 +435,13 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Sea
                 <span className="pl-pager-fill block h-full bg-[#d6b357]" style={{ ["--p" as string]: (pageNum / totalPages).toFixed(3) }} />
               </div>
             </div>
-            <nav aria-label="Pagination" className="mt-6 flex flex-wrap items-center justify-center gap-2">
-              {pageNum > 1 && (
-                <Link href={pageHref(sp, pageNum - 1)} className="group inline-flex items-center gap-2 border border-[#e5e8ec] bg-white px-4 py-2.5 text-sm font-semibold text-[#001f3f] transition-colors hover:border-[#d6b357]">
-                  <ArrowLeft className="h-4 w-4 text-[#b8913f] transition-transform group-hover:-translate-x-0.5" /> Previous
-                </Link>
-              )}
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter((n) => n === 1 || n === totalPages || Math.abs(n - pageNum) <= 2)
-                .map((n, idx, arr) => (
-                  <span key={n} className="flex items-center gap-2">
-                    {idx > 0 && arr[idx - 1] !== n - 1 && <span className="text-[#9ca3af]">…</span>}
-                    {n === pageNum ? (
-                      <span aria-current="page" className="inline-flex h-10 min-w-10 items-center justify-center bg-[#0d1117] px-3 text-sm font-bold text-white">
-                        {n}
-                      </span>
-                    ) : (
-                      <Link href={pageHref(sp, n)} className="inline-flex h-10 min-w-10 items-center justify-center border border-[#e5e8ec] bg-white px-3 text-sm font-semibold text-[#001f3f] transition-colors hover:border-[#d6b357] hover:text-[#b8913f]">
-                        {n}
-                      </Link>
-                    )}
-                  </span>
-                ))}
-              {pageNum < totalPages && (
-                <Link href={pageHref(sp, pageNum + 1)} className="group inline-flex items-center gap-2 bg-[#d6b357] px-4 py-2.5 text-sm font-bold text-[#001f3f] transition-colors hover:bg-[#e2c26a]">
-                  Next <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                </Link>
-              )}
-            </nav>
+            <Pager page={pageNum} totalPages={totalPages} hrefFor={(n) => pageHref(sp, n)} className="mt-6" />
           </InView>
         )}
       </section>
       )}
 
+      </main>
       <Footer />
     </div>
   )
@@ -376,7 +471,7 @@ function toMapProject(p: MapRow): MapProject | null {
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < 22 || lat > 27 || lng < 51 || lng > 57) return null
   const price = p.launch_price_from != null && Number(p.launch_price_from) > 0 ? formatProjectPrice(Number(p.launch_price_from), p.currency ?? "AED") : null
   // Same order as the grid's cards: community, then the free location, then the city.
-  const area = [p.community, p.location].map((v) => v?.trim()).find(Boolean) ?? p.city?.trim() ?? null
+  const area = [normalizeCommunity(p.community), p.location].map((v) => v?.trim()).find(Boolean) ?? p.city?.trim() ?? null
   const dev = p.developers
   return {
     id: String(p.id),
@@ -386,7 +481,8 @@ function toMapProject(p: MapRow): MapProject | null {
     lat,
     lng,
     price,
-    handover: p.delivery_quarter?.trim() || null,
+    // A quarter that has already ended on a project still being built reads "under review".
+    handover: handoverDisplay({ status: p.status, delivery_quarter: p.delivery_quarter }),
     area,
     developer: dev?.name ?? null,
     developerLogo: dev?.logo_url?.trim() || null,

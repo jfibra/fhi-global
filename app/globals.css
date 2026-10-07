@@ -121,7 +121,10 @@
 
 @theme inline {
   --font-sans: "Geist", "Geist Fallback";
-  --font-mono: "Geist Mono", "Geist Mono Fallback";
+  /* Geist Mono loads in the dashboard layout only; everywhere else (and until it has loaded) the system
+     monospace stands in — without a generic family the browser's default (a proportional serif) was
+     used wherever `font-mono` appeared on a page that does not load the font. */
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -286,6 +289,10 @@
 [data-in="true"] .wf-rule { transform: scaleX(1); }
 
 .wf-word { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.14em; margin-bottom: -0.14em; }
+/* The masked words are separated by a real space (so the heading's text reads "Find Your Dream", not
+   "FindYourDream", to crawlers and screen readers) instead of the 0.24em margin the design used to put between
+   them. A space is a little narrower than that margin: this puts the difference back, so lines wrap as before. */
+:is(h1, h2, h3):has(.wf-word) { word-spacing: 0.07em; }
 .wf-word > span {
   display: inline-block;
   transform: translateY(108%) rotate(3deg);
@@ -685,22 +692,26 @@
    Two navy halves with the gold mark between them; the halves part along
    the horizon when data-phase flips to "open". */
 .intro { position: fixed; inset: 0; z-index: 1000; pointer-events: none; }
-.intro-half { position: absolute; left: 0; right: 0; height: 50.5%; background: #06182e; transition: transform 950ms cubic-bezier(0.77, 0, 0.175, 1); }
-.intro-half--top { top: 0; animation: intro-part-top 950ms cubic-bezier(0.77, 0, 0.175, 1) 950ms forwards; }
-.intro-half--bottom { bottom: 0; animation: intro-part-bottom 950ms cubic-bezier(0.77, 0, 0.175, 1) 950ms forwards; }
+/* The whole curtain is about 0.6 s: mark 0–220 ms, rule 60–260 ms, a short hold, and the halves are off
+   screen by 600 ms. The two timing values below (--intro-part-at, --intro-part-ms) are set inline on the
+   curtain by components/public/intro-reveal.tsx, which uses the same numbers for its JS phase — so the CSS
+   animation and the JS cannot drift apart. */
+.intro-half { position: absolute; left: 0; right: 0; height: 50.5%; background: #06182e; transition: transform var(--intro-part-ms, 220ms) cubic-bezier(0.77, 0, 0.175, 1); }
+.intro-half--top { top: 0; animation: intro-part-top var(--intro-part-ms, 220ms) cubic-bezier(0.77, 0, 0.175, 1) var(--intro-part-at, 380ms) forwards; }
+.intro-half--bottom { bottom: 0; animation: intro-part-bottom var(--intro-part-ms, 220ms) cubic-bezier(0.77, 0, 0.175, 1) var(--intro-part-at, 380ms) forwards; }
 .intro[data-phase="open"] .intro-half--top { transform: translateY(-101%); }
 .intro[data-phase="open"] .intro-half--bottom { transform: translateY(101%); }
 /* The halves part on a CSS timer that starts at first paint — on a slow phone React hydrates
    late, and the hero (the page's largest paint) must not wait for it. The JS phase change at
-   the same 950ms agrees with these, so nothing jumps. */
+   the same moment agrees with these (same constants), so nothing jumps. */
 @keyframes intro-part-top { to { transform: translateY(-101%); } }
 @keyframes intro-part-bottom { to { transform: translateY(101%); } }
-.intro-center { position: absolute; left: 50%; top: 50%; display: flex; flex-direction: column; align-items: center; gap: 18px; transform: translate(-50%, -50%); transition: opacity 260ms ease, transform 500ms cubic-bezier(0.16, 1, 0.3, 1); animation: intro-center-out 500ms cubic-bezier(0.16, 1, 0.3, 1) 950ms forwards; }
+.intro-center { position: absolute; left: 50%; top: 50%; display: flex; flex-direction: column; align-items: center; gap: 18px; transform: translate(-50%, -50%); transition: opacity 160ms ease, transform 260ms cubic-bezier(0.16, 1, 0.3, 1); animation: intro-center-out 200ms cubic-bezier(0.16, 1, 0.3, 1) var(--intro-part-at, 380ms) forwards; }
 .intro[data-phase="open"] .intro-center { opacity: 0; transform: translate(-50%, -50%) scale(1.08); }
 @keyframes intro-center-out { to { opacity: 0; transform: translate(-50%, -50%) scale(1.08); } }
-.intro-mark { opacity: 0; transform: scale(0.86) translateY(6px); animation: intro-mark 700ms cubic-bezier(0.16, 1, 0.3, 1) 80ms forwards; filter: drop-shadow(0 0 28px rgba(214, 179, 87, 0.35)); }
+.intro-mark { opacity: 0; transform: scale(0.86) translateY(6px); animation: intro-mark 220ms cubic-bezier(0.16, 1, 0.3, 1) 0ms forwards; filter: drop-shadow(0 0 28px rgba(214, 179, 87, 0.35)); }
 @keyframes intro-mark { to { opacity: 1; transform: scale(1) translateY(0); } }
-.intro-rule { display: block; height: 2px; width: 0; background: #d6b357; animation: intro-rule 520ms cubic-bezier(0.16, 1, 0.3, 1) 420ms forwards; }
+.intro-rule { display: block; height: 2px; width: 0; background: #d6b357; animation: intro-rule 200ms cubic-bezier(0.16, 1, 0.3, 1) 60ms forwards; }
 @keyframes intro-rule { to { width: 120px; } }
 
 /* ─── Hero entrance (after the curtain) ──────────────────────────────────── */
@@ -708,8 +719,17 @@
 .hero[data-in="true"] .hero-sweep { animation: hero-sweep 1800ms cubic-bezier(0.16, 1, 0.3, 1) 200ms forwards; }
 @keyframes hero-sweep { 0% { opacity: 0; transform: translateX(-60%); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateX(60%); } }
 
-.hero-search { opacity: 0; transform: translateY(44px) scale(0.985); transition: opacity 900ms var(--wf-ease), transform 1100ms var(--wf-ease); transition-delay: 1000ms; }
-.hero[data-in="true"] .hero-search { opacity: 1; transform: translateY(0) scale(1); }
+/* The hero's copy is in the very first paint: nothing is hidden behind the curtain, hydration or an
+   observer, so the headline (the page's largest text) is visible — and indexed as such — from the first
+   frame. What remains of the entrance is a 10 px rise once the curtain opens. Scoped to .hero on purpose:
+   other pages keep the masked word reveal. The (0,3,0) .hero[data-in] rules must stay below the (0,2,0)
+   .hero .wf-fade so they win over the generic [data-in] .wf-fade; the reduced-motion block below still
+   neutralises everything. */
+.hero .wf-word > span { transform: none; transition: none; }
+.hero .wf-fade { opacity: 1; filter: none; transform: translateY(10px); transition: transform 800ms var(--wf-ease); transition-delay: calc((var(--d, 0ms) + var(--g, 0ms)) * 0.3); }
+.hero[data-in="true"] .wf-fade { transform: translateY(0); }
+.hero-search { opacity: 1; transform: translateY(10px); transition: transform 800ms var(--wf-ease); transition-delay: 150ms; }
+.hero[data-in="true"] .hero-search { transform: translateY(0); }
 .hero-search::after { content: ""; position: absolute; inset: -6px; pointer-events: none; border: 2px solid rgba(214, 179, 87, 0); }
 .hero[data-in="true"] .hero-search::after { animation: hero-search-pulse 1400ms ease-out 1900ms; }
 @keyframes hero-search-pulse { 0% { border-color: rgba(214, 179, 87, 0.75); inset: 0; } 100% { border-color: rgba(214, 179, 87, 0); inset: -18px; } }
@@ -775,8 +795,13 @@
 .pp-plan-node { transform: scale(0); transition: transform 550ms cubic-bezier(0.34, 1.56, 0.64, 1); transition-delay: calc(var(--d, 0ms) + 200ms); }
 [data-in="true"] .pp-plan-node { transform: scale(1); }
 
-.pp-side { opacity: 0; transform: translateX(32px); transition: opacity 900ms var(--wf-ease), transform 900ms var(--wf-ease); transition-delay: 300ms; }
-[data-in="true"].pp-side { opacity: 1; transform: translateX(0); }
+/* Below lg the sidebar is stacked under the main column, so a sideways slide-in only
+   pushed its right edge 32px past the screen until the reader scrolled to it — the
+   whole page could be panned 16px sideways on a phone. It rises instead; the
+   side-to-side slide stays for the real side column at lg. */
+.pp-side { opacity: 0; transform: translateY(16px); transition: opacity 900ms var(--wf-ease), transform 900ms var(--wf-ease); transition-delay: 300ms; }
+@media (min-width: 1024px) { .pp-side { transform: translateX(32px); } }
+[data-in="true"].pp-side { opacity: 1; transform: none; }
 
 .pp-lightbox { animation: pp-lightbox-in 260ms var(--wf-ease); }
 @keyframes pp-lightbox-in { from { opacity: 0; } to { opacity: 1; } }
@@ -785,10 +810,11 @@
 
 .pp-sticky { transform: translateY(110%); transition: transform 420ms var(--wf-ease); }
 .pp-sticky[data-show="true"] { transform: translateY(0); }
-/* The WhatsApp float rides above the phone action bar while it is shown. */
+/* The WhatsApp float rides above the phone action bar while it is shown. Pure CSS (the bar is in
+   the server HTML with data-show="true"), so the float is already clear of it at first paint. */
 @media (max-width: 1023px) {
   .wa-fab { transition: bottom 420ms var(--wf-ease), transform 200ms; }
-  body.has-sticky-bar .wa-fab { bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px)); }
+  body:has(.pp-sticky[data-show="true"]) .wa-fab { bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

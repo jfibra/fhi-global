@@ -177,7 +177,7 @@ export function ProjectFilters({ developers, cities, total, page, totalPages, pi
                 <Link href={viewHref("list")} scroll={false} aria-current={view === "list" ? "page" : undefined} className={`pl-view ${view === "list" ? "pl-view--on" : ""}`}>
                   <LayoutGrid className="h-4 w-4" /> List
                 </Link>
-                <Link href={viewHref("map")} scroll={false} aria-current={view === "map" ? "page" : undefined} className={`pl-view ${view === "map" ? "pl-view--on" : ""}`}>
+                <Link href={viewHref("map")} scroll={false} rel="nofollow" aria-current={view === "map" ? "page" : undefined} className={`pl-view ${view === "map" ? "pl-view--on" : ""}`}>
                   <MapIcon className="h-4 w-4" /> Map
                 </Link>
               </div>
@@ -212,7 +212,7 @@ export function ProjectFilters({ developers, cities, total, page, totalPages, pi
                 {picks.map((p) => {
                   const on = isPickActive(p)
                   return (
-                    <Link key={p.label} href={pickHref(p)} scroll={false} className={`pl-pick ${on ? "pl-pick--on" : ""}`}>
+                    <Link key={p.label} href={pickHref(p)} scroll={false} rel="nofollow" className={`pl-pick ${on ? "pl-pick--on" : ""}`}>
                       {p.label}
                       <span className="pl-pick-count">{fmtCount(p.count)}</span>
                     </Link>

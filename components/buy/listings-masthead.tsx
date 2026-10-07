@@ -25,7 +25,8 @@ export function ListingsMasthead({
           src="/background/dubai.webp"
           alt=""
           fill
-          priority
+          preload
+          fetchPriority="high"
           sizes="100vw"
           className="object-cover object-center"
           aria-hidden="true"

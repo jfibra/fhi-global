@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { Fragment, useCallback, useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { MapPin, ArrowRight } from "lucide-react"
@@ -10,6 +10,8 @@ import { IntroReveal } from "@/components/public/intro-reveal"
 export interface HeroSpotlight {
   name: string
   slug: string | null
+  /** The developer's slug — the canonical project URL is /<developer>/<project>. */
+  developerSlug: string | null
   image: string
   location: string | null
   priceLabel: string | null
@@ -36,6 +38,8 @@ const HERO_SLIDES = [
   "/background/dubai.webp",
 ]
 const SLIDE_MS = 7000
+/** How long before a crossfade the next photo is mounted (and so starts downloading). */
+const WARM_MS = 2500
 const DECK_MS = 6000
 
 /** A line of the headline, one masked word at a time. `start` offsets the
@@ -43,12 +47,16 @@ const DECK_MS = 6000
 function Words({ text, start, className }: { text: string; start: number; className?: string }) {
   return (
     <>
+      {/* A real space after each word, not a margin: with a margin the H1's text reads "FindYourDream" to
+          crawlers and screen readers. The trailing space at a line end collapses, so nothing shifts. */}
       {text.split(" ").map((w, i) => (
-        <span key={`${w}-${i}`} className="wf-word mr-[0.24em]">
-          <span style={{ ["--i" as string]: start + i }} className={className}>
-            {w}
-          </span>
-        </span>
+        <Fragment key={`${w}-${i}`}>
+          <span className="wf-word">
+            <span style={{ ["--i" as string]: start + i }} className={className}>
+              {w}
+            </span>
+          </span>{" "}
+        </Fragment>
       ))}
     </>
   )
@@ -57,6 +65,11 @@ function Words({ text, start, className }: { text: string; start: number; classN
 export function HeroSection({ popular = [], spotlight = [], facts = [] }: HeroSectionProps) {
   const rootRef = useRef<HTMLElement>(null)
   const [slide, setSlide] = useState(0)
+  // Only slide 0 is in the first paint. The other photos used to be mounted
+  // from the start — hidden by opacity but inside the viewport, so the browser
+  // downloaded all four at once and they fought the one image that is the LCP.
+  // Each next photo is mounted WARM_MS before it fades in instead.
+  const [mounted, setMounted] = useState<number[]>([0])
 
   // The entrance waits for the curtain: IntroReveal calls this when it starts
   // to part (or at once when skipped), and the CSS keyed on data-in takes over.
@@ -69,6 +82,13 @@ export function HeroSection({ popular = [], spotlight = [], facts = [] }: HeroSe
     const slides = setInterval(() => setSlide((i) => (i + 1) % HERO_SLIDES.length), SLIDE_MS)
     return () => clearInterval(slides)
   }, [])
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+    const next = (slide + 1) % HERO_SLIDES.length
+    const warm = setTimeout(() => setMounted((m) => (m.includes(next) ? m : [...m, next])), SLIDE_MS - WARM_MS)
+    return () => clearTimeout(warm)
+  }, [slide])
 
   return (
     // overflow-x-clip, NOT overflow-hidden: the search results panel has to
@@ -83,20 +103,24 @@ export function HeroSection({ popular = [], spotlight = [], facts = [] }: HeroSe
 
       {/* ── Background photo + legibility washes ── */}
       <div className="absolute inset-0 overflow-hidden">
-        {HERO_SLIDES.map((src, i) => (
-          <Image
-            key={src}
-            src={src}
-            alt=""
-            fill
-            priority={i === 0}
-            sizes="100vw"
-            quality={80}
-            className={`object-cover object-center animate-kenburns transition-opacity duration-[1800ms] ease-linear ${
-              i === slide ? "opacity-100" : "opacity-0"
-            }`}
-          />
-        ))}
+        {HERO_SLIDES.map((src, i) =>
+          mounted.includes(i) ? (
+            <Image
+              key={src}
+              src={src}
+              alt=""
+              fill
+              // Slide 0 is the page's LCP: preloaded AND hinted high. `priority`
+              // alone only preloads and disables lazy loading — the fetch itself
+              // still went out at default (Low) priority.
+              {...(i === 0 ? { preload: true, fetchPriority: "high" as const } : {})}
+              sizes="100vw"
+              className={`object-cover object-center animate-kenburns transition-opacity duration-[1800ms] ease-linear ${
+                i === slide ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          ) : null,
+        )}
         {/* Text-protection scrim: deep enough on the left third to carry
             small type at speed, fully transparent by 60% so the skyline stays
             bright and the deck keeps its contrast. */}
@@ -145,7 +169,7 @@ export function HeroSection({ popular = [], spotlight = [], facts = [] }: HeroSe
             style={{ ["--d" as string]: "800ms" }}
           >
             Apartments, villas and penthouses from Dubai&apos;s most trusted
-            developers, with prices, payment plans and handover dates upfront.
+            developers, with prices, unit types and handover dates upfront.
           </p>
 
           {/* ── Search — the omnibox. Live results from the catalog itself.
@@ -288,7 +312,8 @@ function Deck({ cards }: { cards: HeroSpotlight[] }) {
           return (
             <Link
               key={p.slug ?? i}
-              href={p.slug ? `/projects/${p.slug}` : "/projects"}
+              // Straight to the canonical /<developer>/<project> URL: /projects/<slug> is a 308 hop.
+              href={p.slug ? (p.developerSlug ? `/${p.developerSlug}/${p.slug}` : `/projects/${p.slug}`) : "/projects"}
               onClick={(e) => {
                 if (k !== 0) {
                   e.preventDefault()

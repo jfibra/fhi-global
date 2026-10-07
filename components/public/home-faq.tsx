@@ -1,3 +1,4 @@
+import { Fragment } from "react"
 import { ArrowUpRight, MessageCircleQuestion, Plus } from "lucide-react"
 import { HOME_FAQS } from "@/lib/faqs"
 import { InView } from "@/components/public/in-view"
@@ -49,11 +50,13 @@ export function HomeFaq() {
 
               <h2 className="mt-5 font-['Outfit'] text-[40px] font-bold leading-[1.02] tracking-tight text-[#0d1117] sm:text-[48px]">
                 {HEADLINE.map((w, i) => (
-                  <span key={w.text} className="wf-word block">
-                    <span style={{ ["--i" as string]: i }} className={w.gold ? "wf-gold" : undefined}>
-                      {w.text}
-                    </span>
-                  </span>
+                  <Fragment key={w.text}>
+                    <span className="wf-word block">
+                      <span style={{ ["--i" as string]: i }} className={w.gold ? "wf-gold" : undefined}>
+                        {w.text}
+                      </span>
+                    </span>{" "}
+                  </Fragment>
                 ))}
               </h2>
 

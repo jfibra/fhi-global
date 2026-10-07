@@ -40,7 +40,7 @@ export default async function EventCertificatePage({ params }: Props) {
   const back = `/events/${event.slug ?? event.id}`
 
   return (
-    <main className="bg-[#fafafa] min-h-[70vh]">
+    <div className="bg-[#fafafa] min-h-[70vh]">
       <div className="max-w-xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
         <Link href={back} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#6b7280] hover:text-[#001f3f] mb-6">
           <ArrowLeft className="w-3.5 h-3.5" /> {event.title}
@@ -66,6 +66,6 @@ export default async function EventCertificatePage({ params }: Props) {
         </div>
         <p className="text-[11px] text-[#9ca3af] text-center mt-4">Your details are used only to issue your certificate and are never shared.</p>
       </div>
-    </main>
+    </div>
   )
 }

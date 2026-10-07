@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
 /**
  * The doors in front of Featured Projects.
@@ -34,9 +34,46 @@ function fillWall(list: WallImage[], min: number): WallImage[] {
   return out.slice(0, Math.max(min, list.length))
 }
 
+/** How many renders each door carries. Fewer, larger tiles: the wall used to be
+ *  42 tiles per door — every one a separate download, none of them seen until the
+ *  reader had scrolled most of the page. */
+const WALL_TILES = 30
+
 export function FeaturedGate({ count, images = [] }: { count: number; images?: WallImage[] }) {
   const zoneRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
+  // The wall is not part of the first paint: until now it was 80+ <img> and
+  // ~1.1 MB of the home page's images, all competing with the hero for the LCP.
+  // It mounts once the page has settled (2 s after load) — early enough to be
+  // ready long before the reader scrolls here — or at once if they get here first.
+  const [wallReady, setWallReady] = useState(false)
+
+  useEffect(() => {
+    const zone = zoneRef.current
+    if (!zone || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+    let done = false
+    let timer = 0
+    const mount = () => {
+      if (done) return
+      done = true
+      setWallReady(true)
+    }
+    const settle = () => {
+      timer = window.setTimeout(mount, 2000)
+    }
+    if (document.readyState === "complete") settle()
+    else window.addEventListener("load", settle, { once: true })
+    const near = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) mount()
+    }, { rootMargin: "50% 0px" })
+    near.observe(zone)
+    return () => {
+      done = true
+      window.clearTimeout(timer)
+      window.removeEventListener("load", settle)
+      near.disconnect()
+    }
+  }, [])
 
   useEffect(() => {
     const zone = zoneRef.current
@@ -88,7 +125,7 @@ export function FeaturedGate({ count, images = [] }: { count: number; images?: W
   }, [])
 
   const label = `${count} hand-picked ${count === 1 ? "development" : "developments"}`
-  const wall = fillWall(images, 42)
+  const wall = fillWall(images.slice(0, WALL_TILES), WALL_TILES)
 
   return (
     <div ref={zoneRef} className="gate relative h-[170vh] lg:h-[200vh]">
@@ -136,12 +173,13 @@ export function FeaturedGate({ count, images = [] }: { count: number; images?: W
         <div className="gate-doors absolute inset-0 z-20" aria-hidden="true">
           {(["l", "r"] as const).map((side) => (
             <div key={side} className={`gate-door gate-door--${side} absolute inset-y-0 ${side === "l" ? "left-0" : "right-0"} w-1/2 overflow-hidden`}>
-              {wall.length > 0 && (
+              {wallReady && wall.length > 0 && (
                 <div className={`gate-wall absolute inset-y-0 w-[200%] ${side === "l" ? "left-0" : "-left-full"}`}>
-                  <div className="gate-wall-grid grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-7">
+                  <div className="gate-wall-grid grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
                     {wall.map((im, i) => (
                       <div key={`${side}-${i}`} className="relative aspect-[4/3] overflow-hidden bg-[#0a1f38]">
-                        <Image src={im.src} alt="" width={320} height={240} className="absolute inset-0 h-full w-full object-cover" />
+                        {/* Each door's wall spans the full viewport width (200% of a half), so a tile is 1/3, 1/4 or 1/5 of it. */}
+                        <Image src={im.src} alt="" width={320} height={240} sizes="(min-width: 1024px) 20vw, (min-width: 640px) 25vw, 34vw" className="absolute inset-0 h-full w-full object-cover" />
                       </div>
                     ))}
                   </div>

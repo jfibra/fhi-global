@@ -1,17 +1,24 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { Suspense } from "react"
-import { createPageMetadata } from "@/lib/seo"
+import { createPageMetadata, truncateDescription } from "@/lib/seo"
 import { breadcrumbList } from "@/lib/structured-data"
 import { JsonLd } from "@/components/json-ld"
 import {
+  assertListingsPageInRange,
   deriveListings,
+  listingHubIsFiltered,
+  listingHubSelfHref,
   listViewHrefFromSp,
   loadPublicAgentListings,
   loadListingPageProjects,
+  paginateListings,
+  parseListingsPage,
   type ListingSearchParams,
 } from "@/lib/buy/listings-page-logic"
-import { BuyFiltersLoader } from "../buy/buy-filters-loader"
+import { fetchPropertyTypesForBuyFilters } from "@/lib/buy/property-types"
+import { BuyFiltersBar } from "@/components/buy/buy-filters-bar"
+import { Pager } from "@/components/public/pager"
 import { ListingsMasthead } from "@/components/buy/listings-masthead"
 import { BuyListToolbar } from "@/components/buy/buy-list-toolbar"
 import { BuyPropertyCard } from "@/components/buy/buy-property-card"
@@ -26,19 +33,32 @@ import { ChevronRight } from "lucide-react"
 
 export const revalidate = 120
 
-export const metadata: Metadata = createPageMetadata({
-  title: "Rent Property in the United Arab Emirates",
-  description:
-    "Browse rental properties in the UAE from FHI Global listings — filter by location, type, and budget. Listings are curated by our sales team.",
-  pathname: "/rent",
-  keywords: [
-    "rent property UAE",
-    "apartments for rent Dubai",
-    "FHI Global rent",
-    "Dubai rentals",
-    "villa for rent UAE",
-  ],
-})
+const TITLE = "Rent Property in the United Arab Emirates"
+const DESCRIPTION = "Browse rental properties in the UAE from FHI Global listings — filter by location, type, and budget. Listings are curated by our sales team."
+
+export async function generateMetadata({ searchParams }: { searchParams: ListingSearchParams }): Promise<Metadata> {
+  const sp = await searchParams
+  // A search, filter, sort or map view is another way of looking at the same list: kept out of the index
+  // (links still followed) and canonical to ITSELF. The plain list is the one indexable view, and its
+  // numbered pages (?page=N) are indexable too, each self-canonical with its own title — so the cards
+  // beyond page 1 stay in the crawl graph. A page past the last one is a real 404 (a 5xx during an outage).
+  const filtered = listingHubIsFiltered(sp)
+  const pageNum = sp.view === "map" ? 1 : parseListingsPage(sp.page)
+  const totalPages = pageNum > 1 ? await assertListingsPageInRange("rent", sp, pageNum) : 1
+  return createPageMetadata({
+    title: pageNum > 1 ? `Rent Property in the UAE — Page ${pageNum}` : TITLE,
+    description: pageNum > 1 ? truncateDescription(`Page ${pageNum} of ${totalPages}. ${DESCRIPTION}`) : DESCRIPTION,
+    pathname: filtered ? listingHubSelfHref(sp, "/rent", pageNum) : pageNum > 1 ? `/rent?page=${pageNum}` : "/rent",
+    robots: filtered ? { index: false, follow: true } : undefined,
+    keywords: [
+      "rent property UAE",
+      "apartments for rent Dubai",
+      "FHI Global rent",
+      "Dubai rentals",
+      "villa for rent UAE",
+    ],
+  })
+}
 
 function FiltersFallback() {
   return (
@@ -184,12 +204,13 @@ async function RentMapSplitMap({ sp }: { sp: Sp }) {
   )
 }
 
-async function RentListingsColumn({ sp }: { sp: Sp }) {
+async function RentListingsColumn({ sp, page }: { sp: Sp; page: number }) {
   const [{ rows: agentRows, error: agentErr }, { rows: projectRows, error: projErr }] = await Promise.all([
     loadRentListings(),
     loadListingPageProjects("rent"),
   ])
   const { properties, totalLabel } = deriveListings(sp, agentRows, agentErr, projectRows, projErr)
+  const { items, totalPages, start } = paginateListings(properties, page)
 
   return (
     <>
@@ -217,15 +238,29 @@ async function RentListingsColumn({ sp }: { sp: Sp }) {
         </div>
       )}
       {!(agentErr && projErr) &&
-        properties.length > 0 &&
-        properties.map((p) => <BuyPropertyCard key={p.id} property={p} />)}
+        items.map((p) => <BuyPropertyCard key={p.id} property={p} />)}
+      {!(agentErr && projErr) && totalPages > 1 && (
+        <Pager
+          page={Math.min(page, totalPages)}
+          totalPages={totalPages}
+          hrefFor={(n) => listingHubSelfHref(sp, "/rent", n)}
+          summary={`Showing ${start + 1}–${start + items.length} of ${properties.length}`}
+          className="pt-2"
+        />
+      )}
     </>
   )
 }
 
 export default async function RentPage({ searchParams }: { searchParams: ListingSearchParams }) {
-  const sp = await searchParams
+  // The filter bar's property types are cached, so awaiting them here puts the bar in the first flush at
+  // its real height (it used to arrive ~1.7 s late behind a 152 px placeholder — the page's layout shift).
+  const [sp, propertyTypes] = await Promise.all([searchParams, fetchPropertyTypesForBuyFilters()])
   const view = sp.view === "map" ? "map" : "list"
+  // A page past the last one is a 404 decided HERE, at page level and outside every Suspense, so the
+  // status survives streaming.
+  const pageNum = view === "list" ? parseListingsPage(sp.page) : 1
+  if (pageNum > 1) await assertListingsPageInRange("rent", sp, pageNum)
 
   // The h1 lives in the masthead now — this slim row just orients (trail)
   // and controls (view/sort toolbar).
@@ -260,7 +295,7 @@ export default async function RentPage({ searchParams }: { searchParams: Listing
       </ListingsMasthead>
 
       <Suspense fallback={<FiltersFallback />}>
-        <BuyFiltersLoader />
+        <BuyFiltersBar propertyTypes={propertyTypes} />
       </Suspense>
 
       {view === "map" ? (
@@ -287,7 +322,7 @@ export default async function RentPage({ searchParams }: { searchParams: Listing
 
               <div className="space-y-5 min-w-0">
                 <Suspense fallback={<RentListingsSkeleton />}>
-                  <RentListingsColumn sp={sp} />
+                  <RentListingsColumn sp={sp} page={pageNum} />
                 </Suspense>
               </div>
             </div>

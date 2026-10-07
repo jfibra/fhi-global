@@ -24,6 +24,8 @@ export function BuyListToolbar({
   const setParam = useCallback(
     (key: string, value: string | null) => {
       const p = new URLSearchParams(searchParams.toString())
+      // Sorting or switching List/Map starts again from the first page (and the map ignores pages).
+      p.delete("page")
       if (value == null || value === "") p.delete(key)
       else p.set(key, value)
       const qs = p.toString()

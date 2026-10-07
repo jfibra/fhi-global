@@ -129,7 +129,8 @@ export default async function EventsPage() {
             src="/background/dubai.webp"
             alt=""
             fill
-            priority
+            preload
+            fetchPriority="high"
             sizes="(max-width: 1024px) 100vw, 62vw"
             className="object-cover object-center"
           />

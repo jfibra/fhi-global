@@ -1,3 +1,4 @@
+import { Fragment } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
@@ -117,11 +118,13 @@ export function WhyFhi() {
 
               <h2 className="mt-8 font-['Outfit'] text-[40px] font-bold leading-[1.05] tracking-tight text-[#0d1117] sm:text-[52px] lg:text-[56px]">
                 {HEADLINE.map((w, i) => (
-                  <span key={i} className="wf-word mr-[0.26em]">
-                    <span style={{ ["--i" as string]: i }} className={w.gold ? "wf-gold" : undefined}>
-                      {w.text}
-                    </span>
-                  </span>
+                  <Fragment key={i}>
+                    <span className="wf-word">
+                      <span style={{ ["--i" as string]: i }} className={w.gold ? "wf-gold" : undefined}>
+                        {w.text}
+                      </span>
+                    </span>{" "}
+                  </Fragment>
                 ))}
               </h2>
 

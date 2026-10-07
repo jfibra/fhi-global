@@ -1,3 +1,4 @@
+import { Fragment } from "react"
 import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
@@ -23,7 +24,7 @@ export const revalidate = 300
 
 async function loadProject(slug: string) {
   const supabase = createPublicSupabaseClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("projects")
     .select("name, slug, main_image, trakheesi_permit_url, trakheesi_permit_number, trakheesi_permit_link, developers(name, slug, logo_url, logo_bg)")
     .eq("slug", slug)
@@ -31,6 +32,9 @@ async function loadProject(slug: string) {
     .eq("is_published", true)
     .is("deleted_at", null)
     .maybeSingle()
+  // Transient failure → 5xx. This route is ISR (revalidate = 300): a notFound()
+  // here would cache a hard 404 over a live permit page for five minutes.
+  if (error) throw new Error("Failed to load project for permit verification")
   return data as
     | {
         name: string
@@ -84,11 +88,11 @@ export default async function VerifyPermitPage({ params }: Props) {
         </p>
         <h1 className="mt-4 font-['Outfit'] text-[34px] font-bold leading-[1.05] tracking-tight text-white sm:text-[44px]">
           {["Verify", "this", "permit", "with"].map((w, i) => (
-            <span key={w} className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: i }}>{w}</span></span>
+            <Fragment key={w}><span className="wf-word"><span style={{ ["--i" as string]: i }}>{w}</span></span>{" "}</Fragment>
           ))}
           <span className="block">
             {["the", "Dubai", "Land", "Department."].map((w, i) => (
-              <span key={w} className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 4 + i }} className="wf-gold">{w}</span></span>
+              <Fragment key={w}><span className="wf-word"><span style={{ ["--i" as string]: 4 + i }} className="wf-gold">{w}</span></span>{" "}</Fragment>
             ))}
           </span>
         </h1>

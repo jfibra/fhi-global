@@ -66,7 +66,7 @@ export function NewsHero({ stories }: { stories: HeroStory[] }) {
           into the white — that read as a hard line beside the picture. */}
       <div className="absolute inset-y-0 right-0 w-full lg:w-[58%] overflow-hidden" aria-hidden="true">
         {n === 0 ? (
-          <Image src="/background/dubai.webp" alt="" fill sizes="(max-width: 1024px) 100vw, 58vw" priority className="object-cover object-center" />
+          <Image src="/background/dubai.webp" alt="" fill sizes="(max-width: 1024px) 100vw, 58vw" preload fetchPriority="high" className="object-cover object-center" />
         ) : (
           stories.map((s, k) => (
             <Image
@@ -75,7 +75,7 @@ export function NewsHero({ stories }: { stories: HeroStory[] }) {
               alt=""
               fill
               sizes="(max-width: 1024px) 100vw, 58vw"
-              priority={k === 0}
+              {...(k === 0 ? { preload: true, fetchPriority: "high" as const } : {})}
               className={`object-cover object-center ${fade} ${k === i ? "opacity-100" : "opacity-0"} ${k === i && !still ? "nh-drift" : ""}`}
             />
           ))

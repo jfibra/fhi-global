@@ -175,7 +175,6 @@ export function HomeNews({ items }: { items: HomeNewsItem[] }) {
                       alt={item.title}
                       fill
                       sizes="(max-width: 640px) 76vw, (max-width: 1024px) 48vw, 24vw"
-                      priority={i === 0}
                       className="object-cover transition-transform duration-700 group-hover:scale-[1.04]"
                     />
                     {item.badge?.trim() && (

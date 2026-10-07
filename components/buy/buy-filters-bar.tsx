@@ -103,6 +103,9 @@ export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTyp
   const applyParams = useCallback(
     (mutate: (p: URLSearchParams) => void) => {
       const p = new URLSearchParams(searchParams.toString())
+      // Every filter change, the debounced typing and Clear start from the first page — a stale ?page=3
+      // would land past the end of a shorter result.
+      p.delete("page")
       mutate(p)
       const qs = p.toString()
       const base = listBase
@@ -168,7 +171,10 @@ export function BuyFiltersBar({ propertyTypes }: { propertyTypes: BuyPropertyTyp
 
   function saveSearch() {
     if (typeof window === "undefined") return
-    const qs = window.location.search
+    // The page number is not part of a search worth saving.
+    const params = new URLSearchParams(window.location.search)
+    params.delete("page")
+    const qs = params.toString() ? `?${params.toString()}` : ""
     try {
       localStorage.setItem(savedSearchKey, qs)
       setCanRestore(true)

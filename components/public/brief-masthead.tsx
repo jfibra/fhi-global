@@ -24,7 +24,7 @@ export function BriefMasthead({
   return (
     <section className="relative overflow-hidden bg-[#06182e] text-white">
       <div className="absolute inset-0" aria-hidden="true">
-        <Image src="/background/dubai.webp" alt="" fill priority sizes="100vw" className="object-cover object-center" />
+        <Image src="/background/dubai.webp" alt="" fill preload fetchPriority="high" sizes="100vw" className="object-cover object-center" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#06182e]/95 via-[#06182e]/80 to-[#06182e]/45" />
       </div>
       <div className="relative mx-auto max-w-3xl px-4 pb-24 pt-10 sm:px-6 md:pt-14">

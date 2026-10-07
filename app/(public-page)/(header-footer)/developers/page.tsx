@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
-import { Suspense } from "react"
+import { Suspense, Fragment } from "react"
 import { getCachedDevelopersDirectory } from "@/lib/data/developers"
 import { createPageMetadata } from "@/lib/seo"
 import { breadcrumbList } from "@/lib/structured-data"
@@ -13,22 +13,31 @@ import { EMIRATES, countByEmirate, emirateCodeForCity } from "@/lib/emirates"
 import { DeveloperSearch } from "./developer-search"
 import { Building2, ShieldCheck } from "lucide-react"
 
-export const metadata: Metadata = createPageMetadata({
-  title: "Real Estate Developers in Dubai",
-  description: "Browse top real estate developers in Dubai. Discover verified developers and their premium property projects.",
-  pathname: "/developers",
-  keywords: ["Dubai developers", "real estate developers Dubai", "verified developers UAE"],
-})
+// Next hands a repeated param (?q=a&q=b) over as an array, whatever the type says: read the first value.
+type SearchParams = Promise<{ q?: string | string[]; sort?: string | string[] }>
+const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
 
-type SearchParams = Promise<{ q?: string; sort?: string }>
+export async function generateMetadata({ searchParams }: { searchParams: SearchParams }): Promise<Metadata> {
+  const search = (first((await searchParams).q) ?? "").trim()
+  return createPageMetadata({
+    title: "Real Estate Developers in Dubai",
+    description: "Browse top real estate developers in Dubai. Discover verified developers and their premium property projects.",
+    // A search is a filtered view of the same directory: out of the index, canonical to ITSELF (the filter is in
+    // the URL). ?sort=az only reorders the same list, so it keeps the hub's canonical.
+    pathname: search ? `/developers?q=${encodeURIComponent(search)}` : "/developers",
+    robots: search ? { index: false, follow: true } : undefined,
+    keywords: ["Dubai developers", "real estate developers Dubai", "verified developers UAE"],
+  })
+}
 
 function SearchFallback() {
   return <div className="h-11 bg-white border border-[#e8eaed] animate-pulse" aria-hidden />
 }
 
 export default async function DevelopersPage({ searchParams }: { searchParams: SearchParams }) {
-  const { q, sort } = await searchParams
-  const alphabetical = sort === "az"
+  const params = await searchParams
+  const q = first(params.q)
+  const alphabetical = first(params.sort) === "az"
 
   // Directory data comes from a 120s server cache (no Supabase round-trips on
   // the hot path); counts, emirates, search and sort all run in memory over
@@ -111,7 +120,7 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
           site's entrance and the directory's real counts counting up. */}
       <section className="relative overflow-hidden bg-[#06182e] text-white">
         <div className="absolute inset-0" aria-hidden="true">
-          <Image src="/background/dubai.webp" alt="" fill priority sizes="100vw" className="object-cover object-center" />
+          <Image src="/background/dubai.webp" alt="" fill preload fetchPriority="high" sizes="100vw" className="object-cover object-center" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#06182e]/95 via-[#06182e]/70 to-[#06182e]/30" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#06182e]/80 via-transparent to-transparent" />
         </div>
@@ -123,10 +132,10 @@ export default async function DevelopersPage({ searchParams }: { searchParams: S
                 <span className="wf-fade" style={{ ["--d" as string]: "200ms" }}>FHI Global · Trusted developers</span>
               </p>
               <h1 className="mt-3 font-['Outfit'] text-[34px] font-bold leading-[1.06] tracking-tight drop-shadow-[0_2px_16px_rgba(0,10,30,0.5)] sm:text-[44px] lg:text-[52px]">
-                <span className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 0 }}>Dubai&apos;s</span></span>
-                <span className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 1 }}>Top</span></span>
+                <span className="wf-word"><span style={{ ["--i" as string]: 0 }}>Dubai&apos;s</span></span>{" "}
+                <span className="wf-word"><span style={{ ["--i" as string]: 1 }}>Top</span></span>{" "}
                 {["Real", "Estate", "Developers"].map((w, i) => (
-                  <span key={w} className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 2 + i }} className="wf-gold">{w}</span></span>
+                  <Fragment key={w}><span className="wf-word"><span style={{ ["--i" as string]: 2 + i }} className="wf-gold">{w}</span></span>{" "}</Fragment>
                 ))}
               </h1>
               <p className="wf-fade mt-3 max-w-xl text-[15px] text-white/80" style={{ ["--d" as string]: "600ms" }}>

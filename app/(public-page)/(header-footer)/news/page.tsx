@@ -39,16 +39,18 @@ function newsPageHref(category: string | undefined, page: number): string {
 }
 
 export async function generateMetadata({ searchParams }: { searchParams: SearchParams }): Promise<Metadata> {
-  const { page } = await searchParams
+  const { page, category } = await searchParams
   const pageNum = parsePage(page)
   // Self-canonical per page so the article links on deep pages stay in the
-  // crawl graph (category views canonicalize to the unfiltered list, as the
-  // static metadata always did).
+  // crawl graph. A category view lists a subset of the same syndicated articles
+  // (and used to canonicalise to the unfiltered list although its content
+  // differs): it stays out of the index, links followed, canonical to itself.
   return createPageMetadata({
     title: pageNum > 1 ? `Real Estate News & Insights — Page ${pageNum}` : "Real Estate News & Insights",
     description:
       "Stay up to date with the latest real estate news, market trends, and investment insights from FHI Global.",
-    pathname: pageNum > 1 ? `/news?page=${pageNum}` : "/news",
+    pathname: newsPageHref(category || undefined, pageNum),
+    robots: category ? { index: false, follow: true } : undefined,
     keywords: ["Dubai real estate news", "UAE property updates", "FHI Global news", "property market insights"],
   })
 }
@@ -190,12 +192,12 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
   if (all.length === 0 && !activeCategory) {
     return (
       <div className="min-h-screen bg-white flex flex-col">
-        <main className="flex-1 flex flex-col items-center justify-center py-24 px-4">
+        <div className="flex-1 flex flex-col items-center justify-center py-24 px-4">
           <div className="text-center max-w-md">
             <h1 className="text-2xl font-bold text-gray-800 mb-3">No news available</h1>
             <p className="text-gray-500 text-sm">Check back soon for the latest real estate news and market updates.</p>
           </div>
-        </main>
+        </div>
       </div>
     )
   }
@@ -303,7 +305,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
           {/* ════ MAIN ════ */}
-          <main className="lg:col-span-8 space-y-10">
+          <div className="lg:col-span-8 space-y-10">
 
             {/* Latest Articles — one column of wide rows */}
             {listItems.length > 0 && (
@@ -343,7 +345,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
               </nav>
             )}
 
-          </main>
+          </div>
 
           {/* ════ SIDEBAR ════ */}
           <aside className="lg:col-span-4 space-y-6">

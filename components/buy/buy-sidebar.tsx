@@ -16,6 +16,19 @@ function fmt(dateStr: string) {
 }
 
 function recommendedForListingBase(base: "/buy" | "/rent") {
+  // /buy: these were ?q= searches — noindex views that cannot rank. The area guides and
+  // landing pages cover the same intents and can. /rent has no landing pages of its own
+  // (the rental catalogue is a handful of listings), so it keeps plain searches.
+  if (base === "/buy") {
+    return [
+      { label: "Downtown Dubai area guide", href: "/downtown-dubai" },
+      { label: "Dubai Marina area guide", href: "/dubai-marina" },
+      { label: "Palm Jumeirah area guide", href: "/palm-jumeirah" },
+      { label: "New projects in Abu Dhabi", href: "/new-projects-in-abu-dhabi" },
+      { label: "Properties under AED 1M", href: "/properties-under-1m-in-dubai" },
+      { label: "Featured projects", href: "/projects?featured=true" },
+    ]
+  }
   return [
     { label: "Apartments in Downtown Dubai", href: `${base}?q=Downtown+Dubai&type=apartment` },
     { label: "2 bedroom homes in Dubai Marina", href: `${base}?q=Marina&beds=2` },
@@ -26,8 +39,9 @@ function recommendedForListingBase(base: "/buy" | "/rent") {
 }
 
 const USEFUL = [
-  { label: "Apartments for rent in the UAE", href: "/rent?q=UAE&type=apartment" },
-  { label: "Villa compound for sale", href: "/buy?q=villa+compound+UAE&type=villa" },
+  // "?q=UAE" narrowed nothing; and a "villa compound" search is a noindex view — the Dubai villas landing page ranks.
+  { label: "Apartments for rent in the UAE", href: "/rent?type=apartment" },
+  { label: "Villas for sale in Dubai", href: "/villas-for-sale-in-dubai" },
   { label: "All projects", href: "/projects" },
   { label: "Developers", href: "/developers" },
   { label: "News & insights", href: "/news" },
@@ -153,6 +167,8 @@ export function BuySidebarBottom({ searchBasePath = "/buy" }: { searchBasePath?:
             <li key={r.href}>
               <Link
                 href={r.href}
+                // A filtered view is noindex: say so on the link too, so crawlers do not spend budget on it.
+                rel={r.href.includes("?") ? "nofollow" : undefined}
                 className="text-sm text-[#475569] hover:text-[#d6b357] transition-colors leading-snug"
               >
                 {r.label}
@@ -174,6 +190,7 @@ export function BuySidebarBottom({ searchBasePath = "/buy" }: { searchBasePath?:
             <li key={r.href}>
               <Link
                 href={r.href}
+                rel={r.href.includes("?") ? "nofollow" : undefined}
                 className="text-sm text-[#475569] hover:text-[#d6b357] transition-colors"
               >
                 {r.label}
