@@ -122,7 +122,7 @@ export function NearbyPlaces({ points, neighbors }: NearbyPlacesProps) {
               <div className="w-7 h-7 rounded-lg bg-[#001f3f]/8 flex items-center justify-center">
                 <Icon className="w-3.5 h-3.5 text-[#001f3f]" />
               </div>
-              <h4 className="text-sm font-bold text-[#0d1117] capitalize">{category}</h4>
+              <h3 className="text-sm font-bold text-[#0d1117] capitalize">{category}</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {places.map((p, idx) => (

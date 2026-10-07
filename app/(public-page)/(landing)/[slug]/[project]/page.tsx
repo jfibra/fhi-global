@@ -3,23 +3,34 @@ import Image from "next/image"
 import { notFound, permanentRedirect } from "next/navigation"
 import Link from "next/link"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
-import { createPageMetadata, truncateDescription } from "@/lib/seo"
+import { absoluteUrl, createPageMetadata } from "@/lib/seo"
+import { COMPANY } from "@/lib/company"
 import {
-  composeProjectDescription,
+  HANDOVER_UNDER_REVIEW,
   composeProjectTitle,
   formatPrice,
+  goldenVisaMayQualify,
+  hasPaymentSchedule,
+  isHandoverOverdue,
+  isOffPlan,
+  parseHandover,
   parsePaymentPlan,
   priceFromValue,
   priceToValue,
   projectAtAGlance,
   projectFaqs,
+  projectMetaDescription,
   projectSubtitle,
+  typeLabel,
   type ProjectSeoInput,
 } from "@/lib/project-seo"
-import { relatedSeoPagesForProject } from "@/lib/seo-pages"
+import { normalizeCommunity } from "@/lib/communities"
+import { ogCardImage } from "@/lib/og-url"
+import { buyerGuidesForProject, relatedSeoPagesForProject } from "@/lib/seo-pages"
+import { BuyingGuideLinks } from "@/components/public/buying-guide-links"
 import { ProjectCard, type ProjectCardData } from "@/components/project-card"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
-import { breadcrumbList, faqPageSchema, realEstateListingSchema } from "@/lib/structured-data"
+import { breadcrumbList, developerNodeId, faqPageSchema, realEstateListingSchema } from "@/lib/structured-data"
 import { JsonLd } from "@/components/json-ld"
 import { TopBar } from "@/components/topbar"
 import { Header } from "@/components/header"
@@ -28,7 +39,8 @@ import { SocialShare } from "@/components/social-share"
 import { ProjectGallery } from "@/components/public/project-gallery"
 import { PdfPagePreviews } from "@/components/public/pdf-page-previews"
 import { AmenitiesGrid, NearbyPlaces } from "@/components/public/amenities-grid"
-import { ProjectInquireForm } from "@/components/public/project-inquire-form"
+import { InquireForm } from "@/components/public/inquire-form"
+import { WhatsAppFabTarget } from "@/components/public/whatsapp-fab"
 import { InView } from "@/components/public/in-view"
 import { CountUp } from "@/components/public/count-up"
 import { ProjectStickyBar } from "@/components/public/project-sticky-bar"
@@ -66,14 +78,27 @@ export async function generateStaticParams(): Promise<{ slug: string; project: s
 // slug = the developer's slug (the parent segment), project = the project's.
 type Props = { params: Promise<{ slug: string; project: string }> }
 
+/** Every slug in the database is lowercase, so /Azizi-Developments/Azizi-Emerald is a mistyped or
+ *  auto-capitalised link to the real page: send it there for good instead of a 404 (decided before
+ *  any query, so crawlers get the 308 from generateMetadata too). Only plain slugs (letters, digits,
+ *  hyphens) are re-cased: Next hands params over percent-encoded and "%C3%A9" has capitals that are
+ *  not a typo. */
+const PLAIN_SLUG = /^[A-Za-z0-9-]+$/
+function redirectToLowercase(devSlug: string, slug: string) {
+  const plain = PLAIN_SLUG.test(devSlug) && PLAIN_SLUG.test(slug)
+  if (plain && (devSlug !== devSlug.toLowerCase() || slug !== slug.toLowerCase())) {
+    permanentRedirect(`/${devSlug.toLowerCase()}/${slug.toLowerCase()}`)
+  }
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug: devSlug, project: slug } = await params
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fhiglobal.ae"
+  redirectToLowercase(devSlug, slug)
   const supabase = createPublicSupabaseClient()
   const { data, error } = await supabase
     .from("projects")
     .select(
-      "name, status, description, meta_title, meta_description, main_image, city, location, community, launch_price_from, launch_price_to, currency, delivery_quarter, expected_completion_date, delivery_date, developers(name, slug), project_property_types(property_types(name)), project_units(unit_type, bedrooms, size_sqft, price_from)",
+      "name, status, is_active, description, meta_title, meta_description, main_image, city, location, community, launch_price_from, launch_price_to, currency, delivery_quarter, expected_completion_date, delivery_date, developers(name, slug), project_property_types(property_types(name)), project_units(unit_type, bedrooms, size_sqft, price_from)",
     )
     .eq("slug", slug)
     .eq("is_published", true)
@@ -115,14 +140,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // facts (lib/project-seo.ts): "Coventry 49 | FHI Global" over a one-line
   // tagline told Google nothing, and 256 of 257 projects have no curated copy.
   const title = data.meta_title ? { absolute: data.meta_title } : composeProjectTitle(seoInput)
-  const description = truncateDescription(data.meta_description) || composeProjectDescription(seoInput)
-  const ogImage = `${siteUrl}/og/project/${slug}`
-  const area = data.community || data.location
+  const description = projectMetaDescription(seoInput, data.meta_description)
+  const area = normalizeCommunity(data.community) || data.location
   const keywords = [
     data.name,
     devRel?.name ? `${data.name} ${devRel.name}` : null,
     `${data.name} price`,
-    `${data.name} payment plan`,
     area ? `off-plan projects in ${area}` : null,
     area,
     data.city,
@@ -133,13 +156,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return createPageMetadata({
     title,
     description,
-    imageUrl: ogImage || data.main_image,
-    // The card's size, so Facebook draws it on the FIRST share of a link
-    // (without it the crawler fetches the image afterwards and the first
-    // post goes out with no picture).
-    imageWidth: 1200,
-    imageHeight: 630,
+    // The card (app/og/project) with a version token over everything it draws — photo, name, place and
+    // developer — so an edit changes the URL, and its declared size lets Facebook draw it on the FIRST share
+    // of a link (without it the crawler fetches the image afterwards and the first post has no picture).
+    ...ogCardImage(`/og/project/${slug}`, data.name, data.main_image, data.city ?? data.location, devRel?.name),
     pathname: `/${devSlug}/${slug}`,
+    // A deactivated project is hidden from /projects, the developer page and the sitemap but its page is still
+    // reachable by link: keep it out of the index too, so the page does not contradict every list.
+    robots: data.is_active === false ? { index: false, follow: true } : undefined,
     keywords,
     openGraphTitle: data.name,
     openGraphDescription: description,
@@ -155,6 +179,7 @@ const STATUS_STYLES: Record<string, { label: string; bg: string; text: string; b
 
 export default async function ProjectDetailPage({ params }: Props) {
   const { slug: devSlug, project: slug } = await params
+  redirectToLowercase(devSlug, slug)
   const supabase = createPublicSupabaseClient()
 
   const { data: project, error: projectError } = await supabase
@@ -188,7 +213,9 @@ export default async function ProjectDetailPage({ params }: Props) {
   const status = STATUS_STYLES[project.status] ?? { label: project.status, bg: "#f3f4f6", text: "#374151", border: "#e5e7eb" }
   // Price is computed AFTER seoInput below, so the hero, the schema, the
   // overview and the FAQ all quote the same reconciled figure.
-  const locationStr = [project.community, project.location, project.city].filter(Boolean).join(", ")
+  // The community as it should read (typos and duplicate spellings tidied at render; the stored value is untouched).
+  const community = normalizeCommunity(project.community)
+  const locationStr = [community, project.location, project.city].filter(Boolean).join(", ")
   const mapsApiKey =
     process.env.GOOGLE_MAPS_API_KEY?.trim() || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || ""
   const images = ((project.project_images ?? []) as {id:number;url:string;thumb:string|null;is_main:boolean|null;rank:number|null}[])
@@ -265,6 +292,14 @@ export default async function ProjectDetailPage({ params }: Props) {
   const subtitle = projectSubtitle(seoInput)
   const atAGlance = projectAtAGlance(seoInput)
   const faqs = projectFaqs(seoInput)
+  // Display rules shared with every other surface (lib/project-seo.ts): a stated handover that has already
+  // passed reads "under review", the Golden Visa chip needs AED + Dubai + a residential type + a floor price
+  // at the threshold, and the schema description is the meta description.
+  const overdue = isHandoverOverdue(seoInput)
+  const goldenVisa = goldenVisaMayQualify(seoInput)
+  const guides = buyerGuidesForProject({ status: project.status, goldenVisa })
+  const metaDescription = projectMetaDescription(seoInput, project.meta_description)
+  const heroType = typeLabel(seoInput) === "Properties" ? null : typeLabel(seoInput)
   // The Overview runs to ~1,380 characters on a median project and 2,470 on
   // the longest — 36 and 65 lines on a phone — which pushed the unit table,
   // payment plan and gallery far down the page. Long ones collapse on mobile;
@@ -285,6 +320,8 @@ export default async function ProjectDetailPage({ params }: Props) {
     (u) => u.unit_type || u.bedrooms != null || u.size_sqft != null || u.price_from != null,
   )
   const paymentPlan = parsePaymentPlan(project.payment_plan_details, project.down_payment_percentage)
+  // A plan that read as a real schedule gets a table; anything else keeps its own wording.
+  const hasSchedule = hasPaymentSchedule(paymentPlan)
   const hasPaymentPlan =
     paymentPlan.milestones.length > 0 ||
     paymentPlan.fees.length > 0 ||
@@ -294,7 +331,7 @@ export default async function ProjectDetailPage({ params }: Props) {
   const quickFacts = [
     { icon: CheckCircle2, label: "Ownership", value: project.ownership_type ?? (project.freehold ? "Freehold" : null) },
     { icon: MapPin, label: "Region", value: project.region },
-    { icon: Home, label: "Community", value: project.community },
+    { icon: Home, label: "Community", value: community },
     { icon: Building2, label: "City", value: project.city },
     { icon: Globe, label: "Country", value: project.country },
     { icon: DollarSign, label: "Currency", value: project.currency },
@@ -332,7 +369,7 @@ export default async function ProjectDetailPage({ params }: Props) {
   // within a developer. Area values are DB-driven — strip PostgREST filter
   // syntax before interpolating into .or().
   const shownIds = [project.id as number, ...moreProjects.map((p) => p.id as number)]
-  const areaKey = (project.community || project.location || "").replace(/[(),.:*%]/g, " ").trim()
+  const areaKey = (community || project.location || "").replace(/[(),.:*%]/g, " ").trim()
   const similarSelect =
     "id, name, slug, main_image, location, city, community, delivery_quarter, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug)"
   const similarBase = () =>
@@ -354,7 +391,7 @@ export default async function ProjectDetailPage({ params }: Props) {
     const { data } = await similarBase().or(`community.ilike.%${areaKey}%,location.ilike.%${areaKey}%`)
     if (data && data.length >= 2) {
       similarProjects = data
-      similarLabel = project.community || project.location
+      similarLabel = community || project.location
     }
   }
   if (similarProjects.length === 0 && project.city) {
@@ -367,26 +404,44 @@ export default async function ProjectDetailPage({ params }: Props) {
   const seoLinks = relatedSeoPagesForProject({
     city: project.city,
     location: project.location,
-    community: project.community,
+    community,
     propertyType: propertyTypes[0] ?? null,
-    priceFrom: project.launch_price_from != null ? Number(project.launch_price_from) : null,
+    // The reconciled floor the page shows, not the raw column.
+    priceFrom: priceFromValue(seoInput),
     status: project.status,
+    goldenVisa,
+    // Its handover-year page: the page's own filter matches the latest year in delivery_quarter,
+    // which is the year parseHandover reads, so the project is on the page it links.
+    handoverYear: (() => {
+      const handover = parseHandover(project.delivery_quarter, project.expected_completion_date)
+      return handover ? String(handover.year) : null
+    })(),
   })
 
   const listingSchema = realEstateListingSchema({
     name: project.name,
-    description: project.meta_description || project.description || project.about_project || project.name,
+    // The same text the page's own meta description carries. The raw columns held a
+    // bare project name on 53 pages and a trailing-space stub on 43 more.
+    description: metaDescription,
     path: `/${developer.slug}/${project.slug}`,
     images: [project.main_image, ...images.map((image) => image.image_url)],
     // The same reconciled figure the page shows — quoting the raw column here
     // put an Offer price in the markup that contradicted the visible one.
     price: priceFromValue(seoInput),
+    // The page prints "From X – Y": a starting price and a range, not one price — an AggregateOffer.
+    priceTo: priceToValue(seoInput),
+    priceKind: "from",
     currency: project.currency,
     city: project.city,
-    street: [project.location, project.community].filter(Boolean).join(", ") || null,
+    street: [project.location, community].filter(Boolean).join(", ") || null,
     latitude: project.latitude,
     longitude: project.longitude,
-    seller: { name: developer.name, path: developer.slug ? `/${developer.slug}` : null },
+    offPlan: isOffPlan(project.status),
+    // The developer as ITS entity (the node its page on this site is about) — not a
+    // "url" pointing at our own developer page, which claimed fhiglobal.ae was the developer.
+    seller: developer.slug
+      ? { "@type": "Organization", "@id": developerNodeId(developer.slug), name: developer.name }
+      : { "@type": "Organization", name: developer.name },
   })
 
   return (
@@ -409,6 +464,13 @@ export default async function ProjectDetailPage({ params }: Props) {
     <div className="relative min-h-screen bg-[#fafafa] font-sans">
       <TopBar />
       <Header />
+      {/* The floating WhatsApp button opens a chat that already names this project and page. */}
+      <WhatsAppFabTarget
+        text={`Hi, I'm interested in ${project.name} by ${developer.name}. Could you send me the price list${project.status === "completed" ? "" : ", payment plan"} and available units? ${absoluteUrl(`/${developer.slug}/${project.slug}`)}`}
+        label={`Ask about ${project.name} on WhatsApp`}
+        context={`project:${project.slug}`}
+      />
+      <main>
 
       {/* ── Masthead — cinematic: the main photo fills the screen and settles
              out of a zoom while the title rises word by word; the facts sit
@@ -426,7 +488,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           >
             {mastheadImages.length > 0 ? (
               <div className="pp-hero-img absolute inset-0">
-                <Image src={mastheadImages[0]} alt={project.name} fill priority sizes="100vw" className="object-cover object-center" />
+                <Image src={mastheadImages[0]} alt={project.name} fill preload fetchPriority="high" sizes="100vw" className="object-cover object-center" />
               </div>
             ) : (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -438,7 +500,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           </div>
 
           <div className="relative mx-auto flex min-h-[70vh] max-w-[1440px] flex-col justify-end px-4 pb-10 pt-[26vh] sm:px-6 lg:min-h-[78vh] lg:px-8 lg:pb-12">
-            <div className="mb-5 flex items-center gap-3">
+            <div className="mb-5 flex flex-wrap items-center gap-3">
               <span className="wf-rule h-px w-10 bg-[#d6b357]" aria-hidden="true" />
               <span className="wf-fade inline-flex items-center rounded-full bg-[#d6b357] px-3 py-1 text-[11px] font-bold text-[#001f3f]" style={{ ["--d" as string]: "200ms" }}>
                 {status.label}
@@ -446,12 +508,25 @@ export default async function ProjectDetailPage({ params }: Props) {
               {project.is_featured && (
                 <span className="wf-fade text-[11px] font-bold uppercase tracking-[0.2em] text-white/70" style={{ ["--d" as string]: "320ms" }}>Featured</span>
               )}
+              {goldenVisa && (
+                <Link
+                  href="/dubai-golden-visa-property-guide"
+                  className="wf-fade inline-flex items-center rounded-full border border-[#d6b357]/70 px-3 py-1 text-[11px] font-bold text-[#f0d89b] transition-colors hover:bg-[#d6b357]/15"
+                  style={{ ["--d" as string]: "420ms" }}
+                >
+                  Golden Visa — may qualify
+                </Link>
+              )}
             </div>
 
             <h1 className="max-w-4xl font-['Outfit'] text-[38px] font-bold leading-[1.02] tracking-tight drop-shadow-[0_2px_16px_rgba(0,10,30,0.5)] sm:text-[52px] lg:text-[64px]">
-              {String(project.name).split(" ").map((w: string, i: number) => (
-                <span key={`${w}-${i}`} className="wf-word mr-[0.24em]">
-                  <span style={{ ["--i" as string]: i }}>{w}</span>
+              {/* A real space between the word spans — a margin alone leaves the text reading "AziziNoura" to crawlers and screen readers. */}
+              {String(project.name).trim().split(/\s+/).map((w: string, i: number) => (
+                <span key={`${w}-${i}`}>
+                  {i > 0 ? " " : null}
+                  <span className="wf-word">
+                    <span style={{ ["--i" as string]: i }}>{w}</span>
+                  </span>
                 </span>
               ))}
             </h1>
@@ -474,7 +549,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                   : null,
               },
               { label: "Location", node: locationStr || null },
-              { label: "Type", node: propertyTypes[0] ?? null },
+              { label: "Type", node: heroType },
               { label: "Status", node: status.label },
               { label: "Starting From", node: price },
             ]
@@ -517,7 +592,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           <InView className="wf relative border-t border-[#d6b357]/25 bg-[#001f3f]" threshold={0.3}>
             <div className="mx-auto flex max-w-[1440px] flex-wrap gap-x-10 gap-y-4 px-4 py-5 sm:px-6 lg:px-8">
               {[
-                { icon: Calendar, label: "Completion", text: project.delivery_quarter ?? (project.expected_completion_date ? new Date(project.expected_completion_date).toLocaleDateString("en-AE", { month: "short", year: "numeric" }) : null), num: null as number | null, suffix: "" },
+                { icon: Calendar, label: "Completion", text: overdue ? HANDOVER_UNDER_REVIEW : (project.delivery_quarter ?? (project.expected_completion_date ? new Date(project.expected_completion_date).toLocaleDateString("en-AE", { month: "short", year: "numeric" }) : null)), num: null as number | null, suffix: "" },
                 { icon: Home, label: "Total Units", text: null, num: project.total_units ?? null, suffix: "" },
                 { icon: Building2, label: "Buildings", text: null, num: project.number_of_buildings ?? null, suffix: "" },
                 { icon: Layers, label: "Floors", text: null, num: project.floors ?? null, suffix: "" },
@@ -574,7 +649,7 @@ export default async function ProjectDetailPage({ params }: Props) {
              the white page. No floating cards, no rounded corners. ── */}
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-3 gap-10 lg:gap-12">
         {/* Left / main column */}
-        <div className="lg:col-span-2 space-y-12">
+        <div className="min-w-0 lg:col-span-2 space-y-12">
 
           {/* Overview — the composed facts lead (every project gets a real
               overview; ~40 had none), then the developer's own copy. */}
@@ -594,6 +669,16 @@ export default async function ProjectDetailPage({ params }: Props) {
               )
               return collapseOverview ? <ReadMore>{body}</ReadMore> : body
             })()}
+            {/* Most projects carry no payment-plan data. One honest line — not an empty section —
+                says so and gives the way to get it. */}
+            {!hasPaymentPlan && isOffPlan(project.status) && (
+              <p className="mt-5 text-[14px] text-[#6b7280]">
+                <span className="font-semibold text-[#0d1117]">Payment plan</span> — shared on request.{" "}
+                <a href="#inquire" className="font-bold text-[#001f3f] underline underline-offset-4 hover:text-[#b8913f]">
+                  Get the payment plan
+                </a>
+              </p>
+            )}
           </InView>
 
           {/* Payment plan — the question buyers of off-plan property ask
@@ -608,7 +693,9 @@ export default async function ProjectDetailPage({ params }: Props) {
                 <div className="pp-plan mt-8">
                   {/* A gold track fills left to right; each milestone's node
                       pops and its share counts up as the section enters. */}
-                  <div className="relative">
+                  {/* The track is decoration; when the plan read as a schedule, the table below is the
+                      accessible (and crawlable) version of it. */}
+                  <div className="relative" aria-hidden={hasSchedule || undefined}>
                     <div className="absolute left-0 right-0 top-[7px] h-[2px] bg-[#e5e8ec]" aria-hidden="true">
                       <span className="pp-plan-fill block h-full bg-[#d6b357]" />
                     </div>
@@ -622,7 +709,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                             <span className="absolute inset-[3px] rounded-full bg-[#d6b357]" />
                           </span>
                           <p className="mt-4 font-['Outfit'] text-[26px] font-bold leading-none text-[#001f3f] sm:text-3xl">
-                            <CountUp value={m.percent} delay={500 + i * 260} duration={900} />%
+                            {Number.isInteger(m.percent) ? <CountUp value={m.percent} delay={500 + i * 260} duration={900} /> : m.percent}%
                           </p>
                           {m.label && <p className="mt-1.5 text-[13px] leading-snug text-[#6b7280]">{m.label}</p>}
                         </li>
@@ -631,8 +718,35 @@ export default async function ProjectDetailPage({ params }: Props) {
                   </div>
                 </div>
               )}
+              {hasSchedule && (
+                <table className="mt-6 w-full text-sm">
+                  <caption className="sr-only">Payment schedule for {project.name}</caption>
+                  <thead>
+                    <tr className="border-b border-[#e5e8ec] text-left text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7280]">
+                      <th scope="col" className="py-2 pr-6 font-bold">Stage</th>
+                      <th scope="col" className="py-2 font-bold">Share of price</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paymentPlan.milestones.map((m, i) => (
+                      <tr key={`${m.percent}-${m.label}-${i}`} className="border-b border-[#eef0f3]">
+                        <th scope="row" className="py-3 pr-6 text-left font-semibold text-[#0d1117]">{m.label || `Instalment ${i + 1}`}</th>
+                        <td className="py-3 font-semibold text-[#001f3f]">{m.percent}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
               {paymentPlan.note && (
                 <p className="mt-4 text-[15px] leading-relaxed text-[#374151]">{paymentPlan.note}</p>
+              )}
+              {!hasSchedule && (
+                <p className="mt-4 text-[14px] text-[#6b7280]">
+                  The full instalment schedule is shared on request.{" "}
+                  <a href="#inquire" className="font-bold text-[#001f3f] underline underline-offset-4 hover:text-[#b8913f]">
+                    Get the payment plan
+                  </a>
+                </p>
               )}
               <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-sm">
                 {paymentPlan.fees.map((f) => (
@@ -851,12 +965,22 @@ export default async function ProjectDetailPage({ params }: Props) {
               </dl>
             </InView>
           )}
+
+          {/* Buying guide — the process guides that fit this project (status-aware; the Golden Visa guide
+              leads when the project may qualify). Real internal links into pages that were reachable
+              only from the footer. */}
+          {guides.length > 0 && (
+            <InView as="section" id="buying-guide" className="pp-section wf scroll-mt-24" threshold={0.1}>
+              <SectionHeading title="Buying Guide" />
+              <BuyingGuideLinks guides={guides} />
+            </InView>
+          )}
         </div>
 
         {/* ── Right sidebar — headings sit on the page, panels are square.
                Sticky so the developer and enquiry panels stay with the reader
                through a long gallery instead of leaving the column blank. ── */}
-        <InView className="pp-side wf space-y-10" threshold={0.05}>
+        <InView className="pp-side wf min-w-0 space-y-10" threshold={0.05}>
           {/* Developer */}
           {developer && (
             <SidePanel title="Developer">
@@ -905,25 +1029,29 @@ export default async function ProjectDetailPage({ params }: Props) {
                   href={`/${developer.slug}`}
                   className="inline-flex items-center gap-1.5 text-sm font-bold text-[#001f3f] hover:text-[#d6b357] transition-colors"
                 >
-                  View Developer Profile <ArrowLeft className="w-4 h-4 rotate-180" />
+                  {developer.name} profile <ArrowLeft className="w-4 h-4 rotate-180" />
                 </Link>
               </div>
             </SidePanel>
           )}
 
           {/* Trakheesi permit — the Dubai Land Department's advertising permit,
-              the first thing a Dubai buyer checks. Only when the project has
-              one uploaded; other projects show nothing here. */}
-          {project.trakheesi_permit_url && (
+              the first thing a Dubai buyer checks. Shown when the project has
+              the QR image OR the permit number: a number on its own is already
+              what a buyer (and the regulator) looks for, so it no longer waits
+              for an image. Projects with neither show nothing here. */}
+          {(project.trakheesi_permit_url || project.trakheesi_permit_number) && (
             <SidePanel title="Trakheesi Permit">
               <div className="flex items-start gap-3">
                 <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#b8913f]" />
                 <p className="text-sm leading-relaxed text-[#374151]">
-                  Advertising permit issued by the Dubai Land Department.{" "}
-                  {project.trakheesi_permit_link ? "Tap or scan the code to verify this project with the DLD." : "Scan the code to verify this project with the DLD."}
+                  Advertising permit issued by the Dubai Land Department.
+                  {project.trakheesi_permit_url
+                    ? ` ${project.trakheesi_permit_link ? "Tap or scan the code" : "Scan the code"} to verify this project with the DLD.`
+                    : ""}
                 </p>
               </div>
-              {project.trakheesi_permit_link ? (
+              {!project.trakheesi_permit_url ? null : project.trakheesi_permit_link ? (
                 <PermitVerify
                   projectName={project.name}
                   developerName={developer?.name ?? null}
@@ -979,12 +1107,11 @@ export default async function ProjectDetailPage({ params }: Props) {
           {/* Inquire Now — lead capture, with direct contact as secondary links */}
           <SidePanel id="inquire" title="Inquire Now" className="scroll-mt-24 lg:sticky lg:top-24">
             <p className="text-sm text-[#6b7280] leading-relaxed">
-              Leave your details and our team will reach out with availability, payment plans and exclusive offers.
+              Leave your details and our team will reach out with availability, the developer&rsquo;s payment plan and current offers.
             </p>
             <div className="mt-4">
-              <ProjectInquireForm
-                projectId={Number(project.id)}
-                projectName={project.name}
+              <InquireForm
+                context={{ kind: "project", projectId: Number(project.id), name: project.name }}
                 defaultCategory={project.status === "completed" ? "ready" : "off_plan"}
               />
             </div>
@@ -995,9 +1122,9 @@ export default async function ProjectDetailPage({ params }: Props) {
                   <Phone className="w-3.5 h-3.5 text-[#d6b357]" /> {project.sales_contact_phone ?? "Call our team"}
                 </a>
               )}
-              <a href={`mailto:${project.sales_contact_email ?? "info@fhiglobal.ae"}`}
+              <a href={`mailto:${project.sales_contact_email ?? COMPANY.email}`}
                 className="inline-flex items-center gap-2 text-[13px] font-semibold text-[#001f3f] hover:text-[#c8a544] transition-colors">
-                <Mail className="w-3.5 h-3.5 text-[#d6b357]" /> {project.sales_contact_email ?? "info@fhiglobal.ae"}
+                <Mail className="w-3.5 h-3.5 text-[#d6b357]" /> {project.sales_contact_email ?? COMPANY.email}
               </a>
             </div>
           </SidePanel>
@@ -1030,7 +1157,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                     href={`/${developer.slug}`}
                     className="hidden sm:inline-flex items-center gap-1.5 text-sm font-bold text-[#001f3f] hover:text-[#b8913f] transition-colors shrink-0"
                   >
-                    View All <ArrowLeft className="w-4 h-4 rotate-180" />
+                    All {developer.name} projects <ArrowLeft className="w-4 h-4 rotate-180" />
                   </Link>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -1092,7 +1219,11 @@ export default async function ProjectDetailPage({ params }: Props) {
         </section>
       )}
 
+      </main>
       <Footer />
+      {/* The phone action bar is fixed over the bottom of the page from first paint; this strip, in the
+          footer's own colour, keeps the footer's last row readable above it. */}
+      <div className="h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] bg-[#001428] lg:hidden" aria-hidden="true" />
     </div>
     </>
   )

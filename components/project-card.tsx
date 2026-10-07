@@ -1,6 +1,11 @@
 import { TransitionLink } from "@/components/public/transition-link"
 import Image from "next/image"
 import { CalendarClock, MapPin, ArrowRight, Building2 } from "lucide-react"
+import { HANDOVER_UNDER_REVIEW, isHandoverOverdue } from "@/lib/project-seo"
+import { normalizeCommunity } from "@/lib/communities"
+
+/** The card photo's `sizes` — exported so a page that preloads its first card uses exactly the same srcset. */
+export const PROJECT_CARD_IMAGE_SIZES = "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
 
 export interface ProjectCardData {
   id: string
@@ -53,7 +58,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
   // of 204 of 251 projects, so the line carried no information. Fall back to
   // the freer location text, then the city. The city is appended only when it
   // adds something the area name does not already say.
-  const area = [community, location].map((v) => v?.trim()).find(Boolean) ?? null
+  const area = [normalizeCommunity(community), location].map((v) => v?.trim()).find(Boolean) ?? null
+  // A stated quarter that has already ended on a project still being built is not printed as a date.
+  const handoverOverdue = isHandoverOverdue({ status: status ?? null, delivery_quarter })
   const cityName = city?.trim() || null
   const displayLocation = area
     ? area.toLowerCase().includes((cityName ?? "").toLowerCase()) || !cityName
@@ -76,7 +83,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             alt={name}
             fill
             className="object-cover transition-transform duration-500 group-hover:scale-110"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            sizes={PROJECT_CARD_IMAGE_SIZES}
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[#c0c8d4]">
@@ -144,7 +151,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             {delivery_quarter && (
               <span className="flex items-center gap-1.5">
                 <CalendarClock className="w-3 h-3 shrink-0 text-[#d6b357]" />
-                <span className="truncate">Handover {delivery_quarter}</span>
+                <span className="truncate">{handoverOverdue ? HANDOVER_UNDER_REVIEW : `Handover ${delivery_quarter}`}</span>
               </span>
             )}
           </div>

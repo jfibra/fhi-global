@@ -3,6 +3,8 @@ import { TransitionLink } from "@/components/public/transition-link"
 import Image from "next/image"
 import { Building2, MapPin, CalendarClock, WalletCards, ArrowRight } from "lucide-react"
 import { formatProjectPrice, type ProjectCardData } from "@/components/project-card"
+import { HANDOVER_UNDER_REVIEW, isHandoverOverdue } from "@/lib/project-seo"
+import { normalizeCommunity } from "@/lib/communities"
 import { InView } from "@/components/public/in-view"
 
 /**
@@ -33,13 +35,15 @@ const STATUS_LABEL: Record<string, string> = {
 function statusPill(status: string | null | undefined, delivery: string | null | undefined): string | null {
   const handover = delivery?.trim()
   if (status === "completed") return STATUS_LABEL.completed
+  // A quarter that has already ended is not announced as upcoming.
+  if (handover && isHandoverOverdue({ status: status ?? null, delivery_quarter: handover })) return `Off-plan, ${HANDOVER_UNDER_REVIEW.toLowerCase()}`
   if (handover) return `Off-plan, handover ${handover}`
   return status ? (STATUS_LABEL[status] ?? null) : null
 }
 
 /** Community first (the city is "Dubai" on almost every project), then location, then city. */
 function areaLabel(p: FeaturedProjectData): string | null {
-  const area = [p.community, p.location].map((v) => v?.trim()).find(Boolean) ?? null
+  const area = [normalizeCommunity(p.community), p.location].map((v) => v?.trim()).find(Boolean) ?? null
   const city = p.city?.trim() || null
   if (!area) return city
   if (!city || area.toLowerCase().includes(city.toLowerCase())) return area
@@ -93,7 +97,12 @@ function Facts({ p, compact }: { p: FeaturedProjectData; compact?: boolean }) {
   // A payment plan may run to a second line; the other facts stay on one.
   const rows: { icon: React.ElementType; text: string; wrap?: boolean }[] = []
   if (area) rows.push({ icon: MapPin, text: area })
-  if (!compact && handover && p.status !== "completed") rows.push({ icon: CalendarClock, text: `Handover ${handover}` })
+  if (!compact && handover && p.status !== "completed") {
+    rows.push({
+      icon: CalendarClock,
+      text: isHandoverOverdue({ status: p.status ?? null, delivery_quarter: handover }) ? HANDOVER_UNDER_REVIEW : `Handover ${handover}`,
+    })
+  }
   if (pay) rows.push({ icon: WalletCards, text: pay, wrap: true })
   if (rows.length === 0) return null
   return (
@@ -142,7 +151,6 @@ function HeroCard({ p }: { p: FeaturedProjectData }) {
               src={p.main_image}
               alt={p.name}
               fill
-              priority
               sizes="(max-width: 1024px) 100vw, 66vw"
               className="object-cover transition-transform duration-700 group-hover:scale-[1.04]"
             />
@@ -177,7 +185,7 @@ function HeroCard({ p }: { p: FeaturedProjectData }) {
   )
 }
 
-function SideCard({ p, index, delay }: { p: FeaturedProjectData; index: number; delay: number }) {
+function SideCard({ p, delay }: { p: FeaturedProjectData; delay: number }) {
   const pill = statusPill(p.status, p.delivery_quarter)
   return (
     <TransitionLink href={projectHref(p)} className="group block" style={{ ["--d" as string]: `${delay}ms` }}>
@@ -188,7 +196,6 @@ function SideCard({ p, index, delay }: { p: FeaturedProjectData; index: number; 
               src={p.main_image}
               alt={p.name}
               fill
-              priority={index < 2}
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               className="object-cover transition-transform duration-700 group-hover:scale-[1.04]"
             />
@@ -233,7 +240,7 @@ export function FeaturedProjectsShowcase({ projects }: { projects: FeaturedProje
         </div>
         {side.length > 0 && (
           <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-1 lg:gap-8">
-            {side.map((p, i) => <SideCard key={p.id} p={p} index={i} delay={260 + i * 220} />)}
+            {side.map((p, i) => <SideCard key={p.id} p={p} delay={260 + i * 220} />)}
           </div>
         )}
       </InView>
@@ -247,7 +254,7 @@ export function FeaturedProjectsShowcase({ projects }: { projects: FeaturedProje
         <div className="mt-12 grid grid-cols-1 gap-10 border-t border-[#e8eaed] pt-12 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
           {more.map((p, i) => (
             <InView key={p.id} threshold={0.15}>
-              <SideCard p={p} index={9} delay={(i % 3) * 180} />
+              <SideCard p={p} delay={(i % 3) * 180} />
             </InView>
           ))}
         </div>
