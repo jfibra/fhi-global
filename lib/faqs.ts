@@ -8,6 +8,8 @@
  * the wording here in step if they change.
  */
 
+import { BOOKING_DEPOSIT_RANGE, GROSS_YIELD_RANGE } from "@/lib/market-figures"
+
 export type Faq = { question: string; answer: string }
 
 export const HOME_FAQS: Faq[] = [
@@ -24,7 +26,7 @@ export const HOME_FAQS: Faq[] = [
   {
     question: "How much do I need to pay upfront?",
     answer:
-      "On a typical off-plan launch the first payment is a booking deposit of around 10–20% of the price, with the balance spread across the payment plan. On top of the price you should budget for the Dubai Land Department transfer fee of 4% plus administrative charges. Payment plans differ from project to project, so the specific schedule is shown on each project page.",
+      `On a typical off-plan launch the first payment is a booking deposit, typically ${BOOKING_DEPOSIT_RANGE} of the price, with the balance spread across the payment plan. On top of the price you should budget for the Dubai Land Department transfer fee of 4% plus administrative charges. Payment plans differ from project to project: the schedule is shown on the project page where the developer has published it, and FHI Global can send the current plan for any project.`,
   },
   {
     question: "Does buying property in Dubai give me residency?",
@@ -39,7 +41,7 @@ export const HOME_FAQS: Faq[] = [
   {
     question: "What rental returns can I expect?",
     answer:
-      "Gross rental yields in Dubai typically run in the region of 5–8%, which is high compared with most major global cities, though the figure varies considerably by community, building and unit type. Short-term holiday lets can return more but carry higher running costs. We are happy to run the numbers for any specific project you are considering.",
+      `Gross rental yields in Dubai's more affordable communities commonly run around ${GROSS_YIELD_RANGE}, which is high compared with most major global cities, and lower in prime areas — the figure varies considerably by community, building and unit type. Short-term holiday lets can return more but carry higher running costs. We are happy to run the numbers for any specific project you are considering.`,
   },
   {
     question: "Can I buy from abroad without flying to Dubai?",

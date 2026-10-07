@@ -22,7 +22,48 @@
  * SEO should go through review, not appear the moment a row is inserted.
  * When listings volume grows, "apartments-for-sale-in-dubai-marina"-style
  * entries can join as a listings-backed kind.
+ *
+ * Optional page fields, by purpose:
+ *   sort        — "newest" (newest ADDED first) or "handover" (soonest delivery first,
+ *                 handovers already past last): the server-side order of a projects grid.
+ *   layout      — "emirate-hub": a UAE-wide page grouped under one heading per emirate.
+ *   guideType   — "buyer" for the process guides (Golden Visa, off-plan, costs, foreigners);
+ *                 unset = an area guide.
+ *   reviewer / reviewedAt / sources — a licensed person's review of a buyer guide. The
+ *                 "Reviewed by" line, the Sources list and the WebPage + Article JSON-LD render
+ *                 ONLY when reviewer AND reviewedAt are both set. Never put a placeholder or an
+ *                 unlicensed name here, and bump reviewedAt on every human re-review.
+ *   marketData  — a hand-entered, sourced, dated table for an area guide (the type forces the
+ *                 source and the date) until DLD aggregates are wired in.
+ *   sections[]  — a section may carry a one-sentence `answer` shown first in bold, `body` as one
+ *                 string or several paragraphs, and a `table`.
+ *
+ * This module must stay import-free: the footer reads it on every public page, and the
+ * catalogue can be audited with a one-line `node` import.
  */
+
+export type SeoSource = { label: string; url: string }
+
+/** A fact table rendered by SeoDataTable: real <table> semantics, optional source and date. */
+export type SeoTable = {
+  caption: string
+  columns: string[]
+  rows: string[][]
+  source?: SeoSource
+  asOf?: string
+}
+
+export type SeoSection = {
+  heading: string
+  /** One sentence that answers the heading outright — shown first, in bold. */
+  answer?: string
+  body: string | string[]
+  table?: SeoTable
+}
+
+export type SeoReviewer = { name: string; role?: string; brn?: string }
+
+export type SeoSort = "newest" | "handover"
 
 export type SeoPageFilter = {
   /** Case-insensitive substring match on projects.city (values are messy —
@@ -58,8 +99,9 @@ export type SeoPage = {
   kind: "projects" | "guide"
   /** projects kind: which projects fill the grid. */
   filter?: SeoPageFilter
-  /** guide kind: matches projects.location/name to pick the page photo from
-   *  our own portfolio; pages with no match fall back to the Dubai pool. */
+  /** guide kind WITHOUT an inventoryFilter (the buyer guides): a neighbourhood word matched on
+   *  projects.location/community to pick an illustrative portfolio photo. Area guides (with an
+   *  inventoryFilter) take their photo from their own inventory; the Dubai pool is the last resort. */
   imageQuery?: string
   /** guide kind: which of our projects sit in this area. When at least three
    *  match, the guide renders a live stats strip and project grid — the area
@@ -74,12 +116,29 @@ export type SeoPage = {
    *  "Why invest in {label}" — info guides override it). */
   factsHeading?: string
   /** guide kind: body sections. */
-  sections?: { heading: string; body: string }[]
+  sections?: SeoSection[]
   /** Rendered as a visible FAQ block AND FAQPage structured data — the two
    *  must always carry the same wording. */
   faqs?: { q: string; a: string }[]
   /** Slugs from this catalog to cross-link at the bottom. */
   related: string[]
+  /** YYYY-MM-DD this page's copy last changed in a way worth re-crawling. Feeds the
+   *  sitemap <lastmod> only — set it when the copy is edited. Unset = no lastmod
+   *  (an honest "unknown" beats a date that was never true). */
+  updated?: string
+  /** projects kind: server-side order of the grid. Unset = the inventory query's own order. */
+  sort?: SeoSort
+  /** projects kind: "emirate-hub" groups a UAE-wide grid under one heading per emirate. */
+  layout?: "emirate-hub"
+  /** guide kind: "buyer" = a process guide; unset = an area guide. */
+  guideType?: "buyer"
+  /** guide kind: who reviewed the copy, and when (YYYY-MM-DD) — see the header comment. */
+  reviewer?: SeoReviewer
+  reviewedAt?: string
+  /** guide kind: the sources the copy rests on, listed under the guide. */
+  sources?: SeoSource[]
+  /** guide kind: a sourced, dated table of market figures for the area. */
+  marketData?: SeoTable & { source: SeoSource; asOf: string }
 }
 
 // Non-UAE one-offs in the projects table (a project in Istanbul, one in
@@ -87,22 +146,36 @@ export type SeoPage = {
 // stays true.
 export const NON_UAE_CITIES = ["istanbul", "mostakbal"]
 
+// The handover-year pages (dubai-projects-handover-<year>) and every list that links them.
+const HANDOVER_YEARS = ["2026", "2027", "2028", "2029", "2030"] as const
+type HandoverYear = (typeof HANDOVER_YEARS)[number]
+
+// `updated` for the pages whose title, description or copy was last rewritten together
+// (the 2026-10-06 SEO pass) — feeds the sitemap <lastmod>. Bump a page's own `updated`
+// when only that page changes.
+const COPY_UPDATED = "2026-10-06"
+
 // ─── Project-backed searches ─────────────────────────────────────────────────
 
 const PROJECT_PAGES: SeoPage[] = [
   {
     slug: "new-projects-in-dubai",
     label: "New Projects in Dubai",
-    title: "New Projects in Dubai — Latest Launches & Prices",
+    title: "New Projects in Dubai — Latest Launches",
+    updated: COPY_UPDATED,
     h1: "New Projects in Dubai",
     description:
-      "Browse the newest residential projects in Dubai — launch prices, payment plans and handover dates from developers like Samana, Azizi and Reportage.",
+      "Browse new and pre-launch residential projects in Dubai — launch prices and handover dates from developers like Samana, Azizi and Reportage.",
     intro: [
       "Dubai's developers release new communities every month, and launch week is when the best units and the friendliest payment plans are on the table. This page tracks the projects currently open for booking across Dubai — apartments, townhouses and branded residences — with launch pricing where the developer has published it.",
-      "Every project below links to its full profile: location, gallery, price range and the developer behind it. If you want a shortlist matched to your budget instead, send us an enquiry and a consultant will come back the same business day.",
+      "The newest additions are listed first. Every project below links to its full profile: location, gallery, price range and the developer behind it. If you want a shortlist matched to your budget instead, send us an enquiry and a consultant will come back the same business day.",
     ],
     kind: "projects",
-    filter: { cityLike: "dubai" },
+    // Launches only, newest ADDED first (there is no launch-date column). This used to be every
+    // Dubai project — the same grid as the off-plan page. If it ever falls under ~12 projects,
+    // widen the statuses again.
+    filter: { cityLike: "dubai", statuses: ["pre_launch", "launch"] },
+    sort: "newest",
     faqs: [
       {
         q: "What is the minimum price for a new project in Dubai?",
@@ -127,16 +200,18 @@ const PROJECT_PAGES: SeoPage[] = [
   {
     slug: "off-plan-projects-in-dubai",
     label: "Off-Plan Projects in Dubai",
-    title: "Off-Plan Projects in Dubai — Payment Plans & Launch Prices",
+    title: "Off-Plan Projects in Dubai — Prices & Handover",
+    updated: COPY_UPDATED,
     h1: "Off-Plan Projects in Dubai",
     description:
-      "Off-plan property in Dubai: current launches and under-construction projects with developer payment plans, starting prices and handover timelines.",
+      "Off-plan property in Dubai: current launches and under-construction projects with developer starting prices, construction status and handover timelines.",
     intro: [
       "Off-plan is how most investors enter the Dubai market: you buy at today's price on a construction-linked payment plan, and the developer carries the build. The projects below are at launch or under construction right now, which is where the widest unit choice and the longest plans are found.",
-      "FHI Global works directly with the developers, so the prices and plans you see on each project page are the developer's own — no mark-up, and our consultation costs you nothing.",
+      "Projects are ordered by handover date, soonest first. FHI Global works directly with the developers, so the prices and plans you see on each project page are the developer's own — no mark-up, and our consultation costs you nothing.",
     ],
     kind: "projects",
     filter: { cityLike: "dubai", statuses: ["launch", "under_construction"] },
+    sort: "handover",
     faqs: [
       {
         q: "Is buying off-plan in Dubai safe?",
@@ -151,17 +226,20 @@ const PROJECT_PAGES: SeoPage[] = [
         a: "Yes — this is called an assignment or resale. Most developers allow it once a set percentage of the price (commonly 30–40%) has been paid, subject to their NOC.",
       },
     ],
+    // The topical hub for the handover-year pages.
     related: [
       "new-projects-in-dubai",
       "how-to-buy-off-plan-property-in-dubai",
       "off-plan-projects-in-uae",
       "ready-properties-in-dubai",
+      ...HANDOVER_YEARS.map((y) => `dubai-projects-handover-${y}`),
     ],
   },
   {
     slug: "ready-properties-in-dubai",
     label: "Ready Properties in Dubai",
-    title: "Ready Properties in Dubai — Completed Projects to Move In Now",
+    title: "Ready Properties in Dubai — Completed Projects",
+    updated: COPY_UPDATED,
     h1: "Ready Properties in Dubai",
     description:
       "Completed, handed-over projects in Dubai — move in or rent out immediately. Compare ready communities and current availability with FHI Global.",
@@ -195,10 +273,11 @@ const PROJECT_PAGES: SeoPage[] = [
   {
     slug: "new-projects-in-abu-dhabi",
     label: "New Projects in Abu Dhabi",
-    title: "New Projects in Abu Dhabi — Launches, Prices & Payment Plans",
+    title: "New Projects in Abu Dhabi — Launches & Prices",
+    updated: COPY_UPDATED,
     h1: "New Projects in Abu Dhabi",
     description:
-      "New residential projects in Abu Dhabi — current launches with developer pricing and payment plans, from Reportage and other active developers.",
+      "New residential projects in Abu Dhabi — current launches with developer pricing and handover dates, from Reportage and other active developers.",
     intro: [
       "Abu Dhabi's market runs quieter than Dubai's, and that's precisely its appeal: entry prices are lower, service charges gentler, and communities like Al Reem and Masdar keep delivering steady rental demand. These are the projects currently selling in the capital.",
       "Each card opens the full project profile — location, gallery, price range and developer. For a side-by-side with comparable Dubai launches, our consultants do that daily.",
@@ -210,31 +289,35 @@ const PROJECT_PAGES: SeoPage[] = [
   {
     slug: "off-plan-projects-in-uae",
     label: "Off-Plan Projects in UAE",
-    title: "Off-Plan Projects in the UAE — Every Active Launch",
+    title: "Off-Plan Projects in the UAE — By Emirate",
+    updated: COPY_UPDATED,
     h1: "Off-Plan Projects in the UAE",
     description:
-      "Every off-plan project FHI Global covers across the UAE — launches and under-construction communities with payment plans and starting prices.",
+      "Off-plan projects across the UAE by emirate — launches and under-construction communities in Dubai, Abu Dhabi and beyond, with starting prices.",
     intro: [
-      "This is the wide view: every launch and under-construction project on our books across the Emirates, in one grid. Useful when you care about the numbers more than the neighbourhood — sort by what catches your eye, then drill into the project page for the plan.",
+      "This is the wide view: every launch and under-construction project on our books across the Emirates, grouped by emirate. Start with the emirate you are weighing, open its full list, then drill into a project page for the plan.",
       "Inventory updates as developers release phases, so this page is worth a bookmark if you're timing an entry.",
     ],
     kind: "projects",
     filter: { statuses: ["launch", "under_construction"] },
+    layout: "emirate-hub",
     related: ["off-plan-projects-in-dubai", "new-projects-in-dubai", "new-projects-in-abu-dhabi"],
   },
   {
     slug: "new-projects-in-uae",
     label: "New Projects in UAE",
-    title: "New Projects in the UAE — Full Developer Portfolio",
+    title: "New Projects in the UAE — Every Emirate",
+    updated: COPY_UPDATED,
     h1: "New Projects in the UAE",
     description:
-      "The full FHI Global project portfolio across the UAE — new launches, under-construction and ready communities from every developer we work with.",
+      "The full FHI Global portfolio across the UAE, by emirate — new launches, under-construction and ready communities from every developer we work with.",
     intro: [
-      "Everything we cover, one page: launches, projects mid-build and completed communities across Dubai, Abu Dhabi and the northern emirates. Start here if you're mapping the market before narrowing down.",
+      "Everything we cover, grouped by emirate: launches, projects mid-build and completed communities across Dubai, Abu Dhabi and the northern emirates. Start here if you're mapping the market before narrowing down.",
       "For a filtered view — by developer, by status, by price band — the projects browser has the full controls.",
     ],
     kind: "projects",
     filter: {},
+    layout: "emirate-hub",
     related: ["new-projects-in-dubai", "new-projects-in-abu-dhabi", "off-plan-projects-in-uae"],
   },
 ]
@@ -250,7 +333,8 @@ const AREA_GUIDES: SeoPage[] = [
     slug: "dubai-marina",
     imageQuery: "marina",
     label: "Dubai Marina",
-    title: "Dubai Marina Area Guide — Living, Buying & Renting",
+    title: "Dubai Marina Area Guide — Living & Buying",
+    updated: COPY_UPDATED,
     h1: "Dubai Marina",
     description:
       "Dubai Marina area guide: waterfront high-rise living, rental demand, and what to know before buying or renting an apartment on the Marina.",
@@ -299,7 +383,8 @@ const AREA_GUIDES: SeoPage[] = [
     slug: "downtown-dubai",
     imageQuery: "downtown",
     label: "Downtown Dubai",
-    title: "Downtown Dubai Area Guide — Burj Khalifa District Living",
+    title: "Downtown Dubai Area Guide — Burj Khalifa Living",
+    updated: COPY_UPDATED,
     h1: "Downtown Dubai",
     description:
       "Downtown Dubai area guide: the Burj Khalifa district — prestige apartments, hotel-branded residences, and what ownership there really involves.",
@@ -348,7 +433,8 @@ const AREA_GUIDES: SeoPage[] = [
     slug: "business-bay",
     imageQuery: "business bay",
     label: "Business Bay",
-    title: "Business Bay Area Guide — Canal-Side Living Next to Downtown",
+    title: "Business Bay Area Guide — Canal-Side Living",
+    updated: COPY_UPDATED,
     h1: "Business Bay",
     description:
       "Business Bay area guide: Downtown's neighbour on the canal — newer towers, sharper prices, and one of Dubai's busiest rental markets.",
@@ -391,13 +477,14 @@ const AREA_GUIDES: SeoPage[] = [
         a: "The district became Dubai's laboratory for hotel-flagged living — brands pair hotel amenities with private ownership here, and the launch calendar rarely pauses. It adds a premium but also a strong rental story.",
       },
     ],
-    related: ["downtown-dubai", "difc", "off-plan-projects-in-dubai"],
+    related: ["downtown-dubai", "difc", "projects-in-business-bay", "off-plan-projects-in-dubai"],
   },
   {
     slug: "palm-jumeirah",
     imageQuery: "palm",
     label: "Palm Jumeirah",
-    title: "Palm Jumeirah Area Guide — Villas, Fronds & Shoreline Apartments",
+    title: "Palm Jumeirah Area Guide — Villas & Apartments",
+    updated: COPY_UPDATED,
     h1: "Palm Jumeirah",
     description:
       "Palm Jumeirah area guide: frond villas, shoreline apartments and trunk towers — what living and investing on the Palm actually looks like.",
@@ -446,7 +533,8 @@ const AREA_GUIDES: SeoPage[] = [
     slug: "jumeirah-village-circle",
     imageQuery: "jumeirah village",
     label: "Jumeirah Village Circle (JVC)",
-    title: "JVC Area Guide — Jumeirah Village Circle for Buyers & Tenants",
+    title: "JVC Area Guide — Jumeirah Village Circle",
+    updated: COPY_UPDATED,
     h1: "Jumeirah Village Circle (JVC)",
     description:
       "JVC area guide: Dubai's value district — affordable apartments and townhouses, strong yields, and what to check before buying in Jumeirah Village Circle.",
@@ -495,10 +583,11 @@ const AREA_GUIDES: SeoPage[] = [
     slug: "dubai-creek-harbour",
     imageQuery: "creek",
     label: "Dubai Creek Harbour",
-    title: "Dubai Creek Harbour Area Guide — Emaar's Second Downtown",
+    title: "Dubai Creek Harbour Area Guide — New Downtown",
+    updated: COPY_UPDATED,
     h1: "Dubai Creek Harbour",
     description:
-      "Dubai Creek Harbour area guide: Emaar's waterfront district opposite the wildlife sanctuary — new towers, long payment plans and a skyline view of Downtown.",
+      "Dubai Creek Harbour area guide: Emaar's waterfront district opposite the wildlife sanctuary — new towers, phased launches and a skyline view of Downtown.",
     intro: [
       "Creek Harbour is Emaar building a second Downtown on the water: a masterplanned district across the creek from the Ras Al Khor flamingo sanctuary, with the old city's skyline on one horizon and the new one on the other. It is still mid-build, which is exactly its appeal to off-plan buyers.",
       "Buying here is a bet on a district maturing on schedule — the developer's record on that is the strongest in the market, and the early phases have already handed over into a functioning waterfront community.",
@@ -544,7 +633,8 @@ const AREA_GUIDES: SeoPage[] = [
     slug: "dubai-hills-estate",
     imageQuery: "hills",
     label: "Dubai Hills Estate",
-    title: "Dubai Hills Estate Area Guide — Golf-Course Family Living",
+    title: "Dubai Hills Estate Area Guide — Family Living",
+    updated: COPY_UPDATED,
     h1: "Dubai Hills Estate",
     description:
       "Dubai Hills Estate area guide: Emaar's golf-course district — family villas, the Hills Park, and the strongest school run in new Dubai.",
@@ -593,7 +683,8 @@ const AREA_GUIDES: SeoPage[] = [
     slug: "jumeirah-beach-residence",
     imageQuery: "beach residence",
     label: "JBR — Jumeirah Beach Residence",
-    title: "JBR Area Guide — Beachfront Apartments on The Walk",
+    title: "JBR Area Guide — Beachfront Apartments",
+    updated: COPY_UPDATED,
     h1: "Jumeirah Beach Residence (JBR)",
     description:
       "JBR area guide: Dubai's beachfront apartment strip — The Walk, The Beach mall, and what buying into Jumeirah Beach Residence involves.",
@@ -642,7 +733,8 @@ const AREA_GUIDES: SeoPage[] = [
     slug: "arabian-ranches",
     imageQuery: "ranches",
     label: "Arabian Ranches",
-    title: "Arabian Ranches Area Guide — Established Villa Community",
+    title: "Arabian Ranches Area Guide — Villa Community",
+    updated: COPY_UPDATED,
     h1: "Arabian Ranches",
     description:
       "Arabian Ranches area guide: Dubai's most established villa community — mature streets, schools, and the trade-offs of desert-edge family living.",
@@ -691,7 +783,8 @@ const AREA_GUIDES: SeoPage[] = [
     slug: "al-furjan",
     imageQuery: "furjan",
     label: "Al Furjan",
-    title: "Al Furjan Area Guide — Metro-Connected Villas & Apartments",
+    title: "Al Furjan Area Guide — Villas & Apartments",
+    updated: COPY_UPDATED,
     h1: "Al Furjan",
     description:
       "Al Furjan area guide: the metro-connected value district near Ibn Battuta — townhouses, new apartments, and honest pricing in south Dubai.",
@@ -740,7 +833,8 @@ const AREA_GUIDES: SeoPage[] = [
     slug: "difc",
     imageQuery: "difc",
     label: "DIFC",
-    title: "DIFC Area Guide — Living in Dubai's Financial Centre",
+    title: "DIFC Area Guide — Dubai's Financial Centre",
+    updated: COPY_UPDATED,
     h1: "DIFC — Dubai International Financial Centre",
     description:
       "DIFC area guide: apartments inside Dubai's financial free zone — art, fine dining, and the shortest commute in the city for finance professionals.",
@@ -789,7 +883,8 @@ const AREA_GUIDES: SeoPage[] = [
     slug: "dubailand",
     imageQuery: "dubailand",
     label: "Dubailand",
-    title: "Dubailand Area Guide — Value Communities in Dubai's South",
+    title: "Dubailand Area Guide — Value Communities",
+    updated: COPY_UPDATED,
     h1: "Dubailand",
     description:
       "Dubailand area guide: the value belt of south Dubai — townhouse communities, new launches, and the entry prices the coast no longer offers.",
@@ -838,10 +933,11 @@ const AREA_GUIDES: SeoPage[] = [
     slug: "al-jaddaf",
     imageQuery: "jaddaf",
     label: "Al Jaddaf",
-    title: "Al Jaddaf Area Guide — Living, Buying & New Projects",
+    title: "Al Jaddaf Area Guide — Living & New Projects",
+    updated: COPY_UPDATED,
     h1: "Al Jaddaf",
     description:
-      "Al Jaddaf area guide: Dubai Creek-side apartments minutes from Downtown and the airport, two Metro stations, and one of the busiest off-plan pipelines in central Dubai.",
+      "Al Jaddaf area guide: Creek-side apartments minutes from Downtown and the airport, two Metro stations and one of central Dubai's busiest off-plan pipelines",
     intro: [
       "Al Jaddaf sits on the Bur Dubai bank of Dubai Creek, between Dubai Healthcare City, Ras Al Khor and the water — ten to fifteen minutes from Downtown in one direction and the airport in the other. For decades it was the city's boatyard; today it is one of the densest construction zones in central Dubai, with a creekside promenade, the Mohammed Bin Rashid Library and Jameel Arts Centre as its cultural anchors and Dubai Festival City lit up across the water.",
       "What draws buyers is the arithmetic: a genuinely central address at prices closer to the outer belts than to Downtown. Most of the launches on our books here start between AED 700,000 and AED 850,000 for studios and one-bedroom units, and the district's two Green Line Metro stations — Al Jaddaf and Creek — make it one of the few off-plan hotspots where a tenant can live without a car.",
@@ -898,10 +994,11 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
   {
     slug: "apartments-for-sale-in-dubai",
     label: "Apartments for Sale in Dubai",
-    title: "Apartments for Sale in Dubai — New & Off-Plan Prices",
+    title: "Apartments for Sale in Dubai — New & Off-Plan",
+    updated: COPY_UPDATED,
     h1: "Apartments for Sale in Dubai",
     description:
-      "Apartments for sale in Dubai — studios to four-bedroom residences in new and off-plan projects, with developer prices and payment plans.",
+      "Apartments for sale in Dubai — studios to four-bedroom residences in new and off-plan projects, with developer prices and handover dates.",
     intro: [
       "Apartments are Dubai's core market: the deepest choice, the easiest resale, and the strongest rental demand. This page gathers every apartment project we cover in Dubai — from compact studios in JVC to waterfront residences — each with its developer's own pricing.",
       "Open any card for the full picture: unit types, sizes, payment plan and handover date. If you tell us your budget and whether you're buying to live or to let, we'll send a shortlist the same business day.",
@@ -927,10 +1024,11 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
   {
     slug: "villas-for-sale-in-dubai",
     label: "Villas for Sale in Dubai",
-    title: "Villas for Sale in Dubai — New & Off-Plan Villa Projects",
+    title: "Villas for Sale in Dubai — New & Off-Plan",
+    updated: COPY_UPDATED,
     h1: "Villas for Sale in Dubai",
     description:
-      "Villas for sale in Dubai — standalone and community villas in new and off-plan projects, with developer prices, plot sizes and payment plans.",
+      "Villas for sale in Dubai — standalone and community villas in new and off-plan projects, with developer prices and handover dates.",
     intro: [
       "Villa living is what Dubai's master-planned communities do best: gated districts with parks, pools and schools inside the fence, and a private garden at the end of the day. These are the villa projects currently on our books in Dubai.",
       "Villa supply is structurally tighter than apartments — communities release in phases and the best plots go first — so if a project below fits, moving early matters more here than anywhere else in the market.",
@@ -942,10 +1040,11 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
   {
     slug: "townhouses-for-sale-in-dubai",
     label: "Townhouses for Sale in Dubai",
-    title: "Townhouses for Sale in Dubai — Family Communities & Prices",
+    title: "Townhouses for Sale in Dubai — Family Homes",
+    updated: COPY_UPDATED,
     h1: "Townhouses for Sale in Dubai",
     description:
-      "Townhouses for sale in Dubai — three and four-bedroom family homes in gated communities, with developer prices and construction-linked payment plans.",
+      "Townhouses for sale in Dubai — three and four-bedroom family homes in gated communities, with developer prices and handover dates.",
     intro: [
       "The townhouse is Dubai's family workhorse: three or four bedrooms, a small garden, and community amenities — at a price meaningfully below a standalone villa. Most of the action is in the newer belts, where developers launch whole townhouse districts at once.",
       "Every project below shows its developer pricing and payment plan. Told simply: if you need bedrooms and a school run rather than a skyline view, this page is where Dubai gives you the most home per dirham.",
@@ -957,7 +1056,8 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
   {
     slug: "penthouses-for-sale-in-dubai",
     label: "Penthouses for Sale in Dubai",
-    title: "Penthouses for Sale in Dubai — Luxury Sky Residences",
+    title: "Penthouses for Sale in Dubai — Sky Residences",
+    updated: COPY_UPDATED,
     h1: "Penthouses for Sale in Dubai",
     description:
       "Penthouses for sale in Dubai — full-floor and duplex sky residences in the city's landmark towers, with developer pricing and handover dates.",
@@ -972,10 +1072,11 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
   {
     slug: "properties-under-1m-in-dubai",
     label: "Properties Under AED 1M",
-    title: "Properties Under AED 1 Million in Dubai — Affordable Projects",
+    title: "Properties Under AED 1M in Dubai — New Projects",
+    updated: COPY_UPDATED,
     h1: "Properties Under AED 1M in Dubai",
     description:
-      "Dubai properties under AED 1 million — studios, apartments and affordable projects with payment plans, curated from live developer inventory.",
+      "Dubai properties under AED 1 million — studios, apartments and affordable projects with developer prices, curated from live inventory.",
     intro: [
       "One million dirhams is Dubai's most-searched budget line, and the market clears it comfortably: whole districts — JVC, Dubailand, Dubai South, Majan — launch projects with studios and one-bedrooms well under it. This page tracks every project on our books with starting prices below AED 1M.",
       "At this budget the levers that matter are payment plan length and service charges, not just the headline price. Both are on each project page, and our consultants will happily stress-test the numbers with you.",
@@ -1001,7 +1102,8 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
   {
     slug: "golden-visa-properties-in-dubai",
     label: "Golden Visa Properties",
-    title: "Golden Visa Properties in Dubai — AED 2M+ Investments",
+    title: "Golden Visa Properties in Dubai — AED 2M+",
+    updated: COPY_UPDATED,
     h1: "Golden Visa Properties in Dubai",
     description:
       "Dubai properties priced from AED 2 million — the investment threshold for the UAE's 10-year Golden Visa. Live projects with developer pricing.",
@@ -1030,10 +1132,11 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
   {
     slug: "projects-in-jumeirah-village-circle",
     label: "Projects in JVC",
-    title: "New Projects in Jumeirah Village Circle (JVC) — Prices & Plans",
+    title: "New Projects in JVC — Jumeirah Village Circle",
+    updated: COPY_UPDATED,
     h1: "New Projects in Jumeirah Village Circle",
     description:
-      "Every JVC project on our books — new launches and under-construction towers in Jumeirah Village Circle with developer prices and payment plans.",
+      "Every JVC project on our books — new launches and under-construction towers in Jumeirah Village Circle with developer prices and handover dates.",
     intro: [
       "JVC is Dubai's busiest launch pad: more new projects break ground here than in any other district, because the arithmetic works — central location, freehold ownership, and entry prices the coastal districts left behind years ago. These are the JVC projects live on our books right now.",
       "With this much simultaneous supply, developer selection is the whole game in JVC. Delivery track record and service-charge levels separate the towers that hold value from the ones that don't — ask us for the honest comparison before you commit.",
@@ -1045,7 +1148,8 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
   {
     slug: "projects-in-business-bay",
     label: "Projects in Business Bay",
-    title: "New Projects in Business Bay — Canal Towers & Branded Residences",
+    title: "New Projects in Business Bay — Canal Towers",
+    updated: COPY_UPDATED,
     h1: "New Projects in Business Bay",
     description:
       "New and off-plan projects in Business Bay, Dubai — canal-side towers and branded residences minutes from Downtown, with developer pricing.",
@@ -1060,10 +1164,11 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
   {
     slug: "projects-in-dubailand",
     label: "Projects in Dubailand",
-    title: "New Projects in Dubailand — Family Communities & Payment Plans",
+    title: "New Projects in Dubailand — Family Communities",
+    updated: COPY_UPDATED,
     h1: "New Projects in Dubailand",
     description:
-      "New and off-plan projects in Dubailand — townhouse districts and value apartments in Dubai's biggest family belt, with developer payment plans.",
+      "New and off-plan projects in Dubailand — townhouse districts and value apartments in Dubai's biggest family belt, with developer prices and handover dates.",
     intro: [
       "Dubailand is where Dubai builds room to grow: self-contained family communities with pools, parks and schools inside the gates, at the widest price-to-space ratio in the city. The launch calendar here never stops, which is exactly what keeps pricing honest.",
       "It is less one neighbourhood than a belt of them. Arjan and Majan supply mid-rise apartments beside Dubai Miracle Garden and the Al Barari fringe; Dubai Land Residence Complex (DLRC) and Liwan run to value studios and one-beds; Wadi Al Safa, Villanova, Rukan and Mudon are townhouse and villa country. Prices on our books span compact apartments from under AED 500,000 to villas above AED 5 million — no other Dubai district covers that range.",
@@ -1095,7 +1200,8 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
   {
     slug: "projects-in-jumeirah-village-triangle",
     label: "Projects in JVT",
-    title: "New Projects in Jumeirah Village Triangle (JVT) — Prices & Plans",
+    title: "New Projects in JVT — Jumeirah Village Triangle",
+    updated: COPY_UPDATED,
     h1: "New Projects in Jumeirah Village Triangle",
     description:
       "New and off-plan projects in Jumeirah Village Triangle (JVT), Dubai — quieter than JVC with the same central value, developer prices included.",
@@ -1110,10 +1216,11 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
   {
     slug: "projects-in-al-jaddaf",
     label: "Projects in Al Jaddaf",
-    title: "New Projects in Al Jaddaf — Off-Plan Prices & Payment Plans",
+    title: "New Projects in Al Jaddaf — Off-Plan Prices",
+    updated: COPY_UPDATED,
     h1: "New Projects in Al Jaddaf",
     description:
-      "New and off-plan projects in Al Jaddaf, Dubai — Binghatti and Azizi towers on the Creek, minutes from Downtown and the airport, with developer prices and payment plans.",
+      "New and off-plan projects in Al Jaddaf, Dubai — Binghatti and Azizi towers on the Creek, minutes from Downtown and the airport, with developer prices.",
     intro: [
       "Al Jaddaf has quietly become one of the busiest off-plan districts in central Dubai. The creekside strip between Dubai Healthcare City and Ras Al Khor is filling with mid- and high-rise apartment towers, most of them from Binghatti and Azizi, with handovers rolling from 2026 into 2028.",
       "The projects below are live in Al Jaddaf now. Read the price column against the map: these are Downtown-adjacent addresses with Metro access, priced closer to the outer belts. Studio and one-bedroom launches cluster between AED 700,000 and AED 850,000; the premium is for creek views and the newer Jaddaf Waterfront plots.",
@@ -1141,9 +1248,11 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
 
 // ─── Handover-year searches ──────────────────────────────────────────────────
 // Investors shop by delivery date ("projects handover 2027 dubai"). Backed by
-// delivery_quarter / expected_completion_date; counts checked before shipping.
+// delivery_quarter / expected_completion_date. In the 2026-10-06 crawl 14 Dubai projects hand
+// over in 2030 and only 2 in 2031, so 2030 has a page and 2031 does not (add a year when it has
+// enough projects to fill a grid; HANDOVER_INTRO is typed so a year without copy fails tsc).
 
-const HANDOVER_INTRO: Record<string, string[]> = {
+const HANDOVER_INTRO: Record<HandoverYear, string[]> = {
   "2026": [
     "Handover in 2026 means the finish line is in sight: construction is in its final stretches, most of the payment plan is already behind the original buyers, and what's left on the market skews toward assignments and the developer's last units. These are the Dubai projects scheduled to hand over in 2026.",
     "Buying this close to completion trades the longest payment plans for near-term certainty — you can see what you're getting, and rent starts flowing within months rather than years.",
@@ -1159,8 +1268,12 @@ const HANDOVER_INTRO: Record<string, string[]> = {
     "The longer runway suits investors paying from cash flow: instalments spread across three years, with the balance often payable at or after handover.",
   ],
   "2029": [
-    "A 2029 handover is the earliest entry Dubai currently offers: brand-new launches at first-release pricing, with the longest payment plans in the market. These are the projects scheduled to deliver in 2029.",
+    "A 2029 handover sits near the far end of Dubai's off-plan calendar: brand-new launches at first-release pricing, with some of the longest payment plans in the market. These are the projects scheduled to deliver in 2029.",
     "Early entry earns the widest unit choice — the best stacks, views and floor plates go in the first releases — in exchange for patience and faith in the developer's track record. We help with the second part.",
+  ],
+  "2030": [
+    "Projects handing over in 2030 sit at the far end of Dubai's off-plan calendar: recent launches whose construction is only beginning, which typically carry the longest instalment schedules a buyer can sign today. These are the 2030 deliveries on our books in Dubai.",
+    "The distance cuts both ways. It buys first choice of units and the most gradual payment schedule, and it asks for patience and trust in the developer — so check their record on completed projects, not just the renders, before you reserve.",
   ],
 }
 
@@ -1185,18 +1298,21 @@ const HANDOVER_FAQS = (year: string): { q: string; a: string }[] => [
   },
 ]
 
-const HANDOVER_PAGES: SeoPage[] = (["2026", "2027", "2028", "2029"] as const).map((year, i, years) => ({
+const HANDOVER_PAGES: SeoPage[] = HANDOVER_YEARS.map((year) => ({
   slug: `dubai-projects-handover-${year}`,
   label: `Handover ${year}`,
-  title: `Dubai Projects Handing Over in ${year} — Off-Plan by Delivery Date`,
+  title: `Dubai Projects Handing Over in ${year} — Off-Plan`,
+  updated: COPY_UPDATED,
   h1: `Dubai Projects Handing Over in ${year}`,
-  description: `Off-plan projects in Dubai with handover scheduled for ${year} — developer prices, payment plans and construction status, updated from live inventory.`,
+  description: `Off-plan projects in Dubai with handover scheduled for ${year} — developer prices, construction status and delivery quarter, updated from live inventory.`,
   intro: [...HANDOVER_INTRO[year]],
   kind: "projects" as const,
   filter: { cityLike: "dubai", handoverYear: year },
+  sort: "handover" as const,
   faqs: HANDOVER_FAQS(year),
+  // Every year links every sibling year, and the off-plan hub links all of them back.
   related: [
-    ...years.filter((y) => y !== year).slice(0, 2).map((y) => `dubai-projects-handover-${y}`),
+    ...HANDOVER_YEARS.filter((y) => y !== year).map((y) => `dubai-projects-handover-${y}`),
     "off-plan-projects-in-dubai",
     "how-to-buy-off-plan-property-in-dubai",
   ],
@@ -1211,47 +1327,86 @@ const INFO_GUIDES: SeoPage[] = [
   {
     slug: "dubai-golden-visa-property-guide",
     label: "Golden Visa Property Guide",
-    title: "Dubai Golden Visa Through Property — The 2M Investor Guide",
+    title: "Dubai Golden Visa via Property — AED 2M Guide",
+    updated: COPY_UPDATED,
+    guideType: "buyer",
     h1: "The Dubai Golden Visa Through Property Investment",
     description:
       "How to get the UAE's 10-year Golden Visa by buying property in Dubai — the AED 2M threshold, what qualifies, the process, and family sponsorship.",
     intro: [
-      "The UAE Golden Visa is a 10-year renewable residency granted, among other routes, to property investors: buy real estate worth AED 2 million or more and you can apply — no employer, no local sponsor, and no minimum stay requirement to keep it valid.",
-      "For most international buyers this is the highest-leverage feature of the Dubai market: the same capital that buys the home also secures long-term residency for the whole family. This guide covers what qualifies, the process, and the practical questions we answer daily.",
+      "The UAE Golden Visa is a 10-year renewable residency, and property investment is one of the ways to qualify: buy real estate worth AED 2 million or more and you can apply without an employer, without a local sponsor and without having to spend a minimum number of days in the country to keep it valid.",
+      "For many international buyers that is the most valuable thing about the Dubai market — the same capital that buys the home also secures long-term residency for the whole family. It is also an area where the rules have changed several times since the visa launched in 2019, so this guide separates what is stable (the AED 2 million threshold, the 10-year term, family sponsorship) from what you should confirm with the authorities on the day you apply: equity requirements for mortgaged and off-plan purchases, document lists and processing times.",
     ],
     kind: "guide",
     imageQuery: "downtown",
     factsHeading: "The Golden Visa at a glance",
     facts: [
-      { label: "Investment threshold", value: "AED 2 million in property — single or combined holdings" },
-      { label: "Visa length", value: "10 years, renewable while you hold the qualifying investment" },
-      { label: "Family", value: "Sponsor your spouse, children and support staff under your visa" },
-      { label: "Off-plan", value: "Eligible when bought from approved developers" },
-      { label: "Mortgages", value: "Financed purchases can qualify, subject to equity requirements" },
+      { label: "Investment threshold", value: "AED 2 million in property — a single property or several combined" },
+      { label: "Visa length", value: "10 years, renewable while you keep the qualifying investment" },
+      { label: "Family", value: "Your spouse and children can be sponsored under your visa" },
+      { label: "Off-plan", value: "Can qualify when bought from developers approved for the scheme — confirm the paid-up rule" },
+      { label: "Mortgages", value: "Financed purchases can qualify — the equity and bank-letter rules change, so confirm first" },
       { label: "Stay requirement", value: "No minimum days in the UAE to keep the visa valid" },
     ],
     sections: [
       {
-        heading: "How the process works",
-        body: "Once your qualifying property is registered with the Dubai Land Department, you apply through the DLD's Cube office or the official channels: title deed (or Oqood for off-plan), passport, photographs, medical fitness test and Emirates ID biometrics. Approvals routinely come through in under two weeks, and our team walks clients through each step after the purchase completes.",
+        heading: "How do you apply for the Golden Visa through property?",
+        answer:
+          "Complete and register a qualifying purchase with the Dubai Land Department, then apply through the official Golden Visa channels with your title deed (or Oqood for an off-plan unit), passport, photographs and a medical fitness test — a straightforward file can be approved in days to a few weeks.",
+        body: [
+          "The order matters. Confirm eligibility before you pay, not after: the value that counts is the price registered with the Dubai Land Department, so check that the unit clears AED 2 million on the contract price rather than on a brochure or a pre-discount list price. Once the sale is registered you will hold a title deed for a ready property, or an Oqood — the interim registration — for an off-plan one.",
+          "Then you apply. Applicants normally submit through the Dubai Land Department's property-investor services or the federal residency channels, with the registered deed or Oqood, a valid passport and passport-style photographs; once the application is accepted you complete a medical fitness test and Emirates ID biometrics. Whether you apply from inside or outside the country, and the current document checklist, change the exact route — and the authorities update both — so we confirm the live requirements with you before every application rather than relying on a PDF that may be a year old.",
+          "Plan for the paperwork around the visa as well: health insurance that meets the emirate's rules for your family, an address for the Emirates ID, and — if you sponsor dependants — their own attested documents, such as marriage and birth certificates, with Arabic translations where required.",
+        ],
       },
       {
-        heading: "What property qualifies",
-        body: "Residential property worth AED 2 million or more at purchase, held in your name. Current practice accepts combined properties adding up past the threshold, off-plan purchases from approved developers, and mortgaged homes subject to the equity and bank-letter rules in force at application time — the fine print evolves, so we confirm the current requirements before every application.",
+        heading: "What property qualifies for the Golden Visa?",
+        answer:
+          "Property registered in your name with a value of at least AED 2 million; the value can be spread across more than one property, and off-plan and mortgaged purchases can qualify under conditions the authorities set.",
+        body: [
+          "Three points decide most cases. First, the threshold is measured on registered value and on what you own: combining several properties to reach AED 2 million has been accepted, but jointly owned property is assessed by each owner's own share, so one AED 2.5 million apartment bought 50/50 does not, by itself, qualify two people.",
+          "Second, off-plan. A project bought from a developer approved for the scheme can support an application on the Oqood registration; what has varied is how much of the price must already be paid when you apply. Third, mortgages. A financed home can qualify, but the minimum equity you must have paid in and the bank's no-objection letter have been adjusted more than once. These two points are exactly where a general web page goes out of date first, so treat anything you read about them — including here — as a prompt to ask, and have the current rule confirmed in writing before you commit.",
+          "If you are choosing between projects partly for the visa, look for homes priced comfortably above the line rather than on it: a unit at AED 2,000,000 on paper that is adjusted at registration can slip underneath. Our AED 2M+ projects page lists current options, and a consultant will check each unit's contract price against the threshold before you reserve.",
+        ],
       },
       {
-        heading: "Why investors use it",
-        body: "Stability is the honest answer. The visa decouples your residency from employment, lets your family live, study and bank in the UAE long-term, and removes the renewal anxiety of shorter permits. Selling the qualifying property ends the basis of the visa, so most holders treat it as a long-hold asset — which suits Dubai's rental market just fine.",
+        heading: "Why do investors use the property Golden Visa?",
+        answer:
+          "Because it makes residency independent of an employer: the visa lets a whole family live, study and bank in the UAE for ten years, with no sponsor and no minimum stay.",
+        body: [
+          "Stability is the honest answer. Employment visas end with the job; a Golden Visa tied to a property does not. Holders can sponsor a spouse and children, and are not required to spend any part of the year in the UAE to keep the residency valid — though a long absence is worth discussing with an adviser if you also care about a UAE tax residency certificate or your banking relationships.",
+          "The trade-offs are just as plain. The visa rests on the investment: if you sell the qualifying property, or its value falls below the threshold, the basis for the residency goes with it, so it suits buyers who intend to hold. It is residency, not citizenship, and it does not change your obligations in your home country — tax residency and reporting rules there remain yours to check.",
+        ],
+      },
+      {
+        heading: "How long does the Golden Visa take, and what does it cost?",
+        answer:
+          "Plan on days to a few weeks for a complete application; the government fees are small next to the purchase and change from time to time, so we quote them on the day rather than print a figure that could be wrong.",
+        body: [
+          "Timing depends on the route and on how complete the file is — missing attestations and unpaid fees are the usual delays. Most of the real cost of a Golden Visa purchase is the purchase itself, so read the buying-costs guide before you budget: the Dubai Land Department's transfer fee alone is 4% of the price.",
+        ],
+      },
+      {
+        heading: "Is there a lower-cost investor visa?",
+        answer:
+          "Dubai has also offered a renewable two-year investor residence for property from AED 750,000; it is a different visa with a shorter term, so check that it is currently available before relying on it.",
+        body: [
+          "If your budget sits below AED 2 million, a smaller property can still support a shorter residence visa under the property-investor route. We mention it for completeness: the term is shorter, it needs renewing, and the conditions are set by the authorities — so ask for the current position instead of assuming the figure above is unchanged.",
+        ],
       },
     ],
     faqs: [
       {
         q: "What is the minimum property investment for a UAE Golden Visa?",
-        a: "AED 2 million. The value can sit in a single property or be combined across several, based on Dubai Land Department registered values.",
+        a: "AED 2 million. The value can sit in a single property or be combined across several, based on values registered with the Dubai Land Department.",
       },
       {
         q: "Can I get a Golden Visa with an off-plan property?",
-        a: "Yes — off-plan purchases from approved developers qualify, using the Oqood registration in place of a title deed.",
+        a: "Yes — off-plan purchases from approved developers can qualify, using the Oqood registration in place of a title deed. Confirm the current paid-up requirement before you rely on it.",
+      },
+      {
+        q: "Can I get a Golden Visa with a mortgage?",
+        a: "Possibly. A financed home can qualify, but the equity you must have paid and the documents the bank must provide are conditions the authorities have changed before. Ask for the current rule in writing before you exchange contracts.",
       },
       {
         q: "Do I lose the visa if I sell the property?",
@@ -1259,81 +1414,148 @@ const INFO_GUIDES: SeoPage[] = [
       },
       {
         q: "Can my family get residency too?",
-        a: "Yes. Golden Visa holders sponsor their spouse and children (with no age cap for unmarried children under current rules), so one qualifying purchase settles the household.",
+        a: "Yes. Golden Visa holders can sponsor a spouse and children, so one qualifying purchase can settle the household. The age rules for children have been relaxed over time — confirm the current limits for your family.",
       },
+      {
+        q: "Do I have to live in Dubai to keep the Golden Visa?",
+        a: "No. Unlike many residence visas, the Golden Visa does not require you to spend a minimum number of days in the UAE to keep it valid.",
+      },
+      {
+        q: "Is the Golden Visa the same as UAE citizenship?",
+        a: "No. It is long-term residency. It does not give a UAE passport or change your tax obligations in your home country.",
+      },
+    ],
+    sources: [
+      { label: "Dubai Land Department", url: "https://dubailand.gov.ae/en/" },
+      { label: "UAE Government Portal — residency and visas", url: "https://u.ae/en" },
+      { label: "Federal Authority for Identity, Citizenship, Customs and Port Security (ICP)", url: "https://icp.gov.ae/en/" },
+      { label: "General Directorate of Residency and Foreigners Affairs — Dubai (GDRFA)", url: "https://gdrfad.gov.ae/en" },
     ],
     related: ["golden-visa-properties-in-dubai", "can-foreigners-buy-property-in-dubai", "dubai-property-buying-costs"],
   },
   {
     slug: "how-to-buy-off-plan-property-in-dubai",
     label: "How to Buy Off-Plan",
-    title: "How to Buy Off-Plan Property in Dubai — Step-by-Step Guide",
+    title: "How to Buy Off-Plan Property in Dubai — 6 Steps",
+    updated: COPY_UPDATED,
+    guideType: "buyer",
     h1: "How to Buy Off-Plan Property in Dubai",
     description:
       "The complete off-plan buying process in Dubai: booking, SPA and Oqood registration, escrow protection, payment plans and handover — step by step.",
     intro: [
-      "Off-plan is how most investors enter Dubai: you buy at today's price while the project is under construction, pay in instalments linked to build progress, and take handover of a brand-new home. The process is more regulated — and more protected — than most first-time buyers expect.",
-      "This guide walks the full journey from shortlist to keys. Read it once and the project pages on this site will make complete sense: every price, plan and handover date you see slots into the steps below.",
+      "Off-plan is how most investors enter the Dubai market: you buy at today's price while the project is still being built, pay in instalments tied to a payment plan, and take handover of a brand-new home. It is also more regulated — and better protected — than most first-time buyers expect, because Dubai requires developers to register their projects, hold buyers' money in a supervised escrow account and record every sale with the Dubai Land Department.",
+      "This guide walks the full journey from shortlist to keys: what you sign, what you pay and when, what protects your money, what happens if the date slips, and how to resell before completion. Read it once and the project pages on this site will make complete sense — every price, plan and handover date you see slots into the steps below.",
     ],
     kind: "guide",
     factsHeading: "The process at a glance",
     facts: [
       { label: "1 · Reserve", value: "Booking form + deposit, typically 5–20% of the price" },
-      { label: "2 · Contract", value: "Sign the SPA; the sale registers with DLD as an Oqood" },
-      { label: "3 · Pay in stages", value: "Construction-linked instalments on the developer's plan" },
-      { label: "4 · Protected funds", value: "Payments sit in a RERA-regulated project escrow account" },
-      { label: "5 · Fees", value: "4% DLD registration plus admin fees, usually at contract" },
+      { label: "2 · Contract", value: "Sign the SPA; the sale registers with the Dubai Land Department as an Oqood" },
+      { label: "3 · Pay in stages", value: "Instalments on the developer's payment plan" },
+      { label: "4 · Protected funds", value: "Payments go into a regulated project escrow account" },
+      { label: "5 · Fees", value: "4% DLD registration plus admin fees, usually settled around contract signing" },
       { label: "6 · Handover", value: "Snag the unit, settle the balance, receive keys and title" },
     ],
     sections: [
       {
-        heading: "From shortlist to contract",
-        body: "Once you choose a unit, the developer issues a booking form against a deposit and drafts the Sale and Purchase Agreement. Read the SPA for three things: the payment schedule, the anticipated completion date with its grace period, and the compensation clause for late handover. The sale is then registered with the Dubai Land Department as an Oqood — your official record of ownership until the title deed issues at completion.",
+        heading: "How does an off-plan purchase go from shortlist to contract?",
+        answer:
+          "You choose a unit, pay a booking deposit, sign the Sale and Purchase Agreement (SPA), and the sale is registered with the Dubai Land Department as an Oqood — your official record of ownership until the title deed issues at completion.",
+        body: [
+          "Start with the unit, not the brochure: ask for the floor plan, the exact unit number and the price list for that stack, because prices differ by floor and view. The reservation takes a booking form and a deposit — typically 5–20% of the price depending on the developer — and, in most cases, a short window in which to sign the SPA.",
+          "Read the SPA for the things that decide the outcome: the payment schedule and what triggers each instalment, the anticipated completion date and its grace period, what happens if the developer is late, your right to assign (resell) the contract and from what payment threshold, and the fees due at registration. The 4% Dubai Land Department registration fee is normally settled around contract signing, so keep that cash ready. If anything is unclear, ask a lawyer — the SPA is a binding contract.",
+          "Once registered, the Oqood certificate is your evidence of ownership. It is what a bank, a Golden Visa application or a future buyer will look at until the title deed is issued.",
+        ],
       },
       {
-        heading: "Why escrow makes off-plan safe",
-        body: "Dubai requires every off-plan project to run a RERA-supervised escrow account. Your instalments go into that account — not the developer's pocket — and funds release only as independent engineers certify construction milestones. If a project stalls, the money is ring-fenced. It is the single biggest reason Dubai's off-plan market matured past its early reputation.",
+        heading: "Why does escrow make off-plan buying safe?",
+        answer:
+          "Because buyers' instalments go into a project-specific escrow account supervised under Dubai's escrow law, and the developer can draw money out only as independent engineers certify construction milestones.",
+        body: [
+          "Dubai's escrow law (Law No. 8 of 2007) requires every off-plan project to run an escrow account with a licensed bank, and RERA — the Real Estate Regulatory Agency, part of the Dubai Land Department — oversees developers and project registrations. Your instalments are paid into that account, not into the developer's operating account, and funds are released against certified progress. If a project stalls, what has been collected is ring-fenced for it.",
+          "That protection is real, but it protects your money, not your schedule: delays still happen, and the developer's track record remains the best predictor of a smooth delivery. Always pay by bank transfer into the escrow account named in your SPA — never to an individual or to a different account, whatever a salesperson or intermediary says.",
+        ],
       },
       {
-        heading: "Choosing the right project",
-        body: "Three filters do most of the work: the developer's delivery track record (ask for their handed-over projects, not their renders), the location's rental demand today (not the masterplan's promise), and a payment plan you can carry comfortably if your circumstances change. We apply all three before any project reaches our recommendations.",
+        heading: "How do you choose the right off-plan project?",
+        answer:
+          "Weigh the developer's delivery record, the area's rental demand today and a payment plan you could carry comfortably if your circumstances changed — in that order.",
+        body: [
+          "Ask for completed projects, not renders: when were the developer's previous towers handed over relative to their announced dates, and what do owners there say about build quality and service charges? Look at the location as it is today — walkable amenities, the metro or main roads, whether the neighbourhood already has tenants — rather than the masterplan's promise. And test the payment plan against a bad year: if the next instalment fell due during a period of lower income, could you still meet it?",
+          "Then compare like with like. Two projects at similar prices can carry very different service charges, handover dates and post-handover terms. We apply these filters before a project reaches our recommendations, and every project page on this site shows the developer, the delivery quarter and the payment plan we hold on file.",
+        ],
+      },
+      {
+        heading: "What happens between booking and handover?",
+        answer:
+          "You pay each instalment on the schedule in your SPA, keep your contact details current with the developer, and follow construction through the developer's updates.",
+        body: [
+          "Most plans link instalments to construction milestones or to dates; some include a share due on completion and, in a growing number of launches, a share spread over months or years after handover. Keep every receipt and pay each instalment by its due date: SPAs set out what follows a missed payment, and the consequences can be severe.",
+          "Developers send construction updates and many projects publish progress photos; asking for a site visit is also reasonable. If your plans change, remember that you can usually assign the contract to a new buyer once you have paid the share the developer requires, subject to its no-objection certificate (NOC) and fee.",
+        ],
+      },
+      {
+        heading: "What happens at handover?",
+        answer:
+          "You inspect and snag the unit, pay the final instalment and handover charges, receive the keys, and the Oqood converts into a title deed.",
+        body: [
+          "Before you accept the keys, inspect with a snagging checklist — or a professional snagger — and list every defect in writing; the developer is responsible for fixing defects within the liability period set out in the contract. You will also pay the final instalment, the first service-charge period and utility connection deposits. Then you decide how to use the home: live in it, rent it out or sell.",
+        ],
       },
     ],
     faqs: [
       {
         q: "How much deposit do I need for off-plan in Dubai?",
-        a: "Booking amounts typically run 5–20% of the purchase price, followed by construction-linked instalments. The 4% DLD fee is usually payable around contract signing.",
+        a: "Booking amounts typically run 5–20% of the purchase price, followed by instalments on the developer's payment plan. The 4% DLD fee is usually payable around contract signing.",
       },
       {
         q: "What happens if the developer delays handover?",
-        a: "SPAs include an anticipated completion date plus a grace period (commonly up to 12 months). Beyond it, buyers are generally entitled to compensation as set out in the contract, and RERA oversees stalled projects.",
+        a: "SPAs include an anticipated completion date plus a grace period (commonly up to 12 months). Beyond it, buyers are generally entitled to the remedies set out in the contract, and RERA oversees stalled projects.",
       },
       {
         q: "Can I resell before the project completes?",
-        a: "Yes — assignments are normal in Dubai. Most developers permit resale once 30–40% of the price is paid, against an NOC fee.",
+        a: "Yes — assignments are normal in Dubai. Most developers permit resale once 30–40% of the price is paid, against an NOC fee; each developer sets its own threshold.",
       },
       {
         q: "Do foreigners get the same protections?",
         a: "Identical. Escrow, Oqood registration and RERA oversight apply to every buyer regardless of nationality or residency.",
       },
+      {
+        q: "What is the difference between an Oqood and a title deed?",
+        a: "An Oqood is the interim registration of an off-plan sale at the Dubai Land Department. The title deed is issued when the building is complete and the final payments have been made.",
+      },
+      {
+        q: "Is the 4% DLD fee paid at booking or at handover?",
+        a: "For off-plan it is normally paid at or soon after you sign the SPA, when the sale is registered — not at handover. Check the timing in your contract, because some developers offer to waive or share the fee as a launch incentive.",
+      },
+      {
+        q: "Can I get a mortgage on an off-plan property?",
+        a: "Some banks lend on off-plan, usually at a lower loan-to-value than for completed homes, and many buyers instead carry the developer's payment plan and refinance after handover. Ask the bank before you assume financing will be available.",
+      },
+    ],
+    sources: [
+      { label: "Dubai Land Department", url: "https://dubailand.gov.ae/en/" },
+      { label: "UAE Government Portal — buying property", url: "https://u.ae/en" },
     ],
     related: ["off-plan-projects-in-dubai", "dubai-property-buying-costs", "new-projects-in-dubai"],
   },
   {
     slug: "dubai-property-buying-costs",
     label: "Buying Costs Explained",
-    title: "Dubai Property Buying Costs — Fees, Charges & What to Budget",
+    title: "Dubai Property Buying Costs — Fees & Charges",
+    updated: COPY_UPDATED,
+    guideType: "buyer",
     h1: "Dubai Property Buying Costs, Explained",
     description:
       "Every cost of buying property in Dubai: the 4% DLD fee, trustee and agent fees, mortgage costs and ongoing service charges — with rules of thumb.",
     intro: [
-      "Dubai's headline advantage is what it doesn't charge: no annual property tax, no capital gains tax, no stamp duty beyond a one-time transfer fee. But there are real one-time costs at purchase, and glossing over them is how first-time buyers end up surprised at the trustee office.",
-      "The honest rule of thumb: budget 6–8% on top of the purchase price for a ready property bought with a mortgage, less for cash, and closer to 4–5% for off-plan direct from a developer. Here is where every dirham goes.",
+      "Dubai's headline advantage is what it does not charge: no annual property tax, no capital gains tax and no stamp duty beyond a one-time registration fee. But there are real one-time costs at purchase, and overlooking them is how first-time buyers end up surprised at the trustee office.",
+      "The rule of thumb we use with clients: budget about 6–8% on top of the purchase price for a ready property bought with a mortgage, less for a cash purchase, and closer to 4–5% for an off-plan home bought direct from a developer. Below is where every dirham goes, a worked example you can check against our mortgage calculator, and the running costs of ownership that the purchase price does not show.",
     ],
     kind: "guide",
     factsHeading: "The costs at a glance",
     facts: [
-      { label: "DLD transfer fee", value: "4% of the price + AED 580 admin — the big one" },
+      { label: "DLD transfer fee", value: "4% of the price + about AED 580 admin — the big one" },
       { label: "Trustee office", value: "≈ AED 4,000 + VAT (AED 2,000 below 500K)" },
       { label: "Agent commission", value: "Typically 2% + VAT on resale; developer sales cost you nothing" },
       { label: "Mortgage registration", value: "0.25% of the loan + AED 290, plus bank arrangement fees" },
@@ -1342,16 +1564,69 @@ const INFO_GUIDES: SeoPage[] = [
     ],
     sections: [
       {
-        heading: "One-time costs at purchase",
-        body: "The Dubai Land Department takes 4% of the purchase price at transfer, plus small admin fees. Add the trustee office fee, your agent's commission on resales, and — if you finance — the bank's arrangement fee (commonly up to 1% of the loan), the 0.25% mortgage registration and a valuation. Off-plan buyers pay the same 4% DLD (as the Oqood fee) but usually no agent commission, since developers pay the broker.",
+        heading: "What are the one-time costs when buying in Dubai?",
+        answer:
+          "The Dubai Land Department takes 4% of the purchase price at transfer, plus a small administrative fee; on top of that come the trustee office fee, your agent's commission on a resale and, if you finance, the bank's charges.",
+        body: [
+          "For a ready property the main items are: the DLD transfer fee (4% of the price plus an administrative fee of about AED 580), the registration trustee's fee (AED 4,000 plus VAT for most purchases, AED 2,000 plus VAT below AED 500,000), the agent's commission on a resale (usually 2% plus VAT, paid by the buyer) and, where the unit sits in a managed project, the developer's NOC. If you borrow, add the mortgage registration at 0.25% of the loan plus AED 290, a valuation fee, and the bank's arrangement fee — commonly up to 1% of the loan.",
+          "An off-plan buyer pays the same 4% (registered with the Oqood) but usually no agent commission, because the developer pays the broker; a few small registration charges apply. That is why off-plan sits nearer 4–5% extra.",
+        ],
+        table: {
+          caption: "Extra cash to budget on top of the purchase price",
+          columns: ["Purchase type", "Typical extra cost"],
+          rows: [
+            ["Ready property with a mortgage", "6–8% of the price"],
+            ["Off-plan, direct from a developer", "4–5% of the price"],
+            ["Ready property, cash", "Less than a mortgaged purchase"],
+          ],
+        },
       },
       {
-        heading: "Ongoing costs owners actually pay",
-        body: "Service charges are the number to respect: they fund the building's upkeep and run anywhere from roughly AED 10 to 30+ per square foot per year depending on the community and its amenities. Add DEWA (utilities), district cooling where applicable, and home insurance. There is no annual property tax — the service charge is effectively Dubai's substitute, so always check it before you buy, not after.",
+        heading: "What does a worked example look like?",
+        answer:
+          "On a AED 1,500,000 ready apartment bought with a 20% down payment, fees and charges come to roughly AED 102,570 (about 6.8% of the price), so the cash needed on the day is about AED 402,570 including the deposit.",
+        body: [
+          "The figures below use the same assumptions as our mortgage calculator — the 4% DLD fee plus AED 580, a trustee fee of AED 4,000 plus VAT, a 2% agent commission plus VAT, mortgage registration and an approximate valuation fee. They leave out the bank's arrangement fee, which varies by lender and could add up to roughly AED 12,000 on a AED 1.2 million loan. Treat the table as a planning estimate: your final figures depend on the transaction and the lender.",
+        ],
+        table: {
+          caption: "Worked example: AED 1,500,000 ready apartment, 20% down payment",
+          columns: ["Item", "Amount (AED)"],
+          rows: [
+            ["Down payment (20%)", "300,000"],
+            ["DLD transfer fee (4% + AED 580)", "60,580"],
+            ["Trustee office (incl. VAT)", "4,200"],
+            ["Agent commission (2% + VAT)", "31,500"],
+            ["Mortgage registration (0.25% + AED 290)", "3,290"],
+            ["Bank valuation (approx.)", "3,000"],
+            ["Total cash needed up front", "402,570"],
+          ],
+        },
       },
       {
-        heading: "Where buyers overspend",
-        body: "Two places: paying agent commission on a new launch a developer would have sold them commission-free, and underestimating service charges on amenity-heavy towers. Both are checkable in minutes — the first by coming to the developer's broker directly (that's us), the second by asking for the current OA budget before signing.",
+        heading: "What does financing add beyond the mortgage registration fee?",
+        answer:
+          "Lenders add an arrangement fee, a valuation fee and compulsory insurance on top of the 0.25% registration, and the interest rate, the fixed-rate period and the early-settlement terms decide what the loan really costs.",
+        body: [
+          "The bank's arrangement fee is commonly up to 1% of the loan, plus VAT, and is sometimes negotiable; the valuation is paid by the borrower; and lenders require life cover on the borrower and building insurance on the property, both renewed each year. Those premiums are small next to the interest, but they belong in your monthly budget.",
+          "The rate is the larger cost. UAE mortgages are usually priced at a fixed rate for an initial period — one to five years is common — and then reset to EIBOR plus the bank's margin, so a plan that works at today's payment should still work if the rate rises. Ask about early settlement as well: Central Bank rules limit what a lender may charge to settle a mortgage early, but the charge still decides whether refinancing after the fixed period pays off. Our mortgage calculator shows the repayment and the up-front cash side by side, and a broker can compare lenders for your profile.",
+        ],
+      },
+      {
+        heading: "What ongoing costs do Dubai property owners pay?",
+        answer:
+          "Service charges are the recurring cost to plan around: they fund the building's maintenance and amenities and are set per square foot each year, alongside utilities, district cooling where it applies, and insurance.",
+        body: [
+          "Service charges vary widely — from the low teens to well over AED 30 per square foot a year, depending on the community and its amenities — and the owners' association sets them annually. There is no annual property tax; the service charge is the nearest equivalent, so ask for the current budget and the last two years' charges before you sign. Add DEWA electricity and water, district cooling fees where a tower is connected to a central chiller (common in several dense districts), and home insurance, which a mortgage lender will require.",
+          "If you rent the property out, budget for tenancy registration (Ejari), a property manager's fee if you use one, vacancy between tenants and periodic maintenance. In general, individuals who simply own and rent out property are not taxed on that income in the UAE, but a company or a business activity can be — take advice on structure before you buy.",
+        ],
+      },
+      {
+        heading: "Where do buyers overspend?",
+        answer:
+          "In two places: paying commission on a new launch the developer would have paid for, and underestimating service charges on amenity-heavy towers.",
+        body: [
+          "The first is checkable in minutes — come to the developer's broker directly, which is what we are: developer sales cost the buyer no agent commission. The second means asking for the current service-charge budget before signing. Others worth a look: ignoring chiller charges, choosing a smaller unit than you need because of a lower price per square foot, and paying a poor exchange rate on a large transfer — compare quotes from your bank and a specialist before moving six or seven figures.",
+        ],
       },
     ],
     faqs: [
@@ -1367,19 +1642,33 @@ const INFO_GUIDES: SeoPage[] = [
         q: "Who pays the agent's commission?",
         a: "On resales, the buyer typically pays 2% + VAT. On new developer launches the developer pays the broker — buying through us costs you nothing extra.",
       },
+      {
+        q: "Is the DLD fee negotiable?",
+        a: "The fee itself is 4% of the registered price and is customarily paid by the buyer. In a resale who bears it can be negotiated, and developers sometimes waive or share it as a launch incentive — so ask.",
+      },
+      {
+        q: "Do I pay VAT on a property purchase in Dubai?",
+        a: "In the ordinary case the purchase price of residential property is not subject to VAT. VAT at 5% does apply to fees such as the agent's commission and the trustee's charge.",
+      },
+    ],
+    sources: [
+      { label: "Dubai Land Department", url: "https://dubailand.gov.ae/en/" },
+      { label: "Central Bank of the UAE", url: "https://www.centralbank.ae/en/" },
     ],
     related: ["how-to-buy-off-plan-property-in-dubai", "ready-properties-in-dubai", "dubai-golden-visa-property-guide"],
   },
   {
     slug: "can-foreigners-buy-property-in-dubai",
     label: "Foreign Buyer Guide",
-    title: "Can Foreigners Buy Property in Dubai? — Ownership Rules 2026",
+    title: "Can Foreigners Buy Property in Dubai? The Rules",
+    updated: COPY_UPDATED,
+    guideType: "buyer",
     h1: "Can Foreigners Buy Property in Dubai?",
     description:
       "Yes — foreigners can own Dubai property 100% freehold in designated zones, with no residency required. The rules, the zones and the process.",
     intro: [
       "Yes — and more completely than in almost any comparable market. Since 2002, foreign nationals can buy, own, sell and lease property in Dubai's designated freehold zones with 100% ownership, a government-issued title deed, and no requirement to live in — or even visit — the UAE.",
-      "Practically every district an international buyer has heard of is freehold: Dubai Marina, Downtown, Palm Jumeirah, JVC, Business Bay, Dubai Hills and dozens more. This guide covers how ownership works, how overseas buyers complete purchases remotely, and the financing available to non-residents.",
+      "Practically every district an international buyer has heard of is freehold: Dubai Marina, Downtown, Palm Jumeirah, JVC, Business Bay, Dubai Hills and many more. This guide covers how ownership works, how overseas buyers complete purchases remotely, how non-residents finance a purchase, and the checks that keep a foreign buyer on the right side of a regulated process.",
     ],
     kind: "guide",
     imageQuery: "marina",
@@ -1387,23 +1676,62 @@ const INFO_GUIDES: SeoPage[] = [
     facts: [
       { label: "Ownership", value: "100% freehold in designated zones — full title in your name" },
       { label: "Residency", value: "Not required to buy, own or sell" },
-      { label: "Visa path", value: "AED 2M+ property qualifies you for the 10-year Golden Visa" },
-      { label: "The zones", value: "Marina, Downtown, Palm, JVC, Business Bay + 40 more districts" },
+      { label: "Visa path", value: "AED 2M+ property can qualify you for the 10-year Golden Visa" },
+      { label: "The zones", value: "Marina, Downtown, Palm, JVC, Business Bay and many more districts" },
       { label: "Financing", value: "UAE banks lend to non-residents, typically 50–60% of value" },
       { label: "Inheritance", value: "A DIFC Wills registration protects non-Muslim succession wishes" },
     ],
     sections: [
       {
-        heading: "How freehold works for foreigners",
-        body: "Inside the designated zones, a foreign buyer's ownership is identical to a UAE national's: a title deed issued by the Dubai Land Department, the right to sell, lease, mortgage or pass on the property, and no time limit on the holding. Outside those zones, ownership for foreigners is generally via long leasehold — but in practice the freehold map covers virtually everywhere international buyers actually look.",
+        heading: "How does freehold ownership work for foreigners?",
+        answer:
+          "In Dubai's designated freehold areas a foreign buyer owns the property outright: a title deed from the Dubai Land Department in their own name, with the same rights to sell, lease, mortgage or pass it on as a UAE national.",
+        body: [
+          "Inside the designated zones, ownership is identical to a UAE national's: no local partner, no time limit on the holding, and a title deed registered with the Dubai Land Department. Outside those zones, foreign ownership is generally limited to long leasehold or usufruct terms — which is why it pays to confirm that a project sits in a freehold zone before you reserve. Every project page on this site shows the community, and our consultants confirm the ownership type for you.",
+          "Dubai is only one of the emirates. Abu Dhabi has its own regime that lets foreigners own freehold in its designated investment areas, and Sharjah, Ajman and Ras Al Khaimah each set their own rules and zones — if you are looking beyond Dubai, ask us which regime applies to the project you have in mind.",
+        ],
       },
       {
-        heading: "Buying from abroad",
-        body: "Remote purchases are routine: reservation and contracts are signed digitally, funds move by bank transfer into regulated accounts (escrow for off-plan, trustee-managed transfer for ready), and a power of attorney can stand in for you at the transfer appointment. A passport is the only document a cash buyer strictly needs to get started.",
+        heading: "Can you buy Dubai property from abroad?",
+        answer:
+          "Yes — reservation, contract and payment can all be completed remotely, and a power of attorney can stand in for you at the transfer.",
+        body: [
+          "Remote purchases are routine: contracts are signed digitally, funds move by bank transfer into regulated accounts (the project escrow account for off-plan, the registered trustee process for a ready home), and a power of attorney can represent you at the transfer appointment. A passport is the only document a cash buyer strictly needs to get started, although developers and the Dubai Land Department also ask for evidence of the source of funds — so have your bank statements ready.",
+          "A few practical checks for an overseas purchase: pay only into the account named in the contract or through the trustee process, never to an individual; use a power of attorney drawn up for the specific transaction and notarised and attested for use in the UAE; keep copies of everything you sign; and, if your home country has exchange controls, talk to your bank early about transfer timing.",
+        ],
       },
       {
-        heading: "Financing as a non-resident",
-        body: "UAE banks lend to non-residents on completed property, typically at 50–60% loan-to-value with rates linked to EIBOR; residents reach 75–80%. Off-plan purchases are usually carried on the developer's payment plan instead — which is interest-free by construction — and refinanced after handover if desired.",
+        heading: "How do non-residents finance a Dubai purchase?",
+        answer:
+          "UAE banks lend to non-residents on completed property, usually at a lower loan-to-value than for residents; off-plan buyers more often carry the developer's payment plan and refinance after handover.",
+        body: [
+          "On a completed home, non-residents typically borrow in the region of 50–60% of the value, against 75–80% for a resident's first home, within the Central Bank's loan-to-value limits and each bank's own checks; rates are usually linked to EIBOR plus a margin. Expect to show income evidence, bank statements and a credit report from your home country, and to pay a larger deposit than a resident would — the process is more document-heavy, and a mortgage broker who works with several UAE banks usually saves weeks.",
+          "Off-plan purchases are usually carried on the developer's payment plan instead, which carries no interest by construction, and some buyers then refinance with a mortgage at or after handover. Whichever route you take, ask the bank for its terms in writing before you assume financing will be available.",
+        ],
+      },
+      {
+        heading: "Which areas of Dubai can foreigners buy in?",
+        answer:
+          "Most of the districts international buyers search for are freehold — including Dubai Marina, Downtown Dubai, Palm Jumeirah, Business Bay, Jumeirah Village Circle, Dubai Hills Estate and Dubai Creek Harbour.",
+        body: [
+          "The list of designated areas is maintained by the Dubai Land Department and extended from time to time. Our area guides cover the districts where we currently sell; for any other address, we check the ownership regime before you commit.",
+        ],
+      },
+      {
+        heading: "What can go wrong, and how do foreign buyers avoid it?",
+        answer:
+          "Most problems come from stepping outside a regulated process: check the developer's registration, the project's escrow account, the seller's title and your agent's broker number before you pay anything.",
+        body: [
+          "For an off-plan project, ask to see the developer's and the project's registration with the Dubai Land Department and the escrow account named in the contract. For a resale, ask for the seller's title deed and have the transaction handled through a registered trustee office. Use a RERA-registered broker — ask for their broker number (BRN) and check it with the Dubai Land Department — and read the contract before you pay any deposit.",
+        ],
+      },
+      {
+        heading: "What about wills and inheritance for foreign owners?",
+        answer:
+          "Non-Muslim owners can register a will for their UAE property so that it passes under the terms they choose rather than under default succession rules.",
+        body: [
+          "Registering a will for UAE assets — for example with the DIFC Wills Service or the Dubai Courts — is inexpensive next to the value of the property and avoids delay for your family. Take advice from a lawyer who handles UAE succession, because the right route depends on your nationality, religion and where your family lives.",
+        ],
       },
     ],
     faqs: [
@@ -1417,16 +1745,34 @@ const INFO_GUIDES: SeoPage[] = [
       },
       {
         q: "Can buying property get me UAE residency?",
-        a: "Yes — property worth AED 750,000+ can support a renewable 2-year residence visa, and AED 2 million+ qualifies you to apply for the 10-year Golden Visa.",
+        a: "Yes. Property worth AED 2 million or more can qualify you to apply for the 10-year Golden Visa, and shorter investor visas have been available at lower thresholds — confirm the current conditions before you rely on them.",
       },
       {
         q: "Can non-residents get a UAE mortgage?",
         a: "Yes, on completed properties — typically up to 50–60% of the value for non-residents, subject to the bank's income checks.",
       },
+      {
+        q: "Which documents does a foreign buyer need?",
+        a: "A valid passport to start, and evidence of the source of funds for the contract and the transfer. Developers may also ask for proof of address and, for a company purchase, the company's registration documents — your consultant sends the exact list for the project you choose.",
+      },
+      {
+        q: "Is there a minimum price for foreign buyers?",
+        a: "There is no minimum purchase price for owning freehold property in Dubai. Minimums only matter for visa eligibility — see the Golden Visa guide.",
+      },
+      {
+        q: "Can I buy Dubai property through a company?",
+        a: "Yes, through a UAE or offshore company, subject to the rules of the area and the company's registration. The structure changes your tax and visa position, so take advice first.",
+      },
+    ],
+    sources: [
+      { label: "Dubai Land Department", url: "https://dubailand.gov.ae/en/" },
+      { label: "UAE Government Portal — buying property", url: "https://u.ae/en" },
+      { label: "Central Bank of the UAE", url: "https://www.centralbank.ae/en/" },
     ],
     related: ["dubai-golden-visa-property-guide", "new-projects-in-dubai", "dubai-property-buying-costs"],
   },
 ]
+
 
 export const SEO_PAGES: SeoPage[] = [
   ...PROJECT_PAGES,
@@ -1440,9 +1786,30 @@ export const SEO_PAGES: SeoPage[] = [
  *  reached through related-links and the sitemap. */
 export const SEO_SEARCH_PAGES = PROJECT_PAGES
 export const SEO_AREA_GUIDES = AREA_GUIDES
+/** The buyer's-process guides (Golden Visa, how to buy off-plan, costs, foreigners). */
+export const SEO_BUYER_GUIDES = INFO_GUIDES
+/** "Dubai projects handing over in <year>". */
+export const SEO_HANDOVER_PAGES = HANDOVER_PAGES
+/** Property-type, budget and community inventory pages ("villas for sale in Dubai", "projects in JVC"). */
+export const SEO_TYPE_AND_AREA_PAGES = TYPE_AND_AREA_PAGES
 
 export function getSeoPage(slug: string): SeoPage | undefined {
   return SEO_PAGES.find((p) => p.slug === slug)
+}
+
+/**
+ * The buyer guides worth offering on a project page: the Golden Visa guide first when the project
+ * may qualify, then the process guide that fits its status (off-plan → how to buy off-plan; ready →
+ * skip it), then costs and the foreign-buyer guide.
+ */
+export function buyerGuidesForProject(p: { status: string | null | undefined; goldenVisa: boolean }): SeoPage[] {
+  const slugs = [
+    ...(p.goldenVisa ? ["dubai-golden-visa-property-guide"] : []),
+    ...(p.status === "completed" ? [] : ["how-to-buy-off-plan-property-in-dubai"]),
+    "dubai-property-buying-costs",
+    "can-foreigners-buy-property-in-dubai",
+  ]
+  return slugs.map(getSeoPage).filter((page): page is SeoPage => Boolean(page))
 }
 
 /**
@@ -1458,6 +1825,10 @@ export function relatedSeoPagesForProject(p: {
   propertyType?: string | null
   priceFrom?: number | null
   status?: string | null
+  /** The project's handover year ("2027"), when known — links its dubai-projects-handover-<year> page. */
+  handoverYear?: string | null
+  /** The page's own Golden Visa check (lib/project-seo goldenVisaMayQualify) — links the AED 2M+ landing only when it passes. */
+  goldenVisa?: boolean
 }): SeoPage[] {
   const out: SeoPage[] = []
   const add = (slug: string) => {
@@ -1475,6 +1846,8 @@ export function relatedSeoPagesForProject(p: {
     ["jumeirah village triangle", ["projects-in-jumeirah-village-triangle"]],
     ["business bay", ["projects-in-business-bay", "business-bay"]],
     ["dubailand", ["projects-in-dubailand", "dubailand"]],
+    // "Dubai Land Residence Complex" is how the community normaliser spells the Dubailand complexes.
+    ["dubai land", ["projects-in-dubailand", "dubailand"]],
     ["marina", ["dubai-marina"]],
     ["downtown", ["downtown-dubai"]],
     ["palm jumeirah", ["palm-jumeirah"]],
@@ -1498,13 +1871,17 @@ export function relatedSeoPagesForProject(p: {
 
   // Price band (same realistic floor as the budget page itself).
   if (price != null && price >= 50_000 && price <= 1_000_000) add("properties-under-1m-in-dubai")
-  if (price != null && price >= 2_000_000) add("golden-visa-properties-in-dubai")
+  if (p.goldenVisa) add("golden-visa-properties-in-dubai")
 
   // Status and city.
   if (city.includes("abu dhabi")) add("new-projects-in-abu-dhabi")
   else if (p.status === "completed") add("ready-properties-in-dubai")
   else add("off-plan-projects-in-dubai")
+  // Its handover-year page (a year without a page is ignored by getSeoPage). Ahead of the generic
+  // city link so the cap below can never be the thing that drops it.
+  if (city.includes("dubai") && p.handoverYear) add(`dubai-projects-handover-${p.handoverYear}`)
   if (city.includes("dubai")) add("new-projects-in-dubai")
 
-  return out.slice(0, 6)
+  // Two area pages + type + price + status + handover + city = 7.
+  return out.slice(0, 7)
 }

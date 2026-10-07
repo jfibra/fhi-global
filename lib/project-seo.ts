@@ -1,15 +1,27 @@
 import { truncateDescription } from "@/lib/seo"
+import { normalizeCommunity } from "@/lib/communities"
+import { GOLDEN_VISA_MIN_AED } from "@/lib/market-figures"
 
 /**
  * Data-driven SEO copy for project pages (/{developer}/{project}).
  *
- * 256 of 257 published projects carry no curated meta_title/meta_description,
- * ~40 have no overview text at all, and the ones that do average a paragraph —
- * yet the structured columns ARE populated: price on 249, handover on 242,
- * unit types on 244, amenities on 230. These helpers turn that data into the
- * title, description, "at a glance" paragraph and FAQ block, so every project
- * page reads differently because its facts are different — the opposite of
- * swapping a name into boilerplate.
+ * Almost no published project carries a curated meta_title/meta_description,
+ * some have no overview text at all, and the ones that do average a paragraph —
+ * yet the structured columns ARE populated: price, handover, unit types,
+ * amenities. These helpers turn that data into the title, description, "at a
+ * glance" paragraph and FAQ block, so every project page reads differently
+ * because its facts are different — the opposite of swapping a name into
+ * boilerplate.
+ *
+ * Three display rules live here so every surface applies them the same way:
+ * - OVERDUE HANDOVER: a stated quarter that has already ended on a project that
+ *   is not completed is never printed as an upcoming date ("Handover date under
+ *   review" instead) — see isHandoverOverdue.
+ * - GOLDEN VISA: the "may qualify" claim needs AED, a Dubai city, a residential
+ *   type and a reconciled from-price of at least the threshold — see
+ *   goldenVisaMayQualify.
+ * - COMMUNITY: free-text community values are normalised at render
+ *   (lib/communities.ts); the stored value is untouched.
  *
  * Ground rules:
  * - Only state what the row supports. A missing field drops its sentence;
@@ -123,12 +135,90 @@ function quarterOf(iso: string): string | null {
   return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`
 }
 
-/** "Q4 2027" — from delivery_quarter, else the completion/delivery date. */
-export function handoverLabel(p: ProjectSeoInput): string | null {
+/** The fields a handover label and the overdue rule read. */
+export type HandoverFields = Pick<ProjectSeoInput, "status" | "delivery_quarter" | "expected_completion_date" | "delivery_date">
+
+/** Printed in place of a stated handover that has already passed. */
+export const HANDOVER_UNDER_REVIEW = "Handover date under review"
+
+/** "Q4 2027" — from delivery_quarter, else the completion/delivery date. This is the RAW stated quarter; use handoverDisplay where a past date must not be printed. */
+export function handoverLabel(p: HandoverFields): string | null {
   const q = clean(p.delivery_quarter)
   if (q) return q
   const date = clean(p.expected_completion_date) ?? clean(p.delivery_date)
   return date ? quarterOf(date) : null
+}
+
+// ─── Handover as a point in time ─────────────────────────────────────────────
+//
+// delivery_quarter is free text ("Q4 2027", "AUG 2028", "Q4 2026 – Q2 2027", "2027 to 2028"). Anything
+// that needs to ORDER or COMPARE handovers — the landing pages' "soonest first" sort, "this handover is
+// already past" — reads it through parseHandover so there is one parser, not one per page.
+
+const MONTH_QUARTER: Record<string, 1 | 2 | 3 | 4> = {
+  jan: 1, feb: 1, mar: 1, apr: 2, may: 2, jun: 2, jul: 3, aug: 3, sep: 3, oct: 4, nov: 4, dec: 4,
+}
+const QUARTER_TOKEN = /\bQ([1-4])\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/gi
+
+/**
+ * The handover as { year, quarter }, or null when neither the quarter text nor the completion date
+ * gives one. A range reads as where it ENDS ("Q4 2026 – Q2 2027" → 2027 Q2), so a project is never
+ * called late while its window is still open; a bare year reads as its Q4; a month reads as its quarter.
+ */
+export function parseHandover(
+  deliveryQuarter: string | null | undefined,
+  expectedCompletionDate?: string | null,
+): { year: number; quarter: 1 | 2 | 3 | 4 } | null {
+  const raw = clean(deliveryQuarter)
+  const years = raw ? [...raw.matchAll(/\b(20\d{2})\b/g)] : []
+  if (raw && years.length > 0) {
+    const latest = years.reduce((a, b) => (Number(b[1]) >= Number(a[1]) ? b : a))
+    let quarter: 1 | 2 | 3 | 4 = 4
+    for (const m of raw.slice(0, latest.index ?? raw.length).matchAll(QUARTER_TOKEN)) {
+      quarter = m[1] ? (Number(m[1]) as 1 | 2 | 3 | 4) : MONTH_QUARTER[m[2].toLowerCase()]
+    }
+    return { year: Number(latest[1]), quarter }
+  }
+  const date = clean(expectedCompletionDate)
+  if (!date) return null
+  const d = new Date(date)
+  if (Number.isNaN(d.getTime())) return null
+  return { year: d.getUTCFullYear(), quarter: (Math.floor(d.getUTCMonth() / 3) + 1) as 1 | 2 | 3 | 4 }
+}
+
+/** A sortable number for a handover: later quarter = larger. */
+export function handoverRank(h: { year: number; quarter: number }): number {
+  return h.year * 4 + h.quarter - 1
+}
+
+/** handoverRank of the current quarter; a handover ranking below it is already in the past. */
+export function currentQuarterRank(now: Date = new Date()): number {
+  return now.getUTCFullYear() * 4 + Math.floor(now.getUTCMonth() / 3)
+}
+
+/**
+ * True when the project is still being sold off-plan but the quarter it states has already ended.
+ * Judged on the SAME source the page prints (the delivery_quarter text first, else the quarter of
+ * the completion date), so the label and the flag cannot disagree; text with no readable year is
+ * never flagged. Completed projects are never overdue.
+ */
+export function isHandoverOverdue(p: HandoverFields, now: Date = new Date()): boolean {
+  if (!isOffPlan(p.status)) return false
+  const quarterText = clean(p.delivery_quarter)
+  const handover = quarterText
+    ? parseHandover(quarterText, null)
+    : parseHandover(null, clean(p.expected_completion_date) ?? clean(p.delivery_date))
+  return handover !== null && handoverRank(handover) < currentQuarterRank(now)
+}
+
+/** The label to print where something must be shown: the stated quarter, or "under review" once it has passed. */
+export function handoverDisplay(p: HandoverFields, now?: Date): string | null {
+  return isHandoverOverdue(p, now) ? HANDOVER_UNDER_REVIEW : handoverLabel(p)
+}
+
+/** The stated handover for copy that says "expected in …" — null once that quarter has passed. */
+function upcomingHandover(p: HandoverFields): string | null {
+  return isHandoverOverdue(p) ? null : handoverLabel(p)
 }
 
 // Residential types carry the search intent; retail/office rows are noise in a
@@ -183,12 +273,12 @@ function typeNoun(p: ProjectSeoInput): string {
 
 /** Primary area for titles: community, else location, else city. */
 export function primaryArea(p: ProjectSeoInput): string | null {
-  return clean(p.community) ?? clean(p.location) ?? clean(p.city)
+  return normalizeCommunity(p.community) ?? clean(p.location) ?? clean(p.city)
 }
 
 /** "Al Furjan, Dubai" — area + city when they differ. */
 export function fullArea(p: ProjectSeoInput): string | null {
-  const area = clean(p.community) ?? clean(p.location)
+  const area = normalizeCommunity(p.community) ?? clean(p.location)
   const city = clean(p.city)
   if (area && city && !area.toLowerCase().includes(city.toLowerCase()) && !city.toLowerCase().includes(area.toLowerCase())) {
     return `${area}, ${city}`
@@ -284,6 +374,21 @@ function priceFrom(p: ProjectSeoInput): string | null {
 }
 
 /**
+ * May a purchase here support a UAE Golden Visa application? A claim about a government programme, so
+ * it is strict: priced in AED, in Dubai, with a residential type (untyped and commercial-only rows get
+ * no claim), and a reconciled from-price at or above the threshold. Wording on the page is always
+ * "may qualify" — eligibility is decided on the registered value and the rules in force at application.
+ */
+export function goldenVisaMayQualify(p: ProjectSeoInput): boolean {
+  const currency = clean(p.currency)
+  if (currency && currency.toUpperCase() !== "AED") return false
+  if (!/\bdubai\b/i.test(clean(p.city) ?? "")) return false
+  if (residentialTypes(p.propertyTypes).length === 0) return false
+  const from = priceFromValue(p)
+  return from !== null && from >= GOLDEN_VISA_MIN_AED
+}
+
+/**
  * Title: the most informative variant that fits Google's ~60-char display.
  * Always `absolute` so the layout's " | FHI Global" template can't push a
  * fitted title past the cutoff — the brand is included where it fits.
@@ -298,6 +403,7 @@ export function composeProjectTitle(p: ProjectSeoInput): { absolute: string } {
   const brand = ` | ${BRAND}`
 
   const variants: string[] = []
+  const city = clean(p.city)
   if (area) {
     variants.push(
       `${name}${byDev} — ${intent}${types} in ${area}${brand}`,
@@ -306,6 +412,26 @@ export function composeProjectTitle(p: ProjectSeoInput): { absolute: string } {
       `${name}${byDev} — ${types} in ${area}`,
       `${name} — ${intent}${types} in ${area}`,
       `${name} — ${types} in ${area}`,
+    )
+  }
+  // A long community name pushes every area variant past the limit; the city still says where.
+  if (city && city.toLowerCase() !== (area ?? "").toLowerCase()) {
+    variants.push(
+      `${name}${byDev} — ${intent}${types} in ${city}${brand}`,
+      `${name}${byDev} — ${intent}${types} in ${city}`,
+      `${name} — ${intent}${types} in ${city}${brand}`,
+      `${name} — ${intent}${types} in ${city}`,
+      `${name} — ${types} in ${city}`,
+    )
+  }
+  // Still too long (a very long project name): drop the place and keep the type — "Off-Plan Apartments"
+  // beats a bare name for what the page is.
+  if (types !== "Properties") {
+    variants.push(
+      `${name}${byDev} — ${intent}${types}${brand}`,
+      `${name}${byDev} — ${intent}${types}`,
+      `${name} — ${intent}${types}`,
+      `${name} — ${types}`,
     )
   }
   if (byDev) variants.push(`${name}${byDev}${brand}`)
@@ -324,7 +450,7 @@ export function composeProjectDescription(p: ProjectSeoInput): string {
   const dev = clean(p.developer?.name)
   const area = fullArea(p)
   const price = priceFrom(p)
-  const handover = handoverLabel(p)
+  const handover = upcomingHandover(p)
   const offPlan = isOffPlan(p.status)
   const types = typeLabel(p).toLowerCase()
   const { mix } = unitsSummary(p)
@@ -342,6 +468,14 @@ export function composeProjectDescription(p: ProjectSeoInput): string {
     if (s && `${text} ${s}`.length <= DESCRIPTION_MAX) text = `${text} ${s}`
   }
   return truncateDescription(text, DESCRIPTION_MAX)
+}
+
+/**
+ * The page's meta description — the curated one when an editor wrote one, else the composed one. The
+ * structured-data description uses this too, so the schema says what the snippet says.
+ */
+export function projectMetaDescription(p: ProjectSeoInput, curated: string | null | undefined): string {
+  return truncateDescription(curated) || composeProjectDescription(p)
 }
 
 /**
@@ -377,8 +511,9 @@ export function projectAtAGlance(p: ProjectSeoInput): string[] {
   }
 
   const price = priceFrom(p)
-  const priceTo = formatPrice(p.launch_price_to, null, p.currency)
-  const handover = handoverLabel(p)
+  // The upper bound the hero shows, not the raw column (which could undercut the reconciled floor).
+  const priceTo = formatPrice(priceToValue(p), null, p.currency)
+  const handover = upcomingHandover(p)
   if (price) {
     let s = `Prices start from ${price}`
     if (priceTo && priceTo !== price) s += ` and range up to ${priceTo}`
@@ -388,12 +523,17 @@ export function projectAtAGlance(p: ProjectSeoInput): string[] {
   } else if (offPlan && handover) {
     out.push(`Handover is expected in ${handover}.`)
   }
+  if (offPlan && isHandoverOverdue(p)) {
+    out.push(`The developer's published handover date for ${name} has passed; contact ${BRAND} for the current construction status and timeline.`)
+  }
 
   const dp = toNum(p.down_payment_percentage)
   if (dp) out.push(`A ${dp}% down payment${p.installment_available ? " with instalments" : ""} applies.`)
 
   const amenities = (p.amenities ?? []).filter(Boolean).slice(0, 5)
-  if (amenities.length >= 3) out.push(`Residents have access to ${listJoin(amenities.map(softLower))}.`)
+  if (amenities.length >= 3) {
+    out.push(`${isCommercialOnly(p.propertyTypes) ? "Occupiers" : "Residents"} have access to ${listJoin(amenities.map(softLower))}.`)
+  }
 
   const neighbors = (p.neighbors ?? []).filter(Boolean).slice(0, 3).map(tidyCase)
   if (neighbors.length >= 2) out.push(`Nearby: ${neighbors.join("; ")}.`)
@@ -416,8 +556,8 @@ export function projectFaqs(p: ProjectSeoInput): Faq[] {
   const area = fullArea(p)
   const offPlan = isOffPlan(p.status)
   const price = priceFrom(p)
-  const priceTo = formatPrice(p.launch_price_to, null, p.currency)
-  const handover = handoverLabel(p)
+  const priceTo = formatPrice(priceToValue(p), null, p.currency)
+  const handover = upcomingHandover(p)
   const { mix, sizes } = unitsSummary(p)
   const faqs: Faq[] = []
 
@@ -437,6 +577,12 @@ export function projectFaqs(p: ProjectSeoInput): Faq[] {
     faqs.push({
       q: `What is the starting price of ${name}?`,
       a: `Prices at ${name} start from ${price}${priceTo && priceTo !== price ? ` and go up to ${priceTo}` : ""}. Contact ${BRAND} for current availability and unit-level pricing.`,
+    })
+  }
+  if (goldenVisaMayQualify(p)) {
+    faqs.push({
+      q: `Does ${name} qualify for the UAE Golden Visa?`,
+      a: `Prices at ${name} start from ${price}, at or above the AED ${GOLDEN_VISA_MIN_AED / 1_000_000} million property threshold, so a purchase may qualify for the 10-year UAE Golden Visa${offPlan ? " when bought from a DLD-approved developer" : ""}. Eligibility depends on the Dubai Land Department-registered value and the rules in force when you apply — ${BRAND} can confirm the current position before you buy.`,
     })
   }
   if (offPlan && handover) {
@@ -487,7 +633,9 @@ const RECURRING_LABEL = /\b(month|monthly|quarter|quarterly|annual|annually|year
 /** Tidy a milestone label: "on booking" → "On booking", "ON HANDOVER" → "On handover". */
 function milestoneLabel(raw: string): string {
   const t = raw
+    // "is paid over 24 months after handover" → "over 24 months after handover"
     .replace(/^[\s\-–—:/|]+/, "")
+    .replace(/^(?:is|are|will be|to be)\s+(?:paid\s+)?/i, "")
     .replace(/[\s\-–—:/|]+$/, "")
     .replace(/\s+/g, " ")
     .trim()
@@ -529,7 +677,8 @@ export function parsePaymentPlan(
   // A schedule has to be at least two steps that between them buy the property.
   // Anything else (a "1% monthly" plan, "8 Years Payment Plan", a per-unit-type
   // split) keeps its sentence rather than being rendered as a partial schedule.
-  if (milestones.length >= 2 && total >= 90 && total <= 110) {
+  // A label longer than a short phrase means the text was prose, not a schedule — keep it as written.
+  if (milestones.length >= 2 && total >= 90 && total <= 110 && milestones.every((m) => m.label.length <= 60)) {
     return { milestones, fees, note: null }
   }
   const dp = toNum(downPaymentPercent)
@@ -538,6 +687,11 @@ export function parsePaymentPlan(
     fees,
     note: raw,
   }
+}
+
+/** True only when the plan read as a real schedule (two or more steps that together buy the property). */
+export function hasPaymentSchedule(plan: PaymentPlan): boolean {
+  return plan.milestones.length >= 2
 }
 
 /** Visible sub-heading under the H1: "Off-Plan Apartments by GFS Developments in Dubai South". */
