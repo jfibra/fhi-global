@@ -70,6 +70,8 @@ export function ListingPhotoMosaic({
         src={img.image_url}
         alt={subject ? `${subject} — photo ${index + 1} of ${count}` : `Photo ${index + 1} of ${count}`}
         loading={index > 0 ? "lazy" : undefined}
+        // The first photo is the page's LCP — hint it high; the rest stay lazy.
+        fetchPriority={index === 0 ? "high" : undefined}
         className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-300"
       />
       {overlay ? (

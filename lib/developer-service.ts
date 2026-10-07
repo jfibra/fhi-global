@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
+import { pingSeoRevalidate } from "@/lib/seo-ping"
+import { developerSlugError, normalizeDeveloperSlug } from "@/lib/reserved-slugs"
 
 export type Developer = {
   id: string
@@ -119,12 +121,15 @@ export async function reviewDeveloperSlug(
 export async function createDeveloper(
   formData: DeveloperFormData,
 ): Promise<{ data: Developer | null; error: string | null }> {
+  const slug = normalizeDeveloperSlug(formData.slug)
+  const slugError = developerSlugError(slug)
+  if (slugError) return { data: null, error: slugError }
   const supabase = createClient()
   const { data, error } = await supabase
     .from("developers")
     .insert({
       name:        formData.name.trim(),
-      slug:        formData.slug.trim(),
+      slug,
       description: formData.description.trim() || null,
       website_url: formData.website_url.trim() || null,
       phone:       formData.phone.trim() || null,
@@ -138,6 +143,9 @@ export async function createDeveloper(
     .single()
 
   if (error) return { data: null, error: error.message }
+  // A developer created active is a new public page (and a new card on /developers, the home map and the
+  // sitemap) — the other write paths pinged, this one never did.
+  pingSeoRevalidate("developer", (data as Developer).id)
   return { data: data as Developer, error: null }
 }
 
@@ -146,12 +154,19 @@ export async function updateDeveloper(
   id: string,
   formData: DeveloperFormData,
 ): Promise<{ data: Developer | null; error: string | null }> {
+  const slug = normalizeDeveloperSlug(formData.slug)
+  const slugError = developerSlugError(slug)
+  if (slugError) return { data: null, error: slugError }
   const supabase = createClient()
+  // Before the write: the old address (a rename moves the page and every project under it) and whether the
+  // developer was online (only a live → off change is a removal worth announcing).
+  const { data: previous } = await supabase.from("developers").select("slug, is_active").eq("id", id).maybeSingle()
+  const before = previous as { slug: string | null; is_active: boolean | null } | null
   const { data, error } = await supabase
     .from("developers")
     .update({
       name:        formData.name.trim(),
-      slug:        formData.slug.trim(),
+      slug,
       description: formData.description.trim() || null,
       website_url: formData.website_url.trim() || null,
       phone:       formData.phone.trim() || null,
@@ -160,12 +175,22 @@ export async function updateDeveloper(
       rating:      formData.rating ?? 0,
       is_verified: formData.is_verified,
       is_active:   formData.is_active,
+      // Nothing else stamps this column (no trigger), so the sitemap's lastmod for
+      // developers sat frozen at a bulk write. Every public-facing write sets it.
+      updated_at:  new Date().toISOString(),
     })
     .eq("id", id)
     .select()
     .single()
 
   if (error) return { data: null, error: error.message }
+  // Purge the developer page and the lists that carry its name/logo, and tell IndexNow (switching a live
+  // developer off takes the page and every project under it down — announce that as a removal; a rename
+  // moves them to a new address, so say where they came from).
+  pingSeoRevalidate("developer", id, {
+    removed: before?.is_active === true && formData.is_active === false,
+    fromSlug: before?.slug && before.slug !== slug ? before.slug : undefined,
+  })
   return { data: data as Developer, error: null }
 }
 
@@ -174,8 +199,11 @@ export async function softDeleteDeveloper(id: string): Promise<{ error: string |
   const supabase = createClient()
   const { error } = await supabase
     .from("developers")
-    .update({ deleted_at: new Date().toISOString() })
+    .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq("id", id)
+  // No `removed` hint: a soft delete leaves is_active as it was, so the server reads the row and announces the
+  // removal only when the page was online.
+  if (!error) pingSeoRevalidate("developer", id)
   return { error: error?.message ?? null }
 }
 
@@ -184,8 +212,9 @@ export async function restoreDeveloper(id: string): Promise<{ error: string | nu
   const supabase = createClient()
   const { error } = await supabase
     .from("developers")
-    .update({ deleted_at: null })
+    .update({ deleted_at: null, updated_at: new Date().toISOString() })
     .eq("id", id)
+  if (!error) pingSeoRevalidate("developer", id)
   return { error: error?.message ?? null }
 }
 
@@ -198,8 +227,10 @@ export async function toggleDeveloperActive(
   const supabase = createClient()
   const { error } = await supabase
     .from("developers")
-    .update({ is_active: !currentValue })
+    .update({ is_active: !currentValue, updated_at: new Date().toISOString() })
     .eq("id", id)
+  // currentValue is the OLD state: it was active, so this switch takes the page off the site.
+  if (!error) pingSeoRevalidate("developer", id, { removed: currentValue })
   return { error: error?.message ?? null }
 }
 
@@ -212,8 +243,9 @@ export async function toggleDeveloperVerified(
   const supabase = createClient()
   const { error } = await supabase
     .from("developers")
-    .update({ is_verified: !currentValue })
+    .update({ is_verified: !currentValue, updated_at: new Date().toISOString() })
     .eq("id", id)
+  if (!error) pingSeoRevalidate("developer", id)
   return { error: error?.message ?? null }
 }
 
@@ -225,7 +257,8 @@ export async function updateDeveloperLogoUrl(
   const supabase = createClient()
   const { error } = await supabase
     .from("developers")
-    .update({ logo_url })
+    .update({ logo_url, updated_at: new Date().toISOString() })
     .eq("id", id)
+  if (!error) pingSeoRevalidate("developer", id)
   return { error: error?.message ?? null }
 }

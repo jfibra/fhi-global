@@ -290,7 +290,7 @@ export async function fetchProjects(params: {
 
   let q = supabase
     .from("projects")
-    .select("id, uuid, name, slug, listing_type, status, developer_id, city, country, main_image, is_active, is_published, is_featured, is_premium, launch_price_from, launch_price_to, currency, created_at, updated_at, deleted_at, developers(name, logo_url, slug)", { count: "exact" })
+    .select("id, uuid, name, slug, listing_type, status, developer_id, city, country, main_image, is_active, is_published, is_featured, is_premium, launch_price_from, launch_price_to, currency, delivery_quarter, expected_completion_date, delivery_date, created_at, updated_at, deleted_at, developers(name, logo_url, slug)", { count: "exact" })
     .is("deleted_at", null)
     .order(params.sortField ?? "created_at", { ascending: params.sortDir === "asc" })
     .range(from, to)
@@ -362,21 +362,47 @@ export async function createProject(form: ProjectFormData): Promise<{ data: Proj
 export async function updateProject(id: number, form: Partial<ProjectFormData>): Promise<{ error: string | null }> {
   const supabase = createClient()
   const payload = sanitizeProjectPatch(form)
+
+  // What the row was BEFORE this save, when the save can change its address or whether it is online: a rename
+  // leaves the old URL 404ing (there is no redirect table), and "removed" must mean a real live → off
+  // transition — switching a draft's flag off again is not worth an IndexNow notice.
+  const touchesAddressOrState = "slug" in payload || "is_active" in payload || "is_published" in payload
+  const before = touchesAddressOrState
+    ? ((await supabase.from("projects").select("slug, is_published, is_active").eq("id", id).maybeSingle()).data as
+        | { slug: string | null; is_published: boolean | null; is_active: boolean | null }
+        | null)
+    : null
+
   const { error } = await supabase
     .from("projects")
     .update({ ...payload, updated_at: new Date().toISOString() })
     .eq("id", id)
 
+  // Only publish used to purge the page, so a fix to a live project (a price, a
+  // permit number, a handover date) waited out the 120 s ISR window and never
+  // reached IndexNow. Every successful save now purges; a live page is announced, and a save that takes a
+  // live project off the site is announced as a removal.
+  if (!error) {
+    const wasLive = Boolean(before?.is_published && before?.is_active)
+    const nowLive = Boolean((payload.is_published ?? before?.is_published) && (payload.is_active ?? before?.is_active))
+    const renamedFrom = before?.slug && typeof payload.slug === "string" && payload.slug !== before.slug ? before.slug : undefined
+    pingSeoRevalidate("project", id, { removed: wasLive && !nowLive, fromSlug: renamedFrom })
+  }
   return { error: error?.message ?? null }
 }
 
 export async function softDeleteProject(id: number): Promise<{ error: string | null }> {
   const supabase = createClient()
+  const now = new Date().toISOString()
   const { error } = await supabase
     .from("projects")
-    .update({ deleted_at: new Date().toISOString() })
+    .update({ deleted_at: now, updated_at: now })
     .eq("id", id)
 
+  // The page is about to 404: purge it. No `removed` hint — a soft delete leaves the publish flags as they
+  // were, so the server reads the row and announces the removal only when the page was online (deleting a
+  // draft is purged, not announced).
+  if (!error) pingSeoRevalidate("project", id)
   return { error: error?.message ?? null }
 }
 
@@ -391,7 +417,8 @@ export async function publishProject(id: number, publish: boolean): Promise<{ er
     })
     .eq("id", id)
 
-  if (!error) pingSeoRevalidate("project", id)
+  // Unpublishing takes the page off the site: announce it, not just purge it.
+  if (!error) pingSeoRevalidate("project", id, { removed: !publish })
   return { error: error?.message ?? null }
 }
 
@@ -440,12 +467,16 @@ export async function upsertProjectUnit(unit: Partial<ProjectUnit> & { project_i
     ? await supabase.from("project_units").update({ ...unit, updated_at: new Date().toISOString() }).eq("id", unit.id)
     : await supabase.from("project_units").insert({ ...unit })
 
+  // The public page's "from" price is reconciled from the unit rows, so a unit edit changes it: refresh
+  // the page (one ping for a burst of edits).
+  if (!error) pingSeoRevalidate("project", unit.project_id, { coalesceMs: 4000 })
   return { error: error?.message ?? null }
 }
 
-export async function deleteProjectUnit(id: number): Promise<{ error: string | null }> {
+export async function deleteProjectUnit(id: number, projectId?: number): Promise<{ error: string | null }> {
   const supabase = createClient()
   const { error } = await supabase.from("project_units").delete().eq("id", id)
+  if (!error && projectId != null) pingSeoRevalidate("project", projectId, { coalesceMs: 4000 })
   return { error: error?.message ?? null }
 }
 

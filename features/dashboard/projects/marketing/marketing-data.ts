@@ -10,6 +10,7 @@ import {
   fetchAmenities,
 } from "@/lib/project-service"
 import { createClient } from "@/lib/supabase/client"
+import { isHandoverOverdue } from "@/lib/project-seo"
 import { SITE_URL } from "@/lib/seo"
 
 export type ProjectMarketingData = {
@@ -57,6 +58,8 @@ function quarterOf(dateStr: string): string | null {
 }
 
 export function handoverLabelFor(project: Project): string | null {
+  // A quarter that has already ended on a project still being built is not printed on a poster or reel.
+  if (isHandoverOverdue(project)) return null
   if (project.delivery_quarter?.trim()) return project.delivery_quarter.trim()
   const src = project.delivery_date ?? project.expected_completion_date
   return src ? quarterOf(src) : null

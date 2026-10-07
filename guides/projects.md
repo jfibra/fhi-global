@@ -302,3 +302,37 @@ FROM (VALUES
   ('waterfront')
 ) AS k(keyword)
 CROSS JOIN (SELECT id FROM public.projects WHERE slug = 'aqua-arc') p;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 14. Display rules (documentation only — no schema change)
+-- ─────────────────────────────────────────────────────────────────────────────
+-- delivery_quarter: write it as 'Q4 2027'. Also read: 'Q2–Q3 2028', 'June 2027', '2029' (a range reads as
+--   where it ends; a bare year reads as its Q4). lib/project-seo.ts parseHandover is the one parser.
+-- Overdue rule: when a project that is not Completed states a quarter that has already ended, every public
+--   surface (project page, cards, map, posters, agent sites) says 'Handover date under review' instead of
+--   the date, and the admin list shows a 'Handover overdue' chip. Fix it by updating the quarter or by
+--   setting the status to Completed. Handover-year landing pages leave such projects out.
+-- payment_plan_details: '20% on booking, 50% during construction, 30% on handover' renders as a table; any
+--   other wording shows as written. Never type a split the developer did not state.
+-- community: free text, tidied at render by lib/communities.ts (typos, '(JVC)' suffixes, ', Dubai'); the
+--   stored value is left as typed. Add new spellings to COMMUNITY_ALIASES.
+-- Golden Visa badge: shown only when currency is AED, the city contains 'Dubai', the project has at least
+--   one residential type and the reconciled from-price is >= AED 2,000,000 (lib/market-figures.ts). The
+--   wording is always 'may qualify'.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 15. Trakheesi permit (documentation only — columns come from migrations 053 and 054)
+-- ─────────────────────────────────────────────────────────────────────────────
+-- trakheesi_permit_number (053) : the permit number as printed on the permit. Free text; the editor shows an
+--   amber, non-blocking hint when it does not look like a number (lib/permit-rules.ts — the DLD's format is
+--   not documented, so the rule only rejects obvious non-numbers and never blocks a save).
+-- trakheesi_permit_url    (053) : the uploaded QR image, stored as-is so it keeps scanning.
+-- trakheesi_permit_link   (054) : the trakheesi.dubailand.gov.ae URL decoded from that QR. The public page makes
+--   the QR clickable through the verification interstitial (/verify/permit/<project>) when this is set. A QR
+--   stored before the link was being read has the image but no link: Overview > Trakheesi Permit > 'Re-read
+--   DLD link' decodes the stored image again (no re-upload).
+-- Dubai projects (city contains 'Dubai') advertised without a permit number are flagged in Data Health (the
+--   project's own tab, and the FHI Assistant data_health tool: 'no permit number (Dubai)', 'permit QR without a
+--   verify link'). Publishing is never blocked on it — hundreds of live projects still lack a number — but the
+--   publish toast reminds the editor. Projects outside Dubai answer to another regulator: nothing is asked.
+-- The public page prints a permit panel for a number on its own (no QR needed) and the QR/link when present.

@@ -1,4 +1,5 @@
 import { cache } from "react"
+import { notFound } from "next/navigation"
 import { getListingPageProjectsCached, type BuyRawProject, type ListingMarket } from "@/lib/buy/cached-projects"
 import { getPublicAgentListingsCached, type PublicAgentListingRow } from "@/lib/buy/agent-listings-public"
 import { mergedListingGalleryUrls } from "@/lib/listing-gallery-urls"
@@ -14,6 +15,8 @@ export type ListingSearchParams = Promise<{
   minBaths?: string
   sort?: string
   view?: string
+  /** Page of the list view (24 per page); not a filter. */
+  page?: string
 }>
 
 type RawUnit = NonNullable<BuyRawProject["project_units"]>[number]
@@ -214,6 +217,40 @@ export function listViewHrefFromSp(sp: Awaited<ListingSearchParams>, basePath: "
   return qs ? `${basePath}?${qs}` : basePath
 }
 
+/** True when the hub is showing a search, filter, sort or map view rather than the plain list. */
+export function listingHubIsFiltered(sp: Awaited<ListingSearchParams>): boolean {
+  return Boolean(sp.q || sp.type || sp.beds || sp.minPrice || sp.maxPrice || sp.minBaths || sp.sort || sp.view)
+}
+
+/**
+ * The hub view's own path — filters, sort, the map flag and, past the first, the page — for its
+ * self-referencing canonical AND for the pager's links (one builder, so they cannot disagree).
+ */
+export function listingHubSelfHref(sp: Awaited<ListingSearchParams>, basePath: "/buy" | "/rent", page = 1): string {
+  const href = listViewHrefFromSp(sp, basePath)
+  const extras: string[] = []
+  if (sp.view) extras.push(`view=${encodeURIComponent(sp.view)}`)
+  if (page > 1) extras.push(`page=${page}`)
+  if (extras.length === 0) return href
+  return `${href}${href.includes("?") ? "&" : "?"}${extras.join("&")}`
+}
+
+/** Cards per page of the list view. The map view is never paginated — its list mirrors its pins. */
+export const LISTINGS_PAGE_SIZE = 24
+
+/** The requested page as an integer ≥ 1 (a repeated ?page= arrives as an array; junk reads as page 1). */
+export function parseListingsPage(raw: string | string[] | undefined): number {
+  const first = Array.isArray(raw) ? raw[0] : raw
+  const n = parseInt(first ?? "", 10)
+  return Number.isFinite(n) && n >= 1 ? n : 1
+}
+
+export function paginateListings<T>(items: readonly T[], page: number): { items: T[]; totalPages: number; start: number } {
+  const totalPages = Math.max(1, Math.ceil(items.length / LISTINGS_PAGE_SIZE))
+  const start = (page - 1) * LISTINGS_PAGE_SIZE
+  return { items: items.slice(start, start + LISTINGS_PAGE_SIZE), totalPages, start }
+}
+
 export type { ListingMarket }
 
 export const loadPublicAgentListings = cache((market: ListingMarket) => getPublicAgentListingsCached(market))
@@ -222,6 +259,28 @@ export const loadPublicAgentListings = cache((market: ListingMarket) => getPubli
  *  below the curated agent listings. react.cache dedupes across the several
  *  Suspense'd components that each call this per render. */
 export const loadListingPageProjects = cache((market: ListingMarket) => getListingPageProjectsCached(market))
+
+/**
+ * A page past the last one is a real 404 (so it is not indexed as a thin duplicate) — but only when the
+ * listings really loaded: a failed load derives to an empty list that would read as "no such page", and a
+ * 404 during an outage de-indexes live URLs. So an outage throws (5xx, retried) and only a true miss 404s.
+ * Returns the number of pages. react.cache dedupes the loads with the page's own.
+ */
+export async function assertListingsPageInRange(
+  market: ListingMarket,
+  sp: Awaited<ListingSearchParams>,
+  pageNum: number,
+): Promise<number> {
+  const [{ rows: agentRows, error: agentErr }, { rows: projectRows, error: projErr }] = await Promise.all([
+    loadPublicAgentListings(market),
+    loadListingPageProjects(market),
+  ])
+  const { properties } = deriveListings(sp, agentRows, agentErr, projectRows, projErr)
+  const { totalPages } = paginateListings(properties, pageNum)
+  if (pageNum <= totalPages) return totalPages
+  if (agentErr || projErr) throw new Error("[listings] unavailable")
+  notFound()
+}
 
 /** Reuses the agent-row filter logic verbatim for a catalog project: the
  *  pseudo row carries the project as its embed, so q/type/beds/baths/price
@@ -390,7 +449,7 @@ export function deriveListings(
   const mapMarkers = items.map((i) => i.marker).filter((m): m is BuyMapMarker => m != null)
 
   // Count only projects that can actually render a card (both slugs present)
-  // so "Showing all N" never overstates the list.
+  // so the total never overstates the list.
   const cardableProjects = dedupedProjects.filter((p) => p.slug && p.developers?.slug)
   const rawTotal = safeAgentRows.length + cardableProjects.length
   const shown = items.length
@@ -398,8 +457,8 @@ export function deriveListings(
     rawTotal === 0
       ? null
       : shown === rawTotal
-        ? `Showing all ${shown} propert${shown === 1 ? "y" : "ies"}`
-        : `Showing ${shown} of ${rawTotal} propert${rawTotal === 1 ? "y" : "ies"}`
+        ? `${shown} propert${shown === 1 ? "y" : "ies"}`
+        : `${shown} of ${rawTotal} propert${rawTotal === 1 ? "y" : "ies"}`
 
   return { properties, mapMarkers, totalLabel }
 }

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { MapPin, Building2, ArrowLeft, Mail, Phone, ChevronRight } from "lucide-react"
 import { createPageMetadata, SITE_URL, truncateDescription, truncateTitle } from "@/lib/seo"
+import { COMPANY, companyLegalLine, companyPhoneE164 } from "@/lib/company"
 import {
   fetchPublicAgentListingById,
   isUsableListingAgent,
@@ -47,9 +48,9 @@ export async function generateStaticParams(): Promise<{ id: string }[]> {
 
 type Props = { params: Promise<{ id: string }> }
 
-const TEL = "+971567428288"
-const EMAIL = "info@fhiglobal.ae"
-const WA = "971567428288"
+const TEL = companyPhoneE164()
+const EMAIL = COMPANY.email
+const WA = COMPANY.whatsapp
 
 /**
  * The listing agent's details for the enquiry card.
@@ -125,6 +126,11 @@ function listingOwnPrice(row: Pick<PublicAgentListingRow, "price">): number | nu
   return n != null && Number.isFinite(n) ? n : null
 }
 
+/** The listing links a project (project_id) that the public reader dropped because it is no longer live. */
+function isRetiredProjectListing(row: Pick<PublicAgentListingRow, "project_id" | "projects">): boolean {
+  return row.project_id != null && !row.projects
+}
+
 function listingLocationLabel(proj: PublicAgentListingRow["projects"]): string {
   return [proj?.city, proj?.location].filter(Boolean).join(", ") || "United Arab Emirates"
 }
@@ -133,12 +139,22 @@ function listingTypeLabel(row: ListingRowLike, unitType: string | null | undefin
   return (row.unit_type?.trim() || unitType || "Property").replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+// A type label that already says how many bedrooms ("1BR", "2 Bedroom Villa", "Studio") must not get the count again.
+const BEDS_IN_LABEL = /\b\d+\s*(?:br|bhk|beds?|bedrooms?)\b|\bstudio\b|\bbed(?:room)?s?\b/i
+
+/** The room the plain "<title> | FHI Global" template leaves a title before Google's ~60-character cut. */
+const LISTING_TITLE_MAX = 47
+
 /**
  * SEO title composed from structured fields — "1 Bedroom Apartment for Rent
  * in Mirdif Villas, Dubai" — instead of whatever the agent typed ("1BHK",
  * "luxury"). The agent's own title stays as the visible H1; this only feeds
  * the <title>/OG, where consistency and keywords matter. Falls back to the
  * agent title when the fields are too thin to compose from.
+ *
+ * The first variant that fits LISTING_TITLE_MAX wins, most informative first, and the project is never
+ * dropped: bedrooms + project + city, then without the bedrooms, then project only. When even that is too
+ * long the project-only form is returned whole and the caller cuts it on a word boundary.
  */
 function composedSeoTitle(
   row: Pick<PublicAgentListingRow, "listing_kind"> & ListingRowLike,
@@ -148,19 +164,26 @@ function composedSeoTitle(
   const typeLabel = listingTypeLabel(row, u?.unit_type)
   if (typeLabel === "Property") return null
   const proj = row.projects
-  // A test-named project must never leak into a composed title.
-  const projName = proj?.name && !/test|demo|sample|dummy|placeholder/i.test(proj.name) ? proj.name : null
-  const place = projName ? `${projName}, ${proj?.city ?? "Dubai"}` : loc
-  if (!place || place === "United Arab Emirates") return null
+  // (A test-named project never reaches this page: the public reader answers 404 for it.)
+  const projName = proj?.name?.trim() || null
+  const city = proj?.city?.trim() || "Dubai"
+  if (!projName && (!loc || loc === "United Arab Emirates")) return null
   const kind = row.listing_kind === "rent" ? "for Rent" : "for Sale"
-  const isStudioType = typeLabel.toLowerCase().includes("studio")
   const beds =
-    u?.bedrooms == null || isStudioType
+    u?.bedrooms == null || BEDS_IN_LABEL.test(typeLabel)
       ? ""
       : u.bedrooms === 0
         ? "Studio "
         : `${u.bedrooms} Bedroom `
-  return `${beds}${typeLabel} ${kind} in ${place}`
+  const places = projName ? [`${projName}, ${city}`, projName] : [loc]
+  const variants = [
+    ...new Set(
+      places.flatMap((place) =>
+        beds ? [`${beds}${typeLabel} ${kind} in ${place}`, `${typeLabel} ${kind} in ${place}`] : [`${typeLabel} ${kind} in ${place}`],
+      ),
+    ),
+  ]
+  return variants.find((v) => v.length <= LISTING_TITLE_MAX) ?? variants[variants.length - 1]
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -202,9 +225,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const ogImageVersion = Date.parse(row.updated_at) || 0
   const seoTitle = composedSeoTitle(row, u ? { bedrooms: u.bedrooms, unit_type: u.unit_type } : null, listingLocationLabel(proj))
   return createPageMetadata({
-    title: truncateTitle(seoTitle ?? row.title),
+    // A phrase, not a sentence: cut clean, without a trailing "…" or a dangling "in".
+    title: truncateTitle(seoTitle ?? row.title, LISTING_TITLE_MAX, { ellipsis: false }),
     description,
     pathname: `/listings/${row.slug ?? row.id}`,
+    // Linked to a project that has since been retired: the page shows no photos or price, so it stays
+    // reachable for old links but out of the index (and out of the sitemap — lib/sitemap-sections.ts).
+    robots: isRetiredProjectListing(row) ? { index: false, follow: true } : undefined,
     imageUrl: `${SITE_URL.replace(/\/$/, "")}/og/listing/${row.id}?v=${ogImageVersion}`,
     imageWidth: 1200,
     imageHeight: 630,
@@ -290,14 +317,16 @@ export default async function PublicAgentListingPage({ params }: Props) {
               path: `/listings/${row.slug ?? row.id}`,
               images: galleryUrls,
               price: ownOk ?? proj?.launch_price_from,
+              // With no price of its own the page prints the linked project's "from – to" range.
+              priceTo: ownOk == null ? proj?.launch_price_to : null,
+              priceKind: ownOk == null ? "from" : "exact",
               currency: row.currency?.trim() || proj?.currency || "AED",
               city: proj?.city,
               street: [proj?.location].filter(Boolean).join(", ") || null,
               latitude: proj?.latitude,
               longitude: proj?.longitude,
-              seller: proj?.developers?.name
-                ? { name: proj.developers.name, path: proj.developers.slug ? `/${proj.developers.slug}` : null }
-                : { name: "FHI Global", path: "/" },
+              // The seller defaults to FHI Global's node: it is the one offering an agent's listing — the
+              // developer of the linked project is not the seller of a resale or rental the agent posted.
             }),
           ]}
         />
@@ -485,6 +514,12 @@ export default async function PublicAgentListingPage({ params }: Props) {
                 <Mail className="w-4 h-4" />
                 Email
               </LeadLink>
+              {/* Who is offering it — the structured data names the same entity as the seller. */}
+              {companyLegalLine() && (
+                <p className="pt-2 text-center text-[11px] leading-relaxed text-[#6b7280]">
+                  Listed by <span className="font-semibold text-[#0f2940]">{companyLegalLine()}</span>
+                </p>
+              )}
             </div>
           </aside>
         </div>

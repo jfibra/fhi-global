@@ -31,6 +31,7 @@ import { ProjectSettingsTab }      from "./project-settings-tab"
 import { ProjectHeader }           from "./project-header"
 import { DeveloperPortalPageHeader } from "@/components/developer/developer-portal-page-header"
 import { resolvePermitLink } from "@/lib/trakheesi-client"
+import { isDubaiCity, isPlausiblePermitNumber } from "@/lib/permit-rules"
 
 // ─── Portal ────────────────────────────────────────────────────────────────────
 function Portal({ children }: { children: React.ReactNode }) {
@@ -247,10 +248,10 @@ export function DeveloperProjectsClient({
   const [toasts, setToasts]           = useState<ToastMsg[]>([])
   const toastIdRef                    = useRef(0)
 
-  const showToast = useCallback((variant: ToastVariant, message: string) => {
+  const showToast = useCallback((variant: ToastVariant, message: string, ms = 4500) => {
     const id = ++toastIdRef.current
     setToasts((prev) => [...prev, { id, variant, message }])
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4500)
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), ms)
   }, [])
 
   const removeToast = (id: number) => setToasts((prev) => prev.filter((t) => t.id !== id))
@@ -295,7 +296,17 @@ export function DeveloperProjectsClient({
     const next = !selected.is_published
     const { error } = await toggleProjectPublish(selected.id, developerId, next)
     if (error) { showToast("error", error); return }
-    showToast("success", next ? "Project published" : "Project unpublished")
+    // A reminder, not a block: hundreds of live projects have no permit yet and publishing must still work.
+    const needsPermit = next && isDubaiCity(selected.city) && !isPlausiblePermitNumber(selected.trakheesi_permit_number)
+    showToast(
+      "success",
+      next
+        ? needsPermit
+          ? "Project published. Dubai advertising needs a Trakheesi permit — add its number under Overview > Trakheesi Permit."
+          : "Project published"
+        : "Project unpublished",
+      needsPermit ? 9000 : undefined,
+    )
     setSelected({ ...selected, is_published: next, published_at: next ? new Date().toISOString() : null })
     setProjects((prev) => prev.map((p) => p.id === selected.id ? { ...p, is_published: next } : p))
   }

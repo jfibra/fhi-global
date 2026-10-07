@@ -293,7 +293,7 @@ export function UserProfileModal({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <FloatingInput label="License number" value={f.license_number} onChange={(v) => set("license_number", v)} />
+                <FloatingInput label="RERA BRN (broker card number)" value={f.license_number} onChange={(v) => set("license_number", v)} />
                 <FloatingSelect label="Role" value={f.role} onChange={(v) => set("role", v)}>
                   {ROLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </FloatingSelect>

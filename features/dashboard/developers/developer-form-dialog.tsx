@@ -20,6 +20,7 @@ import {
 import { formatDateTime, relativeTime } from "@/lib/utils"
 import { DeveloperLogoUpload } from "./developer-logo-upload"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
+import { developerSlugError, normalizeDeveloperSlug } from "@/lib/reserved-slugs"
 
 // ─── Portal ────────────────────────────────────────────────────────────────────
 function Portal({ children }: { children: React.ReactNode }) {
@@ -116,7 +117,10 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
   const validate = () => {
     const e: Partial<Record<keyof DeveloperFormData, string>> = {}
     if (!form.name.trim()) e.name = "Name is required."
-    if (!form.slug.trim()) e.slug = "Slug is required."
+    // The slug is the developer's address at the site root: it needs the shape of an address, and must not be
+    // a page that already lives there.
+    const slugError = developerSlugError(normalizeDeveloperSlug(form.slug))
+    if (slugError) e.slug = slugError
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -131,7 +135,9 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
       )
       const fd = new FormData()
       fd.append("file", toUpload, toUpload.name)
-      fd.append("developerSlug", form.slug.trim())
+      // The slug the row was saved with (createDeveloper/updateDeveloper normalise it): the upload route looks the
+      // developer up by it, so a trailing hyphen or underscore as typed would match no row.
+      fd.append("developerSlug", normalizeDeveloperSlug(form.slug))
       const res = await fetch("/api/upload/developer", { method: "POST", body: fd })
       const json = (await res.json()) as { url?: string; error?: string }
       if (!res.ok || !json.url) {
@@ -272,9 +278,14 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
                 <FieldLabel text="Slug" required />
                 <input className={`${inp} font-mono ${errors.slug ? "border-rose-400" : "border-[#e5e5e5]"}`}
                   value={form.slug}
-                  onChange={(e) => { setSlugManual(true); set("slug", e.target.value) }}
+                  onChange={(e) => { setSlugManual(true); set("slug", e.target.value.toLowerCase().replace(/\s+/g, "-")) }}
                   placeholder="e.g. ayala-land" />
                 {errors.slug && <p className="text-xs text-rose-500 mt-1 ml-1">{errors.slug}</p>}
+                {!errors.slug && editDeveloper && normalizeDeveloperSlug(form.slug) !== editDeveloper.slug && (
+                  <p className="text-xs text-amber-600 mt-1 ml-1">
+                    Changing the slug moves this page to a new address; the old address stops working.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -473,7 +484,7 @@ export function DeveloperFormDialog({ open, editDeveloper, onClose, onSaved, onE
       {/* Logo picker/cropper (deferred mode — upload happens when the form is saved) */}
       <DeveloperLogoUpload
         open={showLogoPicker}
-        developerSlug={form.slug.trim() || generateSlug(form.name) || "new-developer"}
+        developerSlug={normalizeDeveloperSlug(form.slug) || generateSlug(form.name) || "new-developer"}
         developerName={form.name.trim() || "New Developer"}
         currentLogoUrl={shownLogoUrl}
         onClose={() => setShowLogoPicker(false)}

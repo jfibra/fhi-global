@@ -11,6 +11,7 @@ import {
   MapPin,
   Phone,
   QrCode,
+  RefreshCw,
   Save,
   Sparkles,
   Trash2,
@@ -18,7 +19,9 @@ import {
 } from "lucide-react"
 import type { Project, Developer, ProjectFormData } from "@/lib/project-service"
 import { generateProjectSlug } from "@/lib/project-service"
+import { isHandoverOverdue } from "@/lib/project-seo"
 import { resolvePermitLink, permitHost } from "@/lib/trakheesi-client"
+import { isDubaiCity, permitNumberProblem } from "@/lib/permit-rules"
 
 // ─── Inner tab definitions ────────────────────────────────────────────────────
 
@@ -138,7 +141,10 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
 
   const handleNameChange = (v: string) => {
     set("name", v)
-    if (!form.slug || form.slug === generateProjectSlug(project.name)) {
+    // A project that is already online keeps its address when it is renamed: the slug IS its URL and there
+    // is no redirect table, so letting it follow the name would turn the indexed page into a 404. The slug
+    // tracks the name only while the project is a draft (or when the editor edits the slug field themselves).
+    if (!project.is_published && (!form.slug || form.slug === generateProjectSlug(project.name))) {
       set("slug", generateProjectSlug(v))
     }
   }
@@ -146,7 +152,8 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    await onSave(form)
+    // A permit number is copied from a PDF: stray spaces around it would print on the public page.
+    await onSave({ ...form, trakheesi_permit_number: String(form.trakheesi_permit_number ?? "").trim() })
     setSaving(false)
     showToast("success", "Changes saved")
   }
@@ -159,6 +166,7 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
   const [permitBusy, setPermitBusy] = useState(false)
   const permitUrl = ((form.trakheesi_permit_url as string | undefined) ?? project.trakheesi_permit_url ?? "").trim()
   const permitLink = ((form.trakheesi_permit_link as string | undefined) ?? project.trakheesi_permit_link ?? "").trim()
+  const permitProblem = permitNumberProblem(form.trakheesi_permit_number)
 
   const uploadPermit = async (file: File | null) => {
     if (!file) return
@@ -185,6 +193,27 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
     } finally {
       setPermitBusy(false)
       if (permitInputRef.current) permitInputRef.current.value = ""
+    }
+  }
+
+  // Projects whose QR was stored before the DLD link was being read (about twenty) have the picture but no
+  // clickable link. Re-read it from the stored image instead of asking for the same upload again.
+  const rereadPermitLink = async () => {
+    if (!permitUrl) return
+    setPermitBusy(true)
+    try {
+      const link = await resolvePermitLink(permitUrl)
+      if (!link) {
+        showToast("error", "No DLD link could be read — upload a sharper image of the QR.")
+        return
+      }
+      set("trakheesi_permit_link", link)
+      // The whole form, not just the link: saving refreshes the project, which resets this form to the stored
+      // values — a number typed just above and not yet saved would otherwise vanish.
+      await onSave({ ...form, trakheesi_permit_number: String(form.trakheesi_permit_number ?? "").trim(), trakheesi_permit_link: link })
+      showToast("success", `Linked to ${permitHost(link) ?? "the DLD"} and saved.`)
+    } finally {
+      setPermitBusy(false)
     }
   }
 
@@ -353,21 +382,26 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
         body: JSON.stringify({
           target,
           name: projectName,
+          projectId: project.id,
           status: form.status ?? "",
           location: form.location ?? "",
           city: form.city ?? "",
           country: form.country ?? "",
+          community: form.community ?? "",
           developerName,
           customPrompt: customPrompt.trim(),
         }),
       })
-      const json = await res.json() as { text?: string; error?: string }
+      const json = await res.json() as { text?: string; error?: string; warnings?: string[] }
       if (!res.ok || !json.text) {
         showToast("error", json.error ?? "Failed to generate content")
         return
       }
       set(target, json.text.trim())
-      showToast("success", target === "description" ? "Description generated" : "About project generated")
+      // The generated copy is a draft for the editor to read, not publish blind: say so when the model
+      // reached for a cliché or repeated a figure the page already shows.
+      if (json.warnings?.length) showToast("error", `Generated — please review: ${json.warnings.join(" ")}`)
+      else showToast("success", target === "description" ? "Description generated" : "About project generated")
     } catch {
       showToast("error", "Failed to generate content")
     } finally {
@@ -376,15 +410,22 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
   }
 
   const handleAiGenerateFromModal = async () => {
+    // The prompt is optional now: the server writes from the project's own facts (location, amenities,
+    // nearby places, scale, ownership) and the prompt only steers it.
     const prompt = aiPrompt.trim()
-    if (!prompt) {
-      showToast("error", "Add your prompt first")
-      return
-    }
     const target = aiTarget
     setAiModalOpen(false)
     await generateAiCopy(target, prompt)
   }
+
+  // The stated handover, as the public page will read it (see isHandoverOverdue).
+  const quarterText = String(form.delivery_quarter ?? "").trim()
+  const handoverOverdue = isHandoverOverdue({
+    status: form.status ?? null,
+    delivery_quarter: quarterText || null,
+    expected_completion_date: form.expected_completion_date || null,
+    delivery_date: form.delivery_date || null,
+  })
 
   // ─── Tab panels ───────────────────────────────────────────────────────────
 
@@ -394,7 +435,16 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
         {field("Project Name *",
           <input type="text" value={form.name ?? ""} onChange={(e) => handleNameChange(e.target.value)} required className={cls} />,
         )}
-        {field("Slug", inp("slug", "auto-generated"))}
+        {field("Slug",
+          <>
+            {inp("slug", "auto-generated")}
+            {project.is_published && form.slug !== project.slug && (
+              <p className="mt-1.5 text-[11px] font-medium text-amber-700">
+                Changing the slug moves this live page to a new address; the old address stops working.
+              </p>
+            )}
+          </>,
+        )}
         {field("Developer",
           sel("developer_id",
             <>
@@ -537,7 +587,19 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
         {field("Construction Start",  inp("construction_start_date",  "", "date"))}
         {field("Expected Completion", inp("expected_completion_date", "", "date"))}
         {field("Delivery Date",       inp("delivery_date",            "", "date"))}
-        {field("Delivery Quarter",    inp("delivery_quarter",         "e.g. Q4 2025"))}
+        {field(
+          "Delivery Quarter",
+          <>
+            {inp("delivery_quarter", "e.g. Q4 2027")}
+            {handoverOverdue ? (
+              <p className="mt-1.5 text-[11px] font-semibold text-amber-700">
+                This handover has passed. Update the quarter, or set the status to Completed — until then the public page says &quot;Handover date under review&quot;.
+              </p>
+            ) : quarterText && !/^Q[1-4] \d{4}$/.test(quarterText) ? (
+              <p className="mt-1.5 text-[11px] text-[#9ca3af]">Write it as Q4 2027 so handover filters and labels can read it.</p>
+            ) : null}
+          </>,
+        )}
       </div>
     ),
 
@@ -564,8 +626,10 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
             Trakheesi is the Dubai Land Department&rsquo;s advertising permit. When a project carries one, its QR code
             and permit number appear in the public project page&rsquo;s sidebar, under the developer, so a buyer can
             verify the listing with the DLD. Projects without a permit show nothing there.
+            {isDubaiCity(String(form.city ?? "")) ? " Dubai advertising needs this permit, so a live Dubai project without one is flagged in Data Health." : ""}
           </p>
           {field("Permit number", inp("trakheesi_permit_number", "As printed on the permit, e.g. 7128 4956 3200 1234"))}
+          {permitProblem && <p className="text-[11px] font-medium text-amber-700">{permitProblem}</p>}
           <p className="text-[11px] text-[#9ca3af]">
             The number is stored when you save. The QR image is stored as soon as it uploads.
           </p>
@@ -588,7 +652,7 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
                   No Dubai Land Department link could be read from this image. Buyers can still scan it; a sharper upload usually fixes this.
                 </p>
               )}
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => permitInputRef.current?.click()}
@@ -597,6 +661,16 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
                 >
                   <Upload className="h-3.5 w-3.5" /> Replace
                 </button>
+                {!permitLink && (
+                  <button
+                    type="button"
+                    onClick={() => void rereadPermitLink()}
+                    disabled={permitBusy}
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#0f2940] hover:border-[#d6b357] disabled:opacity-50"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" /> Re-read DLD link
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => void removePermit()}
@@ -803,7 +877,7 @@ export function ProjectOverviewTab({ project, developers, onSave, showToast, rea
               value={aiPrompt}
               onChange={(e) => setAiPrompt(e.target.value)}
               rows={5}
-              placeholder="Example: Focus on luxury waterfront lifestyle, family amenities, and strong investment value."
+              placeholder="Optional. Example: mention the school and metro nearby; keep it under 120 words."
               className="mt-4 w-full resize-none rounded-xl border border-[#e5e5e5] px-3 py-2.5 text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#001f3f]/20 focus:border-[#001f3f]"
             />
             <div className="mt-5 flex justify-end gap-2">

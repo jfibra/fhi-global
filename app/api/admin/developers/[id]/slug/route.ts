@@ -3,6 +3,8 @@ import { requireRole } from "@/lib/auth-guard"
 import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
+import { reservedSlugReason } from "@/lib/reserved-slugs"
+import { moveDeveloperPages } from "@/lib/developer-move"
 
 export const runtime = "nodejs"
 
@@ -60,7 +62,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ developer: updated })
   }
 
-  // approve — re-check the requested slug is still free before switching the URL.
+  // approve — the slug may have been free when it was requested and reserved since
+  // (a new landing page or route), so re-check that too, then that it is still unique.
+  const reserved = reservedSlugReason(dev.pending_slug)
+  if (reserved) return NextResponse.json({ error: reserved }, { status: 400 })
   const { data: clash } = await admin
     .from("developers")
     .select("id")
@@ -77,7 +82,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: updated, error } = await admin
     .from("developers")
-    .update({ slug: dev.pending_slug, ...clearPending })
+    .update({ slug: dev.pending_slug, ...clearPending, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select()
     .single()
@@ -102,5 +107,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     changedKeys: ["slug"],
     ...requestContextFromRequest(req),
   })
+
+  await moveDeveloperPages(admin, id, dev.slug, dev.pending_slug)
   return NextResponse.json({ developer: updated })
 }

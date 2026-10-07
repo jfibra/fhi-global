@@ -111,14 +111,16 @@ export function ProjectPosterTab({ project, showToast }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           target: "description",
+          projectId: project.id,
           name: project.name,
           status: project.status,
           location: project.location ?? project.community ?? "",
           city: project.city ?? "Dubai",
           country: project.country ?? "UAE",
+          community: project.community ?? "",
           developerName: project.developers?.name ?? "",
           customPrompt:
-            "Write ONE luxurious poster description for this development — a single sentence under 20 words, no quotes, no emojis, confident and premium in tone.",
+            "Write ONE poster tagline for this development — a single sentence under 20 words, no quotes, no emojis, concrete and confident.",
         }),
       })
       const body = await res.json().catch(() => ({}))

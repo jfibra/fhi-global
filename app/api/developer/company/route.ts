@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
+import { after } from "next/server"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
+import { SITE_URL } from "@/lib/seo"
+import { submitToIndexNow } from "@/lib/indexnow"
+import { reservedSlugReason } from "@/lib/reserved-slugs"
 
 export const runtime = "nodejs"
 
@@ -62,12 +67,16 @@ export async function PATCH(req: NextRequest) {
     phone: String(body.phone ?? "").trim() || null,
     email: String(body.email ?? "").trim() || null,
     address: String(body.address ?? "").trim() || null,
+    updated_at: new Date().toISOString(),
   }
 
   const requestedSlug = slugify(String(body.slug ?? ""))
   let slugRequested = false
 
   if (requestedSlug && requestedSlug !== dev.slug) {
+    // The slug is an address at the site root: never a page that already lives there.
+    const reserved = reservedSlugReason(requestedSlug)
+    if (reserved) return NextResponse.json({ error: reserved }, { status: 400 })
     // Reject a slug already used by another live developer (the live slug is the
     // one that must stay unique; a duplicate pending is re-checked at approval).
     const { data: clash } = await admin
@@ -114,6 +123,15 @@ export async function PATCH(req: NextRequest) {
       : "Updated company information",
     ...requestContextFromRequest(req),
   })
+
+  // The company's public page, the developers index and the cached lists that
+  // carry its name and logo follow the edit immediately, and IndexNow hears of it.
+  const livePath = `/${dev.slug}`
+  revalidatePath(livePath)
+  revalidatePath("/developers")
+  revalidateTag("projects", { expire: 0 })
+  revalidateTag("home", { expire: 0 })
+  after(() => submitToIndexNow([`${SITE_URL.replace(/\/$/, "")}${livePath}`]))
 
   return NextResponse.json({ developer: updated, slugRequested })
 }

@@ -558,7 +558,7 @@ export function UserDetailView({
                       <Field label="Birthday" icon={<Calendar />}>{user.birthday ? formatDate(user.birthday) : dash}</Field>
                       <Field label="Gender">{user.gender ? titleCase(user.gender) : dash}</Field>
                       <Field label="Nationality" icon={<Globe />}>{nationality || dash}</Field>
-                      <Field label="License number" icon={<BadgeCheck />}>{license || dash}</Field>
+                      <Field label="RERA BRN" icon={<BadgeCheck />}>{license || dash}</Field>
                     </div>
                   </Panel>
 

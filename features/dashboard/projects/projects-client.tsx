@@ -46,6 +46,8 @@ import { ProjectSettingsTab } from "./project-settings-tab"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 import { sampleLogoBgFromUrl } from "@/lib/logo-bg"
 import { resolvePermitLink } from "@/lib/trakheesi-client"
+import { isDubaiCity, isPlausiblePermitNumber } from "@/lib/permit-rules"
+import { isHandoverOverdue } from "@/lib/project-seo"
 
 /** Title-case regardless of how the value is cased in the DB. */
 const titleCase = (s: string) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
@@ -418,10 +420,10 @@ export function ProjectsClient({
   const [toasts, setToasts]   = useState<ToastMsg[]>([])
   const toastIdRef            = useRef(0)
 
-  const showToast = useCallback((variant: ToastVariant, message: string) => {
+  const showToast = useCallback((variant: ToastVariant, message: string, ms = 4500) => {
     const id = ++toastIdRef.current
     setToasts((prev) => [...prev, { id, variant, message }])
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4500)
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), ms)
   }, [])
 
   const removeToast = (id: number) => setToasts((prev) => prev.filter((t) => t.id !== id))
@@ -531,7 +533,17 @@ export function ProjectsClient({
     const next = !selected.is_published
     const { error } = await publishProject(selected.id, next)
     if (error) { showToast("error", error); return }
-    showToast("success", next ? "Project published" : "Project unpublished")
+    // A reminder, not a block: hundreds of live projects have no permit yet and publishing must still work.
+    const needsPermit = next && isDubaiCity(selected.city) && !isPlausiblePermitNumber(selected.trakheesi_permit_number)
+    showToast(
+      "success",
+      next
+        ? needsPermit
+          ? "Project published. Dubai advertising needs a Trakheesi permit — add its number under Overview > Trakheesi Permit."
+          : "Project published"
+        : "Project unpublished",
+      needsPermit ? 9000 : undefined,
+    )
     setSelected({ ...selected, is_published: next, published_at: next ? new Date().toISOString() : null })
     setProjects((prev) => prev.map((p) => p.id === selected.id ? { ...p, is_published: next } : p))
   }
@@ -844,6 +856,16 @@ export function ProjectsClient({
                     }`}>
                       {statusLabel(p.status)}
                     </span>
+                    {/* A data-quality flag for the people who maintain projects: the stated handover quarter has
+                        passed, so the public page says "Handover date under review" until it is updated. */}
+                    {!readOnly && isHandoverOverdue(p) && (
+                      <span
+                        className="absolute top-10 right-3 bg-amber-100 px-2.5 py-1 text-[10px] font-bold tracking-wider text-amber-800"
+                        title="The stated handover quarter has passed — update it or set the status to Completed"
+                      >
+                        Handover overdue
+                      </span>
+                    )}
                   </div>
                   {/* body */}
                   {readOnly ? (

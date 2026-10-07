@@ -11,6 +11,9 @@ import { sendAdminDirectEmail, sendCongratsEmail } from "@/lib/mailer"
 import { renderTopSellerCertificatePng } from "@/lib/congrats-poster"
 import { formatPrice, handoverLabel, isOffPlan, parsePaymentPlan, priceFromValue, priceToValue, statusLabel, unitsSummary, type ProjectSeoInput } from "@/lib/project-seo"
 import { ROLES_SALES_PIPELINE } from "@/lib/app-roles"
+import { MIN_LISTING_DESCRIPTION, PLACEHOLDER_WORDS, isLiveProject, isTestRecord, type ProjectLiveFlags } from "@/lib/listing-publish-checks"
+import { isDubaiCity } from "@/lib/permit-rules"
+import { leadSourceLabel } from "@/lib/lead-source"
 import { RECOMMEND_LABELS, type RecommendValue } from "@/lib/feedback-service"
 import { fetchArticlesList, isIndexableNewsArticle, type NewsArticle } from "@/lib/news-service"
 import { BUYER_LEAD_COLUMNS, LEAD_GRADES, answerLabel, budgetLabel, leadGrade, sellerAnswerLabel, waDigits, type BuyerLead, type LeadGrade } from "@/lib/buyer-links"
@@ -2369,7 +2372,7 @@ type LeadsArgs = {
 
 /**
  * Every way a prospect reaches the company, in one answer: project inquiries
- * (the Inquire forms on project pages), contact messages (/contact), Buyers
+ * (the Inquire forms on project, landing and developer pages), contact messages (/contact), Buyers
  * Link and Sellers Link briefs (each agent's own link — graded like the
  * dashboard: priority / qualified / nurture / info) and replies that landed in
  * the company inbox. Counts per source with the previous period for context,
@@ -2409,13 +2412,13 @@ async function leadsOverview(admin: Admin, args: LeadsArgs) {
   const inRange = <T extends { created_at: string }>(rows: T[], f: string, t: string | null) =>
     rows.filter((r) => r.created_at >= f && (!t || r.created_at < `${t}T00:00:00Z`))
 
-  type Inq = { id: string; name: string | null; email: string | null; phone_country_code: string | null; phone: string | null; looking_for: string | null; property_category: string | null; project_name: string | null; developer_name: string | null; status: string | null; created_at: string }
+  type Inq = { id: string; name: string | null; email: string | null; phone_country_code: string | null; phone: string | null; looking_for: string | null; property_category: string | null; project_name: string | null; developer_name: string | null; source: string | null; status: string | null; created_at: string }
   type Contact = { id: string; name: string | null; email: string | null; phone: string | null; company: string | null; subject: string | null; message: string | null; status: string | null; read_at: string | null; created_at: string }
   type Reply = { id: string; inquiry_id: string | null; from_name: string | null; from_email: string | null; subject: string | null; read_at: string | null; created_at: string }
 
   const [inqRes, contactRes, briefRes, replyRes] = await Promise.all([
     want("inquiries")
-      ? admin.from("inquiries").select("id, name, email, phone_country_code, phone, looking_for, property_category, project_name, developer_name, status, created_at").is("deleted_at", null).gte("created_at", prev.from).order("created_at", { ascending: false }).limit(3000)
+      ? admin.from("inquiries").select("id, name, email, phone_country_code, phone, looking_for, property_category, project_name, developer_name, source, status, created_at").is("deleted_at", null).gte("created_at", prev.from).order("created_at", { ascending: false }).limit(3000)
       : Promise.resolve({ data: [] as Inq[], error: null }),
     want("contact")
       ? admin.from("contact_submissions").select("id, name, email, phone, company, subject, message, status, read_at, created_at").is("deleted_at", null).gte("created_at", prev.from).order("created_at", { ascending: false }).limit(3000)
@@ -2471,8 +2474,10 @@ async function leadsOverview(admin: Admin, args: LeadsArgs) {
       by_status: count(cur, (r) => r.status ?? "new"),
       by_project: count(cur, (r) => r.project_name),
       by_developer: count(cur, (r) => r.developer_name),
+      // Which kind of page the lead came from: a project page, a search landing page ("landing:<slug>"), a developer page.
+      by_page: count(cur, (r) => leadSourceLabel(r.source)),
       by_looking_for: count(cur, (r) => r.looking_for),
-      newest: list.map((r) => ({ when: when(r.created_at), name: r.name, project: r.project_name, developer: r.developer_name, looking_for: r.looking_for, phone: phone(r.phone_country_code, r.phone), email: r.email, status: r.status ?? "new" })),
+      newest: list.map((r) => ({ when: when(r.created_at), name: r.name, project: r.project_name, developer: r.developer_name, page: leadSourceLabel(r.source), looking_for: r.looking_for, phone: phone(r.phone_country_code, r.phone), email: r.email, status: r.status ?? "new" })),
       where_in_dashboard: "Leads (Communication) — each inquiry opens with its email thread",
     }
   }
@@ -4217,13 +4222,13 @@ async function dataHealth(admin: Admin, args: { area?: "projects" | "listings" |
   if (area === "all" || area === "projects") {
     const { data, error } = await admin
       .from("projects")
-      .select("id, name, slug, launch_price_from, payment_plan_details, main_image, delivery_quarter, expected_completion_date, delivery_date, latitude, longitude, trakheesi_permit_number, trakheesi_permit_link, community, location, city, description, developers(name, slug), project_units(id)")
+      .select("id, name, slug, launch_price_from, payment_plan_details, main_image, delivery_quarter, expected_completion_date, delivery_date, latitude, longitude, trakheesi_permit_number, trakheesi_permit_url, trakheesi_permit_link, community, location, city, description, developers(name, slug), project_units(id)")
       .is("deleted_at", null)
       .eq("is_active", true)
       .eq("is_published", true)
       .limit(1000)
     if (error) throw new Error(error.message)
-    type P = { id: number; name: string; slug: string; launch_price_from: number | string | null; payment_plan_details: string | null; main_image: string | null; delivery_quarter: string | null; expected_completion_date: string | null; delivery_date: string | null; latitude: string | null; longitude: string | null; trakheesi_permit_number: string | null; trakheesi_permit_link: string | null; community: string | null; location: string | null; city: string | null; description: string | null; developers: { name: string; slug: string | null } | { name: string; slug: string | null }[] | null; project_units: { id: number }[] | null }
+    type P = { id: number; name: string; slug: string; launch_price_from: number | string | null; payment_plan_details: string | null; main_image: string | null; delivery_quarter: string | null; expected_completion_date: string | null; delivery_date: string | null; latitude: string | null; longitude: string | null; trakheesi_permit_number: string | null; trakheesi_permit_url: string | null; trakheesi_permit_link: string | null; community: string | null; location: string | null; city: string | null; description: string | null; developers: { name: string; slug: string | null } | { name: string; slug: string | null }[] | null; project_units: { id: number }[] | null }
     const rows = (data ?? []) as P[]
     const blank = (v: unknown) => v == null || (typeof v === "string" && v.trim() === "")
     const checks: Array<[string, (p: P) => boolean]> = [
@@ -4232,7 +4237,12 @@ async function dataHealth(admin: Admin, args: { area?: "projects" | "listings" |
       ["no photo", (p) => blank(p.main_image)],
       ["no handover date", (p) => blank(p.delivery_quarter) && blank(p.expected_completion_date) && blank(p.delivery_date)],
       ["no map pin", (p) => blank(p.latitude) || blank(p.longitude)],
-      ["no permit number", (p) => blank(p.trakheesi_permit_number) && blank(p.trakheesi_permit_link)],
+      // Trakheesi (the DLD's advertising permit) applies to Dubai only — Abu Dhabi and the northern
+      // emirates have their own regimes. A Dubai project advertised without a permit number is the
+      // compliance gap; a QR image with no decoded DLD link can't be verified by a buyer (the admin's
+      // "Re-read" on the permit tab fills it in).
+      ["no permit number (Dubai)", (p) => isDubaiCity(p.city) && blank(p.trakheesi_permit_number)],
+      ["permit QR without a verify link", (p) => !blank(p.trakheesi_permit_url) && blank(p.trakheesi_permit_link)],
       ["no unit table", (p) => !(p.project_units ?? []).length],
       ["no area", (p) => blank(p.community) && blank(p.location)],
       ["no description", (p) => blank(p.description)],
@@ -4245,10 +4255,14 @@ async function dataHealth(admin: Admin, args: { area?: "projects" | "listings" |
       const d = Array.isArray(p.developers) ? p.developers[0] : p.developers
       return d?.slug ? `${base}/${d.slug}/${p.slug}` : null
     }
+    // Records that should not be public: placeholder wording in the NAME. Reported on its own — it is not a
+    // "missing data" check, and a project that looks like test data is fixed by unpublishing it, not by filling a field.
+    const testProjects = rows.filter((p) => PLACEHOLDER_WORDS.test(p.name ?? ""))
     out.projects = {
       published: rows.length,
       complete_on_every_check: complete,
       gaps_by_check: counts,
+      looks_like_test_data: testProjects.map((p) => ({ project: p.name, page: url(p) })),
       most_incomplete: [...gaps]
         .sort((a, b) => b.missing.length - a.missing.length || a.p.name.localeCompare(b.p.name))
         .slice(0, limit)
@@ -4261,31 +4275,75 @@ async function dataHealth(admin: Admin, args: { area?: "projects" | "listings" |
   }
 
   if (area === "all" || area === "listings") {
-    const { data, error } = await admin.from("agent_listings").select("id, title, price, unit_type, project_id, agent_id, status, slug").is("deleted_at", null).neq("status", "archived").limit(2000)
+    const { data, error } = await admin.from("agent_listings").select("id, title, description, price, unit_type, project_id, agent_id, status, slug, created_at, projects(name, is_published, is_active, deleted_at)").is("deleted_at", null).neq("status", "archived").limit(2000)
     if (error) throw new Error(error.message)
-    type L = { id: string; title: string | null; price: number | string | null; unit_type: string | null; project_id: number | null; agent_id: string; status: string; slug: string | null }
-    const rows = (data ?? []) as L[]
+    type LProject = ({ name: string | null } & ProjectLiveFlags) | null
+    type L = { id: string; title: string | null; description: string | null; price: number | string | null; unit_type: string | null; project_id: number | null; agent_id: string; status: string; slug: string | null; created_at: string | null; projects: LProject | LProject[] }
+    const rows = (data ?? []) as unknown as L[]
+    const projectOf = (l: L): LProject => (Array.isArray(l.projects) ? l.projects[0] ?? null : l.projects ?? null)
     const { data: imgs } = rows.length ? await admin.from("agent_listing_images").select("listing_id").in("listing_id", rows.map((l) => l.id)) : { data: [] }
     const withImg = new Set(((imgs ?? []) as { listing_id: string }[]).map((i) => i.listing_id))
     const names = await profileNames(admin, rows.map((l) => l.agent_id))
     const noPrice = rows.filter((l) => !(Number(l.price ?? 0) > 0))
     const noPhoto = rows.filter((l) => !withImg.has(l.id))
     const noType = rows.filter((l) => !l.unit_type)
+    // A page with next to no text is thin content in search (the publish checklist asks for MIN_LISTING_DESCRIPTION
+    // characters; listings that went live before it existed are not held to it).
+    const shortDescription = rows.filter((l) => (l.description ?? "").trim().length < MIN_LISTING_DESCRIPTION)
     const drafts = rows.filter((l) => l.status === "draft")
+    // Records that should not be public: test/placeholder wording in the title, the description or the NAME of
+    // the project it links (the test listing that reached the sitemap is titled just "luxury" — the giveaways
+    // are "Test development" in its text and the project "Test IT purposes"; the site already hides it by
+    // title + project name, this keeps it on the clean-up list until an admin unpublishes it), a listing on a
+    // project that is no longer public (its page shows no photos or price and is noindex), and the same
+    // title posted more than once (the slug trigger suffixes the later ones, "azizi-venice-d35c") —
+    // duplicate pages competing with each other in search.
+    const testNamed = rows.filter(
+      (l) => isTestRecord({ title: l.title, projectName: projectOf(l)?.name }) || PLACEHOLDER_WORDS.test(l.description ?? ""),
+    )
+    const onRetiredProject = rows.filter((l) => l.project_id != null && !isLiveProject(projectOf(l)))
+    const byTitle = new Map<string, L[]>()
+    for (const l of rows) {
+      const t = (l.title ?? "").trim().toLowerCase().replace(/\s+/g, " ")
+      if (t) byTitle.set(t, [...(byTitle.get(t) ?? []), l])
+    }
+    const duplicateTitles = [...byTitle.values()].filter((list) => list.length > 1)
     out.listings = {
       live_or_draft: rows.length,
       no_price: noPrice.length,
       no_photo: noPhoto.length,
       no_unit_type: noType.length,
+      short_description: shortDescription.length,
       drafts_never_published: drafts.length,
+      looks_like_test_data: testNamed.map((l) => ({ listing: l.title, status: l.status, linked_project: projectOf(l)?.name ?? null, page: l.slug ? `${SITE_URL.replace(/\/$/, "")}/listings/${l.slug}` : null })),
+      linked_project_not_live: onRetiredProject.map((l) => ({ listing: l.title, status: l.status, linked_project: projectOf(l)?.name ?? null, page: l.slug ? `${SITE_URL.replace(/\/$/, "")}/listings/${l.slug}` : null })),
+      duplicate_title_groups: duplicateTitles.slice(0, limit).map((list) => {
+        // Keep the OLDEST copy: its address has the history (links, indexing); the later ones carry the suffixed slugs.
+        const oldestFirst = [...list].sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""))
+        const pageOf = (l: L) => (l.slug ? `/listings/${l.slug}` : l.id)
+        return {
+          title: list[0].title,
+          copies: list.length,
+          keep: pageOf(oldestFirst[0]),
+          remove: oldestFirst.slice(1).map(pageOf),
+          agents: [...new Set(list.map((l) => names.get(String(l.agent_id)) ?? "Unknown"))],
+        }
+      }),
       fix_list: rows
-        .map((l) => ({ l, missing: [!(Number(l.price ?? 0) > 0) && "no price", !withImg.has(l.id) && "no photo", !l.unit_type && "no unit type", !l.project_id && "no project linked"].filter(Boolean) as string[] }))
+        .map((l) => ({ l, missing: [!(Number(l.price ?? 0) > 0) && "no price", !withImg.has(l.id) && "no photo", !l.unit_type && "no unit type", !l.project_id && "no project linked", (l.description ?? "").trim().length < MIN_LISTING_DESCRIPTION && "short description"].filter(Boolean) as string[] }))
         .filter((x) => x.missing.length)
         .slice(0, limit)
         .map((x) => ({ listing: x.l.title, agent: names.get(String(x.l.agent_id)) ?? "Unknown", status: x.l.status, missing: x.missing })),
       where_to_fix: "Listings → the agent edits their own; admins can edit any",
     }
-    stats.push(stat("Listings without a price", noPrice.length, null, `of ${rows.length}`))
+    stats.push(stat("Listings without a price", noPrice.length, null, `of ${rows.length}`), stat("Listings with a short description", shortDescription.length, null, `under ${MIN_LISTING_DESCRIPTION} characters`))
+    if (testNamed.length || duplicateTitles.length || onRetiredProject.length) {
+      stats.push(
+        stat("Test-looking listings", testNamed.length),
+        stat("Listings on a project that is not public", onRetiredProject.length),
+        stat("Duplicate-title listings", duplicateTitles.reduce((a, list) => a + list.length, 0)),
+      )
+    }
   }
 
   if (area === "all" || area === "clients") {
@@ -4788,7 +4846,7 @@ export const FHI_CHAT_TOOLS = [
     type: "function" as const,
     function: {
       name: "data_health",
-      description: "DATA HEALTH / what's MISSING on our own records: published projects without a price, payment plan, photo, handover date, map pin, permit number, unit table, area or description (with the most incomplete projects and which developers' projects lack payment plans); listings without price/photo/unit type; clients sharing one email or missing contacts. Use for 'what's missing on our projects', 'which projects have no payment plan', 'data quality', 'listings without prices', 'duplicate client emails'.",
+      description: "DATA HEALTH / what's MISSING on our own records: published projects without a price, payment plan, photo, handover date, map pin, Trakheesi permit number (Dubai) or a permit QR with no verify link, unit table, area or description (with the most incomplete projects and which developers' projects lack payment plans); listings without price/photo/unit type, listings or projects that look like test data (the site already hides listings with a test-like title or project name), listings on a project that is no longer public, and listings posted twice under the same title (with which copy to keep — the oldest — and which to remove); clients sharing one email or missing contacts. Use for 'what's missing on our projects', 'which projects have no payment plan', 'data quality', 'listings without prices', 'duplicate listings', 'test listings', 'duplicate client emails'.",
       parameters: { type: "object", properties: {"area":{"type":"string","enum":["all","projects","listings","clients"],"description":"Default all"},"limit":{"type":"integer"}} },
     },
   },
@@ -4833,7 +4891,7 @@ export const FHI_CHAT_TOOLS = [
     function: {
       name: "leads_overview",
       description:
-        "LEADS — every way a prospect reached the company in a period: project INQUIRIES (Inquire forms on project pages), CONTACT messages (/contact), BUYERS LINK and Sellers Link BRIEFS (each agent's own link, graded Priority/Qualified/Nurture/Information) and REPLIES in the company inbox. Returns totals per source with previous-period comparison, breakdowns (which project/developer, which agent's link, grade, budget, goal, readiness) and the newest entries with phone/WhatsApp/email for follow-up. Use for 'how many leads this week', 'any new inquiries', 'unanswered messages', 'which project gets the most inquiries', 'Buyers Link leads of Michelle', 'priority buyers this month'. Default: last 30 days, all sources.",
+        "LEADS — every way a prospect reached the company in a period: project INQUIRIES (Inquire forms on project, landing and developer pages — each lead says which page, see by_page), CONTACT messages (/contact), BUYERS LINK and Sellers Link BRIEFS (each agent's own link, graded Priority/Qualified/Nurture/Information) and REPLIES in the company inbox. Returns totals per source with previous-period comparison, breakdowns (which project/developer, which agent's link, grade, budget, goal, readiness) and the newest entries with phone/WhatsApp/email for follow-up. Use for 'how many leads this week', 'any new inquiries', 'unanswered messages', 'which project gets the most inquiries', 'Buyers Link leads of Michelle', 'priority buyers this month'. Default: last 30 days, all sources.",
       parameters: {
         type: "object",
         properties: {

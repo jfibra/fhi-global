@@ -65,6 +65,8 @@ import {
   WHITE_PAGE,
 } from "./listing-ui"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
+import { isLiveProject, isTestRecord, listingIssuesMessage, listingPublishIssues } from "@/lib/listing-publish-checks"
+import { pingSeoRevalidate } from "@/lib/seo-ping"
 
 // app/layout.tsx exposes Outfit as a CSS variable; the repo's usual
 // `font-['Outfit']` names a family that was never registered, so it silently
@@ -74,7 +76,10 @@ const emptyForm: AgentListingFormInput = {
   description: "",
   listing_kind: "sale",
   project_id: null,
-  status: "published",
+  // Draft first: a new listing used to go live the moment it was saved, which is
+  // how a test record reached the public site. Publishing is a deliberate step
+  // that runs the checks in lib/listing-publish-checks.ts.
+  status: "draft",
   unit_type: null,
 }
 
@@ -182,10 +187,10 @@ export function AgentListingsClient({
   const [marketing, setMarketing] = useState<{ row: AgentListing; view: "menu" | "flyer" | "announce" } | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
 
-  const showToast = useCallback((variant: Toast["variant"], message: string) => {
+  const showToast = useCallback((variant: Toast["variant"], message: string, ms = 4000) => {
     const id = ++toastSeq
     setToasts((t) => [...t, { id, variant, message }])
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000)
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ms)
   }, [])
 
   const applyListings = useCallback(
@@ -510,6 +515,41 @@ export function AgentListingsClient({
       showToast("error", "Title is required")
       return
     }
+    // Going live (a new listing saved as Published, or a draft being published)
+    // has to pass the checklist. A listing that is already published keeps
+    // saving as before, so existing agents are never locked out of an edit.
+    if (form.status === "published" && (!editing || editing.status !== "published")) {
+      // The picker only offers public projects; a project picked earlier and retired since is not in it, so
+      // fall back to the flags the listing was loaded with.
+      const picked = projects.find((p) => p.id === form.project_id)
+      const linked = form.project_id != null && editing?.project_id === form.project_id ? editing.projects : null
+      // The project's photos arrive from a separate request: wait for it rather than call a project with
+      // photos "photo-less" because the answer is still on its way.
+      if (projectGalleryLoading) {
+        showToast("error", "Still loading the project's photos — try again in a moment.")
+        return
+      }
+      const issues = listingPublishIssues({
+        title: form.title,
+        description: form.description,
+        listingKind: form.listing_kind,
+        hasProject: form.project_id != null,
+        projectName: picked?.name ?? linked?.name ?? null,
+        projectLive: form.project_id == null ? undefined : picked ? true : isLiveProject(linked),
+        ownPhotoCount: galleryUrls.length,
+        projectHasPhoto: projectGalleryUrls.length > 0 || Boolean(linked?.main_image),
+      })
+      if (issues.length > 0) {
+        showToast("error", listingIssuesMessage(issues), 10_000)
+        return
+      }
+    } else if (form.status === "published" && editing?.status === "published" && isTestRecord({ title: form.title }) && !isTestRecord({ title: editing.title })) {
+      // Already live: routine edits go through unchecked, but renaming a real listing INTO test wording
+      // ("Sample flat — …", "Demo unit") makes the site hide it (404, out of /buy and the sitemap) — say so
+      // here instead of letting it vanish. The admin screen enforces the same rule.
+      showToast("error", "That title looks like test data — rename it, or move the listing to Draft.", 10_000)
+      return
+    }
     setSaving(true)
     try {
       if (editing) {
@@ -523,6 +563,12 @@ export function AgentListingsClient({
           imgErr ? "error" : "success",
           imgErr ? `Saved listing but images failed: ${imgErr}` : "Listing updated",
         )
+        // An edit to a live page, or a live page moved to Draft/Archived in the form, used to reach neither the
+        // page cache nor IndexNow (only the row actions pinged). A draft that stays a draft needs neither.
+        const wasLive = editing.status === "published"
+        if (wasLive || form.status === "published") {
+          pingSeoRevalidate("agent-listing", editing.id, { removed: wasLive && form.status !== "published" })
+        }
         await refresh()
       } else {
         const { data, error } = await createAgentListing(userId, form)
@@ -536,6 +582,8 @@ export function AgentListingsClient({
             imgErr ? "error" : "success",
             imgErr ? `Listing created but images failed: ${imgErr}` : "Listing created",
           )
+          // Created straight as Published: a new public page (it used to wait for the cache to expire).
+          if (data.status === "published") pingSeoRevalidate("agent-listing", data.id)
           await refresh()
         }
       }
@@ -548,7 +596,24 @@ export function AgentListingsClient({
   // ── Row actions ─────────────────────────────────────────────────────────────
 
   const changeStatus = async (row: AgentListing, status: AgentListingStatus) => {
-    const { error } = await setAgentListingStatus(row.id, userId, status)
+    if (status === "published" && row.status !== "published") {
+      const issues = listingPublishIssues({
+        title: row.title,
+        description: row.description,
+        listingKind: row.listing_kind,
+        hasProject: row.project_id != null,
+        projectName: row.projects?.name ?? null,
+        projectLive: row.project_id == null ? undefined : isLiveProject(row.projects),
+        ownPhotoCount: row.agent_listing_images?.length ?? 0,
+        projectHasPhoto: Boolean(row.projects?.main_image),
+        price: row.price,
+      })
+      if (issues.length > 0) {
+        showToast("error", listingIssuesMessage(issues), 10_000)
+        return
+      }
+    }
+    const { error } = await setAgentListingStatus(row.id, userId, status, row.status)
     if (error) {
       showToast("error", error)
       return

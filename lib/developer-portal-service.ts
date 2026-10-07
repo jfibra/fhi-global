@@ -182,7 +182,7 @@ export async function toggleProjectPublish(
     .eq("id", projectId)
     .eq("developer_id", developerId)
 
-  if (!error) pingSeoRevalidate("project", projectId)
+  if (!error) pingSeoRevalidate("project", projectId, { removed: !publish })
   return { error: error?.message ?? null }
 }
 
@@ -199,6 +199,8 @@ export async function toggleProjectActive(
     .eq("id", projectId)
     .eq("developer_id", developerId)
 
+  // Deactivating hides the page and its cards just like unpublishing does (this toggle never pinged).
+  if (!error) pingSeoRevalidate("project", projectId, { removed: !active })
   return { error: error?.message ?? null }
 }
 
@@ -214,6 +216,8 @@ export async function softDeleteDeveloperProject(
     .eq("id", projectId)
     .eq("developer_id", developerId)
 
+  // The page is about to 404: purge it and tell IndexNow (this archive never pinged).
+  if (!error) pingSeoRevalidate("project", projectId, { removed: true })
   return { error: error?.message ?? null }
 }
 

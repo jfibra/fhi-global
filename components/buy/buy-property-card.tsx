@@ -4,6 +4,7 @@ import { useState, type MouseEvent } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { MapPin, Building2, Mail, Phone, Bed, Bath, ChevronLeft, ChevronRight } from "lucide-react"
+import { COMPANY, companyPhoneE164 } from "@/lib/company"
 
 export type BuyPropertyCardData = {
   id: string
@@ -48,9 +49,9 @@ function formatPrice(from: number | null, to: number | null, currency = "AED") {
   return `${prefix} ${fmt(from)}`
 }
 
-const TEL = "+971567428288"
-const EMAIL = "info@fhiglobal.ae"
-const WA = "971567428288"
+const TEL = companyPhoneE164()
+const EMAIL = COMPANY.email
+const WA = COMPANY.whatsapp
 
 /** Reference: light yellow buttons (Email / Call). */
 const lightYellowBtn =
@@ -72,7 +73,6 @@ export function BuyPropertyCard({ property }: { property: BuyPropertyCardData })
       : property.main_image
         ? [property.main_image]
         : []
-  const n = Math.max(images.length, 1)
   const canSlide = images.length > 1
   const src = images[imgIndex] ?? null
   const goPrev = (e: MouseEvent<HTMLButtonElement>) => {
@@ -95,9 +95,10 @@ export function BuyPropertyCard({ property }: { property: BuyPropertyCardData })
       : property.size_sqft != null
         ? `${property.size_sqft.toLocaleString("en-AE")} sqft`
         : null
-  const tagline =
-    property.description?.trim() ||
-    `Spacious 1BR Apartment | High Finishing | Prime Location`
+  // A real description or nothing. The old fallback ("Spacious 1BR Apartment | High Finishing | Prime
+  // Location") was printed on every listing without one — false for villas, studios and offices — and
+  // these cards now sit on indexable ?page=N URLs.
+  const tagline = property.description?.trim() || null
 
   return (
     <article className="relative bg-white border border-[#d1d5db] shadow-sm overflow-hidden flex flex-col md:flex-row transition-shadow duration-300 hover:shadow-[0_16px_44px_-14px_rgba(0,20,40,0.3)]">
@@ -141,19 +142,36 @@ export function BuyPropertyCard({ property }: { property: BuyPropertyCardData })
           </>
         )}
 
-        <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
-          {Array.from({ length: Math.max(images.length, 1) }, (_, i) => (
-            <button
-              key={i}
-              type="button"
-              aria-label={`Slide ${i + 1}`}
-              onClick={() => setImgIndex(i % n)}
-              className={`h-1.5 rounded-full transition-all ${
-                i === imgIndex ? "w-6 bg-[#d6b357]" : "w-1.5 bg-white/90"
-              }`}
-            />
-          ))}
-        </div>
+        {/* Position indicator — only when there is something to slide, and capped: the old row drew one
+            tiny (6 px) button per image on every card (about 1,170 buttons on a page). Up to six images get
+            dots with a 24 × 24 px tap target; more than six get a "3 / 12" counter, and the arrows above
+            do the navigating. */}
+        {canSlide && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-1.5 flex justify-center">
+            {images.length <= 6 ? (
+              images.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  aria-label={`Slide ${i + 1}`}
+                  aria-current={i === imgIndex ? "true" : undefined}
+                  onClick={() => setImgIndex(i)}
+                  className="pointer-events-auto flex h-6 w-6 items-center justify-center"
+                >
+                  <span className={`block h-1.5 rounded-full transition-all ${i === imgIndex ? "w-4 bg-[#d6b357]" : "w-1.5 bg-white/90"}`} />
+                </button>
+              ))
+            ) : (
+              <span
+                role="status"
+                aria-label={`Image ${imgIndex + 1} of ${images.length}`}
+                className="rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-white"
+              >
+                {imgIndex + 1} / {images.length}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="relative flex-1 flex flex-col p-5 md:p-6 min-w-0">

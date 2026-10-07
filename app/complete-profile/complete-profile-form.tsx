@@ -215,7 +215,7 @@ export function CompleteProfileForm({
               <FloatingInput name="linkedin" label="LinkedIn" defaultValue={initial.linkedin} />
               <FloatingInput name="facebook" label="Facebook" defaultValue={initial.facebook} />
             </div>
-            <FloatingInput name="license_number" label="License number" defaultValue={initial.license_number} />
+            <FloatingInput name="license_number" label="RERA BRN (broker card number)" defaultValue={initial.license_number} />
             <div className="relative">
               <textarea
                 id="bio" name="bio" defaultValue={initial.bio} rows={3} placeholder=" "

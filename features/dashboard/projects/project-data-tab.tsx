@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { AlertTriangle, ArrowUpRight, CheckCircle2, RefreshCcw } from "lucide-react"
 import { fetchProjectStats, type Project, type ProjectStats } from "@/lib/project-service"
+import { isDubaiCity, isPlausiblePermitNumber } from "@/lib/permit-rules"
 import type { TabId } from "./projects-client"
 
 type Props = {
@@ -18,6 +19,26 @@ type Row = {
   detail: string
   count?: number
   targetTab: TabId
+}
+
+/**
+ * Dubai advertising needs a DLD Trakheesi permit: its number AND the QR (the public page shows both, and the
+ * QR's DLD link is what a buyer clicks to verify it). A project outside Dubai has nothing to ask for here —
+ * another regulator's rules apply.
+ */
+function permitRow(project: Project): Row {
+  const base = { key: "permit", label: "Trakheesi permit", targetTab: "overview" as TabId }
+  if (!isDubaiCity(project.city)) {
+    return { ...base, ok: true, detail: "Dubai DLD permit n/a — check the local regulator" }
+  }
+  const hasNumber = isPlausiblePermitNumber(project.trakheesi_permit_number)
+  const hasQr = Boolean(project.trakheesi_permit_url?.trim())
+  const hasLink = Boolean(project.trakheesi_permit_link?.trim())
+  if (hasNumber && hasQr) {
+    return { ...base, ok: true, detail: hasLink ? "Number, QR and DLD link" : "Number and QR (DLD link not read)" }
+  }
+  const missing = [!hasNumber && "number", !hasQr && "QR"].filter(Boolean).join(" and ")
+  return { ...base, ok: false, detail: `Permit ${missing} missing — Overview › Trakheesi Permit` }
 }
 
 export function ProjectDataTab({ project, onJump, showToast }: Props) {
@@ -98,11 +119,12 @@ export function ProjectDataTab({ project, onJump, showToast }: Props) {
       count: stats?.neighbors,
       targetTab: "nearby",
     },
+    permitRow(project),
     {
       key: "settings",
       label: "Status",
       ok: project.is_active && project.is_published,
-      detail: `${project.is_published ? "Published" : "Draft"} Â· ${project.is_active ? "Active" : "Inactive"}`,
+      detail: `${project.is_published ? "Published" : "Draft"} · ${project.is_active ? "Active" : "Inactive"}`,
       targetTab: "settings",
     },
   ]

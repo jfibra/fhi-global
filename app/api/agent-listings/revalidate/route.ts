@@ -26,14 +26,19 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data } = await supabase
     .from("agent_listings")
-    .select("id, agent_id")
+    .select("id, slug, agent_id")
     .eq("id", listingId)
     .maybeSingle()
 
-  if (!data || (data as { agent_id: string }).agent_id !== session.context.userId) {
+  const listing = data as { id: string; slug: string | null; agent_id: string } | null
+  if (!listing || listing.agent_id !== session.context.userId) {
     return NextResponse.json({ error: "Listing not found" }, { status: 404 })
   }
 
-  revalidatePath(`/listings/${listingId}`)
+  // The public page is cached per URL and the canonical one is the slug
+  // (/listings/luxury-2br-marina); the uuid form is the legacy link. Purging
+  // only the uuid left the slug page — the one shared and indexed — stale.
+  revalidatePath(`/listings/${listing.id}`)
+  if (listing.slug) revalidatePath(`/listings/${listing.slug}`)
   return NextResponse.json({ ok: true })
 }

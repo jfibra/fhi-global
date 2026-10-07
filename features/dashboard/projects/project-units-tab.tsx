@@ -58,7 +58,7 @@ export function ProjectUnitsTab({ projectId, showToast, readOnly = false }: Prop
 
   const handleDelete = async (id: number) => {
     setDelId(id)
-    const { error } = await deleteProjectUnit(id)
+    const { error } = await deleteProjectUnit(id, projectId)
     setDelId(null)
     if (error) { showToast("error", error); return }
     showToast("success", "Unit deleted")

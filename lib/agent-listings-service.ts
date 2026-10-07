@@ -57,6 +57,10 @@ export type AgentListing = {
     launch_price_from?: number | string | null
     launch_price_to?: number | string | null
     currency?: string | null
+    /** Whether the project is public. A listing on a retired project would show no photos or price. */
+    is_published?: boolean | null
+    is_active?: boolean | null
+    deleted_at?: string | null
     developers?: { name?: string | null } | null
     project_units?: ProjectUnitFacts[] | null
     /** Apartment / Penthouse / Townhouse / Villa — the `property_types` catalogue,
@@ -91,7 +95,7 @@ const LISTING_SELECT = `
   *,
   projects (
     id, name, developer_id, city, location, community, main_image,
-    launch_price_from, launch_price_to, currency,
+    launch_price_from, launch_price_to, currency, is_published, is_active, deleted_at,
     developers ( name ),
     project_units ( unit_type, bedrooms, bathrooms, size_sqft, size_sqm, price_from, price_to ),
     project_property_types ( property_types ( name ) )
@@ -291,6 +295,8 @@ export async function setAgentListingStatus(
   listingId: string,
   agentId: string,
   status: AgentListingStatus,
+  /** The status the listing had before this change — so only a published → off change is announced as a removal. */
+  previousStatus?: AgentListingStatus,
 ): Promise<{ error: string | null }> {
   const supabase = createClient()
   const { error } = await supabase
@@ -300,7 +306,12 @@ export async function setAgentListingStatus(
     .eq("agent_id", agentId)
     .is("deleted_at", null)
 
-  if (!error) pingSeoRevalidate("agent-listing", listingId)
+  // A published listing moved to Draft/Archived takes the page off the site: announce it as a removal, not
+  // just a purge (Draft → Archived was never online, so it is not).
+  if (!error) {
+    const wasLive = previousStatus === undefined ? true : previousStatus === "published"
+    pingSeoRevalidate("agent-listing", listingId, { removed: wasLive && status !== "published" })
+  }
   return { error: error?.message ?? null }
 }
 
@@ -336,5 +347,9 @@ export async function softDeleteAgentListing(
     .eq("id", listingId)
     .eq("agent_id", agentId)
 
+  // No .select() above on purpose: the owner's select policy (deleted_at IS NULL) rejects the soft-deleted
+  // row, so asking for it back would fail the whole update. The route reads the row with the service role and
+  // announces the removal only when the listing was published.
+  if (!error) pingSeoRevalidate("agent-listing", listingId)
   return { error: error?.message ?? null }
 }

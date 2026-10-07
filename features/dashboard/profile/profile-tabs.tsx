@@ -383,13 +383,16 @@ export function ProfileTabs({
               </div>
             </div>
 
-            {/* License Number */}
+            {/* RERA BRN — stored as metadata.license_number. The label says what the number IS: a trade-licence
+                number typed here would otherwise be read as a broker registration. */}
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">License Number</label>
+              <label className="text-xs font-bold uppercase tracking-wider ml-1 text-[#374151]">RERA BRN (broker card number)</label>
               <input
                 className="w-full px-5 py-2.5 border border-[#e5e7eb] bg-white transition-colors focus:outline-none focus:border-[#001f3f] text-sm"
                 value={profileInfo.license_number ?? ""}
                 onChange={(e) => handleProfileFieldChange("license_number", e.target.value)}
+                inputMode="numeric"
+                placeholder="The number on your RERA broker card"
               />
             </div>
 

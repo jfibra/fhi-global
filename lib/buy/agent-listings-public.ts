@@ -1,6 +1,7 @@
 import { unstable_cache } from "next/cache"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import type { BuyRawProject, ListingMarket } from "@/lib/buy/cached-projects"
+import { isLiveProject, isTestRecord, type ProjectLiveFlags } from "@/lib/listing-publish-checks"
 
 const DEV_QUERY_MS = 18_000
 
@@ -40,6 +41,11 @@ export type PublicAgentListingRow = {
   created_at: string
   updated_at: string
   projects: BuyRawProject | null
+  /**
+   * The linked project's id as stored. Still set when the project is no longer public — `projects` is then
+   * null — which is how the listing page tells "never linked" from "linked to a retired project".
+   */
+  project_id?: number | null
   agent_listing_images?: { url: string; sort_order: number }[] | null
   /** Owning agent's id. The profile itself is fetched server-side — see below. */
   agent_id?: string | null
@@ -110,12 +116,34 @@ export function listingAgentName(agent: PublicListingAgent | null): string {
 
 const PROJECT_EMBED = `
   id, name, slug, listing_type, main_image, description, city, location, latitude, longitude,
-  launch_price_from, launch_price_to, currency, created_at, is_featured,
+  launch_price_from, launch_price_to, currency, created_at, is_featured, is_published, is_active, deleted_at,
   developers ( name, logo_url, slug ),
   project_units ( unit_type, bedrooms, bathrooms, size_sqft, size_sqm ),
   project_property_types ( property_types ( name ) ),
   project_images ( url, is_main, rank )
 `
+
+/**
+ * A listing borrows its price, location and unit facts from its linked project.
+ * When that project is no longer live (unpublished, deactivated or deleted) its
+ * own page already 404s, so its facts must stop advertising too: the listing is
+ * treated as unlinked. (The public API still returned the row — "/listings/luxury"
+ * kept showing a test project's AED 100–500M after that project's page was gone.)
+ * Missing flags count as live, so an embed without them is left alone.
+ */
+function withLiveProject<T extends { projects: BuyRawProject | null }>(row: T): T {
+  const project = row.projects as (BuyRawProject & ProjectLiveFlags) | null
+  if (!project) return row
+  return isLiveProject(project) ? row : { ...row, projects: null }
+}
+
+/**
+ * Test data never reaches a public surface. Judged on the RAW row — before withLiveProject drops a retired
+ * project, whose NAME ("Test IT purposes") is the only giveaway of the junk listing titled "luxury".
+ */
+function isHiddenTestListing(row: { title: string; projects: BuyRawProject | null }): boolean {
+  return isTestRecord({ title: row.title, projectName: row.projects?.name })
+}
 
 async function fetchPublishedAgentListings(market: ListingMarket): Promise<{
   rows: PublicAgentListingRow[]
@@ -126,7 +154,7 @@ async function fetchPublishedAgentListings(market: ListingMarket): Promise<{
   const { data, error } = await supabase
     .from("agent_listings")
     .select(
-      `id, slug, title, description, listing_kind, price, currency, unit_type, created_at, updated_at, projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
+      `id, slug, title, description, listing_kind, price, currency, unit_type, created_at, updated_at, project_id, projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
     )
     .eq("status", "published")
     .is("deleted_at", null)
@@ -138,7 +166,9 @@ async function fetchPublishedAgentListings(market: ListingMarket): Promise<{
     return { rows: [], error: true }
   }
 
-  const rows = (data ?? []) as unknown as PublicAgentListingRow[]
+  const rows = ((data ?? []) as unknown as PublicAgentListingRow[])
+    .filter((row) => !isHiddenTestListing(row))
+    .map(withLiveProject)
   for (const row of rows) {
     if (row.agent_listing_images?.length) {
       row.agent_listing_images.sort((a, b) => a.sort_order - b.sort_order)
@@ -195,7 +225,7 @@ export async function fetchPublicAgentListingById(idOrSlug: string): Promise<{
       // agent_id only — the profile behind it is behind RLS and is loaded by
       // the page on the service-role client. The list query above doesn't even
       // need the id: the enquiry card exists only on the detail page.
-      `id, slug, title, description, listing_kind, price, currency, unit_type, created_at, updated_at, agent_id,
+      `id, slug, title, description, listing_kind, price, currency, unit_type, created_at, updated_at, agent_id, project_id,
        projects ( ${PROJECT_EMBED} ), agent_listing_images ( url, sort_order )`,
     )
     .eq("status", "published")
@@ -211,7 +241,12 @@ export async function fetchPublicAgentListingById(idOrSlug: string): Promise<{
     return { row: null, error: false }
   }
 
-  const row = data as unknown as PublicAgentListingRow
+  // A test record is a real 404 (the listing page throws on an error but 404s a miss), not a hidden row.
+  if (isHiddenTestListing(data as unknown as PublicAgentListingRow)) {
+    return { row: null, error: false }
+  }
+
+  const row = withLiveProject(data as unknown as PublicAgentListingRow)
   if (row.agent_listing_images?.length) {
     row.agent_listing_images.sort((a, b) => a.sort_order - b.sort_order)
   }

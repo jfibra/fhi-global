@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { after } from "next/server"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { requireRole } from "@/lib/auth-guard"
 import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 import { SITE_URL } from "@/lib/seo"
 import { submitToIndexNow } from "@/lib/indexnow"
+import { isLiveProject, isTestRecord, listingIssuesMessage, listingPublishIssues } from "@/lib/listing-publish-checks"
 
 // Admin edit / soft-delete / restore of any agent's listing. Service-role
 // (bypasses the owner-only RLS on agent_listings) + super_admin/admin guard.
@@ -31,6 +32,25 @@ type ExistingListing = {
   price: number | null
   currency: string
   deleted_at: string | null
+}
+
+/**
+ * Drop every cached view of a listing — its slug page, the legacy uuid page, the /buy and /rent lists — and,
+ * when `announce`, tell IndexNow both URLs changed (a removal is announced the same way as a publish: the
+ * protocol takes "this URL changed" and a dead page then leaves Bing's index promptly).
+ */
+function purgeListing(listing: { id: string; slug: string | null }, announce: boolean) {
+  revalidatePath(`/listings/${listing.slug ?? listing.id}`)
+  if (listing.slug) revalidatePath(`/listings/${listing.id}`)
+  revalidatePath("/buy")
+  revalidatePath("/rent")
+  // /buy and /rent keep their agent-listing cards under this tag for 120 s.
+  revalidateTag("agent-listings", { expire: 0 })
+  if (announce) {
+    const base = SITE_URL.replace(/\/$/, "")
+    const urls = [`${base}/listings/${listing.slug ?? listing.id}`, ...(listing.slug ? [`${base}/listings/${listing.id}`] : [])]
+    after(() => submitToIndexNow(urls))
+  }
 }
 
 function actorFrom(ctx: { userId: string; email: string | null; profile: { role: string | null; fullname: string | null } }) {
@@ -65,6 +85,50 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
   if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 })
   if (!existing) return NextResponse.json({ error: "Listing not found." }, { status: 404 })
+
+  // Going live needs the same checklist the agents' own form runs. Admins get no
+  // override (they can still save as Draft): the test listing that reached the
+  // sitemap was exactly the kind of record this exists to stop.
+  if (status === "published" && existing.status !== "published") {
+    const [{ count: ownPhotos }, { data: project }, { count: projectGalleryPhotos }] = await Promise.all([
+      admin.from("agent_listing_images").select("id", { count: "exact", head: true }).eq("listing_id", id),
+      existing.project_id != null
+        ? admin
+            .from("projects")
+            .select("name, main_image, is_published, is_active, deleted_at")
+            .eq("id", existing.project_id)
+            .maybeSingle<{ name: string | null; main_image: string | null; is_published: boolean | null; is_active: boolean | null; deleted_at: string | null }>()
+        : Promise.resolve({ data: null }),
+      // The public page also shows the project's gallery, so a project with gallery photos but no cover still counts.
+      existing.project_id != null
+        ? admin.from("project_images").select("id", { count: "exact", head: true }).eq("project_id", existing.project_id)
+        : Promise.resolve({ count: 0 }),
+    ])
+    const description = String(body.description ?? "").trim() || null
+    const rawPrice = body.price
+    const price = existing.project_id == null && rawPrice !== null && rawPrice !== undefined && rawPrice !== "" ? Number(rawPrice) : existing.price
+    const issues = listingPublishIssues({
+      title,
+      description,
+      listingKind: listingKind as "sale" | "rent",
+      hasProject: existing.project_id != null,
+      projectName: project?.name ?? null,
+      projectLive: existing.project_id == null ? undefined : isLiveProject(project),
+      ownPhotoCount: ownPhotos ?? 0,
+      projectHasPhoto: Boolean(project?.main_image?.trim()) || (projectGalleryPhotos ?? 0) > 0,
+      price: Number.isFinite(price) ? price : null,
+    })
+    if (issues.length > 0) {
+      return NextResponse.json({ error: listingIssuesMessage(issues), issues }, { status: 422 })
+    }
+  } else if (status === "published" && !existing.deleted_at && isTestRecord({ title }) && !isTestRecord({ title: existing.title })) {
+    // A listing that is already live is never held to the full checklist (routine edits must go through), but a
+    // rename INTO test wording is how a real listing turns into the junk record this gate exists to stop.
+    return NextResponse.json(
+      { error: "That title looks like test data — rename it, or move the listing to Draft." },
+      { status: 422 },
+    )
+  }
 
   const update: Record<string, unknown> = {
     title,
@@ -118,14 +182,10 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     })
   }
 
-  // Purge the public page immediately and, when live, ping IndexNow after the
-  // response is sent (after() keeps the serverless function alive).
-  const publicPath = `/listings/${existing.slug ?? existing.id}`
-  revalidatePath(publicPath)
-  if (status === "published" && !existing.deleted_at) {
-    const loc = `${SITE_URL.replace(/\/$/, "")}${publicPath}`
-    after(() => submitToIndexNow([loc]))
-  }
+  // Purge the public page and the /buy and /rent lists at once; IndexNow is told after the response is sent
+  // (after() keeps the serverless function alive) whenever the page is, or just stopped being, public — so an
+  // admin's unpublish is announced as a removal, which the old code skipped.
+  purgeListing(existing, !existing.deleted_at && (status === "published" || existing.status === "published"))
 
   return NextResponse.json({ ok: true })
 }
@@ -139,9 +199,9 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
   const admin = createAdminSupabase()
   const { data: existing, error: fetchErr } = await admin
     .from("agent_listings")
-    .select("id, title, deleted_at")
+    .select("id, slug, title, status, deleted_at")
     .eq("id", id)
-    .maybeSingle<{ id: string; title: string; deleted_at: string | null }>()
+    .maybeSingle<{ id: string; slug: string | null; title: string; status: string; deleted_at: string | null }>()
 
   if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 })
   if (!existing) return NextResponse.json({ error: "Listing not found." }, { status: 404 })
@@ -164,6 +224,11 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
     description: `${restore ? "Restored" : "Deleted"} listing "${existing.title}"`,
     ...requestContextFromRequest(req),
   })
+
+  // The public page, the lists and the sitemap must follow at once, not after the 120 s revalidate: purge
+  // them and tell IndexNow the URL changed (it accepts removed URLs — a deleted listing should not linger in
+  // Bing's index). A restore of a published listing is announced too: the page is back.
+  purgeListing(existing, existing.status === "published")
 
   return NextResponse.json({ ok: true })
 }
