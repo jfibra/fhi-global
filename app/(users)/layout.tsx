@@ -1,4 +1,5 @@
-import { Great_Vibes, Urbanist } from "next/font/google"
+import type { Metadata } from "next"
+import { Geist_Mono, Great_Vibes, Urbanist } from "next/font/google"
 import { DashboardAuthGate } from "@/components/dashboard/dashboard-auth-gate"
 import { DashboardBodyFonts } from "@/components/dashboard/dashboard-body-fonts"
 
@@ -10,6 +11,14 @@ import { DashboardBodyFonts } from "@/components/dashboard/dashboard-body-fonts"
 const _urbanist = Urbanist({ subsets: ["latin"], weight: ["800", "900"], display: "swap", variable: "--font-urbanist" })
 // Great Vibes — script accents on the award posters (Top Seller studio).
 const _greatVibes = Great_Vibes({ subsets: ["latin"], weight: ["400"], display: "swap", variable: "--font-script" })
+// Geist Mono — ids, codes and figures (`font-mono`, ~66 places in the dashboards). It used to load in the
+// root layout on every public page, where nothing reads it; here only the dashboards download it.
+const _geistMono = Geist_Mono({ subsets: ["latin"], display: "swap", variable: "--font-geist-mono" })
+
+// Every dashboard page is private. next.config.mjs already sends X-Robots-Tag: noindex for these paths; say it in
+// the page as well, so the header and the meta tag agree (without this the HTML carried the site-wide "index"
+// default — and /globalpartner, outside proxy.ts's matcher, is served to anonymous visitors as a 200 shell).
+export const metadata: Metadata = { robots: { index: false, follow: false } }
 
 // No force-dynamic and no server-side session read here: proxy.ts already guards
 // every /dashboard/* request (auth, inactive, role), so this layout stays static
@@ -22,10 +31,10 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className={`${_urbanist.variable} ${_greatVibes.variable}`}>
+    <div className={`${_urbanist.variable} ${_greatVibes.variable} ${_geistMono.variable}`}>
       {/* Portals (Poster Studio's StudioModal) escape this div — mirror the
           variable classes onto <body> so they inherit there too. */}
-      <DashboardBodyFonts classNames={`${_urbanist.variable} ${_greatVibes.variable}`} />
+      <DashboardBodyFonts classNames={`${_urbanist.variable} ${_greatVibes.variable} ${_geistMono.variable}`} />
       <DashboardAuthGate>{children}</DashboardAuthGate>
     </div>
   )

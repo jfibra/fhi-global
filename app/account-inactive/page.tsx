@@ -6,9 +6,12 @@ import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
 
+// A signed-in status screen, reachable only through proxy.ts's redirect — never
+// something to index.
 export const metadata: Metadata = createPageMetadata({
   title: "Account Status",
   description: "Your account status.",
+  robots: { index: false, follow: false },
 })
 
 export default async function AccountInactivePage() {

@@ -957,7 +957,7 @@ export async function sendSaleCommentEmail(input: {
   })
 }
 
-/** Sent to each admin when a visitor submits an Inquire Now lead on a project page. */
+/** Sent to each admin when a visitor submits an Inquire Now lead on a project, landing or developer page. */
 export async function sendLeadInquiryEmail(input: {
   to: string
   adminName: string | null
@@ -969,12 +969,18 @@ export async function sendLeadInquiryEmail(input: {
     propertyCategory: string
     projectName: string | null
     developerName: string | null
+    /** The landing/developer page the lead was sent from (null on a project page). */
+    pageLabel?: string | null
+    pageUrl?: string | null
+    /** The ad/campaign that brought the visitor, e.g. "source=google · medium=cpc". */
+    campaign?: string | null
   }
   dashboardUrl: string
 }): Promise<void> {
   const { lead } = input
   const name = greetingName(input.adminName)
-  const subject = `New lead — ${lead.name}${lead.projectName ? ` · ${lead.projectName}` : ""}`
+  const about = lead.projectName ?? lead.pageLabel ?? null
+  const subject = `New lead — ${lead.name}${about ? ` · ${about}` : ""}`
 
   const detailsHtml = [
     detailRow("Name", lead.name),
@@ -984,6 +990,8 @@ export async function sendLeadInquiryEmail(input: {
     detailRow("Category", lead.propertyCategory),
     lead.projectName ? detailRow("Project", lead.projectName) : "",
     lead.developerName ? detailRow("Developer", lead.developerName) : "",
+    lead.pageLabel ? detailRow("Page", lead.pageUrl ? `${lead.pageLabel} (${lead.pageUrl})` : lead.pageLabel) : "",
+    lead.campaign ? detailRow("Campaign", lead.campaign) : "",
   ].join("")
 
   const bodyHtml = `
@@ -992,7 +1000,7 @@ export async function sendLeadInquiryEmail(input: {
             <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">New lead</p>
             <h1 style="margin:0 0 12px;font-size:23px;line-height:1.3;font-weight:700;color:#0d1117;">A new inquiry just came in, ${esc(name)} 📥</h1>
             <p style="margin:0;font-size:15px;line-height:1.65;color:#4b5563;">
-              <strong>${esc(lead.name)}</strong> submitted an Inquire Now form${lead.projectName ? ` on <strong>${esc(lead.projectName)}</strong>` : ""}.
+              <strong>${esc(lead.name)}</strong> submitted an Inquire Now form${about ? ` on <strong>${esc(about)}</strong>` : ""}.
               Leads go cold fast — reach out while it's warm.
             </p>
           </td>
@@ -1019,10 +1027,10 @@ export async function sendLeadInquiryEmail(input: {
     from: fromAddress(),
     to: input.to,
     subject,
-    text: `New lead from ${lead.name}${lead.projectName ? ` on ${lead.projectName}` : ""}.\n\nName: ${lead.name}\nEmail: ${lead.email}\nPhone: ${lead.phone}\nLooking for: ${lead.lookingFor}\nCategory: ${lead.propertyCategory}${lead.projectName ? `\nProject: ${lead.projectName}` : ""}${lead.developerName ? `\nDeveloper: ${lead.developerName}` : ""}\n\n${input.dashboardUrl}`,
+    text: `New lead from ${lead.name}${about ? ` on ${about}` : ""}.\n\nName: ${lead.name}\nEmail: ${lead.email}\nPhone: ${lead.phone}\nLooking for: ${lead.lookingFor}\nCategory: ${lead.propertyCategory}${lead.projectName ? `\nProject: ${lead.projectName}` : ""}${lead.developerName ? `\nDeveloper: ${lead.developerName}` : ""}${lead.pageLabel ? `\nPage: ${lead.pageLabel}${lead.pageUrl ? ` (${lead.pageUrl})` : ""}` : ""}${lead.campaign ? `\nCampaign: ${lead.campaign}` : ""}\n\n${input.dashboardUrl}`,
     html: eventEmailShell({
       subject,
-      preheader: `${lead.name} inquired${lead.projectName ? ` about ${lead.projectName}` : ""}.`,
+      preheader: `${lead.name} inquired${about ? ` about ${about}` : ""}.`,
       bodyHtml,
     }),
   })

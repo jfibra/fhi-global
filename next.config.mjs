@@ -43,7 +43,10 @@ const TOUR_FRAME_HOSTS = embedHosts.virtualTourFrameHosts.join(" ")
 const YT_THUMBS = "i.ytimg.com"
 
 // ── Content-Security-Policy ──────────────────────────────────────────────────
-// next/font/google self-hosts fonts at build-time → no fonts.googleapis.com needed.
+// next/font/google self-hosts our own fonts at build-time; the Google Maps JS API
+// still loads its Roboto stylesheet from fonts.googleapis.com (and the font files
+// from fonts.gstatic.com), and Tag Manager's measurement pixel is an <img> on
+// www.googletagmanager.com — all three were being blocked on every project page.
 // Next.js App Router requires 'unsafe-inline' for its runtime chunk hydration scripts
 // and 'unsafe-eval' for dev-mode source maps (remove in strict-prod if desired).
 const CSP = [
@@ -53,14 +56,14 @@ const CSP = [
   // JS: own scripts + Next.js inline chunks + Vercel Analytics + Google Maps + GA4
   `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://${MAPS_API} https://${MAPS_GSTATIC} ${VERCEL_SCRIPTS} https://${CF_INSIGHTS_SCRIPT} https://www.googletagmanager.com`,
 
-  // CSS: Tailwind / Next.js injects inline styles
-  `style-src 'self' 'unsafe-inline'`,
+  // CSS: Tailwind / Next.js injects inline styles; Google Maps JS loads its font stylesheet
+  `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
 
   // Images: own assets, data URIs, blob previews, Supabase, flag CDN, maps, Google avatars, S3/CloudFront (listing + project media), YouTube thumbnails
-  `img-src 'self' data: blob: ${SUPABASE_HTTPS} https://${FLAGCDN} https://${YT_THUMBS} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://*.googleusercontent.com https://*.amazonaws.com https://*.cloudfront.net https://gravatar.com https://*.gravatar.com https://*.google-analytics.com`,
+  `img-src 'self' data: blob: ${SUPABASE_HTTPS} https://${FLAGCDN} https://${YT_THUMBS} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://*.googleusercontent.com https://*.amazonaws.com https://*.cloudfront.net https://gravatar.com https://*.gravatar.com https://*.google-analytics.com https://www.googletagmanager.com`,
 
-  // Fonts: self-hosted via next/font – no external font CDN required
-  `font-src 'self' data:`,
+  // Fonts: self-hosted via next/font, plus the Roboto files the Google Maps JS stylesheet pulls in
+  `font-src 'self' data: https://fonts.gstatic.com`,
 
   // XHR / fetch: Supabase REST + Auth + Realtime, Vercel Analytics, Google Maps, GA4
   `connect-src 'self' ${SUPABASE_CONNECT} https://${VERCEL_VITALS} https://${VERCEL_SCRIPTS} https://${MAPS_API} https://${MAPS_GSTATIC} https://*.googleapis.com https://${CF_INSIGHTS_API} https://*.google-analytics.com https://www.googletagmanager.com`,
@@ -119,12 +122,6 @@ const SECURITY_HEADERS = [
     value: "DENY",
   },
 
-  // === Cross-site scripting (legacy browsers) ===
-  {
-    key: "X-XSS-Protection",
-    value: "1; mode=block",
-  },
-
   // === Referrer policy ===
   {
     key: "Referrer-Policy",
@@ -160,18 +157,19 @@ const SECURITY_HEADERS = [
     key: "Cross-Origin-Resource-Policy",
     value: "same-origin",
   },
-  {
-    key: "X-Robots-Tag",
-    value: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
-  },
+  // No X-Robots-Tag here on purpose. A blanket "index, follow" header used to ride
+  // on every response and contradicted every page-level noindex (news articles that
+  // are not property-relevant, business cards, permit verification, 404s) — Google
+  // resolves the conflict to noindex, but two opposing signals are fragile. Indexing
+  // is decided per page through the Metadata API (app/layout.tsx sets the site-wide
+  // googleBot max-* directives); only the private paths below carry a header.
 ]
 
-const PRIVATE_NOINDEX_HEADERS = SECURITY_HEADERS.map((header) => {
-  if (header.key === "X-Robots-Tag") {
-    return { ...header, value: "noindex, nofollow, noarchive, nosnippet" }
-  }
-  return header
-})
+// Private surfaces (dashboards, APIs, sign-in): a noindex header on top of the base set.
+const PRIVATE_NOINDEX_HEADERS = [
+  ...SECURITY_HEADERS,
+  { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, nosnippet" },
+]
 
 // sharp's Linux build (sharp-linux-x64) links libvips at load time, and file
 // tracing cannot see a dynamic-linker dependency, so Vercel's functions shipped
@@ -184,6 +182,8 @@ const PRIVATE_NOINDEX_HEADERS = SECURITY_HEADERS.map((header) => {
 const SHARP_LINUX_LIBS = ["./node_modules/@img/sharp-linux-x64/**/*", "./node_modules/@img/sharp-libvips-linux-x64/**/*"]
 
 const nextConfig = {
+  // No "X-Powered-By: Next.js" — it only tells scanners what to aim at.
+  poweredByHeader: false,
   // Debug escape hatch: lets a second `next dev` run from this directory
   // without fighting the primary one over .next/dev/lock. Inert unless the
   // env var is set.
@@ -194,9 +194,11 @@ const nextConfig = {
     "/api/upload/developer": SHARP_LINUX_LIBS,
     "/certificate/send": SHARP_LINUX_LIBS,
     "/materials": SHARP_LINUX_LIBS,
-    "/projects/*/opengraph-image": SHARP_LINUX_LIBS,
     "/og/project/": SHARP_LINUX_LIBS,
     "/og/news/": SHARP_LINUX_LIBS,
+    // The developer card draws the logo through ogPicture + ogJpeg; the SEO-page card reads two files from public/.
+    "/og/developer/": SHARP_LINUX_LIBS,
+    "/og/seo/": [...SHARP_LINUX_LIBS, "./public/og-default.jpg", "./public/FHI_Branding_White.png"],
     // Agent-site thumbnail (banner via ogPicture) and the event thumbnail (poster card).
     "/website/*/opengraph-image": SHARP_LINUX_LIBS,
     "/og/event/": SHARP_LINUX_LIBS,
@@ -224,6 +226,10 @@ const nextConfig = {
     /[\w-]+-Google|Google-[\w-]+|Googlebot|Chrome-Lighthouse|Slurp|DuckDuckBot|baiduspider|yandex|sogou|bitlybot|tumblr|vkShare|quora link preview|redditbot|ia_archiver|Bingbot|BingPreview|applebot|PetalBot|facebookexternalhit|facebookcatalog|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|Yeti|googleweblight|OAI-SearchBot|ChatGPT-User|PerplexityBot|Perplexity-User|Claude-User|Claude-SearchBot/i,
   images: {
     unoptimized: false,
+    // Serve optimized images inline: the default "attachment" makes /_next/image
+    // responses download when opened directly, and some crawlers and preview
+    // fetchers treat that as a non-image.
+    contentDispositionType: "inline",
     formats: ["image/avif", "image/webp"],
     // Optimized-image cache lifetime. Storage objects here are immutable-named
     // (uploads get unique keys), so re-validating every 5 minutes just re-ran
@@ -285,7 +291,7 @@ const nextConfig = {
     // route handlers under /api/sitemap. The sitemap INDEX must reference only
     // these rewritten URLs: robots.txt disallows /api, and Google honors
     // robots.txt when fetching sitemaps.
-    return ["pages", "projects", "developers", "listings", "events", "news", "gallery"].map((section) => ({
+    return ["pages", "projects", "developers", "listings", "events", "news", "gallery", "agent-sites"].map((section) => ({
       source: `/sitemap-${section}-:page(\\d+).xml`,
       destination: `/api/sitemap/${section}/:page`,
     }))
@@ -376,6 +382,16 @@ const nextConfig = {
       },
       {
         source: "/member/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      // The editor and global-partner dashboards (app/(users)/editor, /globalpartner) had no header of their
+      // own, and /globalpartner is outside proxy.ts's matcher: an anonymous crawler got a 200 shell with no noindex.
+      {
+        source: "/editor/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      {
+        source: "/globalpartner/:path*",
         headers: PRIVATE_NOINDEX_HEADERS,
       },
       {
