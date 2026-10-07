@@ -1,12 +1,14 @@
+import { Fragment } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import {
-  ArrowRight, Building2, Compass, CircleUserRound, Facebook, FileText,
+  ArrowRight, Building2, Compass, CircleUserRound, Facebook, FileText, Instagram,
   Mail, MapPin, Phone, ShieldCheck,
 } from "lucide-react"
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
-import { WhatsAppLogo } from "@/components/brand-icons"
-import { SEO_SEARCH_PAGES, SEO_AREA_GUIDES } from "@/lib/seo-pages"
+import { COMPANY, companyAddressLine, companyLicenceLine, companyPhoneHref } from "@/lib/company"
+import { LinkedInLogo, WhatsAppLogo } from "@/components/brand-icons"
+import { SEO_SEARCH_PAGES, SEO_AREA_GUIDES, SEO_BUYER_GUIDES, SEO_HANDOVER_PAGES } from "@/lib/seo-pages"
 import { WhatsAppFab } from "@/components/public/whatsapp-fab"
 import { InView } from "@/components/public/in-view"
 import { MagneticLink } from "@/components/public/magnetic-link"
@@ -56,10 +58,14 @@ const SECTIONS = [
   { title: "Projects", Icon: FileText,        links: PROJECT_LINKS },
 ]
 
+// An account that is not published yet ("#" in lib/social.ts) is left out of the page entirely rather than
+// rendered as a dead link — add its URL there and its icon appears here.
 const SOCIALS = [
   { label: "Facebook", href: SOCIAL_URLS.facebook, Icon: Facebook },
+  { label: "LinkedIn", href: SOCIAL_URLS.linkedin, Icon: LinkedInLogo },
+  { label: "Instagram", href: SOCIAL_URLS.instagram, Icon: Instagram },
   { label: "WhatsApp", href: SOCIAL_URLS.whatsapp, Icon: WhatsAppLogo },
-]
+].filter((s) => isExternalSocial(s.href))
 
 /**
  * A stylised Dubai skyline in one stroke: low towers, the Burj Al Arab sail,
@@ -144,6 +150,45 @@ export function Footer() {
               ))}
             </ul>
           </div>
+
+          {/* The buyer guides and the handover-year pages: linked from every public page so none of
+              them is reachable only through a sitemap. */}
+          <div className="grid gap-8 md:grid-cols-2">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#a07c1f] mb-4">
+                Buyer Guides
+              </p>
+              <ul className="flex flex-wrap gap-x-6 gap-y-2.5">
+                {SEO_BUYER_GUIDES.map((p) => (
+                  <li key={p.slug}>
+                    <Link
+                      href={`/${p.slug}`}
+                      className="text-sm text-[#4b5563] hover:text-[#001f3f] hover:underline underline-offset-4 transition-colors duration-200 inline-block"
+                    >
+                      {p.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#a07c1f] mb-4">
+                Dubai Projects by Handover Year
+              </p>
+              <ul className="flex flex-wrap gap-x-6 gap-y-2.5">
+                {SEO_HANDOVER_PAGES.map((p) => (
+                  <li key={p.slug}>
+                    <Link
+                      href={`/${p.slug}`}
+                      className="text-sm text-[#4b5563] hover:text-[#001f3f] hover:underline underline-offset-4 transition-colors duration-200 inline-block"
+                    >
+                      {p.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -185,9 +230,9 @@ export function Footer() {
               </p>
               <h3 className="font-['Outfit'] text-3xl md:text-4xl font-bold text-white leading-tight">
                 {["Browse", "Dubai’s", "Finest"].map((w, i) => (
-                  <span key={w} className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: i }}>{w}</span></span>
+                  <Fragment key={w}><span className="wf-word"><span style={{ ["--i" as string]: i }}>{w}</span></span>{" "}</Fragment>
                 ))}
-                <span className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 3 }} className="wf-gold">Properties</span></span>
+                <span className="wf-word"><span style={{ ["--i" as string]: 3 }} className="wf-gold">Properties</span></span>{" "}
               </h3>
               <p className="wf-fade mt-3 text-sm text-white/70 max-w-md leading-relaxed" style={{ ["--d" as string]: "600ms" }}>
                 Explore off-plan and ready properties from Dubai&apos;s most trusted developers.
@@ -235,25 +280,22 @@ export function Footer() {
             {/* Contact details */}
             <div className="wf-fade space-y-3" style={{ ["--d" as string]: "280ms" }}>
               <a
-                href="tel:+971567428288"
+                href={companyPhoneHref()}
                 className="flex items-center gap-3 text-sm text-white/70 hover:text-[#d6b357] transition-colors duration-200"
               >
                 <Phone className="w-4 h-4 text-[#d6b357] shrink-0" />
-                +971 56 742 8288
+                {COMPANY.phone}
               </a>
               <a
-                href="mailto:info@fhiglobal.ae"
+                href={`mailto:${COMPANY.email}`}
                 className="flex items-center gap-3 text-sm text-white/70 hover:text-[#d6b357] transition-colors duration-200"
               >
                 <Mail className="w-4 h-4 text-[#d6b357] shrink-0" />
-                info@fhiglobal.ae
+                {COMPANY.email}
               </a>
               <div className="flex items-start gap-3 text-sm">
                 <MapPin className="w-4 h-4 text-[#d6b357] shrink-0 mt-0.5" />
-                <span className="text-white/55 leading-snug">
-                  Office 98, 3rd Floor, Rigga Business Center<br />
-                  (Ibis Hotel Building), Al Rigga, Deira, Dubai, UAE
-                </span>
+                <span className="text-white/55 leading-snug">{companyAddressLine()}</span>
               </div>
             </div>
 
@@ -305,7 +347,7 @@ export function Footer() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-xs text-white/40">
             <ShieldCheck className="w-4 h-4 text-[#d6b357] shrink-0" />
-            © {year} FHI Global Property. All rights reserved. RERA Licensed.
+            © {year} {COMPANY.legalName || COMPANY.name}. All rights reserved.{companyLicenceLine() ? ` ${companyLicenceLine()}.` : ""}
           </p>
           <div className="flex items-center">
             {[

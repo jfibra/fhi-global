@@ -5,11 +5,12 @@ import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
-  Menu, X, Phone, Mail, Facebook, Instagram, ChevronDown, LayoutDashboard,
+  Menu, X, Phone, Mail, Facebook, Instagram, Linkedin, ChevronDown, LayoutDashboard,
   LogOut, Building2, Camera, Globe, KeyRound, Landmark,
   Tag, Users, BarChart3, type LucideIcon,
 } from "lucide-react"
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
+import { COMPANY, companyPhoneHref } from "@/lib/company"
 import { getDashboardRouteByRole } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/client"
 import { AuthModal } from "@/components/auth/auth-modal"
@@ -62,10 +63,12 @@ const NAV_LINKS: NavItem[] = [
   },
 ]
 
+// Only profiles that exist: an unpublished one ("#" in lib/social.ts) used to render as a dead link.
 const SOCIAL_LINKS = [
   { label: "Facebook",  href: SOCIAL_URLS.facebook,  Icon: Facebook },
   { label: "Instagram", href: SOCIAL_URLS.instagram, Icon: Instagram },
-]
+  { label: "LinkedIn",  href: SOCIAL_URLS.linkedin,  Icon: Linkedin },
+].filter(({ href }) => isExternalSocial(href))
 
 type HeaderSession = {
   dashboardHref: string
@@ -494,9 +497,19 @@ export function Header() {
           </nav>
 
           {/* Desktop: signed-in account / guest CTAs */}
-          <div className="hidden lg:flex items-center gap-3 min-h-[42px] shrink-0">
+          <div className="hidden lg:flex items-center gap-1.5 xl:gap-3 min-h-[42px] shrink-0">
+            {/* "Talk to us" is the visitor's way to a consultant, so it is in the server HTML and on
+                screen from the first paint — only a signed-in account replaces it. */}
+            {!(authReady && session) && (
+              <Link
+                href="/contact"
+                className="px-3.5 xl:px-5 py-2.5 text-sm font-semibold text-[#001f3f] bg-gradient-to-r from-[#d6b357] to-[#f0d890] hover:from-[#c9a449] hover:to-[#e8d080] rounded-full transition-all duration-300 shadow-md hover:shadow-lg hover:translate-y-[-1px] whitespace-nowrap"
+              >
+                Talk to us
+              </Link>
+            )}
             {!authReady ? (
-              <div className="w-[150px] h-10 rounded-full bg-white/5 animate-pulse" aria-hidden />
+              <div className="w-[44px] xl:w-[56px] h-10 rounded-full bg-white/5 animate-pulse" aria-hidden />
             ) : session ? (
               <div className="relative flex items-center gap-2" ref={accountRef}>
                 <button
@@ -565,9 +578,9 @@ export function Header() {
               <button
                 type="button"
                 onClick={() => setAuthModalOpen(true)}
-                className="px-6 py-2.5 text-sm font-semibold text-[#001f3f] bg-gradient-to-r from-[#d6b357] to-[#f0d890] hover:from-[#c9a449] hover:to-[#e8d080] rounded-full transition-all duration-300 shadow-md hover:shadow-lg hover:translate-y-[-1px]"
+                className="px-1 xl:px-2 py-2.5 text-sm font-semibold text-white/85 hover:text-white transition-colors whitespace-nowrap"
               >
-                Login / Register
+                Log in
               </button>
             )}
           </div>
@@ -716,6 +729,15 @@ export function Header() {
 
           {/* CTA / account */}
           <div className="hd-drawer-item px-4 pb-4 flex flex-col gap-3" style={{ ["--i" as string]: NAV_LINKS.length }}>
+            {!(authReady && session) && (
+              <Link
+                href="/contact"
+                onClick={() => setMobileOpen(false)}
+                className="w-full text-center py-3.5 text-sm font-semibold text-[#001f3f] bg-gradient-to-r from-[#d6b357] to-[#f0d890] hover:from-[#c9a449] hover:to-[#e8d080] rounded-xl transition-all duration-300 shadow-md"
+              >
+                Talk to a consultant
+              </Link>
+            )}
             {authReady && session ? (
               <>
                 <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-white/5 border border-white/10">
@@ -763,7 +785,7 @@ export function Header() {
               <button
                 type="button"
                 onClick={() => { setMobileOpen(false); setAuthModalOpen(true) }}
-                className="w-full text-center py-3.5 text-sm font-semibold text-[#001f3f] bg-gradient-to-r from-[#d6b357] to-[#f0d890] hover:from-[#c9a449] hover:to-[#e8d080] rounded-xl transition-all duration-300 shadow-md"
+                className="w-full text-center py-3.5 text-sm font-semibold text-white border border-white/25 hover:bg-white/10 rounded-xl transition-colors"
               >
                 Login / Register
               </button>
@@ -777,22 +799,22 @@ export function Header() {
             <p className="text-xs font-semibold uppercase tracking-widest text-white/55 mb-3">Contact Us</p>
             <div className="flex flex-col gap-2.5">
               <a
-                href="tel:+971567428288"
+                href={companyPhoneHref()}
                 className="flex items-center gap-3 text-white/60 hover:text-[#d6b357] transition-colors text-sm"
               >
                 <div className="w-8 h-8 rounded-lg bg-white/8 flex items-center justify-center shrink-0">
                   <Phone className="w-3.5 h-3.5" />
                 </div>
-                +971 56 742 8288
+                {COMPANY.phone}
               </a>
               <a
-                href="mailto:info@fhiglobal.ae"
+                href={`mailto:${COMPANY.email}`}
                 className="flex items-center gap-3 text-white/60 hover:text-[#d6b357] transition-colors text-sm"
               >
                 <div className="w-8 h-8 rounded-lg bg-white/8 flex items-center justify-center shrink-0">
                   <Mail className="w-3.5 h-3.5" />
                 </div>
-                info@fhiglobal.ae
+                {COMPANY.email}
               </a>
             </div>
           </div>

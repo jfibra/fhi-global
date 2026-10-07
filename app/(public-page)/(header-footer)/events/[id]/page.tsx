@@ -4,8 +4,9 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createPageMetadata, truncateDescription } from "@/lib/seo"
+import { eventBrand } from "@/lib/events/brands"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
-import { breadcrumbList, eventSchema } from "@/lib/structured-data"
+import { brandOrganizer, breadcrumbList, eventSchema, personOrganizer } from "@/lib/structured-data"
 import { eventDateRangeLabel } from "@/lib/events/dates"
 import { JsonLd } from "@/components/json-ld"
 import { EventViewPing } from "@/components/public/event-view-ping"
@@ -131,6 +132,8 @@ export default async function EventDetailPage({ params }: Props) {
       {/* Event entity (rich-result eligible) + the visible trail below. */}
       <JsonLd
         schema={[
+          // null (no date, or no venue to place it) leaves the Event node out — the
+          // breadcrumb below stays. See eventSchema.
           eventSchema({
             title: event.title,
             description: event.description,
@@ -140,18 +143,26 @@ export default async function EventDetailPage({ params }: Props) {
             eventDays: event.event_days,
             dayTimes: event.day_times,
             venue: event.venue,
-            // An agent's event names them as organiser — and, like on their
-            // website, claims no country (agents run roadshows abroad too).
-            ...(event.agent_id
-              ? { organizer: host ? { name: host.name, path: host.websiteHref ?? path } : null, country: null }
-              : {}),
+            latitude: event.venue_lat,
+            longitude: event.venue_lng,
+            // Who runs it: an agent's event names the agent (and omits an organizer when the
+            // host cannot be loaded — it is not the company's event); a company event
+            // published under a sister brand names that brand, as the page's brand chip does;
+            // otherwise FHI Global.
+            organizer: event.agent_id
+              ? host
+                ? personOrganizer(host.name, host.websiteHref)
+                : null
+              : eventBrand(event.brand).key === "fhiglobal"
+                ? undefined
+                : brandOrganizer(eventBrand(event.brand).name),
           }),
           breadcrumbList([
             { name: "Home", path: "/" },
             { name: "Events", path: "/events" },
             { name: event.title },
           ]),
-        ]}
+        ].filter(Boolean)}
       />
       <EventViewPing eventId={event.id} />
       <EventDetail

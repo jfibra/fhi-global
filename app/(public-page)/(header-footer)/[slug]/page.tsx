@@ -17,7 +17,7 @@ import { SOCIAL_URLS } from "@/lib/social"
 import { getSeoPage, NON_UAE_CITIES, SEO_PAGES, type SeoPage, type SeoPageFilter } from "@/lib/seo-pages"
 import { ContactForm } from "../contact/contact-form"
 import { fetchSectionPage } from "@/lib/sitemap-sections"
-import { breadcrumbList, developerOrganizationSchema, faqPageSchema, itemListSchema } from "@/lib/structured-data"
+import { breadcrumbList, developerPageSchema, faqPageSchema, itemListSchema } from "@/lib/structured-data"
 import { JsonLd } from "@/components/json-ld"
 import { Building2, Facebook, Mail, MapPin, CheckCircle2, ArrowLeft, ArrowUpRight, Globe } from "lucide-react"
 
@@ -248,7 +248,7 @@ export default async function DeveloperDetailPage({ params }: Props) {
           visible content: only projects that render make the ItemList). */}
       <JsonLd
         schema={[
-          developerOrganizationSchema(developer),
+          developerPageSchema({ ...developer, slug: developer.slug ?? slug }),
           breadcrumbList([
             { name: "Home", path: "/" },
             { name: "Developers", path: "/developers" },

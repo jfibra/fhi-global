@@ -140,7 +140,8 @@ export function EventDetail({
                 src={event.image_url}
                 alt={event.title}
                 fill
-                priority
+                preload
+                fetchPriority="high"
                 sizes="100vw"
                 className="object-contain"
               />

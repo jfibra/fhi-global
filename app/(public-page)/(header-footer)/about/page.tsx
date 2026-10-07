@@ -1,8 +1,11 @@
+import { Fragment } from "react"
 import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowRight, ArrowUpRight, Mail, MapPin, Phone, Play } from "lucide-react"
-import { createPageMetadata, absoluteUrl } from "@/lib/seo"
+import { ArrowRight, ArrowUpRight, Mail, MapPin, Phone, Play, ShieldCheck } from "lucide-react"
+import { createPageMetadata } from "@/lib/seo"
+import { fhiOrganizationSchema, orgRef, webPageSchema } from "@/lib/structured-data"
+import { COMPANY, companyAddressLine, companyLicenceLine, companyMapsHref } from "@/lib/company"
 import { JsonLd } from "@/components/json-ld"
 import { FilmLines, FilmTrigger, HeroLoop, ScreeningRoom, StoryRow, type Film, type FilmLine } from "@/components/public/film-player"
 import { AGENT_STORIES, COMPANY_FILMS, FILM_BASE, LANDLORD_STORIES } from "@/lib/films"
@@ -18,10 +21,13 @@ import { ParallaxPhoto } from "@/components/public/parallax-photo"
 
 export const revalidate = 600
 
+const ABOUT_TITLE = "About Us — Building Trust, Creating Value"
+const ABOUT_DESCRIPTION =
+  "FHI Global connects investors with Dubai's leading developers — who we are, how we work, and why buyers across the world trust us with UAE real estate."
+
 export const metadata: Metadata = createPageMetadata({
-  title: "About Us — Building Trust, Creating Value",
-  description:
-    "FHI Global Property connects investors with Dubai's leading developers — who we are, how we work, and why buyers across the world trust us with UAE real estate.",
+  title: ABOUT_TITLE,
+  description: ABOUT_DESCRIPTION,
   pathname: "/about",
   keywords: ["About FHI Global", "Dubai real estate company", "FHI Global Property"],
 })
@@ -57,11 +63,11 @@ const filmSchema = (f: Film, description: string, seconds: number) => ({
   name: f.title,
   description,
   thumbnailUrl: [f.poster],
-  uploadDate: "2026-09-28",
+  // With the Gulf offset: Google's video guidance wants a timezone on the date.
+  uploadDate: "2026-09-28T00:00:00+04:00",
   duration: `PT${Math.floor(seconds / 60)}M${seconds % 60}S`,
   contentUrl: f.hd,
-  embedUrl: absoluteUrl("/about"),
-  publisher: { "@type": "Organization", name: "FHI Global Property Dubai" },
+  publisher: orgRef(),
 })
 
 const PHOTOS = {
@@ -74,11 +80,13 @@ const PHOTOS = {
 }
 const STRIP = [PHOTOS.celebrate, PHOTOS.model, PHOTOS.leaders, PHOTOS.masterplan, PHOTOS.siteVisit, PHOTOS.team]
 
+// From lib/company.ts — the same source as the footer, /contact and the company JSON-LD.
 const OFFICE = {
-  address: "Office 98, 3rd Floor, Rigga Business Center (Ibis Hotel Building), Al Rigga, Deira, Dubai, UAE",
-  phone: "+971 56 742 8288",
-  email: "info@fhiglobal.ae",
+  address: companyAddressLine(),
+  phone: COMPANY.phone,
+  email: COMPANY.email,
 }
+const LICENCE = companyLicenceLine()
 
 /** The buying journey, in the order it happens, each step over one of the
  *  team's own photographs. Each names only what the site already does or
@@ -110,9 +118,11 @@ function Words({ text, start, className }: { text: string; start: number; classN
   return (
     <>
       {text.split(" ").map((w, i) => (
-        <span key={`${w}-${i}`} className="wf-word mr-[0.24em]">
-          <span style={{ ["--i" as string]: start + i }} className={className}>{w}</span>
-        </span>
+        <Fragment key={`${w}-${i}`}>
+          <span className="wf-word">
+            <span style={{ ["--i" as string]: start + i }} className={className}>{w}</span>
+          </span>{" "}
+        </Fragment>
       ))}
     </>
   )
@@ -193,7 +203,9 @@ export default async function AboutPage() {
       </noscript>
       <JsonLd
         schema={[
-          filmSchema(FILMS.avp, "FHI Global Property Dubai's film: the team, the founder and the Dubai office, in three minutes.", 193),
+          fhiOrganizationSchema(),
+          webPageSchema({ type: "AboutPage", path: "/about", name: ABOUT_TITLE, description: ABOUT_DESCRIPTION }),
+          filmSchema(FILMS.avp, "FHI Global's film: the team, the founder and the Dubai office, in three minutes.", 193),
           filmSchema(FILMS.event, "The FHI Global team together at its Dubai event.", 134),
         ]}
       />
@@ -203,7 +215,7 @@ export default async function AboutPage() {
         <InView className="relative" threshold={0.05} rootMargin="0px">
           <div className="absolute inset-0" aria-hidden="true">
             <div className="pp-hero-img absolute inset-0">
-              <Image src={PHOTOS.team.url} alt={PHOTOS.team.alt} fill priority sizes="100vw" className="object-cover object-[70%_50%]" />
+              <Image src={PHOTOS.team.url} alt={PHOTOS.team.alt} fill preload fetchPriority="high" sizes="100vw" className="object-cover object-[70%_50%]" />
               <HeroLoop hd={HERO_LOOP.hd} sd={HERO_LOOP.sd} className="object-[70%_50%]" />
             </div>
             <div className="absolute inset-0 bg-gradient-to-r from-[#06182e]/95 via-[#06182e]/65 to-[#06182e]/15" />
@@ -316,7 +328,7 @@ export default async function AboutPage() {
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <Chapter numeral="IV" kicker="Who you will meet" title={<>Real people, <span className="text-[#e3c06c]">real photographs.</span></>} light />
               <p className="wf-fade max-w-sm text-[15px] leading-relaxed text-white/70" style={{ ["--d" as string]: "500ms" }}>
-                Every frame here is ours, from FHI Dubai Global in July 2026. No stock imagery anywhere on this page.
+                Every frame here is ours, from the FHI Global Dubai event in July 2026. No stock imagery anywhere on this page.
               </p>
             </div>
           </div>
@@ -343,7 +355,7 @@ export default async function AboutPage() {
               <p className="font-['Outfit'] text-[22px] font-bold leading-snug text-white sm:text-[28px]">
                 Our mission is to empower people to make confident real estate decisions by providing expert guidance, market insights, and exceptional service.
               </p>
-              <footer className="mt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-[#d6b357]">FHI Global Property</footer>
+              <footer className="mt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-[#d6b357]">{COMPANY.name}</footer>
             </blockquote>
             <div className="wf-fade flex flex-col gap-3 lg:col-span-5 lg:items-end" style={{ ["--d" as string]: "850ms" }}>
               <Link href="/agents" className="group inline-flex items-center gap-2 border border-white/25 px-6 py-3.5 text-[15px] font-bold text-white transition-colors hover:border-[#d6b357] hover:text-[#f0d89b]">
@@ -388,7 +400,7 @@ export default async function AboutPage() {
                   <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b8913f]">Office</dt>
                   <dd className="mt-1 text-[15px] leading-relaxed text-[#0d1117]">{OFFICE.address}</dd>
                   <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("Rigga Business Center, Al Rigga, Deira, Dubai")}`}
+                    href={companyMapsHref()}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-1.5 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#0d1117] transition-colors hover:text-[#b8913f]"
@@ -411,6 +423,17 @@ export default async function AboutPage() {
                   <dd className="mt-1"><a href={`mailto:${OFFICE.email}`} className="text-[15px] font-semibold text-[#0d1117] hover:text-[#b8913f]">{OFFICE.email}</a></dd>
                 </div>
               </div>
+              {/* Shown for either fact: a blank legal name must not hide a published licence number (the footer prints it). */}
+              {(COMPANY.legalName || LICENCE) && (
+                <div className="flex items-start gap-4">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#d6b357]/50 bg-[#d6b357]/10"><ShieldCheck className="h-5 w-5 text-[#b8913f]" /></span>
+                  <div>
+                    <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b8913f]">{COMPANY.legalName ? "Registered as" : "Registration"}</dt>
+                    {COMPANY.legalName && <dd className="mt-1 text-[15px] leading-relaxed text-[#0d1117]">{COMPANY.legalName}</dd>}
+                    {LICENCE && <dd className="mt-1 text-[13px] text-[#6b7280]">{LICENCE}</dd>}
+                  </div>
+                </div>
+              )}
             </dl>
           </div>
           <div className="lg:col-span-6">

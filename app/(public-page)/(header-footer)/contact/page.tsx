@@ -1,9 +1,18 @@
+import { Fragment } from "react"
 import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowUpRight, Mail, MapPin, MessageCircle, Phone } from "lucide-react"
+import { ArrowUpRight, Mail, MapPin, MessageCircle, Phone, ShieldCheck } from "lucide-react"
 import { createPageMetadata } from "@/lib/seo"
-import { breadcrumbList, realEstateAgentOfficeSchema } from "@/lib/structured-data"
+import { breadcrumbList, fhiOrganizationSchema, webPageSchema } from "@/lib/structured-data"
+import {
+  COMPANY,
+  companyAddressLine,
+  companyLicenceLine,
+  companyMapsHref,
+  companyPhoneHref,
+  companyWhatsappHref,
+} from "@/lib/company"
 import { JsonLd } from "@/components/json-ld"
 import { InView } from "@/components/public/in-view"
 import { MagneticLink } from "@/components/public/magnetic-link"
@@ -11,25 +20,31 @@ import { ParallaxPhoto } from "@/components/public/parallax-photo"
 import { ContactStudio } from "./contact-studio"
 import { DubaiNow } from "./dubai-now"
 
+const CONTACT_TITLE = "Contact Us — Get in Touch"
+const CONTACT_DESCRIPTION =
+  "Contact FHI Global's team in Dubai. Reach out for developer partnerships, agent onboarding, or any real estate inquiry."
+
 export const metadata: Metadata = createPageMetadata({
-  title: "Contact Us — Get in Touch",
-  description:
-    "Contact FHI Global's team in Dubai. Reach out for developer partnerships, agent onboarding, or any real estate inquiry.",
+  title: CONTACT_TITLE,
+  description: CONTACT_DESCRIPTION,
   openGraphDescription: "Reach out to FHI Global's Dubai team for any real estate inquiry.",
   pathname: "/contact",
   keywords: ["Contact FHI Global", "Dubai real estate support", "developer partnerships Dubai"],
 })
 
+// Every fact below comes from lib/company.ts, the same source as the footer,
+// /about and the company JSON-LD, so the page and its structured data cannot
+// disagree.
 const OFFICE = {
-  city: "Dubai",
-  address: "Office 98, 3rd Floor, Rigga Business Center (Ibis Hotel Building), Al Rigga, Deira, Dubai, UAE",
-  phone: "+971 56 742 8288",
-  phoneHref: "tel:+971567428288",
-  whatsapp: "https://wa.me/971567428288",
-  email: "info@fhiglobal.ae",
-  hours: "Sunday to Thursday, 9:00 AM to 6:00 PM",
-  mapsHref: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("Rigga Business Center, Al Rigga, Deira, Dubai")}`,
+  address: companyAddressLine(),
+  phone: COMPANY.phone,
+  phoneHref: companyPhoneHref(),
+  whatsapp: companyWhatsappHref(),
+  email: COMPANY.email,
+  hours: COMPANY.hours.label,
+  mapsHref: companyMapsHref(),
 }
+const LICENCE = companyLicenceLine()
 
 const GALLERY_BASE =
   "https://filipinohomes123.s3.ap-southeast-1.amazonaws.com/FHI_GLOBAL/gallery/fhi-global-dubai-event/web"
@@ -53,9 +68,11 @@ function Words({ text, start, className }: { text: string; start: number; classN
   return (
     <>
       {text.split(" ").map((w, i) => (
-        <span key={`${w}-${i}`} className="wf-word mr-[0.24em]">
-          <span style={{ ["--i" as string]: start + i }} className={className}>{w}</span>
-        </span>
+        <Fragment key={`${w}-${i}`}>
+          <span className="wf-word">
+            <span style={{ ["--i" as string]: start + i }} className={className}>{w}</span>
+          </span>{" "}
+        </Fragment>
       ))}
     </>
   )
@@ -67,11 +84,12 @@ export default function ContactPage() {
       <noscript>
         <style>{`.ct [class*="wf-"], .ct .wf-word > span, .ct [class*="pp-"], .ct .ct-step, .ct .ct-channel { opacity: 1 !important; transform: none !important; filter: none !important; }`}</style>
       </noscript>
-      {/* The Dubai office as a RealEstateAgent entity — the same facts printed
-          below, made machine-readable. */}
+      {/* The company as a RealEstateAgent entity (the shared #organization
+          node) — the same facts printed below, made machine-readable. */}
       <JsonLd
         schema={[
-          realEstateAgentOfficeSchema({ city: OFFICE.city, address: OFFICE.address, phone: OFFICE.phone, email: OFFICE.email }),
+          fhiOrganizationSchema(),
+          webPageSchema({ type: "ContactPage", path: "/contact", name: CONTACT_TITLE, description: CONTACT_DESCRIPTION }),
           breadcrumbList([{ name: "Home", path: "/" }, { name: "Contact" }]),
         ]}
       />
@@ -81,7 +99,7 @@ export default function ContactPage() {
         <InView className="relative" threshold={0.05} rootMargin="0px">
           <div className="absolute inset-0" aria-hidden="true">
             <div className="pp-hero-img absolute inset-0">
-              <Image src={HERO_PHOTO.url} alt={HERO_PHOTO.alt} fill priority sizes="100vw" className="object-cover object-[60%_35%]" />
+              <Image src={HERO_PHOTO.url} alt={HERO_PHOTO.alt} fill preload fetchPriority="high" sizes="100vw" className="object-cover object-[60%_35%]" />
             </div>
             <div className="absolute inset-0 bg-gradient-to-r from-[#06182e]/95 via-[#06182e]/70 to-[#06182e]/25" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#06182e] via-[#06182e]/30 to-transparent" />
@@ -144,13 +162,13 @@ export default function ContactPage() {
                 Write to us
               </p>
               <h2 className="mt-4 font-['Outfit'] text-[34px] font-bold leading-[1.06] tracking-tight sm:text-[42px]">
-                <span className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 0 }}>Tell</span></span>
-                <span className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 1 }}>us</span></span>
-                <span className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 2 }}>what</span></span>
-                <span className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 3 }}>you</span></span>
+                <span className="wf-word"><span style={{ ["--i" as string]: 0 }}>Tell</span></span>{" "}
+                <span className="wf-word"><span style={{ ["--i" as string]: 1 }}>us</span></span>{" "}
+                <span className="wf-word"><span style={{ ["--i" as string]: 2 }}>what</span></span>{" "}
+                <span className="wf-word"><span style={{ ["--i" as string]: 3 }}>you</span></span>{" "}
                 <span className="block">
                   {["are", "looking", "for."].map((w, i) => (
-                    <span key={w} className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 4 + i }} className="wf-gold">{w}</span></span>
+                    <Fragment key={w}><span className="wf-word"><span style={{ ["--i" as string]: 4 + i }} className="wf-gold">{w}</span></span>{" "}</Fragment>
                   ))}
                 </span>
               </h2>
@@ -172,7 +190,7 @@ export default function ContactPage() {
             </div>
           </aside>
 
-          <div className="bg-white px-4 py-12 sm:px-8 lg:col-span-7 lg:px-14 lg:py-20">
+          <div id="enquire" className="scroll-mt-24 bg-white px-4 py-12 sm:px-8 lg:col-span-7 lg:px-14 lg:py-20">
             <ContactStudio />
           </div>
         </div>
@@ -211,6 +229,17 @@ export default function ContactPage() {
                   <dd className="mt-1 text-[13px] text-[#6b7280]">Gulf Standard Time, UTC+4. WhatsApp reaches us outside these hours too.</dd>
                 </div>
               </div>
+              {/* Shown for either fact: a blank legal name must not hide a published licence number (the footer prints it). */}
+              {(COMPANY.legalName || LICENCE) && (
+                <div className="flex items-start gap-4">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#d6b357]/50 bg-[#d6b357]/10"><ShieldCheck className="h-5 w-5 text-[#b8913f]" /></span>
+                  <div>
+                    <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b8913f]">{COMPANY.legalName ? "Registered as" : "Registration"}</dt>
+                    {COMPANY.legalName && <dd className="mt-1 text-[15px] leading-relaxed text-[#0d1117]">{COMPANY.legalName}</dd>}
+                    {LICENCE && <dd className="mt-1 text-[13px] text-[#6b7280]">{LICENCE}</dd>}
+                  </div>
+                </div>
+              )}
             </dl>
           </div>
           <div className="lg:col-span-7">

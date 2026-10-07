@@ -1,17 +1,24 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useSyncExternalStore } from "react"
 import Link from "next/link"
 import { ArrowRight, ArrowUpRight, CheckCircle2, Loader2 } from "lucide-react"
 import { gaEvent } from "@/lib/ga"
+import { COMPANY, companyPhoneHref, companyWhatsappHref } from "@/lib/company"
+import { clearEnquiryPrefill, readEnquiryPrefill, subscribeEnquiryPrefill } from "@/lib/enquiry-prefill"
 import { MagneticLink } from "@/components/public/magnetic-link"
 
 /**
- * The contact page's form. Same fields and the same /api/contact payload as
- * the shared ContactForm (name, email, phone, company, subject, message and
- * the honeypot), restyled: the subject is chosen as a row of pills, labels
- * float inside the fields, the message counts down its room, and the success
- * state says exactly what happens next.
+ * The contact page's form (name, email, phone, company, subject, message and
+ * the honeypot, posted to /api/contact): the subject is chosen as a row of
+ * pills, labels float inside the fields, the message counts down its room, and
+ * the success state says exactly what happens next. Buyer enquiries from
+ * landing, developer and project pages use the InquireForm instead (the Leads
+ * inbox); this one is the general contact form.
+ *
+ * The mortgage calculator hands over its figures through lib/enquiry-prefill:
+ * the message and reason arrive filled in after hydration (the page itself
+ * stays static), and the handover is cleared once the message is sent.
  *
  * The stored subject values are the admin inbox's own filter list; the pill
  * labels are what a visitor would say, mapped one to one.
@@ -29,8 +36,13 @@ const MAX_MESSAGE = 5000
 export function ContactStudio() {
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle")
   const [error, setError] = useState("")
-  const [reason, setReason] = useState(REASONS[0])
-  const [length, setLength] = useState(0)
+  // Figures handed over by the mortgage calculator, if any (never on the server, so no hydration mismatch).
+  const prefill = useSyncExternalStore(subscribeEnquiryPrefill, readEnquiryPrefill, () => null)
+  // What the visitor picked / typed wins; until then the prefill, then the defaults.
+  const [picked, setPicked] = useState<(typeof REASONS)[number] | null>(null)
+  const reason = picked ?? REASONS.find((r) => r.subject === prefill?.subject) ?? REASONS[0]
+  const [typedLength, setLength] = useState<number | null>(null)
+  const length = typedLength ?? prefill?.message.length ?? 0
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -55,7 +67,8 @@ export function ContactStudio() {
         return
       }
       setStatus("success")
-      gaEvent("submit_inquiry", { form: "contact" })
+      gaEvent("submit_inquiry", { form: "contact", ...(prefill ? { prefill: prefill.from } : {}) })
+      clearEnquiryPrefill()
       form.reset()
       setLength(0)
     } catch {
@@ -119,7 +132,7 @@ export function ContactStudio() {
                   name="subject"
                   value={r.subject}
                   checked={on}
-                  onChange={() => setReason(r)}
+                  onChange={() => setPicked(r)}
                   className="sr-only"
                 />
                 {r.label}
@@ -162,16 +175,24 @@ export function ContactStudio() {
         </legend>
         <label className="ct-field mt-5 block">
           <textarea
+            // Remounts when the handover appears, so its text becomes the field's starting value.
+            key={prefill ? "prefilled" : "blank"}
             name="message"
             required
             rows={6}
             maxLength={MAX_MESSAGE}
             placeholder=" "
+            defaultValue={prefill?.message ?? ""}
             onChange={(e) => setLength(e.target.value.length)}
             className="ct-input ct-textarea"
           />
           <span className="ct-label">Budget, timeline, where you are buying from. Anything that helps.</span>
         </label>
+        {prefill && (
+          <p className="mt-2 text-[12.5px] font-semibold text-[#8a6d1d]">
+            We&apos;ve added your mortgage calculator numbers — edit anything before sending.
+          </p>
+        )}
         <div className="mt-2 flex items-center justify-between text-[12px] text-[#9ca3af]">
           <span>Your details go only to the FHI Global team and are never shared.</span>
           <span className="tabular-nums">{length.toLocaleString("en-US")} / {MAX_MESSAGE.toLocaleString("en-US")}</span>
@@ -196,10 +217,10 @@ export function ContactStudio() {
         </button>
         <p className="text-[13px] text-[#6b7280]">
           Prefer to talk?{" "}
-          <Link href="https://wa.me/971567428288" target="_blank" rel="noopener noreferrer" className="font-bold text-[#0d1117] underline-offset-4 hover:text-[#b8913f] hover:underline">
+          <Link href={companyWhatsappHref()} target="_blank" rel="noopener noreferrer" className="font-bold text-[#0d1117] underline-offset-4 hover:text-[#b8913f] hover:underline">
             WhatsApp us
           </Link>
-          {" "}or call <a href="tel:+971567428288" className="font-bold text-[#0d1117] hover:text-[#b8913f]">+971 56 742 8288</a>.
+          {" "}or call <a href={companyPhoneHref()} className="font-bold text-[#0d1117] hover:text-[#b8913f]">{COMPANY.phone}</a>.
         </p>
       </div>
     </form>

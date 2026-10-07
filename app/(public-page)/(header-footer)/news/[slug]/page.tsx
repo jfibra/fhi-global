@@ -8,7 +8,10 @@ import {
   isIndexableNewsArticle,
   toManilaIso,
 } from "@/lib/news-service"
-import { DEFAULT_PREVIEW_IMAGE_URL, LEGACY_PREVIEW_IMAGE_URL, jsonLdScript, truncateDescription } from "@/lib/seo"
+import { truncateDescription } from "@/lib/seo"
+import { newsOgPhoto, ogCardImage } from "@/lib/og-url"
+import { breadcrumbList, orgRef } from "@/lib/structured-data"
+import { JsonLd } from "@/components/json-ld"
 import { ContentBlocks } from "@/components/news/content-blocks"
 import { CopyLinkButton } from "@/components/news/copy-link-button"
 import { NewsViewTracker } from "@/components/news/news-view-tracker"
@@ -52,16 +55,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const description =
     truncateDescription(article.excerpt) ||
     "Dubai real estate news and market analysis from FHI Global."
-  // Placeholder rejection must recognize BOTH defaults: stored/upstream
-  // article data still carries the legacy URL (dead host), while the
-  // news-service stamps the current one.
-  const isPlaceholderImage = (u: string | null | undefined) =>
-    !u || u === DEFAULT_PREVIEW_IMAGE_URL || u === LEGACY_PREVIEW_IMAGE_URL
-  const image = !isPlaceholderImage(article.featuredImage)
-    ? article.featuredImage
-    : !isPlaceholderImage(article.img)
-      ? article.img
-      : undefined
+  // The story's photo — the one rule shared with the card route (lib/og-url.ts newsOgPhoto), which rejects BOTH
+  // site placeholders (stored data still carries the legacy dead-host URL, the news service stamps the current one).
+  const image = newsOgPhoto(article)
   const keywords = [
     ...article.keywords,
     ...article.topics,
@@ -70,7 +66,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     "Dubai real estate news",
     "FHI Global news",
   ].filter(Boolean) as string[]
-  const ogCard = `${siteUrl}/og/news/${encodeURIComponent(article.slug)}`
+  // The branded card, versioned by everything it draws (photo, category, title) so a swapped photo changes its URL.
+  const card = ogCardImage(`/og/news/${encodeURIComponent(article.slug)}`, image, article.category, article.title)
   const publishedTime = toManilaIso(article.publishedAt || article.date) ?? undefined
   const modifiedTime = toManilaIso(article.updatedAt) ?? publishedTime
 
@@ -102,13 +99,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       // The branded card (photo + FHI mark, app/og/news); its size is declared
       // so Facebook draws it on the very first share. The plain photo still
       // rides along for scrapers that skip generated images.
-      images: [{ url: ogCard, width: 1200, height: 630, alt: article.title }, ...(image ? [{ url: image, alt: article.title }] : [])],
+      images: [{ url: card.imageUrl, width: card.imageWidth, height: card.imageHeight, alt: article.title }, ...(image ? [{ url: image, alt: article.title }] : [])],
     },
     twitter: {
       card: "summary_large_image",
       title: article.title,
       description,
-      images: [ogCard],
+      images: [card.imageUrl],
     },
   }
 }
@@ -230,9 +227,10 @@ export default async function NewsDetailPage({ params }: PageProps) {
     image: schemaImage,
     inLanguage: "en",
     author: authorSchema(article.author),
+    // The shared company node (same @id as the home page's), with the logo as an
+    // ImageObject — the shape Google's Article guidance asks for.
     publisher: {
-      "@type": "Organization",
-      name: "FHI Global",
+      ...orgRef(),
       logo: {
         "@type": "ImageObject",
         url: `${siteUrl}/android-chrome-512x512.png`,
@@ -248,28 +246,9 @@ export default async function NewsDetailPage({ params }: PageProps) {
     ...(article.keywords.length ? { keywords: article.keywords.join(", ") } : {}),
   }
 
-  const breadcrumbSchema = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: siteUrl },
-      { "@type": "ListItem", position: 2, name: "News", item: `${siteUrl}/news` },
-      ...(article.category && article.categorySlug
-        ? [{
-            "@type": "ListItem",
-            position: 3,
-            name: article.category,
-            item: `${siteUrl}/news?category=${encodeURIComponent(article.categorySlug)}`,
-          }]
-        : []),
-      {
-        "@type": "ListItem",
-        position: article.category && article.categorySlug ? 4 : 3,
-        name: article.title,
-        item: articleUrl,
-      },
-    ],
-  }
+  // The trail the page itself shows below (Home / News / the article): schema mirrors visible content, and the
+  // category link the old markup added is a noindex filter view that the trail never displays.
+  const breadcrumbSchema = breadcrumbList([{ name: "Home", path: "/" }, { name: "News", path: "/news" }, { name: article.title }])
 
   // Related stories — deterministic: same category first, then most recent.
   const pool = latestList.articles.filter((a) => a.slug !== article.slug)
@@ -282,14 +261,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-white font-sans">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLdScript(articleSchema) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLdScript(breadcrumbSchema) }}
-      />
+      <JsonLd schema={[articleSchema, breadcrumbSchema]} />
       <NewsViewTracker slug={article.slug} />
 
       {/* ── Breadcrumb ─────────────────────────────────────────────────────── */}
@@ -303,7 +275,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
           {/* ── LEFT / MAIN ARTICLE ─────────────────────────────────────────── */}
@@ -346,14 +318,16 @@ export default async function NewsDetailPage({ params }: PageProps) {
 
             {/* Featured image */}
             <div className="relative overflow-hidden aspect-video bg-gray-100 mb-6">
-              {/* The article's largest above-the-fold element: priority gives it
-                  a preload and fetchpriority=high instead of the default lazy
-                  loading, which Lighthouse flagged as the LCP bottleneck. */}
+              {/* The article's largest above-the-fold element. `preload` alone
+                  only adds the preload link and disables lazy loading — the
+                  fetch still ran at default priority; fetchPriority="high"
+                  is what lifts it (Lighthouse flagged this as the LCP bottleneck). */}
               <Image
                 src={article.img}
                 alt={article.title}
                 fill
-                priority
+                preload
+                fetchPriority="high"
                 sizes="(max-width: 1024px) 100vw, 66vw"
                 className="object-cover"
               />
@@ -488,7 +462,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
           </aside>
 
         </div>
-      </main>
+      </div>
 
     </div>
   )

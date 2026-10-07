@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef } from "react"
+import { Fragment, useCallback, useEffect, useRef } from "react"
 import Image from "next/image"
 import { Play, X } from "lucide-react"
 import { gaEvent } from "@/lib/ga"
@@ -208,10 +208,10 @@ export function ScreeningRoom({ main, teaser, second }: { main: Film; teaser: st
             </p>
             <h2 className="mt-4 font-['Outfit'] text-[40px] font-bold leading-[1.02] tracking-tight drop-shadow-[0_2px_18px_rgba(0,10,30,0.6)] sm:text-[58px] lg:text-[72px]">
               {["This", "is"].map((w, i) => (
-                <span key={w} className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: i }}>{w}</span></span>
+                <Fragment key={w}><span className="wf-word"><span style={{ ["--i" as string]: i }}>{w}</span></span>{" "}</Fragment>
               ))}
               {["FHI", "Global."].map((w, i) => (
-                <span key={w} className="wf-word mr-[0.24em]"><span style={{ ["--i" as string]: 2 + i }} className="wf-gold">{w}</span></span>
+                <Fragment key={w}><span className="wf-word"><span style={{ ["--i" as string]: 2 + i }} className="wf-gold">{w}</span></span>{" "}</Fragment>
               ))}
             </h2>
             <p className="wf-fade mt-4 max-w-md text-[16px] leading-relaxed text-white/80" style={{ ["--d" as string]: "600ms" }}>

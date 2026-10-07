@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react"
 import { usePathname } from "next/navigation"
 import { gaEvent } from "@/lib/ga"
+import { COMPANY as FHI } from "@/lib/company"
 
 /**
  * Floating WhatsApp button — the standard Dubai real-estate conversion
@@ -12,14 +13,17 @@ import { gaEvent } from "@/lib/ga"
  * the old /b/ and /s/ addresses): that client belongs to the agent who sent
  * it, and the page carries the agent's own WhatsApp buttons.
  *
- * A page can point the button at someone else while it's open — an agent's
- * event on /events/<slug> hands it the host's number (<WhatsAppFabTarget>),
- * so that lead reaches the agent, not the company (2026-10-04).
+ * A page can change where the button goes while it's open (<WhatsAppFabTarget>):
+ *   · an agent's event on /events/<slug> hands it the host's number, so that lead
+ *     reaches the agent, not the company (2026-10-04);
+ *   · project, landing, developer and guide pages keep the company line but
+ *     prefill a message naming the page, so the consultant knows what the
+ *     visitor was looking at. The click reports the page as `context`.
  */
 const AGENT_PAGES = ["/buy-with/", "/sell-with/", "/b/", "/s/"]
-const COMPANY = { number: "971567428288", text: "Hi! I'm interested in a property with FHI Global.", label: "Chat with FHI Global on WhatsApp" }
+const COMPANY: FabTarget = { number: FHI.whatsapp, text: "Hi! I'm interested in a property with FHI Global.", label: "Chat with FHI Global on WhatsApp" }
 
-type FabTarget = { number: string; text: string; label: string }
+type FabTarget = { number: string; text: string; label: string; /** analytics only: which page the chat starts from, e.g. "project:azizi-emerald" */ context?: string }
 let target: FabTarget | null = null
 const listeners = new Set<() => void>()
 const subscribe = (fn: () => void) => {
@@ -31,12 +35,15 @@ const setTarget = (t: FabTarget | null) => {
   listeners.forEach((fn) => fn())
 }
 
-/** While mounted, the floating button chats with this number instead of the company's. */
-export function WhatsAppFabTarget({ number, text, label }: FabTarget) {
+/**
+ * While mounted, the floating button opens a chat with this message (and, when `number` is
+ * given, with that number instead of the company's).
+ */
+export function WhatsAppFabTarget({ number = COMPANY.number, text, label, context }: Omit<FabTarget, "number"> & { number?: string }) {
   useEffect(() => {
-    setTarget({ number, text, label })
+    setTarget({ number, text, label, context })
     return () => setTarget(null)
-  }, [number, text, label])
+  }, [number, text, label, context])
   return null
 }
 
@@ -51,7 +58,14 @@ export function WhatsAppFab() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label={to.label}
-      onClick={() => gaEvent("click_whatsapp", { location: "floating_button", ...(override ? { recipient: "agent" } : {}) })}
+      onClick={() =>
+        gaEvent("click_whatsapp", {
+          location: "floating_button",
+          // Compared on digits: an event host's number is stored as typed ("+971 50 …").
+          recipient: to.number.replace(/\D/g, "") === FHI.whatsapp ? "company" : "agent",
+          ...(to.context ? { context: to.context } : {}),
+        })
+      }
       className="wa-fab fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#25d366] text-white shadow-[0_10px_28px_-6px_rgba(15,60,30,0.5)] transition-transform duration-200 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#25d366]"
     >
       <svg className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden>

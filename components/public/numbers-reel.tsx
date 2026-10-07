@@ -55,11 +55,11 @@ const easeOut = (t: number) => 1 - Math.pow(1 - t, 4)
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 const fmt = (n: number) => Math.round(n).toLocaleString("en-US")
 
-function Backdrop({ b, active, first }: { b: ReelBackdrop; active: boolean; first: boolean }) {
+function Backdrop({ b, active }: { b: ReelBackdrop; active: boolean }) {
   if (b.kind === "photo") {
     return (
       <div className="nr-slide-img absolute inset-0">
-        <Image src={b.src} alt={b.alt} fill sizes="100vw" className="object-cover object-center" priority={first} />
+        <Image src={b.src} alt={b.alt} fill sizes="100vw" className="object-cover object-center" />
       </div>
     )
   }
@@ -240,7 +240,7 @@ export function NumbersReel({
           const wall = it.backdrop.kind !== "photo"
           return (
             <div key={it.label} className="nr-slide absolute inset-0" data-state={state} aria-hidden={i !== active}>
-              <Backdrop b={it.backdrop} active={i === active} first={i === 0} />
+              <Backdrop b={it.backdrop} active={i === active} />
               <div className={`absolute inset-0 bg-gradient-to-r ${wall ? "from-[#06182e]/97 via-[#06182e]/80 to-[#06182e]/45" : "from-[#06182e]/95 via-[#06182e]/70 to-[#06182e]/35"}`} aria-hidden="true" />
               <div className="absolute inset-0 bg-gradient-to-t from-[#06182e] via-[#06182e]/20 to-[#06182e]/60" aria-hidden="true" />
 

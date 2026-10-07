@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { ArrowLeft, ArrowRight, Mail } from "lucide-react"
+import { COMPANY } from "@/lib/company"
 
 const QUICK_LINKS = [
   { href: "/projects", label: "Projects" },
@@ -73,8 +74,8 @@ export default function NotFound() {
           <p className="mt-8 inline-flex items-center gap-2 text-xs text-white/45">
             <Mail className="w-3.5 h-3.5 text-[#d6b357]" />
             Think this is a mistake?{" "}
-            <a href="mailto:info@fhiglobal.ae" className="font-semibold text-white/70 hover:text-[#d6b357] transition-colors">
-              info@fhiglobal.ae
+            <a href={`mailto:${COMPANY.email}`} className="font-semibold text-white/70 hover:text-[#d6b357] transition-colors">
+              {COMPANY.email}
             </a>
           </p>
         </div>

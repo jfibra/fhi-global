@@ -1,16 +1,21 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { COMPANY } from "@/lib/company"
 
 /**
  * The time in Dubai right now and whether the office is open, from the
- * published hours (Sunday to Thursday, 9:00 to 18:00 Gulf Standard Time).
- * Renders nothing until mounted so the server never prints a stale minute.
+ * published hours in lib/company.ts (the same ones /contact prints and the
+ * structured data states — this widget used to carry its own copy of them).
+ * Hour granularity: the hours are whole hours. Renders nothing until mounted
+ * so the server never prints a stale minute.
  */
-const OPEN_DAYS = new Set([0, 1, 2, 3, 4]) // Sun–Thu
-const OPEN_HOUR = 9
-const CLOSE_HOUR = 18
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+const OPEN_DAYS = new Set(COMPANY.hours.days.map((d) => DAY_NAMES.indexOf(d)).filter((i) => i >= 0))
+const OPEN_HOUR = Number.parseInt(COMPANY.hours.opens, 10)
+const CLOSE_HOUR = Number.parseInt(COMPANY.hours.closes, 10)
+/** 9 → "9:00 AM", 18 → "6:00 PM" */
+const hourLabel = (h24: number) => `${h24 % 12 || 12}:00 ${h24 < 12 ? "AM" : "PM"}`
 
 function dubaiParts(now: Date) {
   const fmt = new Intl.DateTimeFormat("en-US", {
@@ -38,14 +43,13 @@ export function DubaiNow({ className = "" }: { className?: string }) {
       const open = OPEN_DAYS.has(weekday) && hour24 >= OPEN_HOUR && hour24 < CLOSE_HOUR
       let next = ""
       if (!open) {
-        // Next opening: today at 9 if it is an open day and still morning, else the next open day.
+        // Next opening: today at opening time if it is an open day and still before it, else the next open day.
         let d = weekday
         const today = OPEN_DAYS.has(d) && hour24 < OPEN_HOUR
-        if (!today) {
-          do d = (d + 1) % 7
-          while (!OPEN_DAYS.has(d))
-        }
-        next = today ? "opens 9:00 AM today" : `opens ${DAY_NAMES[d]} 9:00 AM`
+        // Bounded to one week: with no open day configured (an empty or misspelt list in lib/company.ts) the
+        // search would otherwise never end and freeze the page.
+        for (let step = 0; !today && step < 7 && (step === 0 || !OPEN_DAYS.has(d)); step++) d = (d + 1) % 7
+        next = OPEN_DAYS.size === 0 ? "check our opening hours" : today ? `opens ${hourLabel(OPEN_HOUR)} today` : `opens ${DAY_NAMES[d]} ${hourLabel(OPEN_HOUR)}`
       }
       setState({ time: label, open, next })
     }
@@ -65,7 +69,7 @@ export function DubaiNow({ className = "" }: { className?: string }) {
         <span className="tabular-nums">{state.time} in Dubai</span>
       </span>
       <span className="text-white/45" aria-hidden="true">·</span>
-      <span>{state.open ? "Office open until 6:00 PM" : `Office closed, ${state.next}`}</span>
+      <span>{state.open ? `Office open until ${hourLabel(CLOSE_HOUR)}` : `Office closed, ${state.next}`}</span>
     </span>
   )
 }

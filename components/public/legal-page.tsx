@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Mail } from "lucide-react"
+import { COMPANY, companyAddressLine, companyLegalLine } from "@/lib/company"
 
 export type LegalSection = {
   heading: string
@@ -81,10 +82,10 @@ export function LegalPage({
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <a
-                href="mailto:info@fhiglobal.ae"
+                href={`mailto:${COMPANY.email}`}
                 className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#d6b357] text-[#001f3f] text-sm font-bold hover:bg-[#c8a544] transition-colors"
               >
-                <Mail className="w-4 h-4" /> info@fhiglobal.ae
+                <Mail className="w-4 h-4" /> {COMPANY.email}
               </a>
               <Link
                 href="/contact"
@@ -93,6 +94,12 @@ export function LegalPage({
                 Contact Page
               </Link>
             </div>
+            {/* Who is behind the policy: the registered entity, its licence and its address. */}
+            {companyLegalLine() && (
+              <p className="mt-5 border-t border-white/15 pt-4 text-[12px] leading-relaxed text-white/60">
+                {companyLegalLine()} · {companyAddressLine()}
+              </p>
+            )}
           </section>
         </div>
       </div>

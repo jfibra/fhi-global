@@ -9,7 +9,7 @@ import { eventPublicPath, websiteEventsPath } from "@/lib/events/paths"
 import { EventDetail, type PublicEvent } from "@/components/public/event-detail"
 import { EventViewPing } from "@/components/public/event-view-ping"
 import { JsonLd } from "@/components/json-ld"
-import { breadcrumbList, eventSchema } from "@/lib/structured-data"
+import { breadcrumbList, eventSchema, personOrganizer } from "@/lib/structured-data"
 import { titleCaseName } from "@/lib/public-profile"
 import { themeVars } from "../../../_data"
 import { SiteHeader } from "../../../_components/header"
@@ -126,16 +126,15 @@ export default async function AgentEventPage({ params, searchParams }: Props) {
             eventDays: event.event_days,
             dayTimes: event.day_times,
             venue: event.venue,
-            organizer: { name: host, path: home },
-            // Agents run events abroad too (e.g. roadshows in Manila) — claim no country.
-            country: null,
+            // The agent as a Person (an Organization for a couple or team name), linked to their site.
+            organizer: personOrganizer(host, home),
           }),
           breadcrumbList([
             { name: host, path: home },
             { name: "Events", path: home },
             { name: event.title },
           ]),
-        ]}
+        ].filter(Boolean)}
       />
       <SiteHeader data={data} showEvents showReviews={hasReviews} basePath={home} />
       <main className="relative bg-[#fafafa] font-sans overflow-x-hidden">
