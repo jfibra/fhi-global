@@ -4,6 +4,7 @@ import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { hasMailerConfig, sendAdminDirectEmail } from "@/lib/mailer"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
+import { leadSourcePath } from "@/lib/lead-source"
 
 // Send a real email reply to a lead from the admin Emails page. The send goes
 // through SMTP (lib/mailer.ts); the message is recorded in inquiry_emails so
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       email: string
       project_name: string | null
       developer_name: string | null
+      source: string | null
       status: string
       contacted_at: string | null
       read_at: string | null
@@ -81,9 +83,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   }
 
   const senderName = guard.context.profile.fullname ?? guard.context.email ?? null
+  // The project (and developer), else the developer, else the landing/developer page the lead came from.
   const regarding = lead.project_name
     ? `${lead.project_name}${lead.developer_name ? ` · ${lead.developer_name}` : ""}`
-    : null
+    : lead.developer_name ?? leadSourcePath(lead.source)
 
   let sendError: string | null = null
   try {

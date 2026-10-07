@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth-guard"
 import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { titleCaseName } from "@/lib/public-profile"
+import { leadSourceLabel } from "@/lib/lead-source"
 
 /**
  * The admin bell: what happened in the last seven days that an admin would
@@ -45,7 +46,7 @@ export async function GET() {
     admin.from("profiles").select("id, fullname, role, status, joined_at, metadata").not("is_deleted", "is", true).gte("joined_at", since).order("joined_at", { ascending: false }).limit(PER_KIND),
     admin.from("sales_reports").select("id, agent_id, contract_price, validation_status, created_at, projects(name), developers(name)").gte("created_at", since).order("created_at", { ascending: false }).limit(PER_KIND),
     admin.from("inquiry_emails").select("id, inquiry_id, from_name, from_email, subject, created_at, read_at").eq("direction", "inbound").is("owner_id", null).gte("created_at", since).order("created_at", { ascending: false }).limit(PER_KIND),
-    admin.from("inquiries").select("id, name, project_name, developer_name, created_at").is("deleted_at", null).gte("created_at", since).order("created_at", { ascending: false }).limit(PER_KIND),
+    admin.from("inquiries").select("id, name, project_name, developer_name, source, created_at").is("deleted_at", null).gte("created_at", since).order("created_at", { ascending: false }).limit(PER_KIND),
     admin.from("contact_submissions").select("id, name, subject, created_at").is("deleted_at", null).gte("created_at", since).order("created_at", { ascending: false }).limit(PER_KIND),
     admin.from("support_tickets").select("id, title, status, created_at, reported_by_profile:reported_by(fullname)").gte("created_at", since).order("created_at", { ascending: false }).limit(PER_KIND),
     admin.from("buyer_link_leads").select("id, name, kind, agent_id, created_at").gte("created_at", since).order("created_at", { ascending: false }).limit(PER_KIND),
@@ -93,7 +94,7 @@ export async function GET() {
     items.push({
       id: `inquiry:${q.id}`, kind: "inquiry",
       title: `${name(q.name)} inquired`,
-      detail: [q.project_name, q.developer_name].filter(Boolean).join(" · ") || null, at: String(q.created_at), path: `/leads?open=${q.id}`,
+      detail: [q.project_name, q.developer_name].filter(Boolean).join(" · ") || leadSourceLabel(typeof q.source === "string" ? q.source : null), at: String(q.created_at), path: `/leads?open=${q.id}`,
     })
   }
   for (const c of (contacts.data ?? []) as Array<Record<string, unknown>>) {

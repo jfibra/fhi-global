@@ -1,51 +1,40 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { MessageCircle, Phone } from "lucide-react"
 
 /**
- * Phone-only action bar for a project page. Hidden while the masthead is on
- * screen; slides up from the bottom once the reader has scrolled past it and
- * stays there: the price, an "Inquire" button that scrolls to the form, and
- * a call button when the project or developer lists a number.
+ * Phone-only action bar for a project page: the price, an "Inquire" button that
+ * scrolls to the form, and a call button when the project or developer lists a
+ * number. It is in the server HTML and on screen from the first paint — a visitor
+ * arriving from search should see how to enquire before they have scrolled
+ * anywhere — and steps out of the way only while the Inquire Now panel itself is
+ * visible, returning once it has scrolled off again. The WhatsApp float rides
+ * above it by CSS alone (`.pp-sticky[data-show="true"]` in globals.css), so it is
+ * already in the right place before hydration.
  */
 export function ProjectStickyBar({
   price,
   phone,
-  watch = "#pp-masthead",
   target = "#inquire",
 }: {
   price: string | null
   phone: string | null
-  /** Selector of the element whose leaving the viewport shows the bar. */
-  watch?: string
-  /** Selector the Inquire button scrolls to. */
+  /** Selector of the form the Inquire button scrolls to; the bar hides while it is on screen. */
   target?: string
 }) {
-  const [show, setShow] = useState(false)
-  const shown = useRef(false)
+  const [show, setShow] = useState(true)
 
   useEffect(() => {
-    const el = document.querySelector(watch)
-    if (!el) return
-    const io = new IntersectionObserver(
-      ([e]) => {
-        const next = !e.isIntersecting && e.boundingClientRect.bottom < 0
-        if (next !== shown.current) {
-          shown.current = next
-          setShow(next)
-          // Lets the WhatsApp float step up out of the bar's way (CSS .wa-fab).
-          document.body.classList.toggle("has-sticky-bar", next)
-        }
-      },
-      { threshold: 0 },
-    )
-    io.observe(el)
-    return () => {
-      io.disconnect()
-      document.body.classList.remove("has-sticky-bar")
-    }
-  }, [watch])
+    const form = document.querySelector(target)
+    // No form on this page: the bar simply stays.
+    if (!form) return
+    // The observer reports once straight away, so a page that opens with the form already in view
+    // (a #inquire link) hides the bar at once.
+    const io = new IntersectionObserver(([entry]) => setShow(!entry.isIntersecting), { threshold: 0 })
+    io.observe(form)
+    return () => io.disconnect()
+  }, [target])
 
   const go = () => {
     const el = document.querySelector(target)
@@ -58,6 +47,7 @@ export function ProjectStickyBar({
       data-show={show ? "true" : "false"}
       style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
       aria-hidden={!show}
+      inert={!show}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">

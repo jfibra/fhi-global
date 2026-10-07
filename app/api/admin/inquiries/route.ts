@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     if (search) {
       const safe = search.replace(/[%,()]/g, " ")
       query = query.or(
-        `name.ilike.%${safe}%,email.ilike.%${safe}%,phone.ilike.%${safe}%,project_name.ilike.%${safe}%`,
+        `name.ilike.%${safe}%,email.ilike.%${safe}%,phone.ilike.%${safe}%,project_name.ilike.%${safe}%,developer_name.ilike.%${safe}%`,
       )
     }
     return query

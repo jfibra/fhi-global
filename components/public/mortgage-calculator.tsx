@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
+import { saveEnquiryPrefill } from "@/lib/enquiry-prefill"
 
 /**
  * Dubai mortgage calculator — standard amortization plus the real upfront
@@ -167,11 +168,29 @@ export function MortgageCalculator() {
             consultant will run exact numbers for any project you shortlist.
           </p>
           <Link
-            href="/contact"
+            href="/contact#enquire"
+            onClick={() =>
+              saveEnquiryPrefill({
+                from: "mortgage-calculator",
+                subject: "General Inquiry",
+                message: [
+                  "Mortgage estimate from fhiglobal.ae/dubai-mortgage-calculator",
+                  `Property price: ${AED(price)}`,
+                  `Down payment: ${downPct}% (${AED(r.down)})`,
+                  `Interest rate and term: ${rate}% over ${years} years`,
+                  `Estimated monthly payment: ${AED(r.monthly)}`,
+                  `Cash needed upfront: ${AED(r.upfront)} (down payment plus DLD, trustee, mortgage and valuation fees${r.agent > 0 ? ", agent commission" : ""})`,
+                  ...(fromDeveloper ? ["Buying direct from the developer (no agent commission)."] : []),
+                  "",
+                  "Please send me a real quote for this budget.",
+                ].join("\n"),
+              })
+            }
             className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00152b] transition-colors"
           >
             Get a Real Quote <ArrowRight className="w-4 h-4" />
           </Link>
+          <p className="mt-2 text-[11.5px] text-[#9ca3af]">Opens our enquiry form with these figures already filled in.</p>
         </div>
       </div>
     </div>

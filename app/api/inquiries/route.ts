@@ -8,14 +8,18 @@ import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { getDashboardRouteByRole } from "@/lib/auth"
 import { COUNTRY_CODES } from "@/lib/user-service"
 import { SITE_URL } from "@/lib/seo"
+import { getSeoPage } from "@/lib/seo-pages"
+import { PROJECT_PAGE_SOURCE, WEBSITE_SOURCE, leadSource } from "@/lib/lead-source"
 
 /**
- * Public "Inquire Now" lead endpoint (project pages). Unauthenticated by
- * design; inserts run through the service-role client (the inquiries table has
- * no client write path). Zod-validated, honeypot-guarded, per-IP rate-limited.
- * The project name/developer snapshot is resolved SERVER-SIDE from projectId —
- * a caller can never inject those strings. Admin staff are emailed
- * best-effort; a mail failure never loses the lead.
+ * Public "Inquire Now" lead endpoint (project, landing and developer pages).
+ * Unauthenticated by design; inserts run through the service-role client (the
+ * inquiries table has no client write path). Zod-validated, honeypot-guarded,
+ * per-IP rate-limited. The project name/developer snapshot is resolved
+ * SERVER-SIDE from projectId, and the page a landing/developer lead came from
+ * from `context: { kind, slug }` — a caller can never inject those strings, and
+ * an unusable context only costs the page attribution, never the lead. Admin
+ * staff are emailed best-effort; a mail failure never loses the lead.
  */
 
 export const runtime = "nodejs"
@@ -41,8 +45,30 @@ const InquirySchema = z.object({
   lookingFor: z.enum(["myself", "agent"], { message: "Tell us who you're looking for." }),
   propertyCategory: z.enum(["off_plan", "ready", "rent"], { message: "Pick a property category." }),
   projectId: z.number().int().positive().optional(),
+  // Where a landing/developer lead came from, and the campaign that brought the visitor. Both are
+  // best-effort attribution: parsed leniently below, so a malformed value costs the attribution and
+  // never the lead (a 400 here would throw away a real buyer).
+  context: z.unknown().optional(),
+  utm: z.unknown().optional(),
   website: z.string().optional().default(""), // honeypot — humans leave this empty
 })
+
+// Slugs are checked loosely, only to bound the lookup — the lookup itself decides whether the page exists.
+const ContextSchema = z.object({
+  kind: z.enum(["landing", "developer"]),
+  slug: z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/),
+})
+
+const utmField = z.string().trim().max(100).optional()
+const UtmSchema = z.object({ source: utmField, medium: utmField, campaign: utmField, term: utmField, content: utmField })
+
+/** "source=google · medium=cpc · campaign=off-plan-dubai", or null when the visitor came without a campaign. */
+function formatCampaign(utm: z.infer<typeof UtmSchema>): string | null {
+  const parts = (["source", "medium", "campaign", "term", "content"] as const)
+    .map((key) => (utm[key] ? `${key}=${utm[key]}` : ""))
+    .filter(Boolean)
+  return parts.length ? parts.join(" · ") : null
+}
 
 export async function POST(req: NextRequest) {
   let body: unknown
@@ -92,6 +118,43 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Which page a landing/developer lead came from — validated here, never taken from the client.
+  // An unknown slug (or a missing context) stores the lead as "website" without a page.
+  let source = PROJECT_PAGE_SOURCE
+  let pageLabel: string | null = null
+  let pagePath: string | null = null
+  if (!projectId && !data.projectId) {
+    source = WEBSITE_SOURCE
+    const context = ContextSchema.safeParse(data.context)
+    if (context.success) {
+      const slug = context.data.slug.toLowerCase()
+      if (context.data.kind === "landing") {
+        const seo = getSeoPage(slug)
+        if (seo) {
+          source = leadSource("landing", seo.slug)
+          pageLabel = seo.label
+          pagePath = `/${seo.slug}`
+        }
+      } else {
+        const { data: dev } = await admin
+          .from("developers")
+          .select("name, slug")
+          .eq("slug", slug)
+          .is("deleted_at", null)
+          .maybeSingle()
+        if (dev && typeof dev.name === "string" && typeof dev.slug === "string") {
+          source = leadSource("developer", dev.slug)
+          developerName = dev.name
+          pageLabel = dev.name
+          pagePath = `/${dev.slug}`
+        }
+      }
+    }
+  }
+
+  const utm = UtmSchema.safeParse(data.utm)
+  const campaign = utm.success ? formatCampaign(utm.data) : null
+
   const ctx = requestContextFromRequest(req)
   const { data: inserted, error } = await admin
     .from("inquiries")
@@ -105,7 +168,7 @@ export async function POST(req: NextRequest) {
       project_id: projectId,
       project_name: projectName,
       developer_name: developerName,
-      source: "project_page",
+      source,
       ip_address: ctx.ip,
       user_agent: ctx.userAgent,
     })
@@ -124,7 +187,7 @@ export async function POST(req: NextRequest) {
     subjectType: "inquiries",
     subjectId: inserted.id,
     subjectLabel: data.name,
-    description: `New lead from ${data.name} <${data.email}>${projectName ? ` about ${projectName}` : ""}`,
+    description: `New lead from ${data.name} <${data.email}>${projectName || pageLabel ? ` about ${projectName ?? pageLabel}` : ""} (${source})${campaign ? ` [${campaign}]` : ""}`,
     ...ctx,
   })
 
@@ -143,6 +206,9 @@ export async function POST(req: NextRequest) {
         propertyCategory: CATEGORY_LABELS[data.propertyCategory] ?? data.propertyCategory,
         projectName,
         developerName,
+        pageLabel,
+        pageUrl: pagePath ? `${SITE_URL}${pagePath}` : null,
+        campaign,
       }
       await Promise.all(
         (admins ?? []).map(async (a) => {

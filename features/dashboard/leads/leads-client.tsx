@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
 import { formatDateTime, relativeTime } from "@/lib/utils"
+import { leadSourceLabel, leadSourcePath } from "@/lib/lead-source"
 import {
   type Inquiry,
   type InquiriesSummary,
@@ -883,7 +884,7 @@ export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
                   hint={
                     folder === "archived" ? "Archived leads will appear here."
                     : folder === "starred" ? "Click the star on an email to keep it here."
-                    : "Inquiries from the Inquire Now form on project pages will appear here."
+                    : "Inquiries from the Inquire Now forms on project, landing and developer pages will appear here."
                   }
                 />
               ) : (
@@ -935,7 +936,9 @@ export function LeadsClient({ personal = false }: { personal?: boolean } = {}) {
                             </span>
                           </div>
                           <p className={`text-[13px] truncate mt-0.5 ${isUnread ? "font-semibold text-[#1f2937]" : "text-[#6b7280]"}`}>
-                            {row.project_name ? `Inquiry — ${row.project_name}` : `${CATEGORY_LABELS[row.property_category] ?? row.property_category} inquiry`}
+                            {row.project_name ?? row.developer_name ?? leadSourcePath(row.source)
+                              ? `Inquiry — ${row.project_name ?? row.developer_name ?? leadSourcePath(row.source)}`
+                              : `${CATEGORY_LABELS[row.property_category] ?? row.property_category} inquiry`}
                           </p>
                           <div className="flex items-center gap-1.5 mt-1">
                             <span className="px-2 py-0.5 text-[10px] font-semibold bg-[#f3f4f6] text-[#374151]">
@@ -1106,7 +1109,9 @@ function ThreadReader({
   const isArchived = Boolean(l.deleted_at)
   const fullPhone = `${l.phone_country_code} ${l.phone}`
   const waNumber = `${l.phone_country_code}${l.phone}`.replace(/[^0-9]/g, "")
-  const subjectLine = l.project_name ? `Inquiry — ${l.project_name}` : "New property inquiry"
+  const subjectLine = l.project_name ?? l.developer_name ?? leadSourcePath(l.source)
+    ? `Inquiry — ${l.project_name ?? l.developer_name ?? leadSourcePath(l.source)}`
+    : "New property inquiry"
 
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -1180,7 +1185,8 @@ function ThreadReader({
               <p>
                 <strong>{l.name}</strong> submitted the Inquire Now form
                 {l.project_name ? <> for <strong>{l.project_name}</strong></> : null}
-                {l.developer_name ? <> by {l.developer_name}</> : null}.
+                {l.developer_name ? <> {l.project_name ? "by" : "about"} {l.developer_name}</> : null}
+                {!l.project_name && !l.developer_name && leadSourcePath(l.source) ? <> on <strong>{leadSourcePath(l.source)}</strong></> : null}.
               </p>
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                 <ThreadFact label="Interested in" value={CATEGORY_LABELS[l.property_category] ?? l.property_category} />
@@ -1213,7 +1219,7 @@ function ThreadReader({
                 </summary>
                 <div className="mt-3 bg-[#f8f9fa] px-4 py-3 space-y-1.5 text-xs text-[#6b7280]">
                   <p className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> {formatDateTime(l.created_at)}</p>
-                  <p className="flex items-center gap-1.5"><Globe className="w-3 h-3" /> {l.ip_address ?? "IP unavailable"} · {l.source === "project_page" ? "Project page — Inquire Now" : l.source}</p>
+                  <p className="flex items-center gap-1.5"><Globe className="w-3 h-3" /> {l.ip_address ?? "IP unavailable"} · {leadSourceLabel(l.source)}</p>
                   <p className="flex items-start gap-1.5 break-all"><MonitorSmartphone className="w-3 h-3 mt-0.5 shrink-0" /> {l.user_agent ?? "Device unavailable"}</p>
                   {l.contacted_at && <p className="flex items-center gap-1.5"><PhoneCall className="w-3 h-3" /> First contacted {formatDateTime(l.contacted_at)}</p>}
                 </div>
@@ -1445,8 +1451,8 @@ function ReplyBox({
   onReplied: (email: SentEmail) => void
   onNotice: (n: string) => void
 }) {
-  const defaultSubject = lead.project_name
-    ? `Re: Your inquiry about ${lead.project_name}`
+  const defaultSubject = lead.project_name ?? lead.developer_name
+    ? `Re: Your inquiry about ${lead.project_name ?? lead.developer_name}`
     : "Re: Your inquiry — FHI Global"
 
   const [open, setOpen] = useState(false)
