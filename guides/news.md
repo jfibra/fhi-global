@@ -37,16 +37,20 @@ state, sitemap index skips news shards, view/subscribe endpoints answer without 
   category × country pairs.
 - Pages are ISR (`revalidate = 300`); the detail page prerenders the newest 12 slugs
   in production only (`generateStaticParams` gated on `VERCEL_ENV`).
-- SEO: NewsArticle + BreadcrumbList JSON-LD on detail, CollectionPage + ItemList on the
-  hub; titles truncated ~43 chars (`truncateTitle` in `lib/seo.ts`).
+- SEO: NewsArticle + BreadcrumbList JSON-LD on detail (the breadcrumb is the trail the page shows:
+  Home / News / the article), CollectionPage + ItemList on the hub; titles truncated ~43 chars
+  (`truncateTitle` in `lib/seo.ts`).
 - Hub extras: category filter chips (`/news?category=<slug>` fed by the category ×
   country counts) and the `?title=` → slug redirect (legacy shared links).
 
 ## Indexability (added 2026-09-17)
 
 - Only property-relevant categories are offered to search engines:
-  `real-estate`, `housing`, `business-economy`, `infrastructure`, `law`
-  (`isIndexableNewsArticle` in `lib/news-service.ts`). Everything else — tourism
+  `real-estate`, `housing`, `infrastructure`, `law`
+  (`isIndexableNewsArticle` in `lib/news-service.ts`). `business-economy` was
+  removed on 2026-10-06: of 53 sampled articles, 17 in that category had nothing
+  to do with property (retail brands, robotaxis, crypto, fuel prices) and are
+  syndicated wire copy that also lives on the original publishers' sites. Everything else — tourism
   (~72 of ~280 articles), community, entertainment, sports, gastronomy… — still
   renders for visitors but carries `noindex, follow` and is excluded from both
   sitemaps. Reason: a 2026-09-17 audit found 0 of 10 sampled articles indexed on
@@ -57,10 +61,18 @@ state, sitemap index skips news shards, view/subscribe endpoints answer without 
 ## Sitemaps
 
 - `/sitemap-news-N.xml` — indexable articles (1000-URL shards aggregated from
-  upstream pages of 100), part of the sitemap index. See `lib/sitemap-sections.ts`.
+  upstream pages of 100, fetched in parallel), part of the sitemap index. See
+  `lib/sitemap-sections.ts`. Each shard sits in a 30-minute `unstable_cache`, which is also its
+  last-known-good copy: when the upstream fails while an expired entry is being refreshed, the
+  previous result keeps being served instead of a 503. The index entry's `lastmod` is the newest
+  indexable article's date.
 - `/news-sitemap.xml` — Google News sitemap: ONLY indexable articles published in
-  the last 48 hours, `publication_date` normalized to `+08:00`. Fresh articles are
-  also pinged to IndexNow from this route.
+  the last 48 hours, `publication_date` normalized to `+08:00`. Its index entry carries a
+  `lastmod` only while the newest article is within 3 days (a quiet week leaves the file empty, and
+  "today" on an empty file is a date nothing changed on). Fresh articles are also pinged to IndexNow
+  from this route — those published in the last 6 hours: the ping is request-driven (it runs when a
+  crawler fetches the file) and the response is CDN-cached for an hour, so a shorter window could
+  skip an article.
 
 ## Gotchas
 

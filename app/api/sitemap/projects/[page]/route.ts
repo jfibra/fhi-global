@@ -13,15 +13,13 @@ export async function GET(_req: Request, ctx: { params: Promise<{ page: string }
   if (rows === null) return sitemapUnavailableResponse() // transient upstream failure
   if (rows.length === 0) return new Response("Not found", { status: 404 })
 
-  const urls = rows
-    .filter((row) => row.slug)
-    .map((row) => ({
-      // Nested under the developer when it has one; the legacy /projects/<slug>
-      // route 308s there anyway, but the sitemap should name the canonical.
-      loc: row.developers?.slug
-        ? `${SITE_URL}/${row.developers.slug}/${row.slug}`
-        : `${SITE_URL}/projects/${row.slug}`,
-      lastmod: row.updated_at?.slice(0, 10) ?? undefined,
-    }))
+  // The canonical URL nests the project under its developer. A project with no developer to nest under has
+  // no page of its own — /projects/<slug> only redirects to the index — and a redirecting URL does not
+  // belong in a sitemap, so it is left out.
+  const urls = rows.flatMap((row) =>
+    row.slug && row.developers?.slug
+      ? [{ loc: `${SITE_URL}/${row.developers.slug}/${row.slug}`, lastmod: row.updated_at?.slice(0, 10) ?? undefined }]
+      : [],
+  )
   return sitemapResponse(buildUrlsetXml(urls))
 }

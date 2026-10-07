@@ -14,6 +14,14 @@ export const dynamic = "force-dynamic"
 
 const WINDOW_MS = 48 * 60 * 60 * 1000
 const MAX_ITEMS = 1000
+// IndexNow only needs to hear about an article once. This route re-renders on every
+// CDN miss (hourly) and the sitemap lists 48 hours of articles, so pinging all of
+// them each time resubmitted the same URLs ~48 times each. The ping is request-driven — it
+// happens only when somebody (a crawler) fetches this file — and the response is CDN-cached
+// for an hour, so a quiet stretch can leave an article unpinged for longer than the cache
+// lifetime. Six hours is wide enough that a request after such a gap still catches it, and
+// still keeps each article to a handful of pings.
+const PING_WINDOW_MS = 6 * 60 * 60 * 1000
 
 export async function GET() {
   if (!newsConfigured()) {
@@ -44,11 +52,12 @@ export async function GET() {
     if (items.length >= MAX_ITEMS) break
   }
 
-  if (items.length > 0) {
-    // Ping IndexNow about the fresh articles AFTER the response is sent —
+  const fresh = items.filter((i) => now - Date.parse(i.publicationDate) <= PING_WINDOW_MS)
+  if (fresh.length > 0) {
+    // Ping IndexNow about the newly published articles AFTER the response is sent —
     // after() keeps the serverless function alive for the work, where a bare
     // floating promise could be killed at response time.
-    const locs = items.map((i) => i.loc)
+    const locs = fresh.map((i) => i.loc)
     after(() => submitToIndexNow(locs))
   }
 

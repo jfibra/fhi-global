@@ -11,7 +11,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ page: string }
 
   const rows = await fetchSectionPage("listings", pageNum)
   if (rows === null) return sitemapUnavailableResponse() // transient upstream failure
-  if (rows.length === 0) return new Response("Not found", { status: 404 })
+  // Shard 1 is advertised from the unfiltered count; if the post-filter (test records, retired projects) leaves
+  // nothing, answer an empty urlset rather than a 404 on an advertised URL. Later pages past the end are 404.
+  if (rows.length === 0 && pageNum > 1) return new Response("Not found", { status: 404 })
 
   const urls = rows
     .filter((row) => row.slug || row.id != null)

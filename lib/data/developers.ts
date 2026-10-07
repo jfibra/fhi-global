@@ -11,7 +11,7 @@ import { createPublicSupabaseClient } from "@/lib/supabase/public"
 async function loadDevelopersDirectory() {
   const supabase = createPublicSupabaseClient()
 
-  const [{ data: developers }, { data: projectCoords }] = await Promise.all([
+  const [{ data: developers, error: developersError }, { data: projectCoords, error: coordsError }] = await Promise.all([
     supabase
       .from("developers")
       .select("id, name, slug, description, logo_url, logo_bg, rating, is_verified")
@@ -25,6 +25,10 @@ async function loadDevelopersDirectory() {
       .eq("is_published", true)
       .is("deleted_at", null),
   ])
+
+  // THROW rather than cache a partial answer: unstable_cache never stores a throw, so one Supabase blip can no
+  // longer pin an empty directory for 120 s (and a /developers page with no developers in it).
+  if (developersError || coordsError) throw new Error("Failed to load the developers directory")
 
   return {
     developers: developers ?? [],

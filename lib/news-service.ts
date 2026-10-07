@@ -114,10 +114,15 @@ export function newsConfigured(): boolean {
 // render normally for visitors but carry noindex,follow and are left out of
 // both news sitemaps. Slugs are the upstream category_slug values
 // (GET /external/categories).
+//
+// "business-economy" was dropped from this list on 2026-10-06: a content audit
+// of 53 sampled articles found 17 in that category were not about property at
+// all (retail brands, robotaxis, crypto, fuel prices) — syndicated wire copy
+// that also appears on the original publishers' sites. Property-adjacent
+// stories still come through "real-estate", "housing" and "infrastructure".
 const INDEXABLE_NEWS_CATEGORY_SLUGS = new Set([
   "real-estate",
   "housing",
-  "business-economy",
   "infrastructure",
   "law",
 ])

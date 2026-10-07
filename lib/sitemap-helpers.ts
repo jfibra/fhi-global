@@ -11,14 +11,6 @@ import { SITE_URL } from "@/lib/seo"
 
 export { SITE_URL }
 
-/**
- * lastmod for the static-pages shard AND its entry in the sitemap index.
- * Single source of truth — bump when the static pages list meaningfully
- * changes (the two consumers previously kept hand-maintained copies that
- * drifted apart).
- */
-export const PAGES_LASTMOD = "2026-09-08"
-
 export type SitemapUrl = {
   loc: string
   /** YYYY-MM-DD. Date-only on purpose — synthetic midnight timestamps read as fake to crawlers. */
@@ -44,10 +36,6 @@ export function escapeXml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&apos;")
-}
-
-export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10)
 }
 
 /**
