@@ -1,29 +1,36 @@
 import { ImageResponse } from "next/og"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { isSafeRemoteImageUrl } from "@/lib/image-hosts"
+import { ogCacheHeaders, ogColor, ogJpeg, ogPicture } from "@/lib/og-picture"
 
 export const runtime = "nodejs"
 
-// Without this header ImageResponse defaults to a YEAR of immutable caching —
-// scrapers would keep a stale card forever after a rename or logo change.
-// 5 minutes matches app/og/business-card.
-const CACHE_HEADERS = { "cache-control": "public, max-age=300, s-maxage=300" }
-
-export async function GET(_: Request, context: { params: Promise<{ slug: string }> }) {
-  const { slug } = await context.params
+// Share card for a developer: the logo on its own tile colour, the name, the address and a line of description.
+// The logo goes through ogPicture (the renders on S3 are AVIF/WebP, which Satori draws as nothing; a transparent
+// logo is flattened onto the tile's own colour), and the card is returned as a JPEG (a PNG over ~300 KB gets no
+// WhatsApp preview). The page's metadata points here with a ?v= token that covers everything drawn
+// (lib/og-url.ts), so a COMPLETE card is long-cached; the generic card and a failed logo fetch stay on 5 minutes.
+async function render(slug: string) {
   const supabase = createAdminSupabase()
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("developers")
-    .select("name, description, logo_url, address")
+    .select("name, description, logo_url, logo_bg, address")
     .eq("slug", slug)
-    .eq("is_active", true)
+    // The developer page filters on deleted_at only, so an inactive developer's shared link must not get the generic card.
     .is("deleted_at", null)
     .maybeSingle()
 
   const title = data?.name ?? "FHI Global Developer"
-  const subtitle = data?.address ?? "Dubai, UAE"
+  // Addresses are free text and can run to a full sentence — one line on the card, clipped at a word-ish length.
+  const rawAddress = data?.address?.replace(/\s+/g, " ").trim() || "Dubai, UAE"
+  const subtitle = rawAddress.length > 90 ? `${rawAddress.slice(0, 87)}...` : rawAddress
   const description = data?.description ?? "Explore premium developers and projects on FHI Global."
-  const logo = data?.logo_url
+  const tile = ogColor(data?.logo_bg)
+  const logoUrl = data?.logo_url && isSafeRemoteImageUrl(data.logo_url) ? data.logo_url : null
+  const logo = await ogPicture(logoUrl, 280, 280, "inside", tile)
+  // The initial-letter fallback stays on white so it remains legible; a real logo sits on its own colour.
+  const complete = !error && Boolean(data) && (!logoUrl || logo !== null)
 
   return new ImageResponse(
     (
@@ -53,7 +60,7 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
               width: 180,
               height: 180,
               borderRadius: 24,
-              background: "white",
+              background: logo ? tile : "white",
               border: "3px solid rgba(214,179,87,0.7)",
               display: "flex",
               alignItems: "center",
@@ -72,7 +79,7 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ fontSize: 22, color: "#d6b357", fontWeight: 700 }}>FHI Global • Developer</div>
             <div style={{ fontSize: 60, lineHeight: 1.05, fontWeight: 800 }}>{title}</div>
-            <div style={{ fontSize: 28, opacity: 0.88 }}>{subtitle}</div>
+            <div style={{ fontSize: 28, opacity: 0.88, maxWidth: 820 }}>{subtitle}</div>
             <div style={{ fontSize: 24, opacity: 0.75, maxWidth: 820 }}>
               {description.length > 130 ? `${description.slice(0, 127)}...` : description}
             </div>
@@ -80,6 +87,11 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
         </div>
       </div>
     ),
-    { width: 1200, height: 630, headers: CACHE_HEADERS },
+    { width: 1200, height: 630, headers: ogCacheHeaders(complete) },
   )
+}
+
+export async function GET(_: Request, context: { params: Promise<{ slug: string }> }) {
+  const { slug } = await context.params
+  return ogJpeg(await render(slug))
 }

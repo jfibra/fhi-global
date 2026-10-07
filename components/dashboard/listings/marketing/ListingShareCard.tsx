@@ -1,6 +1,6 @@
 import type { FlyerData } from "@/lib/flyer/theme"
 import { formatPrice, readableOn, withAlpha } from "@/lib/flyer/theme"
-import { OG_CARD_W, OG_CARD_H, OG_THEMES, type OgCardOptions } from "@/lib/flyer/og-card"
+import { OG_CARD_W, OG_CARD_H, OG_CARD_PANEL_W, OG_CARD_PHOTO_W, OG_THEMES, type OgCardOptions } from "@/lib/flyer/og-card"
 
 // The share card itself — rendered by BOTH the ShareCardModal live preview
 // (real DOM, captured with html-to-image) and the /og/listing/{id} route
@@ -19,8 +19,8 @@ export type ListingShareCardProps = {
   logoSrc: string
 }
 
-const PANEL_W = 560
-const PHOTO_W = OG_CARD_W - PANEL_W
+const PANEL_W = OG_CARD_PANEL_W
+const PHOTO_W = OG_CARD_PHOTO_W
 
 // FHI_Branding_White.png is 2269×835 (≈2.72:1).
 const LOGO_H = 58

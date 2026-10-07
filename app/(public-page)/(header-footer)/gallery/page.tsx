@@ -94,7 +94,7 @@ export default async function GalleryPage() {
                       src={url}
                       alt={`FHI Global event photos ${i + 1}`}
                       fill
-                      priority={i === 0}
+                      {...(i === 0 ? { preload: true, fetchPriority: "high" as const } : {})}
                       unoptimized
                       sizes="(min-width: 1024px) 22vw, 50vw"
                       className="object-cover"

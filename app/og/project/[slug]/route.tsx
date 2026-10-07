@@ -2,7 +2,8 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { ImageResponse } from "next/og"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { ogJpeg, ogPicture } from "@/lib/og-picture"
+import { isSafeRemoteImageUrl } from "@/lib/image-hosts"
+import { ogCacheHeaders, ogJpeg, ogPicture } from "@/lib/og-picture"
 
 export const runtime = "nodejs"
 
@@ -33,21 +34,21 @@ async function logo(): Promise<string> {
   return logoDataUrl
 }
 
-// Without this header ImageResponse defaults to a YEAR of immutable caching —
-// scrapers would keep a stale card forever after the project's image or name
-// changes. 5 minutes matches app/og/business-card. (Being a fresh Response per
-// request, the constant is safe to share.)
-const CACHE_HEADERS = { "cache-control": "public, max-age=300, s-maxage=300" }
+// Cache: ImageResponse defaults to a YEAR of immutable caching, so the headers are set per card
+// (ogCacheHeaders). A COMPLETE card — the project was found and its photo drew — is cached for a day at the CDN,
+// because the page's metadata puts a ?v= token on this URL covering everything drawn (lib/og-url.ts); a
+// missing project, a query error or a failed photo fetch stays on 5 minutes.
 
 async function render(_: Request, context: { params: Promise<{ slug: string }> }) {
   const { slug } = await context.params
   const supabase = createAdminSupabase()
 
-  const { data } = await supabase
+  // The same filters the page renders by (is_published + deleted_at), so a shared link never gets the generic card
+  // for a project that is live.
+  const { data, error } = await supabase
     .from("projects")
     .select("name, city, location, main_image, developers(name)")
     .eq("slug", slug)
-    .eq("is_active", true)
     .eq("is_published", true)
     .is("deleted_at", null)
     .maybeSingle()
@@ -59,7 +60,9 @@ async function render(_: Request, context: { params: Promise<{ slug: string }> }
   const subtitle = [developerName, data?.city ?? data?.location].filter(Boolean).join(" • ")
   // The renders on S3 are AVIF/WebP, which Satori draws as nothing — this
   // resizes them to the card as JPEG.
-  const [image, mark] = await Promise.all([ogPicture(data?.main_image, 1200, 630).then((p) => p ?? defaultBackground()), logo()])
+  const photoUrl = data?.main_image && isSafeRemoteImageUrl(data.main_image) ? data.main_image : null
+  const picture = await ogPicture(photoUrl, 1200, 630)
+  const [image, mark] = await Promise.all([picture ?? defaultBackground(), logo()])
 
   return new ImageResponse(
     (
@@ -117,7 +120,7 @@ async function render(_: Request, context: { params: Promise<{ slug: string }> }
         </div>
       </div>
     ),
-    { width: 1200, height: 630, headers: CACHE_HEADERS },
+    { width: 1200, height: 630, headers: ogCacheHeaders(!error && Boolean(data) && (picture !== null || !data?.main_image)) },
   )
 }
 

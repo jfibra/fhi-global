@@ -3,9 +3,9 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { assembleListingMarketingData, type MarketingListingRow } from "@/lib/flyer/marketing-data"
-import { sanitizeOgCardOptions, OG_CARD_W, OG_CARD_H } from "@/lib/flyer/og-card"
+import { sanitizeOgCardOptions, OG_CARD_W, OG_CARD_H, OG_CARD_PHOTO_W } from "@/lib/flyer/og-card"
 import { isSafeRemoteImageUrl } from "@/lib/image-hosts"
-import { ogJpeg } from "@/lib/og-picture"
+import { ogJpeg, ogPicture } from "@/lib/og-picture"
 import ListingShareCard from "@/components/dashboard/listings/marketing/ListingShareCard"
 
 // Social link-preview image for a public agent listing. Renders the same
@@ -17,9 +17,10 @@ import ListingShareCard from "@/components/dashboard/listings/marketing/ListingS
 
 export const runtime = "nodejs"
 
-// Without this header ImageResponse defaults to a YEAR of immutable caching —
-// the page already versions this URL with ?v=updated_at, but scrapers that
-// strip params would keep a stale card forever. 5 min matches business-card.
+// Without this header ImageResponse defaults to a YEAR of immutable caching. This card stays on the
+// SHORT cache on purpose: the page's ?v=updated_at covers the listing row, but the card also draws the
+// linked project's price/currency/photos and the agent's name, which that token cannot cover — a long
+// cache here could serve a stale card. 5 min matches business-card.
 const CACHE_HEADERS = { "cache-control": "public, max-age=300, s-maxage=300" }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -90,12 +91,13 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     isRent: row.listing_kind === "rent",
     gallery: card.gallery,
   })
-  // Raw absolute URLs — satori fetches these server-side, no proxy needed.
-  // Host-allowlisted (agents can insert arbitrary image URLs via the REST
-  // API); a non-allowlisted URL falls back to the no-photo panel rather
-  // than making this server fetch it.
+  // Host-allowlisted (agents can insert arbitrary image URLs via the REST API); a non-allowlisted URL
+  // falls back to the no-photo panel rather than making this server fetch it. The photo then goes through
+  // ogPicture: Satori draws NOTHING for WebP/AVIF (9 of 13 live covers were WebP, so the right half of their
+  // cards was empty); it comes back as a JPEG data URI cropped to the exact box the card draws.
   const photoCandidate = options.photo ?? card.gallery[0] ?? null
-  const photoSrc = photoCandidate && isSafeRemoteImageUrl(photoCandidate) ? photoCandidate : null
+  const photoUrl = photoCandidate && isSafeRemoteImageUrl(photoCandidate) ? photoCandidate : null
+  const photoSrc = await ogPicture(photoUrl, OG_CARD_PHOTO_W, OG_CARD_H)
 
   return ogJpeg(new ImageResponse(
     <ListingShareCard data={card} options={options} photoSrc={photoSrc} logoSrc={await logoDataUrl()} />,

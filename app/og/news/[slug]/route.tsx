@@ -2,8 +2,8 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { ImageResponse } from "next/og"
 import { fetchArticleBySlug } from "@/lib/news-service"
-import { DEFAULT_PREVIEW_IMAGE_URL, LEGACY_PREVIEW_IMAGE_URL } from "@/lib/seo"
-import { ogJpeg, ogPicture } from "@/lib/og-picture"
+import { newsOgPhoto } from "@/lib/og-url"
+import { ogCacheHeaders, ogJpeg, ogPicture } from "@/lib/og-picture"
 
 // Social link-preview card for a news article: the story's photo, a soft navy
 // scrim and the white FHI Global mark, so a shared story is recognisably ours
@@ -30,17 +30,18 @@ async function logo(): Promise<string> {
   return logoDataUrl
 }
 
-// ImageResponse defaults to a year of immutable caching; a story's photo can
-// be swapped upstream, so keep it to 5 minutes like the other cards.
-const CACHE_HEADERS = { "cache-control": "public, max-age=300, s-maxage=300" }
-
-const isPlaceholder = (u: string | null | undefined) => !u || u === DEFAULT_PREVIEW_IMAGE_URL || u === LEGACY_PREVIEW_IMAGE_URL
+// ImageResponse defaults to a year of immutable caching. A COMPLETE card (the article was found and its photo
+// drew) is cached for a day: the article page puts a ?v= token on this URL covering the photo, category and
+// title (lib/og-url.ts), so a swapped photo changes the URL. A feed outage (no article) or a failed photo
+// fetch stays on 5 minutes.
 
 async function render(_: Request, context: { params: Promise<{ slug: string }> }) {
   const { slug } = await context.params
   const article = await fetchArticleBySlug(slug).catch(() => null)
-  const photoUrl = !isPlaceholder(article?.featuredImage) ? article?.featuredImage : !isPlaceholder(article?.img) ? article?.img : undefined
+  // The one rule shared with the page: the featured image, else the thumbnail, never a site placeholder.
+  const photoUrl = newsOgPhoto(article ?? {})
   const [photo, mark] = await Promise.all([ogPicture(photoUrl, W, H), logo()])
+  const headers = ogCacheHeaders(Boolean(article) && (photo !== null || !photoUrl))
   const category = article?.category?.trim()
 
   if (!photo) {
@@ -64,7 +65,7 @@ async function render(_: Request, context: { params: Promise<{ slug: string }> }
           <div style={{ fontSize: 52, lineHeight: 1.1, fontWeight: 800, maxWidth: "92%" }}>{article?.title ?? "Dubai real estate news"}</div>
         </div>
       ),
-      { width: W, height: H, headers: CACHE_HEADERS },
+      { width: W, height: H, headers },
     )
   }
 
@@ -90,7 +91,7 @@ async function render(_: Request, context: { params: Promise<{ slug: string }> }
         </div>
       </div>
     ),
-    { width: W, height: H, headers: CACHE_HEADERS },
+    { width: W, height: H, headers },
   )
 }
 

@@ -21,7 +21,14 @@ export type GalleryPhoto = {
   height: number | null
 }
 
+/** "Dubai Marina Walk — Event Photos — photo 12": the album, its section and the photo's place in the WHOLE album. */
+function photoAlt(albumTitle: string, section: string | null, n: number): string {
+  return `${albumTitle}${section ? ` — ${section}` : ""} — photo ${n}`
+}
+
 export function AlbumGrid({ photos, albumTitle }: { photos: GalleryPhoto[]; albumTitle: string }) {
+  // A photo's number in the whole album, so its alt text does not change when a section tab filters the list.
+  const position = useMemo(() => new Map(photos.map((p, i) => [p.id, i + 1])), [photos])
   // Which section is selected in the tabs; null = All.
   const [active, setActive] = useState<string | null>(null)
   // null = closed; otherwise the index into `visible` (lightbox order matches
@@ -159,7 +166,7 @@ export function AlbumGrid({ photos, albumTitle }: { photos: GalleryPhoto[]; albu
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={photo.thumb_url}
-                    alt=""
+                    alt={photoAlt(albumTitle, photo.section, position.get(photo.id) ?? index + 1)}
                     loading="lazy"
                     decoding="async"
                     className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
@@ -203,7 +210,7 @@ export function AlbumGrid({ photos, albumTitle }: { photos: GalleryPhoto[]; albu
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={visible[open].url}
-            alt={`${albumTitle} — photo ${open + 1}`}
+            alt={photoAlt(albumTitle, visible[open].section, position.get(visible[open].id) ?? open + 1)}
             onClick={(e) => e.stopPropagation()}
             className="max-h-[86vh] max-w-[92vw] object-contain select-none"
           />

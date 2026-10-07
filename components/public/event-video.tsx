@@ -11,8 +11,8 @@ import { toEmbed } from "@/lib/video-embed"
  * a project page's media tile. Only the poster image loads with the page; the
  * player mounts after the click, in the full-screen VideoModal.
  *
- * Poster: a YouTube video shows its own frame (maxres, else hq — a missing one
- * 404s through the image optimizer and the next is tried); other platforms
+ * Poster: a YouTube video shows its own hqdefault frame (it exists for every
+ * video; if it fails to load the event's own poster takes over); other platforms
  * have no free thumbnail, so the event's poster stands in; with neither, a
  * navy panel.
  */

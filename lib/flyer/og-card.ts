@@ -6,6 +6,10 @@
 // OG standard link-preview size (1.91:1) — same as the other /og routes.
 export const OG_CARD_W = 1200
 export const OG_CARD_H = 630
+// The card's two columns: content panel on the left, photo on the right. Exported so the /og/listing route
+// can resize the photo to the exact box the card draws.
+export const OG_CARD_PANEL_W = 560
+export const OG_CARD_PHOTO_W = OG_CARD_W - OG_CARD_PANEL_W
 
 export type OgTheme = "navy" | "red" | "emerald" | "charcoal"
 export type OgBadgeStyle = "color" | "clear"

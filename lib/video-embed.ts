@@ -19,11 +19,12 @@
 // platforms have no token-free thumbnail, so callers bring their own image).
 export type VideoEmbed = { src: string; portrait?: boolean; cropTop?: number; aspect?: number; zoom?: number; needsSize?: boolean; thumbs?: string[] }
 
-// maxresdefault is sharp but exists only for HD uploads; hqdefault exists for
-// every video.
+// hqdefault exists for EVERY video. maxresdefault is sharper but exists only for HD uploads and 404s
+// otherwise — and the server-rendered HTML a crawler reads must never name an image that 404s (an event page
+// embedded maxresdefault for a video that has none), so the poster is hqdefault alone.
 function youtubeThumbs(id: string): string[] | undefined {
   if (!/^[\w-]{6,}$/.test(id)) return undefined
-  return [`https://i.ytimg.com/vi/${id}/maxresdefault.jpg`, `https://i.ytimg.com/vi/${id}/hqdefault.jpg`]
+  return [`https://i.ytimg.com/vi/${id}/hqdefault.jpg`]
 }
 
 export function toEmbed(url: string): VideoEmbed | null {

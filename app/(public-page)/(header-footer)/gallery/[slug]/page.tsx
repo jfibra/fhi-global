@@ -47,12 +47,15 @@ export default async function AlbumPage({ params }: Props) {
   if (albumError) throw new Error("Failed to load album")
   if (!album) notFound()
 
-  const { data: photos } = await supabase
+  const { data: photos, error: photosError } = await supabase
     .from("gallery_photos")
     .select("id, section, url, thumb_url, width, height")
     .eq("album_id", album.id)
     .order("sort", { ascending: true })
     .limit(1000)
+  // ISR rule: a transient error must not become "Photos are being added" — that empty album would be cached
+  // for the page's whole revalidate window. Throwing keeps the last good page serving.
+  if (photosError) throw new Error("Failed to load album photos")
 
   const rows = (photos ?? []) as GalleryPhoto[]
 
