@@ -4,6 +4,7 @@ import Image from "next/image"
 import { ArrowDown, MessageCircle } from "lucide-react"
 import { AgentsGrid, type PublicAgent } from "./agents-grid"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { ROLES_PUBLIC_AGENTS } from "@/lib/app-roles"
 import { createPageMetadata } from "@/lib/seo"
 import { titleCaseName } from "@/lib/public-profile"
 import { breadcrumbList, personListSchema } from "@/lib/structured-data"
@@ -71,9 +72,11 @@ async function fetchRoster(): Promise<Roster> {
     admin
       .from("profiles")
       .select("id, fullname, fname, lname, role, profile_url, metadata")
-      .in("role", ["agent", "team_leader"])
+      .in("role", [...ROLES_PUBLIC_AGENTS])
       .eq("status", "active")
       .not("is_deleted", "is", true)
+      // Only the agents admin staff picked (Accounts & Invites → Public Agents, migration 077).
+      .eq("show_on_agents_page", true)
       .order("fullname", { ascending: true }),
     admin.from("website_builder").select("agent_id, slug, contact, about:about_id(bio, photo)").eq("is_published", true).not("slug", "is", null),
     admin.from("agent_feedback").select("agent_id, overall_rating").eq("status", "approved"),

@@ -11,6 +11,7 @@ import { FilmLines, FilmTrigger, HeroLoop, ScreeningRoom, StoryRow, type Film, t
 import { AGENT_STORIES, COMPANY_FILMS, FILM_BASE, LANDLORD_STORIES } from "@/lib/films"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { ROLES_PUBLIC_AGENTS } from "@/lib/app-roles"
 import { countByEmirate } from "@/lib/emirates"
 import { InView } from "@/components/public/in-view"
 import { NumbersReel, type ReelItem, type ReelBackdrop } from "@/components/public/numbers-reel"
@@ -137,8 +138,9 @@ export default async function AboutPage() {
     supabase.from("projects").select("name, city, developer_id, main_image, is_featured").eq("is_active", true).eq("is_published", true).is("deleted_at", null).order("is_featured", { ascending: false }).order("created_at", { ascending: false }).limit(4000),
     supabase.from("events").select("title, image_url", { count: "exact" }).eq("status", "published").is("deleted_at", null).is("agent_id", null).order("event_date", { ascending: false }).limit(12),
     supabase.from("gallery_photos").select("id", { count: "exact", head: true }).eq("album_id", ALBUM_ID),
-    admin.from("profiles").select("id", { count: "exact", head: true }).in("role", ["agent", "team_leader"]).eq("status", "active"),
-    admin.from("profiles").select("fullname, profile_url").in("role", ["agent", "team_leader"]).eq("status", "active").not("profile_url", "is", null).order("fullname", { ascending: true }).limit(36),
+    // Agents follow the /agents page: only those admin staff put on it (migration 077).
+    admin.from("profiles").select("id", { count: "exact", head: true }).in("role", [...ROLES_PUBLIC_AGENTS]).eq("status", "active").not("is_deleted", "is", true).eq("show_on_agents_page", true),
+    admin.from("profiles").select("fullname, profile_url").in("role", [...ROLES_PUBLIC_AGENTS]).eq("status", "active").not("is_deleted", "is", true).eq("show_on_agents_page", true).not("profile_url", "is", null).order("fullname", { ascending: true }).limit(36),
     supabase.from("developers").select("name, logo_url, logo_bg").eq("is_active", true).is("deleted_at", null).not("logo_url", "is", null).order("name").limit(32),
   ])
   const projects = (rows ?? []) as { name: string; city: string | null; developer_id: string | null; main_image: string | null; is_featured: boolean | null }[]
