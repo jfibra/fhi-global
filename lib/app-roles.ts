@@ -206,6 +206,10 @@ export const ROLES_SALES_PIPELINE: readonly AppRoleId[] = ["agent", "team_leader
  *  belong to — a link dies with its owner's access. */
 export const ROLES_BUYER_LINK_OWNERS: readonly AppRoleId[] = [...ROLES_SALES_PIPELINE, "super_admin", "admin"]
 
+/** Who admin staff can put on the public /agents page (Accounts & Invites →
+ *  Public Agents, migration 077) — the About page's faces and count follow it. */
+export const ROLES_PUBLIC_AGENTS: readonly AppRoleId[] = ["agent", "team_leader"]
+
 export const ROLES_SECRETARY_LIKE: readonly AppRoleId[] = ["secretary", "team_secretary"]
 
 /**

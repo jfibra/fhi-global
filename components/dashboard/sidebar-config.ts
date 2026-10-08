@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library, MonitorPlay,
-  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus, Files,
+  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus, Files, Eye,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -168,6 +168,8 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { icon: UserPlus, label: "Recruitment", to: "recruitment", description: "Accounts waiting for approval, top recruiters and their downlines." },
       // Every Global Partner grouped by the country they live in (lib/partner-signup.ts).
       { icon: Globe, label: "Global Partners", to: "global-partners", description: "Every Global Partner, grouped by the country they live in." },
+      // Who the public /agents page (and the About page's faces) shows — migration 077.
+      { icon: Eye, label: "Public Agents", to: "public-agents", description: "Choose which agents appear on the public Agents page." },
     ],
   },
   { icon: Network, label: "Teams", to: "teams" },
