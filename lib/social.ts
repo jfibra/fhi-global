@@ -10,14 +10,14 @@ import { companyWhatsappHref } from "@/lib/company"
  *
  * "#" means the account isn't published yet: every renderer (top bar, header
  * drawer, footer) drops such an entry with `isExternalSocial`, so no dead "#"
- * anchor reaches the page. LinkedIn is linked from the top bar, the header and
- * the footer; Instagram and YouTube appear once a real URL is set here.
+ * anchor reaches the page. LinkedIn and Instagram are linked from the top bar,
+ * the header and the footer; YouTube appears once a real URL is set here.
  */
 export const SOCIAL_URLS = {
   facebook: "https://www.facebook.com/fhiglobal",
   /** The company WhatsApp line (lib/company.ts), same as the floating button. */
   whatsapp: companyWhatsappHref(),
-  instagram: "#",
+  instagram: "https://www.instagram.com/fhiglobalpropertydubai/",
   /** The company page (found in the 2026-10-06 audit) — also the company node's `sameAs` in the structured data. */
   linkedin: "https://www.linkedin.com/company/fhi-global-property/",
   youtube: "#",
