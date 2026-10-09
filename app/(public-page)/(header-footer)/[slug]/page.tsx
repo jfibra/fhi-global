@@ -35,7 +35,8 @@ import { Building2, Facebook, Mail, MapPin, CheckCircle2, ArrowDown, ArrowLeft, 
 const CONTACT_EMAIL = COMPANY.email
 
 
-export const revalidate = 120
+// 24 h — purged on developer/project writes by app/api/seo/revalidate.
+export const revalidate = 86400
 
 /**
  * Prerender developer profiles + the curated SEO landing pages (production

@@ -55,7 +55,9 @@ import {
   TrendingUp, Star, ShieldCheck
 } from "lucide-react"
 
-export const revalidate = 120
+// 24 h: every project/developer write purges the page through app/api/seo/revalidate
+// (pingSeoRevalidate), so a short window only meant Googlebot hit cold renders.
+export const revalidate = 86400
 
 /**
  * Prerender the published catalog (only in production) so these pages serve
