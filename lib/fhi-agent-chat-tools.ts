@@ -3,6 +3,7 @@ import "server-only"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { ROLES_SALE_AGENT_PROFILES } from "@/lib/app-roles"
 import { SITE_URL } from "@/lib/seo"
+import { eventIsPast, eventWhenLabel } from "@/lib/events/dates"
 import { computeTeamSales } from "@/lib/team-sales-period"
 import { RECOMMEND_LABELS, type RecommendValue } from "@/lib/feedback-service"
 import { BUYER_LEAD_COLUMNS, LEAD_GRADES, answerLabel, budgetLabel, leadGrade, sellerAnswerLabel, type BuyerLead, type LeadGrade } from "@/lib/buyer-links"
@@ -527,6 +528,109 @@ async function myRecruits(admin: Admin, caller: AgentChatCaller, args: { from_da
   }
 }
 
+// ─── my_events ───────────────────────────────────────────────────────────────
+
+type MyEventsArgs = { event_title?: string; from_date?: string; to_date?: string; days?: number; limit?: number; attendees?: number }
+
+/**
+ * The events the caller runs (their Events page): registrations — total, new
+ * today, new in a period, by day — seats per day against the pax limit,
+ * certificates sent and downloaded, page views and QR scans, and the
+ * registrants themselves (name, email, WhatsApp, chosen days), newest first.
+ */
+async function myEvents(admin: Admin, caller: AgentChatCaller, args: MyEventsArgs) {
+  const limit = Math.min(Math.max(args.limit ?? 10, 1), 30)
+  const attendeesCap = Math.min(Math.max(args.attendees ?? 40, 0), 200)
+  let q = admin
+    .from("events")
+    .select("id, title, slug, event_date, event_days, day_pax, venue, status, show_on_main, show_on_website, registration_open, certificate, view_count, qr_scan_count, created_at")
+    .eq("agent_id", caller.userId)
+    .is("deleted_at", null)
+    .order("event_date", { ascending: false })
+    .limit(100)
+  if (args.event_title?.trim()) q = q.ilike("title", `%${args.event_title.trim().replace(/[%_]/g, "")}%`)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  type Ev = { id: string; title: string; slug: string | null; event_date: string | null; event_days: number | null; day_pax: unknown; venue: string | null; status: string | null; show_on_main: boolean | null; show_on_website: boolean | null; registration_open: boolean | null; certificate: unknown; view_count: number | null; qr_scan_count: number | null; created_at: string }
+  const events = (data ?? []) as Ev[]
+  if (!events.length) return { agent: caller.name, events: 0, note: args.event_title ? `None of your events matches "${args.event_title}"` : "You haven't created any events yet — Events in the dashboard creates one (it goes on fhiglobal.ae/events and/or your website).", _stats: [stat("Your events", 0)] }
+  const ids = events.map((e) => e.id)
+  const [{ data: regs }, { data: downloads }] = await Promise.all([
+    admin.from("event_registrations").select("id, event_id, full_name, email, whatsapp, invited_by, days, certificate_sent_at, created_at").in("event_id", ids).order("created_at", { ascending: false }).limit(10000),
+    admin.from("event_certificate_downloads").select("event_id, registration_id, email, full_name, ip").in("event_id", ids).limit(10000),
+  ])
+  type Reg = { id: string; event_id: string; full_name: string | null; email: string | null; whatsapp: string | null; invited_by: string | null; days: number[] | null; certificate_sent_at: string | null; created_at: string }
+  const R = (regs ?? []) as Reg[]
+  const D = (downloads ?? []) as { event_id: string; registration_id: string | null; email: string | null; full_name: string | null; ip: string | null }[]
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" })
+  const dubaiDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" })
+  const win = args.from_date?.trim() || args.days != null ? sinceArgs(args, 7) : null
+  const inWin = (r: Reg) => !win || (r.created_at.slice(0, 10) >= win.from && (!win.to || r.created_at.slice(0, 10) < win.to))
+  const now = Date.now()
+  const list = events.slice(0, limit).map((e) => {
+    const r = R.filter((x) => x.event_id === e.id)
+    const d = D.filter((x) => x.event_id === e.id)
+    const uniqDl = new Set(d.map((x) => x.registration_id ?? x.email?.toLowerCase() ?? x.full_name?.trim().toLowerCase() ?? x.ip ?? "")).size
+    const byDay = [...r.reduce((m, x) => m.set(dubaiDay(x.created_at), (m.get(dubaiDay(x.created_at)) ?? 0) + 1), new Map<string, number>()).entries()].sort((a, b) => a[0].localeCompare(b[0]))
+    const nDays = Math.max(1, e.event_days ?? 1)
+    const pax = Array.isArray(e.day_pax) ? (e.day_pax as Array<number | null>) : []
+    const seats = Array.from({ length: nDays }, (_, i) => {
+      const day = i + 1
+      const taken = r.filter((x) => !x.days || x.days.includes(day)).length
+      const cap = typeof pax[i] === "number" ? (pax[i] as number) : null
+      return { day, registered: taken, limit: cap, seats_left: cap != null ? Math.max(0, cap - taken) : null }
+    })
+    const cert = (e.certificate ?? null) as { design?: string; selfService?: string } | null
+    return {
+      event: e.title,
+      when: eventWhenLabel(e.event_date, e.event_days, "short"),
+      date: e.event_date?.slice(0, 10) ?? null,
+      days: nDays,
+      venue: e.venue,
+      status: e.status,
+      past: e.event_date ? eventIsPast(e.event_date, e.event_days, now) : null,
+      registration_open: Boolean(e.registration_open),
+      shown_on: [e.show_on_main ? "fhiglobal.ae/events" : null, e.show_on_website !== false ? "your website" : null].filter(Boolean),
+      page: e.slug ? `${base()}/events/${e.slug}` : null,
+      registrations_total: r.length,
+      registered_today: r.filter((x) => dubaiDay(x.created_at) === today).length,
+      ...(win ? { registered_in_period: r.filter(inWin).length } : {}),
+      registrations_by_day: byDay.slice(-14).map(([day, n]) => ({ day, registrations: n })),
+      ...(nDays > 1 || seats[0].limit != null ? { seats_per_day: seats } : {}),
+      certificates: { design: cert?.design ?? "classic", sent_by_email: r.filter((x) => x.certificate_sent_at).length, downloads: d.length, people_who_downloaded: uniqDl },
+      page_views: e.view_count ?? 0,
+      qr_scans: e.qr_scan_count ?? 0,
+      top_inviters: count(r.filter((x) => x.invited_by?.trim()), (x) => x.invited_by, 5),
+      attendees: (win ? r.filter(inWin) : r).slice(0, attendeesCap).map((x) => ({
+        name: x.full_name, email: x.email, whatsapp: x.whatsapp || null,
+        ...(nDays > 1 ? { days: x.days ? x.days.join(", ") : "every day" } : {}),
+        registered: x.created_at.slice(0, 16).replace("T", " "),
+        certificate_sent: Boolean(x.certificate_sent_at),
+      })),
+    }
+  })
+  const totalRegs = R.length
+  const todayRegs = R.filter((x) => dubaiDay(x.created_at) === today).length
+  const one = list.length === 1 ? list[0] : null
+  return {
+    agent: caller.name,
+    events: events.length,
+    ...(win ? { period: { from: win.from, to: win.to ?? "today" } } : {}),
+    totals: { registrations: totalRegs, registered_today: todayRegs, ...(win ? { registered_in_period: R.filter(inWin).length } : {}), page_views: events.reduce((a, e) => a + (e.view_count ?? 0), 0), qr_scans: events.reduce((a, e) => a + (e.qr_scan_count ?? 0), 0) },
+    event_list: list,
+    _stats: one
+      ? [stat("Registrations", one.registrations_total, null, `${one.registered_today} today`), stat("Page views", one.page_views), stat("QR scans", one.qr_scans), stat("Certificates downloaded", one.certificates.people_who_downloaded, null, `${one.certificates.sent_by_email} sent by email`)]
+      : [stat("Your events", events.length), stat("Registrations", totalRegs, null, `${todayRegs} today`), stat("Page views", events.reduce((a, e) => a + (e.view_count ?? 0), 0)), stat("QR scans", events.reduce((a, e) => a + (e.qr_scan_count ?? 0), 0))],
+    _charts: [
+      ...(one ? barsChart("Registrations by day", one.registrations_by_day.map((d) => ({ label: new Date(`${d.day}T00:00:00Z`).toLocaleDateString("en-AE", { month: "short", day: "numeric", timeZone: "UTC" }), value: d.registrations, display: String(d.registrations) }))) : []),
+      ...(!one ? sharesChart("Registrations by event", list.map((e) => ({ name: e.event, count: e.registrations_total }))) : []),
+      ...(one && one.seats_per_day ? barsChart("Registered per event day", one.seats_per_day.map((d) => ({ label: `Day ${d.day}`, value: d.registered, display: d.limit != null ? `${d.registered}/${d.limit}` : String(d.registered) }))) : []),
+    ],
+    _names: list.flatMap((e) => e.attendees.map((a) => a.name)).filter((n): n is string => Boolean(n)),
+    where_in_dashboard: "Events (registrations, Change days, certificates)",
+  }
+}
+
 // ─── Team leaders: my_team ───────────────────────────────────────────────────
 
 type MyTeamArgs = { from_date?: string; to_date?: string; limit?: number }
@@ -708,6 +812,15 @@ const PHASE2_TOOLS = [
   },
 ]
 
+const EVENTS_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "my_events",
+    description: "YOUR OWN EVENTS (the ones you created): registrations — total, how many registered TODAY or in a period, by day — seats per day against your pax limit, certificates sent and downloaded, page views, QR scans, who invited the most, and the registrants themselves (name, email, WhatsApp, chosen days). Use for 'how many registered for my event', 'any new registrations today', 'who registered this week', 'seats left on day 2', 'how many downloaded their certificate'. Name the event for one event; omit for all of yours.",
+    parameters: { type: "object", properties: { event_title: { type: "string", description: "Part of the event title (omit = all your events)" }, from_date: { type: "string", description: "YYYY-MM-DD — registrations from this day" }, to_date: { type: "string", description: "YYYY-MM-DD exclusive" }, days: { type: "integer", description: "Registrations in the last N days" }, limit: { type: "integer", description: "Events listed, default 10" }, attendees: { type: "integer", description: "Registrants listed per event, default 40, max 200" } } },
+  },
+}
+
 const TEAM_LEADER_TOOLS = [
   {
     type: "function" as const,
@@ -721,7 +834,7 @@ const TEAM_LEADER_TOOLS = [
 
 /** The toolbox for a caller — team leaders get my_team on top; everyone else never sees it. */
 export function agentChatToolsFor(role: string | null) {
-  return role === "team_leader" ? [...PHASE1_TOOLS, ...PHASE2_TOOLS, ...TEAM_LEADER_TOOLS] : [...PHASE1_TOOLS, ...PHASE2_TOOLS]
+  return role === "team_leader" ? [...PHASE1_TOOLS, ...PHASE2_TOOLS, EVENTS_TOOL, ...TEAM_LEADER_TOOLS] : [...PHASE1_TOOLS, ...PHASE2_TOOLS, EVENTS_TOOL]
 }
 
 /** Runs one tool for the caller. Same contract as runFhiChatTool: cards,
@@ -745,6 +858,7 @@ export async function runAgentChatTool(
       case "my_website": result = await myWebsite(admin, caller); break
       case "my_reviews": result = await myReviews(admin, caller, args as { status?: string; limit?: number }); break
       case "my_recruits": result = await myRecruits(admin, caller, args as Parameters<typeof myRecruits>[2]); break
+      case "my_events": result = await myEvents(admin, caller, args as MyEventsArgs); break
       case "my_team": result = await myTeam(admin, caller, args as MyTeamArgs); break
       default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [], stats: [] }
     }

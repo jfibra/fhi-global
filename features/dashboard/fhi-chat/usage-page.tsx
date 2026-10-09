@@ -20,7 +20,7 @@ import { BarsChart, StatTiles } from "./charts"
 const WINDOWS = [7, 30, 90] as const
 const usd = (n: number) => `$${n.toFixed(n < 0.1 ? 4 : 2)}`
 const when = (iso: string) => new Date(iso).toLocaleString("en-AE", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dubai" })
-const TOOL_WORDS: Record<string, string> = { my_sales: "own sales", top_sales_board: "Top Sales board", find_projects: "project search", project_details: "project details", news_overview: "news", my_leads: "own leads", my_listings: "own listings", my_website: "own website", my_reviews: "own reviews", my_recruits: "own recruits", my_team: "team" }
+const TOOL_WORDS: Record<string, string> = { my_sales: "own sales", top_sales_board: "Top Sales board", find_projects: "project search", project_details: "project details", news_overview: "news", my_leads: "own leads", my_listings: "own listings", my_website: "own website", my_reviews: "own reviews", my_recruits: "own recruits", my_team: "team", my_events: "own events" }
 
 async function load(days: number): Promise<AssistantUsageReport> {
   const res = await fetch(`/api/admin/assistant-usage?days=${days}`, { cache: "no-store" })
