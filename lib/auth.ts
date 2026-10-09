@@ -16,6 +16,7 @@ import {
   ROLES_INTERNAL_RESOURCES,
   ROLES_WEBSITE_BUILDER,
   ROLES_DLD_OPEN_DATA,
+  ROLES_AGENT_ASSISTANT,
 } from "@/lib/app-roles"
 
 export type AppUser = {
@@ -90,6 +91,9 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   // each of these ranks may then set on a recruit. Members are deliberately
   // excluded — they don't recruit.
   invite: ["super_admin", "admin", "agent", "team_leader", "unit_manager"],
+  // FHI Assistant: admins get the company-wide one (app/api/admin/fhi-chat);
+  // agents and team leaders their own-data one (app/api/fhi-chat).
+  "fhi-chat": [...ROLES_ADMIN_STAFF, ...ROLES_AGENT_ASSISTANT],
 }
 
 export function getDashboardRouteByRole(role?: string | null) {

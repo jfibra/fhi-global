@@ -210,6 +210,11 @@ export const ROLES_BUYER_LINK_OWNERS: readonly AppRoleId[] = [...ROLES_SALES_PIP
  *  Public Agents, migration 077) — the About page's faces and count follow it. */
 export const ROLES_PUBLIC_AGENTS: readonly AppRoleId[] = ["agent", "team_leader"]
 
+/** Who gets the agent-side FHI Assistant (app/api/fhi-chat, migration 079):
+ *  identity-bound tools over their OWN sales, the Top Sales board, projects and
+ *  news — never the admin toolbox. Daily question limits live in lib/assistant-usage.ts. */
+export const ROLES_AGENT_ASSISTANT: readonly AppRoleId[] = ["agent", "team_leader"]
+
 export const ROLES_SECRETARY_LIKE: readonly AppRoleId[] = ["secretary", "team_secretary"]
 
 /**

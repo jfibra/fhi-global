@@ -288,8 +288,10 @@ const DEVELOPER_NAV: RoleNavEntry[] = [
 // DLD forms (ROLES_DOCUMENT_LIBRARY in app-roles.ts; migration 071).
 const DOCUMENTS: NavEntry = { icon: Files, label: "Documents", to: "documents" }
 
-const salesPipelineNav = ({ projects = false, teamSales = false, invite = true, openData = false, documents = false } = {}): RoleNavEntry[] => [
+const salesPipelineNav = ({ projects = false, teamSales = false, invite = true, openData = false, documents = false, assistant = false } = {}): RoleNavEntry[] => [
   OVERVIEW,
+  // Their own-data FHI Assistant (agents + team leaders — ROLES_AGENT_ASSISTANT; "fhi-chat" in SUB_PATH_ROLES).
+  ...(assistant ? [{ icon: Sparkles, label: "FHI Assistant", to: "fhi-chat" } satisfies NavEntry] : []),
   // Their Website Builder site — open/copy the link, or the prompt to build one.
   { icon: Globe, label: "My Website", to: "my-website" },
   { icon: ClipboardList, label: "My listings", to: "listings" },
@@ -379,9 +381,9 @@ const ROLE_NAV: Record<AppRoleId, RoleNavEntry[]> = {
   admin:          ADMIN_NAV,
   editor:         EDITOR_NAV,
   developer:      DEVELOPER_NAV,
-  team_leader:    salesPipelineNav({ projects: true, teamSales: true, openData: true, documents: true }),
+  team_leader:    salesPipelineNav({ projects: true, teamSales: true, openData: true, documents: true, assistant: true }),
   unit_manager:   salesPipelineNav({ projects: true, teamSales: true, openData: true, documents: true }),
-  agent:          salesPipelineNav({ projects: true, openData: true, documents: true }),
+  agent:          salesPipelineNav({ projects: true, openData: true, documents: true, assistant: true }),
   secretary:      SECRETARY_NAV,
   team_secretary: SECRETARY_NAV,
   member:         MEMBER_NAV,

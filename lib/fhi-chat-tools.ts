@@ -43,7 +43,7 @@ export type FhiChatCard = {
   rank?: number
 }
 
-type SaleRow = {
+export type SaleRow = {
   id: string
   agent_id: string
   developer_id: string
@@ -72,7 +72,7 @@ export function saleCredits(s: SaleRow): Array<{ agentId: string; share: number;
   return credits.map((c) => ({ ...c, value: (price * c.share) / 100 }))
 }
 
-const AED = (n: number) => `AED ${Math.round(n).toLocaleString("en-AE")}`
+export const AED = (n: number) => `AED ${Math.round(n).toLocaleString("en-AE")}`
 
 // ─── Stat tiles: a tool's headline figures, drawn big above the answer ───────
 export type FhiChatStat = {
@@ -91,7 +91,7 @@ function toneOf(change: string | null | undefined): FhiChatStat["tone"] {
   if (change.startsWith("0%")) return "flat"
   return "neutral"
 }
-function stat(label: string, value: string | number | null | undefined, change?: string | null, hint?: string | null): FhiChatStat {
+export function stat(label: string, value: string | number | null | undefined, change?: string | null, hint?: string | null): FhiChatStat {
   const v = value == null || value === "" ? "–" : typeof value === "number" ? value.toLocaleString("en-AE") : value
   return { label, value: v, change: change ?? null, tone: toneOf(change), hint: hint ?? null }
 }
@@ -99,27 +99,27 @@ function stat(label: string, value: string | number | null | undefined, change?:
 // ─── Chart helpers: tools attach these as `_charts`; the UI draws them ───────
 type ChartCount = { name: string; count: number }
 /** A donut from name/count rows (by status, by role, by source…). Nothing is drawn for fewer than two non-zero slices. */
-function pieChart(title: string, rows: ChartCount[], display?: (n: number) => string): FhiChatChart[] {
+export function pieChart(title: string, rows: ChartCount[], display?: (n: number) => string): FhiChatChart[] {
   const live = rows.filter((r) => r.count > 0)
   return live.length >= 2 ? [{ kind: "pie", title, rows: live.map((r) => ({ label: r.name, value: r.count, display: display ? display(r.count) : undefined })) }] : []
 }
 /** Ranked horizontal bars from name/count rows. */
-function sharesChart(title: string, rows: ChartCount[], display?: (n: number) => string): FhiChatChart[] {
+export function sharesChart(title: string, rows: ChartCount[], display?: (n: number) => string): FhiChatChart[] {
   const live = rows.filter((r) => r.count > 0)
   return live.length >= 2 ? [{ kind: "shares", title, rows: live.map((r) => ({ label: r.name, value: r.count, display: display ? display(r.count) : undefined })) }] : []
 }
 /** Labelled vertical bars — months, stars, statuses. Drawn when at least two points exist. */
-function barsChart(title: string, points: FhiChatBarPoint[]): FhiChatChart[] {
+export function barsChart(title: string, points: FhiChatBarPoint[]): FhiChatChart[] {
   return points.length >= 2 ? [{ kind: "bars", title, points }] : []
 }
-const monthLabel = (ym: string) => new Date(`${ym}-01T00:00:00Z`).toLocaleDateString("en-AE", { month: "short", year: "2-digit", timeZone: "UTC" })
+export const monthLabel = (ym: string) => new Date(`${ym}-01T00:00:00Z`).toLocaleDateString("en-AE", { month: "short", year: "2-digit", timeZone: "UTC" })
 const objCounts = (o: Record<string, number>): ChartCount[] => Object.entries(o).map(([name, count]) => ({ name: name.replace(/_/g, " "), count }))
 
-function businessDate(s: SaleRow): string {
+export function businessDate(s: SaleRow): string {
   return s.reservation_date ?? s.created_at.slice(0, 10)
 }
 
-function inRange(s: SaleRow, from: string | null, to: string | null): boolean {
+export function inRange(s: SaleRow, from: string | null, to: string | null): boolean {
   const d = businessDate(s)
   if (from && d < from) return false
   if (to && d >= to) return false
@@ -127,7 +127,7 @@ function inRange(s: SaleRow, from: string | null, to: string | null): boolean {
 }
 
 /** Half-open [from, to) for a period — same shape as the leaderboard APIs. */
-function periodRange(
+export function periodRange(
   scope: "month" | "quarter" | "year" | "all",
   year: number,
   month: number,
@@ -147,7 +147,7 @@ function periodRange(
 }
 
 /** "+25%" / "-8%" vs the previous period; special-cased when it was empty. */
-function pctChange(cur: number, prev: number): string {
+export function pctChange(cur: number, prev: number): string {
   if (prev === 0) return cur === 0 ? "0% (both periods 0)" : "new (previous period was 0)"
   const p = Math.round(((cur - prev) / prev) * 100)
   return `${p >= 0 ? "+" : ""}${p}%`
@@ -155,7 +155,7 @@ function pctChange(cur: number, prev: number): string {
 
 /** The equal-length window immediately before [from, to) — what "vs previous
  *  period" compares against. A missing `to` means "through today". */
-function previousWindow(from: string, to: string | null): { from: string; to: string } {
+export function previousWindow(from: string, to: string | null): { from: string; to: string } {
   const DAY = 86400e3
   const f = Date.parse(`${from}T00:00:00Z`)
   const t = to ? Date.parse(`${to}T00:00:00Z`) : Date.now() + DAY
@@ -164,7 +164,7 @@ function previousWindow(from: string, to: string | null): { from: string; to: st
   return { from: iso(f - len), to: iso(f) }
 }
 
-function normScope(raw: string | undefined): "month" | "quarter" | "year" | "all" {
+export function normScope(raw: string | undefined): "month" | "quarter" | "year" | "all" {
   return (["month", "quarter", "year", "all"].includes(raw ?? "") ? raw : "year") as
     | "month" | "quarter" | "year" | "all"
 }
@@ -187,7 +187,7 @@ export async function fetchAllSales(admin: Admin): Promise<SaleRow[]> {
 
 type Entity = { name: string; image: string | null }
 
-async function nameMaps(admin: Admin, sales: SaleRow[]) {
+export async function nameMaps(admin: Admin, sales: SaleRow[]) {
   // Partners too, so a shared sale's other agents resolve to names.
   const agentIds = [...new Set(sales.flatMap((s) => [s.agent_id, ...saleCredits(s).map((c) => c.agentId)]))]
   const devIds = [...new Set(sales.map((s) => s.developer_id))]
@@ -2720,7 +2720,7 @@ function paymentPlanShort(p: ProjectRow): string | null {
   return plan.note ?? (plan.milestones[0] ? `${plan.milestones[0].percent}% down payment` : null)
 }
 
-type FindProjectsArgs = {
+export type FindProjectsArgs = {
   area?: string
   developer_name?: string
   bedrooms?: number
@@ -2747,7 +2747,7 @@ type FindProjectsArgs = {
  * projects whose unit table doesn't list that size are left out (and counted,
  * so the answer can say so).
  */
-async function findProjects(admin: Admin, args: FindProjectsArgs) {
+export async function findProjects(admin: Admin, args: FindProjectsArgs) {
   const { data, error } = await admin
     .from("projects")
     .select(PROJECT_FIND_COLUMNS)
@@ -2893,7 +2893,7 @@ async function findProjects(admin: Admin, args: FindProjectsArgs) {
  * payment plan read into milestones, amenities, what's nearby, the developer's
  * contacts, permit number, and how many validated FHI sales it has.
  */
-async function projectDetails(admin: Admin, args: { name?: string }) {
+export async function projectDetails(admin: Admin, args: { name?: string }) {
   const q = (args.name ?? "").trim()
   if (!q) return { error: "Which project? Give its name." }
   const { data, error } = await admin
@@ -4159,7 +4159,7 @@ async function eventEngagement(admin: Admin, args: { event_title?: string; limit
 // ─── Website news + data health ──────────────────────────────────────────────
 
 /** The news feed as the public site shows it: latest stories, most read, by category. */
-async function newsOverview(_admin: Admin, args: { limit?: number; search?: string; category?: string }) {
+export async function newsOverview(_admin: Admin, args: { limit?: number; search?: string; category?: string }) {
   const limit = Math.min(Math.max(args.limit ?? 8, 1), 25)
   const pages = await Promise.all([1, 2, 3].map((page) => fetchArticlesList({ page, perPage: 50, search: args.search?.trim() || undefined }).catch(() => null)))
   const seen = new Set<string>()

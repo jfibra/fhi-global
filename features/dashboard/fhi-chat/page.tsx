@@ -376,6 +376,9 @@ const REPORT_BUTTONS = [
 
 /** Tool names → human wording for the tiny "checked" line. */
 const TOOL_LABELS: Record<string, string> = {
+  // The agent assistant's own tools (lib/fhi-agent-chat-tools.ts).
+  my_sales: "Your sales",
+  top_sales_board: "Top Sales board",
   top_agents: "Top Sales board",
   top_developers: "Top Developers board",
   top_teams: "Team Sales board",
@@ -564,8 +567,38 @@ function exportAnswer(content: string) {
  *  tab (sessionStorage) and cleared when the tab closes or via "New chat". */
 const CHAT_STORAGE_KEY = "fhi-assistant-chat"
 
-export default function FhiChatPage() {
+type Quota = { used: number; limit: number | null; resetsAt: string }
+
+/** The same chat for two assistants: the admin one (defaults) and the
+ *  agent/TL one (features/dashboard/fhi-chat/agent-page.tsx), which points at
+ *  its own endpoint, suggestions and a daily question counter. */
+export type FhiChatPageProps = {
+  endpoint?: string
+  storageKey?: string
+  subtitle?: string
+  intro?: { title: string; text: string }
+  suggestions?: ReadonlyArray<{ label: string; items: ReadonlyArray<string> }>
+  reports?: ReadonlyArray<{ label: string; prompt: string }>
+  placeholder?: string
+  footnote?: string
+  /** Show "N of M questions left today" from the endpoint's GET and each answer. */
+  quota?: boolean
+}
+
+export default function FhiChatPage({
+  endpoint = "/api/admin/fhi-chat",
+  storageKey = CHAT_STORAGE_KEY,
+  subtitle = "Ask anything about FHI's data. Every figure comes from the live database.",
+  intro = { title: "Your data, answered.", text: "Sales, leads, projects, people, the website — the same figures as your dashboard, in plain language, with charts." },
+  suggestions = SUGGESTION_GROUPS,
+  reports = REPORT_BUTTONS,
+  placeholder = 'Ask FHI Assistant — e.g. "Who sold the most this month?"',
+  footnote = "Admin only · answers are computed from the live database at the moment you ask.",
+  quota: showQuota = false,
+}: FhiChatPageProps = {}) {
   const [messages, setMessages] = useState<Msg[]>([])
+  const [quota, setQuota] = useState<Quota | null>(null)
+  const exhausted = Boolean(quota && quota.limit !== null && quota.used >= quota.limit)
   const [input, setInput] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -589,7 +622,7 @@ export default function FhiChatPage() {
   useEffect(() => {
     const id = window.setTimeout(() => {
       try {
-        const raw = sessionStorage.getItem(CHAT_STORAGE_KEY)
+        const raw = sessionStorage.getItem(storageKey)
         if (!raw) return
         const saved = JSON.parse(raw) as Msg[]
         if (Array.isArray(saved) && saved.length) {
@@ -600,24 +633,39 @@ export default function FhiChatPage() {
       }
     }, 0)
     return () => window.clearTimeout(id)
-  }, [])
+  }, [storageKey])
+
+  // The daily counter, for the agent assistant.
+  useEffect(() => {
+    if (!showQuota) return
+    let cancelled = false
+    fetch(endpoint, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j: { quota?: Quota }) => {
+        if (!cancelled && j.quota) setQuota(j.quota)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [showQuota, endpoint])
 
   useEffect(() => {
     // Never delete here: on mount this runs with an empty chat BEFORE the
     // deferred restore reads storage — clearing belongs to "New chat" only.
     if (!messages.length) return
     try {
-      sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages.slice(-30)))
+      sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-30)))
     } catch {
       // Storage full or blocked — the chat still works, it just won't persist.
     }
-  }, [messages])
+  }, [messages, storageKey])
 
   const newChat = () => {
     setMessages([])
     setError(null)
     try {
-      sessionStorage.removeItem(CHAT_STORAGE_KEY)
+      sessionStorage.removeItem(storageKey)
     } catch {}
     inputRef.current?.focus()
   }
@@ -639,14 +687,14 @@ export default function FhiChatPage() {
 
   const ask = async (raw?: string) => {
     const question = (raw ?? input).trim()
-    if (!question || busy) return
+    if (!question || busy || exhausted) return
     setError(null)
     setInput("")
     const next: Msg[] = [...messages, { role: "user", content: question, at: new Date().toISOString() }]
     setMessages(next)
     setBusy(true)
     try {
-      const res = await fetch("/api/admin/fhi-chat", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: next.map(({ role, content }) => ({ role, content })) }),
@@ -660,7 +708,9 @@ export default function FhiChatPage() {
         stats?: StatSpec[]
         printCards?: PrintCardSpec[]
         error?: string
+        quota?: Quota
       }
+      if (data.quota) setQuota(data.quota)
       if (!res.ok || !data.reply) throw new Error(data.error ?? "FHI Assistant couldn't answer — try again.")
       setMessages((ms) => [
         ...ms,
@@ -697,8 +747,16 @@ export default function FhiChatPage() {
         </span>
         <div className="min-w-0 flex-1">
           <h1 className="font-['Outfit'] text-lg font-bold leading-tight sm:text-xl">FHI Assistant</h1>
-          <p className="truncate text-[12px] text-white/65">Ask anything about FHI&apos;s data. Every figure comes from the live database.</p>
+          <p className="truncate text-[12px] text-white/65">{subtitle}</p>
         </div>
+        {quota && quota.limit !== null && (
+          <span
+            title="Questions you can still ask today — the counter resets at midnight Dubai time."
+            className={`hidden shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold sm:inline-flex ${exhausted ? "border-amber-300/60 bg-amber-400/15 text-amber-200" : "border-white/20 text-white/80"}`}
+          >
+            {Math.max(0, quota.limit - quota.used)} of {quota.limit} left today
+          </span>
+        )}
         {messages.length > 0 && (
           <button
             type="button"
@@ -716,13 +774,11 @@ export default function FhiChatPage() {
         {messages.length === 0 ? (
           <div className="rounded-2xl border border-[#e8eaed] bg-white px-5 py-8 shadow-[0_6px_24px_-16px_rgba(0,31,63,0.25)] sm:px-8">
             <div className="text-center">
-              <p className="font-['Outfit'] text-[22px] font-bold text-[#0d1117]">Your data, answered.</p>
-              <p className="mx-auto mt-1 max-w-md text-[13.5px] leading-relaxed text-[#6b7280]">
-                Sales, leads, projects, people, the website — the same figures as your dashboard, in plain language, with charts.
-              </p>
+              <p className="font-['Outfit'] text-[22px] font-bold text-[#0d1117]">{intro.title}</p>
+              <p className="mx-auto mt-1 max-w-md text-[13.5px] leading-relaxed text-[#6b7280]">{intro.text}</p>
             </div>
             <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {SUGGESTION_GROUPS.map((g) => (
+              {suggestions.map((g) => (
                 <div key={g.label}>
                   <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b8913f]">{g.label}</p>
                   <div className="space-y-1.5">
@@ -867,11 +923,11 @@ export default function FhiChatPage() {
             <span className="inline-flex items-center gap-1 pr-1 text-[10.5px] font-bold uppercase tracking-wide text-[#9ca3af]">
               <FileText className="h-3.5 w-3.5" /> Reports
             </span>
-            {REPORT_BUTTONS.map((r) => (
+            {reports.map((r) => (
               <button
                 key={r.label}
                 type="button"
-                disabled={busy}
+                disabled={busy || exhausted}
                 onClick={() => void ask(r.prompt)}
                 className="rounded-full border border-[#e3e6ea] bg-[#fafbfc] px-3 py-1 text-[12px] font-semibold text-[#001f3f] transition-colors hover:border-[#d6b357] hover:bg-[#d6b357]/10 disabled:opacity-50"
               >
@@ -890,13 +946,13 @@ export default function FhiChatPage() {
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder='Ask FHI Assistant — e.g. "Who sold the most this month?"'
-              disabled={busy}
+              placeholder={exhausted ? "You've used today's questions — back tomorrow." : placeholder}
+              disabled={busy || exhausted}
               className="w-full rounded-xl border border-transparent bg-[#f4f6f9] px-4 py-3 text-[14px] text-[#111827] placeholder:text-[#9ca3af] transition-colors focus:border-[#001f3f]/30 focus:bg-white focus:outline-none disabled:opacity-70"
             />
             <button
               type="submit"
-              disabled={busy || !input.trim()}
+              disabled={busy || exhausted || !input.trim()}
               className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl bg-[#001f3f] px-5 text-sm font-bold text-white transition-colors hover:bg-[#00152b] disabled:opacity-40"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -904,7 +960,10 @@ export default function FhiChatPage() {
             </button>
           </form>
         </div>
-        <p className="mt-1.5 text-center text-[10.5px] text-[#9ca3af]">Admin only · answers are computed from the live database at the moment you ask.</p>
+        <p className="mt-1.5 text-center text-[10.5px] text-[#9ca3af]">
+          {footnote}
+          {quota && quota.limit !== null && <span className="sm:hidden"> · {Math.max(0, quota.limit - quota.used)} of {quota.limit} questions left today</span>}
+        </p>
       </div>
       <div ref={endRef} aria-hidden />
     </div>
