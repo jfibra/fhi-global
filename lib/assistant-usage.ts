@@ -141,3 +141,83 @@ export async function noteMonthlyCapReached(admin: Admin, spend: number): Promis
     // Best-effort.
   }
 }
+
+// ─── Admin usage report (phase 3) ────────────────────────────────────────────
+
+export type AssistantUsageReport = {
+  cap_usd: number
+  month: { from: string; spend_usd: number; questions: number; people: number }
+  today: { questions: number }
+  window: { days: number; from: string }
+  per_day: Array<{ day: string; questions: number; cost_usd: number }>
+  per_person: Array<{ userId: string; name: string; role: string | null; questions: number; today: number; cost_usd: number; tokens: number; failed: number; last_asked: string; limit: number | null }>
+  top_tools: Array<{ tool: string; count: number }>
+  recent: Array<{ at: string; userId: string; name: string; role: string | null; question: string; tools: string[]; ok: boolean; error: string | null; cost_usd: number }>
+}
+
+type Row = { user_id: string; role: string | null; asked_at: string; question: string | null; tools: string[] | null; prompt_tokens: number; completion_tokens: number; cost_usd: number | string; ok: boolean; error: string | null }
+
+/** Who asks what and what it costs — everything the admin Usage page shows. Last `days` days (max 92). */
+export async function assistantUsageReport(admin: Admin, days = 30): Promise<AssistantUsageReport> {
+  const span = Math.min(Math.max(days, 1), 92)
+  const windowFrom = new Date(dubaiDayStart().getTime() - (span - 1) * 86_400_000)
+  const monthFrom = dubaiMonthStart()
+  const from = new Date(Math.min(windowFrom.getTime(), monthFrom.getTime()))
+  const rows: Row[] = []
+  for (let page = 0; page < 20; page++) {
+    const { data, error } = await admin
+      .from("assistant_usage")
+      .select("user_id, role, asked_at, question, tools, prompt_tokens, completion_tokens, cost_usd, ok, error")
+      .eq("audience", ASSISTANT_AUDIENCE)
+      .gte("asked_at", from.toISOString())
+      .order("asked_at", { ascending: false })
+      .range(page * 1000, page * 1000 + 999)
+    if (error) throw new Error(error.message)
+    rows.push(...((data ?? []) as Row[]))
+    if (!data || data.length < 1000) break
+  }
+  const dubaiDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" })
+  const cost = (r: Row) => Number(r.cost_usd) || 0
+  const today = dubaiToday()
+  const monthRows = rows.filter((r) => new Date(r.asked_at) >= monthFrom)
+  const winRows = rows.filter((r) => new Date(r.asked_at) >= windowFrom)
+
+  const ids = [...new Set(rows.map((r) => r.user_id))]
+  const names = new Map<string, string>()
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await admin.from("profiles").select("id, fullname").in("id", ids.slice(i, i + 200))
+    for (const p of (data ?? []) as { id: string; fullname: string | null }[]) names.set(String(p.id), (p.fullname ?? "").replace(/\s+/g, " ").trim() || "Unnamed account")
+  }
+
+  const perDay = new Map<string, { questions: number; cost_usd: number }>()
+  for (let i = 0; i < span; i++) perDay.set(new Date(windowFrom.getTime() + i * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" }), { questions: 0, cost_usd: 0 })
+  for (const r of winRows) {
+    const d = perDay.get(dubaiDay(r.asked_at))
+    if (d) { d.questions++; d.cost_usd += cost(r) }
+  }
+  const perPerson = new Map<string, AssistantUsageReport["per_person"][number]>()
+  for (const r of winRows) {
+    const p = perPerson.get(r.user_id) ?? { userId: r.user_id, name: names.get(r.user_id) ?? "Unknown", role: r.role, questions: 0, today: 0, cost_usd: 0, tokens: 0, failed: 0, last_asked: r.asked_at, limit: dailyLimitFor(r.role) }
+    p.questions++
+    if (dubaiDay(r.asked_at) === today) p.today++
+    p.cost_usd += cost(r)
+    p.tokens += (r.prompt_tokens ?? 0) + (r.completion_tokens ?? 0)
+    if (!r.ok) p.failed++
+    if (r.asked_at > p.last_asked) p.last_asked = r.asked_at
+    perPerson.set(r.user_id, p)
+  }
+  const tools = new Map<string, number>()
+  for (const r of winRows) for (const t of r.tools ?? []) tools.set(t, (tools.get(t) ?? 0) + 1)
+  const r4 = (n: number) => Math.round(n * 10000) / 10000
+
+  return {
+    cap_usd: monthlyCapUsd(),
+    month: { from: monthFrom.toISOString(), spend_usd: r4(monthRows.reduce((a, r) => a + cost(r), 0)), questions: monthRows.length, people: new Set(monthRows.map((r) => r.user_id)).size },
+    today: { questions: rows.filter((r) => dubaiDay(r.asked_at) === today).length },
+    window: { days: span, from: windowFrom.toISOString() },
+    per_day: [...perDay.entries()].map(([day, v]) => ({ day, questions: v.questions, cost_usd: r4(v.cost_usd) })),
+    per_person: [...perPerson.values()].map((p) => ({ ...p, cost_usd: r4(p.cost_usd) })).sort((a, b) => b.questions - a.questions || a.name.localeCompare(b.name)),
+    top_tools: [...tools.entries()].map(([tool, count]) => ({ tool, count })).sort((a, b) => b.count - a.count),
+    recent: winRows.slice(0, 200).map((r) => ({ at: r.asked_at, userId: r.user_id, name: names.get(r.user_id) ?? "Unknown", role: r.role, question: r.question ?? "", tools: r.tools ?? [], ok: r.ok, error: r.error, cost_usd: r4(cost(r)) })),
+  }
+}

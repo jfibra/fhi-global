@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Check, Copy, Download, FileText, Globe, Loader2, Monitor, Printer, RotateCcw, Send, Smartphone, Sparkles, Tablet } from "lucide-react"
+import Link from "next/link"
+import { BarChart3, Check, Copy, Download, FileText, Globe, Loader2, Monitor, Printer, RotateCcw, Send, Smartphone, Sparkles, Tablet } from "lucide-react"
 import { BarsChart, PieChart, StatTiles, type ChartSpec, type ShareRow, type StatSpec, type TrendPoint } from "./charts"
 import {
   DESIGNS as CARD_DESIGNS,
@@ -589,6 +590,8 @@ export type FhiChatPageProps = {
   footnote?: string
   /** Show "N of M questions left today" from the endpoint's GET and each answer. */
   quota?: boolean
+  /** A small link in the title band (the admin assistant links to the agents' usage page). */
+  headerLink?: { href: string; label: string }
 }
 
 export default function FhiChatPage({
@@ -601,6 +604,7 @@ export default function FhiChatPage({
   placeholder = 'Ask FHI Assistant — e.g. "Who sold the most this month?"',
   footnote = "Admin only · answers are computed from the live database at the moment you ask.",
   quota: showQuota = false,
+  headerLink,
 }: FhiChatPageProps = {}) {
   const [messages, setMessages] = useState<Msg[]>([])
   const [quota, setQuota] = useState<Quota | null>(null)
@@ -762,6 +766,11 @@ export default function FhiChatPage({
           >
             {Math.max(0, quota.limit - quota.used)} of {quota.limit} left today
           </span>
+        )}
+        {headerLink && (
+          <Link href={headerLink.href} className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-white/20 px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:border-[#d6b357] hover:text-[#d6b357] sm:inline-flex">
+            <BarChart3 className="h-3.5 w-3.5" /> {headerLink.label}
+          </Link>
         )}
         {messages.length > 0 && (
           <button
