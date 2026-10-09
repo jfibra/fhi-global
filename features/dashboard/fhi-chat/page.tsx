@@ -379,6 +379,12 @@ const TOOL_LABELS: Record<string, string> = {
   // The agent assistant's own tools (lib/fhi-agent-chat-tools.ts).
   my_sales: "Your sales",
   top_sales_board: "Top Sales board",
+  my_leads: "Your leads",
+  my_listings: "Your listings",
+  my_website: "Your website",
+  my_reviews: "Your reviews",
+  my_recruits: "Your recruits",
+  my_team: "Your team",
   top_agents: "Top Sales board",
   top_developers: "Top Developers board",
   top_teams: "Team Sales board",

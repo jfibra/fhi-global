@@ -2,6 +2,10 @@ import "server-only"
 
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { ROLES_SALE_AGENT_PROFILES } from "@/lib/app-roles"
+import { SITE_URL } from "@/lib/seo"
+import { computeTeamSales } from "@/lib/team-sales-period"
+import { RECOMMEND_LABELS, type RecommendValue } from "@/lib/feedback-service"
+import { BUYER_LEAD_COLUMNS, LEAD_GRADES, answerLabel, budgetLabel, leadGrade, sellerAnswerLabel, type BuyerLead, type LeadGrade } from "@/lib/buyer-links"
 import {
   AED,
   FHI_CHAT_TOOLS,
@@ -18,6 +22,7 @@ import {
   periodRange,
   pieChart,
   previousWindow,
+  sharesChart,
   projectDetails,
   saleCredits,
   stat,
@@ -29,8 +34,11 @@ import {
 } from "@/lib/fhi-chat-tools"
 
 /**
- * The agent-side FHI Assistant's toolbox (app/api/fhi-chat). Five tools, and
- * the rule that keeps admin data out of reach is structural, not a prompt:
+ * The agent-side FHI Assistant's toolbox (app/api/fhi-chat). Phase 1 (10/9):
+ * own sales, the Top Sales board, projects, news. Phase 2 (same day): own
+ * leads, listings, website, reviews, recruits, and for team leaders their
+ * team (agentChatToolsFor picks the box by role). The rule that keeps admin
+ * data out of reach is structural, not a prompt:
  *
  *  - IDENTITY IS BOUND ON THE SERVER. my_sales and top_sales_board take the
  *    caller from the session; there is no "name" argument, so "show Michelle's
@@ -253,6 +261,353 @@ async function projectDetailsForAgent(admin: Admin, args: { name?: string }) {
   }
 }
 
+// ─── Phase 2: leads, listings, website, reviews, recruits ────────────────────
+
+const base = () => SITE_URL.replace(/\/$/, "")
+const count = <T,>(rows: T[], key: (r: T) => string | null | undefined, cap = 10) => {
+  const m = new Map<string, number>()
+  for (const r of rows) m.set(key(r) ?? "Not given", (m.get(key(r) ?? "Not given") ?? 0) + 1)
+  return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, cap).map(([name, n]) => ({ name, count: n }))
+}
+const sinceArgs = (args: { from_date?: string; to_date?: string; days?: number }, defaultDays: number) => {
+  let from = args.from_date?.trim() || ""
+  if (!from) {
+    const d = new Date()
+    d.setUTCDate(d.getUTCDate() - Math.min(Math.max(args.days ?? defaultDays, 1), 3650))
+    from = d.toISOString().slice(0, 10)
+  }
+  return { from, to: args.to_date?.trim() || null }
+}
+
+type MyLeadsArgs = { from_date?: string; to_date?: string; days?: number; kind?: "buyer" | "seller" | "all"; grade?: string; limit?: number }
+
+/** The briefs that came through the caller's own Buyers Link / Sellers Link —
+ *  exactly the list on their Buyers Link page, graded the same way. */
+async function myLeads(admin: Admin, caller: AgentChatCaller, args: MyLeadsArgs) {
+  const { from, to } = sinceArgs(args, 30)
+  const limit = Math.min(Math.max(args.limit ?? 15, 1), 60)
+  let q = admin.from("buyer_link_leads").select(BUYER_LEAD_COLUMNS).eq("agent_id", caller.userId).gte("created_at", from).order("created_at", { ascending: false }).limit(1000)
+  if (to) q = q.lt("created_at", to)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  let rows = (data ?? []) as BuyerLead[]
+  if (args.kind && args.kind !== "all") rows = rows.filter((b) => (b.kind === "seller" ? "seller" : "buyer") === args.kind)
+  const gradeOf = (b: BuyerLead): LeadGrade | null => (b.kind === "seller" ? null : leadGrade(b))
+  if (args.grade?.trim()) {
+    const g = args.grade.trim().toLowerCase()
+    rows = rows.filter((b) => (gradeOf(b) ?? "") === g)
+  }
+  const prof = (b: BuyerLead) => (b.profile ?? {}) as Record<string, string | string[] | undefined>
+  const label = (b: BuyerLead, key: string) => {
+    const v = prof(b)[key]
+    return b.kind === "seller" ? sellerAnswerLabel(key as Parameters<typeof sellerAnswerLabel>[0], v) : answerLabel(key as Parameters<typeof answerLabel>[0], v)
+  }
+  const buyers = rows.filter((b) => b.kind !== "seller")
+  const priority = buyers.filter((b) => gradeOf(b) === "priority").length
+  return {
+    agent: caller.name,
+    period: { from, to: to ?? "today" },
+    note: "Briefs that came through your own Buyers Link and Sellers Link. Grades: " + Object.values(LEAD_GRADES).map((g) => `${g.label} = ${g.why}`).join("; "),
+    total: rows.length,
+    buyers: buyers.length,
+    sellers: rows.length - buyers.length,
+    by_grade_buyers_only: count(buyers, (b) => LEAD_GRADES[gradeOf(b)!].label),
+    by_budget: count(buyers, (b) => budgetLabel(b.budget)),
+    by_goal: count(buyers, (b) => label(b, "goal")),
+    _stats: [
+      stat("Briefs", rows.length, null, `since ${from}`),
+      stat("Priority buyers", priority),
+      stat("Buyers", buyers.length, null, `${rows.length - buyers.length} seller${rows.length - buyers.length === 1 ? "" : "s"}`),
+    ],
+    _charts: [
+      ...pieChart("Your buyer briefs by grade", count(buyers, (b) => LEAD_GRADES[gradeOf(b)!].label)),
+      ...sharesChart("Your buyer briefs by budget", count(buyers, (b) => budgetLabel(b.budget))),
+    ],
+    leads: rows.slice(0, limit).map((b) => ({
+      when: b.created_at.slice(0, 16).replace("T", " "),
+      kind: b.kind === "seller" ? "seller" : "buyer",
+      grade: gradeOf(b) ? LEAD_GRADES[gradeOf(b)!].label : null,
+      name: b.name,
+      whatsapp: b.whatsapp ? `${b.whatsapp_code ?? ""} ${b.whatsapp}`.trim() : null,
+      email: b.email,
+      budget: budgetLabel(b.budget),
+      ...(b.kind === "seller"
+        ? { property: label(b, "property_type"), completion: label(b, "completion"), sell_timeline: label(b, "sell_timeline") }
+        : { goal: label(b, "goal"), timeline: label(b, "buy_timeline"), readiness: label(b, "readiness"), reach_by: label(b, "contact_channel") }),
+      message: b.message ? b.message.slice(0, 240) : null,
+    })),
+    where_in_dashboard: "Agent Resource → Buyers Link",
+  }
+}
+
+type MyListingsArgs = { kind?: "sale" | "rent"; status?: string; limit?: number }
+
+/** The caller's own listings (Listings page): live, draft, prices, links. */
+async function myListings(admin: Admin, caller: AgentChatCaller, args: MyListingsArgs) {
+  const limit = Math.min(Math.max(args.limit ?? 20, 1), 100)
+  let q = admin
+    .from("agent_listings")
+    .select("id, project_id, title, listing_kind, price, currency, status, unit_type, slug, is_featured, created_at, updated_at, projects(name, community, city)")
+    .eq("agent_id", caller.userId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(500)
+  if (args.kind) q = q.eq("listing_kind", args.kind)
+  const status = (args.status ?? "all").trim()
+  if (status !== "all") q = q.eq("status", status)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  type L = { id: string; title: string | null; listing_kind: string; price: number | string | null; currency: string | null; status: string; unit_type: string | null; slug: string | null; is_featured: boolean | null; created_at: string; updated_at: string | null; projects: { name: string; community: string | null; city: string | null } | { name: string; community: string | null; city: string | null }[] | null }
+  const rows = (data ?? []) as unknown as L[]
+  const proj = (l: L) => (Array.isArray(l.projects) ? l.projects[0] ?? null : l.projects)
+  const price = (l: L) => Number(l.price ?? 0) || null
+  return {
+    agent: caller.name,
+    total: rows.length,
+    by_status: count(rows, (l) => l.status),
+    by_kind: count(rows, (l) => l.listing_kind),
+    _stats: [
+      stat("Listings", rows.length),
+      stat("Published", rows.filter((l) => l.status === "published").length, null, `${rows.filter((l) => l.status === "draft").length} draft`),
+      stat("For sale", rows.filter((l) => l.listing_kind === "sale").length),
+      stat("For rent", rows.filter((l) => l.listing_kind === "rent").length),
+    ],
+    _charts: [...pieChart("Your listings by status", count(rows, (l) => l.status)), ...pieChart("Sale vs rent", count(rows, (l) => l.listing_kind))],
+    listings: rows.slice(0, limit).map((l) => ({
+      title: l.title,
+      kind: l.listing_kind,
+      status: l.status,
+      price_label: price(l) != null ? `${l.currency ?? "AED"} ${price(l)!.toLocaleString("en-AE")}${l.listing_kind === "rent" ? " / year" : ""}` : "no price",
+      unit_type: l.unit_type,
+      project: proj(l)?.name ?? null,
+      area: [proj(l)?.community, proj(l)?.city].filter(Boolean).join(", ") || null,
+      featured: Boolean(l.is_featured),
+      url: l.status === "published" ? `${base()}/listings/${l.slug ?? l.id}` : null,
+      created: l.created_at.slice(0, 10),
+    })),
+    where_in_dashboard: "My listings",
+  }
+}
+
+/** The caller's Website Builder site and the events they run on it. */
+async function myWebsite(admin: Admin, caller: AgentChatCaller) {
+  const [{ data: site, error }, { data: events }] = await Promise.all([
+    admin.from("website_builder").select("title, slug, is_published, created_at, updated_at, show_reviews").eq("agent_id", caller.userId).order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+    admin.from("events").select("title, slug, event_date, status, show_on_main, show_on_website").eq("agent_id", caller.userId).is("deleted_at", null).order("event_date", { ascending: false }).limit(20),
+  ])
+  if (error) throw new Error(error.message)
+  if (!site) return { agent: caller.name, has_website: false, note: "No website yet — it can be built under Agent Resource → Website Builder.", _stats: [stat("Website", "none")] }
+  const url = site.slug ? `${base()}/website/${site.slug}` : null
+  return {
+    agent: caller.name,
+    has_website: true,
+    title: site.title,
+    live: Boolean(site.is_published),
+    url,
+    reviews_shown_on_site: Boolean(site.show_reviews),
+    created: site.created_at?.slice(0, 10) ?? null,
+    last_updated: site.updated_at?.slice(0, 10) ?? null,
+    events: (events ?? []).map((e) => ({ title: e.title, date: e.event_date?.slice(0, 10) ?? null, status: e.status, on_fhiglobal: Boolean(e.show_on_main), on_website: Boolean(e.show_on_website), url: e.slug ? `${base()}/events/${e.slug}` : null })),
+    _stats: [stat("Website", site.is_published ? "Live" : "Draft", null, url), stat("Your events", (events ?? []).length), stat("Last updated", site.updated_at?.slice(0, 10) ?? "–")],
+    where_in_dashboard: "Agent Resource → Website Builder (My Website shows the link)",
+  }
+}
+
+type ReviewRow = { id: string; client_name: string | null; property_ref: string | null; transaction_type: string | null; transaction_date: string | null; overall_rating: number | null; score_communication: number | null; score_market: number | null; score_understanding: number | null; score_professionalism: number | null; score_negotiation: number | null; score_process: number | null; score_experience: number | null; recommend: string | null; did_well: string | null; to_improve: string | null; other_comments: string | null; status: string | null; created_at: string }
+const SCORE_LABELS: Array<[keyof ReviewRow, string]> = [
+  ["score_communication", "Communication"], ["score_market", "Market knowledge"], ["score_understanding", "Understanding needs"],
+  ["score_professionalism", "Professionalism"], ["score_negotiation", "Negotiation"], ["score_process", "Process handling"], ["score_experience", "Overall experience"],
+]
+
+/** The client reviews written about the caller (Customer Feedback page). */
+async function myReviews(admin: Admin, caller: AgentChatCaller, args: { status?: string; limit?: number }) {
+  const limit = Math.min(Math.max(args.limit ?? 10, 1), 50)
+  let q = admin
+    .from("agent_feedback")
+    .select("id, client_name, property_ref, transaction_type, transaction_date, overall_rating, score_communication, score_market, score_understanding, score_professionalism, score_negotiation, score_process, score_experience, recommend, did_well, to_improve, other_comments, status, created_at")
+    .eq("agent_id", caller.userId)
+    .order("created_at", { ascending: false })
+    .limit(500)
+  const status = (args.status ?? "all").trim()
+  if (status !== "all") q = q.eq("status", status)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  const rows = (data ?? []) as ReviewRow[]
+  const rated = rows.filter((r) => r.status !== "hidden")
+  const avg = (ns: Array<number | null>) => {
+    const v = ns.filter((n): n is number => typeof n === "number" && Number.isFinite(n))
+    return v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 100) / 100 : null
+  }
+  const recommendLabel = (v: string | null) => (v && v in RECOMMEND_LABELS ? RECOMMEND_LABELS[v as RecommendValue] : v ?? "Not answered")
+  const wouldRecommend = (r: ReviewRow) => r.recommend === "definitely_yes" || r.recommend === "very_likely" || r.recommend === "likely"
+  const average = avg(rated.map((r) => r.overall_rating))
+  return {
+    agent: caller.name,
+    totals: {
+      reviews: rows.length,
+      approved_shown_on_website: rows.filter((r) => r.status === "approved").length,
+      waiting_for_admin_approval: rows.filter((r) => r.status === "new").length,
+      average_rating: average,
+      would_recommend_percent: rated.length ? Math.round((100 * rated.filter(wouldRecommend).length) / rated.length) : null,
+    },
+    average_scores_out_of_5: Object.fromEntries(SCORE_LABELS.map(([key, label]) => [label, avg(rated.map((r) => r[key] as number | null))])),
+    _stats: [
+      stat("Your reviews", rows.length),
+      stat("Average rating", average != null ? `${average} / 5` : "–"),
+      stat("Would recommend", rated.length ? `${Math.round((100 * rated.filter(wouldRecommend).length) / rated.length)}%` : "–"),
+      stat("Waiting for approval", rows.filter((r) => r.status === "new").length),
+    ],
+    _charts: [
+      ...barsChart("Ratings you received", [1, 2, 3, 4, 5].map((star) => ({ label: `${star} ★`, value: rated.filter((r) => r.overall_rating === star).length, display: String(rated.filter((r) => r.overall_rating === star).length) }))),
+      ...barsChart("Your average score by area (out of 5)", SCORE_LABELS.map(([key, label]) => ({ label, value: avg(rated.map((r) => r[key] as number | null)) ?? 0, display: String(avg(rated.map((r) => r[key] as number | null)) ?? "–") }))),
+    ],
+    reviews: rows.slice(0, limit).map((r) => ({
+      client: r.client_name,
+      rating: r.overall_rating,
+      recommend: recommendLabel(r.recommend),
+      property: r.property_ref,
+      transaction: [r.transaction_type, r.transaction_date].filter(Boolean).join(" · ") || null,
+      did_well: r.did_well,
+      to_improve: r.to_improve,
+      status: r.status,
+      submitted: r.created_at.slice(0, 10),
+    })),
+    where_in_dashboard: "Customer Feedback (admins approve each review; approved ones show on your website)",
+  }
+}
+
+/** The people who registered through the caller's invite link (Invite page),
+ *  with how many validated deals each has — counts only, no amounts. */
+async function myRecruits(admin: Admin, caller: AgentChatCaller, args: { from_date?: string; to_date?: string; days?: number; limit?: number }) {
+  const limit = Math.min(Math.max(args.limit ?? 30, 1), 100)
+  let q = admin
+    .from("profiles")
+    .select("id, fullname, role, status, joined_at, profile_url")
+    .eq("metadata->>invited_by", caller.userId)
+    .is("metadata->>developer_invite_id", null)
+    .not("is_deleted", "is", true)
+    .order("joined_at", { ascending: false })
+    .limit(500)
+  const from = args.from_date?.trim() || (args.days != null ? sinceArgs(args, 30).from : "")
+  if (from) q = q.gte("joined_at", from)
+  if (args.to_date?.trim()) q = q.lt("joined_at", args.to_date.trim())
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  const rows = (data ?? []) as { id: string; fullname: string | null; role: string | null; status: string | null; joined_at: string | null; profile_url: string | null }[]
+  const deals = new Map<string, number>()
+  for (const s of await fetchAllSales(admin)) {
+    if (s.validation_status !== "validated") continue
+    for (const c of saleCredits(s)) deals.set(c.agentId, (deals.get(c.agentId) ?? 0) + 1)
+  }
+  const enriched = rows.map((r) => ({ ...r, deals: deals.get(r.id) ?? 0 }))
+  const selling = enriched.filter((r) => r.deals > 0)
+  return {
+    agent: caller.name,
+    period: { joined_from: from || "all time", joined_to: args.to_date?.trim() || "today" },
+    recruits_total: rows.length,
+    by_status: count(rows, (r) => r.status),
+    by_role: count(rows, (r) => r.role),
+    recruits_with_validated_sales: selling.length,
+    _stats: [
+      stat("Your recruits", rows.length),
+      stat("Active", rows.filter((r) => r.status === "active").length, null, `${rows.filter((r) => r.status === "pending").length} waiting for approval`),
+      stat("Selling", selling.length, null, `${selling.reduce((a, r) => a + r.deals, 0)} validated deals between them`),
+    ],
+    _charts: [...pieChart("Your recruits by status", count(rows, (r) => r.status)), ...pieChart("Your recruits by role", count(rows, (r) => r.role))],
+    recruits: [...selling.sort((a, b) => b.deals - a.deals), ...enriched.filter((r) => r.deals === 0)].slice(0, limit).map((r) => ({
+      name: r.fullname,
+      role: r.role,
+      status: r.status,
+      joined: r.joined_at ? String(r.joined_at).slice(0, 10) : null,
+      validated_deals: r.deals,
+    })),
+    _cards: enriched.slice(0, 8).map((r): FhiChatCard => ({ kind: "agent", title: r.fullname ?? "Member", subtitle: r.deals > 0 ? `${r.deals} validated deal${r.deals === 1 ? "" : "s"}` : [r.role, r.status].filter(Boolean).join(" · "), image: r.profile_url })),
+    _names: enriched.map((r) => r.fullname).filter((n): n is string => Boolean(n)),
+    where_in_dashboard: "Invite",
+  }
+}
+
+// ─── Team leaders: my_team ───────────────────────────────────────────────────
+
+type MyTeamArgs = { from_date?: string; to_date?: string; limit?: number }
+type TeamSalesOk = Extract<Awaited<ReturnType<typeof computeTeamSales>>, { sellers: unknown[] }>
+
+/**
+ * The caller's team as Team Sales shows it: the team they are in (with its
+ * subteams at any depth), everyone's validated and pending sales for the
+ * period (lib/team-sales-period rules, the same as the admin panel), who
+ * hasn't sold, what waits for validation, who joined recently. Team leaders only.
+ */
+async function myTeam(admin: Admin, caller: AgentChatCaller, args: MyTeamArgs) {
+  if (caller.role !== "team_leader") return { error: "Team figures are for team leaders." }
+  const year = new Date().getUTCFullYear()
+  const from = args.from_date?.trim() || `${year}-01-01`
+  const to = args.to_date?.trim() || `${year + 1}-01-01`
+  const limit = Math.min(Math.max(args.limit ?? 15, 1), 60)
+
+  const { data: membership } = await admin.from("team_memberships").select("team_id").eq("user_id", caller.userId).eq("is_active", true).order("joined_at", { ascending: false }).limit(1)
+  const teamId = membership?.[0]?.team_id as string | undefined
+  if (!teamId) return { agent: caller.name, has_team: false, note: "You are not in a team yet. Your recruits are under my_recruits." }
+
+  const result = await computeTeamSales(admin, teamId, from, to)
+  if (result.status !== 200 || !("sellers" in result) || !result.sellers) return { error: ("error" in result && result.error) || "Couldn't total the team." }
+  const team = result as TeamSalesOk
+
+  // Roster (incl. subteams) for quiet members and new joiners.
+  const { data: allTeams } = await admin.from("teams").select("id, name, parent_id").limit(2000)
+  const teamIds = new Set<string>([teamId])
+  for (let grew = true; grew; ) {
+    grew = false
+    for (const t of allTeams ?? []) if (t.parent_id && teamIds.has(t.parent_id) && !teamIds.has(t.id)) { teamIds.add(t.id); grew = true }
+  }
+  type M = { user_id: string; team_id: string; role_in_team: string | null; joined_at: string | null; profiles: { fullname: string | null; role: string | null; profile_url: string | null; is_deleted: boolean | null; joined_at: string | null } | null }
+  const members: M[] = []
+  for (let page = 0; page < 5; page++) {
+    const { data } = await admin.from("team_memberships").select("user_id, team_id, role_in_team, joined_at, profiles!inner(fullname, role, profile_url, is_deleted, joined_at)").in("team_id", [...teamIds]).is("left_at", null).range(page * 1000, page * 1000 + 999)
+    members.push(...((data ?? []) as unknown as M[]))
+    if (!data || data.length < 1000) break
+  }
+  const live = members.filter((m) => m.profiles && m.profiles.is_deleted !== true)
+  const soldIds = new Set(team.sellers.filter((s) => s.validated_deals > 0).map((s) => s.id))
+  const quiet = live.filter((m) => !soldIds.has(m.user_id) && m.user_id !== caller.userId)
+  // A new joiner registered in the period AND entered the team in it — a team
+  // created in bulk (CMG Properties, 2026-10-02) must not make 350 people "new".
+  const inPeriod = (d: string | null | undefined) => Boolean(d && d.slice(0, 10) >= from && d.slice(0, 10) < to)
+  const joiners = live.filter((m) => inPeriod(m.joined_at) && inPeriod(m.profiles?.joined_at)).sort((a, b) => (b.profiles?.joined_at ?? "").localeCompare(a.profiles?.joined_at ?? ""))
+  const pendingDeals = team.sellers.flatMap((s) => s.deals.filter((d) => d.status === "pending").map((d) => ({ agent: s.name, date: d.date, project: d.project, developer: d.developer, price: AED(d.price), ...(d.shared ? { share: `${d.share}%` } : {}) }))).sort((a, b) => a.date.localeCompare(b.date))
+  const change = pctChange(team.totals.validated.value, team.previous.validated.value)
+  const subteamName = (m: M) => (m.team_id !== teamId ? (allTeams ?? []).find((t) => t.id === m.team_id)?.name ?? null : null)
+
+  return {
+    team: { name: team.team.name, subteams: team.team.subteams, members: live.length },
+    period: { from, to },
+    note: "Validated sales are the headline (as on the boards); pending ones are waiting for the office. A shared deal credits each member their share; a deal shared inside the team counts once for the team.",
+    totals: { validated: { deals: team.totals.validated.deals, value: AED(team.totals.validated.value) }, pending: { deals: team.totals.pending.deals, value: AED(team.totals.pending.value) }, rejected: team.totals.rejected.deals },
+    previous_period: { validated: { deals: team.previous.validated.deals, value: AED(team.previous.validated.value) } },
+    change_vs_previous: { validated_value: change, validated_deals: pctChange(team.totals.validated.deals, team.previous.validated.deals) },
+    members_who_sold: team.members_who_sold,
+    quiet_members: { count: quiet.length, note: "No validated sale in the period", names: quiet.slice(0, limit).map((m) => ({ name: m.profiles?.fullname, role: m.profiles?.role, subteam: subteamName(m), joined: m.joined_at?.slice(0, 10) ?? null })) },
+    new_joiners: { count: joiners.length, note: "Registered with FHI and joined the team in the period", names: joiners.slice(0, limit).map((m) => ({ name: m.profiles?.fullname, role: m.profiles?.role, joined: m.profiles?.joined_at?.slice(0, 10) ?? null, subteam: subteamName(m) })) },
+    waiting_for_validation: { count: pendingDeals.length, oldest_first: pendingDeals.slice(0, limit) },
+    by_project: team.by_project.map((p) => ({ project: p.project, deals: p.deals, value: AED(p.value) })),
+    members: team.sellers.slice(0, limit).map((s, i) => ({ rank: i + 1, name: s.name, role: s.role, subteam: s.subteam, validated_deals: s.validated_deals, validated_value: AED(s.validated_value), pending_deals: s.pending_deals, pending_value: s.pending_deals ? AED(s.pending_value) : undefined })),
+    _stats: [
+      stat("Team validated deals", team.totals.validated.deals, pctChange(team.totals.validated.deals, team.previous.validated.deals), `vs ${team.previous.validated.deals} before`),
+      stat("Team validated value", AED(team.totals.validated.value), change, `vs ${AED(team.previous.validated.value)} before`),
+      stat("Pending", team.totals.pending.deals, null, team.totals.pending.deals ? AED(team.totals.pending.value) : "nothing waiting"),
+      stat("Members", live.length, null, `${team.members_who_sold} sold · ${quiet.length} quiet`),
+    ],
+    _charts: [
+      ...barsChart("Team validated sales by month", team.months.map((m) => ({ label: monthLabel(m.month), value: m.value, display: m.value ? `${(m.value / 1e6).toFixed(2)}M` : "0" }))),
+      ...sharesChart("Team sales by member", team.sellers.filter((s) => s.validated_value > 0).slice(0, 8).map((s) => ({ name: s.name, count: s.validated_value })), (n) => AED(n)),
+      ...sharesChart("Team sales by project", team.by_project.slice(0, 8).map((p) => ({ name: p.project, count: p.value })), (n) => AED(n)),
+    ],
+    _cards: team.sellers.filter((s) => s.validated_deals > 0).slice(0, 8).map((s, i): FhiChatCard => ({ kind: "agent", rank: i + 1, title: s.name, subtitle: `${s.validated_deals} deal${s.validated_deals === 1 ? "" : "s"} · ${AED(s.validated_value)}`, image: s.profile_url })),
+    _names: team.sellers.map((s) => s.name),
+    where_in_dashboard: "Team Sales",
+  }
+}
+
 // ─── Tool definitions handed to the model ────────────────────────────────────
 
 const reuse = (name: string) => {
@@ -261,7 +616,7 @@ const reuse = (name: string) => {
   return t
 }
 
-export const FHI_AGENT_CHAT_TOOLS = [
+const PHASE1_TOOLS = [
   {
     type: "function" as const,
     function: {
@@ -310,6 +665,65 @@ export const FHI_AGENT_CHAT_TOOLS = [
   reuse("news_overview"),
 ]
 
+const PHASE2_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "my_leads",
+      description: "YOUR OWN LEADS: the buyer and seller briefs that came through your Buyers Link / Sellers Link — graded Priority / Qualified / Nurture / Information, with name, WhatsApp, email, budget, goal, timeline and readiness. Default: last 30 days. Use for 'my leads', 'any priority buyers', 'who sent me a brief this week', 'seller leads'.",
+      parameters: { type: "object", properties: { from_date: { type: "string", description: "YYYY-MM-DD inclusive" }, to_date: { type: "string", description: "YYYY-MM-DD exclusive" }, days: { type: "integer", description: "Last N days when from_date is omitted (default 30)" }, kind: { type: "string", enum: ["buyer", "seller", "all"] }, grade: { type: "string", enum: ["priority", "qualified", "nurture", "information"] }, limit: { type: "integer", description: "Default 15, max 60" } } },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "my_listings",
+      description: "YOUR OWN LISTINGS (units you listed for sale or rent): live vs draft, prices, unit types, projects, links. Use for 'my listings', 'which of my listings are live', 'my rentals'.",
+      parameters: { type: "object", properties: { kind: { type: "string", enum: ["sale", "rent"] }, status: { type: "string", description: "published | draft | all (default all)" }, limit: { type: "integer" } } },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "my_website",
+      description: "YOUR OWN agent WEBSITE (Website Builder): whether it is live, its address, when it was last updated, whether reviews show on it, and the events you run on it. Use for 'my website', 'is my site live', 'my website link', 'my events'.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "my_reviews",
+      description: "CLIENT REVIEWS written about YOU: how many, average rating, scores by area, would-recommend %, which wait for admin approval, and each review's did_well / to_improve. Use for 'my reviews', 'my rating', 'what do clients say about me'.",
+      parameters: { type: "object", properties: { status: { type: "string", description: "approved | new | hidden | all (default all)" }, limit: { type: "integer" } } },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "my_recruits",
+      description: "YOUR OWN RECRUITS: the people who registered through your invite link — role, status (active / waiting for approval), when they joined, and how many validated deals each has (counts, not amounts). Optionally only those who joined in a period. Use for 'my recruits', 'who joined under me this month', 'are my recruits selling'.",
+      parameters: { type: "object", properties: { from_date: { type: "string", description: "YYYY-MM-DD inclusive — joined from" }, to_date: { type: "string", description: "YYYY-MM-DD exclusive" }, days: { type: "integer" }, limit: { type: "integer" } } },
+    },
+  },
+]
+
+const TEAM_LEADER_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "my_team",
+      description: "YOUR TEAM (team leaders): the team you lead or belong to, subteams included — validated and pending sales for the period (default this year) with the previous-period comparison, each member's deals and value, who hasn't sold (quiet members), deals waiting for validation oldest-first, who joined in the period, and sales by project and by month. Use for 'how is my team doing', 'team sales this month', 'who in my team hasn't sold', 'anything of my team waiting for validation', 'who joined my team recently'.",
+      parameters: { type: "object", properties: { from_date: { type: "string", description: "YYYY-MM-DD inclusive (default Jan 1 this year)" }, to_date: { type: "string", description: "YYYY-MM-DD exclusive (default Jan 1 next year)" }, limit: { type: "integer", description: "Names per list, default 15" } } },
+    },
+  },
+]
+
+/** The toolbox for a caller — team leaders get my_team on top; everyone else never sees it. */
+export function agentChatToolsFor(role: string | null) {
+  return role === "team_leader" ? [...PHASE1_TOOLS, ...PHASE2_TOOLS, ...TEAM_LEADER_TOOLS] : [...PHASE1_TOOLS, ...PHASE2_TOOLS]
+}
+
 /** Runs one tool for the caller. Same contract as runFhiChatTool: cards,
  *  charts and stats go to the UI, never into the model context. */
 export async function runAgentChatTool(
@@ -326,6 +740,12 @@ export async function runAgentChatTool(
       case "find_projects": result = await findProjects(admin, args as FindProjectsArgs); break
       case "project_details": result = await projectDetailsForAgent(admin, args as { name?: string }); break
       case "news_overview": result = await newsOverview(admin, args as { limit?: number; search?: string; category?: string }); break
+      case "my_leads": result = await myLeads(admin, caller, args as MyLeadsArgs); break
+      case "my_listings": result = await myListings(admin, caller, args as MyListingsArgs); break
+      case "my_website": result = await myWebsite(admin, caller); break
+      case "my_reviews": result = await myReviews(admin, caller, args as { status?: string; limit?: number }); break
+      case "my_recruits": result = await myRecruits(admin, caller, args as Parameters<typeof myRecruits>[2]); break
+      case "my_team": result = await myTeam(admin, caller, args as MyTeamArgs); break
       default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [], stats: [] }
     }
     const { _cards, _names, _charts, _stats, _printCards: _pc, ...rest } = result as {

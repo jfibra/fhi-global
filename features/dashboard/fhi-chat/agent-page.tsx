@@ -13,10 +13,15 @@ import FhiChatPage from "./page"
  */
 
 const SUGGESTIONS = [
-  { label: "My sales", items: ["How are my sales this year?", "Anything of mine waiting for validation?", "My sales month by month"] },
-  { label: "Top Sales board", items: ["Where do I rank this year?", "Who are the top sellers this month?", "Am I in the top 10 this quarter?"] },
-  { label: "Projects", items: ["Cheapest 1-bedroom in JVC?", "Payment plan of Samana Greenfield", "Villas under AED 3M handing over by 2027"] },
-  { label: "News", items: ["What's the latest property news?", "Most read article this week?"] },
+  { label: "My sales", items: ["How are my sales this year?", "Anything of mine waiting for validation?", "Where do I rank this year?"] },
+  { label: "My leads & clients", items: ["Any priority buyers in my leads?", "Who sent me a brief this week?", "What do clients say about me?"] },
+  { label: "My pages", items: ["Which of my listings are live?", "Is my website live?", "Are my recruits selling?"] },
+  { label: "Projects & news", items: ["Cheapest 1-bedroom in JVC?", "Payment plan of Samana Greenfield", "What's the latest property news?"] },
+] as const
+
+const TEAM_LEADER_SUGGESTIONS = [
+  { label: "My team", items: ["How is my team doing this month?", "Who in my team hasn't sold this year?", "Anything of my team waiting for validation?"] },
+  ...SUGGESTIONS,
 ] as const
 
 const REPORTS = [
@@ -24,6 +29,7 @@ const REPORTS = [
   { label: "My year", prompt: "How are my sales this year?" },
   { label: "Top sellers", prompt: "Who are the top sellers this month, and where do I rank?" },
 ] as const
+const TEAM_LEADER_REPORTS = [{ label: "My team", prompt: "How is my team doing this month?" }, ...REPORTS] as const
 
 export default function AgentFhiChatPage() {
   const { role } = useAuth()
@@ -33,12 +39,12 @@ export default function AgentFhiChatPage() {
     <FhiChatPage
       endpoint="/api/fhi-chat"
       storageKey="fhi-assistant-chat-agent"
-      subtitle="Your sales, the Top Sales board, projects and news — straight from the live database."
-      intro={{ title: "Your numbers, answered.", text: "Ask about your own sales, where you stand on the Top Sales board, any project FHI sells, or the latest property news." }}
-      suggestions={SUGGESTIONS}
-      reports={REPORTS}
+      subtitle="Your sales, leads, listings, website, reviews and recruits — plus projects and news, straight from the live database."
+      intro={{ title: "Your numbers, answered.", text: "Ask about your own sales, leads, listings, website, reviews and recruits, where you stand on the Top Sales board, any project FHI sells, or the latest property news." }}
+      suggestions={role === "team_leader" ? TEAM_LEADER_SUGGESTIONS : SUGGESTIONS}
+      reports={role === "team_leader" ? TEAM_LEADER_REPORTS : REPORTS}
       placeholder='Ask FHI Assistant — e.g. "How are my sales this month?"'
-      footnote="Covers your own sales, the Top Sales board, projects and news · answers are computed from the live database when you ask."
+      footnote="Covers your own sales, leads, listings, website, reviews, recruits, the Top Sales board, projects and news · answers are computed from the live database when you ask."
       quota
     />
   )
