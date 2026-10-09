@@ -36,11 +36,14 @@ import { BUYER_LEAD_COLUMNS, LEAD_GRADES, answerLabel, budgetLabel, leadGrade, s
 type Admin = ReturnType<typeof createAdminSupabase>
 
 export type FhiChatCard = {
-  kind: "agent" | "developer" | "project" | "poster"
+  kind: "agent" | "developer" | "project" | "poster" | "event"
   title: string
   subtitle?: string
   image?: string | null
   rank?: number
+  /** Event cards: the public page the banner opens, and the figures under the title. */
+  href?: string | null
+  facts?: string[]
 }
 
 export type SaleRow = {

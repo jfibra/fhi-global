@@ -24,11 +24,13 @@ import { isSafeRemoteImageUrl } from "@/lib/image-hosts"
  */
 
 type Card = {
-  kind: "agent" | "developer" | "project" | "poster"
+  kind: "agent" | "developer" | "project" | "poster" | "event"
   title: string
   subtitle?: string
   image?: string | null
   rank?: number
+  href?: string | null
+  facts?: string[]
 }
 type PrintCardSpec = {
   member: { name: string; phoneDial: string; phoneLocal: string; email: string; avatarUrl: string | null; initials: string }
@@ -120,7 +122,37 @@ function CardRow({ cards }: { cards: Card[] }) {
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
       {cards.map((c) =>
-        c.kind === "poster" ? (
+        c.kind === "event" ? (
+          // An event: its banner on top, the date and venue, the figures that matter as chips.
+          <a
+            key={`${c.kind}:${c.title}`}
+            href={c.href ?? undefined}
+            target={c.href ? "_blank" : undefined}
+            rel="noreferrer"
+            className={`group/ev overflow-hidden rounded-xl border border-[#eceef1] bg-white transition-colors ${c.href ? "hover:border-[#d6b357]" : ""} ${c.facts && c.facts.length > 3 ? "sm:col-span-2" : ""}`}
+          >
+            <div className="relative aspect-[16/7] w-full overflow-hidden bg-[#001f3f]">
+              {c.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={c.image} alt={c.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover/ev:scale-[1.03]" />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center font-['Outfit'] text-2xl font-bold text-[#d6b357]">{c.title.charAt(0).toUpperCase()}</span>
+              )}
+              <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white backdrop-blur">Event</span>
+            </div>
+            <div className="px-3 py-2.5">
+              <p className="line-clamp-2 font-['Outfit'] text-[13.5px] font-bold leading-snug text-[#0d1117]">{c.title}</p>
+              {c.subtitle && <p className="mt-0.5 truncate text-[11.5px] text-[#6b7280]">{c.subtitle}</p>}
+              {c.facts && c.facts.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {c.facts.map((f) => (
+                    <span key={f} className="rounded-full border border-[#e8eaed] bg-[#f6f7f9] px-2 py-0.5 text-[10.5px] font-semibold text-[#374151]">{f}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </a>
+        ) : c.kind === "poster" ? (
           // A generated poster: shown big, opens full size for download/share.
           <a
             key={`${c.kind}:${c.title}`}

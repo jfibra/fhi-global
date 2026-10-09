@@ -543,7 +543,7 @@ async function myEvents(admin: Admin, caller: AgentChatCaller, args: MyEventsArg
   const attendeesCap = Math.min(Math.max(args.attendees ?? 40, 0), 200)
   let q = admin
     .from("events")
-    .select("id, title, slug, event_date, event_days, day_pax, venue, status, show_on_main, show_on_website, registration_open, certificate, view_count, qr_scan_count, created_at")
+    .select("id, title, slug, event_date, event_days, day_pax, venue, status, show_on_main, show_on_website, registration_open, certificate, view_count, qr_scan_count, created_at, image_url")
     .eq("agent_id", caller.userId)
     .is("deleted_at", null)
     .order("event_date", { ascending: false })
@@ -551,7 +551,7 @@ async function myEvents(admin: Admin, caller: AgentChatCaller, args: MyEventsArg
   if (args.event_title?.trim()) q = q.ilike("title", `%${args.event_title.trim().replace(/[%_]/g, "")}%`)
   const { data, error } = await q
   if (error) throw new Error(error.message)
-  type Ev = { id: string; title: string; slug: string | null; event_date: string | null; event_days: number | null; day_pax: unknown; venue: string | null; status: string | null; show_on_main: boolean | null; show_on_website: boolean | null; registration_open: boolean | null; certificate: unknown; view_count: number | null; qr_scan_count: number | null; created_at: string }
+  type Ev = { id: string; title: string; slug: string | null; event_date: string | null; event_days: number | null; day_pax: unknown; venue: string | null; status: string | null; show_on_main: boolean | null; show_on_website: boolean | null; registration_open: boolean | null; certificate: unknown; view_count: number | null; qr_scan_count: number | null; created_at: string; image_url: string | null }
   const events = (data ?? []) as Ev[]
   if (!events.length) return { agent: caller.name, events: 0, note: args.event_title ? `None of your events matches "${args.event_title}"` : "You haven't created any events yet — Events in the dashboard creates one (it goes on fhiglobal.ae/events and/or your website).", _stats: [stat("Your events", 0)] }
   const ids = events.map((e) => e.id)
@@ -582,6 +582,7 @@ async function myEvents(admin: Admin, caller: AgentChatCaller, args: MyEventsArg
     })
     const cert = (e.certificate ?? null) as { design?: string; selfService?: string } | null
     return {
+      _image: e.image_url,
       event: e.title,
       when: eventWhenLabel(e.event_date, e.event_days, "short"),
       date: e.event_date?.slice(0, 10) ?? null,
@@ -617,7 +618,6 @@ async function myEvents(admin: Admin, caller: AgentChatCaller, args: MyEventsArg
     events: events.length,
     ...(win ? { period: { from: win.from, to: win.to ?? "today" } } : {}),
     totals: { registrations: totalRegs, registered_today: todayRegs, ...(win ? { registered_in_period: R.filter(inWin).length } : {}), page_views: events.reduce((a, e) => a + (e.view_count ?? 0), 0), qr_scans: events.reduce((a, e) => a + (e.qr_scan_count ?? 0), 0) },
-    event_list: list,
     _stats: one
       ? [stat("Registrations", one.registrations_total, null, `${one.registered_today} today`), stat("Page views", one.page_views), stat("QR scans", one.qr_scans), stat("Certificates downloaded", one.certificates.people_who_downloaded, null, `${one.certificates.sent_by_email} sent by email`)]
       : [stat("Your events", events.length), stat("Registrations", totalRegs, null, `${todayRegs} today`), stat("Page views", events.reduce((a, e) => a + (e.view_count ?? 0), 0)), stat("QR scans", events.reduce((a, e) => a + (e.qr_scan_count ?? 0), 0))],
@@ -627,6 +627,25 @@ async function myEvents(admin: Admin, caller: AgentChatCaller, args: MyEventsArg
       ...(one && one.seats_per_day ? barsChart("Registered per event day", one.seats_per_day.map((d) => ({ label: `Day ${d.day}`, value: d.registered, display: d.limit != null ? `${d.registered}/${d.limit}` : String(d.registered) }))) : []),
     ],
     _names: list.flatMap((e) => e.attendees.map((a) => a.name)).filter((n): n is string => Boolean(n)),
+    _cards: list.slice(0, 6).map((e): FhiChatCard => {
+      const seats = e.seats_per_day?.filter((d) => d.seats_left != null)
+      const left = seats?.length ? seats.reduce((a, d) => a + (d.seats_left ?? 0), 0) : null
+      return {
+        kind: "event",
+        title: e.event,
+        subtitle: [e.when, e.venue].filter(Boolean).join(" · "),
+        image: e._image,
+        href: e.page,
+        facts: [
+          `${e.registrations_total} registered`,
+          ...(e.registered_today ? [`${e.registered_today} today`] : []),
+          ...(left != null ? [`${left} seat${left === 1 ? "" : "s"} left`] : []),
+          ...(e.page_views ? [`${e.page_views.toLocaleString("en-AE")} views`] : []),
+          ...(e.past ? ["past"] : e.registration_open ? ["registration open"] : ["registration closed"]),
+        ],
+      }
+    }),
+    event_list: list.map(({ _image: _i, ...rest }) => { void _i; return rest }),
     where_in_dashboard: "Events (registrations, Change days, certificates)",
   }
 }
