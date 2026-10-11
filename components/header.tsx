@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation"
 import {
   Menu, X, Phone, Mail, Facebook, Instagram, Linkedin, ChevronDown, LayoutDashboard,
   LogOut, Building2, Camera, Globe, KeyRound, Landmark,
-  Tag, Users, BarChart3, type LucideIcon,
+  Tag, Users, BarChart3, FileText, type LucideIcon,
 } from "lucide-react"
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
 import { COMPANY, companyPhoneHref } from "@/lib/company"
@@ -58,6 +58,7 @@ const NAV_LINKS: NavItem[] = [
     href: "/open-data",
     children: [
       { label: "Dubai Residential Price Index", href: "/open-data", desc: "DLD's official property price index", icon: BarChart3 },
+      { label: "Dubai Real Estate Report 2024", href: "/dubai-real-estate-report-2024", desc: "DLD's annual report, the key findings", icon: FileText },
       { label: "Contact",   href: "/contact",   desc: "Get in touch with our team",          icon: Phone },
     ],
   },

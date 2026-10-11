@@ -15,6 +15,7 @@ import { SEO_PAGES } from "@/lib/seo-pages"
 const ROUTE_SEGMENTS = new Set([
   // app/(public-page)/(header-footer)
   "about", "agent-websites", "agents", "b", "buy", "buy-with", "contact", "cookies", "developers",
+  "dubai-real-estate-report-2024",
   "dubai-mortgage-calculator", "events", "feedback", "gallery", "news", "open-data", "privacy", "rent",
   "s", "sell-with", "terms", "verify",
   // app/(public-page)/(landing) and (auth)
