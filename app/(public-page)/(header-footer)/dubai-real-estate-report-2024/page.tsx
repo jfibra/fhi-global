@@ -9,6 +9,20 @@ import { JsonLd } from "@/components/json-ld"
 import { InView } from "@/components/public/in-view"
 import { CountUp } from "@/components/public/count-up"
 import { MagneticLink } from "@/components/public/magnetic-link"
+import {
+  COMMUNITIES_REST,
+  COMMUNITIES_TOP,
+  DataTable,
+  INVESTOR_TYPES_TABLE,
+  LUXURY_APARTMENTS_TABLE,
+  LUXURY_VILLAS_TABLE,
+  PRICE_USAGE_TABLE,
+  PROFITS_TABLE,
+  RENT_COMMUNITIES_TABLE,
+  RENTS_TABLE,
+  SEGMENTS_TABLE,
+  TRANSACTIONS_TABLE,
+} from "./tables"
 
 /**
  * The Dubai Land Department's "Dubai Real Estate Annual Report 2024" (81 pages,
@@ -63,9 +77,9 @@ const BY_TYPE = [
 ]
 // p. 16 — value by category, AED bn
 const BY_CATEGORY = [
-  { label: "Ready (existing)", v2024: 295.82, change: "+35.4%" },
-  { label: "Vacant land", v2024: 234.56, change: "−7.3%" },
-  { label: "Off-plan", v2024: 230.61, change: "+43.7%" },
+  { label: "Ready (existing)", v2024: 295.82, v2023: 218.56, change: "+35.4%" },
+  { label: "Vacant land", v2024: 234.56, v2023: 253.09, change: "−7.3%" },
+  { label: "Off-plan", v2024: 230.61, v2023: 160.48, change: "+43.7%" },
 ]
 
 // p. 18–19 — average price per sq m, selected years the report cites
@@ -94,15 +108,6 @@ const BY_CONTINENT = [
   { label: "South & Central America", v: 2.91, share: "0.5%" },
 ]
 
-// p. 27–29 — extra investment vs 2023 (DLD's official community names)
-const HOT_COMMUNITIES = [
-  { name: "Madinat Al Mataar", value: 11.74, investors: 4726, note: "The airport district — top for both new money and new buyers" },
-  { name: "Bukadra", value: 10.71, investors: 4354, note: "Steady resales plus new launches" },
-  { name: "Wadi Al Safa 5", value: 10.6, investors: 4423, note: "Rising suburb with a surge of retail buyers" },
-  { name: "Dubai Investment Park Second", value: 9.31, investors: 1718, note: "Institutional, large-ticket buying" },
-  { name: "Wadi Al Safa 7", value: 8.69, investors: 1834, note: "Extends the Wadi Al Safa momentum" },
-]
-
 // p. 64 — US$10M+ home sales in 2024 (Knight Frank, REIDIN)
 const TEN_MILLION = [
   { city: "Dubai", n: 435 },
@@ -121,6 +126,16 @@ const MILLION_BUYS = [
 ]
 
 const COMPANY_WHATSAPP = companyWhatsappHref()
+
+const CHAPTERS = [
+  { id: "transactions", n: "01", label: "Where the money went" },
+  { id: "prices", n: "02", label: "What it cost" },
+  { id: "investors", n: "03", label: "Who is buying" },
+  { id: "communities", n: "04", label: "Where the new money went" },
+  { id: "profits", n: "05", label: "Did buyers make money?" },
+  { id: "luxury-rents", n: "06", label: "Luxury & rents" },
+  { id: "outlook", n: "07", label: "What comes next" },
+]
 
 function Words({ text, start = 0, gold = false }: { text: string; start?: number; gold?: boolean }) {
   return (
@@ -148,7 +163,7 @@ function Eyebrow({ n, children, dark = false }: { n: string; children: React.Rea
 }
 
 /** A horizontal bar that grows in when its section scrolls into view. */
-function Bar({ label, value, max, display, change, i, tone = "navy", neutral = false }: { label: string; value: number; max: number; display: string; change?: string; i: number; tone?: "navy" | "gold" | "muted"; neutral?: boolean }) {
+function Bar({ label, value, max, display, change, i, tone = "navy", neutral = false, prev }: { label: string; value: number; max: number; display: string; change?: string; i: number; tone?: "navy" | "gold" | "muted"; neutral?: boolean; prev?: number }) {
   const fill = tone === "gold" ? "bg-[#d6b357]" : tone === "muted" ? "bg-[#c5ccd6]" : "bg-[#001f3f]"
   const negative = change?.startsWith("−")
   return (
@@ -163,6 +178,11 @@ function Bar({ label, value, max, display, change, i, tone = "navy", neutral = f
       <div className="mt-2 h-2.5 w-full bg-[#eef0f3]">
         <div className={`wf-line h-full ${fill}`} style={{ width: `${Math.max(1.5, (100 * value) / max)}%`, ["--g" as string]: `${250 + i * 110}ms` }} />
       </div>
+      {prev != null && (
+        <div className="mt-1 h-1 w-full" title={`2023: ${prev.toFixed(1)}`}>
+          <div className="wf-line h-full bg-[#c5ccd6]" style={{ width: `${Math.max(1.5, (100 * prev) / max)}%`, ["--g" as string]: `${400 + i * 110}ms` }} />
+        </div>
+      )}
     </div>
   )
 }
@@ -214,11 +234,10 @@ function Stat({ big, label, sub }: { big: string; label: string; sub?: string })
 }
 
 export default function DubaiRealEstateReport2024Page() {
-  const typeMax = Math.max(...BY_TYPE.map((r) => r.v2024))
-  const catMax = Math.max(...BY_CATEGORY.map((r) => r.v2024))
+  const typeMax = Math.max(...BY_TYPE.flatMap((r) => [r.v2024, r.v2023]))
+  const catMax = Math.max(...BY_CATEGORY.flatMap((r) => [r.v2024, r.v2023]))
   const contMax = BY_CONTINENT[0].v
-  const commMax = HOT_COMMUNITIES[0].value
-  const tenMax = TEN_MILLION[0].n
+    const tenMax = TEN_MILLION[0].n
   const millionMax = MILLION_BUYS[0].sqft
 
   return (
@@ -291,8 +310,25 @@ export default function DubaiRealEstateReport2024Page() {
         <div className="absolute inset-x-0 bottom-0 h-[3px] bg-[#d6b357]" aria-hidden="true" />
       </section>
 
+      {/* ── In this report ──────────────────────────────────────────── */}
+      <nav aria-label="In this report" className="border-b border-[#e5e8ec] bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#9ca3af]">In this report</p>
+          <ol className="mt-3 grid grid-cols-1 gap-px border border-[#e5e8ec] bg-[#e5e8ec] sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+            {CHAPTERS.map((c) => (
+              <li key={c.id} className="bg-white">
+                <a href={`#${c.id}`} className="group flex h-full items-baseline gap-3 px-4 py-3 transition-colors hover:bg-[#faf7ee]">
+                  <span className="font-['Outfit'] text-[15px] font-bold text-[#d6b357]">{c.n}</span>
+                  <span className="text-[13px] font-semibold leading-snug text-[#0d1117] group-hover:text-[#001f3f]">{c.label}</span>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </nav>
+
       {/* ── 01 Where the money went ─────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+      <section id="transactions" className="mx-auto max-w-7xl scroll-mt-24 px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
         <InView threshold={0.15}>
           <Eyebrow n="01">Where the money went</Eyebrow>
           <h2 className="mt-4 max-w-3xl font-['Outfit'] text-[32px] font-bold leading-[1.08] tracking-tight text-[#0d1117] sm:text-[42px]">
@@ -304,10 +340,16 @@ export default function DubaiRealEstateReport2024Page() {
           </p>
           <div className="mt-10 grid gap-10 lg:grid-cols-2 lg:gap-16">
             <div className="border border-[#e5e8ec] bg-white p-6 sm:p-8">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#9ca3af]">By property type · AED billion</p>
+              <p className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#9ca3af]">
+                <span>By property type · AED billion</span>
+                <span className="inline-flex items-center gap-3 normal-case tracking-normal">
+                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-4 bg-[#001f3f]" aria-hidden="true" />2024</span>
+                  <span className="inline-flex items-center gap-1.5"><span className="h-1 w-4 bg-[#c5ccd6]" aria-hidden="true" />2023</span>
+                </span>
+              </p>
               <div className="mt-6 space-y-5">
                 {BY_TYPE.map((r, i) => (
-                  <Bar key={r.label} i={i} label={r.label} value={r.v2024} max={typeMax} display={r.v2024.toFixed(1)} change={r.change} tone={r.change.startsWith("−") ? "muted" : "navy"} />
+                  <Bar key={r.label} i={i} label={r.label} value={r.v2024} max={typeMax} display={r.v2024.toFixed(1)} change={r.change} tone={r.change.startsWith("−") ? "muted" : "navy"} prev={r.v2023} />
                 ))}
               </div>
             </div>
@@ -315,7 +357,7 @@ export default function DubaiRealEstateReport2024Page() {
               <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#9ca3af]">Ready vs off-plan vs land · AED billion</p>
               <div className="mt-6 space-y-5">
                 {BY_CATEGORY.map((r, i) => (
-                  <Bar key={r.label} i={i} label={r.label} value={r.v2024} max={catMax} display={r.v2024.toFixed(1)} change={r.change} tone={r.label === "Off-plan" ? "gold" : r.change.startsWith("−") ? "muted" : "navy"} />
+                  <Bar key={r.label} i={i} label={r.label} value={r.v2024} max={catMax} display={r.v2024.toFixed(1)} change={r.change} tone={r.label === "Off-plan" ? "gold" : r.change.startsWith("−") ? "muted" : "navy"} prev={r.v2023} />
                 ))}
               </div>
               <p className="mt-6 border-t border-[#eef0f3] pt-4 text-[13px] leading-relaxed text-[#6b7280]">
@@ -328,11 +370,14 @@ export default function DubaiRealEstateReport2024Page() {
             <Stat big="AED 187bn" label="Mortgages, −1.2%" sub="A plateau: more buyers are paying cash or on developer plans" />
             <Stat big="+59%" label="Property gifted within families" sub="AED 51bn — families passing homes to the next generation" />
           </div>
+          <div className="mt-12">
+            <DataTable caption="The full picture · AED billion" head={["", "2023", "2024", "Change"]} rows={TRANSACTIONS_TABLE} />
+          </div>
         </InView>
       </section>
 
       {/* ── 02 Prices ───────────────────────────────────────────────── */}
-      <section className="border-y border-[#e5e8ec] bg-white">
+      <section id="prices" className="scroll-mt-24 border-y border-[#e5e8ec] bg-white">
         <InView className="mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] lg:px-8 lg:py-24" threshold={0.15}>
           <div>
             <Eyebrow n="02">What it cost</Eyebrow>
@@ -355,11 +400,20 @@ export default function DubaiRealEstateReport2024Page() {
             <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.18em] text-[#9ca3af]">Average price per sq m · AED</p>
             <PriceChart />
           </div>
+          <div className="lg:col-span-2">
+            <DataTable
+              caption="Average price per sq m by use · AED"
+              head={["", "2007", "2024", "Change"]}
+              rows={PRICE_USAGE_TABLE}
+             
+              note="Residential and commercial averages as the report gives them by use. The ×-multiples are our arithmetic."
+            />
+          </div>
         </InView>
       </section>
 
       {/* ── 03 Who is buying ────────────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+      <section id="investors" className="mx-auto max-w-7xl scroll-mt-24 px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
         <InView threshold={0.15}>
           <Eyebrow n="03">Who is buying</Eyebrow>
           <h2 className="mt-4 max-w-3xl font-['Outfit'] text-[32px] font-bold leading-[1.08] tracking-tight text-[#0d1117] sm:text-[42px]">
@@ -387,11 +441,27 @@ export default function DubaiRealEstateReport2024Page() {
               </p>
             </div>
           </div>
+          <div className="mt-12 grid gap-10">
+            <DataTable
+              caption="Investment by segment · 2024, change vs 2023 under each figure"
+              head={["", "Invested", "Investors", "Living abroad", "First-time", "Repeat"]}
+              rows={SEGMENTS_TABLE}
+              minWidth={760}
+              note="Two ways of slicing the same market — by property (apartments, villas) and by stage (ready, off-plan) — so the rows don't add up to one total. Off-plan led every growth column."
+            />
+            <DataTable
+              caption="First-time vs repeat investors · 2024"
+              head={["", "Investors", "Change", "Invested", "Share of investors", "Share of value"]}
+              rows={INVESTOR_TYPES_TABLE}
+              minWidth={720}
+              note="First-time buyers leaned to off-plan, especially villas; repeat investors spread across off-plan, whole buildings and land."
+            />
+          </div>
         </InView>
       </section>
 
       {/* ── 04 Where they bought ────────────────────────────────────── */}
-      <section className="border-y border-[#e5e8ec] bg-white">
+      <section id="communities" className="scroll-mt-24 border-y border-[#e5e8ec] bg-white">
         <InView className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24" threshold={0.15}>
           <Eyebrow n="04">Where the new money went</Eyebrow>
           <h2 className="mt-4 max-w-3xl font-['Outfit'] text-[32px] font-bold leading-[1.08] tracking-tight text-[#0d1117] sm:text-[42px]">
@@ -401,31 +471,23 @@ export default function DubaiRealEstateReport2024Page() {
           <p className="wf-fade mt-4 max-w-2xl text-[15.5px] leading-relaxed text-[#4b5563]" style={{ ["--d" as string]: "450ms" }}>
             Ranked by how much more was invested in 2024 than in 2023. Airport-side districts led, while mid-market suburbs are catching up fast. Names are DLD&rsquo;s official community names.
           </p>
-          <ol className="mt-10 divide-y divide-[#eef0f3] border-y border-[#e5e8ec]">
-            {HOT_COMMUNITIES.map((c, i) => (
-              <li key={c.name} className="wf-fade grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-4 gap-y-2 py-5 sm:grid-cols-[3rem_minmax(0,1.2fr)_minmax(0,1fr)] sm:items-center" style={{ ["--d" as string]: `${300 + i * 90}ms` }}>
-                <span className="font-['Outfit'] text-[26px] font-bold leading-none text-[#d6b357]">{String(i + 1).padStart(2, "0")}</span>
-                <div>
-                  <p className="font-['Outfit'] text-[19px] font-bold text-[#0d1117]">{c.name}</p>
-                  <p className="mt-0.5 text-[13px] text-[#6b7280]">{c.note}</p>
-                </div>
-                <div className="col-start-2 sm:col-start-auto">
-                  <div className="flex items-baseline justify-between gap-3 text-[13px]">
-                    <span className="font-['Outfit'] text-[18px] font-bold text-[#0d1117]">+AED {c.value.toFixed(2)}bn</span>
-                    <span className="font-semibold text-[#6b7280]">+{c.investors.toLocaleString("en-US")} investors</span>
-                  </div>
-                  <div className="mt-2 h-2 bg-[#eef0f3]">
-                    <div className="wf-line h-full bg-[#001f3f]" style={{ width: `${(100 * c.value) / commMax}%`, ["--g" as string]: `${400 + i * 110}ms` }} />
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ol>
+          <div className="mt-10">
+            <DataTable caption="Top communities by extra investment in 2024 vs 2023" head={["Community", "Extra invested", "Extra investors"]} rows={COMMUNITIES_TOP} />
+            <details className="group mt-3">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-2 border border-[#e5e8ec] bg-white px-4 py-2.5 text-[13px] font-bold text-[#001f3f] transition-colors hover:border-[#d6b357] [&::-webkit-details-marker]:hidden">
+                <span className="group-open:hidden">Show all 20 communities</span>
+                <span className="hidden group-open:inline">Show the top 10 only</span>
+              </summary>
+              <div className="mt-3">
+                <DataTable caption="Communities 11–20" head={["Community", "Extra invested", "Extra investors"]} rows={COMMUNITIES_REST} note="“—” where the report charts a community's extra value but not its extra investors. Madinat Hind 4 and Al Barsha South Fourth added many buyers on smaller tickets — the report's sign of a retail-driven market." />
+              </div>
+            </details>
+          </div>
         </InView>
       </section>
 
       {/* ── 05 Did investors make money ─────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+      <section id="profits" className="mx-auto max-w-7xl scroll-mt-24 px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
         <InView threshold={0.15}>
           <Eyebrow n="05">Did buyers make money?</Eyebrow>
           <h2 className="mt-4 max-w-3xl font-['Outfit'] text-[32px] font-bold leading-[1.08] tracking-tight text-[#0d1117] sm:text-[42px]">
@@ -451,11 +513,14 @@ export default function DubaiRealEstateReport2024Page() {
           <p className="wf-fade mt-4 text-[12px] text-[#9ca3af]" style={{ ["--d" as string]: "700ms" }}>
             Totals of realised gains across all sellers in each of DLD&rsquo;s three analyses, 2021–2024 — the groups can overlap, so they are not added together. Past results are not a promise of future returns.
           </p>
+          <div className="mt-10">
+            <DataTable caption="Realised profits by property · AED billion, 2021–2024" head={["How they sold", "Villas", "Apartments", "Total"]} rows={PROFITS_TABLE} />
+          </div>
         </InView>
       </section>
 
       {/* ── 06 Luxury + rents (dark) ────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-[#06182e] text-white">
+      <section id="luxury-rents" className="relative scroll-mt-24 overflow-hidden bg-[#06182e] text-white">
         <div className="absolute inset-x-0 top-0 h-[3px] bg-[#d6b357]" aria-hidden="true" />
         <InView className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24" threshold={0.12}>
           <Eyebrow n="06" dark>Luxury &amp; rents</Eyebrow>
@@ -517,11 +582,20 @@ export default function DubaiRealEstateReport2024Page() {
               </p>
             </div>
           </div>
+          <div className="mt-14 grid gap-10 lg:grid-cols-2">
+            <DataTable dark caption="Priciest luxury apartments · AED per sq m" head={["Community", "Average"]} rows={LUXURY_APARTMENTS_TABLE} />
+            <DataTable dark caption="Priciest luxury villas · AED per sq m" head={["Community", "Average"]} rows={LUXURY_VILLAS_TABLE} />
+            <DataTable dark caption="Rents 2023 → 2024" head={["", "2023", "2024", "Change"]} rows={RENTS_TABLE} />
+            <DataTable dark caption="Top communities by rental value · 2024" head={["Community", "Rents paid", "Change"]} rows={RENT_COMMUNITIES_TABLE} />
+          </div>
+          <p className="mt-4 text-[12px] leading-relaxed text-white/45">
+            &ldquo;Luxury&rdquo; is the report&rsquo;s definition: the top 10% of apartments and villas by price per sq m. Marsa Dubai, Burj Khalifa and Business Bay hold the most luxury value (AED 16.2bn, 12.1bn and 10.2bn of luxury apartments).
+          </p>
         </InView>
       </section>
 
       {/* ── 07 What comes next ──────────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+      <section id="outlook" className="mx-auto max-w-7xl scroll-mt-24 px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
         <InView threshold={0.15}>
           <Eyebrow n="07">What comes next</Eyebrow>
           <h2 className="mt-4 max-w-3xl font-['Outfit'] text-[32px] font-bold leading-[1.08] tracking-tight text-[#0d1117] sm:text-[42px]">
