@@ -57,7 +57,7 @@ const NAV_LINKS: NavItem[] = [
     label: "More",
     href: "/open-data",
     children: [
-      { label: "Open Data", href: "/open-data", desc: "DLD's official property price index", icon: BarChart3 },
+      { label: "Dubai Residential Price Index", href: "/open-data", desc: "DLD's official property price index", icon: BarChart3 },
       { label: "Contact",   href: "/contact",   desc: "Get in touch with our team",          icon: Phone },
     ],
   },
