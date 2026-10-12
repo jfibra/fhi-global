@@ -12,6 +12,7 @@ const STATIC_PATHS = [
   "/developers",
   "/open-data",
   "/dubai-real-estate-report-2024",
+  "/forms",
   "/agents",
   "/agent-websites",
   "/events",

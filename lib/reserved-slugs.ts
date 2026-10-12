@@ -16,7 +16,7 @@ const ROUTE_SEGMENTS = new Set([
   // app/(public-page)/(header-footer)
   "about", "agent-websites", "agents", "b", "buy", "buy-with", "contact", "cookies", "developers",
   "dubai-real-estate-report-2024",
-  "dubai-mortgage-calculator", "events", "feedback", "gallery", "news", "open-data", "privacy", "rent",
+  "dubai-mortgage-calculator", "events", "feedback", "forms", "gallery", "news", "open-data", "privacy", "rent",
   "s", "sell-with", "terms", "verify",
   // app/(public-page)/(landing) and (auth)
   "projects", "developers-login", "developer-login", "register", "staff-login", "login",
@@ -24,7 +24,7 @@ const ROUTE_SEGMENTS = new Set([
   "account-inactive", "api", "auth", "business-card", "complete-profile", "dashboard", "johndorf",
   "listings", "logout", "og", "owner-documents", "template", "website", "internal",
   // folders under public/ — served at the root, so a developer slug with the same name would never be reached
-  "background", "certificates", "fonts", "images", "logos", "materials", "pdfjs", "reelssounds", "seals",
+  "background", "certificates", "fonts", "hub-samples", "images", "logos", "materials", "pdfjs", "reelssounds", "seals",
   // files and framework paths served at the root
   "llms.txt", "robots.txt", "sitemap.xml", "news-sitemap.xml", "indexnow.txt", "favicon.ico", "_next",
 ])

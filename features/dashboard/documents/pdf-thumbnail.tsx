@@ -17,7 +17,7 @@
 // running pdf.js again). Rendering a page is the expensive part of this
 // shelf — worth more than the catalogue query to keep across refreshes.
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 
 /** Canvas width in px — the tile displays well under this, so it stays crisp on a 2x screen without over-rendering. */
 const RENDER_WIDTH = 400
@@ -57,8 +57,20 @@ function getCached(src: string): string | null {
   return null
 }
 
+// Subscribers of the cache (useSyncExternalStore below): a tile re-renders the
+// moment its page is rasterised, whichever tile did the work.
+const listeners = new Set<() => void>()
+const subscribe = (cb: () => void) => {
+  listeners.add(cb)
+  return () => {
+    listeners.delete(cb)
+  }
+}
+const noSnapshot = () => null
+
 function setCached(src: string, dataUrl: string) {
   cache.set(src, dataUrl)
+  listeners.forEach((cb) => cb())
   const store = readPersisted()
   // Re-insert at the end so the most recently rendered is evicted last.
   delete store[src]
@@ -86,8 +98,14 @@ type Props = {
 }
 
 export default function PdfThumbnail({ src, alt, fallback }: Props) {
-  const [dataUrl, setDataUrl] = useState<string | null>(() => getCached(src))
+  // The cached copy is read through useSyncExternalStore so a server render
+  // (the public /forms shelf) and the first client render agree on the
+  // fallback — reading localStorage in a useState initialiser gave the client
+  // a thumbnail the server never had, and React threw a hydration mismatch.
+  const cached = useSyncExternalStore(subscribe, () => getCached(src), noSnapshot)
+  const [rendered, setRendered] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
+  const dataUrl = rendered ?? cached
   const hostRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -121,7 +139,7 @@ export default function PdfThumbnail({ src, alt, fallback }: Props) {
         void pdf.destroy()
         if (cancelled) return
         setCached(src, url)
-        setDataUrl(url)
+        setRendered(url)
       } catch {
         if (!cancelled) setFailed(true)
       }
