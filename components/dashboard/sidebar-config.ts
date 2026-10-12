@@ -69,6 +69,8 @@ export interface NavEntry {
   description?: string
   /** Which format mockup the hub tile shows (see hub-tile-mockups.tsx). */
   mock?: string
+  /** Which real sample the tile shows instead — Library and Agent Resource only (hub-tile-previews.tsx). */
+  preview?: string
 }
 
 /** A set of entries reachable through one sidebar row → a hub page of tiles. */
@@ -100,6 +102,7 @@ export interface HubTile {
   href: string
   description: string
   mock?: string
+  preview?: string
 }
 
 /** A destination the topbar search can jump to. */
@@ -210,15 +213,15 @@ const ADMIN_NAV: RoleNavEntry[] = [
     to: "agent-resource",
     icon: FileText,
     items: [
-      { ...BUSINESS_CARD,  description: "Your shareable digital business card.", mock: "business-card" },
-      { ...DIGITAL_CARD, description: "The one link you share — contacts, socials and QR.", mock: "digital-business-card" },
-      { ...REELS_MAKER,   description: "Turn a listing or project into a shareable reel.", mock: "reels-maker" },
-      { ...PHOTO_STUDIO, description: "Stage a photo with AI — add people, furniture or landscaping.", mock: "photo-studio" },
-      { ...POSTER_MAKER,  description: "Flyers and posters from any listing or project.", mock: "poster-maker" },
-      { icon: Presentation, label: "Meeting Poster", to: "meeting-poster", description: "Event posters with your choice of speakers.", mock: "meeting-poster" },
-      { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website.", mock: "website-builder" },
-      { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement.", mock: "a2a-agreement" },
-      { ...BUYERS_LINK,     description: "Links for buyers and sellers — their brief comes straight to you.", mock: "buyers-link" },
+      { ...BUSINESS_CARD,  description: "Your shareable digital business card.", preview: "business-card" },
+      { ...DIGITAL_CARD, description: "The one link you share — contacts, socials and QR.", preview: "digital-business-card" },
+      { ...REELS_MAKER,   description: "Turn a listing or project into a shareable reel.", preview: "reels-maker" },
+      { ...PHOTO_STUDIO, description: "Stage a photo with AI — add people, furniture or landscaping.", preview: "photo-studio" },
+      { ...POSTER_MAKER,  description: "Flyers and posters from any listing or project.", preview: "poster-maker" },
+      { icon: Presentation, label: "Meeting Poster", to: "meeting-poster", description: "Event posters with your choice of speakers.", preview: "meeting-poster" },
+      { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website.", preview: "website-builder" },
+      { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement.", preview: "a2a-agreement" },
+      { ...BUYERS_LINK,     description: "Links for buyers and sellers — their brief comes straight to you.", preview: "buyers-link" },
     ],
   },
   {
@@ -239,12 +242,12 @@ const ADMIN_NAV: RoleNavEntry[] = [
     to: "library",
     icon: Library,
     items: [
-      { ...MATERIALS, description: "Branded marketing artwork to download and share.", mock: "materials" },
-      { ...EBOOKS,    description: "Training guides and reference PDFs.", mock: "ebooks" },
-      { ...VIDEOS,    description: "FHI's films to watch, download and share.", mock: "videos" },
+      { ...MATERIALS, description: "Branded marketing artwork to download and share.", preview: "materials" },
+      { ...EBOOKS,    description: "Training guides and reference PDFs.", preview: "ebooks" },
+      { ...VIDEOS,    description: "FHI's films to watch, download and share.", preview: "videos" },
       // Admin-uploadable — DLD contract forms, agreements, company templates.
       // The sales ladder has a read-only copy on its Library hub (DOCUMENTS below).
-      { icon: Files, label: "Documents", to: "documents", description: "Upload and manage DLD forms, agreements and company templates." },
+      { icon: Files, label: "Documents", to: "documents", description: "Upload and manage DLD forms, agreements and company templates.", preview: "documents" },
     ],
   },
   { icon: ScrollText, label: "Activity Logs", to: "system-logs" },
@@ -321,13 +324,13 @@ const salesPipelineNav = ({ projects = false, teamSales = false, invite = true, 
     to: "agent-resource",
     icon: FileText,
     items: [
-      { ...BUSINESS_CARD,   description: "Your shareable digital business card.", mock: "business-card" },
-      { ...DIGITAL_CARD,    description: "The one link you share — contacts, socials and QR.", mock: "digital-business-card" },
-      { ...REELS_MAKER,     description: "Turn a listing or project into a shareable reel.", mock: "reels-maker" },
-      { ...POSTER_MAKER,    description: "Flyers and posters from any listing or project.", mock: "poster-maker" },
-      { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website.", mock: "website-builder" },
-      { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement.", mock: "a2a-agreement" },
-      { ...BUYERS_LINK,     description: "Links for buyers and sellers — their brief comes straight to you.", mock: "buyers-link" },
+      { ...BUSINESS_CARD,   description: "Your shareable digital business card.", preview: "business-card" },
+      { ...DIGITAL_CARD,    description: "The one link you share — contacts, socials and QR.", preview: "digital-business-card" },
+      { ...REELS_MAKER,     description: "Turn a listing or project into a shareable reel.", preview: "reels-maker" },
+      { ...POSTER_MAKER,    description: "Flyers and posters from any listing or project.", preview: "poster-maker" },
+      { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website.", preview: "website-builder" },
+      { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement.", preview: "a2a-agreement" },
+      { ...BUYERS_LINK,     description: "Links for buyers and sellers — their brief comes straight to you.", preview: "buyers-link" },
     ],
   },
   // Marketing artwork + training PDFs, grouped under one hub.
@@ -336,10 +339,10 @@ const salesPipelineNav = ({ projects = false, teamSales = false, invite = true, 
     to: "library",
     icon: Library,
     items: [
-      { ...MATERIALS, description: "Branded marketing artwork to download and share.", mock: "materials" },
-      { ...EBOOKS,    description: "Training guides and reference PDFs.", mock: "ebooks" },
-      { ...VIDEOS,    description: "FHI's films to watch, download and share.", mock: "videos" },
-      ...(documents ? [{ ...DOCUMENTS, description: "DLD forms, agreements and company templates — fill in and download." }] : []),
+      { ...MATERIALS, description: "Branded marketing artwork to download and share.", preview: "materials" },
+      { ...EBOOKS,    description: "Training guides and reference PDFs.", preview: "ebooks" },
+      { ...VIDEOS,    description: "FHI's films to watch, download and share.", preview: "videos" },
+      ...(documents ? [{ ...DOCUMENTS, description: "DLD forms, agreements and company templates — fill in and download.", preview: "documents" }] : []),
     ],
   },
 ]
@@ -555,6 +558,7 @@ export function getHubTiles(
       href: hubItemHref(base, group, item),
       description: item.description ?? "",
       mock: item.mock,
+      preview: item.preview,
     })),
   }
 }
