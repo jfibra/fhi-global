@@ -173,6 +173,8 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { icon: Globe, label: "Global Partners", to: "global-partners", description: "Every Global Partner, grouped by the country they live in." },
       // Who the public /agents page (and the About page's faces) shows — migration 077.
       { icon: Eye, label: "Public Agents", to: "public-agents", description: "Choose which agents appear on the public Agents page." },
+      // Any recruiter's whole tree, level by level (the same view agents get for their own).
+      { icon: GitBranch, label: "Genealogy", to: "genealogy", description: "Any recruiter's whole tree, level by level." },
     ],
   },
   { icon: Network, label: "Teams", to: "teams" },

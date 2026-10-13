@@ -22,8 +22,8 @@ import type { GenealogyNode, GenealogyResponse } from "@/app/api/genealogy/route
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-AE", { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Dubai" }) : "—"
 
-async function load(): Promise<GenealogyResponse> {
-  const res = await fetch("/api/genealogy", { cache: "no-store" })
+async function load(endpoint: string): Promise<GenealogyResponse> {
+  const res = await fetch(endpoint, { cache: "no-store" })
   const json = (await res.json().catch(() => ({}))) as GenealogyResponse & { error?: string }
   if (!res.ok || !json.nodes) throw new Error(json.error ?? `Request failed (${res.status}).`)
   return json
@@ -45,9 +45,19 @@ function StatusChip({ status }: { status: string }) {
   return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10.5px] font-bold capitalize ${c.bg} ${c.text} ${c.border}`}>{status}</span>
 }
 
+/** The recruiter's own page: the gate, then the shared view on the session-scoped API. */
 export default function GenealogyPage() {
   const { role } = useAuth()
   const allowed = useRequireAllowed(invitableRolesFor(role).length > 0 || roleInList(role, ROLES_ADMIN_STAFF))
+  if (!allowed) return null
+  return <GenealogyView endpoint="/api/genealogy" self />
+}
+
+/**
+ * The tree itself — tiles, Chart | List, search. `self` = the signed-in person's
+ * own tree (second-person copy); the admin page passes someone else's endpoint.
+ */
+export function GenealogyView({ endpoint, self = false, heading = true }: { endpoint: string; self?: boolean; heading?: boolean }) {
   const [data, setData] = useState<GenealogyResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -59,7 +69,7 @@ export default function GenealogyPage() {
 
   const refresh = () => {
     setBusy(true)
-    load()
+    load(endpoint)
       .then((d) => {
         setData(d)
         setError(null)
@@ -76,7 +86,8 @@ export default function GenealogyPage() {
   useEffect(() => {
     const id = window.setTimeout(refresh, 0)
     return () => window.clearTimeout(id)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [endpoint])
 
   const childrenOf = useMemo(() => {
     const m = new Map<string, GenealogyNode[]>()
@@ -107,8 +118,6 @@ export default function GenealogyPage() {
     })
   const expandAll = () => setOpen(new Set([data?.root.id ?? "", ...(data?.nodes ?? []).filter((n) => n.direct > 0).map((n) => n.id)]))
   const collapseAll = () => setOpen(new Set([data?.root.id ?? ""]))
-
-  if (!allowed) return null
 
   const Branch = ({ parentId, level }: { parentId: string; level: number }) => {
     const kids = (childrenOf.get(parentId) ?? []).filter((n) => !visible || visible.has(n.id))
@@ -167,14 +176,18 @@ export default function GenealogyPage() {
   return (
     <div className="w-full space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 font-['Outfit'] text-2xl font-bold text-[#0d1117]">
-            <GitBranch className="h-6 w-6 text-[#001f3f]" /> Genealogy
-          </h1>
-          <p className="mt-1 max-w-3xl text-sm text-[#6b7280]">
-            Everyone who joined through your invite link, and everyone under them, level by level. Tap a person to open their branch.
-          </p>
-        </div>
+        {heading ? (
+          <div>
+            <h1 className="flex items-center gap-2 font-['Outfit'] text-2xl font-bold text-[#0d1117]">
+              <GitBranch className="h-6 w-6 text-[#001f3f]" /> Genealogy
+            </h1>
+            <p className="mt-1 max-w-3xl text-sm text-[#6b7280]">
+              Everyone who joined through your invite link, and everyone under them, level by level. Tap a person to open their branch.
+            </p>
+          </div>
+        ) : (
+          <div />
+        )}
         <button
           type="button"
           onClick={refresh}
@@ -235,7 +248,7 @@ export default function GenealogyPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Find someone in your network…"
+              placeholder={self ? "Find someone in your network…" : "Find someone in this network…"}
               className="w-full rounded-xl border border-[#e5e5e5] py-2.5 pl-10 pr-4 text-sm text-[#111827] placeholder:text-[#9ca3af] focus:border-[#001f3f] focus:outline-none"
             />
           </div>
@@ -250,8 +263,8 @@ export default function GenealogyPage() {
           </p>
         ) : data.nodes.length === 0 ? (
           <div className="py-10 text-center">
-            <p className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Nobody has joined through your link yet.</p>
-            <p className="mt-1 text-sm text-[#6b7280]">Share your invite link from the Invite page — everyone who registers with it appears here, and so do the people they bring in.</p>
+            <p className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{self ? "Nobody has joined through your link yet." : `Nobody has joined through ${data.root.name}'s link yet.`}</p>
+            {self && <p className="mt-1 text-sm text-[#6b7280]">Share your invite link from the Invite page — everyone who registers with it appears here, and so do the people they bring in.</p>}
           </div>
         ) : mode === "chart" ? (
           <div className="mt-5">
@@ -263,8 +276,8 @@ export default function GenealogyPage() {
             <div className="flex items-center gap-3 border-b-2 border-[#d6b357] pb-3">
               <Avatar name={data.root.name} photo={data.root.photo} size="h-12 w-12" ring />
               <div className="min-w-0">
-                <p className="font-['Outfit'] text-lg font-bold leading-tight text-[#0d1117]">{data.root.name} <span className="text-sm font-semibold text-[#9ca3af]">(you)</span></p>
-                <p className="text-xs text-[#6b7280]">{roleToLabel(data.root.role)} · {data.summary.direct} direct · {data.summary.network} in your network</p>
+                <p className="font-['Outfit'] text-lg font-bold leading-tight text-[#0d1117]">{data.root.name} {self && <span className="text-sm font-semibold text-[#9ca3af]">(you)</span>}</p>
+                <p className="text-xs text-[#6b7280]">{roleToLabel(data.root.role)} · {data.summary.direct} direct · {data.summary.network} in {self ? "your" : "their"} network</p>
               </div>
             </div>
             {visible && (
@@ -273,7 +286,7 @@ export default function GenealogyPage() {
               </p>
             )}
             {visible && matches === 0 ? (
-              <p className="py-8 text-sm text-[#9ca3af]">Nobody in your network matches.</p>
+              <p className="py-8 text-sm text-[#9ca3af]">Nobody in {self ? "your" : "this"} network matches.</p>
             ) : (
               <div className="mt-1">
                 <Branch parentId={data.root.id} level={1} />
