@@ -11,7 +11,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ChevronDown, ChevronsDownUp, ChevronsUpDown, GitBranch, Loader2, RefreshCw, Search, TrendingUp, UserPlus, Users } from "lucide-react"
+import { ChevronDown, ChevronsDownUp, ChevronsUpDown, GitBranch, List, Loader2, Network, RefreshCw, Search, TrendingUp, UserPlus, Users } from "lucide-react"
+import { TreeChart } from "./tree-chart"
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { ROLES_ADMIN_STAFF, invitableRolesFor, roleInList, roleToLabel } from "@/lib/app-roles"
@@ -53,6 +54,7 @@ export default function GenealogyPage() {
   const [query, setQuery] = useState("")
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [onlySelling, setOnlySelling] = useState(false)
+  const [mode, setMode] = useState<"chart" | "list">("chart")
   const loadedOnce = useRef(false)
 
   const refresh = () => {
@@ -203,12 +205,21 @@ export default function GenealogyPage() {
       <div className="rounded-2xl border border-[#e8eaed] bg-white p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-1.5">
+            <div role="tablist" aria-label="View" className="mr-1 inline-flex rounded-lg border border-[#e5e7eb] p-0.5">
+              {([["chart", "Chart", Network], ["list", "List", List]] as const).map(([k, label, Icon]) => (
+                <button key={k} type="button" role="tab" aria-selected={mode === k} onClick={() => setMode(k)} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${mode === k ? "bg-[#001f3f] text-white" : "text-[#374151] hover:bg-[#f1f3f6]"}`}>
+                  <Icon className="h-3.5 w-3.5" /> {label}
+                </button>
+              ))}
+            </div>
+            {mode === "list" && (<>
             <button type="button" onClick={expandAll} disabled={!data} className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e7eb] px-2.5 py-1.5 text-xs font-bold text-[#374151] transition-colors hover:border-[#d6b357] disabled:opacity-50">
               <ChevronsUpDown className="h-3.5 w-3.5" /> Expand all
             </button>
             <button type="button" onClick={collapseAll} disabled={!data} className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e7eb] px-2.5 py-1.5 text-xs font-bold text-[#374151] transition-colors hover:border-[#d6b357] disabled:opacity-50">
               <ChevronsDownUp className="h-3.5 w-3.5" /> Collapse all
             </button>
+            </>)}
             <button
               type="button"
               onClick={() => setOnlySelling((v) => !v)}
@@ -218,6 +229,7 @@ export default function GenealogyPage() {
               <TrendingUp className="h-3.5 w-3.5" /> Selling only
             </button>
           </div>
+          {mode === "list" && (
           <div className="relative lg:w-80">
             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9ca3af]" />
             <input
@@ -227,6 +239,7 @@ export default function GenealogyPage() {
               className="w-full rounded-xl border border-[#e5e5e5] py-2.5 pl-10 pr-4 text-sm text-[#111827] placeholder:text-[#9ca3af] focus:border-[#001f3f] focus:outline-none"
             />
           </div>
+          )}
         </div>
 
         {error ? (
@@ -239,6 +252,10 @@ export default function GenealogyPage() {
           <div className="py-10 text-center">
             <p className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Nobody has joined through your link yet.</p>
             <p className="mt-1 text-sm text-[#6b7280]">Share your invite link from the Invite page — everyone who registers with it appears here, and so do the people they bring in.</p>
+          </div>
+        ) : mode === "chart" ? (
+          <div className="mt-5">
+            <TreeChart data={data} selling={onlySelling} />
           </div>
         ) : (
           <div className="mt-5">
