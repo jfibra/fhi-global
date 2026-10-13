@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, ChevronRight, Crosshair, Minus, Plus, Maximize2, TrendingUp, UserPlus } from "lucide-react"
+import { ChevronLeft, ChevronRight, Crosshair, Expand, Maximize, Minimize, Minus, Plus, TrendingUp, UserPlus } from "lucide-react"
 import { roleToLabel } from "@/lib/app-roles"
 import { STATUS_COLORS } from "@/lib/user-service"
 import type { GenealogyNode, GenealogyResponse } from "@/app/api/genealogy/route"
@@ -161,33 +161,60 @@ export function TreeChart({ data, selling }: { data: GenealogyResponse; selling:
     },
     [frameSize],
   )
-  const onWheel = useCallback(
-    (e: React.WheelEvent) => {
+  // Wheel zoom needs a non-passive listener (React's onWheel can't preventDefault), so it is
+  // attached by hand. Dragging follows the pointer on the window — no pointer capture, which
+  // would steal the click from the cards.
+  useEffect(() => {
+    const el = frame.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
       e.preventDefault()
-      const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      const r = el.getBoundingClientRect()
       zoom(e.deltaY < 0 ? 1.12 : 1 / 1.12, e.clientX - r.left, e.clientY - r.top)
-    },
-    [zoom],
-  )
+    }
+    el.addEventListener("wheel", onWheel, { passive: false })
+    return () => el.removeEventListener("wheel", onWheel)
+  }, [zoom])
   const onDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0 && e.pointerType === "mouse") return
+    const start = { x: e.clientX, y: e.clientY }
     setView((v) => {
-      drag.current = { x: e.clientX, y: e.clientY, vx: v.x, vy: v.y, moved: false }
+      drag.current = { x: start.x, y: start.y, vx: v.x, vy: v.y, moved: false }
       return v
     })
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    const move = (ev: PointerEvent) => {
+      const d = drag.current
+      if (!d) return
+      const dx = ev.clientX - d.x
+      const dy = ev.clientY - d.y
+      if (!d.moved && Math.abs(dx) + Math.abs(dy) > 6) d.moved = true
+      if (d.moved) setView((v) => ({ ...v, x: d.vx + dx, y: d.vy + dy }))
+    }
+    const up = () => {
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", up)
+      window.removeEventListener("pointercancel", up)
+      // Keep `moved` for the click that follows the pointer-up, then forget the drag.
+      const d = drag.current
+      window.setTimeout(() => { if (drag.current === d) drag.current = null }, 0)
+    }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", up)
+    window.addEventListener("pointercancel", up)
   }, [])
-  const onMove = useCallback((e: React.PointerEvent) => {
-    const d = drag.current
-    if (!d) return
-    const dx = e.clientX - d.x
-    const dy = e.clientY - d.y
-    if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true
-    setView((v) => ({ ...v, x: d.vx + dx, y: d.vy + dy }))
+  // Real fullscreen for the chart box; the frame grows to the whole screen.
+  const box = useRef<HTMLDivElement>(null)
+  const [full, setFull] = useState(false)
+  useEffect(() => {
+    const onChange = () => setFull(document.fullscreenElement === box.current)
+    document.addEventListener("fullscreenchange", onChange)
+    return () => document.removeEventListener("fullscreenchange", onChange)
   }, [])
-  const onUp = useCallback(() => {
-    // Keep `moved` for the click that follows the pointer-up, then forget the drag.
-    const d = drag.current
-    if (d) window.setTimeout(() => { if (drag.current === d) drag.current = null }, 0)
+  const toggleFull = useCallback(() => {
+    const el = box.current
+    if (!el) return
+    if (document.fullscreenElement) void document.exitFullscreen()
+    else void el.requestFullscreen?.()
   }, [])
   const toggle = (id: string) =>
     setOpen((s) => {
@@ -224,7 +251,7 @@ export function TreeChart({ data, selling }: { data: GenealogyResponse; selling:
   for (let cur: string | undefined = focus; cur && cur !== data.root.id; cur = byId.get(cur)?.parentId) trail.unshift(rootPerson(cur))
 
   return (
-    <div className="relative">
+    <div ref={box} className={`relative ${full ? "bg-white p-4" : ""}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <nav aria-label="Chart path" className="flex flex-wrap items-center gap-1 text-[12px] font-semibold text-[#6b7280]">
           <button type="button" onClick={() => focusOn(data.root.id)} className={`rounded-md px-1.5 py-0.5 hover:bg-[#f1f3f6] ${focus === data.root.id ? "text-[#001f3f]" : ""}`}>{data.root.name}</button>
@@ -236,26 +263,17 @@ export function TreeChart({ data, selling }: { data: GenealogyResponse; selling:
           ))}
         </nav>
         <div className="flex items-center gap-1">
-          {[
-            { label: "Zoom out", icon: Minus, act: () => zoom(1 / 1.25) },
-            { label: "Zoom in", icon: Plus, act: () => zoom(1.25) },
-            { label: "Fit to screen", icon: Maximize2, act: fit },
-          ].map((b) => (
-            <button key={b.label} type="button" onClick={b.act} aria-label={b.label} title={b.label} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e5e7eb] bg-white text-[#374151] transition-colors hover:border-[#d6b357]">
-              <b.icon className="h-4 w-4" />
-            </button>
-          ))}
+          <button type="button" onClick={() => zoom(1 / 1.25)} aria-label="Zoom out" title="Zoom out" className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e5e7eb] bg-white text-[#374151] transition-colors hover:border-[#d6b357]"><Minus className="h-4 w-4" /></button>
+          <button type="button" onClick={() => zoom(1.25)} aria-label="Zoom in" title="Zoom in" className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e5e7eb] bg-white text-[#374151] transition-colors hover:border-[#d6b357]"><Plus className="h-4 w-4" /></button>
+          <button type="button" onClick={fit} aria-label="Fit to screen" title="Fit to screen" className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e5e7eb] bg-white text-[#374151] transition-colors hover:border-[#d6b357]"><Expand className="h-4 w-4" /></button>
+          <button type="button" onClick={toggleFull} aria-label={full ? "Exit full screen" : "Full screen"} title={full ? "Exit full screen" : "Full screen"} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e5e7eb] bg-white text-[#374151] transition-colors hover:border-[#d6b357]">{full ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}</button>
         </div>
       </div>
 
       <div
         ref={frame}
-        onWheel={onWheel}
         onPointerDown={onDown}
-        onPointerMove={onMove}
-        onPointerUp={onUp}
-        onPointerCancel={onUp}
-        className="relative h-[70vh] min-h-[520px] cursor-grab touch-none select-none overflow-hidden rounded-2xl border border-[#e8eaed] active:cursor-grabbing"
+        className={`relative cursor-grab touch-none select-none overflow-hidden rounded-2xl border border-[#e8eaed] active:cursor-grabbing ${full ? "h-[calc(100vh-88px)]" : "h-[70vh] min-h-[520px]"}`}
         style={{ backgroundColor: "#f7f8fa", backgroundImage: "radial-gradient(#d9dde3 1px, transparent 1px)", backgroundSize: "22px 22px" }}
       >
         <div className="absolute left-0 top-0 origin-top-left" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.s})`, width: layout.w, height: layout.h }}>
