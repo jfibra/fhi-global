@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library, MonitorPlay,
-  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus, Files, Eye,
+  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus, Files, Eye, GitBranch,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -305,6 +305,8 @@ const salesPipelineNav = ({ projects = false, teamSales = false, invite = true, 
   ...(projects ? [PROJECTS] : []),
   // Global partners are recruited, they do not recruit — no Invite for them.
   ...(invite ? [INVITE] : []),
+  // Their whole recruitment tree, level by level ("genealogy" in SUB_PATH_ROLES).
+  ...(invite ? [{ icon: GitBranch, label: "Genealogy", to: "genealogy" } satisfies NavEntry] : []),
   // Their own events, published on their website (migration 057).
   EVENTS,
   SALES_REPORTS,

@@ -91,6 +91,8 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   // each of these ranks may then set on a recruit. Members are deliberately
   // excluded — they don't recruit.
   invite: ["super_admin", "admin", "agent", "team_leader", "unit_manager"],
+  // The recruiter's own tree (app/api/genealogy is session-scoped). Admin staff read trees in Recruitment.
+  genealogy: ["agent", "team_leader", "unit_manager"],
   // FHI Assistant: admins get the company-wide one (app/api/admin/fhi-chat);
   // agents and team leaders their own-data one (app/api/fhi-chat).
   "fhi-chat": [...ROLES_ADMIN_STAFF, ...ROLES_AGENT_ASSISTANT],
