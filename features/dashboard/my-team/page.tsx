@@ -15,23 +15,22 @@
  * a ranked project list, and tables that turn into cards on a phone.
  */
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { LucideIcon } from "lucide-react"
-import { Award, BarChart3, Building2, Download, Hourglass, RefreshCw, Search, Target, TrendingUp, Trophy, UserPlus, Users } from "lucide-react"
+import { Award, BarChart3, Building2, Download, Hourglass, RefreshCw, Search, Share2, Target, TrendingUp, Trophy, UserPlus, Users } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { ROLES_ADMIN_STAFF, invitableRolesFor, roleInList, roleToLabel } from "@/lib/app-roles"
-import { STATUS_COLORS } from "@/lib/user-service"
 import type { MyTeamResponse, TeamMember, TeamSale } from "@/app/api/my-team/route"
+import { AED, Avatar, Level, StatusChip, fmtDate, inRange, short } from "./ui"
+import MemberPanel from "./member-panel"
+import ShareDialog from "./share-dialog"
 
 type Period = "month" | "last_month" | "quarter" | "year" | "all" | "custom"
 type SaleStatus = "validated" | "pending" | "rejected" | "all"
 type SoldFilter = "all" | "sold" | "not_sold"
 type MonthPoint = { key: string; value: number; deals: number; inPeriod: boolean }
 
-const AED = (n: number) => `AED ${Math.round(n).toLocaleString("en-AE")}`
-const short = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(Math.round(n)))
-const fmtDate = (iso: string | null) => (iso ? new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-AE", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }) : "—")
 const iso = (d: Date) => d.toISOString().slice(0, 10)
 const ymAdd = (ym: string, n: number) => { const [y, m] = ym.split("-").map(Number); return iso(new Date(Date.UTC(y, m - 1 + n, 1))).slice(0, 7) }
 const ymRange = (from: string, to: string) => { const out: string[] = []; for (let k = from; k <= to && out.length < 120; k = ymAdd(k, 1)) out.push(k); return out }
@@ -51,7 +50,6 @@ function periodBounds(p: Period, custom: { from: string; to: string }): { from: 
   if (p === "custom") return { from: custom.from || null, to: custom.to ? iso(new Date(Date.parse(`${custom.to}T00:00:00Z`) + 86400e3)) : null, label: `${custom.from ? fmtDate(custom.from) : "…"} – ${custom.to ? fmtDate(custom.to) : "…"}` }
   return { from: null, to: null, label: "All time" }
 }
-const inRange = (d: string, from: string | null, to: string | null) => (!from || d >= from) && (!to || d < to)
 
 function downloadCsv(name: string, head: string[], rows: (string | number | null)[][]) {
   const esc = (v: string | number | null) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
@@ -65,19 +63,6 @@ function downloadCsv(name: string, head: string[], rows: (string | number | null
 
 // ─── Small pieces ────────────────────────────────────────────────────────────
 
-function Avatar({ name, photo, size = "h-9 w-9", ring = "" }: { name: string; photo: string | null; size?: string; ring?: string }) {
-  return photo ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={photo} alt="" loading="lazy" className={`${size} shrink-0 rounded-full object-cover ${ring}`} />
-  ) : (
-    <span className={`${size} flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#001f3f] to-[#003366] font-['Outfit'] text-sm font-bold text-white ${ring}`}>{name.charAt(0).toUpperCase()}</span>
-  )
-}
-function StatusChip({ status }: { status: string }) {
-  const c = STATUS_COLORS[status] ?? STATUS_COLORS.pending
-  return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10.5px] font-bold capitalize ${c.bg} ${c.text} ${c.border}`}>{status}</span>
-}
-const Level = ({ n }: { n: number }) => <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-[#001f3f]/5 px-1 text-[10.5px] font-bold text-[#001f3f]">L{n}</span>
 const Select = ({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) => (
   <select value={value} onChange={(e) => onChange(e.target.value)} className="h-9 rounded-lg border border-[#e5e7eb] bg-white px-2.5 text-[13px] font-semibold text-[#111827] focus:border-[#001f3f] focus:outline-none">
     {children}
@@ -164,6 +149,16 @@ function Ring({ frac }: { frac: number }) {
 export default function MyTeamPage() {
   const { role } = useAuth()
   const allowed = useRequireAllowed(invitableRolesFor(role).length > 0 || roleInList(role, ROLES_ADMIN_STAFF))
+  if (!allowed) return null
+  return <MyTeamView endpoint="/api/my-team" shareEndpoint="/api/my-team/share-image" self />
+}
+
+/**
+ * The whole page for one recruiter's team. `self` = the signed-in leader's own
+ * team ("you", "your network"); the admin Team Performance page renders it for
+ * anyone with `self={false}` and admin endpoints.
+ */
+export function MyTeamView({ endpoint, shareEndpoint, self = false }: { endpoint: string; shareEndpoint: string; self?: boolean }) {
   const [data, setData] = useState<MyTeamResponse | null>(null)
   const [loadedAt, setLoadedAt] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -180,10 +175,16 @@ export default function MyTeamPage() {
   const [tab, setTab] = useState<"members" | "sales">("members")
   const [memberSort, setMemberSort] = useState("value")
   const [showAll, setShowAll] = useState(false)
+  // Member panel: a stack, so Back walks up the people opened from inside it.
+  const [panel, setPanel] = useState<string[]>([])
+  const [sharing, setSharing] = useState(false)
+  const openMember = (id: string) => setPanel([id])
+  const closePanel = useCallback(() => setPanel([]), [])
+  const closeShare = useCallback(() => setSharing(false), [])
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
     setBusy(true)
-    fetch("/api/my-team", { cache: "no-store" })
+    fetch(endpoint, { cache: "no-store" })
       .then(async (res) => {
         const json = (await res.json().catch(() => ({}))) as MyTeamResponse & { error?: string }
         if (!res.ok || !json.members) throw new Error(json.error ?? `Request failed (${res.status}).`)
@@ -193,11 +194,11 @@ export default function MyTeamPage() {
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't load your team."))
       .finally(() => setBusy(false))
-  }
+  }, [endpoint])
   useEffect(() => {
     const id = window.setTimeout(refresh, 0)
     return () => window.clearTimeout(id)
-  }, [])
+  }, [refresh])
 
   const bounds = periodBounds(period, custom)
   const q = query.trim().toLowerCase()
@@ -303,8 +304,6 @@ export default function MyTeamPage() {
     return { months, clipped, hasFaded: months.some((m) => !m.inPeriod), projects: projectRows.slice(0, 7), projectCount: projectRows.length, projectTotal: projectRows.reduce((a, r) => a + r.value, 0) }
   }, [data, periodSales, bounds.from, bounds.to])
 
-  if (!allowed) return null
-
   const exportMembers = () => downloadCsv("my-team-members", ["Name", "Level", "Role", "Status", "Joined", "Direct recruits", "Network", "Validated deals", "Validated value (AED)", "Pending deals", "Pending value (AED)", "Rejected", "Last sale"], members.map(({ n, p }) => [n.name, n.level, roleToLabel(n.role), n.status, n.joinedAt?.slice(0, 10) ?? "", n.direct, n.network, p.validated, Math.round(p.value), p.pending, Math.round(p.pendingValue), p.rejected, p.last ?? ""]))
   const exportSales = () => downloadCsv("my-team-sales", ["Date", "Status", "Member", "Level", "Share %", "Credited (AED)", "Project", "Developer", "Unit", "Contract price (AED)", "Shared with"], sales.flatMap((s) => s.credits.map((c) => [s.date, s.status, c.name, c.level, c.share, c.value, s.project, s.developer ?? "", s.unit ?? "", s.price, [...s.credits.filter((x) => x.memberId !== c.memberId).map((x) => x.name), ...s.outside].join("; ")])))
 
@@ -322,6 +321,8 @@ export default function MyTeamPage() {
     { h: "h-14", bg: "bg-gradient-to-b from-[#e3e8ee] to-[#b9c2cf]", ring: "ring-[3px] ring-[#c5ccd6]", size: "h-14 w-14 sm:h-16 sm:w-16", num: "text-[#5c6b7a]" },
     { h: "h-10", bg: "bg-gradient-to-b from-[#e8c4a0] to-[#b98250]", ring: "ring-[3px] ring-[#d9b48f]", size: "h-14 w-14 sm:h-16 sm:w-16", num: "text-white" },
   ]
+  const shownName = (n: string) => (n === "you" && !self && data ? data.root.name : n)
+  const outsideNote = (outside: string[]) => `shared with ${outside.map(shownName).join(", ")}${outside.some((n) => n !== "you") ? ` — outside ${self ? "your" : "the"} team` : ""}`
 
   return (
     <div className="w-full space-y-6">
@@ -367,7 +368,7 @@ export default function MyTeamPage() {
                 {data && (
                   <>
                     <span className="hidden text-white/30 sm:inline">·</span>
-                    <span>{data.members.length.toLocaleString("en-AE")} in your network · {data.perLevel.length} level{data.perLevel.length === 1 ? "" : "s"}</span>
+                    <span>{data.members.length.toLocaleString("en-AE")} in {self ? "your" : "their"} network · {data.perLevel.length} level{data.perLevel.length === 1 ? "" : "s"}</span>
                   </>
                 )}
               </p>
@@ -429,8 +430,8 @@ export default function MyTeamPage() {
         </div>
       ) : data.members.length === 0 ? (
         <div className="rounded-2xl border border-[#e8eaed] bg-white py-12 text-center">
-          <p className="font-['Outfit'] text-lg font-bold text-[#0d1117]">Nobody has joined through your link yet.</p>
-          <p className="mt-1 text-sm text-[#6b7280]">Share your invite link from the Invite page — your team builds from there.</p>
+          <p className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{self ? "Nobody has joined through your link yet." : "Nobody has joined through their link yet."}</p>
+          {self && <p className="mt-1 text-sm text-[#6b7280]">Share your invite link from the Invite page — your team builds from there.</p>}
         </div>
       ) : (
         <>
@@ -480,7 +481,21 @@ export default function MyTeamPage() {
           {/* ── Podium + conversion ── */}
           <div className="grid gap-5 lg:grid-cols-5">
             <Card className="lg:col-span-3">
-              <CardTitle icon={Trophy} aside={bounds.label}>Top sellers</CardTitle>
+              <CardTitle
+                icon={Trophy}
+                aside={
+                  <span className="inline-flex items-center gap-3">
+                    {bounds.label}
+                    {podium.length > 0 && (
+                      <button type="button" onClick={() => setSharing(true)} className="inline-flex items-center gap-1.5 rounded-full bg-[#001f3f] px-3 py-1.5 text-[11.5px] font-bold text-white transition-colors hover:bg-[#00356b]">
+                        <Share2 className="h-3.5 w-3.5 text-[#f0d89b]" /> Share
+                      </button>
+                    )}
+                  </span>
+                }
+              >
+                Top sellers
+              </CardTitle>
               {podium.length === 0 ? (
                 <p className="mt-6 text-sm text-[#9ca3af]">No validated sales in this period yet.</p>
               ) : (
@@ -491,22 +506,23 @@ export default function MyTeamPage() {
                       if (!r) return <div key={rank} />
                       const s = PLINTH[rank]
                       return (
-                        <div key={r.n.id} className="flex min-w-0 flex-col items-center text-center">
+                        <button type="button" key={r.n.id} onClick={() => openMember(r.n.id)} className="group flex min-w-0 flex-col items-center text-center">
                           <Avatar name={r.n.name} photo={r.n.photo} size={s.size} ring={`${s.ring} ring-offset-2 ring-offset-white`} />
-                          <p className="mt-3 line-clamp-2 min-h-[2.5em] text-[12.5px] font-bold leading-tight text-[#0d1117] sm:text-[13px]">{r.n.name}</p>
+                          <p className="mt-3 line-clamp-2 min-h-[2.5em] text-[12.5px] font-bold leading-tight text-[#0d1117] group-hover:underline sm:text-[13px]">{r.n.name}</p>
                           <p className="mt-0.5 whitespace-nowrap font-['Outfit'] text-[13px] font-bold text-[#001f3f] sm:text-[15px]"><span className="sm:hidden">AED {short(r.p.value)}</span><span className="hidden sm:inline">{AED(r.p.value)}</span></p>
                           <p className="text-[11px] text-[#6b7280]">{r.p.validated} deal{r.p.validated === 1 ? "" : "s"} · L{r.n.level}</p>
                           <div className={`relative mt-3 flex w-full items-start justify-center rounded-t-xl ${s.h} ${s.bg} shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]`}>
                             <span className={`mt-1.5 font-['Outfit'] text-[22px] font-bold leading-none ${s.num} [text-shadow:0_1px_0_rgba(255,255,255,0.35)]`}>{rank + 1}</span>
                           </div>
-                        </div>
+                        </button>
                       )
                     })}
                   </div>
                   {kpi.ranked.length > 3 && (
                     <ol className="divide-y divide-[#f0f2f5] border-t border-[#e5e8ec]">
                       {kpi.ranked.slice(3, 8).map((r, i) => (
-                        <li key={r.n.id} className="flex items-center gap-3 py-2.5 text-sm">
+                        <li key={r.n.id}>
+                          <button type="button" onClick={() => openMember(r.n.id)} className="flex w-full items-center gap-3 py-2.5 text-left text-sm transition-colors hover:bg-[#fafbfc]">
                           <span className="w-5 text-right font-['Outfit'] text-[13px] font-bold text-[#c5ccd6]">{i + 4}</span>
                           <Avatar name={r.n.name} photo={r.n.photo} size="h-8 w-8" />
                           <span className="min-w-0 flex-1">
@@ -514,6 +530,7 @@ export default function MyTeamPage() {
                             <span className="text-[11px] text-[#9ca3af]">{r.p.validated} deal{r.p.validated === 1 ? "" : "s"}</span>
                           </span>
                           <span className="whitespace-nowrap font-['Outfit'] font-bold tabular-nums text-[#001f3f]">{AED(r.p.value)}</span>
+                          </button>
                         </li>
                       ))}
                     </ol>
@@ -633,7 +650,8 @@ export default function MyTeamPage() {
                   {/* Phone: cards */}
                   <ul className="divide-y divide-[#f0f2f5] md:hidden">
                     {shown.map(({ n, p }) => (
-                      <li key={n.id} className="px-4 py-3.5">
+                      <li key={n.id}>
+                       <button type="button" onClick={() => openMember(n.id)} className="block w-full px-4 py-3.5 text-left active:bg-[#f4f6f9]">
                         <div className="flex items-center gap-3">
                           <Avatar name={n.name} photo={n.photo} size="h-10 w-10" ring={p.validated ? "ring-2 ring-[#d6b357]" : ""} />
                           <div className="min-w-0 flex-1">
@@ -657,6 +675,7 @@ export default function MyTeamPage() {
                           </div>
                         )}
                         {n.direct > 0 && <p className="mt-1 pl-[52px] text-[11px] text-[#9ca3af]">{n.direct} direct recruit{n.direct === 1 ? "" : "s"}{n.network > n.direct ? ` · ${n.network} in network` : ""}</p>}
+                       </button>
                       </li>
                     ))}
                   </ul>
@@ -670,12 +689,12 @@ export default function MyTeamPage() {
                       </thead>
                       <tbody className="divide-y divide-[#f0f2f5]">
                         {shown.map(({ n, p }) => (
-                          <tr key={n.id} className="transition-colors hover:bg-[#fafbfc]">
+                          <tr key={n.id} onClick={() => openMember(n.id)} className="cursor-pointer transition-colors hover:bg-[#fafbfc]">
                             <td className="px-5 py-3">
                               <div className="flex items-center gap-3">
                                 <Avatar name={n.name} photo={n.photo} ring={p.validated ? "ring-2 ring-[#d6b357]" : ""} />
                                 <div className="min-w-0">
-                                  <p className="flex flex-wrap items-center gap-1.5 text-sm font-bold text-[#111827]"><span className="truncate">{n.name}</span><Level n={n.level} /><StatusChip status={n.status} /></p>
+                                  <p className="flex flex-wrap items-center gap-1.5 text-sm font-bold text-[#111827]"><button type="button" onClick={(e) => { e.stopPropagation(); openMember(n.id) }} className="truncate text-left hover:underline">{n.name}</button><Level n={n.level} /><StatusChip status={n.status} /></p>
                                   <p className="text-[11px] text-[#6b7280]">{roleToLabel(n.role)}</p>
                                 </div>
                               </div>
@@ -723,12 +742,12 @@ export default function MyTeamPage() {
                       </div>
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {s.credits.map((c) => (
-                          <span key={c.memberId} className="inline-flex items-center gap-1.5 rounded-full bg-[#f4f6f9] py-0.5 pl-0.5 pr-2 text-[12px] font-semibold text-[#111827]">
+                          <button type="button" key={c.memberId} onClick={() => openMember(c.memberId)} className="inline-flex items-center gap-1.5 rounded-full bg-[#f4f6f9] py-0.5 pl-0.5 pr-2 text-[12px] font-semibold text-[#111827]">
                             <Avatar name={c.name} photo={photoOf.get(c.memberId) ?? null} size="h-5 w-5" /> {c.name} <span className="text-[10.5px] font-bold text-[#001f3f]/60">L{c.level}</span>{s.credits.length + s.outside.length > 1 && <span className="text-[10.5px] font-normal text-[#9ca3af]">{c.share}%</span>}
-                          </span>
+                          </button>
                         ))}
                       </div>
-                      {s.outside.length > 0 && <p className="mt-1 text-[11px] text-[#9ca3af]">shared with {s.outside.join(", ")}{s.outside.some((n) => n !== "you") ? " — outside your team" : ""}</p>}
+                      {s.outside.length > 0 && <p className="mt-1 text-[11px] text-[#9ca3af]">{outsideNote(s.outside)}</p>}
                       <div className="mt-2 flex items-baseline justify-between text-[12px]">
                         <span className="text-[#6b7280]">Contract {AED(s.price)}</span>
                         <span className="font-['Outfit'] font-bold tabular-nums text-[#001f3f]">{AED(s.credits.reduce((a, c) => a + c.value, 0))}</span>
@@ -752,10 +771,10 @@ export default function MyTeamPage() {
                             {s.credits.map((c) => (
                               <p key={c.memberId} className="flex items-center gap-2 py-0.5">
                                 <Avatar name={c.name} photo={photoOf.get(c.memberId) ?? null} size="h-6 w-6" />
-                                <span className="font-semibold text-[#111827]">{c.name}</span> <Level n={c.level} />{s.credits.length + s.outside.length > 1 && <span className="text-[11px] text-[#9ca3af]">{c.share}%</span>}
+                                <button type="button" onClick={() => openMember(c.memberId)} className="font-semibold text-[#111827] hover:underline">{c.name}</button> <Level n={c.level} />{s.credits.length + s.outside.length > 1 && <span className="text-[11px] text-[#9ca3af]">{c.share}%</span>}
                               </p>
                             ))}
-                            {s.outside.length > 0 && <p className="text-[11px] text-[#9ca3af]">shared with {s.outside.join(", ")}{s.outside.some((n) => n !== "you") ? " — outside your team" : ""}</p>}
+                            {s.outside.length > 0 && <p className="text-[11px] text-[#9ca3af]">{outsideNote(s.outside)}</p>}
                           </td>
                           <td className="px-3 py-3"><p className="font-semibold text-[#111827]">{s.project}</p>{s.developer && <p className="text-[11px] text-[#6b7280]">{s.developer}</p>}</td>
                           <td className="px-3 py-3 text-[#6b7280]">{s.unit ?? "—"}</td>
@@ -772,6 +791,20 @@ export default function MyTeamPage() {
           </div>
         </>
       )}
+
+      {data && panel.length > 0 && (
+        <MemberPanel
+          data={data}
+          id={panel[panel.length - 1]}
+          canGoBack={panel.length > 1}
+          self={self}
+          period={bounds}
+          onOpen={(id) => setPanel((p) => (p[p.length - 1] === id ? p : [...p, id]))}
+          onBack={() => setPanel((p) => p.slice(0, -1))}
+          onClose={closePanel}
+        />
+      )}
+      {sharing && <ShareDialog endpoint={shareEndpoint} period={bounds} onClose={closeShare} />}
     </div>
   )
 }

@@ -175,6 +175,8 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { icon: Eye, label: "Public Agents", to: "public-agents", description: "Choose which agents appear on the public Agents page." },
       // Any recruiter's whole tree, level by level (the same view agents get for their own).
       { icon: GitBranch, label: "Genealogy", to: "genealogy", description: "Any recruiter's whole tree, level by level." },
+      // Any recruiter's My Team page as they see it (KPIs, top sellers, every deal).
+      { icon: TrendingUp, label: "Team Performance", to: "team-performance", description: "Any recruiter's My Team page — KPIs, top sellers, every deal." },
     ],
   },
   { icon: Network, label: "Teams", to: "teams" },

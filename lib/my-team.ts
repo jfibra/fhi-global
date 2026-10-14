@@ -109,3 +109,25 @@ export async function buildMyTeam(admin: Admin, userId: string, fallback: { name
   for (const m of members) { m.validatedValue = Math.round(m.validatedValue); m.pendingValue = Math.round(m.pendingValue) }
   return { root: tree.root, team, members, sales, perLevel: tree.summary.perLevel }
 }
+
+/**
+ * Members ranked by validated value credited to them in [from, to) — the
+ * page's podium and the shareable Top Sellers image (app/api/my-team/share-image)
+ * both rank this way, so the picture always matches the screen.
+ */
+export function rankSellers(team: MyTeamResponse, from: string | null, to: string | null): Array<{ member: TeamMember; deals: number; value: number }> {
+  const tally = new Map<string, { deals: number; value: number }>()
+  for (const s of team.sales) {
+    if (s.status !== "validated" || (from && s.date < from) || (to && s.date >= to)) continue
+    for (const c of s.credits) {
+      const t = tally.get(c.memberId) ?? { deals: 0, value: 0 }
+      t.deals++
+      t.value += c.value
+      tally.set(c.memberId, t)
+    }
+  }
+  const byId = new Map(team.members.map((m) => [m.id, m]))
+  return [...tally.entries()]
+    .flatMap(([id, t]) => (byId.has(id) ? [{ member: byId.get(id)!, ...t }] : []))
+    .sort((a, b) => b.value - a.value || b.deals - a.deals)
+}

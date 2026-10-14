@@ -204,6 +204,8 @@ const nextConfig = {
     "/og/event/": SHARP_LINUX_LIBS,
     "/og/business-card/": SHARP_LINUX_LIBS,
     "/og/listing/": SHARP_LINUX_LIBS,
+    // My Team "Top Sellers" poster — photos and the team logo through ogPicture, output through ogJpeg.
+    "/api/my-team/share-image": SHARP_LINUX_LIBS,
   },
   typescript: {
     ignoreBuildErrors: true,
