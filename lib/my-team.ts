@@ -35,6 +35,8 @@ export type TeamSale = {
 }
 export type MyTeamResponse = {
   root: { id: string; name: string; photo: string | null; role: string | null }
+  /** The formal team the root belongs to, if any — its logo brands the masthead. */
+  team: { name: string; logo: string | null; roleInTeam: string | null } | null
   members: TeamMember[]
   sales: TeamSale[]
   perLevel: number[]
@@ -44,6 +46,10 @@ const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ?
 
 export async function buildMyTeam(admin: Admin, userId: string, fallback: { name: string | null; photo: string | null; role: string | null }): Promise<MyTeamResponse> {
   const tree = await buildGenealogy(admin, userId, fallback)
+  const { data: membership } = await admin.from("team_memberships").select("role_in_team, teams(name, logo_url)").eq("user_id", userId).eq("is_active", true).order("joined_at", { ascending: false }).limit(1)
+  const mt = (membership?.[0] ?? null) as unknown as { role_in_team: string | null; teams: { name: string | null; logo_url: string | null } | { name: string | null; logo_url: string | null }[] | null } | null
+  const teamRow = mt ? one(mt.teams) : null
+  const team = teamRow?.name ? { name: teamRow.name, logo: teamRow.logo_url ?? null, roleInTeam: mt?.role_in_team ?? null } : null
   const memberById = new Map(tree.nodes.map((n) => [n.id, n]))
 
   type Row = { id: string; agent_id: string; developer_id: string; project_id: number; contract_price: number | string | null; validation_status: string | null; reservation_date: string | null; created_at: string; partners: unknown; unit_number: string | null; sale_type: string | null; property_address: string | null; projects: { name: string | null } | { name: string | null }[] | null; developers: { name: string | null } | { name: string | null }[] | null }
@@ -101,5 +107,5 @@ export async function buildMyTeam(admin: Admin, userId: string, fallback: { name
 
   const members: TeamMember[] = tree.nodes.map((n) => ({ ...n, ...(stats.get(n.id) ?? { validated: 0, validatedValue: 0, pending: 0, pendingValue: 0, rejected: 0, lastSale: null }) }))
   for (const m of members) { m.validatedValue = Math.round(m.validatedValue); m.pendingValue = Math.round(m.pendingValue) }
-  return { root: tree.root, members, sales, perLevel: tree.summary.perLevel }
+  return { root: tree.root, team, members, sales, perLevel: tree.summary.perLevel }
 }
