@@ -309,6 +309,8 @@ const salesPipelineNav = ({ projects = false, teamSales = false, invite = true, 
   ...(invite ? [INVITE] : []),
   // Their whole recruitment tree, level by level ("genealogy" in SUB_PATH_ROLES).
   ...(invite ? [{ icon: GitBranch, label: "Genealogy", to: "genealogy" } satisfies NavEntry] : []),
+  // Their network's performance: KPIs, who sold, every deal with filters ("my-team" in SUB_PATH_ROLES).
+  ...(invite ? [{ icon: Users, label: "My Team", to: "my-team" } satisfies NavEntry] : []),
   // Their own events, published on their website (migration 057).
   EVENTS,
   SALES_REPORTS,
