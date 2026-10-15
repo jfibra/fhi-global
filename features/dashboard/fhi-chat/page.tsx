@@ -17,6 +17,7 @@ import {
 } from "@/features/business-card/card-render"
 import { isSafeRemoteImageUrl } from "@/lib/image-hosts"
 import PdfReportMenu from "./pdf-report-menu"
+import AnswerBody from "./answer-body"
 import ReportCard, { reportSummaryText, type ChatReport } from "./report-card"
 import type { ReportPeriodKey } from "@/lib/company-report/data"
 
@@ -70,40 +71,6 @@ function reportPeriodOf(question: string): ReportPeriodKey | null {
   return null
 }
 
-function escapeRe(s: string) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-}
-
-/** Styles the entities inside a reply: names the tools returned get bold
- *  navy, AED amounts get gold — the same hierarchy as the dashboard. Purely
- *  presentational; the matching runs against OUR card titles, not guesses. */
-function RichText({ text, names }: { text: string; names: string[] }) {
-  const pattern = [...names.map(escapeRe), "AED\\s[\\d,]+(?:\\.\\d+)?"].join("|")
-  if (!pattern) return <>{text}</>
-  const lower = new Set(names.map((n) => n.toLowerCase()))
-  const parts = text.split(new RegExp(`(${pattern})`, "gi"))
-  return (
-    <>
-      {parts.map((p, i) => {
-        if (!p) return null
-        if (/^AED\s[\d,]/.test(p))
-          return (
-            <span key={i} className="font-semibold text-[#8a6d2a]">
-              {p}
-            </span>
-          )
-        if (lower.has(p.toLowerCase()))
-          return (
-            <span key={i} className="font-semibold text-[#001f3f]">
-              {p}
-            </span>
-          )
-        return <span key={i}>{p}</span>
-      })}
-    </>
-  )
-}
-
 /** Typewriter reveal — types the reply like a live assistant, then reports
  *  done so the cards and sources fade in after the words. */
 function TypedText({ text, names, onDone }: { text: string; names: string[]; onDone: () => void }) {
@@ -132,8 +99,8 @@ function TypedText({ text, names, onDone }: { text: string; names: string[]; onD
   }, [len, text])
   return (
     <>
-      <RichText text={text.slice(0, len)} names={names} />
-      {len < text.length && <span className="inline-block w-[2px] h-[1em] align-middle bg-[#d6b357] animate-pulse" aria-hidden="true" />}
+      <AnswerBody text={text.slice(0, len)} names={names} />
+      {len < text.length && <span className="mt-1 inline-block h-[1em] w-[2px] animate-pulse bg-[#d6b357] align-middle" aria-hidden="true" />}
     </>
   )
 }
@@ -915,7 +882,7 @@ export default function FhiChatPage({
                       <StatTiles stats={m.stats} />
                     </div>
                   )}
-                  <div className="px-5 pb-4 pt-2.5 text-[14px] leading-[1.7] text-[#1f2937] whitespace-pre-wrap">
+                  <div className="px-5 pb-4 pt-3 text-[14px] leading-[1.7] text-[#1f2937]">
                     {m.typed === false ? (
                       <TypedText
                         text={m.content}
@@ -923,7 +890,7 @@ export default function FhiChatPage({
                         onDone={() => setMessages((ms) => ms.map((x, xi) => (xi === i ? { ...x, typed: true } : x)))}
                       />
                     ) : (
-                      <RichText text={m.content} names={m.names ?? (m.cards ?? []).map((c) => c.title)} />
+                      <AnswerBody text={m.content} names={m.names ?? (m.cards ?? []).map((c) => c.title)} />
                     )}
                   </div>
                   {m.typed !== false && m.charts && m.charts.length > 0 && (
