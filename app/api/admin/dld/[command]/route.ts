@@ -117,8 +117,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ command: s
     if (!isSearchableColumn(dataset, searchColumn)) {
       return NextResponse.json({ error: "Unknown search column." }, { status: 400 })
     }
+    // Any whole number of chunks from one up to the max: the page walks a
+    // scan 1,000 rows at a time so progress shows, DLD_SEARCH_SCAN_STEP per click.
     const requestedScan = Number.parseInt(clean(incoming[DLD_SEARCH_SCAN_ROWS_KEY]), 10) || DLD_SEARCH_SCAN_STEP
-    const scanLimit = Math.min(DLD_SEARCH_SCAN_MAX, Math.max(DLD_SEARCH_SCAN_STEP, requestedScan))
+    const scanLimit = Math.min(DLD_SEARCH_SCAN_MAX, Math.max(DLD_SEARCH_CHUNK, Math.ceil(requestedScan / DLD_SEARCH_CHUNK) * DLD_SEARCH_CHUNK))
     // `refresh: true` (the page's Refresh button) re-pulls every chunk from DLD.
     const refresh = flag(incoming.refresh)
     const search = isExactLookup(dataset, searchColumn, searchTerm)

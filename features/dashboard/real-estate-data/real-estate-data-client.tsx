@@ -299,8 +299,13 @@ function DatasetPanel({
   const [searchColumn, setSearchColumn] = useState(memo?.searchColumn ?? defaultSearchColumn)
   const [searchTerm, setSearchTerm] = useState(memo?.searchTerm ?? "")
   // `scanRows` is how far a contains-search may read (raised by "Search the
-  // next 5,000 rows"); the exact number lookup ignores it.
+  // next 5,000 rows"); the exact number lookup ignores it. The scan walks
+  // there one chunk (1,000 rows) at a time — `scanStep` is how far it has
+  // been asked to read so far, so the table redraws after every 1,000 rows
+  // and the progress is visible, instead of one silent 5,000-row request.
   const [appliedSearch, setAppliedSearch] = useState<{ column: string; term: string; scanRows: number } | null>(memo?.appliedSearch ?? null)
+  const [scanStep, setScanStep] = useState(memo?.appliedSearch?.scanRows ?? DLD_SEARCH_CHUNK)
+  const scanAt = appliedSearch ? Math.min(scanStep, appliedSearch.scanRows) : 0
 
   useEffect(() => {
     cacheSet<TableMemo>(stateKey, { values, applied, sort, page, pageSize, searchColumn, searchTerm, appliedSearch })
@@ -312,8 +317,8 @@ function DatasetPanel({
   // for the current key — derived, so the effect never calls setState synchronously.
   const [attempt, setAttempt] = useState(0)
   const queryKey = useMemo(
-    () => JSON.stringify({ applied, appliedSearch, sort, page, pageSize }),
-    [applied, appliedSearch, sort, page, pageSize],
+    () => JSON.stringify({ applied, appliedSearch, scanAt, sort, page, pageSize }),
+    [applied, appliedSearch, scanAt, sort, page, pageSize],
   )
   const resultKey = `table:${dataset.command}:${queryKey}`
   type Loaded = { rows: DldRow[]; total: number; error: string | null; search: DldSearchInfo | null }
@@ -355,7 +360,7 @@ function DatasetPanel({
               ? {
                   [DLD_SEARCH_COLUMN_KEY]: appliedSearch.column,
                   [DLD_SEARCH_TERM_KEY]: appliedSearch.term,
-                  [DLD_SEARCH_SCAN_ROWS_KEY]: String(appliedSearch.scanRows),
+                  [DLD_SEARCH_SCAN_ROWS_KEY]: String(scanAt),
                 }
               : {}),
           }),
@@ -384,6 +389,14 @@ function DatasetPanel({
   const total = result?.total ?? 0
   const error = result?.error ?? null
   const searchInfo = result?.search ?? null
+  // A contains-scan still short of its target: ask for the next 1,000 rows.
+  // The table on screen already shows the matches so far.
+  const scanning = !!appliedSearch && !!searchInfo && !error && searchInfo.mode === "contains" && searchInfo.truncated && scanAt < appliedSearch.scanRows
+  useEffect(() => {
+    if (!scanning) return
+    const id = setTimeout(() => setScanStep(scanAt + DLD_SEARCH_CHUNK), 0)
+    return () => clearTimeout(id)
+  }, [scanning, scanAt])
   const updatedAt = result && !result.error ? result.at : null
   // Retry (after an error) and Refresh both drop the cached copy and refetch.
   const retry = () => {
@@ -396,6 +409,7 @@ function DatasetPanel({
     const next = term ? { column: searchColumn, term, scanRows: DLD_SEARCH_SCAN_STEP } : null
     if (JSON.stringify(next) === JSON.stringify(appliedSearch)) return
     setPage(1)
+    setScanStep(DLD_SEARCH_CHUNK)
     setAppliedSearch(next)
   }
   const searchFurther = () => {
@@ -543,9 +557,7 @@ function DatasetPanel({
               {loading || !searchInfo ? (
                 <span className="inline-flex items-center gap-1.5">
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  Searching &ldquo;{appliedSearch.term}&rdquo;
-                  {appliedSearch.scanRows > DLD_SEARCH_SCAN_STEP && <> in the first {money.format(appliedSearch.scanRows)} rows</>}
-                  …
+                  Searching &ldquo;{appliedSearch.term}&rdquo; in the first {money.format(scanAt)} rows…
                 </span>
               ) : (
                 <>
@@ -564,7 +576,13 @@ function DatasetPanel({
                     )}
                     {searchInfo.cacheHits > 0 && <span className="text-[#9ca3af]"> · {money.format(searchInfo.cacheHits * DLD_SEARCH_CHUNK)} rows from cache</span>}
                   </span>
-                  {searchInfo.mode === "contains" && searchInfo.truncated && (
+                  {scanning && (
+                    <span className="inline-flex items-center gap-1.5 text-amber-700">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      searching the next {money.format(DLD_SEARCH_CHUNK)}, up to {money.format(appliedSearch.scanRows)}…
+                    </span>
+                  )}
+                  {!scanning && searchInfo.mode === "contains" && searchInfo.truncated && (
                     appliedSearch.scanRows < DLD_SEARCH_SCAN_MAX ? (
                       <button
                         type="button"
