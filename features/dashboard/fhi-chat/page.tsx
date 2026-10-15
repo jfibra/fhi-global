@@ -16,6 +16,7 @@ import {
   type DesignId,
 } from "@/features/business-card/card-render"
 import { isSafeRemoteImageUrl } from "@/lib/image-hosts"
+import PdfReportMenu from "./pdf-report-menu"
 
 /**
  * FHI Assistant — the admin one-stop shop for questions about the business.
@@ -625,6 +626,8 @@ export type FhiChatPageProps = {
   quota?: boolean
   /** A small link in the title band (the admin assistant links to the agents' usage page). */
   headerLink?: { href: string; label: string }
+  /** The company-report PDF endpoint — shows the "PDF report" menu beside the report buttons (admin only). */
+  pdfReport?: string
 }
 
 export default function FhiChatPage({
@@ -638,6 +641,7 @@ export default function FhiChatPage({
   footnote = "Admin only · answers are computed from the live database at the moment you ask.",
   quota: showQuota = false,
   headerLink,
+  pdfReport,
 }: FhiChatPageProps = {}) {
   const [messages, setMessages] = useState<Msg[]>([])
   const [quota, setQuota] = useState<Quota | null>(null)
@@ -982,6 +986,7 @@ export default function FhiChatPage({
                 {r.label}
               </button>
             ))}
+            {pdfReport && <PdfReportMenu endpoint={pdfReport} disabled={busy} />}
           </div>
           <form
             className="flex items-center gap-2"

@@ -223,6 +223,8 @@ const nextConfig = {
     // My Team "Top Sellers" poster — photos and the team logo through ogPicture, output through ogJpeg.
     "/api/my-team/share-image": SHARP_LINUX_LIBS,
     "/forms/cover/": PDFJS_SERVER_FILES,
+    // Company report PDF — shrinks the brand logos with sharp before embedding them.
+    "/api/admin/reports/company": SHARP_LINUX_LIBS,
   },
   // Loaded from node_modules at run time instead of bundled: @napi-rs/canvas is
   // a native addon, and pdf.js finds it, and its own data files, relative to
