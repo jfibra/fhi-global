@@ -860,11 +860,13 @@ export const DLD_CHART_SPECS: Record<DldCommand, DldChartSpec> = {
 /**
  * Breakdowns are aggregated one batch of chunks per request and merged on
  * the client, so there is no cap on how much of a range the charts cover —
- * only on how long one request takes (~10 gateway calls cold, ~12–25s).
+ * only on how long one request takes. One chunk (1,000 rows) per request:
+ * the charts redraw after every 1,000 rows, so progress is visible row by
+ * row (a cold chunk is one ~4s gateway call; cached ones return at once).
  */
-export const DLD_CHART_BATCH_CHUNKS = 10
-/** The first batch is small so a cold load paints within a few seconds. */
-export const DLD_CHART_FIRST_BATCH_CHUNKS = 2
+export const DLD_CHART_BATCH_CHUNKS = 1
+/** The first batch is the same size — 1,000 rows, then 2,000, 3,000 … */
+export const DLD_CHART_FIRST_BATCH_CHUNKS = 1
 export const DLD_CHART_TOP_N = 10
 /** Latest rows kept for the sales-history table. */
 export const DLD_CHART_LATEST_N = 25
