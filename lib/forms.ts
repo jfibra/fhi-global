@@ -1,5 +1,6 @@
 import "server-only"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { formCoverHref } from "@/lib/form-cover"
 import type { PublicForm } from "@/lib/forms-shared"
 
 export type { PublicForm } from "@/lib/forms-shared"
@@ -14,12 +15,14 @@ export type { PublicForm } from "@/lib/forms-shared"
  */
 
 /** Newest first. Throws on a failed read so an outage is a 5xx the crawler
- *  retries, never an empty page cached as the real thing. */
+ *  retries, never an empty page cached as the real thing. `file_url` is read
+ *  only to address the cover (a hash of it is the ?v=) and is not returned. */
 export async function listPublicForms(): Promise<PublicForm[]> {
   const { data, error } = await createAdminSupabase()
     .from("documents")
-    .select("id, title, category, file_name, file_size, mime_type, created_at")
+    .select("id, title, category, file_name, file_size, mime_type, created_at, file_url")
     .order("created_at", { ascending: false })
   if (error) throw new Error(`forms: ${error.message}`)
-  return (data ?? []) as PublicForm[]
+  const rows = (data ?? []) as (Omit<PublicForm, "cover"> & { file_url: string })[]
+  return rows.map(({ file_url, ...form }) => ({ ...form, cover: formCoverHref({ ...form, file_url }) }))
 }

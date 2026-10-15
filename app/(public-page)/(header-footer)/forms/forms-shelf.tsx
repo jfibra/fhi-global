@@ -3,18 +3,22 @@
 // The public Forms shelf — the dashboard's Documents shelf (features/dashboard/
 // documents/documents-client.tsx) dressed for the public site: the editorial
 // masthead the other pages open with, category pills, 2:3 paper tiles whose
-// cover is page 1 rendered by pdf.js, and one Download per form. No hover
-// effects and nothing opens from the tile — there is no viewer and no fill-in
-// here; visitors save a copy.
+// cover is page 1 rendered on the server (lib/form-cover.ts), and one Download
+// per form. No hover effects and nothing opens from the tile — there is no
+// viewer and no fill-in here; visitors save a copy.
 
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { Download, FileSpreadsheet, FileText, FileType2 } from "lucide-react"
-import PdfThumbnail from "@/features/dashboard/documents/pdf-thumbnail"
 import { formatBytes } from "@/lib/materials-shared"
 import { formFileHref, type PublicForm } from "@/lib/forms-shared"
 
 const ALL = "All"
 const UNCATEGORIZED = "Other"
+/** Covers fetched with the HTML. A lazy image waits for the browser's lazy-load check, which runs on the
+ *  main thread once the page's scripts let it — the second row sat on file icons while the page hydrated. */
+const EAGER_COVERS = 9
+/** The first row is in view on a desktop: fetch it ahead of everything else. */
+const PRIORITY_COVERS = 3
 
 const extensionOf = (fileName: string) => fileName.split(".").pop()?.toLowerCase() ?? ""
 const isPdf = (fileName: string) => extensionOf(fileName) === "pdf"
@@ -98,12 +102,18 @@ export function FormsShelf({ docs }: { docs: PublicForm[] }) {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 lg:gap-8">
-            {shown.map((doc) => (
+            {shown.map((doc, i) => (
               <article key={doc.id} className="flex h-full flex-col">
                 {/* Paper tile: page 1 as the cover, category chip, hover reveal with the full title and file facts. */}
                 <div className="relative block aspect-[2/3] w-full overflow-hidden rounded-xl border border-[#e8eaed] bg-[#eef1f5] shadow-[0_2px_10px_-4px_rgba(0,31,63,0.18)]">
-                  {isPdf(doc.file_name) ? (
-                    <PdfThumbnail src={formFileHref(doc.id)} alt={doc.title} fallback={<FileTile fileName={doc.file_name} />} />
+                  {doc.cover ? (
+                    <FormCover
+                      src={doc.cover}
+                      alt={`First page of ${doc.title}`}
+                      eager={i < EAGER_COVERS}
+                      priority={i < PRIORITY_COVERS}
+                      fallback={<FileTile fileName={doc.file_name} />}
+                    />
                   ) : (
                     <FileTile fileName={doc.file_name} />
                   )}
@@ -134,6 +144,54 @@ export function FormsShelf({ docs }: { docs: PublicForm[] }) {
           </div>
         )}
       </section>
+    </>
+  )
+}
+
+/**
+ * Page 1 of a form as a plain <img> in the page HTML: the server rendered it
+ * once (/forms/cover/<id>), so the browser fetches a ~40 KB image instead of
+ * pdf.js plus the whole PDF. The file tile underneath shows while the image
+ * loads and stays if it fails; it is decoration, so screen readers skip it
+ * (the title and file facts sit right below).
+ */
+function FormCover({
+  src,
+  alt,
+  eager,
+  priority,
+  fallback,
+}: {
+  src: string
+  alt: string
+  eager: boolean
+  priority: boolean
+  fallback: React.ReactNode
+}) {
+  const [failed, setFailed] = useState(false)
+  // A load that fails before hydration fires no React onError. Setting the
+  // src again once mounted replays it (a loaded image answers from memory) —
+  // the same fix next/image uses.
+  const replayLoad = useCallback((img: HTMLImageElement | null) => {
+    if (img) img.src = img.src
+  }, [])
+  return (
+    <>
+      <span aria-hidden="true">{fallback}</span>
+      {!failed && (
+        // eslint-disable-next-line @next/next/no-img-element -- already a sized WebP from our own route; the optimizer would only re-encode it
+        <img
+          ref={replayLoad}
+          src={src}
+          alt={alt}
+          loading={eager ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
+          decoding="async"
+          draggable={false}
+          onError={() => setFailed(true)}
+          className="absolute inset-0 h-full w-full object-cover object-top"
+        />
+      )}
     </>
   )
 }

@@ -181,6 +181,22 @@ const PRIVATE_NOINDEX_HEADERS = [
 // `contains`), so no `[param]` brackets, which picomatch would read as a set.
 const SHARP_LINUX_LIBS = ["./node_modules/@img/sharp-linux-x64/**/*", "./node_modules/@img/sharp-libvips-linux-x64/**/*"]
 
+// The /forms covers render page 1 of each PDF on the server (lib/form-cover.ts).
+// pdf.js reads its fonts, CMaps, wasm decoders and ICC profile off disk by path
+// and loads @napi-rs/canvas through a require() built at run time — none of it
+// visible to file tracing — and the canvas is a prebuilt native binary per
+// platform (linux-x64-gnu on Vercel).
+const PDFJS_SERVER_FILES = [
+  "./node_modules/pdfjs-dist/legacy/build/pdf.mjs",
+  "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+  "./node_modules/pdfjs-dist/standard_fonts/**/*",
+  "./node_modules/pdfjs-dist/cmaps/**/*",
+  "./node_modules/pdfjs-dist/wasm/**/*",
+  "./node_modules/pdfjs-dist/iccs/**/*",
+  "./node_modules/@napi-rs/canvas/**/*",
+  "./node_modules/@napi-rs/canvas-linux-x64-gnu/**/*",
+]
+
 const nextConfig = {
   // No "X-Powered-By: Next.js" — it only tells scanners what to aim at.
   poweredByHeader: false,
@@ -206,7 +222,12 @@ const nextConfig = {
     "/og/listing/": SHARP_LINUX_LIBS,
     // My Team "Top Sellers" poster — photos and the team logo through ogPicture, output through ogJpeg.
     "/api/my-team/share-image": SHARP_LINUX_LIBS,
+    "/forms/cover/": PDFJS_SERVER_FILES,
   },
+  // Loaded from node_modules at run time instead of bundled: @napi-rs/canvas is
+  // a native addon, and pdf.js finds it, and its own data files, relative to
+  // where it is installed (the /forms covers, lib/form-cover.ts).
+  serverExternalPackages: ["pdfjs-dist", "@napi-rs/canvas"],
   typescript: {
     ignoreBuildErrors: true,
   },

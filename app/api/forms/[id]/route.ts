@@ -7,9 +7,10 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
  * fillable viewer). Visitors never see the S3 address: the row is looked up
  * by id with the service-role client, the target must sit under our own
  * documents prefix (SSRF guard), and the bytes stream through with Range
- * support so the page's first-page thumbnails (pdf.js) load the same way the
- * dashboard's do. `?download=1` makes it a real download (Content-Disposition:
- * attachment — the `download` attribute alone is ignored cross-origin).
+ * support for a browser PDF viewer opening it inline. The shelf's covers come
+ * from /forms/cover instead (lib/form-cover.ts). `?download=1` makes it a real
+ * download (Content-Disposition: attachment — the `download` attribute alone
+ * is ignored cross-origin).
  */
 
 export const runtime = "nodejs"

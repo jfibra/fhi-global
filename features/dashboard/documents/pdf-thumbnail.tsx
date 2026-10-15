@@ -98,10 +98,11 @@ type Props = {
 }
 
 export default function PdfThumbnail({ src, alt, fallback }: Props) {
-  // The cached copy is read through useSyncExternalStore so a server render
-  // (the public /forms shelf) and the first client render agree on the
-  // fallback — reading localStorage in a useState initialiser gave the client
-  // a thumbnail the server never had, and React threw a hydration mismatch.
+  // The cached copy is read through useSyncExternalStore so the server render
+  // and the first client render agree on the fallback — reading localStorage
+  // in a useState initialiser gave the client a thumbnail the server never
+  // had, and React threw a hydration mismatch. (The public /forms shelf no
+  // longer uses this: its covers are rendered on the server, lib/form-cover.ts.)
   const cached = useSyncExternalStore(subscribe, () => getCached(src), noSnapshot)
   const [rendered, setRendered] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
