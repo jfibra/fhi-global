@@ -14,8 +14,9 @@ import { createClient } from "@/lib/supabase/server"
  * attachment, an actual download, not a hint the browser can ignore.
  *
  * Without `download=1` the file is served `inline` with Range passthrough —
- * that is what the in-page pdf.js preview (PdfFormViewer) and the shelf's
- * PdfThumbnail fetch, since pdf.js needs a same-origin URL it can read.
+ * that is what the in-page pdf.js preview (PdfFormViewer) fetches, since
+ * pdf.js needs a same-origin URL it can read. (The shelf's covers come from
+ * /forms/cover instead — lib/form-cover.ts.)
  *
  * The target must both sit under our own S3 documents prefix (an SSRF guard)
  * and match a real row the caller's session can read (RLS already scopes

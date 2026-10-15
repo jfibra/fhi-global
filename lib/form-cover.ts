@@ -1,26 +1,28 @@
 import "server-only"
-import { createHash } from "node:crypto"
 import path from "node:path"
 import { unstable_cache } from "next/cache"
+import { FORM_COVER_REV } from "@/lib/forms-shared"
 
 /**
- * Covers for the public Forms shelf (/forms): page 1 of each PDF, rendered on
- * the server and served as a small WebP by app/(public-page)/(header-footer)/
- * forms/cover/[id]/route.ts.
+ * Document covers: page 1 of each PDF, rendered on the server and served as a
+ * small WebP by app/(public-page)/(header-footer)/forms/cover/[id]/route.ts to
+ * the public Forms shelf (/forms), the dashboard's Documents shelf and its
+ * Library hub tile (components/form-cover.tsx). formCoverHref in
+ * lib/forms-shared.ts builds their URLs.
  *
- * The shelf used to draw them in the browser (pdf.js, like the dashboard's
- * PdfThumbnail): a first visit downloaded pdf.js plus every whole PDF — about
- * 9 MB for seven forms, through an uncached route — and rasterised them one
- * by one, so the tiles sat on a PDF icon for seconds. Now the page HTML
- * carries an <img> per form and a cover weighs ~40 KB.
+ * All three used to draw the page in the browser with pdf.js: a first visit
+ * downloaded pdf.js plus every whole PDF — about 9 MB for seven forms,
+ * through an uncached route — and rasterised them one by one, so the tiles
+ * sat on a PDF icon for seconds. Now each tile is an <img> and a cover
+ * weighs ~40 KB.
  *
  * A cover is rendered once per file, not once per visit:
  *  - the Data Cache (unstable_cache) keeps the encoded image across
  *    deployments. Vercel's CDN cache is per deployment, so without it every
  *    deploy would send the first visitors back to a cold render;
  *  - the CDN keeps the response per region and the browser for a year: the
- *    URL carries ?v=, a hash of the file URL and COVER_REV, so another file or
- *    a new rendering gets a new address.
+ *    URL carries ?v=, a hash of the file URL and FORM_COVER_REV, so another
+ *    file or a new rendering gets a new address.
  *
  * pdf.js and @napi-rs/canvas load from node_modules at run time
  * (serverExternalPackages), and the route's outputFileTracingIncludes ship
@@ -28,26 +30,12 @@ import { unstable_cache } from "next/cache"
  * (next.config.mjs).
  */
 
-/** Bump to re-render every cover under a new URL (size, quality or renderer change). */
-const COVER_REV = 1
 /** The tile is at most ~384 CSS px wide, so 768 px stays sharp on a 2x screen. */
 const COVER_WIDTH = 768
 const COVER_WEBP_QUALITY = 78
 const PDF_FETCH_TIMEOUT_MS = 20_000
 /** pdf.js reads its standard fonts, CMaps, wasm decoders and ICC profile from here by path. */
 const PDFJS_DIR = path.join(process.cwd(), "node_modules", "pdfjs-dist")
-
-export const isPdfFileName = (fileName: string) => /\.pdf$/i.test(fileName)
-
-/** The cover's ?v= — changes with the file and with COVER_REV, so its URL can be cached for a year. */
-export function formCoverVersion(fileUrl: string): string {
-  return createHash("sha256").update(`${COVER_REV}:${fileUrl}`).digest("base64url").slice(0, 12)
-}
-
-/** Same-origin address of a form's cover, or null when the file is not a PDF. */
-export function formCoverHref(form: { id: string; file_url: string; file_name: string }): string | null {
-  return isPdfFileName(form.file_name) ? `/forms/cover/${form.id}?v=${formCoverVersion(form.file_url)}` : null
-}
 
 /** Page 1 of the PDF at fileUrl as base64 WebP (the Data Cache stores JSON). Throws on any failure, so a failure is never cached. */
 async function renderCover(fileUrl: string): Promise<string> {
@@ -84,7 +72,7 @@ async function renderCover(fileUrl: string): Promise<string> {
   }
 }
 
-const cachedCover = unstable_cache(renderCover, ["form-cover", `rev-${COVER_REV}`], {
+const cachedCover = unstable_cache(renderCover, ["form-cover", `rev-${FORM_COVER_REV}`], {
   revalidate: false,
   tags: ["form-cover"],
 })

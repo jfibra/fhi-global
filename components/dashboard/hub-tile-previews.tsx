@@ -25,8 +25,9 @@ import { useAuth } from "@/context/auth-context"
 import { EBOOKS, ebookCoverUrl } from "@/lib/ebooks"
 import { COMPANY_FILMS } from "@/lib/films"
 import { SITE_URL } from "@/lib/seo"
-import PdfThumbnail from "@/features/dashboard/documents/pdf-thumbnail"
+import { FormCover } from "@/components/form-cover"
 import { listDocuments, type DocumentRow } from "@/lib/document-service"
+import { formCoverHref } from "@/lib/forms-shared"
 
 // ─── Plumbing ─────────────────────────────────────────────────────────────────
 
@@ -125,22 +126,19 @@ function VideosPreview() {
   )
 }
 
-/** The newest uploaded document, page 1 rendered from the real PDF. */
+/** The newest uploaded document: page 1 of the real PDF, as the cover the Documents shelf shows (server-rendered, FormCover). */
 function DocumentsPreview() {
   const { data, ready } = useSample("documents", async () => (await listDocuments()).data)
   if (!ready) return <Loading />
   const docs: DocumentRow[] = data ?? []
   if (!docs.length) return <Empty icon={Files} text="No documents uploaded yet" />
   const first = docs[0]
-  const isPdf = /pdf/i.test(first.mime_type ?? "") || /\.pdf$/i.test(first.file_name)
+  const cover = formCoverHref(first)
+  const icon = <span className="absolute inset-0 flex items-center justify-center"><FileText className="h-6 w-6 text-[#c3c9d1]" /></span>
   return (
     <div className="w-full">
       <span className={`${sheet} relative mx-auto block h-[118px] w-[86px]`}>
-        {isPdf ? (
-          <PdfThumbnail src={`/api/document-proxy?${new URLSearchParams({ url: first.file_url })}`} alt={first.title} fallback={<span className="flex h-full items-center justify-center"><FileText className="h-6 w-6 text-[#c3c9d1]" /></span>} />
-        ) : (
-          <span className="flex h-full items-center justify-center"><FileText className="h-6 w-6 text-[#c3c9d1]" /></span>
-        )}
+        {cover ? <FormCover src={cover} alt={first.title} eager priority={false} fallback={icon} /> : icon}
       </span>
     </div>
   )

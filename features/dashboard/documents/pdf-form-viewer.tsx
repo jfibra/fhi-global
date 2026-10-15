@@ -204,7 +204,7 @@ const PdfFormViewer = forwardRef<PdfFormViewerHandle, Props>(function PdfFormVie
         // needs for link annotations; it lives in the viewer bundle.
         const { SimpleLinkService } = await import("pdfjs-dist/web/pdf_viewer.mjs")
         // Served from public/ (copied by the `pdfjs:worker` postinstall
-        // script) — same reasoning as PdfThumbnail / the Ebooks reader.
+        // script) — same reasoning as the Ebooks reader (book-view.tsx).
         pdfjs.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs"
 
         const task = pdfjs.getDocument({ url: src, disableAutoFetch: true, disableStream: false })

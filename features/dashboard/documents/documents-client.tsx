@@ -11,9 +11,11 @@
 // shelf and reader without the Upload button or Delete (migration 071 lets
 // them read the catalog; the insert/delete policies stay admin-only).
 //
-// A PDF's tile shows its actual page 1, rendered client-side by
-// PdfThumbnail (pdf-thumbnail.tsx) — there's no authored cover art the way
-// Ebooks has. A non-PDF file (Word, Excel, PowerPoint, …) falls back to
+// A PDF's tile shows its actual page 1 — there's no authored cover art the
+// way Ebooks has — as an image rendered once on the server and shared with the
+// public /forms shelf (FormCover, lib/form-cover.ts). It used to be drawn here
+// with pdf.js, which meant downloading pdf.js and every whole PDF before the
+// tiles filled in. A non-PDF file (Word, Excel, PowerPoint, …) falls back to
 // FileTile's generic file-type icon, same as before.
 //
 // Clicking a tile opens a full page (DocumentPage below), replacing the
@@ -42,11 +44,12 @@ import {
   Trash2,
   UploadCloud,
 } from "lucide-react"
+import { FormCover } from "@/components/form-cover"
 import { useAuth } from "@/context/auth-context"
 import { canManageDocumentLibrary } from "@/lib/app-roles"
 import { formatBytes } from "@/lib/materials-shared"
 import { createDocument, deleteDocument, listDocuments, type DocumentRow } from "@/lib/document-service"
-import PdfThumbnail from "./pdf-thumbnail"
+import { formCoverHref } from "@/lib/forms-shared"
 import PdfFormViewer, { type PdfFormViewerHandle } from "./pdf-form-viewer"
 
 // Catalogue cache — stale-while-revalidate. The list is tiny (a few dozen
@@ -108,6 +111,10 @@ function sameDocs(a: DocumentRow[], b: DocumentRow[]): boolean {
 
 const ALL = "All"
 const UNCATEGORIZED = "Uncategorized"
+/** Covers fetched as soon as the shelf renders rather than when the browser's lazy-load check reaches them: the first two rows. */
+const EAGER_COVERS = 8
+/** The first row, fetched ahead of everything else. */
+const PRIORITY_COVERS = 4
 
 function extensionOf(fileName: string): string {
   return fileName.split(".").pop()?.toLowerCase() ?? ""
@@ -424,7 +431,7 @@ export function DocumentsClient() {
         </div>
       ) : (
         <div className="grid grid-cols-4 gap-4">
-          {shown.map((doc) => (
+          {shown.map((doc, i) => (
             <article key={doc.id} className="flex flex-col">
               <button
                 type="button"
@@ -432,15 +439,7 @@ export function DocumentsClient() {
                 aria-label={`Open ${doc.title}`}
                 className="group relative block aspect-[2/3] w-full overflow-hidden rounded-lg border border-black/[0.08] bg-[#eef1f5] shadow-sm transition-shadow hover:shadow-[0_12px_28px_-12px_rgba(0,31,63,0.5)] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#001f3f]/20"
               >
-                {isPdf(doc.file_name) ? (
-                  <PdfThumbnail
-                    src={proxyUrl(doc.file_url, false)}
-                    alt={doc.title}
-                    fallback={<FileTile fileName={doc.file_name} />}
-                  />
-                ) : (
-                  <FileTile fileName={doc.file_name} />
-                )}
+                <DocumentCover doc={doc} index={i} />
                 <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-[#001f3f]/85 px-2.5 py-2 transition-opacity duration-200 group-hover:opacity-0">
                   <span className="block truncate text-xs font-semibold text-white">{doc.title}</span>
                 </span>
@@ -467,10 +466,25 @@ export function DocumentsClient() {
   )
 }
 
+/** A PDF's page 1 (server-rendered, FormCover); the file-type tile for anything else. */
+function DocumentCover({ doc, index }: { doc: DocumentRow; index: number }) {
+  const cover = formCoverHref(doc)
+  if (!cover) return <FileTile fileName={doc.file_name} />
+  return (
+    <FormCover
+      src={cover}
+      alt={`First page of ${doc.title}`}
+      eager={index < EAGER_COVERS}
+      priority={index < PRIORITY_COVERS}
+      fallback={<FileTile fileName={doc.file_name} />}
+    />
+  )
+}
+
 /**
- * Cover-style tile for a document — no real thumbnail (an arbitrary uploaded
- * PDF/Word/Excel file has none to generate cheaply), so a large, color-coded
- * file-type icon stands in for the ebook cover art.
+ * Cover-style tile for a file with no page-1 cover (Word, Excel, PowerPoint,
+ * …): a large, color-coded file-type icon stands in for the ebook cover art.
+ * A PDF's tile shows it too while the cover loads, or if the cover fails.
  */
 function FileTile({ fileName }: { fileName: string }) {
   const ext = extensionOf(fileName)

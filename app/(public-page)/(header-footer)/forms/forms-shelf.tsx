@@ -3,12 +3,13 @@
 // The public Forms shelf — the dashboard's Documents shelf (features/dashboard/
 // documents/documents-client.tsx) dressed for the public site: the editorial
 // masthead the other pages open with, category pills, 2:3 paper tiles whose
-// cover is page 1 rendered on the server (lib/form-cover.ts), and one Download
-// per form. No hover effects and nothing opens from the tile — there is no
-// viewer and no fill-in here; visitors save a copy.
+// cover is page 1 rendered on the server (FormCover, lib/form-cover.ts), and
+// one Download per form. No hover effects and nothing opens from the tile —
+// there is no viewer and no fill-in here; visitors save a copy.
 
-import { useCallback, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Download, FileSpreadsheet, FileText, FileType2 } from "lucide-react"
+import { FormCover } from "@/components/form-cover"
 import { formatBytes } from "@/lib/materials-shared"
 import { formFileHref, type PublicForm } from "@/lib/forms-shared"
 
@@ -144,54 +145,6 @@ export function FormsShelf({ docs }: { docs: PublicForm[] }) {
           </div>
         )}
       </section>
-    </>
-  )
-}
-
-/**
- * Page 1 of a form as a plain <img> in the page HTML: the server rendered it
- * once (/forms/cover/<id>), so the browser fetches a ~40 KB image instead of
- * pdf.js plus the whole PDF. The file tile underneath shows while the image
- * loads and stays if it fails; it is decoration, so screen readers skip it
- * (the title and file facts sit right below).
- */
-function FormCover({
-  src,
-  alt,
-  eager,
-  priority,
-  fallback,
-}: {
-  src: string
-  alt: string
-  eager: boolean
-  priority: boolean
-  fallback: React.ReactNode
-}) {
-  const [failed, setFailed] = useState(false)
-  // A load that fails before hydration fires no React onError. Setting the
-  // src again once mounted replays it (a loaded image answers from memory) —
-  // the same fix next/image uses.
-  const replayLoad = useCallback((img: HTMLImageElement | null) => {
-    if (img) img.src = img.src
-  }, [])
-  return (
-    <>
-      <span aria-hidden="true">{fallback}</span>
-      {!failed && (
-        // eslint-disable-next-line @next/next/no-img-element -- already a sized WebP from our own route; the optimizer would only re-encode it
-        <img
-          ref={replayLoad}
-          src={src}
-          alt={alt}
-          loading={eager ? "eager" : "lazy"}
-          fetchPriority={priority ? "high" : "auto"}
-          decoding="async"
-          draggable={false}
-          onError={() => setFailed(true)}
-          className="absolute inset-0 h-full w-full object-cover object-top"
-        />
-      )}
     </>
   )
 }

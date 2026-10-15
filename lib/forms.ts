@@ -1,7 +1,6 @@
 import "server-only"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { formCoverHref } from "@/lib/form-cover"
-import type { PublicForm } from "@/lib/forms-shared"
+import { formCoverHref, type PublicForm } from "@/lib/forms-shared"
 
 export type { PublicForm } from "@/lib/forms-shared"
 

@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { formCoverVersion, getFormCover, isPdfFileName } from "@/lib/form-cover"
+import { getFormCover } from "@/lib/form-cover"
+import { formCoverVersion, isPdfFileName } from "@/lib/forms-shared"
 
 /**
- * /forms/cover/<id>?v=<version> — page 1 of a form on /forms as a WebP cover,
- * rendered and cached by lib/form-cover.ts. Public like the shelf, with the
- * download route's lookup and S3 prefix guard (app/api/forms/[id]). It lives
- * outside /api (robots.txt blocks that) so the covers are crawlable images,
- * like the /og/* cards.
+ * /forms/cover/<id>?v=<version> — page 1 of a document as a WebP cover,
+ * rendered and cached by lib/form-cover.ts, for /forms and the dashboard's
+ * Documents shelf. Public like /forms, which lists every row of `documents`,
+ * with the download route's lookup and S3 prefix guard (app/api/forms/[id]).
+ * It lives outside /api (robots.txt blocks that) so the covers are crawlable
+ * images, like the /og/* cards.
  *
  * Only the current ?v= is served: a missing or old one redirects to it, so a
  * made-up query string can't fill the CDN or force a render, and the one URL
