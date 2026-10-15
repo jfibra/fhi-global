@@ -13,6 +13,8 @@ import { CompanyReportDocument, registerReportFonts, type ReportImages } from "@
  * with tables and charts, and recommendations drafted from the figures.
  *
  *   GET ?period=today | last7 | month | last_month   (admin staff only)
+ *   GET ...&format=json   the same report as data — FHI Assistant draws it in
+ *                         the chat (features/dashboard/fhi-chat/report-card.tsx)
  *
  * Company-wide sales figures, so never cached by a CDN.
  */
@@ -57,7 +59,13 @@ export async function GET(req: NextRequest) {
   if (!REPORT_PERIOD_KEYS.includes(key)) return NextResponse.json({ error: "Unknown period." }, { status: 400 })
 
   const origin = req.nextUrl.origin
+  const asJson = req.nextUrl.searchParams.get("format") === "json"
   try {
+    if (asJson) {
+      const report = await buildCompanyReport(key)
+      const insights = await buildInsights(report)
+      return NextResponse.json({ report, insights }, { headers: { "Cache-Control": "private, no-store" } })
+    }
     registerReportFonts(origin)
     const [report, whiteLogo, navyLogo] = await Promise.all([
       buildCompanyReport(key),

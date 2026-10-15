@@ -17,6 +17,22 @@ const PERIODS = [
   { key: "last_month", label: "Last month", hint: "Full month" },
 ] as const
 
+/** Fetch the report PDF for a period and save it under the server's file name. Throws a readable error. */
+export async function downloadReportPdf(endpoint: string, key: string): Promise<void> {
+  const res = await fetch(`${endpoint}?period=${key}`, { cache: "no-store" })
+  if (!res.ok) {
+    const json = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(json.error ?? `Request failed (${res.status}).`)
+  }
+  const blob = await res.blob()
+  const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? `fhi-report-${key}.pdf`
+  const a = document.createElement("a")
+  a.href = URL.createObjectURL(blob)
+  a.download = name
+  a.click()
+  window.setTimeout(() => URL.revokeObjectURL(a.href), 10_000)
+}
+
 export default function PdfReportMenu({ endpoint, disabled = false }: { endpoint: string; disabled?: boolean }) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
@@ -27,18 +43,7 @@ export default function PdfReportMenu({ endpoint, disabled = false }: { endpoint
     setBusy(label)
     setError(null)
     try {
-      const res = await fetch(`${endpoint}?period=${key}`, { cache: "no-store" })
-      if (!res.ok) {
-        const json = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(json.error ?? `Request failed (${res.status}).`)
-      }
-      const blob = await res.blob()
-      const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? `fhi-report-${key}.pdf`
-      const a = document.createElement("a")
-      a.href = URL.createObjectURL(blob)
-      a.download = name
-      a.click()
-      window.setTimeout(() => URL.revokeObjectURL(a.href), 10_000)
+      await downloadReportPdf(endpoint, key)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't build the report.")
     } finally {

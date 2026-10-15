@@ -104,7 +104,7 @@ Rules:
 - FACTS.draft_recommendations are rule-based findings already checked against the data. Use them as your starting point: keep the important ones, merge or sharpen them, order by impact, and add others only when FACTS support them.
 - Never make an action vaguer than its draft. Good actions name who does what, how often and where (e.g. "Give each team leader the list of their never-sold members and run a weekly first-deal session"), not generic phrases like "implement a training programme" or "enhance support".
 - Be specific and practical for this business: activating recruits into first sales, team-leader coaching, approval and validation speed, lead follow-up, marketing that converts visits into inquiries, data hygiene (e.g. commission statuses never updated).
-- A zero is a finding (e.g. no inquiry forms submitted while WhatsApp clicks exist), not a reason to stay silent.
+- A zero is a finding (e.g. no inquiry forms submitted while WhatsApp clicks exist), not a reason to stay silent. State it plainly ("No validated deals this week, against 1 the week before") — no filler such as "maintaining a total of 0".
 - "action" is what to do in the next 2 weeks, starting with a verb, max 30 words.
 - "owner" must be one of: ${OWNERS.join(", ")}.
 - "impact" must be one of: ${IMPACTS.join(", ")}.

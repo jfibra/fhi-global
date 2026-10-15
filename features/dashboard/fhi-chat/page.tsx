@@ -17,6 +17,8 @@ import {
 } from "@/features/business-card/card-render"
 import { isSafeRemoteImageUrl } from "@/lib/image-hosts"
 import PdfReportMenu from "./pdf-report-menu"
+import ReportCard, { reportSummaryText, type ChatReport } from "./report-card"
+import type { ReportPeriodKey } from "@/lib/company-report/data"
 
 /**
  * FHI Assistant — the admin one-stop shop for questions about the business.
@@ -46,9 +48,26 @@ type Msg = {
   charts?: ChartSpec[]
   stats?: StatSpec[]
   printCards?: PrintCardSpec[]
+  /** A company report drawn as a document (report-card.tsx) instead of text. */
+  report?: ChatReport
   typed?: boolean
   /** When it was sent/received (ISO), shown as a small time. */
   at?: string
+}
+
+/**
+ * "Full report for today / the last 7 days / this month / last month" — the
+ * four periods the company report covers. Anything else (a quarter, custom
+ * dates) stays a normal question for the model.
+ */
+function reportPeriodOf(question: string): ReportPeriodKey | null {
+  const q = question.toLowerCase()
+  if (!/\b(full|complete|overall|company)\b[^.?!]*\breport\b|^(daily|weekly|monthly) report$/.test(q.trim())) return null
+  if (/\btoday\b|^daily/.test(q)) return "today"
+  if (/last 7 days|past 7 days|last seven days|this week|^weekly/.test(q)) return "last7"
+  if (/last month|previous month/.test(q)) return "last_month"
+  if (/this month|month to date|^monthly/.test(q)) return "month"
+  return null
 }
 
 function escapeRe(s: string) {
@@ -740,6 +759,23 @@ export default function FhiChatPage({
     const next: Msg[] = [...messages, { role: "user", content: question, at: new Date().toISOString() }]
     setMessages(next)
     setBusy(true)
+    // The full company report: the same document as the PDF, drawn in the chat.
+    const reportKey = pdfReport ? reportPeriodOf(question) : null
+    if (reportKey && pdfReport) {
+      try {
+        const res = await fetch(`${pdfReport}?period=${reportKey}&format=json`, { cache: "no-store" })
+        const data = (await res.json().catch(() => ({}))) as Partial<Pick<ChatReport, "insights">> & { report?: ChatReport["data"]; error?: string }
+        if (!res.ok || !data.report || !data.insights) throw new Error(data.error ?? "Couldn't build the report — try again.")
+        const report: ChatReport = { period: reportKey, data: data.report, insights: data.insights }
+        setMessages((ms) => [...ms, { role: "assistant", content: reportSummaryText(report), report, typed: true, at: new Date().toISOString() }])
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Something went wrong.")
+      } finally {
+        setBusy(false)
+        inputRef.current?.focus()
+      }
+      return
+    }
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -868,6 +904,12 @@ export default function FhiChatPage({
                     <span className="font-['Outfit'] text-[12.5px] font-bold text-[#0d1117]">FHI Assistant</span>
                     {m.at && <span className="text-[10.5px] text-[#9ca3af]">{timeOf(m.at)}</span>}
                   </div>
+                  {m.report && pdfReport ? (
+                    <div className="mt-3">
+                      <ReportCard report={m.report} pdfEndpoint={pdfReport} />
+                    </div>
+                  ) : (
+                  <>
                   {m.stats && m.stats.length > 1 && (
                     <div className="px-5 pt-3">
                       <StatTiles stats={m.stats} />
@@ -915,6 +957,8 @@ export default function FhiChatPage({
                       <CardRow cards={m.cards} />
                     </div>
                   )}
+                  </>
+                  )}
                   {m.typed !== false && (
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-[#eef0f3] px-5 py-2.5">
                       {m.used && m.used.length > 0 && (
@@ -936,13 +980,15 @@ export default function FhiChatPage({
                           {copiedIdx === i ? <Check className="h-3 w-3 text-[#15803d]" /> : <Copy className="h-3 w-3" />}
                           {copiedIdx === i ? "Copied" : "Copy"}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => exportAnswer(m.content)}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#6b7280] transition-colors hover:text-[#001f3f]"
-                        >
-                          <Printer className="h-3 w-3" /> Export PDF
-                        </button>
+                        {!m.report && (
+                          <button
+                            type="button"
+                            onClick={() => exportAnswer(m.content)}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#6b7280] transition-colors hover:text-[#001f3f]"
+                          >
+                            <Printer className="h-3 w-3" /> Export PDF
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
