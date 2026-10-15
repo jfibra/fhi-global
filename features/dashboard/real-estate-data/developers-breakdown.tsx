@@ -5,7 +5,7 @@
 // Who is selling: DLD transactions for a date range, each row credited to
 // the developer behind its project. A transaction row names its project but
 // never its developer, so the server resolves it in three layers
-// (lib/dld-developer-lookup.ts): the archived DLD projects register, FHI's
+// (lib/dld-developer-lookup.ts): DLD's live projects register, FHI's
 // own projects + developers catalogue, then — only when the project's
 // leading word is also the leading word of a developer those two already
 // know — a guess labelled "(by name)". A project nobody recognises is

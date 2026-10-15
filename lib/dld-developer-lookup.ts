@@ -1,5 +1,7 @@
 import "server-only"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { DLD_DATASETS, toDldDate } from "@/lib/dld-open-data"
+import { buildGatewayBody, chunkReader, readChunksUpTo } from "@/lib/dld-gateway"
 
 /**
  * Project name → developer, for the "Top developers" ranking of DLD
@@ -12,8 +14,9 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
  *               project name. Brand-level names ("Imtiaz Developments"), and
  *               it covers the older projects FHI has catalogued. Checked
  *               first so a brand name wins whenever one is known.
- *   2. "dld"  — the archived DLD projects register (dld_projects, migration
- *               065): PROJECT_EN → DEVELOPER_EN. Exact, but the gateway only
+ *   2. "dld"  — DLD's projects register, read live from the gateway (this
+ *               year's projects, a few hundred rows, through the six-hour chunk
+ *               cache): PROJECT_EN → DEVELOPER_EN. Exact, but the gateway only
  *               serves the current year's projects, so older ones are absent,
  *               and DLD's developer is the legal entity — usually a per-project
  *               SPV ("IMTIAZ JA REAL ESTATE DEVELOPMENT L.L.C"). When exactly
@@ -105,12 +108,13 @@ async function build(): Promise<Lookup> {
     /* catalogue unavailable — the register still works */
   }
 
-  // Layer 2 — DLD register, for projects the catalogue doesn't have.
+  // Layer 2 — DLD register, for projects the catalogue doesn't have. Pulled
+  // from the gateway itself (1 January of this year to today, by start date —
+  // the same query the DLD site submits), not from a copy in our database.
   try {
-    const { data } = await supabase.from("dld_projects").select("project_en, developer_en").limit(20_000)
-    for (const r of (data ?? []) as Array<{ project_en: string | null; developer_en: string | null }>) {
-      const key = normalizeName(r.project_en)
-      const legal = r.developer_en?.trim()
+    for (const r of await fetchDldProjectsRegister()) {
+      const key = normalizeName(r.PROJECT_EN)
+      const legal = typeof r.DEVELOPER_EN === "string" ? r.DEVELOPER_EN.trim() : ""
       if (!key || !legal) continue
       // SPV → brand when the catalogue has exactly one brand with that leading word.
       const brand = brandByFirstWord.get(firstWord(legal))
@@ -120,10 +124,23 @@ async function build(): Promise<Lookup> {
       if (fw && !byFirstWord.has(fw)) byFirstWord.set(fw, dev)
     }
   } catch {
-    /* archive unavailable — fall through */
+    /* gateway unavailable — fall through */
   }
 
   return { byProject, byFirstWord, at: Date.now() }
+}
+
+/** Every project DLD has registered this year, at most REGISTER_MAX rows. */
+const REGISTER_MAX = 20_000
+async function fetchDldProjectsRegister(): Promise<Array<Record<string, unknown>>> {
+  const dataset = DLD_DATASETS.projects
+  const now = new Date()
+  // P_DATE_TYPE 1 = Start Date, what the DLD site itself submits.
+  const built = buildGatewayBody(dataset, { P_DATE_TYPE: "1", P_FROM_DATE: `01/01/${now.getFullYear()}`, P_TO_DATE: toDldDate(now) })
+  if (!built.ok) return []
+  built.body.P_SORT = dataset.defaultSort
+  const pulled = await readChunksUpTo(chunkReader("projects", built.body), REGISTER_MAX)
+  return "error" in pulled ? [] : pulled.rows
 }
 
 export async function getDeveloperLookup(): Promise<Lookup> {
