@@ -51,6 +51,10 @@ type Msg = {
   printCards?: PrintCardSpec[]
   /** A company report drawn as a document (report-card.tsx) instead of text. */
   report?: ChatReport
+  /** Still arriving from the server (the words stream in). */
+  streaming?: boolean
+  /** What the assistant is doing right now — "Checking Top Sales board…". */
+  status?: string
   typed?: boolean
   /** When it was sent/received (ISO), shown as a small time. */
   at?: string
@@ -69,40 +73,6 @@ function reportPeriodOf(question: string): ReportPeriodKey | null {
   if (/last month|previous month/.test(q)) return "last_month"
   if (/this month|month to date|^monthly/.test(q)) return "month"
   return null
-}
-
-/** Typewriter reveal — types the reply like a live assistant, then reports
- *  done so the cards and sources fade in after the words. */
-function TypedText({ text, names, onDone }: { text: string; names: string[]; onDone: () => void }) {
-  const [len, setLen] = useState(0)
-  const doneRef = useRef(false)
-  useEffect(() => {
-    doneRef.current = false
-    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setLen(text.length)
-      return
-    }
-    setLen(0)
-    const id = window.setInterval(() => {
-      setLen((n) => Math.min(n + 3, text.length))
-    }, 14)
-    return () => window.clearInterval(id)
-  }, [text])
-  // Completion is reported from an effect, never from inside a state updater —
-  // React forbids updating the parent while another component renders.
-  useEffect(() => {
-    if (len >= text.length && !doneRef.current) {
-      doneRef.current = true
-      onDone()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [len, text])
-  return (
-    <>
-      <AnswerBody text={text.slice(0, len)} names={names} />
-      {len < text.length && <span className="mt-1 inline-block h-[1em] w-[2px] animate-pulse bg-[#d6b357] align-middle" aria-hidden="true" />}
-    </>
-  )
 }
 
 function CardRow({ cards }: { cards: Card[] }) {
@@ -387,6 +357,9 @@ const SUGGESTION_GROUPS = [
   { label: "Reports", items: ["Give me the full report for this month", "Sales report for last quarter", "What happened today?"] },
 ] as const
 
+/** Markdown the model sometimes emits mid-stream — the final reply arrives cleaned by the server. */
+const liveClean = (t: string) => t.replace(/\*\*/g, "").replace(/^#{1,6}\s+/gm, "").replace(/`/g, "")
+
 /** One-tap professional reports — each sends a preset question. */
 const REPORT_BUTTONS = [
   { label: "Daily Report", prompt: "Give me the full report for today" },
@@ -659,7 +632,8 @@ export default function FhiChatPage({
         if (!raw) return
         const saved = JSON.parse(raw) as Msg[]
         if (Array.isArray(saved) && saved.length) {
-          setMessages((cur) => (cur.length ? cur : saved.map((m) => ({ ...m, typed: true }))))
+          // A reply that was still streaming when the page closed is dropped, never left spinning.
+          setMessages((cur) => (cur.length ? cur : saved.filter((m) => !m.streaming).map((m) => ({ ...m, typed: true }))))
         }
       } catch {
         // Corrupt or blocked storage — start fresh.
@@ -686,7 +660,7 @@ export default function FhiChatPage({
   useEffect(() => {
     // Never delete here: on mount this runs with an empty chat BEFORE the
     // deferred restore reads storage — clearing belongs to "New chat" only.
-    if (!messages.length) return
+    if (!messages.length || messages.some((m) => m.streaming)) return
     try {
       sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-30)))
     } catch {
@@ -703,20 +677,21 @@ export default function FhiChatPage({
     inputRef.current?.focus()
   }
 
+  const isStreaming = messages.some((m) => m.streaming)
+  const messageCount = messages.length
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
-  }, [messages, busy])
+  }, [messageCount, busy])
 
-  // Follow the typewriter: while a reply is typing, keep the end in view.
-  const isTyping = messages.some((m) => m.typed === false)
+  // While an answer streams in, keep its end in view.
   useEffect(() => {
-    if (!isTyping) return
+    if (!isStreaming) return
     const id = window.setInterval(
       () => endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }),
       400,
     )
     return () => window.clearInterval(id)
-  }, [isTyping])
+  }, [isStreaming])
 
   const ask = async (raw?: string) => {
     const question = (raw ?? input).trim()
@@ -743,43 +718,73 @@ export default function FhiChatPage({
       }
       return
     }
+    // The live answer: the bubble appears at once with a status line, then the
+    // words stream in as the model writes them (lib/fhi-chat-stream.ts).
+    const patchLive = (patch: (m: Msg) => Msg) =>
+      setMessages((ms) => ms.map((m, i) => (i === ms.length - 1 && m.streaming ? patch(m) : m)))
+    let liveText = ""
+    let flushTimer: number | null = null
+    setMessages((ms) => [...ms, { role: "assistant", content: "", streaming: true, status: "Thinking…", typed: true, at: new Date().toISOString() }])
+    const flush = () => {
+      flushTimer = null
+      const text = liveText
+      patchLive((m) => ({ ...m, content: text }))
+    }
     try {
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
         body: JSON.stringify({ messages: next.map(({ role, content }) => ({ role, content })) }),
       })
-      const data = (await res.json().catch(() => ({}))) as {
-        reply?: string
-        used?: string[]
-        cards?: Card[]
-        names?: string[]
-        charts?: ChartSpec[]
-        stats?: StatSpec[]
-        printCards?: PrintCardSpec[]
-        error?: string
-        quota?: Quota
+      type Final = { reply?: string; used?: string[]; cards?: Card[]; names?: string[]; charts?: ChartSpec[]; stats?: StatSpec[]; printCards?: PrintCardSpec[]; error?: string; quota?: Quota }
+      if (!res.ok || !res.body || !(res.headers.get("content-type") ?? "").includes("text/event-stream")) {
+        // Refused before streaming (sign-in, the daily limit…) or an old server: one JSON object.
+        const data = (await res.json().catch(() => ({}))) as Final
+        if (data.quota) setQuota(data.quota)
+        if (!res.ok || !data.reply) throw new Error(data.error ?? "FHI Assistant couldn't answer — try again.")
+        patchLive((m) => ({ ...m, content: data.reply ?? "", used: data.used, cards: data.cards, names: data.names, charts: data.charts, stats: data.stats, printCards: data.printCards, streaming: false, status: undefined }))
+        return
       }
-      if (data.quota) setQuota(data.quota)
-      if (!res.ok || !data.reply) throw new Error(data.error ?? "FHI Assistant couldn't answer — try again.")
-      setMessages((ms) => [
-        ...ms,
-        {
-          role: "assistant",
-          content: data.reply ?? "",
-          used: data.used,
-          cards: data.cards,
-          names: data.names,
-          charts: data.charts,
-          stats: data.stats,
-          printCards: data.printCards,
-          typed: false,
-          at: new Date().toISOString(),
-        },
-      ])
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ""
+      let finished = false
+      while (!finished) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        let cut: number
+        while ((cut = buffer.indexOf("\n\n")) >= 0) {
+          const line = buffer.slice(0, cut).trim()
+          buffer = buffer.slice(cut + 2)
+          if (!line.startsWith("data:")) continue
+          const ev = JSON.parse(line.slice(5)) as { type: string; text?: string; tools?: string[]; error?: string; quota?: Quota } & Final
+          if (ev.type === "status") {
+            const labels = [...new Set((ev.tools ?? []).map((t) => TOOL_LABELS[t] ?? t.replace(/_/g, " ")))]
+            patchLive((m) => ({ ...m, status: labels.length ? `Checking ${labels.join(", ")}…` : "Thinking…" }))
+          } else if (ev.type === "delta") {
+            liveText += ev.text ?? ""
+            if (flushTimer === null) flushTimer = window.setTimeout(flush, 50)
+          } else if (ev.type === "reset") {
+            liveText = ""
+            patchLive((m) => ({ ...m, content: "" }))
+          } else if (ev.type === "done") {
+            if (flushTimer !== null) window.clearTimeout(flushTimer)
+            if (ev.quota) setQuota(ev.quota)
+            patchLive((m) => ({ ...m, content: ev.reply ?? liveText, used: ev.used, cards: ev.cards, names: ev.names, charts: ev.charts, stats: ev.stats, printCards: ev.printCards, streaming: false, status: undefined }))
+            finished = true
+          } else if (ev.type === "error") {
+            if (ev.quota) setQuota(ev.quota)
+            throw new Error(ev.error ?? "FHI Assistant couldn't answer — try again.")
+          }
+        }
+      }
+      if (!finished) throw new Error("The answer was cut off — try again.")
     } catch (e) {
+      if (flushTimer !== null) window.clearTimeout(flushTimer)
+      // Drop a half-written answer; keep the question so a retry is one click away.
+      setMessages((ms) => (ms[ms.length - 1]?.streaming ? ms.slice(0, -1) : ms))
       setError(e instanceof Error ? e.message : "Something went wrong.")
-      // Keep the question in the thread so a retry is one click away.
     } finally {
       setBusy(false)
       inputRef.current?.focus()
@@ -883,14 +888,20 @@ export default function FhiChatPage({
                     </div>
                   )}
                   <div className="px-5 pb-4 pt-3 text-[14px] leading-[1.7] text-[#1f2937]">
-                    {m.typed === false ? (
-                      <TypedText
-                        text={m.content}
-                        names={m.names ?? (m.cards ?? []).map((c) => c.title)}
-                        onDone={() => setMessages((ms) => ms.map((x, xi) => (xi === i ? { ...x, typed: true } : x)))}
-                      />
+                    {m.streaming && !m.content ? (
+                      <p className="inline-flex items-center gap-2.5 text-[13px] text-[#6b7280]" aria-live="polite">
+                        <span className="flex items-center gap-1" aria-hidden>
+                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357] [animation-delay:-0.3s]" />
+                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357] [animation-delay:-0.15s]" />
+                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357]" />
+                        </span>
+                        {m.status ?? "Thinking…"}
+                      </p>
                     ) : (
-                      <AnswerBody text={m.content} names={m.names ?? (m.cards ?? []).map((c) => c.title)} />
+                      <>
+                        <AnswerBody text={m.streaming ? liveClean(m.content) : m.content} names={m.names ?? (m.cards ?? []).map((c) => c.title)} />
+                        {m.streaming && <span className="mt-1 inline-block h-[1em] w-[2px] animate-pulse bg-[#d6b357] align-middle" aria-hidden="true" />}
+                      </>
                     )}
                   </div>
                   {m.typed !== false && m.charts && m.charts.length > 0 && (
@@ -926,7 +937,7 @@ export default function FhiChatPage({
                   )}
                   </>
                   )}
-                  {m.typed !== false && (
+                  {m.typed !== false && !m.streaming && (
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-[#eef0f3] px-5 py-2.5">
                       {m.used && m.used.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -964,7 +975,7 @@ export default function FhiChatPage({
             ),
           )
         )}
-        {busy && (
+        {busy && !isStreaming && (
           <div className="inline-flex items-center gap-2.5 rounded-2xl border border-[#e8eaed] bg-white px-4 py-3 text-[13px] text-[#6b7280] shadow-[0_8px_28px_-16px_rgba(0,31,63,0.28)]">
             <span className="flex items-center gap-1" aria-hidden>
               <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357] [animation-delay:-0.3s]" />

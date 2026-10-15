@@ -2,6 +2,7 @@ import "server-only"
 
 import { agentChatToolsFor, runAgentChatTool, type AgentChatCaller } from "@/lib/fhi-agent-chat-tools"
 import type { FhiChatCard, FhiChatChart, FhiChatStat } from "@/lib/fhi-chat-tools"
+import { cleanReply, streamCompletion, type ChatMessage, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
 
 /**
  * The agent-side FHI Assistant's model loop (app/api/fhi-chat is the guard,
@@ -14,13 +15,6 @@ const MODEL = () => process.env.OPENAI_CHAT_MODEL?.trim() || "gpt-4o-mini"
 const MAX_TOOL_ROUNDS = 4
 export const AGENT_CHAT_MAX_HISTORY = 10
 export const AGENT_CHAT_MAX_QUESTION_CHARS = 1000
-
-type ChatMessage = {
-  role: "user" | "assistant" | "system" | "tool"
-  content: string | null
-  tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>
-  tool_call_id?: string
-}
 
 export type AgentChatHistory = Array<{ role: "user" | "assistant"; content: string }>
 
@@ -63,21 +57,17 @@ Rules:
 - The UI shows the headline figures as big tiles above your text and draws charts and photo cards from your tools automatically. Lead with the one-sentence insight, then only the details the tiles and cards don't show; never re-list what a card shows. The month-by-month figures (by_month) are drawn as a chart — never list them month by month; mention only the best month if it matters.
 - If asked something outside FHI's own data (general knowledge, other companies, the wider market, legal or visa advice), say FHI Assistant only answers from FHI Global's own data.`
 
-const cleanReply = (text: string) =>
-  text
-    .replace(/\*\*(.+?)\*\*/g, "$1")
-    .replace(/__(.+?)__/g, "$1")
-    .replace(/\*\*/g, "")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-
 const dedupe = <T,>(items: T[], key: (t: T) => string, cap: number): T[] => {
   const seen = new Set<string>()
   return [...items].reverse().filter((t) => (seen.has(key(t)) ? false : (seen.add(key(t)), true))).reverse().slice(0, cap)
 }
 
-export async function runAgentChat(caller: AgentChatCaller, history: AgentChatHistory, apiKey: string): Promise<AgentChatResult> {
+/**
+ * One question → tool rounds → the reply. Every round streams (text goes to
+ * `emit` as it is written — the route forwards it to the page); the tools a
+ * round asks for run in parallel. Without `emit` it simply returns the result.
+ */
+export async function runAgentChat(caller: AgentChatCaller, history: AgentChatHistory, apiKey: string, emit: (e: ChatStreamEvent) => void = () => {}): Promise<AgentChatResult> {
   const model = MODEL()
   const tools = agentChatToolsFor(caller.role)
   const messages: ChatMessage[] = [{ role: "system", content: agentSystemPrompt(caller.name, caller.role) }, ...history]
@@ -91,37 +81,22 @@ export async function runAgentChat(caller: AgentChatCaller, history: AgentChatHi
   const base = () => ({ used: [...new Set(used)], cards, names: entityNames, charts, stats, model, promptTokens, completionTokens })
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-    const callOpenAI = () =>
-      fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model,
-          messages,
-          tools,
-          tool_choice: round === MAX_TOOL_ROUNDS ? "none" : "auto",
-          temperature: 0.1,
-        }),
-      })
-    let res: Response
-    try {
-      res = await callOpenAI()
-    } catch {
-      try {
-        await new Promise((r) => setTimeout(r, 700))
-        res = await callOpenAI()
-      } catch {
-        return { ok: false, status: 502, error: "Couldn't reach the AI service — try again.", ...base() }
-      }
-    }
-    const data = (await res.json().catch(() => null)) as
-      | { choices?: Array<{ message?: ChatMessage }>; usage?: { prompt_tokens?: number; completion_tokens?: number }; error?: { message?: string } }
-      | null
-    promptTokens += data?.usage?.prompt_tokens ?? 0
-    completionTokens += data?.usage?.completion_tokens ?? 0
-    if (!res.ok) return { ok: false, status: 502, error: "The AI service had a problem — try again.", ...base() }
-    const msg = data?.choices?.[0]?.message
-    if (!msg) return { ok: false, status: 502, error: "The AI service returned no reply.", ...base() }
+    let streamed = false
+    const step = await streamCompletion({
+      apiKey,
+      model,
+      messages,
+      tools,
+      toolChoice: round === MAX_TOOL_ROUNDS ? "none" : "auto",
+      onDelta: (text) => {
+        streamed = true
+        emit({ type: "delta", text })
+      },
+    })
+    promptTokens += step.usage.prompt
+    completionTokens += step.usage.completion
+    if (!step.ok) return { ok: false, status: 502, error: "The AI service had a problem — try again.", ...base() }
+    const msg = step.message
 
     if (!msg.tool_calls?.length) {
       return {
@@ -135,17 +110,24 @@ export async function runAgentChat(caller: AgentChatCaller, history: AgentChatHi
       }
     }
 
+    // A round that wrote a few words before asking for tools: the page drops them.
+    if (streamed) emit({ type: "reset" })
     messages.push(msg)
-    for (const call of msg.tool_calls) {
+    emit({ type: "status", tools: msg.tool_calls.map((c) => c.function.name) })
+    const results = await Promise.all(
+      msg.tool_calls.map(async (call) => {
+        let args: Record<string, unknown> = {}
+        try {
+          args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>
+        } catch {
+          // A malformed argument string becomes an empty call.
+        }
+        // The caller comes from the session — never from the model's arguments.
+        return { call, result: await runAgentChatTool(call.function.name, args, caller) }
+      }),
+    )
+    for (const { call, result } of results) {
       used.push(call.function.name)
-      let args: Record<string, unknown> = {}
-      try {
-        args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>
-      } catch {
-        // A malformed argument string becomes an empty call.
-      }
-      // The caller comes from the session — never from the model's arguments.
-      const result = await runAgentChatTool(call.function.name, args, caller)
       cards.push(...result.cards)
       entityNames.push(...result.names)
       charts.push(...result.charts)

@@ -4,6 +4,7 @@ import { ROLES_ADMIN_STAFF, ROLES_AGENT_ASSISTANT } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { AGENT_CHAT_MAX_HISTORY, AGENT_CHAT_MAX_QUESTION_CHARS, runAgentChat } from "@/lib/fhi-agent-chat"
 import { assistantMonthSpend, assistantQuota, monthlyCapUsd, noteMonthlyCapReached, recordAssistantUsage } from "@/lib/assistant-usage"
+import { sseResponse, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
 
 /**
  * FHI Assistant for agents and team leaders (boss, 2026-10-09). The same
@@ -74,29 +75,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Couldn't check your usage — try again.", }, { status: 500 })
   }
 
-  const result = await runAgentChat({ userId, name: profile.fullname, role: profile.role }, history, apiKey)
-  // Every question that reached the model counts, answered or not — it cost tokens.
-  await recordAssistantUsage(admin, {
-    userId,
-    role: profile.role,
-    question,
-    tools: result.used,
-    model: result.model,
-    promptTokens: result.promptTokens,
-    completionTokens: result.completionTokens,
-    ok: result.ok,
-    error: result.error,
-  })
-  const nextQuota = { ...quota, used: quota.used + 1 }
-  if (!result.ok) return NextResponse.json({ error: result.error, quota: nextQuota }, { status: result.status ?? 500 })
-  return NextResponse.json({
-    reply: result.reply,
-    used: result.used,
-    cards: result.cards,
-    names: result.names,
-    charts: result.charts,
-    stats: result.stats,
-    printCards: [],
-    quota: nextQuota,
-  })
+  const run = async (emit: (e: ChatStreamEvent) => void) => {
+    const result = await runAgentChat({ userId, name: profile.fullname, role: profile.role }, history, apiKey, emit)
+    // Every question that reached the model counts, answered or not — it cost tokens.
+    await recordAssistantUsage(admin, {
+      userId,
+      role: profile.role,
+      question,
+      tools: result.used,
+      model: result.model,
+      promptTokens: result.promptTokens,
+      completionTokens: result.completionTokens,
+      ok: result.ok,
+      error: result.error,
+    })
+    const nextQuota = { ...quota, used: quota.used + 1 }
+    if (!result.ok) return { ok: false as const, status: result.status ?? 500, error: result.error ?? "FHI Assistant couldn't answer — try again.", quota: nextQuota }
+    return {
+      ok: true as const,
+      payload: { reply: result.reply, used: result.used, cards: result.cards, names: result.names, charts: result.charts, stats: result.stats, printCards: [], quota: nextQuota },
+    }
+  }
+
+  // The page asks for a live stream (words as they are written, which lookups
+  // are running); anything else gets the whole answer as one JSON object.
+  if (req.headers.get("accept")?.includes("text/event-stream")) {
+    return sseResponse(async (send) => {
+      const out = await run(send)
+      send(out.ok ? { type: "done", ...out.payload } : { type: "error", error: out.error, status: out.status, quota: out.quota })
+    })
+  }
+  const out = await run(() => {})
+  return out.ok ? NextResponse.json(out.payload) : NextResponse.json({ error: out.error, quota: out.quota }, { status: out.status })
 }

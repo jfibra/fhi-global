@@ -173,7 +173,26 @@ export function normScope(raw: string | undefined): "month" | "quarter" | "year"
 }
 
 /** Page through sales_reports (PostgREST caps a single select at 1000 rows). */
-export async function fetchAllSales(admin: Admin): Promise<SaleRow[]> {
+/**
+ * Every sales_reports row. Lookups that run together (the assistant runs a
+ * round's tools in parallel) share ONE read, and a read is reused for
+ * SALES_READ_TTL_MS — a few seconds, so figures stay current.
+ */
+const SALES_READ_TTL_MS = 15_000
+let salesRead: { at: number; rows: Promise<SaleRow[]> } | null = null
+export function fetchAllSales(admin: Admin): Promise<SaleRow[]> {
+  if (salesRead && Date.now() - salesRead.at < SALES_READ_TTL_MS) return salesRead.rows
+  const rows = loadAllSales(admin)
+  const entry = { at: Date.now(), rows }
+  salesRead = entry
+  // A failed read is never reused.
+  rows.catch(() => {
+    if (salesRead === entry) salesRead = null
+  })
+  return rows
+}
+
+async function loadAllSales(admin: Admin): Promise<SaleRow[]> {
   const out: SaleRow[] = []
   for (let page = 0; page < 10; page++) {
     const { data, error } = await admin
@@ -4961,6 +4980,34 @@ export type FhiChatChart =
   | { kind: "pie"; title: string; rows: FhiChatShareRow[] }
 
 export async function runFhiChatTool(
+  name: string,
+  args: Record<string, unknown>,
+  sender?: FhiChatSender,
+): Promise<{
+  forModel: string
+  cards: FhiChatCard[]
+  names: string[]
+  charts: FhiChatChart[]
+  printCards: FhiChatPrintCard[]
+  stats: FhiChatStat[]
+}> {
+  // Google's figures (Analytics, Search Console) lag a day and take seconds to
+  // read, so the same question within GOOGLE_TTL_MS reuses the answer.
+  const cacheKey = GOOGLE_TOOLS.has(name) ? `${name}:${JSON.stringify(args)}` : null
+  if (cacheKey) {
+    const hit = googleCache.get(cacheKey)
+    if (hit && Date.now() - hit.at < GOOGLE_TTL_MS) return hit.result
+  }
+  const result = await runFhiChatToolUncached(name, args, sender)
+  if (cacheKey && !result.forModel.startsWith('{"error"')) googleCache.set(cacheKey, { at: Date.now(), result })
+  return result
+}
+
+const GOOGLE_TOOLS = new Set(["website_traffic", "search_keywords"])
+const GOOGLE_TTL_MS = 10 * 60 * 1000
+const googleCache = new Map<string, { at: number; result: Awaited<ReturnType<typeof runFhiChatToolUncached>> }>()
+
+async function runFhiChatToolUncached(
   name: string,
   args: Record<string, unknown>,
   sender?: FhiChatSender,
