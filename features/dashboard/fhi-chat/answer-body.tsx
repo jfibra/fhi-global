@@ -26,6 +26,7 @@ type Block =
   | { kind: "timeline"; rows: Array<{ when: string; text: string }> }
   | { kind: "contacts"; rows: string[][] }
   | { kind: "bullets"; rows: string[] }
+  | { kind: "recs"; rows: Array<{ n: string; title: string | null; text: string }> }
 
 // ─── Parsing ────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,17 @@ function classify(item: string): { kind: Item; row: unknown } {
   return { kind: "bullets", row: item }
 }
 
+/** Headings whose list items are actions — drawn as numbered recommendation cards. */
+const RECS_HEADING = /RECOMMEND|ACTIONS?\b|NEXT STEPS|WHAT TO DO|ADVICE|ACTION PLAN/
+
+function recRow(item: string, index: number): { n: string; title: string | null; text: string } {
+  const r = RANK.exec(item)
+  const n = r ? r[1] : String(index + 1)
+  const body = r ? r[2] : item
+  const m = /^(.{3,70}?):\s+(.+)$/.exec(body)
+  return m ? { n, title: m[1].trim(), text: m[2].trim() } : { n, title: null, text: body }
+}
+
 export function parseAnswer(text: string): Block[] {
   const lines = text.split(/\r?\n/).map((l) => l.trim())
   const blocks: Block[] = []
@@ -74,6 +86,7 @@ export function parseAnswer(text: string): Block[] {
   const firstLine = lines.find((l) => l)
   let n = 0
   let titleDone = false
+  let inRecs = false
   for (const line of lines) {
     if (!line) continue
     if (isHeading(line)) {
@@ -85,6 +98,7 @@ export function parseAnswer(text: string): Block[] {
       }
       titleDone = true
       n++
+      inRecs = RECS_HEADING.test(line)
       blocks.push({ kind: "heading", text: line.replace(/:$/, ""), n })
       continue
     }
@@ -92,6 +106,14 @@ export function parseAnswer(text: string): Block[] {
     const c = CALLOUT.exec(line.replace(/^-\s+/, ""))
     if (c) {
       blocks.push({ kind: "callout", label: c[1], text: c[2] })
+      continue
+    }
+    // Under a RECOMMENDATIONS heading, "- 1. …", "1. …" and "- …" items are all actions.
+    if (inRecs && (line.startsWith("- ") || line.startsWith("• ") || /^\d{1,2}[.)]\s/.test(line))) {
+      const item = /^\d/.test(line) ? line : line.slice(2).trim()
+      const last = blocks[blocks.length - 1]
+      if (last && last.kind === "recs") last.rows.push(recRow(item, last.rows.length))
+      else blocks.push({ kind: "recs", rows: [recRow(item, 0)] })
       continue
     }
     if (line.startsWith("- ") || line.startsWith("• ")) {
@@ -254,6 +276,20 @@ export default function AnswerBody({ text, names }: { text: string; names: strin
                   </li>
                 ))}
               </ul>
+            )
+          case "recs":
+            return (
+              <ol key={i} className="space-y-2">
+                {b.rows.map((r, ri) => (
+                  <li key={ri} className="flex gap-3 rounded-xl border border-[#e8eaed] px-3.5 py-3">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#001f3f] font-['Outfit'] text-[13px] font-bold text-[#f0d89b]">{r.n}</span>
+                    <div className="min-w-0 flex-1">
+                      {r.title && <p className="font-['Outfit'] text-[14.5px] font-bold leading-snug text-[#001f3f]">{r.title}</p>}
+                      <p className={`text-[13.5px] leading-snug text-[#1f2937] ${r.title ? "mt-0.5" : ""}`}><Inline text={r.text} names={names} /></p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
             )
           case "bullets":
             return (
