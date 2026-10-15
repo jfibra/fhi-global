@@ -1,7 +1,7 @@
 import "server-only"
 
 import { FHI_CHAT_TOOLS, runFhiChatTool, type FhiChatCard, type FhiChatChart, type FhiChatPrintCard, type FhiChatSender, type FhiChatStat } from "@/lib/fhi-chat-tools"
-import { cleanReply, streamCompletion, type ChatMessage, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
+import { cleanReply, isAdviceQuestion, streamCompletion, type ChatMessage, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
 
 /**
  * FHI Assistant (admin) — the answer loop behind app/api/admin/fhi-chat,
@@ -24,9 +24,6 @@ const MODEL = () => process.env.OPENAI_CHAT_MODEL?.trim() || "gpt-4o-mini"
  * question (~$0.02–0.05), so data questions stay on MODEL.
  */
 const ADVICE_MODEL = () => process.env.OPENAI_ADVICE_MODEL?.trim() || "gpt-4.1"
-const ADVICE_RE =
-  /\b(advice|advise|suggest(ion)?s?|recommend\w*|tips?|strateg(y|ies)|action plan)\b|\bwhat (should|can|could) (we|i)\b|\bhow (can|do|should|could) (we|i) (improve|increase|get|grow|boost|market|attract|activate|sell|convert|make)\b|\bhow to (improve|increase|get|grow|boost|market|attract|activate|sell|convert)\b|\bbest (way|thing|things) to\b|\bmore productive\b/i
-export const isAdviceQuestion = (q: string) => ADVICE_RE.test(q)
 const MAX_TOOL_ROUNDS = 5
 export const MAX_HISTORY = 16
 

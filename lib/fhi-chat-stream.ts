@@ -159,3 +159,8 @@ export const cleanReply = (text: string) =>
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/`([^`]+)`/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+
+/** "How do we market the website", "how can I sell more", "what should we do" — both assistants answer these on a stronger model, grounded in the asker's figures. */
+const ADVICE_RE =
+  /\b(advice|advise|suggest(ion)?s?|recommend\w*|tips?|strateg(y|ies)|action plan)\b|\bwhat (should|can|could) (we|i)\b|\bhow (can|do|should|could) (we|i) (improve|increase|get|grow|boost|market|attract|activate|sell|convert|make)\b|\bhow to (improve|increase|get|grow|boost|market|attract|activate|sell|convert)\b|\bbest (way|thing|things) to\b|\bmore productive\b/i
+export const isAdviceQuestion = (q: string) => ADVICE_RE.test(q)

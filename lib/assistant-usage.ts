@@ -39,9 +39,23 @@ export const monthlyCapUsd = () => num(process.env.ASSISTANT_MONTHLY_CAP_USD, 30
  * USD per 1M tokens. Defaults are gpt-4o-mini's list prices (input 0.15,
  * output 0.60) — override in env if the model or OpenAI's pricing changes.
  */
-export function costUsd(promptTokens: number, completionTokens: number): number {
-  const inPrice = num(process.env.OPENAI_PRICE_INPUT_USD_PER_M, 0.15)
-  const outPrice = num(process.env.OPENAI_PRICE_OUTPUT_USD_PER_M, 0.6)
+/**
+ * USD per million tokens (input, output) for the models the assistants use —
+ * advice questions run on a stronger model than data questions (2026-10-15),
+ * so the monthly cap must price each question by the model that answered it.
+ * Cached-input discounts are ignored: the cap errs on the safe side. The env
+ * prices still override the default model's.
+ */
+const MODEL_PRICES: Record<string, [number, number]> = {
+  "gpt-4o-mini": [0.15, 0.6],
+  "gpt-4.1-mini": [0.4, 1.6],
+  "gpt-4.1": [2, 8],
+  "gpt-4o": [2.5, 10],
+}
+export function costUsd(promptTokens: number, completionTokens: number, model?: string | null): number {
+  const known = model ? MODEL_PRICES[model] : undefined
+  const inPrice = known ? known[0] : num(process.env.OPENAI_PRICE_INPUT_USD_PER_M, 0.15)
+  const outPrice = known ? known[1] : num(process.env.OPENAI_PRICE_OUTPUT_USD_PER_M, 0.6)
   return (promptTokens * inPrice + completionTokens * outPrice) / 1_000_000
 }
 
@@ -108,7 +122,7 @@ export async function recordAssistantUsage(admin: Admin, row: UsageRow): Promise
       model: row.model,
       prompt_tokens: row.promptTokens,
       completion_tokens: row.completionTokens,
-      cost_usd: Number(costUsd(row.promptTokens, row.completionTokens).toFixed(6)),
+      cost_usd: Number(costUsd(row.promptTokens, row.completionTokens, row.model).toFixed(6)),
       ok: row.ok,
       error: row.error ?? null,
     })

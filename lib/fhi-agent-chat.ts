@@ -2,7 +2,7 @@ import "server-only"
 
 import { agentChatToolsFor, runAgentChatTool, type AgentChatCaller } from "@/lib/fhi-agent-chat-tools"
 import type { FhiChatCard, FhiChatChart, FhiChatStat } from "@/lib/fhi-chat-tools"
-import { cleanReply, streamCompletion, type ChatMessage, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
+import { cleanReply, isAdviceQuestion, streamCompletion, type ChatMessage, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
 
 /**
  * The agent-side FHI Assistant's model loop (app/api/fhi-chat is the guard,
@@ -12,6 +12,15 @@ import { cleanReply, streamCompletion, type ChatMessage, type ChatStreamEvent } 
  */
 
 const MODEL = () => process.env.OPENAI_CHAT_MODEL?.trim() || "gpt-4o-mini"
+/**
+ * Advice questions (isAdviceQuestion — "how can I sell more", "how do I get
+ * more leads") run on a stronger model. Tested 2026-10-15 as a team leader and
+ * an agent: gpt-4.1 gave specific coaching from their own figures ("0 seller
+ * leads → go after sellers", "use your recent sale at The Wadi") where
+ * gpt-4.1-mini stayed generic; ~$0.02 vs ~$0.004 a question. The monthly cap
+ * prices each question by the model that answered (lib/assistant-usage.ts).
+ */
+const AGENT_ADVICE_MODEL = () => process.env.OPENAI_AGENT_ADVICE_MODEL?.trim() || "gpt-4.1"
 const MAX_TOOL_ROUNDS = 4
 export const AGENT_CHAT_MAX_HISTORY = 10
 export const AGENT_CHAT_MAX_QUESTION_CHARS = 1000
@@ -55,7 +64,19 @@ Rules:
 - Answer fast and precise. Plain text ONLY — no markdown: no asterisks, no underscores, no # headers, no backticks, no tables. For lists use "- " lines, e.g. "- 2026-08-13: Samana Greenfield (Samana Developers) — AED 1,198,000, validated".
 - STRUCTURE — the chat draws these as report-style blocks, so use them whenever an answer has more than one part: a CAPS heading per part on its own line; figures on "- Label: value" lines with the comparison in brackets, e.g. "- Validated: 3 deals, AED 2,911,000 (up 50% vs the previous week)"; rankings as "- 1. Name: 3 deals, AED 2,484,200"; dated happenings starting with the date ("- 2026-08-13: …"); people to follow up as "- Name - phone - email"; and, when there is a real one, a final "Insight: …" line. A one-line answer stays one plain line — never add headings to a short reply.
 - The UI shows the headline figures as big tiles above your text and draws charts and photo cards from your tools automatically. Lead with the one-sentence insight, then only the details the tiles and cards don't show; never re-list what a card shows. The month-by-month figures (by_month) are drawn as a chart — never list them month by month; mention only the best month if it matters.
-- If asked something outside FHI's own data (general knowledge, other companies, the wider market, legal or visa advice), say FHI Assistant only answers from FHI Global's own data.`
+- ADVICE — "how can I sell more", "how do I get more leads", "what should I focus on", "how do I grow my team / activate my recruits", "how do I make my website or events work better" are about THEIR OWN work: answer them as their coach. First call the tools that measure it for the last 30 days unless a period is named — selling: my_sales + my_leads + top_sales_board; leads and marketing: my_leads + my_website + my_listings; recruiting and team: my_recruits${role === "team_leader" ? " + my_team" : ""}; events: my_events. Then answer in exactly this layout:
+
+WHAT YOUR DATA SHOWS
+- Label: figure (with the comparison when the tool gives one) — 3 to 5 lines, only figures their tools returned, each with the tool's own meaning (a recruit count is not a sales count)
+
+RECOMMENDATIONS
+- 1. Short title: what to do in the next 2 weeks — and the figure above that it moves
+- 2. …  (4 to 6, most impactful first)
+
+Insight: one sentence.
+
+The actions may use sound practice for a Dubai property agent (WhatsApp follow-up within the hour, sharing their Buyers Link, short project videos, hosting an event, asking happy clients for a review, coaching recruits to a first deal), but every number must come from their tools: never invent figures, targets or commissions, and never show another agent's figures beyond what top_sales_board gives (rank and deal count).
+- If asked something truly outside FHI's own data and not a request for advice about their own work (general knowledge, other companies, the wider market, legal or visa advice), say FHI Assistant only answers from FHI Global's own data.`
 
 const dedupe = <T,>(items: T[], key: (t: T) => string, cap: number): T[] => {
   const seen = new Set<string>()
@@ -68,7 +89,7 @@ const dedupe = <T,>(items: T[], key: (t: T) => string, cap: number): T[] => {
  * round asks for run in parallel. Without `emit` it simply returns the result.
  */
 export async function runAgentChat(caller: AgentChatCaller, history: AgentChatHistory, apiKey: string, emit: (e: ChatStreamEvent) => void = () => {}): Promise<AgentChatResult> {
-  const model = MODEL()
+  const model = isAdviceQuestion(history[history.length - 1]?.content ?? "") ? AGENT_ADVICE_MODEL() : MODEL()
   const tools = agentChatToolsFor(caller.role)
   const messages: ChatMessage[] = [{ role: "system", content: agentSystemPrompt(caller.name, caller.role) }, ...history]
   const used: string[] = []
