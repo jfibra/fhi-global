@@ -128,7 +128,7 @@ function GoldenHour({ data, format, headline, heroUrl, showQr, phone, email }: P
                 Starting From
               </div>
             ) : null}
-            <div style={{ fontFamily: DISPLAY_FONT, fontSize: 62 * u, fontWeight: 900, lineHeight: 1 }}>
+            <div style={{ fontFamily: DISPLAY_FONT, fontSize: 62 * u, fontWeight: 900, lineHeight: 1, whiteSpace: "nowrap" }}>
               {priceText(data)}
             </div>
           </div>
@@ -310,13 +310,15 @@ function Pearl({ data, format, headline, heroUrl, showQr, phone, email }: Poster
 
         {/* Price band */}
         <div style={{ background: NAVY, border: `${2 * u}px solid rgba(214,179,87,0.75)`, borderRadius: 22 * u, padding: `${28 * u}px ${34 * u}px`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 * u }}>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             {hasPrice(data) && (
               <div style={{ color: GOLD, fontSize: 24 * u, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase" }}>
                 Starting From
               </div>
             )}
-            <div style={{ fontFamily: DISPLAY_FONT, color: "#fff", fontSize: (isSquare ? 52 : 64) * u, fontWeight: 900, lineHeight: 1.1, marginTop: 6 * u, ...clampLines(1) }}>
+            {/* One line, never wrapped: the download draws text a hair wider than the
+                preview, and a wrapped price under a one-line clamp exported as just "AED". */}
+            <div style={{ fontFamily: DISPLAY_FONT, color: "#fff", fontSize: (isSquare ? 52 : 64) * u, fontWeight: 900, lineHeight: 1.1, marginTop: 6 * u, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {priceText(data)}
             </div>
             {data.handoverLabel && (
