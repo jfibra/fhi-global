@@ -819,6 +819,16 @@ export default function FhiChatPage({
     return () => window.clearInterval(id)
   }, [isStreamingText, atBottom])
 
+  // A report lands as one tall card: when its figures arrive, glide down so
+  // the card fills the view from its top (following its END would skip the
+  // header and tiles). The advice filling in later doesn't move the view.
+  const arrivedReport = messages.findIndex((m) => m.streaming && m.report && !m.report.insights)
+  useEffect(() => {
+    if (arrivedReport < 0) return
+    const t = window.setTimeout(() => document.getElementById(`chat-msg-${arrivedReport}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60)
+    return () => window.clearTimeout(t)
+  }, [arrivedReport])
+
   // The composer grows with its text, up to a limit.
   useEffect(() => {
     const el = inputRef.current
@@ -1198,7 +1208,7 @@ export default function FhiChatPage({
                       <p className="max-w-[85%] whitespace-pre-wrap rounded-3xl bg-[#e9edf3] px-4 py-2.5 text-[15px] leading-relaxed text-[#0d1117]">{m.content}</p>
                     </div>
                   ) : (
-                    <div key={i} className="group flex gap-3">
+                    <div key={i} id={`chat-msg-${i}`} className="group flex scroll-mt-4 gap-3">
                       <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#001f3f]"><Sparkles className="h-3.5 w-3.5 text-[#d6b357]" /></span>
                       <div className="min-w-0 flex-1">
                         {m.report && pdfReport ? (
