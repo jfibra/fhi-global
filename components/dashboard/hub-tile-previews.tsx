@@ -11,15 +11,17 @@
  * The two tiles that read data (Documents, Buyers Link) load lazily with a
  * tab-level cache and show an honest empty state when there is nothing yet.
  *
- * Only the Library and Agent Resource hubs use these; every tile reads static
- * assets or the signed-in user's own data, so the same sample works for
- * agents, team leaders and global partners. The other hubs keep their
- * original tiles (hub-tile-mockups.tsx).
+ * The Library, Agent Resource and Communication hubs use these; every tile
+ * reads static assets or the signed-in user's own data, so the same sample
+ * works for agents, team leaders and global partners. Communication (admin
+ * only, 2026-10-16) shows miniatures of its four screens with sample people —
+ * never real enquiries, leads or reviews. The other hubs keep their original
+ * tiles (hub-tile-mockups.tsx).
  */
 
 import { useEffect, useState, type ReactNode } from "react"
 import Image from "next/image"
-import { FileText, Files, Globe, Play, QrCode } from "lucide-react"
+import { Check, FileText, Files, Globe, LifeBuoy, Play, QrCode, Star } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import { useAuth } from "@/context/auth-context"
 import { EBOOKS, ebookCoverUrl } from "@/lib/ebooks"
@@ -342,6 +344,117 @@ function BuyersLinkPreview() {
   )
 }
 
+// ─── Communication (admin) ──────────────────────────────────────────────────
+// Miniatures of the four screens with sample people — no real enquiries,
+// leads or reviews ever appear on the tiles.
+
+/** The Contact Inbox: unread enquiries from the public site, newest first. */
+function ContactInboxPreview() {
+  const rows = [
+    { i: "M", c: "bg-[#2f5d8a]", name: "Maria Santos", subject: "Viewing request · JVC", t: "2m", unread: true },
+    { i: "A", c: "bg-[#b8913f]", name: "Ahmed Khalid", subject: "Payment plan question", t: "1h", unread: true },
+    { i: "S", c: "bg-[#5c6b7a]", name: "Sarah Lim", subject: "Partnership enquiry", t: "3h", unread: false },
+  ]
+  return (
+    <span className={`${sheet} flex w-[116px] flex-col`}>
+      <span className="flex items-center justify-between bg-[#001f3f] px-1.5 py-1">
+        <span className="text-[6.5px] font-bold text-white">Contact Inbox</span>
+        <span className="rounded-full bg-[#d6b357] px-1 text-[5.5px] font-bold text-[#001f3f]">2 new</span>
+      </span>
+      {rows.map((r) => (
+        <span key={r.name} className={`flex items-center gap-1 border-b border-[#eef0f3] px-1.5 py-1 ${r.unread ? "bg-[#fffaf0]" : ""}`}>
+          <span className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[5.5px] font-bold text-white ${r.c}`}>{r.i}</span>
+          <span className="flex min-w-0 flex-1 flex-col leading-none">
+            <span className={`truncate text-[6px] ${r.unread ? "font-bold text-[#0d1117]" : "font-semibold text-[#374151]"}`}>{r.name}</span>
+            <span className="mt-0.5 truncate text-[5px] text-[#6b7280]">{r.subject}</span>
+          </span>
+          <span className="flex flex-col items-end gap-0.5">
+            <span className="text-[4.5px] text-[#9ca3af]">{r.t}</span>
+            {r.unread && <span className="h-1 w-1 rounded-full bg-[#d6b357]" />}
+          </span>
+        </span>
+      ))}
+      <span className="m-1.5 flex h-3.5 items-center justify-center rounded bg-[#d6b357] text-[5.5px] font-bold text-[#001f3f]">Reply</span>
+    </span>
+  )
+}
+
+/** Buyer Leads: every agent's Buyers Link briefs, graded. */
+function BuyerLeadsPreview() {
+  const leads = [
+    { name: "Ahmed K.", grade: "Priority", gc: "bg-[#d6b357] text-[#001f3f]", budget: "AED 1M – 2M", when: "Within 3 months", via: "via Juan D." },
+    { name: "Grace T.", grade: "Qualified", gc: "bg-[#001f3f] text-white", budget: "AED 500K – 1M", when: "Within a year", via: "via Maria S." },
+  ]
+  return (
+    <span className="flex w-[112px] flex-col gap-1.5">
+      {leads.map((l, i) => (
+        <span key={l.name} className={`${sheet} flex flex-col gap-0.5 p-1.5 ${i === 1 ? "ml-2" : "mr-2"}`}>
+          <span className="flex items-center justify-between gap-1">
+            <span className="truncate text-[6.5px] font-bold text-[#0d1117]">{l.name}</span>
+            <span className={`rounded-full px-1 text-[5px] font-bold ${l.gc}`}>{l.grade}</span>
+          </span>
+          <span className="text-[5.5px] font-semibold text-[#8a6d2a]">{l.budget}</span>
+          <span className="flex items-center justify-between text-[4.8px] text-[#6b7280]">
+            <span>{l.when}</span>
+            <span className="text-[#9ca3af]">{l.via}</span>
+          </span>
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/** Support Tickets: what agents and clients raised, with status. */
+function SupportTicketsPreview() {
+  const rows = [
+    { id: "#1042", title: "Can't upload my ID", st: "Open", c: "bg-amber-100 text-amber-800" },
+    { id: "#1041", title: "Commission status", st: "In progress", c: "bg-sky-100 text-sky-800" },
+    { id: "#1038", title: "Password reset", st: "Resolved", c: "bg-emerald-100 text-emerald-800" },
+  ]
+  return (
+    <span className={`${sheet} flex w-[116px] flex-col`}>
+      <span className="flex items-center justify-between border-b border-[#eef0f3] px-1.5 py-1">
+        <span className="text-[6.5px] font-bold text-[#001f3f]">Support Tickets</span>
+        <LifeBuoy className="h-2.5 w-2.5 text-[#b8913f]" />
+      </span>
+      {rows.map((r) => (
+        <span key={r.id} className="flex items-center gap-1 border-b border-[#f3f4f6] px-1.5 py-1 last:border-0">
+          <span className="flex min-w-0 flex-1 flex-col leading-none">
+            <span className="text-[4.5px] font-bold text-[#9ca3af]">{r.id}</span>
+            <span className="mt-0.5 truncate text-[5.8px] font-semibold text-[#0d1117]">{r.title}</span>
+          </span>
+          <span className={`shrink-0 rounded-full px-1 py-px text-[4.5px] font-bold ${r.c}`}>{r.st}</span>
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/** Customer Feedback: a client's review of an advisor, waiting for approval. */
+function CustomerFeedbackPreview() {
+  return (
+    <span className="flex w-[114px] flex-col gap-1.5">
+      <span className={`${sheet} flex flex-col gap-1 p-1.5`}>
+        <span className="flex items-center gap-1">
+          <span className="relative h-4 w-4 shrink-0 overflow-hidden rounded-full ring-1 ring-[#d6b357]">
+            <Image src={SAMPLE_PORTRAIT} alt="" fill sizes="20px" className="object-cover object-top" />
+          </span>
+          <span className="flex min-w-0 flex-col leading-none">
+            <span className="truncate text-[5.8px] font-bold text-[#0d1117]">Juan Dela Cruz</span>
+            <span className="mt-0.5 flex gap-px">{[0, 1, 2, 3, 4].map((i) => <Star key={i} className="h-1.5 w-1.5 fill-[#d6b357] text-[#d6b357]" />)}</span>
+          </span>
+        </span>
+        <span className="text-[5.3px] italic leading-snug text-[#374151]">&ldquo;Juan made buying our first apartment in Dubai easy and clear.&rdquo;</span>
+        <span className="text-[4.8px] text-[#9ca3af]">— Sarah L., buyer</span>
+      </span>
+      <span className="flex gap-1">
+        <span className="flex h-3.5 flex-1 items-center justify-center gap-0.5 rounded bg-emerald-600 text-[5.5px] font-bold text-white"><Check className="h-2 w-2" /> Approve</span>
+        <span className="flex h-3.5 flex-1 items-center justify-center rounded border border-[#dfe4ea] bg-white text-[5.5px] font-bold text-[#6b7280]">Hide</span>
+      </span>
+    </span>
+  )
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────────
 
 const PREVIEWS: Record<string, () => ReactNode> = {
@@ -360,6 +473,11 @@ const PREVIEWS: Record<string, () => ReactNode> = {
   "website-builder": () => <WebsiteBuilderPreview />,
   "a2a-agreement": () => <A2APreview />,
   "buyers-link": () => <BuyersLinkPreview />,
+  // Communication (admin)
+  "contact-inbox": () => <ContactInboxPreview />,
+  "buyer-leads": () => <BuyerLeadsPreview />,
+  "support-tickets": () => <SupportTicketsPreview />,
+  "customer-feedback": () => <CustomerFeedbackPreview />,
 }
 
 /** The sample inside a tile's right-hand frame; null when no sample is registered for this kind. */

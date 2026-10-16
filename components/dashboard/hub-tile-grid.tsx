@@ -9,7 +9,7 @@ import { TilePreview, hasTilePreview } from "@/components/dashboard/hub-tile-pre
  * that owns this hub — the tiles are derived from sidebar-config, so a hub can
  * never drift out of sync with the nav.
  *
- * Two looks. A hub whose tiles carry a `preview` (Library, Agent Resource)
+ * Two looks. A hub whose tiles carry a `preview` (Library, Agent Resource, Communication)
  * renders filipinohomes-final's hub card: icon, title, description and
  * "Open ›" down the left, and on the right a soft gold frame holding a
  * real sample of what the tool produces (hub-tile-previews.tsx). Every other
