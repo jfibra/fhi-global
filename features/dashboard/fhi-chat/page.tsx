@@ -800,24 +800,41 @@ export default function FhiChatPage({
     } catch {}
   }
 
-  // Scrolling: follow streaming text only while the reader sits at the bottom.
+  // Scrolling, the way ChatGPT does it: while the reader sits at the bottom,
+  // the thread STAYS at the bottom whenever it grows — streamed words, and the
+  // tiles, charts and photo cards that land when an answer finishes (they
+  // used to leave the view stranded mid-answer). Scrolling up lets go.
+  const stickRef = useRef(true)
+  const contentRef = useRef<HTMLDivElement | null>(null)
   const onScroll = () => {
     const el = scrollRef.current
     if (!el) return
-    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80)
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    stickRef.current = near
+    setAtBottom(near)
   }
-  const toBottom = (smooth = true) => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: smooth ? "smooth" : "auto" })
-  const isStreamingText = messages.some((m) => m.streaming && !m.report)
+  const toBottom = (smooth = true) => {
+    stickRef.current = true
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: smooth ? "smooth" : "auto" })
+  }
   const messageCount = messages.length
+  const hasThread = messageCount > 0
   useEffect(() => {
     const t = window.setTimeout(() => toBottom(true), 0)
     return () => window.clearTimeout(t)
   }, [messageCount])
   useEffect(() => {
-    if (!isStreamingText || !atBottom) return
-    const id = window.setInterval(() => toBottom(false), 120)
-    return () => window.clearInterval(id)
-  }, [isStreamingText, atBottom])
+    const content = contentRef.current
+    const box = scrollRef.current
+    if (!hasThread || !content || !box || typeof ResizeObserver === "undefined") return
+    const ro = new ResizeObserver(() => {
+      // A report that is still filling in places itself (below); everything else follows.
+      if (!stickRef.current || content.querySelector("[data-live-report]")) return
+      box.scrollTop = box.scrollHeight
+    })
+    ro.observe(content)
+    return () => ro.disconnect()
+  }, [hasThread])
 
   // A report lands as one tall card: when its figures arrive, glide down so
   // the card fills the view from its top (following its END would skip the
@@ -1201,14 +1218,14 @@ export default function FhiChatPage({
           <>
             {/* Thread */}
             <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto">
-              <div className="mx-auto w-full max-w-3xl space-y-7 px-4 pb-8 pt-6 sm:px-6">
+              <div ref={contentRef} className="mx-auto w-full max-w-3xl space-y-7 px-4 pb-8 pt-6 sm:px-6">
                 {messages.map((m, i) =>
                   m.role === "user" ? (
                     <div key={i} className="flex justify-end">
                       <p className="max-w-[85%] whitespace-pre-wrap rounded-3xl bg-[#e9edf3] px-4 py-2.5 text-[15px] leading-relaxed text-[#0d1117]">{m.content}</p>
                     </div>
                   ) : (
-                    <div key={i} id={`chat-msg-${i}`} className="group flex scroll-mt-4 gap-3">
+                    <div key={i} id={`chat-msg-${i}`} data-live-report={m.streaming && m.report ? "" : undefined} className="group flex scroll-mt-4 gap-3">
                       <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#001f3f]"><Sparkles className="h-3.5 w-3.5 text-[#d6b357]" /></span>
                       <div className="min-w-0 flex-1">
                         {m.report && pdfReport ? (
