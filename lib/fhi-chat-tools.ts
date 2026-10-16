@@ -2666,6 +2666,8 @@ type ProjectRow = {
   project_units: { unit_type: string | null; bedrooms: number | null; size_sqft: number | string | null; price_from: number | string | null; price_to: number | string | null }[] | null
 }
 
+type ProjectUnitRow = NonNullable<ProjectRow["project_units"]>[number]
+
 const PROJECT_FIND_COLUMNS =
   "id, name, slug, status, city, region, community, sub_community, location, launch_price_from, launch_price_to, currency, delivery_quarter, expected_completion_date, delivery_date, down_payment_percentage, payment_plan_details, installment_available, total_units, main_image, is_published, developers(name, slug), project_property_types(property_types(name)), project_units(unit_type, bedrooms, size_sqft, price_from, price_to)"
 
@@ -2697,6 +2699,86 @@ function unitBeds(u: { unit_type: string | null; bedrooms: number | null }): num
   if (/studio/.test(t)) return 0
   const m = /(\d)\s*(?:br\b|bhk|bed)/.exec(t)
   return m ? Number(m[1]) : null
+}
+
+/** The property kinds a buyer asks for, as project tags and unit names say them. */
+type UnitKind = "apartment" | "villa" | "townhouse" | "penthouse" | "retail" | "office" | "plot"
+
+const KIND_WORDS: Record<string, UnitKind> = {
+  apartment: "apartment",
+  flat: "apartment",
+  studio: "apartment",
+  villa: "villa",
+  mansion: "villa",
+  townhouse: "townhouse",
+  "town house": "townhouse",
+  penthouse: "penthouse",
+  retail: "retail",
+  shop: "retail",
+  commercial: "retail",
+  office: "office",
+  "commercial office": "office",
+  plot: "plot",
+  land: "plot",
+}
+
+/** "Villas" / "town houses" / "Commercial Office" → the kind; null when it isn't one we know. */
+function kindOfWord(word: string | null | undefined): UnitKind | null {
+  return KIND_WORDS[(word ?? "").normalize("NFKC").trim().toLowerCase().replace(/s$/, "")] ?? null
+}
+
+const projectKinds = (p: ProjectRow): UnitKind[] => [
+  ...new Set((p.project_property_types ?? []).map((t) => kindOfWord(t.property_types?.name)).filter((k): k is UnitKind => k != null)),
+]
+
+/**
+ * What one unit row is. Its name says so when it can ("4BR Villa", "3BR TH",
+ * "Sky Mansion Penthouse", "Retail"); a bare "4BR" takes the project's homes —
+ * an apartment wherever the project sells apartments (or isn't tagged), else
+ * the villa / townhouse / penthouse kinds it is tagged with (a "4BR" in a
+ * villas-and-townhouses community could be either, so it counts as both).
+ */
+function unitKinds(unitType: string | null, project: UnitKind[]): UnitKind[] {
+  const t = (unitType ?? "").normalize("NFKC").toLowerCase()
+  if (/penthouse/.test(t)) return ["penthouse"]
+  if (/sky\s*villa/.test(t)) return ["apartment"]
+  if (/villa|mansion/.test(t)) return ["villa"]
+  if (/town\s*house|\bth\b/.test(t)) return ["townhouse"]
+  if (/office/.test(t) && !/bed|\d\s*br\b|bhk|studio/.test(t)) return ["office"]
+  if (/retail|shop|commercial/.test(t)) return ["retail"]
+  if (/\bplot\b|\bland\b/.test(t)) return ["plot"]
+  if (/studio|apartment|\bflat\b/.test(t)) return ["apartment"]
+  if (project.length === 0 || project.includes("apartment")) return ["apartment"]
+  const homes = project.filter((k) => k === "villa" || k === "townhouse" || k === "penthouse")
+  return homes.length ? homes : ["apartment"]
+}
+
+/** A unit row's from-price, or null when missing or a sub-AED 50K data slip. */
+const unitPrice = (u: { price_from: number | string | null }): number | null => {
+  const n = numOf(u.price_from)
+  return n != null && n >= 50_000 ? n : null
+}
+
+/** "𝟐 𝐁𝐞𝐝𝐫𝐨𝐨𝐦" → "2 Bedroom"; a nameless row is named by its bedrooms. */
+function unitName(u: { unit_type: string | null; bedrooms: number | null }): string {
+  const name = (u.unit_type ?? "").normalize("NFKC").replace(/\s+/g, " ").trim()
+  const beds = unitBeds(u)
+  return name || (beds === 0 ? "Studio" : beds != null ? `${beds}-bedroom` : "Unit")
+}
+
+const unitSqft = (u: { size_sqft: number | string | null }): number | null => {
+  const n = numOf(u.size_sqft)
+  return n != null && n > 0 ? Math.round(n) : null
+}
+
+/** The cheapest priced row among these units, or null. */
+function cheapestUnit<U extends { price_from: number | string | null }>(units: U[]): U | null {
+  let best: U | null = null
+  for (const u of units) {
+    const p = unitPrice(u)
+    if (p != null && (best == null || p < unitPrice(best)!)) best = u
+  }
+  return best
 }
 
 function seoInputOf(p: ProjectRow): ProjectSeoInput {
@@ -2756,6 +2838,7 @@ export type FindProjectsArgs = {
   handover_by_year?: number
   name_contains?: string
   sort?: "price_asc" | "price_desc" | "handover" | "name"
+  per_unit?: boolean
   limit?: number
 }
 
@@ -2797,62 +2880,96 @@ export async function findProjects(admin: Admin, args: FindProjectsArgs) {
   if (args.status) rows = rows.filter((p) => p.status === args.status)
   if (args.off_plan_only) rows = rows.filter((p) => isOffPlan(p.status))
   if (args.ready_only) rows = rows.filter((p) => !isOffPlan(p.status))
-  if (args.property_type?.trim()) {
-    const t = args.property_type.trim().toLowerCase().replace(/s$/, "")
+  // A known kind (villa, townhouse, apartment…) is matched by what each unit
+  // IS, so a tower tagged "Villa" never passes its apartments off as villas;
+  // any other word falls back to plain text matching.
+  const typeWanted = args.property_type?.trim() ? args.property_type.trim().normalize("NFKC").toLowerCase().replace(/s$/, "") : null
+  const kindWanted = kindOfWord(typeWanted)
+  const typeLabel = kindWanted ?? typeWanted
+  const unitIsType = (u: { unit_type: string | null }, p: ProjectRow) =>
+    kindWanted ? unitKinds(u.unit_type, projectKinds(p)).includes(kindWanted) : lc(u.unit_type).includes(typeWanted ?? "")
+  if (typeWanted) {
     rows = rows.filter((p) => {
-      const types = seoInputOf(p).propertyTypes ?? []
-      const units = (p.project_units ?? []).map((u) => lc(u.unit_type))
-      return types.some((x) => x.toLowerCase().includes(t)) || units.some((x) => x.includes(t))
+      const tagged = kindWanted
+        ? projectKinds(p).includes(kindWanted)
+        : (seoInputOf(p).propertyTypes ?? []).some((x) => x.toLowerCase().includes(typeWanted))
+      return tagged || (p.project_units ?? []).some((u) => unitIsType(u, p))
     })
   }
 
   const beds = typeof args.bedrooms === "number" && Number.isFinite(args.bedrooms) ? args.bedrooms : null
-  const typeNeedle = args.property_type?.trim() ? args.property_type.trim().toLowerCase().replace(/s$/, "") : null
+  const limit = Math.min(Math.max(args.limit ?? 12, 1), 40)
+
+  if (args.per_unit) return unitShortlist(rows, args, { beds, typeWanted, unitIsType, limit })
+
   let withoutUnitRows = 0
   const scored = rows
     .map((p) => {
       const seo = seoInputOf(p)
       let price: number | null
+      let priceTo: number | null = null
       let priceNote: string
+      let noTypePrice = false
+      let pick: ProjectUnitRow | null = null
       if (beds != null) {
-        const matching = (p.project_units ?? []).filter((u) => unitBeds(u) === beds)
+        const matching = (p.project_units ?? []).filter((u) => unitBeds(u) === beds && (!typeWanted || unitIsType(u, p)))
         if (matching.length === 0) return null
-        const prices = matching.map((u) => numOf(u.price_from)).filter((n): n is number => n != null && n >= 50_000)
-        price = prices.length ? Math.min(...prices) : null
-        priceNote = price != null ? `cheapest ${beds === 0 ? "studio" : `${beds}-bedroom`} unit` : "no unit price listed"
-      } else {
-        // "Villas under 3M" on a mixed project: price the villa rows, not the
-        // apartments the headline price describes — when the unit table has them.
-        const typed = typeNeedle ? (p.project_units ?? []).filter((u) => lc(u.unit_type).includes(typeNeedle)) : []
-        const typedPrices = typed.map((u) => numOf(u.price_from)).filter((n): n is number => n != null && n >= 50_000)
-        if (typedPrices.length) {
-          price = Math.min(...typedPrices)
-          priceNote = `cheapest ${typeNeedle} unit`
+        pick = cheapestUnit(matching)
+        price = pick ? unitPrice(pick) : null
+        const size = beds === 0 ? "studio" : `${beds}-bedroom`
+        priceNote = price != null ? `cheapest ${size}${typeLabel && typeLabel !== "apartment" ? ` ${typeLabel}` : ""} unit` : "no unit price listed"
+      } else if (typeWanted) {
+        // "Villas under 3M": price the villa rows, never the apartments the
+        // headline price usually describes. The headline stands in only when
+        // the project prices no units at all and sells nothing but that kind
+        // (or it is apartments asked for and the project sells apartments).
+        pick = cheapestUnit((p.project_units ?? []).filter((u) => unitIsType(u, p)))
+        const kinds = projectKinds(p)
+        const headlineFits =
+          kindWanted != null &&
+          !(p.project_units ?? []).some((u) => unitPrice(u) != null) &&
+          (kinds.length ? kinds.every((k) => k === kindWanted) || (kindWanted === "apartment" && kinds.includes("apartment")) : kindWanted === "apartment")
+        const headline = headlineFits ? priceFromValue(seo) : null
+        if (pick) {
+          price = unitPrice(pick)
+          priceNote = `cheapest ${typeLabel} unit`
+        } else if (headline != null) {
+          price = headline
+          priceTo = priceToValue(seo)
+          priceNote = "project from price"
         } else {
-          price = priceFromValue(seo)
-          priceNote = price != null ? (typeNeedle ? "project from price (no per-type unit price listed)" : "from price") : "no price listed"
+          price = null
+          noTypePrice = true
+          priceNote = `lists ${typeLabel}s but has no ${typeLabel} price on file — price on request`
         }
+      } else {
+        price = priceFromValue(seo)
+        priceTo = priceToValue(seo)
+        priceNote = price != null ? "from price" : "no price listed"
       }
       const handover = handoverLabel(seo)
-      return { p, seo, price, priceNote, handover, year: handoverYear(handover) }
+      return { p, seo, price, priceTo, priceNote, noTypePrice, pick, handover, year: handoverYear(handover) }
     })
     .filter((x): x is NonNullable<typeof x> => x !== null)
   if (beds != null) withoutUnitRows = rows.length - scored.length
 
   let list = scored
-  if (typeof args.min_price === "number") list = list.filter((x) => x.price != null && x.price >= args.min_price!)
-  if (typeof args.max_price === "number") list = list.filter((x) => x.price != null && x.price <= args.max_price!)
   if (typeof args.handover_year === "number") list = list.filter((x) => x.year === args.handover_year)
   if (typeof args.handover_by_year === "number") list = list.filter((x) => x.year != null && x.year <= args.handover_by_year!)
+  const noPriceForType = list.filter((x) => x.noTypePrice).length
+  if (typeof args.min_price === "number") list = list.filter((x) => x.price != null && x.price >= args.min_price!)
+  if (typeof args.max_price === "number") list = list.filter((x) => x.price != null && x.price <= args.max_price!)
 
   const sort = args.sort ?? (args.max_price != null || args.min_price != null || beds != null ? "price_asc" : "name")
-  const byPrice = (a: { price: number | null }, b: { price: number | null }) => (a.price ?? Infinity) - (b.price ?? Infinity)
-  if (sort === "price_asc") list.sort(byPrice)
-  else if (sort === "price_desc") list.sort((a, b) => byPrice(b, a))
+  // Unpriced projects go last both ways — "most expensive" is never one with no price.
+  const byPrice = (dir: 1 | -1) => (a: { price: number | null }, b: { price: number | null }) =>
+    a.price == null ? (b.price == null ? 0 : 1) : b.price == null ? -1 : dir * (a.price - b.price)
+  if (sort === "price_asc") list.sort(byPrice(1))
+  else if (sort === "price_desc") list.sort(byPrice(-1))
   else if (sort === "handover") list.sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999))
   else list.sort((a, b) => a.p.name.localeCompare(b.p.name))
+  const headlinePick = list.filter((x) => x.price != null).sort(byPrice(sort === "price_desc" ? -1 : 1))[0]
 
-  const limit = Math.min(Math.max(args.limit ?? 12, 1), 40)
   const shown = list.slice(0, limit)
   const countBy = (key: (x: (typeof list)[number]) => string | null) => {
     const m = new Map<string, number>()
@@ -2865,16 +2982,21 @@ export async function findProjects(admin: Admin, args: FindProjectsArgs) {
     matched: list.length,
     shown: shown.length,
     ...(beds != null ? { left_out_no_unit_table_for_that_size: withoutUnitRows } : {}),
+    ...(beds != null && withoutUnitRows
+      ? { note: `${withoutUnitRows} more project${withoutUnitRows === 1 ? "" : "s"} in this search ${withoutUnitRows === 1 ? "has" : "have"} no ${beds === 0 ? "studio" : `${beds}-bedroom`}${typeLabel && typeLabel !== "apartment" ? ` ${typeLabel}` : ""} row in ${withoutUnitRows === 1 ? "its" : "their"} unit table, so ${withoutUnitRows === 1 ? "it was" : "they were"} left out — say exactly that; don't claim they sell that size` }
+      : {}),
+    ...(noPriceForType ? { no_price_for_that_type: noPriceForType } : {}),
     by_developer: countBy((x) => oneRel(x.p.developers)?.name ?? null),
     by_area: countBy((x) => x.p.community || x.p.location || x.p.city),
     by_handover_year: countBy((x) => (x.year ? String(x.year) : null)),
     _stats: [
       stat("Matching projects", list.length, null, beds != null && withoutUnitRows ? `+${withoutUnitRows} without unit data for that size` : null),
-      stat("Cheapest", shown[0]?.price != null ? formatPrice(shown[0].price, null, shown[0].p.currency) ?? "–" : "–", null, shown[0] ? shown[0].p.name : null),
+      stat(sort === "price_desc" ? "Most expensive" : "Cheapest", headlinePick ? formatPrice(headlinePick.price, null, headlinePick.p.currency) ?? "–" : "–", null, headlinePick ? headlinePick.p.name : null),
       stat("Developers", countBy((x) => oneRel(x.p.developers)?.name ?? null).length),
       ...(list.some((x) => x.year) ? [stat("Earliest handover", String(Math.min(...list.map((x) => x.year ?? 9999))))] : []),
     ],
-    price_rule: "Prices are what the public page shows: a from-price never below the cheapest listed unit; values under AED 50K ignored as data slips",
+    price_rule:
+      "Prices are what the public page shows: a from-price never below the cheapest listed unit; values under AED 50K ignored as data slips. For a property type, the price is that type's cheapest unit; a project counted in no_price_for_that_type sells that type but has no price for it on file — say 'price on request', never quote its headline (usually apartment) price for it; such projects are left out of any budget and listed last",
     _charts: [
       ...sharesChart("Matching projects by developer", countBy((x) => oneRel(x.p.developers)?.name ?? null)),
       ...barsChart("Matching projects by handover year", countBy((x) => (x.year ? String(x.year) : null)).filter((c) => c.name !== "Not given").sort((a, b) => a.name.localeCompare(b.name)).map((c) => ({ label: c.name, value: c.count, display: String(c.count) }))),
@@ -2887,8 +3009,10 @@ export async function findProjects(admin: Admin, args: FindProjectsArgs) {
         area: areaOf(x.p) || null,
         status: statusLabel(x.p.status),
         price_aed: x.price,
-        price_label: x.price != null ? formatPrice(x.price, beds != null ? null : priceToValue(x.seo), x.p.currency) : null,
+        price_label: x.price != null ? formatPrice(x.price, x.priceTo, x.p.currency) : null,
         price_basis: x.priceNote,
+        // The unit that price belongs to — its size answers "how big is it", not the project's range.
+        ...(x.pick ? { priced_unit: { unit: unitName(x.pick), size_sqft: unitSqft(x.pick) } } : {}),
         handover: x.handover,
         unit_mix: mix.mix,
         sizes: mix.sizes,
@@ -2904,6 +3028,102 @@ export async function findProjects(admin: Admin, args: FindProjectsArgs) {
         kind: "project",
         title: x.p.name,
         subtitle: [oneRel(x.p.developers)?.name, x.price != null ? formatPrice(x.price, null, x.p.currency) : null, x.handover].filter(Boolean).join(" · "),
+        image: x.p.main_image,
+      })),
+  }
+}
+
+/**
+ * find_projects with per_unit: one row per priced unit type across the
+ * matching projects — "cheapest unit", "most expensive penthouse", "cheapest
+ * 2-bedroom and its size". Only unit rows with a credible price take part;
+ * projects that price no units are counted, and for a plain "cheapest unit"
+ * the ones whose advertised from-price is lower than the cheapest unit are
+ * named, so the answer never hides a cheaper project.
+ */
+function unitShortlist(
+  rows: ProjectRow[],
+  args: FindProjectsArgs,
+  opts: { beds: number | null; typeWanted: string | null; unitIsType: (u: { unit_type: string | null }, p: ProjectRow) => boolean; limit: number },
+) {
+  const dir = args.sort === "price_desc" ? -1 : 1
+  const units = rows.flatMap((p) => {
+    const handover = handoverLabel(seoInputOf(p))
+    const year = handoverYear(handover)
+    if (typeof args.handover_year === "number" && year !== args.handover_year) return []
+    if (typeof args.handover_by_year === "number" && (year == null || year > args.handover_by_year)) return []
+    return (p.project_units ?? []).flatMap((u) => {
+      const price = unitPrice(u)
+      if (price == null) return []
+      if (opts.beds != null && unitBeds(u) !== opts.beds) return []
+      if (opts.typeWanted && !opts.unitIsType(u, p)) return []
+      if (typeof args.min_price === "number" && price < args.min_price) return []
+      if (typeof args.max_price === "number" && price > args.max_price) return []
+      return [{ p, u, price, handover }]
+    })
+  })
+  units.sort((a, b) => dir * (a.price - b.price))
+  const shown = units.slice(0, opts.limit)
+  const top = shown[0]
+  const sqft = unitSqft
+  const unpriced = rows.filter((p) => !(p.project_units ?? []).some((u) => unitPrice(u) != null))
+  const lowerHeadlines =
+    dir === 1 && opts.beds == null && !opts.typeWanted && args.min_price == null
+      ? unpriced
+          .map((p) => ({ p, price: priceFromValue(seoInputOf(p)) }))
+          .filter((x): x is { p: ProjectRow; price: number } => x.price != null && (top == null || x.price < top.price))
+          .sort((a, b) => a.price - b.price)
+          .slice(0, 3)
+      : []
+
+  return {
+    filters: args,
+    mode: "units",
+    matched_units: units.length,
+    shown: shown.length,
+    projects_with_matching_units: new Set(units.map((x) => x.p.id)).size,
+    projects_without_unit_prices: unpriced.length,
+    ...(lowerHeadlines.length
+      ? {
+          note: `The cheapest unit with a listed price is shown first, but ${lowerHeadlines.map((x) => `${x.p.name} (from ${formatPrice(x.price, null, x.p.currency)})`).join(", ")} advertise${lowerHeadlines.length === 1 ? "s" : ""} a lower from-price without listing unit prices — say so; never call the first unit the cheapest in the market`,
+          lower_from_prices_without_unit_table: lowerHeadlines.map((x) => ({
+            name: x.p.name,
+            from_price_label: formatPrice(x.price, null, x.p.currency),
+            page: projectUrl(x.p),
+          })),
+        }
+      : {}),
+    _stats: [
+      stat("Matching units", units.length),
+      stat(dir === -1 ? "Most expensive" : "Cheapest", top ? formatPrice(top.price, null, top.p.currency) ?? "–" : "–", null, top ? `${top.p.name} · ${unitName(top.u)}` : null),
+      stat("Projects", new Set(units.map((x) => x.p.id)).size),
+    ],
+    price_rule:
+      "Each row is one unit type's listed from-price (a range when the project gives a top price); rows under AED 50K are data slips and ignored. Projects that price no units can't be compared unit by unit — when lower_from_prices_without_unit_table is present, say those projects advertise a lower from-price but list no unit prices",
+    units: shown.map((x) => {
+      const size = sqft(x.u)
+      const to = numOf(x.u.price_to)
+      return {
+        project: x.p.name,
+        developer: oneRel(x.p.developers)?.name ?? null,
+        area: areaOf(x.p) || null,
+        unit: unitName(x.u),
+        bedrooms: unitBeds(x.u),
+        size_sqft: size,
+        price_aed: x.price,
+        // A top price that rounds to the same label is no range ("AED 1.7M – 1.7M").
+        price_label: formatPrice(x.price, to != null && to > x.price && formatPrice(to, null) !== formatPrice(x.price, null) ? to : null, x.p.currency),
+        price_per_sqft_aed: size ? Math.round(x.price / size) : null,
+        handover: x.handover,
+        page: projectUrl(x.p),
+      }
+    }),
+    _cards: [...new Map(shown.filter((x) => x.p.main_image).map((x) => [x.p.id, x])).values()]
+      .slice(0, 8)
+      .map((x): FhiChatCard => ({
+        kind: "project",
+        title: x.p.name,
+        subtitle: [unitName(x.u), formatPrice(x.price, null, x.p.currency), sqft(x.u) ? `${sqft(x.u)!.toLocaleString()} sq ft` : null].filter(Boolean).join(" · "),
         image: x.p.main_image,
       })),
   }
@@ -4877,7 +5097,7 @@ export const FHI_CHAT_TOOLS = [
     function: {
       name: "find_projects",
       description:
-        "SHORTLIST projects by what a buyer wants — area/community (JVC, Dubai Marina, Business Bay…), developer, number of bedrooms (0 = studio), property type (apartment, villa, townhouse), budget (min/max AED), handover year, off-plan or ready. Returns the matching published projects sorted (cheapest first when a budget or bedroom count is given) with price, handover, unit mix, sizes, payment plan and the page link, plus counts by developer/area/handover year. Use for 'cheapest 1-bedroom in JVC', 'Azizi projects handing over 2027', 'villas under AED 3M', 'what do we have in Dubai South', 'ready apartments'. For everything about ONE named project use project_details instead.",
+        "SHORTLIST projects by what a buyer wants — area/community (JVC, Dubai Marina, Business Bay…), developer, number of bedrooms (0 = studio), property type (apartment, villa, townhouse), budget (min/max AED), handover year, off-plan or ready. Returns the matching published projects sorted (cheapest first when a budget or bedroom count is given) with price, handover, unit mix, sizes, payment plan and the page link, plus counts by developer/area/handover year. Use for 'cheapest project', 'most expensive project' (sort price_desc), 'cheapest 1-bedroom in JVC', 'Azizi projects handing over 2027', 'villas under AED 3M', 'what do we have in Dubai South', 'ready apartments'. With per_unit it returns UNITS instead (project, unit, size, price, price per sq ft) — for 'cheapest unit', 'most expensive unit', 'cheapest 2-bedroom and its size'. For everything about ONE named project use project_details instead.",
       parameters: {
         type: "object",
         properties: {
@@ -4894,6 +5114,7 @@ export const FHI_CHAT_TOOLS = [
           handover_by_year: { type: "integer", description: "Handover in or before this year" },
           name_contains: { type: "string", description: "Part of the project name" },
           sort: { type: "string", enum: ["price_asc", "price_desc", "handover", "name"] },
+          per_unit: { type: "boolean", description: "One row per UNIT TYPE across the matching projects instead of one per project, sorted by unit price (price_desc = most expensive first)" },
           limit: { type: "integer", description: "Default 12, max 40" },
         },
       },
