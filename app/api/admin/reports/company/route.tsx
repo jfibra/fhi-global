@@ -5,6 +5,7 @@ import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { REPORT_PERIOD_KEYS, buildCompanyReport, type ReportPeriodKey } from "@/lib/company-report/data"
 import { buildInsights } from "@/lib/company-report/insights"
 import { CompanyReportDocument, registerReportFonts, type ReportImages } from "@/lib/company-report/pdf"
+import { sseEvents } from "@/lib/fhi-chat-stream"
 
 /**
  * The company performance report as a PDF (boss via Juliecor, 2026-10-15) —
@@ -15,6 +16,9 @@ import { CompanyReportDocument, registerReportFonts, type ReportImages } from "@
  *   GET ?period=today | last7 | month | last_month   (admin staff only)
  *   GET ...&format=json   the same report as data — FHI Assistant draws it in
  *                         the chat (features/dashboard/fhi-chat/report-card.tsx)
+ *   GET ...&format=json with Accept: text/event-stream — the same, in stages
+ *                         (status → report → insights → done), so the chat
+ *                         shows the figures while the model writes the advice
  *
  * Company-wide sales figures, so never cached by a CDN.
  */
@@ -60,6 +64,25 @@ export async function GET(req: NextRequest) {
 
   const origin = req.nextUrl.origin
   const asJson = req.nextUrl.searchParams.get("format") === "json"
+  if (asJson && req.headers.get("accept")?.includes("text/event-stream")) {
+    type ReportEvent =
+      | { type: "status"; text: string }
+      | { type: "report"; report: Awaited<ReturnType<typeof buildCompanyReport>> }
+      | { type: "insights"; insights: Awaited<ReturnType<typeof buildInsights>> }
+      | { type: "done" }
+      | { type: "error"; error: string }
+    return sseEvents<ReportEvent>(
+      async (send) => {
+        const report = await buildCompanyReport(key)
+        send({ type: "report", report })
+        send({ type: "status", text: "Writing the takeaways and recommendations…" })
+        send({ type: "insights", insights: await buildInsights(report) })
+        send({ type: "done" })
+      },
+      { type: "status", text: "Collecting sales, teams, recruitment, leads and website…" },
+      { type: "error", error: "Couldn't build the report. Try again in a moment." },
+    )
+  }
   try {
     if (asJson) {
       const report = await buildCompanyReport(key)

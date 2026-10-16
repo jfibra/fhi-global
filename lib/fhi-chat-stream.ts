@@ -123,18 +123,21 @@ export async function streamCompletion(opts: {
   return { ok: true, message: { role: "assistant", content: content || null, ...(toolCalls.length ? { tool_calls: toolCalls } : {}) }, usage }
 }
 
-/** Server-Sent Events from an async producer; an exception becomes an error event. */
-export function sseResponse(run: (send: (e: ChatStreamEvent) => void) => Promise<void>): Response {
+/**
+ * Server-Sent Events from an async producer: `opening` goes out at once (so
+ * proxies open the stream before the slow part starts), an exception becomes
+ * `onError`. Used by the chat routes and the company report's staged load.
+ */
+export function sseEvents<E extends { type: string }>(run: (send: (e: E) => void) => Promise<void>, opening: E | null, onError: E): Response {
   const encoder = new TextEncoder()
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (e: ChatStreamEvent) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`))
-      // A first byte at once, so proxies open the stream before the model answers.
-      send({ type: "status", tools: [] })
+      const send = (e: E) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`))
+      if (opening) send(opening)
       try {
         await run(send)
       } catch {
-        send({ type: "error", error: "FHI Assistant couldn't answer — try again." })
+        send(onError)
       } finally {
         controller.close()
       }
@@ -148,6 +151,11 @@ export function sseResponse(run: (send: (e: ChatStreamEvent) => void) => Promise
       Connection: "keep-alive",
     },
   })
+}
+
+/** The chat routes' stream: "Thinking…" at once, then status / delta / done. */
+export function sseResponse(run: (send: (e: ChatStreamEvent) => void) => Promise<void>): Response {
+  return sseEvents<ChatStreamEvent>(run, { type: "status", tools: [] }, { type: "error", error: "FHI Assistant couldn't answer — try again." })
 }
 
 /** Strip the markdown the model sometimes emits despite the rules — the UI renders plain text. */

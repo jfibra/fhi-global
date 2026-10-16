@@ -16,7 +16,8 @@ import type { Insights } from "@/lib/company-report/insights"
 import { PieChart, StatTiles } from "./charts"
 import { downloadReportPdf } from "./pdf-report-menu"
 
-export type ChatReport = { period: ReportPeriodKey; data: CompanyReport; insights: Insights }
+/** `insights` is null while the model is still writing them — the figures show first. */
+export type ChatReport = { period: ReportPeriodKey; data: CompanyReport; insights: Insights | null }
 
 const aed = (n: number) => `AED ${Math.round(n).toLocaleString("en-AE")}`
 const short = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(Math.round(n)))
@@ -30,11 +31,15 @@ export function reportSummaryText({ data: r, insights }: ChatReport): string {
     "",
     ...r.kpis.map((k) => `- ${k.label}: ${k.value}${k.change ? ` (${k.change} vs ${r.period.versus})` : ""}`),
     "",
-    "AT A GLANCE",
-    ...insights.takeaways.map((t) => `- ${t}`),
-    "",
-    "RECOMMENDATIONS",
-    ...insights.recommendations.map((x, i) => `- ${i + 1}. ${x.title}: ${x.action} (owner: ${x.owner})`),
+    ...(insights
+      ? [
+          "AT A GLANCE",
+          ...insights.takeaways.map((t) => `- ${t}`),
+          "",
+          "RECOMMENDATIONS",
+          ...insights.recommendations.map((x, i) => `- ${i + 1}. ${x.title}: ${x.action} (owner: ${x.owner})`),
+        ]
+      : []),
   ]
   return lines.join("\n")
 }
@@ -169,6 +174,27 @@ function Split({ title, rows }: { title: string; rows: Share[] }) {
   )
 }
 
+/** A soft placeholder while the model writes — a label with gold dots and shimmering lines. */
+function Writing({ lines, label }: { lines: number; label: string }) {
+  return (
+    <div className="mt-2" aria-live="polite">
+      <p className="inline-flex items-center gap-2 text-[12.5px] text-[#6b7280]">
+        <span className="flex items-center gap-1" aria-hidden>
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357] [animation-delay:-0.3s]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357] [animation-delay:-0.15s]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357]" />
+        </span>
+        {label}
+      </p>
+      {lines > 0 && (
+        <div className="mt-2 space-y-1.5">
+          {Array.from({ length: lines }, (_, i) => <span key={i} className="block h-3 animate-pulse rounded bg-[#e6eaf0]" style={{ width: `${92 - i * 14}%` }} />)}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const th = "px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-[#9ca3af]"
 const td = "px-3 py-2 text-[12.5px] text-[#374151]"
 
@@ -218,7 +244,8 @@ export default function ReportCard({ report, pdfEndpoint }: { report: ChatReport
         <div className="rounded-xl border-l-[3px] border-[#d6b357] bg-[#f4f6fa] px-4 py-3">
           <p className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-[#b8913f]">At a glance</p>
           <ol className="mt-2 space-y-1.5">
-            {insights.takeaways.map((t, i) => (
+            {!insights && <Writing lines={3} label="Writing the takeaways from these figures…" />}
+            {insights?.takeaways.map((t, i) => (
               <li key={i} className="flex gap-2.5 text-[13.5px] leading-snug text-[#0d1117]"><span className="font-['Outfit'] font-bold text-[#b8913f]">{i + 1}</span>{t}</li>
             ))}
           </ol>
@@ -410,7 +437,22 @@ export default function ReportCard({ report, pdfEndpoint }: { report: ChatReport
       </Section>
 
       <Section n="06" title="Recommendations" subtitle="What to do in the next two weeks to make the company more productive.">
-        {insights.recommendations.map((rec, i) => (
+        {!insights && (
+          <div className="space-y-2.5">
+            <Writing lines={0} label="FHI Assistant is writing the recommendations from the figures above…" />
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex gap-3 rounded-xl border border-[#e8eaed] p-3.5">
+                <span className="h-7 w-7 shrink-0 animate-pulse rounded-full bg-[#eef1f5]" />
+                <div className="flex-1 space-y-2">
+                  <span className="block h-3.5 w-1/3 animate-pulse rounded bg-[#eef1f5]" />
+                  <span className="block h-2.5 w-full animate-pulse rounded bg-[#f3f5f8]" />
+                  <span className="block h-2.5 w-4/5 animate-pulse rounded bg-[#f3f5f8]" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {insights?.recommendations.map((rec, i) => (
           <div key={i} className="flex gap-3 rounded-xl border border-[#e8eaed] p-3.5">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#001f3f] font-['Outfit'] text-[13px] font-bold text-[#f0d89b]">{i + 1}</span>
             <div className="min-w-0 flex-1">
@@ -424,7 +466,7 @@ export default function ReportCard({ report, pdfEndpoint }: { report: ChatReport
             </div>
           </div>
         ))}
-        <p className="text-[11px] text-[#9ca3af]">{insights.source === "ai" ? "Recommendations are drafted by FHI Assistant from the figures in this report only — review them before acting." : "Recommendations are generated from the figures in this report by fixed rules."}</p>
+        {insights && <p className="text-[11px] text-[#9ca3af]">{insights.source === "ai" ? "Recommendations are drafted by FHI Assistant from the figures in this report only — review them before acting." : "Recommendations are generated from the figures in this report by fixed rules."}</p>}
       </Section>
     </div>
   )

@@ -678,6 +678,8 @@ export default function FhiChatPage({
   }
 
   const isStreaming = messages.some((m) => m.streaming)
+  // A report fills in above the reader; only streaming TEXT is followed to its end.
+  const isStreamingText = messages.some((m) => m.streaming && !m.report)
   const messageCount = messages.length
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
@@ -685,13 +687,13 @@ export default function FhiChatPage({
 
   // While an answer streams in, keep its end in view.
   useEffect(() => {
-    if (!isStreaming) return
+    if (!isStreamingText) return
     const id = window.setInterval(
       () => endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }),
       400,
     )
     return () => window.clearInterval(id)
-  }, [isStreaming])
+  }, [isStreamingText])
 
   const ask = async (raw?: string) => {
     const question = (raw ?? input).trim()
@@ -704,13 +706,59 @@ export default function FhiChatPage({
     // The full company report: the same document as the PDF, drawn in the chat.
     const reportKey = pdfReport ? reportPeriodOf(question) : null
     if (reportKey && pdfReport) {
+      // In stages: a status at once, the figures as soon as they are counted,
+      // then the takeaways and recommendations when the model has written them.
+      const patchReport = (patch: (m: Msg) => Msg) =>
+        setMessages((ms) => ms.map((m, i) => (i === ms.length - 1 && m.streaming ? patch(m) : m)))
+      setMessages((ms) => [...ms, { role: "assistant", content: "", streaming: true, status: "Collecting sales, teams, recruitment, leads and website…", typed: true, at: new Date().toISOString() }])
       try {
-        const res = await fetch(`${pdfReport}?period=${reportKey}&format=json`, { cache: "no-store" })
-        const data = (await res.json().catch(() => ({}))) as Partial<Pick<ChatReport, "insights">> & { report?: ChatReport["data"]; error?: string }
-        if (!res.ok || !data.report || !data.insights) throw new Error(data.error ?? "Couldn't build the report — try again.")
-        const report: ChatReport = { period: reportKey, data: data.report, insights: data.insights }
-        setMessages((ms) => [...ms, { role: "assistant", content: reportSummaryText(report), report, typed: true, at: new Date().toISOString() }])
+        const res = await fetch(`${pdfReport}?period=${reportKey}&format=json`, { cache: "no-store", headers: { Accept: "text/event-stream" } })
+        type ReportJson = Partial<Pick<ChatReport, "insights">> & { report?: ChatReport["data"]; error?: string }
+        if (!res.ok || !res.body || !(res.headers.get("content-type") ?? "").includes("text/event-stream")) {
+          const data = (await res.json().catch(() => ({}))) as ReportJson
+          if (!res.ok || !data.report || !data.insights) throw new Error(data.error ?? "Couldn't build the report — try again.")
+          const report: ChatReport = { period: reportKey, data: data.report, insights: data.insights }
+          patchReport((m) => ({ ...m, content: reportSummaryText(report), report, streaming: false, status: undefined }))
+          return
+        }
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+        let finished = false
+        while (!finished) {
+          const { value, done } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          let cut: number
+          while ((cut = buffer.indexOf("\n\n")) >= 0) {
+            const line = buffer.slice(0, cut).trim()
+            buffer = buffer.slice(cut + 2)
+            if (!line.startsWith("data:")) continue
+            const ev = JSON.parse(line.slice(5)) as { type: string; text?: string; error?: string; report?: ChatReport["data"]; insights?: ChatReport["insights"] }
+            if (ev.type === "status") patchReport((m) => ({ ...m, status: ev.text ?? m.status }))
+            else if (ev.type === "report" && ev.report) {
+              const data = ev.report
+              patchReport((m) => ({ ...m, report: { period: reportKey, data, insights: null } }))
+            } else if (ev.type === "insights" && ev.insights) {
+              const insights = ev.insights
+              patchReport((m) => {
+                if (!m.report) return m
+                const report = { ...m.report, insights }
+                return { ...m, report, content: reportSummaryText(report), streaming: false, status: undefined }
+              })
+            } else if (ev.type === "done") finished = true
+            else if (ev.type === "error") throw new Error(ev.error ?? "Couldn't build the report — try again.")
+          }
+        }
+        if (!finished) throw new Error("The report was cut off — try again.")
       } catch (e) {
+        // Figures already on screen stay (without the advice); a report that never arrived is dropped.
+        setMessages((ms) => {
+          const last = ms[ms.length - 1]
+          if (!last?.streaming) return ms
+          if (last.report) return [...ms.slice(0, -1), { ...last, content: reportSummaryText(last.report), streaming: false, status: undefined }]
+          return ms.slice(0, -1)
+        })
         setError(e instanceof Error ? e.message : "Something went wrong.")
       } finally {
         setBusy(false)
