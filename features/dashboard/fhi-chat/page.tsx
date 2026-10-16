@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { BarChart3, Check, Copy, Download, FileText, Globe, Loader2, Monitor, Printer, RotateCcw, Send, Smartphone, Sparkles, Tablet } from "lucide-react"
+import { ArrowDown, ArrowUp, BarChart3, Check, Copy, Download, Globe, Loader2, Monitor, PanelLeft, Printer, RefreshCw, Smartphone, Sparkles, Square, SquarePen, Tablet, Trash2, X } from "lucide-react"
+import { useAuth } from "@/context/auth-context"
 import { BarsChart, PieChart, StatTiles, type ChartSpec, type ShareRow, type StatSpec, type TrendPoint } from "./charts"
 import {
   DESIGNS as CARD_DESIGNS,
@@ -55,6 +56,8 @@ type Msg = {
   streaming?: boolean
   /** What the assistant is doing right now — "Checking Top Sales board…". */
   status?: string
+  /** The reader pressed Stop; the text is what had arrived by then. */
+  stopped?: boolean
   typed?: boolean
   /** When it was sent/received (ISO), shown as a small time. */
   at?: string
@@ -568,12 +571,16 @@ function exportAnswer(content: string) {
 const CHAT_STORAGE_KEY = "fhi-assistant-chat"
 
 type Quota = { used: number; limit: number | null; resetsAt: string }
+type ConversationRow = { id: string; title: string; updated_at: string }
 
 /** The same chat for two assistants: the admin one (defaults) and the
  *  agent/TL one (features/dashboard/fhi-chat/agent-page.tsx), which points at
  *  its own endpoint, suggestions and a daily question counter. */
 export type FhiChatPageProps = {
   endpoint?: string
+  /** Which history list the conversations belong to (migration 081). */
+  audience?: "admin" | "agent"
+  /** sessionStorage key for the conversation open in this tab. */
   storageKey?: string
   subtitle?: string
   intro?: { title: string; text: string }
@@ -583,25 +590,49 @@ export type FhiChatPageProps = {
   footnote?: string
   /** Show "N of M questions left today" from the endpoint's GET and each answer. */
   quota?: boolean
-  /** A small link in the title band (the admin assistant links to the agents' usage page). */
+  /** A small link in the header (the admin assistant links to the agents' usage page). */
   headerLink?: { href: string; label: string }
   /** The company-report PDF endpoint — shows the "PDF report" menu beside the report buttons (admin only). */
   pdfReport?: string
 }
 
+/** History list sections, newest first — "Today", "Yesterday", "Previous 7 days", "Older". */
+function groupByDay(rows: ConversationRow[]): Array<{ label: string; rows: ConversationRow[] }> {
+  const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const today = day(new Date())
+  const groups: Record<string, ConversationRow[]> = { Today: [], Yesterday: [], "Previous 7 days": [], Older: [] }
+  for (const r of rows) {
+    const diff = Math.round((today - day(new Date(r.updated_at))) / 86400000)
+    groups[diff <= 0 ? "Today" : diff === 1 ? "Yesterday" : diff <= 7 ? "Previous 7 days" : "Older"].push(r)
+  }
+  return Object.entries(groups).filter(([, rs]) => rs.length).map(([label, rs]) => ({ label, rows: rs }))
+}
+
+/**
+ * FHI Assistant in a ChatGPT / Claude-style layout (boss via Juliecor,
+ * 2026-10-16): the chat fills the content area (the dashboard shell drops its
+ * padding for [data-chat-full]); past conversations in a side list saved to
+ * the person's account (app/api/assistant/conversations, migration 081); one
+ * centred reading column; questions in a soft bubble, answers as plain text
+ * with a small FHI mark; a growing composer (Enter sends, Shift+Enter breaks
+ * the line) whose send button becomes Stop while an answer streams;
+ * Copy / Regenerate under answers; a jump-to-latest button when scrolled up.
+ */
 export default function FhiChatPage({
   endpoint = "/api/admin/fhi-chat",
+  audience = "admin",
   storageKey = CHAT_STORAGE_KEY,
   subtitle = "Ask anything about FHI's data. Every figure comes from the live database.",
   intro = { title: "Your data, answered.", text: "Sales, leads, projects, people, the website — the same figures as your dashboard, in plain language, with charts." },
   suggestions = SUGGESTION_GROUPS,
   reports = REPORT_BUTTONS,
-  placeholder = 'Ask FHI Assistant — e.g. "Who sold the most this month?"',
+  placeholder = "Ask FHI Assistant anything…",
   footnote = "Admin only · answers are computed from the live database at the moment you ask.",
   quota: showQuota = false,
   headerLink,
   pdfReport,
 }: FhiChatPageProps = {}) {
+  const { profile } = useAuth()
   const [messages, setMessages] = useState<Msg[]>([])
   const [quota, setQuota] = useState<Quota | null>(null)
   const exhausted = Boolean(quota && quota.limit !== null && quota.used >= quota.limit)
@@ -609,8 +640,21 @@ export default function FhiChatPage({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
-  const endRef = useRef<HTMLDivElement | null>(null)
-  const inputRef = useRef<HTMLInputElement | null>(null)
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [conversations, setConversations] = useState<ConversationRow[] | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [atBottom, setAtBottom] = useState(true)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  // Persistence bookkeeping: what was last saved, and an in-flight create.
+  const savedSigRef = useRef("")
+  const creatingRef = useRef<Promise<string | null> | null>(null)
+  const idRef = useRef<string | null>(null)
+
+  const listUrl = `/api/assistant/conversations?audience=${audience}`
+  const oneUrl = (id: string) => `/api/assistant/conversations/${id}?audience=${audience}`
 
   const copyAnswer = async (i: number, content: string) => {
     try {
@@ -622,25 +666,38 @@ export default function FhiChatPage({
     }
   }
 
-  // Restore the tab's conversation after navigating away and back. Restored
-  // replies never re-run the typewriter. Deferred a tick so the restore never
-  // sets state synchronously inside the effect (avoids cascading renders).
+  // History list + the conversation this tab had open. Deferred a tick so
+  // nothing sets state synchronously inside the effect.
   useEffect(() => {
+    let cancelled = false
     const id = window.setTimeout(() => {
+      fetch(listUrl, { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : { conversations: [] }))
+        .then((j: { conversations?: ConversationRow[] }) => { if (!cancelled) setConversations(j.conversations ?? []) })
+        .catch(() => { if (!cancelled) setConversations([]) })
+      let active: string | null = null
       try {
-        const raw = sessionStorage.getItem(storageKey)
-        if (!raw) return
-        const saved = JSON.parse(raw) as Msg[]
-        if (Array.isArray(saved) && saved.length) {
-          // A reply that was still streaming when the page closed is dropped, never left spinning.
-          setMessages((cur) => (cur.length ? cur : saved.filter((m) => !m.streaming).map((m) => ({ ...m, typed: true }))))
-        }
-      } catch {
-        // Corrupt or blocked storage — start fresh.
+        active = sessionStorage.getItem(storageKey)
+      } catch {}
+      if (active && /^[0-9a-f-]{36}$/i.test(active)) {
+        fetch(`/api/assistant/conversations/${active}?audience=${audience}`, { cache: "no-store" })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((c: { id: string; messages: Msg[] } | null) => {
+            if (cancelled || !c) return
+            const restored = (c.messages ?? []).filter((m) => !m.streaming).map((m) => ({ ...m, typed: true }))
+            savedSigRef.current = JSON.stringify(restored)
+            idRef.current = c.id
+            setConversationId(c.id)
+            setMessages((cur) => (cur.length ? cur : restored))
+          })
+          .catch(() => {})
       }
     }, 0)
-    return () => window.clearTimeout(id)
-  }, [storageKey])
+    return () => {
+      cancelled = true
+      window.clearTimeout(id)
+    }
+  }, [listUrl, storageKey, audience])
 
   // The daily counter, for the agent assistant.
   useEffect(() => {
@@ -657,52 +714,133 @@ export default function FhiChatPage({
     }
   }, [showQuota, endpoint])
 
+  // Save the thread to the person's history once an answer is complete:
+  // the first save creates the conversation, later ones update it.
   useEffect(() => {
-    // Never delete here: on mount this runs with an empty chat BEFORE the
-    // deferred restore reads storage — clearing belongs to "New chat" only.
-    if (!messages.length || messages.some((m) => m.streaming)) return
-    try {
-      sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-30)))
-    } catch {
-      // Storage full or blocked — the chat still works, it just won't persist.
-    }
-  }, [messages, storageKey])
+    if (!messages.length || busy || messages.some((m) => m.streaming)) return
+    const sig = JSON.stringify(messages)
+    if (sig === savedSigRef.current) return
+    const t = window.setTimeout(async () => {
+      savedSigRef.current = sig
+      try {
+        let id = idRef.current
+        if (!id && creatingRef.current) id = await creatingRef.current
+        if (!id) {
+          creatingRef.current = fetch(listUrl.split("?")[0], { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audience, messages }) })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((row: ConversationRow | null) => {
+              if (!row) return null
+              idRef.current = row.id
+              setConversationId(row.id)
+              setConversations((cs) => [row, ...(cs ?? []).filter((c) => c.id !== row.id)])
+              try {
+                sessionStorage.setItem(storageKey, row.id)
+              } catch {}
+              return row.id
+            })
+            .catch(() => null)
+          await creatingRef.current
+          creatingRef.current = null
+          return
+        }
+        const res = await fetch(oneUrl(id), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audience, messages }) })
+        const row = res.ok ? ((await res.json()) as ConversationRow) : null
+        if (row) setConversations((cs) => [row, ...(cs ?? []).filter((c) => c.id !== row.id)])
+      } catch {
+        savedSigRef.current = ""
+      }
+    }, 400)
+    return () => window.clearTimeout(t)
+    // oneUrl/listUrl derive from audience.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, busy, audience, storageKey])
 
   const newChat = () => {
+    abortRef.current?.abort()
     setMessages([])
     setError(null)
+    setConversationId(null)
+    idRef.current = null
+    savedSigRef.current = ""
+    setHistoryOpen(false)
     try {
       sessionStorage.removeItem(storageKey)
     } catch {}
     inputRef.current?.focus()
   }
 
-  const isStreaming = messages.some((m) => m.streaming)
-  // A report fills in above the reader; only streaming TEXT is followed to its end.
+  const openConversation = async (id: string) => {
+    if (busy) return
+    setHistoryOpen(false)
+    setError(null)
+    try {
+      const res = await fetch(oneUrl(id), { cache: "no-store" })
+      if (!res.ok) throw new Error()
+      const c = (await res.json()) as { id: string; messages: Msg[] }
+      const restored = (c.messages ?? []).filter((m) => !m.streaming).map((m) => ({ ...m, typed: true }))
+      savedSigRef.current = JSON.stringify(restored)
+      idRef.current = c.id
+      setConversationId(c.id)
+      setMessages(restored)
+      try {
+        sessionStorage.setItem(storageKey, c.id)
+      } catch {}
+      window.setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }), 0)
+    } catch {
+      setError("Couldn't open that chat — try again.")
+    }
+  }
+
+  const deleteConversation = async (id: string) => {
+    setConfirmDelete(null)
+    setConversations((cs) => (cs ?? []).filter((c) => c.id !== id))
+    if (id === conversationId) newChat()
+    try {
+      await fetch(oneUrl(id), { method: "DELETE" })
+    } catch {}
+  }
+
+  // Scrolling: follow streaming text only while the reader sits at the bottom.
+  const onScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80)
+  }
+  const toBottom = (smooth = true) => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: smooth ? "smooth" : "auto" })
   const isStreamingText = messages.some((m) => m.streaming && !m.report)
   const messageCount = messages.length
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
-  }, [messageCount, busy])
-
-  // While an answer streams in, keep its end in view.
+    const t = window.setTimeout(() => toBottom(true), 0)
+    return () => window.clearTimeout(t)
+  }, [messageCount])
   useEffect(() => {
-    if (!isStreamingText) return
-    const id = window.setInterval(
-      () => endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }),
-      400,
-    )
+    if (!isStreamingText || !atBottom) return
+    const id = window.setInterval(() => toBottom(false), 120)
     return () => window.clearInterval(id)
-  }, [isStreamingText])
+  }, [isStreamingText, atBottom])
 
-  const ask = async (raw?: string) => {
+  // The composer grows with its text, up to a limit.
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = "0px"
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`
+  }, [input])
+
+  const stop = () => abortRef.current?.abort()
+
+  const ask = async (raw?: string, base?: Msg[]) => {
     const question = (raw ?? input).trim()
     if (!question || busy || exhausted) return
     setError(null)
-    setInput("")
-    const next: Msg[] = [...messages, { role: "user", content: question, at: new Date().toISOString() }]
+    if (raw === undefined) setInput("")
+    const next: Msg[] = [...(base ?? messages), { role: "user", content: question, at: new Date().toISOString() }]
     setMessages(next)
     setBusy(true)
+    setAtBottom(true)
+    const controller = new AbortController()
+    abortRef.current = controller
+    const aborted = (e: unknown) => e instanceof DOMException && e.name === "AbortError"
     // The full company report: the same document as the PDF, drawn in the chat.
     const reportKey = pdfReport ? reportPeriodOf(question) : null
     if (reportKey && pdfReport) {
@@ -712,7 +850,7 @@ export default function FhiChatPage({
         setMessages((ms) => ms.map((m, i) => (i === ms.length - 1 && m.streaming ? patch(m) : m)))
       setMessages((ms) => [...ms, { role: "assistant", content: "", streaming: true, status: "Collecting sales, teams, recruitment, leads and website…", typed: true, at: new Date().toISOString() }])
       try {
-        const res = await fetch(`${pdfReport}?period=${reportKey}&format=json`, { cache: "no-store", headers: { Accept: "text/event-stream" } })
+        const res = await fetch(`${pdfReport}?period=${reportKey}&format=json`, { cache: "no-store", headers: { Accept: "text/event-stream" }, signal: controller.signal })
         type ReportJson = Partial<Pick<ChatReport, "insights">> & { report?: ChatReport["data"]; error?: string }
         if (!res.ok || !res.body || !(res.headers.get("content-type") ?? "").includes("text/event-stream")) {
           const data = (await res.json().catch(() => ({}))) as ReportJson
@@ -756,17 +894,18 @@ export default function FhiChatPage({
         setMessages((ms) => {
           const last = ms[ms.length - 1]
           if (!last?.streaming) return ms
-          if (last.report) return [...ms.slice(0, -1), { ...last, content: reportSummaryText(last.report), streaming: false, status: undefined }]
+          if (last.report) return [...ms.slice(0, -1), { ...last, content: reportSummaryText(last.report), streaming: false, status: undefined, stopped: aborted(e) }]
           return ms.slice(0, -1)
         })
-        setError(e instanceof Error ? e.message : "Something went wrong.")
+        if (!aborted(e)) setError(e instanceof Error ? e.message : "Something went wrong.")
       } finally {
+        abortRef.current = null
         setBusy(false)
         inputRef.current?.focus()
       }
       return
     }
-    // The live answer: the bubble appears at once with a status line, then the
+    // The live answer: the reply appears at once with a status line, then the
     // words stream in as the model writes them (lib/fhi-chat-stream.ts).
     const patchLive = (patch: (m: Msg) => Msg) =>
       setMessages((ms) => ms.map((m, i) => (i === ms.length - 1 && m.streaming ? patch(m) : m)))
@@ -783,6 +922,7 @@ export default function FhiChatPage({
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
         body: JSON.stringify({ messages: next.map(({ role, content }) => ({ role, content })) }),
+        signal: controller.signal,
       })
       type Final = { reply?: string; used?: string[]; cards?: Card[]; names?: string[]; charts?: ChartSpec[]; stats?: StatSpec[]; printCards?: PrintCardSpec[]; error?: string; quota?: Quota }
       if (!res.ok || !res.body || !(res.headers.get("content-type") ?? "").includes("text/event-stream")) {
@@ -830,267 +970,341 @@ export default function FhiChatPage({
       if (!finished) throw new Error("The answer was cut off — try again.")
     } catch (e) {
       if (flushTimer !== null) window.clearTimeout(flushTimer)
-      // Drop a half-written answer; keep the question so a retry is one click away.
-      setMessages((ms) => (ms[ms.length - 1]?.streaming ? ms.slice(0, -1) : ms))
-      setError(e instanceof Error ? e.message : "Something went wrong.")
+      if (aborted(e)) {
+        // Stopped: keep what was written so far, like ChatGPT; nothing written → drop the bubble.
+        const text = liveText
+        setMessages((ms) => {
+          const last = ms[ms.length - 1]
+          if (!last?.streaming) return ms
+          return text.trim() ? [...ms.slice(0, -1), { ...last, content: text, streaming: false, status: undefined, stopped: true }] : ms.slice(0, -1)
+        })
+      } else {
+        // Drop a half-written answer; keep the question so a retry is one click away.
+        setMessages((ms) => (ms[ms.length - 1]?.streaming ? ms.slice(0, -1) : ms))
+        setError(e instanceof Error ? e.message : "Something went wrong.")
+      }
     } finally {
+      abortRef.current = null
       setBusy(false)
       inputRef.current?.focus()
     }
   }
 
+  /** Ask the last question again, replacing the answer after it. */
+  const regenerate = () => {
+    if (busy) return
+    let lastUser = -1
+    for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === "user") { lastUser = i; break }
+    if (lastUser < 0) return
+    void ask(messages[lastUser].content, messages.slice(0, lastUser))
+  }
+
   const timeOf = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString("en-AE", { hour: "2-digit", minute: "2-digit" }) : null)
+  const hour = new Date().getHours()
+  const firstName = (profile?.fullname ?? "").trim().split(/\s+/)[0] ?? ""
+  const greeting = `Good ${hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"}${firstName ? `, ${firstName}` : ""}.`
+  const activeTitle = conversations?.find((c) => c.id === conversationId)?.title
+  const lastAssistant = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === "assistant") return i
+    return -1
+  })()
 
-  return (
-    <div className="mx-auto max-w-[900px] pb-6">
-      {/* Title band — the page's one anchor; everything below flows on the page. */}
-      <div className="flex items-center gap-4 rounded-2xl bg-[#001f3f] px-5 py-4 text-white shadow-[0_10px_30px_-14px_rgba(0,31,63,0.6)] sm:px-6">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
-          <Sparkles className="h-5 w-5 text-[#d6b357]" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h1 className="font-['Outfit'] text-lg font-bold leading-tight sm:text-xl">FHI Assistant</h1>
-          <p className="truncate text-[12px] text-white/65">{subtitle}</p>
-        </div>
-        {quota && quota.limit !== null && (
-          <span
-            title="Questions you can still ask today — the counter resets at midnight Dubai time."
-            className={`hidden shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold sm:inline-flex ${exhausted ? "border-amber-300/60 bg-amber-400/15 text-amber-200" : "border-white/20 text-white/80"}`}
-          >
-            {Math.max(0, quota.limit - quota.used)} of {quota.limit} left today
-          </span>
-        )}
-        {headerLink && (
-          <Link href={headerLink.href} className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-white/20 px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:border-[#d6b357] hover:text-[#d6b357] sm:inline-flex">
-            <BarChart3 className="h-3.5 w-3.5" /> {headerLink.label}
-          </Link>
-        )}
-        {messages.length > 0 && (
-          <button
-            type="button"
-            onClick={newChat}
-            disabled={busy}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/20 px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:border-[#d6b357] hover:text-[#d6b357] disabled:opacity-50"
-          >
-            <RotateCcw className="h-3.5 w-3.5" /> New chat
-          </button>
-        )}
+  // ── Pieces ────────────────────────────────────────────────────────────────
+  const history = (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="p-3">
+        <button type="button" onClick={newChat} className="flex w-full items-center gap-2 rounded-xl border border-[#e3e6ea] bg-white px-3 py-2.5 text-[13.5px] font-semibold text-[#001f3f] shadow-sm transition-colors hover:border-[#d6b357]">
+          <SquarePen className="h-4 w-4" /> New chat
+        </button>
       </div>
-
-      {/* Thread */}
-      <div className="mt-6 space-y-5">
-        {messages.length === 0 ? (
-          <div className="rounded-2xl border border-[#e8eaed] bg-white px-5 py-8 shadow-[0_6px_24px_-16px_rgba(0,31,63,0.25)] sm:px-8">
-            <div className="text-center">
-              <p className="font-['Outfit'] text-[22px] font-bold text-[#0d1117]">{intro.title}</p>
-              <p className="mx-auto mt-1 max-w-md text-[13.5px] leading-relaxed text-[#6b7280]">{intro.text}</p>
-            </div>
-            <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {suggestions.map((g) => (
-                <div key={g.label}>
-                  <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b8913f]">{g.label}</p>
-                  <div className="space-y-1.5">
-                    {g.items.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => void ask(s)}
-                        className="block w-full rounded-lg border border-[#eceef1] bg-[#fafbfc] px-3 py-2 text-left text-[13px] font-medium text-[#1f2937] transition-colors hover:border-[#d6b357] hover:bg-[#d6b357]/10 hover:text-[#001f3f]"
-                      >
-                        {s}
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4" aria-label="Your chats">
+        {conversations === null ? (
+          <div className="space-y-2 px-2 pt-2">{[0, 1, 2, 3].map((i) => <span key={i} className="block h-7 animate-pulse rounded-lg bg-[#eceff3]" />)}</div>
+        ) : conversations.length === 0 ? (
+          <p className="px-3 pt-2 text-[12.5px] leading-relaxed text-[#9ca3af]">Your chats will appear here. Every conversation is saved to your account.</p>
+        ) : (
+          groupByDay(conversations).map((g) => (
+            <div key={g.label} className="mt-3 first:mt-1">
+              <p className="px-3 pb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[#9ca3af]">{g.label}</p>
+              {g.rows.map((c) => (
+                <div key={c.id} className={`group/item relative flex items-center rounded-lg ${c.id === conversationId ? "bg-[#e9edf3]" : "hover:bg-[#eef1f5]"}`}>
+                  {confirmDelete === c.id ? (
+                    <div className="flex w-full items-center justify-between gap-2 px-3 py-2 text-[12.5px]">
+                      <span className="font-semibold text-[#b91c1c]">Delete this chat?</span>
+                      <span className="flex gap-1.5">
+                        <button type="button" onClick={() => void deleteConversation(c.id)} className="rounded-md bg-[#b91c1c] px-2 py-0.5 text-[11.5px] font-bold text-white">Delete</button>
+                        <button type="button" onClick={() => setConfirmDelete(null)} className="rounded-md px-2 py-0.5 text-[11.5px] font-semibold text-[#6b7280] hover:bg-white">Cancel</button>
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => void openConversation(c.id)} className={`min-w-0 flex-1 truncate px-3 py-2 text-left text-[13.5px] ${c.id === conversationId ? "font-semibold text-[#001f3f]" : "text-[#374151]"}`} title={c.title}>
+                        {c.title}
                       </button>
-                    ))}
-                  </div>
+                      <button type="button" onClick={() => setConfirmDelete(c.id)} aria-label={`Delete ${c.title}`} className="mr-1.5 block rounded-md p-1 text-[#9ca3af] hover:bg-white hover:text-[#b91c1c] lg:hidden lg:group-hover/item:block">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
-          </div>
-        ) : (
-          messages.map((m, i) =>
-            m.role === "user" ? (
-              <div key={i} className="flex flex-col items-end gap-1">
-                <p className="max-w-[80%] rounded-2xl rounded-br-md bg-[#001f3f] px-4 py-2.5 text-[14px] leading-relaxed text-white whitespace-pre-wrap shadow-[0_6px_18px_-10px_rgba(0,31,63,0.6)]">
-                  {m.content}
-                </p>
-                {m.at && <span className="pr-1 text-[10.5px] text-[#9ca3af]">{timeOf(m.at)}</span>}
-              </div>
-            ) : (
-              <div key={i} className="group">
-                <div className="overflow-hidden rounded-2xl border border-[#e8eaed] bg-white shadow-[0_8px_28px_-16px_rgba(0,31,63,0.28)]">
-                  <div className="flex items-center gap-2.5 px-5 pt-4">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#001f3f]">
-                      <Sparkles className="h-3.5 w-3.5 text-[#d6b357]" />
-                    </span>
-                    <span className="font-['Outfit'] text-[12.5px] font-bold text-[#0d1117]">FHI Assistant</span>
-                    {m.at && <span className="text-[10.5px] text-[#9ca3af]">{timeOf(m.at)}</span>}
-                  </div>
-                  {m.report && pdfReport ? (
-                    <div className="mt-3">
-                      <ReportCard report={m.report} pdfEndpoint={pdfReport} />
-                    </div>
-                  ) : (
-                  <>
-                  {m.stats && m.stats.length > 1 && (
-                    <div className="px-5 pt-3">
-                      <StatTiles stats={m.stats} />
-                    </div>
-                  )}
-                  <div className="px-5 pb-4 pt-3 text-[14px] leading-[1.7] text-[#1f2937]">
-                    {m.streaming && !m.content ? (
-                      <p className="inline-flex items-center gap-2.5 text-[13px] text-[#6b7280]" aria-live="polite">
-                        <span className="flex items-center gap-1" aria-hidden>
-                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357] [animation-delay:-0.3s]" />
-                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357] [animation-delay:-0.15s]" />
-                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357]" />
-                        </span>
-                        {m.status ?? "Thinking…"}
-                      </p>
-                    ) : (
-                      <>
-                        <AnswerBody text={m.streaming ? liveClean(m.content) : m.content} names={m.names ?? (m.cards ?? []).map((c) => c.title)} />
-                        {m.streaming && <span className="mt-1 inline-block h-[1em] w-[2px] animate-pulse bg-[#d6b357] align-middle" aria-hidden="true" />}
-                      </>
-                    )}
-                  </div>
-                  {m.typed !== false && m.charts && m.charts.length > 0 && (
-                    <div className="grid gap-x-8 gap-y-5 border-t border-[#eef0f3] bg-[#fbfcfd] px-5 py-4 sm:grid-cols-2">
-                      {m.charts.map((c, ci) =>
-                        c.kind === "trend" ? (
-                          <div key={ci} className="sm:col-span-2">
-                            <TrendChart title={c.title} points={c.points} />
-                          </div>
-                        ) : c.kind === "bars" ? (
-                          <div key={ci} className={c.points.length > 6 ? "sm:col-span-2" : ""}>
-                            <BarsChart title={c.title} points={c.points} />
-                          </div>
-                        ) : c.kind === "pie" ? (
-                          <PieChart key={ci} title={c.title} rows={c.rows} />
-                        ) : (
-                          <ShareChart key={ci} chart={c} />
-                        ),
-                      )}
-                    </div>
-                  )}
-                  {m.typed !== false && m.printCards && m.printCards.length > 0 && (
-                    <div className="space-y-4 border-t border-[#eef0f3] px-5 py-4">
-                      {m.printCards.map((pc, pi) => (
-                        <PrintBusinessCards key={pi} spec={pc} />
-                      ))}
-                    </div>
-                  )}
-                  {m.typed !== false && m.cards && m.cards.length > 0 && (
-                    <div className="border-t border-[#eef0f3] px-3 py-3">
-                      <CardRow cards={m.cards} />
-                    </div>
-                  )}
-                  </>
-                  )}
-                  {m.typed !== false && !m.streaming && (
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-[#eef0f3] px-5 py-2.5">
-                      {m.used && m.used.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-[10.5px] font-semibold uppercase tracking-wide text-[#9ca3af]">Sources</span>
-                          {[...new Set(m.used.map((u) => TOOL_LABELS[u] ?? u.replace(/_/g, " ")))].map((label) => (
-                            <span key={label} className="rounded-full border border-[#e8eaed] bg-[#f6f7f9] px-2 py-0.5 text-[10.5px] font-semibold text-[#374151]">
-                              {label}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <div className="ml-auto flex items-center gap-3 opacity-60 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                        <button
-                          type="button"
-                          onClick={() => void copyAnswer(i, m.content)}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#6b7280] transition-colors hover:text-[#001f3f]"
-                        >
-                          {copiedIdx === i ? <Check className="h-3 w-3 text-[#15803d]" /> : <Copy className="h-3 w-3" />}
-                          {copiedIdx === i ? "Copied" : "Copy"}
-                        </button>
-                        {!m.report && (
-                          <button
-                            type="button"
-                            onClick={() => exportAnswer(m.content)}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#6b7280] transition-colors hover:text-[#001f3f]"
-                          >
-                            <Printer className="h-3 w-3" /> Export PDF
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ),
-          )
+          ))
         )}
-        {busy && !isStreaming && (
-          <div className="inline-flex items-center gap-2.5 rounded-2xl border border-[#e8eaed] bg-white px-4 py-3 text-[13px] text-[#6b7280] shadow-[0_8px_28px_-16px_rgba(0,31,63,0.28)]">
-            <span className="flex items-center gap-1" aria-hidden>
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357] [animation-delay:-0.3s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357] [animation-delay:-0.15s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357]" />
-            </span>
-            Checking the numbers…
-          </div>
-        )}
-      </div>
+      </nav>
+    </div>
+  )
 
-      {/* Composer — stays in view while the thread scrolls behind it. */}
-      <div className="sticky bottom-0 z-10 -mx-2 mt-6 bg-gradient-to-t from-[#f4f6f9] via-[#f4f6f9]/95 to-transparent px-2 pb-2 pt-6">
-        {error && (
-          <p role="alert" className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-            {error}
-          </p>
-        )}
-        <div className="rounded-2xl border border-[#e3e6ea] bg-white p-2.5 shadow-[0_14px_40px_-16px_rgba(0,31,63,0.35)]">
-          <div className="flex flex-wrap items-center gap-1.5 px-1 pb-2">
-            <span className="inline-flex items-center gap-1 pr-1 text-[10.5px] font-bold uppercase tracking-wide text-[#9ca3af]">
-              <FileText className="h-3.5 w-3.5" /> Reports
-            </span>
+  const composer = (
+    <div className="w-full">
+      {error && (
+        <p role="alert" className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+          {error}
+        </p>
+      )}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          void ask()
+        }}
+        className="rounded-[26px] border border-[#dfe3e8] bg-white p-2 shadow-[0_8px_30px_-12px_rgba(0,31,63,0.25)] transition-colors focus-within:border-[#c9ced6]"
+      >
+        <textarea
+          ref={inputRef}
+          value={input}
+          rows={1}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault()
+              void ask()
+            }
+          }}
+          placeholder={exhausted ? "You've used today's questions — back at midnight Dubai time." : placeholder}
+          disabled={exhausted}
+          maxLength={1000}
+          aria-label="Message FHI Assistant"
+          className="block max-h-[200px] w-full resize-none bg-transparent px-3 pb-1 pt-2 text-[15px] leading-6 text-[#0d1117] placeholder:text-[#9ca3af] focus:outline-none disabled:cursor-not-allowed"
+        />
+        <div className="flex items-center gap-2 px-1 pt-1">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
             {reports.map((r) => (
               <button
                 key={r.label}
                 type="button"
                 disabled={busy || exhausted}
                 onClick={() => void ask(r.prompt)}
-                className="rounded-full border border-[#e3e6ea] bg-[#fafbfc] px-3 py-1 text-[12px] font-semibold text-[#001f3f] transition-colors hover:border-[#d6b357] hover:bg-[#d6b357]/10 disabled:opacity-50"
+                className="rounded-full border border-[#e3e6ea] px-2.5 py-1 text-[12px] font-semibold text-[#374151] transition-colors hover:border-[#d6b357] hover:bg-[#d6b357]/10 hover:text-[#001f3f] disabled:opacity-50"
               >
                 {r.label}
               </button>
             ))}
             {pdfReport && <PdfReportMenu endpoint={pdfReport} disabled={busy} />}
           </div>
-          <form
-            className="flex items-center gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
-              void ask()
-            }}
-          >
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={exhausted ? "You've used today's questions — back tomorrow." : placeholder}
-              disabled={busy || exhausted}
-              className="w-full rounded-xl border border-transparent bg-[#f4f6f9] px-4 py-3 text-[14px] text-[#111827] placeholder:text-[#9ca3af] transition-colors focus:border-[#001f3f]/30 focus:bg-white focus:outline-none disabled:opacity-70"
-            />
-            <button
-              type="submit"
-              disabled={busy || exhausted || !input.trim()}
-              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl bg-[#001f3f] px-5 text-sm font-bold text-white transition-colors hover:bg-[#00152b] disabled:opacity-40"
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Ask
+          {busy ? (
+            <button type="button" onClick={stop} aria-label="Stop answering" title="Stop" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#001f3f] text-white transition-colors hover:bg-[#0b3a68]">
+              <Square className="h-3.5 w-3.5 fill-current" />
             </button>
-          </form>
+          ) : (
+            <button type="submit" disabled={!input.trim() || exhausted} aria-label="Send" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#001f3f] text-white transition-colors hover:bg-[#0b3a68] disabled:bg-[#d5dbe3]">
+              <ArrowUp className="h-4 w-4" />
+            </button>
+          )}
         </div>
-        <p className="mt-1.5 text-center text-[10.5px] text-[#9ca3af]">
-          {footnote}
-          {quota && quota.limit !== null && <span className="sm:hidden"> · {Math.max(0, quota.limit - quota.used)} of {quota.limit} questions left today</span>}
-        </p>
-      </div>
-      <div ref={endRef} aria-hidden />
+      </form>
+      <p className="mt-2 text-center text-[11px] text-[#9ca3af]">{footnote}</p>
+    </div>
+  )
+
+  return (
+    <div data-chat-full className="flex h-full min-h-0 bg-[#f7f8fa]">
+      {/* History — a column on wide screens, a drawer on phones. */}
+      <aside className="hidden w-64 shrink-0 border-r border-[#e8eaed] bg-[#f1f3f6] lg:block">{history}</aside>
+      {historyOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <button type="button" aria-label="Close chats" onClick={() => setHistoryOpen(false)} className="absolute inset-0 bg-black/40" />
+          <aside className="absolute inset-y-0 left-0 w-72 max-w-[85%] bg-[#f1f3f6] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#e3e6ea] px-4 py-3">
+              <span className="font-['Outfit'] text-[15px] font-bold text-[#001f3f]">Your chats</span>
+              <button type="button" onClick={() => setHistoryOpen(false)} aria-label="Close" className="rounded-lg p-1 text-[#6b7280] hover:bg-white"><X className="h-4 w-4" /></button>
+            </div>
+            {history}
+          </aside>
+        </div>
+      )}
+
+      <section className="relative flex min-w-0 flex-1 flex-col">
+        {/* Header */}
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-[#eceef1] bg-white/70 px-3 backdrop-blur sm:px-5">
+          <button type="button" onClick={() => setHistoryOpen(true)} aria-label="Your chats" className="rounded-lg p-2 text-[#374151] hover:bg-[#f1f3f6] lg:hidden"><PanelLeft className="h-4.5 w-4.5" /></button>
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#001f3f]"><Sparkles className="h-3.5 w-3.5 text-[#d6b357]" /></span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-['Outfit'] text-[14.5px] font-bold leading-tight text-[#0d1117]">{messages.length && activeTitle ? activeTitle : "FHI Assistant"}</p>
+            <p className="hidden truncate text-[11.5px] text-[#9ca3af] sm:block">{subtitle}</p>
+          </div>
+          {quota && quota.limit !== null && (
+            <span title="Questions you can still ask today — the counter resets at midnight Dubai time." className={`hidden shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold sm:inline-flex ${exhausted ? "border-amber-300 bg-amber-50 text-amber-800" : "border-[#e3e6ea] text-[#6b7280]"}`}>
+              {Math.max(0, quota.limit - quota.used)} of {quota.limit} left today
+            </span>
+          )}
+          {headerLink && (
+            <Link href={headerLink.href} className="hidden shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold text-[#374151] transition-colors hover:bg-[#f1f3f6] sm:inline-flex">
+              <BarChart3 className="h-3.5 w-3.5" /> {headerLink.label}
+            </Link>
+          )}
+          <button type="button" onClick={newChat} aria-label="New chat" title="New chat" className="rounded-lg p-2 text-[#374151] transition-colors hover:bg-[#f1f3f6]"><SquarePen className="h-4.5 w-4.5" /></button>
+        </header>
+
+        {messages.length === 0 ? (
+          /* Welcome: greeting, the composer in the middle, suggestions under it. */
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-4 py-10">
+              <div className="text-center">
+                <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#001f3f] shadow-[0_10px_24px_-10px_rgba(0,31,63,0.6)]"><Sparkles className="h-6 w-6 text-[#d6b357]" /></span>
+                <h1 className="mt-4 font-['Outfit'] text-[28px] font-bold leading-tight text-[#0d1117] sm:text-[32px]">{greeting}</h1>
+                <p className="mx-auto mt-1.5 max-w-lg text-[14.5px] leading-relaxed text-[#6b7280]">{intro.text}</p>
+              </div>
+              <div className="mt-7">{composer}</div>
+              <div className="mt-6 grid gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+                {suggestions.map((g) => (
+                  <div key={g.label}>
+                    <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b8913f]">{g.label}</p>
+                    <div className="space-y-1.5">
+                      {g.items.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          disabled={busy || exhausted}
+                          onClick={() => void ask(s)}
+                          className="block w-full rounded-xl border border-[#e8eaed] bg-white px-3 py-2 text-left text-[13px] text-[#1f2937] transition-colors hover:border-[#d6b357] hover:bg-[#fffaf0] disabled:opacity-50"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Thread */}
+            <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto">
+              <div className="mx-auto w-full max-w-3xl space-y-7 px-4 pb-8 pt-6 sm:px-6">
+                {messages.map((m, i) =>
+                  m.role === "user" ? (
+                    <div key={i} className="flex justify-end">
+                      <p className="max-w-[85%] whitespace-pre-wrap rounded-3xl bg-[#e9edf3] px-4 py-2.5 text-[15px] leading-relaxed text-[#0d1117]">{m.content}</p>
+                    </div>
+                  ) : (
+                    <div key={i} className="group flex gap-3">
+                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#001f3f]"><Sparkles className="h-3.5 w-3.5 text-[#d6b357]" /></span>
+                      <div className="min-w-0 flex-1">
+                        {m.report && pdfReport ? (
+                          <div className="overflow-hidden rounded-2xl border border-[#e8eaed] bg-white shadow-[0_8px_28px_-16px_rgba(0,31,63,0.28)]">
+                            <ReportCard report={m.report} pdfEndpoint={pdfReport} />
+                          </div>
+                        ) : m.streaming && !m.content ? (
+                          <p className="inline-flex items-center gap-2.5 pt-1 text-[14px] text-[#6b7280]" aria-live="polite">
+                            <span className="flex items-center gap-1" aria-hidden>
+                              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357] [animation-delay:-0.3s]" />
+                              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357] [animation-delay:-0.15s]" />
+                              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#d6b357]" />
+                            </span>
+                            {m.status ?? "Thinking…"}
+                          </p>
+                        ) : (
+                          <>
+                            {m.stats && m.stats.length > 1 && (
+                              <div className="mb-3">
+                                <StatTiles stats={m.stats} />
+                              </div>
+                            )}
+                            <div className="text-[15px] leading-7 text-[#1f2937]">
+                              <AnswerBody text={m.streaming ? liveClean(m.content) : m.content} names={m.names ?? (m.cards ?? []).map((c) => c.title)} />
+                              {m.streaming && <span className="mt-1 inline-block h-[1em] w-[2px] animate-pulse bg-[#d6b357] align-middle" aria-hidden="true" />}
+                            </div>
+                            {!m.streaming && m.charts && m.charts.length > 0 && (
+                              <div className="mt-4 grid gap-x-8 gap-y-5 rounded-2xl border border-[#eceef1] bg-white px-5 py-4 sm:grid-cols-2">
+                                {m.charts.map((c, ci) =>
+                                  c.kind === "trend" ? (
+                                    <div key={ci} className="sm:col-span-2">
+                                      <TrendChart title={c.title} points={c.points} />
+                                    </div>
+                                  ) : c.kind === "bars" ? (
+                                    <div key={ci} className={c.points.length > 6 ? "sm:col-span-2" : ""}>
+                                      <BarsChart title={c.title} points={c.points} />
+                                    </div>
+                                  ) : c.kind === "pie" ? (
+                                    <PieChart key={ci} title={c.title} rows={c.rows} />
+                                  ) : (
+                                    <ShareChart key={ci} chart={c} />
+                                  ),
+                                )}
+                              </div>
+                            )}
+                            {!m.streaming && m.printCards && m.printCards.length > 0 && (
+                              <div className="mt-4 space-y-4">
+                                {m.printCards.map((pc, pi) => (
+                                  <PrintBusinessCards key={pi} spec={pc} />
+                                ))}
+                              </div>
+                            )}
+                            {!m.streaming && m.cards && m.cards.length > 0 && (
+                              <div className="mt-4">
+                                <CardRow cards={m.cards} />
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {!m.streaming && (
+                          <div className="mt-2.5 flex flex-wrap items-center gap-x-1 gap-y-1.5 text-[#6b7280]">
+                            <button type="button" onClick={() => void copyAnswer(i, m.content)} title="Copy" className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] font-semibold transition-colors hover:bg-[#eef1f5] hover:text-[#001f3f]">
+                              {copiedIdx === i ? <Check className="h-3.5 w-3.5 text-[#15803d]" /> : <Copy className="h-3.5 w-3.5" />}
+                              {copiedIdx === i ? "Copied" : "Copy"}
+                            </button>
+                            {i === lastAssistant && !busy && (
+                              <button type="button" onClick={regenerate} title="Ask again" className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] font-semibold transition-colors hover:bg-[#eef1f5] hover:text-[#001f3f]">
+                                <RefreshCw className="h-3.5 w-3.5" /> Regenerate
+                              </button>
+                            )}
+                            {!m.report && (
+                              <button type="button" onClick={() => exportAnswer(m.content)} title="Export as PDF" className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] font-semibold transition-colors hover:bg-[#eef1f5] hover:text-[#001f3f]">
+                                <Printer className="h-3.5 w-3.5" /> Export PDF
+                              </button>
+                            )}
+                            {m.stopped && <span className="ml-1 text-[11.5px] italic text-[#9ca3af]">Stopped</span>}
+                            {m.used && m.used.length > 0 && (
+                              <span className="ml-1 flex flex-wrap items-center gap-1">
+                                {[...new Set(m.used.map((u) => TOOL_LABELS[u] ?? u.replace(/_/g, " ")))].map((label) => (
+                                  <span key={label} className="rounded-full bg-[#eef1f5] px-2 py-0.5 text-[10.5px] font-semibold text-[#6b7280]">{label}</span>
+                                ))}
+                              </span>
+                            )}
+                            {m.at && <span className="ml-auto text-[11px] text-[#b0b7c3] opacity-0 transition-opacity group-hover:opacity-100">{timeOf(m.at)}</span>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ),
+                )}
+              </div>
+            </div>
+
+            {!atBottom && (
+              <button type="button" onClick={() => toBottom(true)} aria-label="Jump to the latest message" className="absolute bottom-[132px] left-1/2 z-10 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border border-[#e3e6ea] bg-white text-[#374151] shadow-md transition-colors hover:text-[#001f3f]">
+                <ArrowDown className="h-4 w-4" />
+              </button>
+            )}
+
+            {/* Composer */}
+            <div className="shrink-0 bg-gradient-to-t from-[#f7f8fa] via-[#f7f8fa] to-[#f7f8fa]/0 px-4 pb-3 pt-2 sm:px-6">
+              <div className="mx-auto max-w-3xl">{composer}</div>
+            </div>
+          </>
+        )}
+      </section>
     </div>
   )
 }

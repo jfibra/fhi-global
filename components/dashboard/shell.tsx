@@ -367,8 +367,10 @@ export function DashboardShell({
     // The :has() classes are the full-bleed editor gate: when the page below
     // renders an element with data-wb-full-bleed (the Website Builder), the
     // sidebar hides and <main> drops its padding/scroll — pure CSS, so the
-    // shell's render-once contract (no usePathname here) stays intact.
-    <div className="flex h-screen bg-[#f4f6f9] font-sans overflow-hidden [&:has([data-wb-full-bleed])>aside]:hidden [&:has([data-wb-full-bleed])_main]:p-0 [&:has([data-wb-full-bleed])_main]:overflow-hidden">
+    // shell's render-once contract (no usePathname here) stays intact. The
+    // FHI Assistant (data-chat-full) keeps the sidebar but takes <main> whole:
+    // no padding, its own scrolling, like a chat app.
+    <div className="flex h-screen bg-[#f4f6f9] font-sans overflow-hidden [&:has([data-wb-full-bleed])>aside]:hidden [&:has([data-wb-full-bleed])_main]:p-0 [&:has([data-wb-full-bleed])_main]:overflow-hidden [&:has([data-chat-full])_main]:p-0 [&:has([data-chat-full])_main]:overflow-hidden">
 
       {/* ── Sidebar ───────────────────────────────────────────────────── */}
       {/* Mobile overlay — backdrop blur */}

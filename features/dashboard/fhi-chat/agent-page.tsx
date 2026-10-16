@@ -40,12 +40,13 @@ export default function AgentFhiChatPage() {
   return (
     <FhiChatPage
       endpoint="/api/fhi-chat"
+      audience="agent"
       storageKey="fhi-assistant-chat-agent"
       subtitle="Your sales, leads, listings, website, events, reviews and recruits — plus projects and news, straight from the live database."
       intro={{ title: "Your numbers, answered.", text: "Ask about your own sales, leads, listings, website, reviews and recruits, where you stand on the Top Sales board, any project FHI sells, or the latest property news." }}
       suggestions={role === "team_leader" ? TEAM_LEADER_SUGGESTIONS : SUGGESTIONS}
       reports={role === "team_leader" ? TEAM_LEADER_REPORTS : REPORTS}
-      placeholder='Ask FHI Assistant — e.g. "How are my sales this month?"'
+      placeholder="Ask about your sales, leads, team or any project…"
       footnote="Covers your own sales, leads, listings, website, events, reviews, recruits, the Top Sales board, projects and news · answers are computed from the live database when you ask."
       quota
     />
