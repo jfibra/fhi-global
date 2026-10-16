@@ -803,15 +803,25 @@ export default function FhiChatPage({
   // Scrolling, the way ChatGPT does it: while the reader sits at the bottom,
   // the thread STAYS at the bottom whenever it grows — streamed words, and the
   // tiles, charts and photo cards that land when an answer finishes (they
-  // used to leave the view stranded mid-answer). Scrolling up lets go.
+  // used to leave the view stranded mid-answer) and the reports, which follow
+  // down as their figures and then their advice arrive. Scrolling up lets go.
   const stickRef = useRef(true)
   const contentRef = useRef<HTMLDivElement | null>(null)
+  // Only the reader's own hand lets go (wheel or swipe up, Page Up / Home /
+  // arrows, grabbing the scrollbar) — never the browser's own scroll
+  // adjustments while a report or answer reflows, which used to unstick it
+  // (a report stopped short of its recommendations). Reaching the bottom again
+  // sticks it back.
   const onScroll = () => {
     const el = scrollRef.current
     if (!el) return
     const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80
-    stickRef.current = near
+    if (near) stickRef.current = true
     setAtBottom(near)
+  }
+  const touchY = useRef<number | null>(null)
+  const letGo = () => {
+    stickRef.current = false
   }
   const toBottom = (smooth = true) => {
     stickRef.current = true
@@ -828,23 +838,12 @@ export default function FhiChatPage({
     const box = scrollRef.current
     if (!hasThread || !content || !box || typeof ResizeObserver === "undefined") return
     const ro = new ResizeObserver(() => {
-      // A report that is still filling in places itself (below); everything else follows.
-      if (!stickRef.current || content.querySelector("[data-live-report]")) return
+      if (!stickRef.current) return
       box.scrollTop = box.scrollHeight
     })
     ro.observe(content)
     return () => ro.disconnect()
   }, [hasThread])
-
-  // A report lands as one tall card: when its figures arrive, glide down so
-  // the card fills the view from its top (following its END would skip the
-  // header and tiles). The advice filling in later doesn't move the view.
-  const arrivedReport = messages.findIndex((m) => m.streaming && m.report && !m.report.insights)
-  useEffect(() => {
-    if (arrivedReport < 0) return
-    const t = window.setTimeout(() => document.getElementById(`chat-msg-${arrivedReport}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60)
-    return () => window.clearTimeout(t)
-  }, [arrivedReport])
 
   // The composer grows with its text, up to a limit.
   useEffect(() => {
@@ -1217,7 +1216,20 @@ export default function FhiChatPage({
         ) : (
           <>
             {/* Thread */}
-            <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto">
+            <div
+              ref={scrollRef}
+              onScroll={onScroll}
+              onWheel={(e) => { if (e.deltaY < 0) letGo() }}
+              onTouchStart={(e) => { touchY.current = e.touches[0]?.clientY ?? null }}
+              onTouchMove={(e) => {
+                const y = e.touches[0]?.clientY
+                // A finger moving down scrolls the thread up.
+                if (touchY.current !== null && y !== undefined && y - touchY.current > 6) letGo()
+              }}
+              onKeyDown={(e) => { if (["PageUp", "ArrowUp", "Home"].includes(e.key)) letGo() }}
+              onPointerDown={(e) => { if (e.target === e.currentTarget) letGo() }}
+              className="min-h-0 flex-1 overflow-y-auto"
+            >
               <div ref={contentRef} className="mx-auto w-full max-w-3xl space-y-7 px-4 pb-8 pt-6 sm:px-6">
                 {messages.map((m, i) =>
                   m.role === "user" ? (
@@ -1225,7 +1237,7 @@ export default function FhiChatPage({
                       <p className="max-w-[85%] whitespace-pre-wrap rounded-3xl bg-[#e9edf3] px-4 py-2.5 text-[15px] leading-relaxed text-[#0d1117]">{m.content}</p>
                     </div>
                   ) : (
-                    <div key={i} id={`chat-msg-${i}`} data-live-report={m.streaming && m.report ? "" : undefined} className="group flex scroll-mt-4 gap-3">
+                    <div key={i} id={`chat-msg-${i}`} className="group flex scroll-mt-4 gap-3">
                       <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#001f3f]"><Sparkles className="h-3.5 w-3.5 text-[#d6b357]" /></span>
                       <div className="min-w-0 flex-1">
                         {m.report && pdfReport ? (
