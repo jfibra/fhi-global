@@ -172,3 +172,45 @@ export const cleanReply = (text: string) =>
 const ADVICE_RE =
   /\b(advice|advise|suggest(ion)?s?|recommend\w*|tips?|strateg(y|ies)|action plan)\b|\bwhat (should|can|could) (we|i)\b|\bhow (can|do|should|could) (we|i) (improve|increase|get|grow|boost|market|attract|activate|sell|convert|make)\b|\bhow to (improve|increase|get|grow|boost|market|attract|activate|sell|convert)\b|\bbest (way|thing|things) to\b|\bmore productive\b/i
 export const isAdviceQuestion = (q: string) => ADVICE_RE.test(q)
+
+/**
+ * The periods both assistants read their dates from, worked out here in Dubai
+ * time. Left to do the date math itself, the model got it wrong in October:
+ * "this quarter" came back as July–September, "this month" stopped the day
+ * before today and "last month" lost its last day (to_date is exclusive). The
+ * prompt hands over the exact pairs instead. Periods "so far" end tomorrow, as
+ * the company report counts them.
+ */
+export function periodCalendar(today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" })): string {
+  const addDays = (iso: string, n: number) => {
+    const d = new Date(`${iso}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() + n)
+    return d.toISOString().slice(0, 10)
+  }
+  // Month index may run past 0–11; Date.UTC rolls it into the right year.
+  const firstOf = (y: number, m: number) => new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10)
+  const monthName = (y: number, m: number) => new Date(Date.UTC(y, m, 1)).toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" })
+  const y = Number(today.slice(0, 4))
+  const m = Number(today.slice(5, 7)) - 1
+  const q = Math.floor(m / 3)
+  const tomorrow = addDays(today, 1)
+  const weekStart = addDays(today, -((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7))
+  const lastQ = q === 0 ? { n: 4, y: y - 1 } : { n: q, y }
+  const pair = (label: string, from: string, to: string) => `- ${label}: from_date ${from}, to_date ${to}`
+  return [
+    `PERIODS — today in Dubai is ${today}. to_date is EXCLUSIVE. Use these exact pairs; never work a period's dates out yourself:`,
+    pair("today", today, tomorrow),
+    pair("yesterday", addDays(today, -1), today),
+    pair("this week (Monday to today)", weekStart, tomorrow),
+    pair("last week (Monday to Sunday)", addDays(weekStart, -7), weekStart),
+    pair("last 7 days", addDays(today, -6), tomorrow),
+    pair("last 30 days", addDays(today, -29), tomorrow),
+    pair(`this month (${monthName(y, m)} so far)`, firstOf(y, m), tomorrow),
+    pair(`last month (${monthName(y, m - 1)})`, firstOf(y, m - 1), firstOf(y, m)),
+    pair(`this quarter (Q${q + 1} ${y} so far)`, firstOf(y, q * 3), tomorrow),
+    pair(`last quarter (Q${lastQ.n} ${lastQ.y})`, firstOf(y, q * 3 - 3), firstOf(y, q * 3)),
+    pair(`this year (${y} so far)`, `${y}-01-01`, tomorrow),
+    pair(`last year (${y - 1})`, `${y - 1}-01-01`, `${y}-01-01`),
+    `- Any named month, quarter or year runs from its first day to the first day after it (e.g. May ${y}: from_date ${y}-05-01, to_date ${y}-06-01).`,
+  ].join("\n")
+}

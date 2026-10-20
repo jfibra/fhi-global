@@ -280,6 +280,16 @@ const sinceArgs = (args: { from_date?: string; to_date?: string; days?: number }
   return { from, to: args.to_date?.trim() || null }
 }
 
+/** "Cris Enrico Gudia" → ["cris", "enrico", "gudia"] — for matching names typed loosely. */
+const nameWords = (s: string | null | undefined) =>
+  (s ?? "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z]+/).filter(Boolean)
+
+/** Every asked word starts a word of the name ("cris gud" finds Cris Enrico Antonio Gudia). */
+const nameMatches = (asked: string[], name: string | null | undefined) => {
+  const have = nameWords(name)
+  return asked.length > 0 && asked.every((w) => have.some((h) => h.startsWith(w)))
+}
+
 type MyLeadsArgs = { from_date?: string; to_date?: string; days?: number; kind?: "buyer" | "seller" | "all"; grade?: string; limit?: number }
 
 /** The briefs that came through the caller's own Buyers Link / Sellers Link —
@@ -292,6 +302,18 @@ async function myLeads(admin: Admin, caller: AgentChatCaller, args: MyLeadsArgs)
   const { data, error } = await q
   if (error) throw new Error(error.message)
   let rows = (data ?? []) as BuyerLead[]
+  // Briefs carrying the agent's own email, or a name made only of their own
+  // names, are them trying the link — not buyers to call back.
+  const { data: authUser } = await admin.auth.admin.getUserById(caller.userId)
+  const ownEmail = authUser?.user?.email?.trim().toLowerCase() || null
+  const ownWords = new Set(nameWords(caller.name))
+  const isOwnTest = (b: BuyerLead) => {
+    if (ownEmail && (b.email ?? "").trim().toLowerCase() === ownEmail) return true
+    const w = nameWords(b.name)
+    return w.length >= 2 && w.every((x) => ownWords.has(x))
+  }
+  const ownTests = rows.filter(isOwnTest).length
+  rows = rows.filter((b) => !isOwnTest(b))
   if (args.kind && args.kind !== "all") rows = rows.filter((b) => (b.kind === "seller" ? "seller" : "buyer") === args.kind)
   const gradeOf = (b: BuyerLead): LeadGrade | null => (b.kind === "seller" ? null : leadGrade(b))
   if (args.grade?.trim()) {
@@ -310,13 +332,16 @@ async function myLeads(admin: Admin, caller: AgentChatCaller, args: MyLeadsArgs)
     period: { from, to: to ?? "today" },
     note: "Briefs that came through your own Buyers Link and Sellers Link. Grades: " + Object.values(LEAD_GRADES).map((g) => `${g.label} = ${g.why}`).join("; "),
     total: rows.length,
+    ...(ownTests
+      ? { your_own_test_submissions: ownTests, own_test_note: "Briefs sent with your own name or email — you trying your link. They are left out of every count and list here; say so, and never treat them as buyers to call" }
+      : {}),
     buyers: buyers.length,
     sellers: rows.length - buyers.length,
     by_grade_buyers_only: count(buyers, (b) => LEAD_GRADES[gradeOf(b)!].label),
     by_budget: count(buyers, (b) => budgetLabel(b.budget)),
     by_goal: count(buyers, (b) => label(b, "goal")),
     _stats: [
-      stat("Briefs", rows.length, null, `since ${from}`),
+      stat("Briefs", rows.length, null, ownTests ? `since ${from} · ${ownTests} own test${ownTests === 1 ? "" : "s"} left out` : `since ${from}`),
       stat("Priority buyers", priority),
       stat("Buyers", buyers.length, null, `${rows.length - buyers.length} seller${rows.length - buyers.length === 1 ? "" : "s"}`),
     ],
@@ -652,7 +677,7 @@ async function myEvents(admin: Admin, caller: AgentChatCaller, args: MyEventsArg
 
 // ─── Team leaders: my_team ───────────────────────────────────────────────────
 
-type MyTeamArgs = { from_date?: string; to_date?: string; limit?: number }
+type MyTeamArgs = { from_date?: string; to_date?: string; member_name?: string; limit?: number }
 type TeamSalesOk = Extract<Awaited<ReturnType<typeof computeTeamSales>>, { sellers: unknown[] }>
 
 /**
@@ -701,7 +726,39 @@ async function myTeam(admin: Admin, caller: AgentChatCaller, args: MyTeamArgs) {
   const change = pctChange(team.totals.validated.value, team.previous.validated.value)
   const subteamName = (m: M) => (m.team_id !== teamId ? (allTeams ?? []).find((t) => t.id === m.team_id)?.name ?? null : null)
 
+  // One member asked about by name ("show me Cris's sales") — a team leader
+  // sees their own team's figures, as on Team Sales; nobody outside the team.
+  let member: Record<string, unknown> | null = null
+  if (args.member_name?.trim()) {
+    const asked = nameWords(args.member_name)
+    const hits = live.filter((m) => nameMatches(asked, m.profiles?.fullname))
+    if (hits.length === 0) {
+      member = { found: false, asked: args.member_name, note: "Nobody by that name is in your team (subteams included). You can only see your own team's figures — say so." }
+    } else if (hits.length > 1) {
+      member = { found: false, asked: args.member_name, several_match: hits.slice(0, 10).map((m) => ({ name: m.profiles?.fullname, role: m.profiles?.role, subteam: subteamName(m) })), note: "Ask which one they mean." }
+    } else {
+      const m = hits[0]
+      const s = team.sellers.find((x) => x.id === m.user_id)
+      const sellersRanked = team.sellers.filter((x) => x.validated_deals > 0)
+      member = {
+        found: true,
+        name: m.profiles?.fullname,
+        role: m.profiles?.role,
+        subteam: subteamName(m),
+        in_team_since: m.joined_at?.slice(0, 10) ?? null,
+        period: { from, to },
+        rank_in_team: s && s.validated_deals > 0 ? sellersRanked.indexOf(s) + 1 : null,
+        validated: { deals: s?.validated_deals ?? 0, value: AED(s?.validated_value ?? 0) },
+        pending: { deals: s?.pending_deals ?? 0, value: AED(s?.pending_value ?? 0) },
+        // A shared deal credits them their share — validated.value adds up those shares.
+        deals: (s?.deals ?? []).map((d) => ({ date: d.date, project: d.project, developer: d.developer, deal_price: AED(d.price), status: d.status, ...(d.shared ? { their_share: `${d.share}%`, credited_to_them: AED(d.credited) } : {}) })),
+        note: s ? "validated.value is the sum of what each deal credits them; for a shared deal quote credited_to_them as their figure, the deal_price only as the deal's size" : "No sale recorded in the period",
+      }
+    }
+  }
+
   return {
+    ...(member ? { member } : {}),
     team: { name: team.team.name, subteams: team.team.subteams, members: live.length },
     period: { from, to },
     note: "Validated sales are the headline (as on the boards); pending ones are waiting for the office. A shared deal credits each member their share; a deal shared inside the team counts once for the team.",
@@ -713,7 +770,7 @@ async function myTeam(admin: Admin, caller: AgentChatCaller, args: MyTeamArgs) {
     new_joiners: { count: joiners.length, note: "Registered with FHI and joined the team in the period", names: joiners.slice(0, limit).map((m) => ({ name: m.profiles?.fullname, role: m.profiles?.role, joined: m.profiles?.joined_at?.slice(0, 10) ?? null, subteam: subteamName(m) })) },
     waiting_for_validation: { count: pendingDeals.length, oldest_first: pendingDeals.slice(0, limit) },
     by_project: team.by_project.map((p) => ({ project: p.project, deals: p.deals, value: AED(p.value) })),
-    members: team.sellers.slice(0, limit).map((s, i) => ({ rank: i + 1, name: s.name, role: s.role, subteam: s.subteam, validated_deals: s.validated_deals, validated_value: AED(s.validated_value), pending_deals: s.pending_deals, pending_value: s.pending_deals ? AED(s.pending_value) : undefined })),
+    members_ranked_by_validated_value: team.sellers.slice(0, limit).map((s, i) => ({ rank: i + 1, name: s.name, role: s.role, subteam: s.subteam, validated_deals: s.validated_deals, validated_value: AED(s.validated_value), pending_deals: s.pending_deals, pending_value: s.pending_deals ? AED(s.pending_value) : undefined })),
     _stats: [
       stat("Team validated deals", team.totals.validated.deals, pctChange(team.totals.validated.deals, team.previous.validated.deals), `vs ${team.previous.validated.deals} before`),
       stat("Team validated value", AED(team.totals.validated.value), change, `vs ${AED(team.previous.validated.value)} before`),
@@ -728,6 +785,47 @@ async function myTeam(admin: Admin, caller: AgentChatCaller, args: MyTeamArgs) {
     _cards: team.sellers.filter((s) => s.validated_deals > 0).slice(0, 8).map((s, i): FhiChatCard => ({ kind: "agent", rank: i + 1, title: s.name, subtitle: `${s.validated_deals} deal${s.validated_deals === 1 ? "" : "s"} · ${AED(s.validated_value)}`, image: s.profile_url })),
     _names: team.sellers.map((s) => s.name),
     where_in_dashboard: "Team Sales",
+  }
+}
+
+// ─── person_sales ────────────────────────────────────────────────────────────
+
+type PersonSalesArgs = { name?: string; from_date?: string; to_date?: string }
+
+/**
+ * "How much did Agnes sell?" — a question about someone else. A team leader
+ * sees a member of their own team in full (my_team, as on Team Sales); for
+ * anyone else the assistant repeats only what the Top Sales board shows every
+ * agent: rank and number of validated deals. Never amounts, clients or leads.
+ */
+async function personSales(admin: Admin, caller: AgentChatCaller, args: PersonSalesArgs) {
+  const name = args.name?.trim() ?? ""
+  if (!name) return { error: "Whose sales? Give a name." }
+  const asked = nameWords(name)
+  if (nameMatches(asked, caller.name)) return { note: "That is the person asking — use my_sales for their own record." }
+  const year = new Date().getUTCFullYear()
+  const from = args.from_date?.trim() || `${year}-01-01`
+  const to = args.to_date?.trim() || `${year + 1}-01-01`
+
+  if (caller.role === "team_leader") {
+    const team = await myTeam(admin, caller, { from_date: from, to_date: to, member_name: name, limit: 1 })
+    const member = "member" in team ? (team.member as { found?: boolean; several_match?: unknown } | undefined) : undefined
+    if (member?.found || member?.several_match) return { in_your_team: true, member, where_in_dashboard: "Team Sales" }
+  }
+
+  const board = await topSalesBoard(admin, caller, { from_date: from, to_date: to, limit: 25 })
+  const onBoard = board.leaders.filter((l) => nameMatches(asked, l.agent))
+  const beyondTop = !onBoard.length && board.agents_on_board > 25
+  return {
+    person: name,
+    period: { from, to },
+    ...(caller.role === "team_leader" ? { in_your_team: false } : {}),
+    on_top_sales_board: onBoard.length ? onBoard.map((l) => ({ name: l.agent, rank: l.rank, validated_deals: l.deals })) : null,
+    agents_on_board: board.agents_on_board,
+    note:
+      "Other agents' sales amounts, clients and leads are private: FHI Assistant can only say what the Top Sales board shows everyone — their rank and number of validated deals. " +
+      (onBoard.length ? "Say that in one sentence, then give their board line. " : beyondTop ? "They are not in the board's top 25 for the period. " : "They are not on the board for the period — no validated sale, or no FHI agent by that name. ") +
+      "Never estimate an amount, and don't show the asker's own record instead.",
   }
 }
 
@@ -765,13 +863,30 @@ const PHASE1_TOOLS = [
       parameters: {
         type: "object",
         properties: {
-          scope: { type: "string", enum: ["month", "quarter", "year", "all"], description: "Period shape. Default year." },
+          scope: { type: "string", enum: ["month", "quarter", "year", "all"], description: "Only for the CURRENT month, quarter or year (default year). Any other period — last quarter, last month, a named month — goes in from_date/to_date from PERIODS instead" },
           year: { type: "integer" },
           month: { type: "integer", description: "1-12, anchors month/quarter" },
           from_date: { type: "string", description: "YYYY-MM-DD inclusive — overrides scope" },
           to_date: { type: "string", description: "YYYY-MM-DD exclusive" },
           limit: { type: "integer", description: "Default 10, max 25" },
         },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "person_sales",
+      description:
+        "ANOTHER PERSON's sales — 'how much did Agnes sell', 'show Michelle's sales', 'how many deals does Cris have'. Never answer those with my_sales, which is only ever the asker's own record. A team leader gets the full figures of a member of their own team; for anyone else it returns what the Top Sales board shows everyone (rank and number of validated deals) — their amounts stay private.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "The person's name as asked, partial ok" },
+          from_date: { type: "string", description: "YYYY-MM-DD inclusive (default Jan 1 this year)" },
+          to_date: { type: "string", description: "YYYY-MM-DD exclusive" },
+        },
+        required: ["name"],
       },
     },
   },
@@ -845,8 +960,8 @@ const TEAM_LEADER_TOOLS = [
     type: "function" as const,
     function: {
       name: "my_team",
-      description: "YOUR TEAM (team leaders): the team you lead or belong to, subteams included — validated and pending sales for the period (default this year) with the previous-period comparison, each member's deals and value, who hasn't sold (quiet members), deals waiting for validation oldest-first, who joined in the period, and sales by project and by month. Use for 'how is my team doing', 'team sales this month', 'who in my team hasn't sold', 'anything of my team waiting for validation', 'who joined my team recently'.",
-      parameters: { type: "object", properties: { from_date: { type: "string", description: "YYYY-MM-DD inclusive (default Jan 1 this year)" }, to_date: { type: "string", description: "YYYY-MM-DD exclusive (default Jan 1 next year)" }, limit: { type: "integer", description: "Names per list, default 15" } } },
+      description: "YOUR TEAM (team leaders): the team you lead or belong to, subteams included — validated and pending sales for the period (default this year) with the previous-period comparison, each member's deals and value, who hasn't sold (quiet members), deals waiting for validation oldest-first, who joined in the period, and sales by project and by month. Use for 'how is my team doing', 'team sales this month', 'who in my team hasn't sold', 'anything of my team waiting for validation', 'who joined my team recently', 'who is my top seller' (members come ranked by validated value, with amounts), and ONE member by name with member_name: 'show me Cris's sales', 'how is Agnes doing'.",
+      parameters: { type: "object", properties: { from_date: { type: "string", description: "YYYY-MM-DD inclusive (default Jan 1 this year)" }, to_date: { type: "string", description: "YYYY-MM-DD exclusive (default Jan 1 next year)" }, member_name: { type: "string", description: "One team member's name, partial ok — returns their rank in the team, figures and every deal in the period" }, limit: { type: "integer", description: "Names per list, default 15" } } },
     },
   },
 ]
@@ -879,6 +994,7 @@ export async function runAgentChatTool(
       case "my_recruits": result = await myRecruits(admin, caller, args as Parameters<typeof myRecruits>[2]); break
       case "my_events": result = await myEvents(admin, caller, args as MyEventsArgs); break
       case "my_team": result = await myTeam(admin, caller, args as MyTeamArgs); break
+      case "person_sales": result = await personSales(admin, caller, args as PersonSalesArgs); break
       default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [], stats: [] }
     }
     const { _cards, _names, _charts, _stats, _printCards: _pc, ...rest } = result as {

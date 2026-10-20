@@ -511,7 +511,7 @@ async function topTeams(
   }
 }
 
-async function salesSummary(admin: Admin, args: { from_date?: string; to_date?: string }) {
+async function salesSummary(admin: Admin, args: { from_date?: string; to_date?: string; compare_from_date?: string; compare_to_date?: string }) {
   const from = args.from_date ?? null
   const to = args.to_date ?? null
   const all = await fetchAllSales(admin)
@@ -525,17 +525,22 @@ async function salesSummary(admin: Admin, args: { from_date?: string; to_date?: 
     }
   }
   const cur = { validated: bucket(sales, "validated"), pending: bucket(sales, "pending"), rejected: bucket(sales, "rejected") }
-  // Professional reports show context: compare against the equal-length
-  // window immediately before (only meaningful when a period was given).
+  // Professional reports show context: compare against the period asked for
+  // ("this quarter vs last quarter" — the tool does the arithmetic, the model
+  // got it wrong), else the equal-length window immediately before (only
+  // meaningful when a period was given).
   let comparison: Record<string, unknown> = {}
+  const askedCompare =
+    args.compare_from_date?.trim() && args.compare_to_date?.trim() ? { from: args.compare_from_date.trim(), to: args.compare_to_date.trim() } : null
   if (from) {
-    const prev = previousWindow(from, to)
+    const prev = askedCompare ?? previousWindow(from, to)
     const prevSales = all.filter((s) => inRange(s, prev.from, prev.to))
     const pv = bucket(prevSales, "validated")
     comparison = {
       previous_period: {
         from: prev.from,
         to: prev.to,
+        compared_with: askedCompare ? "the period asked for" : "the same number of days just before",
         validated: { count: pv.count, total: pv.total },
         pending_count: bucket(prevSales, "pending").count,
       },
@@ -4630,7 +4635,7 @@ export const FHI_CHAT_TOOLS = [
       parameters: {
         type: "object",
         properties: {
-          scope: { type: "string", enum: ["month", "quarter", "year", "all"], description: "Period shape. Default year." },
+          scope: { type: "string", enum: ["month", "quarter", "year", "all"], description: "Only for the CURRENT month, quarter or year (default year). Any other period — last quarter, last month, a named month — goes in from_date/to_date from PERIODS instead" },
           year: { type: "integer" }, month: { type: "integer", description: "1-12, anchors month/quarter" },
           from_date: { type: "string", description: "YYYY-MM-DD inclusive — overrides scope for exact ranges like today" },
           to_date: { type: "string", description: "YYYY-MM-DD exclusive" },
@@ -4678,12 +4683,14 @@ export const FHI_CHAT_TOOLS = [
     type: "function" as const,
     function: {
       name: "sales_summary",
-      description: "Totals of sales (count + AED value) split by validation status, optionally within a date range.",
+      description: "Totals of sales (count + AED value) split by validation status, optionally within a date range. Comparing two periods ('this quarter vs last quarter'): pass the first as from_date/to_date and the other as compare_from_date/compare_to_date — change_vs_previous is then worked out against it.",
       parameters: {
         type: "object",
         properties: {
           from_date: { type: "string", description: "YYYY-MM-DD inclusive" },
           to_date: { type: "string", description: "YYYY-MM-DD exclusive" },
+          compare_from_date: { type: "string", description: "Start of the period to compare against (PERIODS dates), e.g. last quarter. Without it the comparison is the same number of days just before" },
+          compare_to_date: { type: "string", description: "End of the period to compare against, exclusive" },
         },
       },
     },
