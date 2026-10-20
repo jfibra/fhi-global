@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowDown, ArrowUp, BarChart3, Check, Copy, Download, Globe, Loader2, Monitor, PanelLeft, Printer, RefreshCw, Smartphone, Sparkles, Square, SquarePen, Tablet, Trash2, X } from "lucide-react"
+import { ArrowDown, ArrowUp, BarChart3, Check, Copy, CornerDownRight, Download, Globe, Loader2, Monitor, PanelLeft, Printer, RefreshCw, Smartphone, Sparkles, Square, SquarePen, Tablet, Trash2, X } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { BarsChart, PieChart, StatTiles, type ChartSpec, type ShareRow, type StatSpec, type TrendPoint } from "./charts"
 import {
@@ -19,6 +19,7 @@ import {
 import { isSafeRemoteImageUrl } from "@/lib/image-hosts"
 import PdfReportMenu from "./pdf-report-menu"
 import AnswerBody from "./answer-body"
+import { followUpsFor } from "./follow-ups"
 import ReportCard, { reportSummaryText, type ChatReport } from "./report-card"
 import type { ReportPeriodKey } from "@/lib/company-report/data"
 
@@ -572,6 +573,8 @@ function exportAnswer(content: string) {
 const CHAT_STORAGE_KEY = "fhi-assistant-chat"
 
 type Quota = { used: number; limit: number | null; resetsAt: string }
+/** A "Today at a glance" tile — lib/assistant-briefing.ts BriefingItem. */
+type BriefTile = { key: string; label: string; value: string; note: string | null; tone: "attention" | "good" | "quiet"; ask: string | null }
 type ConversationRow = { id: string; title: string; updated_at: string }
 
 /** The same chat for two assistants: the admin one (defaults) and the
@@ -595,6 +598,8 @@ export type FhiChatPageProps = {
   headerLink?: { href: string; label: string }
   /** The company-report PDF endpoint — shows the "PDF report" menu beside the report buttons (admin only). */
   pdfReport?: string
+  /** "Today at a glance" tiles on the welcome screen (app/api/assistant/briefing); null hides them. */
+  briefing?: string | null
 }
 
 /** History list sections, newest first — "Today", "Yesterday", "Previous 7 days", "Older". */
@@ -632,8 +637,9 @@ export default function FhiChatPage({
   quota: showQuota = false,
   headerLink,
   pdfReport,
+  briefing = "/api/assistant/briefing?audience=admin",
 }: FhiChatPageProps = {}) {
-  const { profile } = useAuth()
+  const { profile, role } = useAuth()
   const [messages, setMessages] = useState<Msg[]>([])
   const [quota, setQuota] = useState<Quota | null>(null)
   const exhausted = Boolean(quota && quota.limit !== null && quota.used >= quota.limit)
@@ -646,6 +652,7 @@ export default function FhiChatPage({
   const [historyOpen, setHistoryOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [atBottom, setAtBottom] = useState(true)
+  const [brief, setBrief] = useState<BriefTile[] | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -653,6 +660,23 @@ export default function FhiChatPage({
   const savedSigRef = useRef("")
   const creatingRef = useRef<Promise<string | null> | null>(null)
   const idRef = useRef<string | null>(null)
+
+  // "Today at a glance" — read once per visit; a failure simply hides the tiles.
+  useEffect(() => {
+    if (!briefing) return
+    let alive = true
+    fetch(briefing, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { items?: BriefTile[] } | null) => {
+        if (alive) setBrief(Array.isArray(j?.items) ? j.items : [])
+      })
+      .catch(() => {
+        if (alive) setBrief([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [briefing])
 
   const listUrl = `/api/assistant/conversations?audience=${audience}`
   const oneUrl = (id: string) => `/api/assistant/conversations/${id}?audience=${audience}`
@@ -1035,6 +1059,23 @@ export default function FhiChatPage({
     for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === "assistant") return i
     return -1
   })()
+  // The next questions offered under the latest answer (./follow-ups.ts).
+  const nextQuestions = (() => {
+    const m = messages[lastAssistant]
+    if (!m || busy || m.streaming || m.report || !m.content) return []
+    let question = ""
+    for (let i = lastAssistant - 1; i >= 0; i--) if (messages[i].role === "user") { question = messages[i].content; break }
+    return followUpsFor({
+      audience,
+      teamLeader: role === "team_leader",
+      question,
+      used: m.used ?? [],
+      names: m.names ?? [],
+      projects: (m.cards ?? []).filter((c) => c.kind === "project").map((c) => c.title),
+      asked: messages.filter((x) => x.role === "user").map((x) => x.content),
+      selfName: profile?.fullname ?? null,
+    })
+  })()
 
   // ── Pieces ────────────────────────────────────────────────────────────────
   const history = (
@@ -1191,6 +1232,35 @@ export default function FhiChatPage({
                 <h1 className="mt-4 font-['Outfit'] text-[28px] font-bold leading-tight text-[#0d1117] sm:text-[32px]">{greeting}</h1>
                 <p className="mx-auto mt-1.5 max-w-lg text-[14.5px] leading-relaxed text-[#6b7280]">{intro.text}</p>
               </div>
+              {briefing && (brief === null || brief.length > 0) && (
+                <div className="mt-7">
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b8913f]">Today at a glance</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {brief === null
+                      ? [0, 1, 2].map((k) => <div key={k} className="h-[78px] animate-pulse rounded-xl bg-[#eef1f5]" />)
+                      : brief.map((t) => {
+                          const body = (
+                            <>
+                              <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[#6b7280]">
+                                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${t.tone === "attention" ? "bg-[#d6b357]" : t.tone === "good" ? "bg-[#16a34a]" : "bg-[#c3c8cf]"}`} aria-hidden />
+                                {t.label}
+                              </span>
+                              <span className="mt-1 block font-['Outfit'] text-[22px] font-bold leading-none text-[#001f3f]">{t.value}</span>
+                              {t.note && <span className="mt-1 block truncate text-[11.5px] text-[#6b7280]">{t.note}</span>}
+                            </>
+                          )
+                          const cls = `block w-full rounded-xl border bg-white px-3 py-2.5 text-left ${t.tone === "attention" ? "border-[#ecd9a4]" : "border-[#e8eaed]"}`
+                          return t.ask ? (
+                            <button key={t.key} type="button" disabled={busy || exhausted} onClick={() => void ask(t.ask!)} title={t.ask} className={`${cls} transition-colors hover:border-[#d6b357] hover:bg-[#fffaf0] disabled:opacity-50`}>
+                              {body}
+                            </button>
+                          ) : (
+                            <div key={t.key} className={cls}>{body}</div>
+                          )
+                        })}
+                  </div>
+                </div>
+              )}
               <div className="mt-7">{composer}</div>
               <div className="mt-6 grid gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
                 {suggestions.map((g) => (
@@ -1323,6 +1393,22 @@ export default function FhiChatPage({
                               </span>
                             )}
                             {m.at && <span className="ml-auto text-[11px] text-[#b0b7c3] opacity-0 transition-opacity group-hover:opacity-100">{timeOf(m.at)}</span>}
+                          </div>
+                        )}
+                        {i === lastAssistant && nextQuestions.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2" aria-label="Ask next">
+                            {nextQuestions.map((q) => (
+                              <button
+                                key={q}
+                                type="button"
+                                disabled={busy || exhausted}
+                                onClick={() => void ask(q)}
+                                className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#e3e6ea] bg-white px-3 py-1.5 text-left text-[12.5px] font-medium text-[#1f2937] transition-colors hover:border-[#d6b357] hover:bg-[#fffaf0] disabled:opacity-50"
+                              >
+                                <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-[#b8913f]" aria-hidden />
+                                <span className="truncate">{q}</span>
+                              </button>
+                            ))}
                           </div>
                         )}
                       </div>

@@ -187,7 +187,7 @@ type BoardArgs = { scope?: string; year?: number; month?: number; from_date?: st
  * agent, AED values withheld (app/api/sales/top-sellers shows values to admin
  * staff only). The caller gets their own rank, deals and value.
  */
-async function topSalesBoard(admin: Admin, caller: AgentChatCaller, args: BoardArgs) {
+export async function topSalesBoard(admin: Admin, caller: AgentChatCaller, args: BoardArgs) {
   const now = new Date()
   const scope = normScope(args.scope)
   let { from, to } = periodRange(scope, args.year ?? now.getUTCFullYear(), args.month ?? now.getUTCMonth() + 1)
@@ -290,6 +290,19 @@ const nameMatches = (asked: string[], name: string | null | undefined) => {
   return asked.length > 0 && asked.every((w) => have.some((h) => h.startsWith(w)))
 }
 
+/** Briefs carrying the agent's own email, or a name made only of their own
+ *  names, are them trying the link — not buyers to call back. */
+export async function ownTestBrief(admin: Admin, caller: AgentChatCaller): Promise<(b: { email: string | null; name: string | null }) => boolean> {
+  const { data: authUser } = await admin.auth.admin.getUserById(caller.userId)
+  const ownEmail = authUser?.user?.email?.trim().toLowerCase() || null
+  const ownWords = new Set(nameWords(caller.name))
+  return (b) => {
+    if (ownEmail && (b.email ?? "").trim().toLowerCase() === ownEmail) return true
+    const w = nameWords(b.name)
+    return w.length >= 2 && w.every((x) => ownWords.has(x))
+  }
+}
+
 type MyLeadsArgs = { from_date?: string; to_date?: string; days?: number; kind?: "buyer" | "seller" | "all"; grade?: string; limit?: number }
 
 /** The briefs that came through the caller's own Buyers Link / Sellers Link —
@@ -302,16 +315,7 @@ async function myLeads(admin: Admin, caller: AgentChatCaller, args: MyLeadsArgs)
   const { data, error } = await q
   if (error) throw new Error(error.message)
   let rows = (data ?? []) as BuyerLead[]
-  // Briefs carrying the agent's own email, or a name made only of their own
-  // names, are them trying the link — not buyers to call back.
-  const { data: authUser } = await admin.auth.admin.getUserById(caller.userId)
-  const ownEmail = authUser?.user?.email?.trim().toLowerCase() || null
-  const ownWords = new Set(nameWords(caller.name))
-  const isOwnTest = (b: BuyerLead) => {
-    if (ownEmail && (b.email ?? "").trim().toLowerCase() === ownEmail) return true
-    const w = nameWords(b.name)
-    return w.length >= 2 && w.every((x) => ownWords.has(x))
-  }
+  const isOwnTest = await ownTestBrief(admin, caller)
   const ownTests = rows.filter(isOwnTest).length
   rows = rows.filter((b) => !isOwnTest(b))
   if (args.kind && args.kind !== "all") rows = rows.filter((b) => (b.kind === "seller" ? "seller" : "buyer") === args.kind)

@@ -181,7 +181,13 @@ export const isAdviceQuestion = (q: string) => ADVICE_RE.test(q)
  * prompt hands over the exact pairs instead. Periods "so far" end tomorrow, as
  * the company report counts them.
  */
-export function periodCalendar(today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" })): string {
+/** Nothing in FHI's data predates this — "all time" starts here. */
+const RECORDS_START = "2025-01-01"
+
+type Period = { label: string; from: string; to: string; re: RegExp | null }
+
+/** Every named period, worked out for today in Dubai. */
+function periodsFor(today: string): Period[] {
   const addDays = (iso: string, n: number) => {
     const d = new Date(`${iso}T00:00:00Z`)
     d.setUTCDate(d.getUTCDate() + n)
@@ -196,21 +202,48 @@ export function periodCalendar(today = new Date().toLocaleDateString("en-CA", { 
   const tomorrow = addDays(today, 1)
   const weekStart = addDays(today, -((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7))
   const lastQ = q === 0 ? { n: 4, y: y - 1 } : { n: q, y }
-  const pair = (label: string, from: string, to: string) => `- ${label}: from_date ${from}, to_date ${to}`
+  return [
+    { label: "today", from: today, to: tomorrow, re: /\btoday\b|\bngayong araw\b/i },
+    { label: "yesterday", from: addDays(today, -1), to: today, re: /\byesterday\b|\bkahapon\b/i },
+    { label: "this week (Monday to today)", from: weekStart, to: tomorrow, re: /\bthis week\b|\bngayong linggo\b/i },
+    { label: "last week (Monday to Sunday)", from: addDays(weekStart, -7), to: weekStart, re: /\blast week\b/i },
+    { label: "last 7 days", from: addDays(today, -6), to: tomorrow, re: /\b(last|past) (7|seven) days\b/i },
+    { label: "last 30 days", from: addDays(today, -29), to: tomorrow, re: /\b(last|past) (30|thirty) days\b/i },
+    { label: `this month (${monthName(y, m)} so far)`, from: firstOf(y, m), to: tomorrow, re: /\bthis month\b|\bngayong buwan\b/i },
+    { label: `last month (${monthName(y, m - 1)})`, from: firstOf(y, m - 1), to: firstOf(y, m), re: /\blast month\b|\bnakaraang buwan\b/i },
+    { label: `this quarter (Q${q + 1} ${y} so far)`, from: firstOf(y, q * 3), to: tomorrow, re: /\bthis quarter\b/i },
+    { label: `last quarter (Q${lastQ.n} ${lastQ.y})`, from: firstOf(y, q * 3 - 3), to: firstOf(y, q * 3), re: /\blast quarter\b/i },
+    { label: `this year (${y} so far)`, from: `${y}-01-01`, to: tomorrow, re: /\bthis year\b|\bngayong taon\b/i },
+    { label: `last year (${y - 1})`, from: `${y - 1}-01-01`, to: `${y}-01-01`, re: /\blast year\b|\bnakaraang taon\b/i },
+    // FHI's records start in 2025 (first sale: a September 2025 reservation).
+    { label: "all time (every record — there is nothing before it to compare with, so quote no change for it)", from: RECORDS_START, to: tomorrow, re: /\ball[- ]?time\b|\bever\b|\bsince (the )?(start|beginning)\b/i },
+  ]
+}
+
+const dubaiToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" })
+
+export function periodCalendar(today = dubaiToday()): string {
   return [
     `PERIODS — today in Dubai is ${today}. to_date is EXCLUSIVE. Use these exact pairs; never work a period's dates out yourself:`,
-    pair("today", today, tomorrow),
-    pair("yesterday", addDays(today, -1), today),
-    pair("this week (Monday to today)", weekStart, tomorrow),
-    pair("last week (Monday to Sunday)", addDays(weekStart, -7), weekStart),
-    pair("last 7 days", addDays(today, -6), tomorrow),
-    pair("last 30 days", addDays(today, -29), tomorrow),
-    pair(`this month (${monthName(y, m)} so far)`, firstOf(y, m), tomorrow),
-    pair(`last month (${monthName(y, m - 1)})`, firstOf(y, m - 1), firstOf(y, m)),
-    pair(`this quarter (Q${q + 1} ${y} so far)`, firstOf(y, q * 3), tomorrow),
-    pair(`last quarter (Q${lastQ.n} ${lastQ.y})`, firstOf(y, q * 3 - 3), firstOf(y, q * 3)),
-    pair(`this year (${y} so far)`, `${y}-01-01`, tomorrow),
-    pair(`last year (${y - 1})`, `${y - 1}-01-01`, `${y}-01-01`),
-    `- Any named month, quarter or year runs from its first day to the first day after it (e.g. May ${y}: from_date ${y}-05-01, to_date ${y}-06-01).`,
+    ...periodsFor(today).map((p) => `- ${p.label}: from_date ${p.from}, to_date ${p.to}`),
+    `- Any named month, quarter or year runs from its first day to the first day after it (e.g. May ${today.slice(0, 4)}: from_date ${today.slice(0, 4)}-05-01, to_date ${today.slice(0, 4)}-06-01).`,
   ].join("\n")
+}
+
+/**
+ * The periods THIS question names, as a note placed right after it. The
+ * calendar alone wasn't enough on follow-ups — asked "what about all time
+ * sales of the whole team" after another question, the model called the tool
+ * with no dates (this year) and labelled it all time. Null when it names none.
+ */
+export function periodHint(question: string, earlier: string | null = null, today = dubaiToday()): string | null {
+  const all = periodsFor(today)
+  const hits = all.filter((p) => p.re?.test(question))
+  // "Compare it with last month" names one side; the other is the period the
+  // previous question was about.
+  if (earlier && /\b(compar\w*|vs\.?|versus)\b/i.test(question)) {
+    for (const p of all) if (p.re?.test(earlier) && !hits.includes(p)) hits.push(p)
+  }
+  if (!hits.length) return null
+  return `This question names ${hits.map((p) => `${p.label}: from_date ${p.from}, to_date ${p.to}`).join("; ")}. Pass exactly these dates to every tool you call for it that takes dates — never a tool's default period.`
 }

@@ -1,7 +1,7 @@
 import "server-only"
 
 import { FHI_CHAT_TOOLS, runFhiChatTool, type FhiChatCard, type FhiChatChart, type FhiChatPrintCard, type FhiChatSender, type FhiChatStat } from "@/lib/fhi-chat-tools"
-import { cleanReply, isAdviceQuestion, periodCalendar, streamCompletion, type ChatMessage, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
+import { cleanReply, isAdviceQuestion, periodCalendar, periodHint, streamCompletion, type ChatMessage, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
 
 /**
  * FHI Assistant (admin) — the answer loop behind app/api/admin/fhi-chat,
@@ -187,6 +187,10 @@ export async function runAdminChat(
   emit: (e: ChatStreamEvent) => void,
 ): Promise<AdminChatAnswer> {
   const messages: ChatMessage[] = [{ role: "system", content: systemPrompt() }, ...history]
+  // The period this question names, spelled out next to it (periodHint).
+  const asked = history.filter((m) => m.role === "user").map((m) => m.content)
+  const hint = periodHint(asked[asked.length - 1] ?? "", asked[asked.length - 2] ?? null)
+  if (hint) messages.push({ role: "system", content: hint })
   const model = isAdviceQuestion(history[history.length - 1]?.content ?? "") ? ADVICE_MODEL() : MODEL()
   const used: string[] = []
   const cards: FhiChatCard[] = []

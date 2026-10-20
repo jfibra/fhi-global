@@ -2,7 +2,7 @@ import "server-only"
 
 import { agentChatToolsFor, runAgentChatTool, type AgentChatCaller } from "@/lib/fhi-agent-chat-tools"
 import type { FhiChatCard, FhiChatChart, FhiChatStat } from "@/lib/fhi-chat-tools"
-import { cleanReply, isAdviceQuestion, periodCalendar, streamCompletion, type ChatMessage, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
+import { cleanReply, isAdviceQuestion, periodCalendar, periodHint, streamCompletion, type ChatMessage, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
 
 /**
  * The agent-side FHI Assistant's model loop (app/api/fhi-chat is the guard,
@@ -53,7 +53,7 @@ What you can do, and only this:
 - PROJECTS → find_projects for a shortlist by area, bedrooms (0 = studio), type, budget ("under 1M" = max_price 1000000), handover year, off-plan/ready; project_details for everything about ONE named project. Quote prices exactly as returned (price_label) and say what they are based on (price_basis). "Most expensive" → sort price_desc; a UNIT question ("cheapest unit", "cheapest 2-bedroom and its size") → per_unit true, naming the unit, size and project (and, when lower_from_prices_without_unit_table is present, that those projects advertise a lower from-price without unit prices). For villas/townhouses, no_price_for_that_type projects have no price for that type on file — say "price on request", never their headline price. Always give the page link for one project.
 - PROPERTY NEWS on the website → news_overview, with links.
 - THEIR OWN LEADS → my_leads (briefs from their Buyers Link / Sellers Link, graded; list the newest one per "- " line with name, what they want, WhatsApp and email — they follow up from this). THEIR OWN LISTINGS → my_listings. THEIR WEBSITE and the events on it → my_website. CLIENT REVIEWS about them → my_reviews. THEIR RECRUITS (people who joined through their invite link) → my_recruits — deal counts only, never amounts. THEIR EVENTS (the events they created) → my_events: registrations (total, today, in a period, by day), seats left per day, certificates, page views, QR scans and the registrants with email and WhatsApp (one per "- " line when they ask who registered — they follow up from this). "Registered today" means registrations made today, not the event's date. The UI draws a card per event (banner, date, venue, registrations, seats left, views) — don't repeat those per event in text; give the headline and what the cards don't show (who registered, when asked).
-${role === "team_leader" ? "- THEIR TEAM (they are a team leader) → my_team: team totals, each member's validated and pending sales, quiet members, deals waiting for validation, new joiners, by project and by month. Team figures include subteams. Lists of names (quiet members, new joiners) are only the first ones — always give the full count from the tool (e.g. 370 members, including: …). Name the members with their figures — the team leader already sees these on Team Sales. ONE member (\"show me Cris's sales\", \"how is Agnes doing\") → my_team with member_name, and give that member's figures and deals. \"My top seller\", \"my best agent\", \"who sells the most\" mean in THEIR TEAM → my_team (members_ranked_by_validated_value, with amounts), not top_sales_board.\n" : ""}
+${role === "team_leader" ? "- THEIR TEAM (they are a team leader) → my_team, for any period including all time — 'my team', 'the team', 'the whole team', 'our team' all mean THEIR team, never the company, so answer those straight away with my_team instead of asking which they mean: team totals, each member's validated and pending sales, quiet members, deals waiting for validation, new joiners, by project and by month. Team figures include subteams. Lists of names (quiet members, new joiners) are only the first ones — always give the full count from the tool (e.g. 370 members, including: …). Name the members with their figures — the team leader already sees these on Team Sales. ONE member (\"show me Cris's sales\", \"how is Agnes doing\") → my_team with member_name, and give that member's figures and deals. \"My top seller\", \"my best agent\", \"who sells the most\" mean in THEIR TEAM → my_team (members_ranked_by_validated_value, with amounts), not top_sales_board.\n" : ""}
 Rules:
 - ALWAYS use the tools for numbers. Never invent, estimate or extrapolate. If a tool returns empty or an error, say so plainly.
 - Every answer comes from tool calls made for THIS question; on any follow-up with a different period or filter, CALL THE TOOL AGAIN. When a period is named (today, this month, last quarter, May to August), take its from_date/to_date from PERIODS below (to_date exclusive) and pass the same dates to every tool you call.
@@ -94,6 +94,10 @@ export async function runAgentChat(caller: AgentChatCaller, history: AgentChatHi
   const model = isAdviceQuestion(history[history.length - 1]?.content ?? "") ? AGENT_ADVICE_MODEL() : MODEL()
   const tools = agentChatToolsFor(caller.role)
   const messages: ChatMessage[] = [{ role: "system", content: agentSystemPrompt(caller.name, caller.role) }, ...history]
+  // The period this question names, spelled out next to it (periodHint).
+  const asked = history.filter((m) => m.role === "user").map((m) => m.content)
+  const hint = periodHint(asked[asked.length - 1] ?? "", asked[asked.length - 2] ?? null)
+  if (hint) messages.push({ role: "system", content: hint })
   const used: string[] = []
   const cards: FhiChatCard[] = []
   const entityNames: string[] = []

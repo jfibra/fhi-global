@@ -49,6 +49,7 @@ export default function AgentFhiChatPage() {
       placeholder="Ask about your sales, leads, team or any project…"
       footnote="Covers your own sales, leads, listings, website, events, reviews, recruits, the Top Sales board, projects and news · answers are computed from the live database when you ask."
       quota
+      briefing="/api/assistant/briefing?audience=agent"
     />
   )
 }
