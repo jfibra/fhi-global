@@ -1,7 +1,9 @@
 import "server-only"
 
+import { randomUUID } from "node:crypto"
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { sendBirthdayEmail } from "@/lib/mailer"
+import { birthdayEmailCopy, sendBirthdayEmail } from "@/lib/mailer"
 import { renderBirthdayPosterPng } from "@/lib/birthday-poster"
 
 /**
@@ -72,15 +74,66 @@ export async function sendBirthdayGreetings(): Promise<{
       skipped.push(`${p.name} (no email)`)
       continue
     }
+    // The poster is a bonus — a render failure never blocks the greeting.
+    const posterPng = await renderBirthdayPosterPng({ name: p.posterName, photoUrl: p.photo }).catch(() => null)
+    let sendError: string | null = null
     try {
-      // The poster is a bonus — a render failure never blocks the greeting.
-      const posterPng = await renderBirthdayPosterPng({ name: p.posterName, photoUrl: p.photo }).catch(() => null)
       await sendBirthdayEmail({ to: p.email, name: p.name, posterPng })
       sent.push(p.email)
-    } catch {
+    } catch (err) {
       // One failed send must not stop the other birthdays.
+      sendError = err instanceof Error ? err.message : String(err)
       skipped.push(`${p.name} (send failed)`)
     }
+    await recordInSentFolder(p, posterPng, sendError)
   }
   return { matched: people.length, sent, skipped }
 }
+
+/**
+ * Every greeting shows in the admin Emails → Sent folder like any email sent
+ * from the dashboard (inquiry_emails, no sender profile), with the poster as
+ * an attachment so admins see exactly what went out. A failed send is listed
+ * too, marked failed. Recording never throws — the greetings matter more.
+ */
+async function recordInSentFolder(p: BirthdayPerson, posterPng: Buffer | null, sendError: string | null) {
+  try {
+    const { subject, text } = birthdayEmailCopy(p.name)
+    const attachments: Array<{ name: string; url: string; size: number; type: string }> = []
+    if (posterPng) {
+      try {
+        const key = `fhi_global/email-attachments/${randomUUID()}-happy-birthday.png`
+        await posterBucket().send(
+          new PutObjectCommand({ Bucket: process.env.S3_BUCKET_NAME!, Key: key, Body: posterPng, ContentType: "image/png", CacheControl: "public, max-age=31536000, immutable" }),
+        )
+        attachments.push({ name: "happy-birthday.png", url: `${(process.env.S3_PUBLIC_URL ?? "").replace(/\/+$/, "")}/${key}`, size: posterPng.length, type: "image/png" })
+      } catch {
+        // The record without its poster still beats no record.
+      }
+    }
+    await createAdminSupabase()
+      .from("inquiry_emails")
+      .insert({
+        to_email: p.email!.toLowerCase(),
+        to_name: p.posterName,
+        subject,
+        body_text: text,
+        sent_by: null,
+        sent_by_name: "Birthday greeting (automatic)",
+        status: sendError ? "failed" : "sent",
+        error: sendError,
+        from_email: (process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "").trim().toLowerCase() || null,
+        from_name: process.env.SMTP_FROM_NAME || "FHI Global",
+        attachments,
+      })
+  } catch {
+    /* never block the greetings on the record */
+  }
+}
+
+let bucket: S3Client | null = null
+const posterBucket = () =>
+  (bucket ??= new S3Client({
+    region: process.env.S3_REGION!,
+    credentials: { accessKeyId: process.env.S3_ACCESS_KEY_ID!, secretAccessKey: process.env.S3_SECRET_ACCESS_KEY! },
+  }))

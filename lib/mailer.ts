@@ -1119,9 +1119,18 @@ export async function sendAdminDirectEmail(input: {
 /** The birthday greeting — warm, personal, no sales pitch, no buttons.
  *  With posterPng, the member's personalized birthday poster (their photo on
  *  the studio artwork) is embedded inline; without it, a gold wish card. */
+/** The birthday greeting's subject and plain text — the email and its Sent-folder record share them. */
+export function birthdayEmailCopy(fullName: string | null): { name: string; subject: string; text: string } {
+  const name = greetingName(fullName)
+  return {
+    name,
+    subject: `Happy Birthday, ${name}! 🎂 From all of us at FHI Global`,
+    text: `Happy Birthday, ${name}! 🎉\n\nToday is all about you. On behalf of the entire FHI Global family, we want you to know how much we value having you with us.\n\nWishing you health, happiness and record-breaking success in the year ahead.\n\nEnjoy your day — you've earned every bit of it. Here's to another amazing year together.\n\nWith warm wishes,\nThe FHI Global Family\nFHI Global · Dubai, UAE`,
+  }
+}
+
 export async function sendBirthdayEmail(input: { to: string; name: string | null; posterPng?: Buffer | null }): Promise<void> {
-  const name = greetingName(input.name)
-  const subject = `Happy Birthday, ${name}! 🎂 From all of us at FHI Global`
+  const { name, subject, text } = birthdayEmailCopy(input.name)
 
   const centerpiece = input.posterPng
     ? `
@@ -1184,7 +1193,7 @@ export async function sendBirthdayEmail(input: { to: string; name: string | null
           ],
         }
       : {}),
-    text: `Happy Birthday, ${name}! 🎉\n\nToday is all about you. On behalf of the entire FHI Global family, we want you to know how much we value having you with us.\n\nWishing you health, happiness and record-breaking success in the year ahead.\n\nEnjoy your day — you've earned every bit of it. Here's to another amazing year together.\n\nWith warm wishes,\nThe FHI Global Family\nFHI Global · Dubai, UAE`,
+    text,
     html: eventEmailShell({
       subject,
       preheader: `Happy Birthday, ${name} — with love from the FHI Global family. 🎂`,
