@@ -1,8 +1,9 @@
 "use client"
 
 import { Fragment, useRef, useState } from "react"
+import Link from "next/link"
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react"
-import { Check, Copy, Download, ExternalLink, MessageCircle } from "lucide-react"
+import { ArrowRight, Check, Copy, Download, ExternalLink, Inbox, MessageCircle, Users } from "lucide-react"
 
 /**
  * One shareable link as a QR card — the card the Invite and Buyers Link pages
@@ -21,6 +22,7 @@ export function ShareLinkCard({
   logo,
   problem,
   onRetry,
+  more,
 }: {
   title: string
   qrTitle: string
@@ -34,6 +36,8 @@ export function ShareLinkCard({
   /** Why the link can't be shared (failed to load, switched off). */
   problem?: string | null
   onRetry?: () => void
+  /** Who came in through this link — opens the old page on that list, as before. */
+  more?: { label: string; href: string; count: number | null; kind: "people" | "briefs" }
 }) {
   const [copied, setCopied] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -159,6 +163,25 @@ export function ShareLinkCard({
             Open
           </a>
         </div>
+        {more && (
+          <Link
+            href={more.href}
+            className={`mt-1 flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-[13.5px] font-bold transition-colors ${
+              dark ? "bg-white/10 text-white hover:bg-white/15" : "bg-[#f4f6f9] text-[#001f3f] hover:bg-[#eaeef3]"
+            }`}
+          >
+            <span className="inline-flex min-w-0 items-center gap-2">
+              {more.kind === "people" ? <Users className="h-4 w-4 shrink-0" /> : <Inbox className="h-4 w-4 shrink-0" />}
+              <span className="truncate">{more.label}</span>
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-1.5">
+              {more.count !== null && (
+                <span className={`min-w-[26px] rounded-full px-2 py-0.5 text-center text-[12px] ${dark ? "bg-[#d6b357] text-[#001f3f]" : "bg-[#001f3f] text-white"}`}>{more.count}</span>
+              )}
+              <ArrowRight className="h-4 w-4" />
+            </span>
+          </Link>
+        )}
       </div>
     </div>
   )

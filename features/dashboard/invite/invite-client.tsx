@@ -125,7 +125,11 @@ export function InviteClient({
 
   // Two audiences share the page: the team (agents, members, …) and Global
   // Partners (agents abroad). Each has its own QR and its own recruit list.
-  const [view, setView] = useState<"team" | "partners">("team")
+  // ?view=partners (the Links page's Global Partners card) opens that list. The
+  // page mounts only in the browser (DashboardAuthGate), so reading the URL here is safe.
+  const [view, setView] = useState<"team" | "partners">(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "partners" ? "partners" : "team",
+  )
   const pool = useMemo(
     () => recruits.filter((r) => (view === "partners" ? r.role === "global_partner" : r.role !== "global_partner")),
     [recruits, view],

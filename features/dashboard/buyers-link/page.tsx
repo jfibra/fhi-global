@@ -333,7 +333,10 @@ export default function BuyersLinkPage({ scope = "agent" }: { scope?: "agent" | 
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const downloadRef = useRef<HTMLDivElement>(null)
 
-  const [view, setView] = useState<View>("buyers")
+  // ?view=sellers (the Links page's Sellers Link card) opens My sellers.
+  const [view, setView] = useState<View>(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "sellers" ? "sellers" : "buyers",
+  )
   const [query, setQuery] = useState("")
   // One slot per filter, plus the admin's Agent filter in front (unused for agents).
   const [filters, setFilters] = useState<Record<View, string[]>>({ buyers: ["", "", "", ""], sellers: ["", "", ""] })
