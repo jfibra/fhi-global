@@ -25,6 +25,7 @@ import {
   type BriefKind, type BuyerLead, type BuyerLink, type Choice, type LeadGrade, type QuestionKey, type SellerQuestionKey,
 } from "@/lib/buyer-links"
 import { fetchAllBuyerLeads, fetchMyBuyerLeads, fetchMyBuyerLink } from "@/lib/buyer-link-service"
+import { buyersLinkShare, sellersLinkShare } from "@/lib/share-links"
 
 const PAGE_SIZE = 10
 /** A brief this recent gets a "New" badge. */
@@ -167,8 +168,7 @@ const VIEWS: Record<View, ViewConfig> = {
       "Your one link for every buyer. Send it or show the QR. Your client answers four quick steps about what they want, and their brief lands here.",
     qrTitle: "Scan to send your brief",
     qrNote: null,
-    share: (url) =>
-      `Hi! To help me find the right property for you in Dubai, please answer a few quick questions here. It takes about two minutes: ${url}`,
+    share: buyersLinkShare,
     qrFile: "fhi-buyers-link-qr.png",
     how: [
       "Send your link on WhatsApp, or let a client scan the QR.",
@@ -238,8 +238,7 @@ const VIEWS: Record<View, ViewConfig> = {
       "Your link for owners who want to sell. Send it or show the QR. They answer four quick steps about their property, and it lands here.",
     qrTitle: "Scan to sell your property",
     qrNote: "For owners who want to sell in Dubai. Their property details land in your Sellers list.",
-    share: (url) =>
-      `Hi! Thinking of selling your property in Dubai? Tell me about it here and I'll come back to you on price and next steps. It takes about two minutes: ${url}`,
+    share: sellersLinkShare,
     qrFile: "fhi-sellers-link-qr.png",
     how: [
       "Send your Sellers Link on WhatsApp, or let an owner scan the QR.",

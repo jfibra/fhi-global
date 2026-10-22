@@ -14,6 +14,7 @@ import {
   FileText, Loader2, MessageCircle, Phone, QrCode, RefreshCw, Search, Users, Globe,} from "lucide-react"
 import { roleToLabel } from "@/lib/auth"
 import { ROLE_COLORS, invitableRolesFor, roleInList } from "@/lib/app-roles"
+import { partnerInviteShare, partnerInviteUrl, teamInviteShare, teamInviteUrl } from "@/lib/share-links"
 
 type Recruit = {
   id: string
@@ -194,7 +195,7 @@ export function InviteClient({
     if (!recruitsLoading) recruitsCache = recruits
   }, [recruits, recruitsLoading])
 
-  const inviteUrl = origin ? `${origin}/register?ref=${userId}` : ""
+  const inviteUrl = origin ? teamInviteUrl(origin, userId) : ""
 
   const handleCopy = async () => {
     if (!inviteUrl) return
@@ -216,14 +217,10 @@ export function InviteClient({
     a.click()
   }
 
-  const waText = encodeURIComponent(
-    `Join me on FHI Global — Dubai's premier real estate portal. Create your account here: ${inviteUrl}`,
-  )
+  const waText = encodeURIComponent(teamInviteShare(inviteUrl))
 
-  const gpInviteUrl = origin ? `${origin}/register?type=global-partner&ref=${userId}` : ""
-  const gpWaText = encodeURIComponent(
-    `Become an FHI Global Partner — earn with Dubai real estate from anywhere. Register under my network here: ${gpInviteUrl}`,
-  )
+  const gpInviteUrl = origin ? partnerInviteUrl(origin, userId) : ""
+  const gpWaText = encodeURIComponent(partnerInviteShare(gpInviteUrl))
   const handleGpCopy = async () => {
     if (!gpInviteUrl) return
     try {

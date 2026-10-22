@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library, MonitorPlay,
-  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus, Files, Eye, GitBranch,
+  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus, Files, Eye, GitBranch, Link as LinkIcon,
 } from "lucide-react"
 import {
   ROLE_DASHBOARD_MAP,
@@ -299,6 +299,9 @@ const salesPipelineNav = ({ projects = false, teamSales = false, invite = true, 
   OVERVIEW,
   // Their own-data FHI Assistant (agents + team leaders — ROLES_AGENT_ASSISTANT; "fhi-chat" in SUB_PATH_ROLES).
   ...(assistant ? [{ icon: Sparkles, label: "FHI Assistant", to: "fhi-chat" } satisfies NavEntry] : []),
+  // Their four share links on one page — team + Global Partners invites, Buyers + Sellers Link
+  // (agents + team leaders, the same as the assistant; "links" in SUB_PATH_ROLES).
+  ...(assistant ? [{ icon: LinkIcon, label: "Links", to: "links" } satisfies NavEntry] : []),
   // Their Website Builder site — open/copy the link, or the prompt to build one.
   { icon: Globe, label: "My Website", to: "my-website" },
   { icon: ClipboardList, label: "My listings", to: "listings" },

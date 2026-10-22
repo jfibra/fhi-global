@@ -97,6 +97,8 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   // FHI Assistant: admins get the company-wide one (app/api/admin/fhi-chat);
   // agents and team leaders their own-data one (app/api/fhi-chat).
   "fhi-chat": [...ROLES_ADMIN_STAFF, ...ROLES_AGENT_ASSISTANT],
+  // Their four share links in one place (features/dashboard/links).
+  links: ["agent", "team_leader"],
 }
 
 export function getDashboardRouteByRole(role?: string | null) {
