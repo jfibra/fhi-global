@@ -1116,6 +1116,62 @@ export async function sendAdminDirectEmail(input: {
   })
 }
 
+/** "We replied to your support ticket" — subject and plain text, shared by the email and its Sent-folder record. */
+export function supportReplyCopy(input: { name: string | null; ticketTitle: string; comment: string; replierName: string; ticketUrl: string }): { subject: string; text: string } {
+  const title = input.ticketTitle.trim().replace(/\s+/g, " ")
+  const shortTitle = title.length > 80 ? `${title.slice(0, 77)}…` : title
+  return {
+    subject: `We replied to your support ticket: ${shortTitle}`,
+    text: `Hi ${greetingName(input.name)},\n\n${input.replierName} replied to your support ticket "${title}":\n\n${input.comment.trim()}\n\nView the ticket and reply: ${input.ticketUrl}\n\n—\nFHI Global Support · Dubai, UAE`,
+  }
+}
+
+/**
+ * A comment on someone's support ticket, emailed to them so they notice it
+ * (boss via Juliecor, 2026-10-22): who replied, what they wrote, and a button
+ * to the ticket in their own dashboard. Replies to the email land in the
+ * house inbox.
+ */
+export async function sendSupportReplyEmail(input: { to: string; name: string | null; ticketTitle: string; comment: string; replierName: string; ticketUrl: string }): Promise<void> {
+  const { subject, text } = supportReplyCopy(input)
+  await deliver("SupportReplyMailer", { from: fromAddress(), to: input.to, subject, text, html: supportReplyHtml(input) })
+}
+
+/** The branded HTML of the support-reply email (also handy to preview without sending). */
+export function supportReplyHtml(input: { name: string | null; ticketTitle: string; comment: string; replierName: string; ticketUrl: string }): string {
+  const { subject } = supportReplyCopy(input)
+  const name = greetingName(input.name)
+  const bodyHtml = `
+        <tr>
+          <td style="padding:36px 40px 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">Support ticket update</p>
+            <h1 style="margin:0 0 14px;font-size:22px;line-height:1.35;font-weight:700;color:#0d1117;">Hi ${esc(name)}, we replied to your ticket</h1>
+            <p style="margin:0;padding:12px 14px;background:#f6f7f9;border:1px solid #eceef1;border-radius:10px;font-size:13.5px;line-height:1.5;color:#374151;">${esc(input.ticketTitle.trim())}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 40px 4px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <div style="border-left:3px solid ${GOLD};padding:4px 0 4px 16px;font-size:15px;line-height:1.75;color:#1f2937;">${esc(input.comment.trim()).replace(/\r?\n/g, "<br>")}</div>
+            <p style="margin:10px 0 0 19px;font-size:12.5px;font-weight:700;color:#8a6d2a;">— ${esc(input.replierName)}, FHI Global Support</p>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:24px 40px 8px;">
+            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+              <td bgcolor="${GOLD}" style="background:${GOLD};border-radius:10px;">
+                <a href="${esc(input.ticketUrl)}" style="display:inline-block;padding:14px 30px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:${NAVY};text-decoration:none;">View your ticket</a>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:12px 40px 30px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <p style="margin:0;font-size:12px;line-height:1.6;color:#9ca3af;text-align:center;">Reply by adding a comment on the ticket — or simply reply to this email.</p>
+          </td>
+        </tr>`
+  return eventEmailShell({ subject, preheader: `${input.replierName} replied: ${input.comment.trim().slice(0, 100)}`, bodyHtml })
+}
+
 /** The birthday greeting — warm, personal, no sales pitch, no buttons.
  *  With posterPng, the member's personalized birthday poster (their photo on
  *  the studio artwork) is embedded inline; without it, a gold wish card. */

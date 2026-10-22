@@ -551,7 +551,7 @@ export function SupportTable({
       <ShortcutModal
         open={Boolean(statusTicket)}
         title="Update Ticket Status"
-        subtitle={statusTicket ? `${statusTicket.title} Â· ${statusTicket.id}` : undefined}
+        subtitle={statusTicket ? `${statusTicket.title} · ${statusTicket.id}` : undefined}
         onClose={() => setStatusTicket(null)}
       >
         {statusTicket && (
@@ -587,7 +587,7 @@ export function SupportTable({
       <ShortcutModal
         open={Boolean(commentsTicket)}
         title="Support Ticket Comments"
-        subtitle={commentsTicket ? `${commentsTicket.title} Â· ${commentsTicket.id}` : undefined}
+        subtitle={commentsTicket ? `${commentsTicket.title} · ${commentsTicket.id}` : undefined}
         onClose={() => setCommentsTicket(null)}
       >
         {commentsTicket && (
@@ -603,7 +603,7 @@ export function SupportTable({
       <ShortcutModal
         open={Boolean(attachmentsTicket)}
         title="Support Ticket Attachments"
-        subtitle={attachmentsTicket ? `${attachmentsTicket.title} Â· ${attachmentsTicket.id}` : undefined}
+        subtitle={attachmentsTicket ? `${attachmentsTicket.title} · ${attachmentsTicket.id}` : undefined}
         onClose={() => setAttachmentsTicket(null)}
       >
         {attachmentsTicket && (

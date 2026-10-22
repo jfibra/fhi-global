@@ -71,7 +71,15 @@ export function TicketComments({
       }
       setComments((prev) => [...prev, data])
       setComment("")
-      onToast("success", "Comment added")
+      // Email the person who opened the ticket (skipped server-side when it's their own comment).
+      const notify = await fetch(`/api/support/tickets/${ticketId}/comment-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commentId: data.id }),
+      })
+        .then((r) => r.json() as Promise<{ emailed?: boolean; to_name?: string | null }>)
+        .catch(() => null)
+      onToast("success", notify?.emailed ? `Comment added — ${notify.to_name ?? "the reporter"} was emailed` : "Comment added")
     } finally {
       setSending(false)
     }
