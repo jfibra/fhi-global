@@ -1,12 +1,12 @@
 import "server-only"
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { deleteS3ObjectsByUrl, moveTransitFileToS3 } from "@/lib/s3-transit"
 
 // Server-only shared helpers for the public owner-document intake flow: the
 // private Supabase transit bucket, doc/type validation, the request-token
-// lookup + open-state check, and the Supabase→S3 relocation (mirrors
-// moveSupabaseFileToS3 in the construction-updates route, but downloads from a
-// PRIVATE bucket via the service role instead of fetching a public URL).
+// lookup + open-state check, and the Supabase→S3 relocation (the shared
+// transit in lib/s3-transit.ts — downloads from the PRIVATE bucket via the
+// service role, unlike the construction-updates route's public-URL fetch).
 
 export const OWNER_DOCS_BUCKET = "owner-documents"
 
@@ -21,11 +21,6 @@ const EXT_BY_MIME: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "application/pdf": "pdf",
-}
-const CONTENT_TYPE_BY_EXT: Record<string, string> = {
-  pdf: "application/pdf",
-  jpg: "image/jpeg", jpeg: "image/jpeg",
-  png: "image/png", webp: "image/webp",
 }
 
 export function extForMime(mime: string): string | null {
@@ -50,14 +45,6 @@ export function isPathInToken(path: string, token: string): boolean {
   )
 }
 
-const s3 = new S3Client({
-  region: process.env.S3_REGION!,
-  credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
-  },
-})
-
 /**
  * Download a just-uploaded file from the private owner-documents bucket, put it
  * on S3 under fhi_global/owner-documents/<path>, and delete the transient
@@ -65,30 +52,12 @@ const s3 = new S3Client({
  * decides how to handle a failed move).
  */
 export async function moveOwnerDocToS3(admin: SupabaseClient, path: string): Promise<string | null> {
-  try {
-    const { data, error } = await admin.storage.from(OWNER_DOCS_BUCKET).download(path)
-    if (error || !data) return null
-    const buffer = Buffer.from(await data.arrayBuffer())
-    const ext = path.split(".").pop()?.toLowerCase() ?? "bin"
-    const key = `fhi_global/owner-documents/${path}`
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: process.env.S3_BUCKET_NAME!,
-        Key: key,
-        Body: buffer,
-        ContentType: CONTENT_TYPE_BY_EXT[ext] ?? "application/octet-stream",
-        CacheControl: "private, max-age=31536000",
-      }),
-    )
-    try {
-      await admin.storage.from(OWNER_DOCS_BUCKET).remove([path])
-    } catch {
-      /* orphan in the private bucket is harmless */
-    }
-    return `${process.env.S3_PUBLIC_URL}/${key}`
-  } catch {
-    return null
-  }
+  const moved = await moveTransitFileToS3(admin, {
+    bucket: OWNER_DOCS_BUCKET,
+    path,
+    keyPrefix: "fhi_global/owner-documents",
+  })
+  return moved.url ?? null
 }
 
 /**
@@ -96,18 +65,8 @@ export async function moveOwnerDocToS3(admin: SupabaseClient, path: string): Pro
  * when an admin deletes a request). Only touches objects under our S3_PUBLIC_URL
  * — signed Supabase fallback URLs are left alone.
  */
-export async function deleteOwnerDocFilesFromS3(urls: string[]): Promise<void> {
-  const base = process.env.S3_PUBLIC_URL
-  if (!base) return
-  for (const url of urls) {
-    if (typeof url !== "string" || !url.startsWith(`${base}/`)) continue
-    const key = url.slice(base.length + 1)
-    try {
-      await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET_NAME!, Key: key }))
-    } catch {
-      /* best-effort — orphaned object is harmless */
-    }
-  }
+export function deleteOwnerDocFilesFromS3(urls: string[]): Promise<void> {
+  return deleteS3ObjectsByUrl(urls)
 }
 
 export type OwnerRequestRow = {
