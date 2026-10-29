@@ -8,10 +8,12 @@
 // source), Party B the next agent, Party C the third when the sale has two
 // partners. Each party's share is their share of the WHOLE deal, exactly as the
 // sale records it. Names, shares and BRNs always come from the sale's partner
-// table; everything else is what was typed.
+// table, and the ORN is FHI's own (everyone on a sale is an FHI agent);
+// everything else is what was typed.
 
 import { buildA2APdfBlob, downloadA2APdf, type A2AInput, type A2AParty, type A2AScope } from "@/lib/a2a-agreement"
 import { todayLocal } from "@/features/dashboard/a2a-agreement/a2a-form"
+import { COMPANY } from "@/lib/company"
 import type { SalePartner } from "@/lib/sales-service"
 
 export const A2A_AGENCY = "FHI Global Property"
@@ -74,6 +76,7 @@ export function composeA2A(opts: {
       fullName: agent.name,
       agency: typed.agency ?? A2A_AGENCY,
       brn: agent.brn ?? "",
+      orn: COMPANY.reraOrn,
       phone: typed.phone ?? d.phone,
       email: typed.email ?? d.email,
       signatureDataUrl: typed.signatureDataUrl,

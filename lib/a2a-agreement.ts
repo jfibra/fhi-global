@@ -13,7 +13,10 @@ export type A2AScope = "inventory" | "client" | "both"
 export type A2AParty = {
   fullName: string
   agency: string
+  /** RERA Broker Registration Number — the agent's broker card. */
   brn: string
+  /** RERA Office Registration Number — the agency's. */
+  orn: string
   phone: string
   email: string
   /** PNG data URL of the drawn signature. */
@@ -222,10 +225,13 @@ export async function buildA2APdfBlob(input: A2AInput): Promise<Blob> {
     fieldRow([{ label: "Full Name:", value: p.fullName, boxW: 330 }])
     fieldRow([{ label: "Agency / Brokerage:", value: p.agency, labelW: 106, boxW: 320 }])
     fieldRow([
-      { label: "BRN/ORN No.:", value: p.brn, labelW: 76, boxW: 130 },
-      { label: "Phone:", value: p.phone, x: MARGIN + 226, labelW: 40, boxW: 140 },
+      { label: "BRN No.:", value: p.brn, labelW: 50, boxW: 150 },
+      { label: "ORN No.:", value: p.orn, x: MARGIN + 220, labelW: 50, boxW: 150 },
     ])
-    fieldRow([{ label: "Email:", value: p.email, labelW: 46, boxW: 300 }])
+    fieldRow([
+      { label: "Phone:", value: p.phone, labelW: 40, boxW: 140 },
+      { label: "Email:", value: p.email, x: MARGIN + 196, labelW: 36, boxW: 250 },
+    ])
     y -= 4
   }
 
@@ -384,7 +390,11 @@ export async function buildA2APdfBlob(input: A2AInput): Promise<Blob> {
 
 /** Build the agreement and hand it to the browser as a download. */
 export async function downloadA2APdf(input: A2AInput, filename: string): Promise<void> {
-  const blob = await buildA2APdfBlob(input)
+  downloadBlob(await buildA2APdfBlob(input), filename)
+}
+
+/** Hand an already-built file to the browser as a download. */
+export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   try {
     const a = document.createElement("a")

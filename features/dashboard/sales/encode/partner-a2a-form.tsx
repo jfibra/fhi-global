@@ -107,10 +107,11 @@ export function PartnerA2ASection({
             onPartyChange={(which, patch) => {
               const agent = order[which === "A" ? 0 : which === "B" ? 1 : 2]
               if (!agent) return
-              // Name is the sale's and the date is stamped on build; BRN goes to the table.
+              // Name is the sale's, the ORN FHI's, and the date is stamped on build; BRN goes to the table.
               const typed = { ...patch }
               delete typed.fullName
               delete typed.signedDate
+              delete typed.orn
               delete typed.brn
               if (patch.brn !== undefined) onAgentBrn(agent.agent_id, patch.brn)
               if (Object.keys(typed).length > 0) {
@@ -119,7 +120,7 @@ export function PartnerA2ASection({
             }}
             fieldErrors={scopeError ? new Set(["scope"] as const) : undefined}
             lockNamesAndSplits
-            lockedNote="Names and shares come from the partner table above — change them there. Leave the property and client boxes blank to fill them from the next steps."
+            lockedNote="Names and shares come from the partner table above — change them there. The ORN is FHI's. Leave the property and client boxes blank to fill them from the next steps."
             partyNameSuffix={{ A: you(order[0]), B: you(order[1]), C: you(order[2]) }}
             referencePlaceholders={{
               propertyRef: sale.propertyRef || "Filled in from the Property step",
