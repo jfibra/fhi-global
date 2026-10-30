@@ -87,6 +87,10 @@ export async function fetchSeoInventory(filter: SeoPageFilter): Promise<SeoGridR
   if (filter.locationLike) {
     query = query.or(`location.ilike.%${filter.locationLike}%,community.ilike.%${filter.locationLike}%`)
   }
+  if (filter.locationAnyOf?.length) {
+    // Any of several areas, on either column — the "near the airport" pages span a belt of communities.
+    query = query.or(filter.locationAnyOf.flatMap((t) => [`location.ilike.%${t}%`, `community.ilike.%${t}%`]).join(","))
+  }
   if (filter.priceMin != null) query = query.gte("launch_price_from", filter.priceMin)
   if (filter.priceMax != null) {
     // The realistic floor keeps placeholder AED 1 rows off "budget" pages.

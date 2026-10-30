@@ -19,10 +19,10 @@ import { CountUp } from "@/components/public/count-up"
 import { EMIRATES, countByEmirate, emirateCodeForCity, type Emirate } from "@/lib/emirates"
 import { SOCIAL_URLS } from "@/lib/social"
 import { COMPANY, companyWhatsappHref } from "@/lib/company"
-import { getSeoPage, SEO_PAGES, type SeoPage, type SeoPageFilter, type SeoSort } from "@/lib/seo-pages"
+import { getSeoPage, SEO_PAGES, seoPageTitle, type SeoPage, type SeoPageFilter, type SeoSort } from "@/lib/seo-pages"
 import { landingPageForFilter, projectsBrowseTarget, regulatorLine } from "@/lib/seo-page-links"
 import { SeoDataTable } from "@/components/public/seo-data-table"
-import { ProjectIndexTable, builtOn, currentMonth, listedOn, monthKey, projectHref } from "@/components/public/project-index-table"
+import { ProjectIndexTable, builtOn, currentMonth, launchSummary, listedOn, monthKey, projectHref } from "@/components/public/project-index-table"
 import { InquireForm } from "@/components/public/inquire-form"
 import { LeadLink } from "@/components/public/lead-link"
 import { WhatsAppFabTarget } from "@/components/public/whatsapp-fab"
@@ -93,8 +93,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       // Its own share card (/og/seo/<slug>): the lead project's photo, the page title and a one-line count. The
       // inventory read is shared with the page body through React's cache(), and a transient error throws (5xx).
       const card = seoOgImage(seo, await getSeoInventory(seo.slug))
+      // The launch pages carry the current (Dubai) year in the title — "new projects in dubai 2026" is how it is searched.
+      const year = Number(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" }).slice(0, 4))
       return createPageMetadata({
-        title: seo.title,
+        title: seoPageTitle(seo, year),
         description: seo.description,
         openGraphTitle: seo.h1,
         openGraphDescription: seo.description,
@@ -1017,6 +1019,8 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
               <h2 id="recently-added" className="font-['Outfit'] text-lg font-bold text-[#001f3f]">Recently added</h2>
               <p className="text-xs text-[#6b7280]">Newest first · the day each project joined this list</p>
             </div>
+            {/* This month in one paragraph, written from the rows at every build — never by hand, never stale. */}
+            <p className="mt-3 max-w-3xl text-[14.5px] leading-relaxed text-[#4b5563]">{launchSummary(visible, now)}</p>
             <ul className="mt-4 grid grid-cols-1 gap-x-8 gap-y-2.5 sm:grid-cols-2 lg:grid-cols-3">
               {recent.map((p) => (
                 <li key={p.id} className="flex items-baseline justify-between gap-3 text-[14px]">

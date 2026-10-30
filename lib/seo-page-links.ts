@@ -71,6 +71,7 @@ export function landingPageForFilter(filter: SeoPageFilter): SeoPage | undefined
       sameSet(f.statuses, filter.statuses) &&
       !f.propertyTypeLike &&
       !f.locationLike &&
+      !f.locationAnyOf &&
       f.priceMin === undefined &&
       f.priceMax === undefined &&
       !f.handoverYear

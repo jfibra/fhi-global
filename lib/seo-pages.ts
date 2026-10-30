@@ -77,6 +77,9 @@ export type SeoPageFilter = {
   /** Case-insensitive substring match on projects.location OR community —
    *  the area-inventory pages ("projects in JVC"). */
   locationLike?: string
+  /** Any of several such matches — a page about a belt of communities ("near Abu Dhabi airport":
+   *  Masdar City, Khalifa City, Al Raha, Yas Island, Fahid Island). Each entry is matched like locationLike. */
+  locationAnyOf?: string[]
   /** launch_price_from bounds in AED. priceMax pages also apply the realistic
    *  floor, so placeholder rows can't fill a "budget" page. */
   priceMin?: number
@@ -92,6 +95,9 @@ export type SeoPage = {
   /** Short link text, used in the footer and in related-searches rows. */
   label: string
   title: string
+  /** The <title> carries the current year after the subject ("New Projects in Dubai 2026 — …") — for the
+   *  searches people type with the year. Computed at render by seoPageTitle, so it never goes stale. */
+  yearInTitle?: boolean
   h1: string
   description: string
   /** Intro paragraphs rendered under the H1 — real copy, crawlable. */
@@ -165,12 +171,19 @@ export function seoPageLastmod(p: SeoPage): string | undefined {
   return !p.updated || p.updated < PROJECT_LIST_UPDATED ? PROJECT_LIST_UPDATED : p.updated
 }
 
+/** The page's <title>, with the year after the subject when the page asks for it (see yearInTitle). */
+export function seoPageTitle(p: SeoPage, year: number): string {
+  if (!p.yearInTitle) return p.title
+  return p.title.includes(" — ") ? p.title.replace(" — ", ` ${year} — `) : `${p.title} ${year}`
+}
+
 // ─── Project-backed searches ─────────────────────────────────────────────────
 
 const PROJECT_PAGES: SeoPage[] = [
   {
     slug: "new-projects-in-dubai",
     label: "New Projects in Dubai",
+    yearInTitle: true,
     title: "New Projects in Dubai — Latest Launches",
     updated: COPY_UPDATED,
     h1: "New Projects in Dubai",
@@ -205,11 +218,14 @@ const PROJECT_PAGES: SeoPage[] = [
       "apartments-for-sale-in-dubai",
       "properties-under-1m-in-dubai",
       "new-projects-in-abu-dhabi",
+      "property-near-dubai-airport",
+      "property-near-al-maktoum-airport",
     ],
   },
   {
     slug: "off-plan-projects-in-dubai",
     label: "Off-Plan Projects in Dubai",
+    yearInTitle: true,
     title: "Off-Plan Projects in Dubai — Prices & Handover",
     updated: COPY_UPDATED,
     h1: "Off-Plan Projects in Dubai",
@@ -283,6 +299,7 @@ const PROJECT_PAGES: SeoPage[] = [
   {
     slug: "new-projects-in-abu-dhabi",
     label: "New Projects in Abu Dhabi",
+    yearInTitle: true,
     title: "New Projects in Abu Dhabi — Launches & Prices",
     updated: COPY_UPDATED,
     h1: "New Projects in Abu Dhabi",
@@ -293,12 +310,14 @@ const PROJECT_PAGES: SeoPage[] = [
       "Each card opens the full project profile — location, gallery, price range and developer. For a side-by-side with comparable Dubai launches, our consultants do that daily.",
     ],
     kind: "projects",
-    filter: { cityLike: "abu dhabi" },
-    related: ["new-projects-in-uae", "new-projects-in-dubai", "off-plan-projects-in-uae"],
+    // New = not yet handed over; the capital's completed projects were sitting on a "new projects" list.
+    filter: { cityLike: "abu dhabi", statuses: ["pre_launch", "launch", "under_construction"] },
+    related: ["property-near-abu-dhabi-airport", "new-projects-in-uae", "new-projects-in-dubai", "off-plan-projects-in-uae"],
   },
   {
     slug: "off-plan-projects-in-uae",
     label: "Off-Plan Projects in UAE",
+    yearInTitle: true,
     title: "Off-Plan Projects in the UAE — By Emirate",
     updated: COPY_UPDATED,
     h1: "Off-Plan Projects in the UAE",
@@ -316,17 +335,19 @@ const PROJECT_PAGES: SeoPage[] = [
   {
     slug: "new-projects-in-uae",
     label: "New Projects in UAE",
+    yearInTitle: true,
     title: "New Projects in the UAE — Every Emirate",
-    updated: COPY_UPDATED,
+    updated: "2026-10-30",
     h1: "New Projects in the UAE",
     description:
-      "The full FHI Global portfolio across the UAE, by emirate — new launches, under-construction and ready communities from every developer we work with.",
+      "New projects across the UAE, by emirate — current launches and under-construction communities from every developer we work with, with starting prices and handover dates.",
     intro: [
-      "Everything we cover, grouped by emirate: launches, projects mid-build and completed communities across Dubai, Abu Dhabi and the northern emirates. Start here if you're mapping the market before narrowing down.",
+      "Every new project we cover, grouped by emirate: launches and communities still being built across Dubai, Abu Dhabi and the northern emirates. Start here if you're mapping the market before narrowing down; completed, ready-to-move projects have their own page.",
       "For a filtered view — by developer, by status, by price band — the projects browser has the full controls.",
     ],
     kind: "projects",
-    filter: {},
+    // New = not yet handed over. Completed projects (a 2021 handover was listed here) belong on the ready page.
+    filter: { statuses: ["pre_launch", "launch", "under_construction"] },
     layout: "emirate-hub",
     related: ["new-projects-in-dubai", "new-projects-in-abu-dhabi", "off-plan-projects-in-uae"],
   },
@@ -837,7 +858,7 @@ const AREA_GUIDES: SeoPage[] = [
         a: "It works both ways — end-users get space and connectivity; investors get steady tenant demand from families priced out of the coastal districts, with yields typical of Dubai's value belt.",
       },
     ],
-    related: ["jumeirah-village-circle", "dubailand", "off-plan-projects-in-dubai"],
+    related: ["property-near-al-maktoum-airport", "jumeirah-village-circle", "dubailand", "off-plan-projects-in-dubai"],
   },
   {
     slug: "difc",
@@ -991,7 +1012,7 @@ const AREA_GUIDES: SeoPage[] = [
         a: "Roughly ten to fifteen minutes by car to either — Downtown via Al Khail Road, Dubai International Airport via Al Garhoud Bridge. Al Jaddaf and Creek Metro stations on the Green Line connect to the rest of the network.",
       },
     ],
-    related: ["projects-in-al-jaddaf", "dubai-creek-harbour", "downtown-dubai", "properties-under-1m-in-dubai"],
+    related: ["projects-in-al-jaddaf", "property-near-dubai-airport", "dubai-creek-harbour", "downtown-dubai", "properties-under-1m-in-dubai"],
   },
 ]
 
@@ -1252,7 +1273,7 @@ const TYPE_AND_AREA_PAGES: SeoPage[] = [
         a: "Yes — Al Jaddaf and Creek stations on the Green Line both serve the district, which is rare among Dubai's off-plan hotspots and a core part of its rental case.",
       },
     ],
-    related: ["al-jaddaf", "apartments-for-sale-in-dubai", "properties-under-1m-in-dubai", "dubai-projects-handover-2027"],
+    related: ["al-jaddaf", "property-near-dubai-airport", "apartments-for-sale-in-dubai", "properties-under-1m-in-dubai", "dubai-projects-handover-2027"],
   },
 ]
 
@@ -1783,10 +1804,146 @@ const INFO_GUIDES: SeoPage[] = [
   },
 ]
 
+// ─── "Near the airport" searches ─────────────────────────────────────────────
+// Boss via Juliecor, 2026-10-30: "condos for sale near Abu Dhabi airport" and the like. Each page is a
+// belt of communities around one airport (locationAnyOf), checked against live inventory before shipping:
+// 24 projects around Zayed International, 28 around Dubai International, 49 around Al Maktoum. The copy says
+// "condo" once, because that is the word Filipino and North American buyers type; the inventory is whatever
+// the belt holds (apartments mostly, villas on Al Raha Beach and at Knightsbridge Park), so the pages say
+// "property". Distances are by car off-peak and deliberately rounded.
+
+const NEAR_AIRPORT_PAGES: SeoPage[] = [
+  {
+    slug: "property-near-abu-dhabi-airport",
+    label: "Property near Abu Dhabi Airport",
+    title: "Apartments & Villas for Sale near Abu Dhabi Airport — Zayed International",
+    updated: "2026-10-30",
+    h1: "Property for Sale near Abu Dhabi Airport",
+    description:
+      "New and off-plan apartments, condos and villas within 5–20 minutes of Zayed International Airport (AUH) — Masdar City, Khalifa City, Al Raha Beach, Yas Island and Fahid Island — with developer prices and handover dates.",
+    intro: [
+      "Zayed International Airport sits on the mainland east of Abu Dhabi island, and the communities around it are where most of the capital's new building is happening. Masdar City is next door (about five minutes), Khalifa City and Al Raha Beach are ten, Yas Island ten to fifteen, and Fahid Island — the new island between Yas and Saadiyat — around twenty. This page lists every project on our books in that belt, from studios in Masdar City to beachfront villas on Al Raha Beach.",
+      "Who buys here: airline and airport staff who want a short commute, families drawn to Khalifa City's schools and villas, and investors who like Yas Island's tenant pool — the island is Abu Dhabi's entertainment district, with Yas Marina Circuit, Ferrari World, Yas Mall and the Etihad Arena. If you are searching for a condo — the word Filipino and North American buyers use for an apartment — this is the list: the apartment projects below start well under AED 1 million in Masdar City and parts of Yas Island, while Al Raha Beach and the Yas waterfront carry the premium.",
+      "Most of these communities sit inside Abu Dhabi's investment zones, where foreign buyers hold freehold title — Yas Island, Al Raha Beach, Masdar City and Saadiyat among them. Ownership rules differ plot by plot, so we confirm the title type for every project before you reserve. Prices and handover dates come from the developers, and the table at the end lists every project with the day it was added, so you can see what is new.",
+    ],
+    kind: "projects",
+    filter: { cityLike: "abu dhabi", locationAnyOf: ["masdar", "khalifa city", "al raha", "yas", "fahid", "al reef", "shamkha", "zayed city", "al falah"] },
+    faqs: [
+      {
+        q: "How far is Masdar City from Abu Dhabi airport?",
+        a: "About five minutes by car — Masdar City borders the airport on its western side, which is why it draws airport and airline staff and why its apartments are among the most affordable new homes in the capital.",
+      },
+      {
+        q: "Which areas near Abu Dhabi airport are freehold for foreigners?",
+        a: "Yas Island, Al Raha Beach, Masdar City and Saadiyat Island are designated investment zones, where foreign buyers hold freehold title. Rules differ plot by plot elsewhere, so ask us to confirm the title type for a specific project before you reserve.",
+      },
+      {
+        q: "Is Yas Island a good place to invest?",
+        a: "Its tenant pool is unusually broad — airport and airline staff, hospitality workers, families using its schools and beaches — and the island keeps adding attractions. Entry prices start well under AED 1 million for compact apartments and rise to several million for waterfront homes; yields are strongest at the affordable end.",
+      },
+      {
+        q: "Can I buy a condo near Abu Dhabi airport on a payment plan?",
+        a: "Yes. Almost everything on this page is off-plan, sold on construction-linked instalments — a booking amount, staged payments as the building rises, and a final portion at handover. Each project page shows its plan where the developer has published it.",
+      },
+      {
+        q: "How long is the commute from these areas to Abu Dhabi city centre?",
+        a: "Twenty to thirty minutes by car along Sheikh Zayed Bin Sultan Street (E10) or the E11 to Al Reem Island and the Corniche outside rush hour. Yas Island and Al Raha are also roughly an hour from Dubai Marina, which is why some Dubai commuters choose to live here.",
+      },
+    ],
+    related: ["new-projects-in-abu-dhabi", "new-projects-in-uae", "off-plan-projects-in-uae", "property-near-dubai-airport"],
+  },
+  {
+    slug: "property-near-dubai-airport",
+    label: "Property near Dubai Airport",
+    title: "Apartments for Sale near Dubai Airport (DXB) — Al Jaddaf, Creek Harbour, Meydan",
+    updated: "2026-10-30",
+    h1: "Property for Sale near Dubai International Airport",
+    description:
+      "New and off-plan apartments and condos 10–15 minutes from Dubai International Airport (DXB) — Al Jaddaf, Dubai Healthcare City, Dubai Creek Harbour, Nad Al Sheba and Meydan — with developer prices and handover dates.",
+    intro: [
+      "Dubai International Airport sits in Garhoud, on the Deira side of the Creek, and the new homes closest to it are across the water: Al Jaddaf and Dubai Healthcare City (about ten minutes over Al Garhoud Bridge), Dubai Creek Harbour (ten to fifteen), and the Nad Al Sheba–Meydan belt (fifteen minutes down Al Ain Road or Ras Al Khor Road). The older districts beside the terminals — Garhoud, Deira, Festival City — are built out, so this is where the launches are.",
+      "Who buys here: airline crew and airport staff on shift patterns who want to be home in minutes, medical professionals at Dubai Healthcare City, and investors who like the Green Line Metro at Al Jaddaf and Creek stations — a tenant without a car still reaches the airport, Downtown and DIFC. For buyers searching for a condo near Dubai airport (the word Filipino and North American buyers use for an apartment), the Al Jaddaf towers below are the entry point, with studios and one-bedroom units from around AED 700,000; Dubai Creek Harbour and Meydan carry the premium for views and masterplan amenities.",
+      "Al Jaddaf, Dubai Creek Harbour and Meydan are designated freehold areas, so foreign buyers hold a full title deed. Nearly everything listed here is off-plan, with construction-linked payment plans and handovers between 2026 and 2030; the table at the end shows every project with its handover quarter and the day it was listed.",
+    ],
+    kind: "projects",
+    filter: { cityLike: "dubai", locationAnyOf: ["jaddaf", "healthcare city", "creek harbour", "garhoud", "deira", "festival city", "mirdif", "nad al sheba", "meydan", "ras al khor", "al warqa"] },
+    faqs: [
+      {
+        q: "Which new projects are closest to Dubai International Airport?",
+        a: "Al Jaddaf and Dubai Healthcare City, about ten minutes away over Al Garhoud Bridge — Binghatti and Azizi have most of the towers rising there. Dubai Creek Harbour is next at ten to fifteen minutes, then the Nad Al Sheba and Meydan communities.",
+      },
+      {
+        q: "Is there a Metro near the airport-side projects?",
+        a: "Al Jaddaf and Creek stations on the Green Line serve Al Jaddaf and Dubai Healthcare City; from there the Red Line reaches the airport's Terminal 1 and Terminal 3 stations with one change at BurJuman or Union. Dubai Creek Harbour and Meydan are car-based for now.",
+      },
+      {
+        q: "What do apartments near Dubai airport cost?",
+        a: "Studios and one-bedroom launches in Al Jaddaf start around AED 700,000; Dubai Creek Harbour apartments from about AED 1.8 million; Meydan and Nad Al Sheba from roughly AED 1.2 million, up to multi-million villas at Knightsbridge Park. Every project on this page shows its own starting price.",
+      },
+      {
+        q: "Is a condo near the airport a good rental investment?",
+        a: "The tenant pool is deep and steady — airline crew, airport staff, Dubai Healthcare City professionals and Downtown commuters — and Al Jaddaf's Metro stations widen it to tenants without cars. Mid-market entry prices put gross yields there toward the top of central Dubai's range; Creek Harbour trades some yield for capital growth.",
+      },
+      {
+        q: "Is aircraft noise a problem in Al Jaddaf or Creek Harbour?",
+        a: "Dubai International runs around the clock, so some towers hear traffic on certain flight paths. It varies by tower, floor and glazing — tell us which project you are weighing and we will say what we know, or arrange a visit at the hour that matters to you.",
+      },
+      {
+        q: "Can foreigners buy near Dubai airport?",
+        a: "Yes — Al Jaddaf, Dubai Creek Harbour and Meydan are designated freehold areas, so foreign buyers hold a full title deed with no residency requirement. We confirm the title type for any project before you reserve.",
+      },
+    ],
+    related: ["al-jaddaf", "projects-in-al-jaddaf", "dubai-creek-harbour", "property-near-al-maktoum-airport", "new-projects-in-dubai"],
+  },
+  {
+    slug: "property-near-al-maktoum-airport",
+    label: "Property near Al Maktoum Airport",
+    title: "Apartments for Sale near Al Maktoum Airport (DWC) — Dubai South, Expo City, Jebel Ali",
+    updated: "2026-10-30",
+    h1: "Property for Sale near Al Maktoum International Airport",
+    description:
+      "New and off-plan apartments, condos and townhouses 5–20 minutes from Al Maktoum International Airport (DWC) — Dubai South, Expo City, Dubai Industrial City, Jebel Ali, Dubai Investment Park and Al Furjan — with developer prices and handover dates.",
+    intro: [
+      "Al Maktoum International Airport (DWC) anchors Dubai South, the city's planned second centre on the Abu Dhabi side of Jebel Ali. In April 2024 Dubai approved a AED 128 billion passenger terminal there, with the plan to move all of Dubai International's operations across over the following decade — which is why the belt around it is the most active entry-level off-plan market in Dubai. Dubai South's Residential District and Expo City are five to ten minutes from the terminal; Dubai Industrial City ten; Downtown Jebel Ali, Jebel Ali and Dubai Investment Park about fifteen; Al Furjan and Discovery Gardens fifteen to twenty.",
+      "Prices are the draw: studios and one-bedroom apartments from under AED 500,000 in Dubai South, Dubai Industrial City and Downtown Jebel Ali — the lowest entry points of any new-build belt in Dubai — rising to AED 1.3–1.6 million for the family-sized apartments and townhouses at Expo Living and Al Furjan's newer launches. For buyers hunting a condo near the new airport (the word Filipino and North American buyers use for an apartment), this is the deepest list on our site. Tenants are already here: Expo City's business park, the Jebel Ali Free Zone and port, and the airport's own staff.",
+      "Getting around: the Red Line's Route 2020 branch runs from Jabal Ali through Discovery Gardens, Al Furjan, Jumeirah Golf Estates and Dubai Investment Park to Expo 2020 station at Expo City, so several of these communities are on the Metro; Dubai South and Dubai Industrial City are car-based for now. These areas are in Dubai's designated freehold zones, and nearly everything on this page is off-plan with construction-linked payment plans — the table at the end lists every project with its handover quarter and the day it was added.",
+    ],
+    kind: "projects",
+    filter: { cityLike: "dubai", locationAnyOf: ["dubai south", "expo", "industrial city", "saih shuaib", "jebel ali", "al furjan", "discovery gardens", "investment park", "jumeirah golf estates"] },
+    faqs: [
+      {
+        q: "How close are Dubai South and Expo City to Al Maktoum airport?",
+        a: "Dubai South's Residential District is beside the airport — five to ten minutes to the terminal — and Expo City is about ten minutes up Expo Road. Downtown Jebel Ali, Jebel Ali and Dubai Investment Park are roughly fifteen minutes; Al Furjan and Discovery Gardens fifteen to twenty.",
+      },
+      {
+        q: "Is the new airport actually happening?",
+        a: "Yes. Dubai approved the AED 128 billion passenger terminal at Al Maktoum International in April 2024, designed for 150 million passengers a year in its first phase, with the plan to move Dubai International's operations there over the following decade. Phase dates will move, as they do on projects this size — but the communities around it are being built now.",
+      },
+      {
+        q: "Which areas near DWC are on the Metro?",
+        a: "The Red Line's Route 2020 branch stops at Jabal Ali, The Gardens, Discovery Gardens, Al Furjan, Jumeirah Golf Estates, Dubai Investment Park and Expo 2020 (Expo City). Dubai South's Residential District and Dubai Industrial City are not on the network yet.",
+      },
+      {
+        q: "What is the cheapest new apartment near Al Maktoum airport?",
+        a: "Studios in Dubai Industrial City, Dubai South and Downtown Jebel Ali are the lowest entry points in new-build Dubai, starting under AED 500,000 at the time of writing. The table on this page shows every project's current starting price.",
+      },
+      {
+        q: "Is buying near DWC a good investment?",
+        a: "It is the classic buy-before-the-infrastructure play, with the risk that goes with it: prices are the lowest in Dubai because the airport expansion and the jobs around it are still arriving. Rental demand today comes from Expo City, the Jebel Ali Free Zone and port, and Dubai South's logistics district; the upside depends on the airport timeline. Buy from developers with a delivery record and keep the handover date in view.",
+      },
+      {
+        q: "Can foreigners buy in Dubai South and Al Furjan?",
+        a: "Yes — these are designated freehold areas, so foreign buyers hold a full title deed with no residency requirement.",
+      },
+    ],
+    related: ["al-furjan", "new-projects-in-dubai", "properties-under-1m-in-dubai", "property-near-dubai-airport"],
+  },
+]
 
 export const SEO_PAGES: SeoPage[] = [
   ...PROJECT_PAGES,
   ...TYPE_AND_AREA_PAGES,
+  ...NEAR_AIRPORT_PAGES,
   ...HANDOVER_PAGES,
   ...INFO_GUIDES,
   ...AREA_GUIDES,

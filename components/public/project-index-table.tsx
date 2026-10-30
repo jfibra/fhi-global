@@ -2,7 +2,7 @@ import Link from "next/link"
 import { formatProjectPrice } from "@/components/project-card"
 import { normalizeCommunity } from "@/lib/communities"
 import { EMIRATES, emirateCodeForCity } from "@/lib/emirates"
-import { handoverDisplay, statusLabel } from "@/lib/project-seo"
+import { handoverDisplay, handoverLabel, isHandoverOverdue, statusLabel } from "@/lib/project-seo"
 import { projectFloorPrice, type SeoGridRow } from "@/lib/seo-inventory"
 
 /**
@@ -52,8 +52,46 @@ export function projectHref(p: Pick<SeoGridRow, "slug" | "developers">): string 
 }
 
 /** Community first, then the freer location text, then the city — the card's rule. */
-function areaOf(p: SeoGridRow): string | null {
+export function areaOf(p: SeoGridRow): string | null {
   return [normalizeCommunity(p.community), p.location, p.city].map((v) => v?.trim()).find(Boolean) ?? null
+}
+
+const byNewest = (a: SeoGridRow, b: SeoGridRow) => (b.published_at ?? "").localeCompare(a.published_at ?? "")
+
+/**
+ * One paragraph for the Recently added block, written from the data at every build: which projects joined
+ * this month and what they cost — fresh, specific text on the pages that already earn the impressions, with
+ * nobody writing it by hand. It says so plainly when nothing was added, rather than inventing news.
+ */
+export function launchSummary(rows: readonly SeoGridRow[], now: Date): string {
+  const month = currentMonth(now)
+  const year = now.toLocaleDateString("en-GB", { year: "numeric", timeZone: DUBAI })
+  const added = rows.filter((p) => monthKey(p.published_at) === month.key).sort(byNewest)
+  if (added.length === 0) {
+    const latest = rows.filter((p) => p.published_at).sort(byNewest)[0]
+    const when = latest ? new Date(latest.published_at as string).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: DUBAI }) : null
+    return `No projects joined this list in ${month.name} ${year}${when ? `; the latest additions date from ${when}` : ""}.`
+  }
+  const describe = (p: SeoGridRow) => {
+    const floor = projectFloorPrice(p)
+    const handover = isHandoverOverdue(p, now) ? null : handoverLabel(p)
+    const facts = [
+      p.developers?.name,
+      areaOf(p),
+      floor != null ? `from ${formatProjectPrice(floor, (p.currency ?? "AED").toUpperCase())}` : null,
+      handover ? `handover ${handover}` : null,
+    ].filter(Boolean)
+    return facts.length ? `${p.name} (${facts.join(", ")})` : p.name
+  }
+  const lead = added.slice(0, 3).map(describe)
+  const leadText = lead.length === 1 ? lead[0] : lead.length === 2 ? `${lead[0]} and ${lead[1]}` : `${lead[0]}, ${lead[1]} and ${lead[2]}`
+  const floors = added.map(projectFloorPrice).filter((n): n is number => n != null)
+  const range =
+    floors.length >= 2 && Math.min(...floors) !== Math.max(...floors)
+      ? ` Starting prices among the month's additions run from ${formatProjectPrice(Math.min(...floors))} to ${formatProjectPrice(Math.max(...floors))}.`
+      : ""
+  const n = added.length
+  return `In ${month.name} ${year}, ${n} ${n === 1 ? "project" : "projects"} joined this list${n > 3 ? ` — led by ${leadText}` : `: ${leadText}`}.${range}`
 }
 
 function emirateOf(p: SeoGridRow): string | null {
