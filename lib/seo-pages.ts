@@ -155,6 +155,16 @@ type HandoverYear = (typeof HANDOVER_YEARS)[number]
 // when only that page changes.
 const COPY_UPDATED = "2026-10-06"
 
+/** The day every "projects" page last changed as a whole: 2026-10-30, when each gained the dated full-list
+ *  table and the Recently added block (the launch-tracker pass). A projects page's sitemap lastmod is the
+ *  later of this and its own `updated`; a guide keeps its own. */
+export const PROJECT_LIST_UPDATED = "2026-10-30"
+
+export function seoPageLastmod(p: SeoPage): string | undefined {
+  if (p.kind !== "projects") return p.updated
+  return !p.updated || p.updated < PROJECT_LIST_UPDATED ? PROJECT_LIST_UPDATED : p.updated
+}
+
 // ─── Project-backed searches ─────────────────────────────────────────────────
 
 const PROJECT_PAGES: SeoPage[] = [

@@ -22,6 +22,7 @@ import { COMPANY, companyWhatsappHref } from "@/lib/company"
 import { getSeoPage, SEO_PAGES, type SeoPage, type SeoPageFilter, type SeoSort } from "@/lib/seo-pages"
 import { landingPageForFilter, projectsBrowseTarget, regulatorLine } from "@/lib/seo-page-links"
 import { SeoDataTable } from "@/components/public/seo-data-table"
+import { ProjectIndexTable, builtOn, currentMonth, listedOn, monthKey, projectHref } from "@/components/public/project-index-table"
 import { InquireForm } from "@/components/public/inquire-form"
 import { LeadLink } from "@/components/public/lead-link"
 import { WhatsAppFabTarget } from "@/components/public/whatsapp-fab"
@@ -788,8 +789,19 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
   ).size
   const priceFrom = inventoryPriceFrom(visible)
 
-  // What the page actually lists: a hub's grouped cards, otherwise the first 24. (The ItemList
-  // JSON-LD below mirrors exactly this.)
+  // The tracker facts (boss via Juliecor, 2026-10-30): the day this copy was built, how many projects
+  // were listed this month, and the newest six. The page is rebuilt daily (revalidate) and purged on
+  // every project write, so the date is honest to the day.
+  const now = new Date()
+  const month = currentMonth(now)
+  const addedThisMonth = visible.filter((p) => monthKey(p.published_at) === month.key).length
+  const recent = visible
+    .filter((p) => p.published_at)
+    .sort((a, b) => (b.published_at as string).localeCompare(a.published_at as string))
+    .slice(0, 6)
+
+  // The cards: a hub's grouped cards, otherwise the first 24. Every row is listed in the full-list
+  // table further down, which is what the ItemList JSON-LD below mirrors.
   const shown = isHub ? groups.flatMap((g) => g.rows) : visible.slice(0, 24)
   const related = seo.related.map(getSeoPage).filter((r): r is SeoPage => Boolean(r))
   const regulator = regulatorLine(filter)
@@ -817,7 +829,7 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
         schema={[
           breadcrumbList([{ name: "Home", path: "/" }, { name: seo.h1 }]),
           itemListSchema(
-            shown.flatMap((p) => {
+            visible.flatMap((p) => {
               const dev = p.developers as unknown as { slug: string | null } | null
               return p.slug && dev?.slug ? [{ name: p.name, path: `/${dev.slug}/${p.slug}` }] : []
             }),
@@ -844,6 +856,19 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
           </h1>
           <p className="mt-4 text-[15px] leading-relaxed text-[#6b7280] max-w-xl">
             {seo.description}
+          </p>
+          {/* The tracker line — a dated page is what a "new projects" searcher (and Google) looks for. */}
+          <p className="mt-3 text-[12.5px] font-semibold text-[#6b7280]">
+            Updated {builtOn(now)}
+            {addedThisMonth > 0 && ` · ${addedThisMonth} ${addedThisMonth === 1 ? "project" : "projects"} added in ${month.name}`}
+            {visible.length > 0 && (
+              <>
+                {" · "}
+                <a href="#full-list" className="underline underline-offset-2 hover:text-[#001f3f]">
+                  Full list of {visible.length}
+                </a>
+              </>
+            )}
           </p>
 
           {/* Collage — real projects from the grid below. Desktop only: on a phone it would
@@ -886,6 +911,7 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
           <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:gap-x-0 sm:gap-y-4">
             {[
               { label: "Projects Available", value: String(visible.length) },
+              ...(addedThisMonth > 0 ? [{ label: `Added in ${month.name}`, value: String(addedThisMonth) }] : []),
               { label: "Developers", value: String(developerCount) },
               ...(priceFrom ? [{ label: "Starting From", value: priceFrom }] : []),
             ].map((f) => (
@@ -950,6 +976,14 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
                     ? `Showing ${shown.length} of ${visible.length}`
                     : `${shown.length} ${shown.length === 1 ? "project" : "projects"}`}
                   {seo.sort ? ` · ${SORT_NOTE[seo.sort]}` : ""}
+                  {visible.length > shown.length && (
+                    <>
+                      {" · "}
+                      <a href="#full-list" className="font-semibold text-[#001f3f] underline underline-offset-2">
+                        Full list
+                      </a>
+                    </>
+                  )}
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
@@ -974,6 +1008,29 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
             <p className="font-['Outfit'] font-semibold text-[#0d1117] text-sm mb-1">Nothing here right now</p>
             <p className="text-[#6b7280] text-xs">New launches land regularly — check the full projects browser.</p>
           </div>
+        )}
+
+        {/* The newest projects on this list, each with the day it was listed — the "what's new" a tracker answers. */}
+        {recent.length > 0 && (
+          <section aria-labelledby="recently-added" className="bg-white border border-[#e8eaed] p-5 sm:p-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="recently-added" className="font-['Outfit'] text-lg font-bold text-[#001f3f]">Recently added</h2>
+              <p className="text-xs text-[#6b7280]">Newest first · the day each project joined this list</p>
+            </div>
+            <ul className="mt-4 grid grid-cols-1 gap-x-8 gap-y-2.5 sm:grid-cols-2 lg:grid-cols-3">
+              {recent.map((p) => (
+                <li key={p.id} className="flex items-baseline justify-between gap-3 text-[14px]">
+                  <Link href={projectHref(p)} className="min-w-0 truncate font-semibold text-[#001f3f] hover:text-[#b8913f] transition-colors">
+                    {p.name}
+                  </Link>
+                  <span className="shrink-0 text-xs text-[#6b7280]">
+                    {p.developers?.name ? `${p.developers.name} · ` : ""}
+                    {listedOn(p.published_at)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         {!isHub && visible.length > shown.length && (
@@ -1052,6 +1109,19 @@ async function SeoLandingPage({ seo }: { seo: SeoPage }) {
             </div>
           </section>
           </Reveal>
+        )}
+
+        {/* Every project this page is about, as one table — the cards above stop at 24; this is the list. */}
+        {visible.length > 0 && (
+          <section id="full-list" aria-labelledby="full-list-heading" className="scroll-mt-24">
+            <h2 id="full-list-heading" className="font-['Outfit'] text-lg font-bold text-[#001f3f]">
+              Full list — {visible.length} {visible.length === 1 ? "project" : "projects"}
+            </h2>
+            <p className="mt-1 mb-4 text-[13px] text-[#6b7280]">
+              Every project on this page{seo.sort ? `, ${SORT_NOTE[seo.sort].toLowerCase()}` : ""}. Open a project for its gallery, prices and details.
+            </p>
+            <ProjectIndexTable rows={visible} caption={`${seo.h1} — all ${visible.length} projects`} showEmirate={isHub} now={now} />
+          </section>
         )}
 
         {/* Related searches — the interlinking is half the SEO value. */}

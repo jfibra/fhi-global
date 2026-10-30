@@ -38,6 +38,8 @@ export type SeoGridRow = {
   currency: string | null
   status: string
   is_featured: boolean | null
+  /** When the project was listed on FHI Global — the catalogue pages' "Listed" column and "added this month" count. */
+  published_at: string | null
   developers: { name: string | null; logo_url: string | null; slug: string | null } | null
   /** Unit prices, used to keep the "starting from" stat honest — see inventoryPriceFrom. */
   project_units: { price_from: number | string | null }[] | null
@@ -54,7 +56,7 @@ export async function fetchSeoInventory(filter: SeoPageFilter): Promise<SeoGridR
   // Property-type pages need an inner join so only projects carrying the
   // type survive; every other page keeps the plain select.
   const baseSelect =
-    "id, name, slug, main_image, location, city, community, delivery_quarter, expected_completion_date, delivery_date, launch_price_from, launch_price_to, currency, status, is_featured, developers(name, logo_url, slug), project_units(price_from)"
+    "id, name, slug, main_image, location, city, community, delivery_quarter, expected_completion_date, delivery_date, launch_price_from, launch_price_to, currency, status, is_featured, published_at, developers(name, logo_url, slug), project_units(price_from)"
   // Widened to string on purpose: supabase-js's type-level parser can't read
   // the conditional embed, and these rows are consumed loosely below anyway.
   const select: string = filter.propertyTypeLike
@@ -140,9 +142,10 @@ export async function fetchSeoInventory(filter: SeoPageFilter): Promise<SeoGridR
  * launch_price_from undercuts the project's own unit table on 124 of the 174
  * projects that carry both, so a bare MIN over that column advertised prices
  * nothing was sold at (Al Jaddaf led with "AED 199,999" against a cheapest
- * real unit of AED 1,999,999). Same rule as priceFromValue on project pages.
+ * real unit of AED 1,999,999). Same rule as priceFromValue on project pages. Exported for the
+ * catalogue pages' full-list table, so a row never quotes a price the page's own stat would refuse.
  */
-function projectFloorPrice(p: SeoGridRow): number | null {
+export function projectFloorPrice(p: SeoGridRow): number | null {
   const head = Number(p.launch_price_from)
   const headline = Number.isFinite(head) && head >= MIN_REALISTIC_PRICE_AED ? head : null
   const units = (p.project_units ?? [])
