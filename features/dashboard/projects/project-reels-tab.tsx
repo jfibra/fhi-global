@@ -36,13 +36,15 @@ interface Props {
 const LOGO_WHITE = "/FHI_Branding_White.png"
 const MAX_PHOTOS = 8
 
-// Selectable soundtracks (files live in public/reelssounds). There is no
-// dedicated FHI jingle yet, so "FHI Global Property" reuses the FH Global
-// Partners track — swap its src here when an FHI jingle lands.
+// Selectable soundtracks (files live in public/reelssounds — a file dropped in
+// the folder is NOT picked up until it is listed here). The Global Partners
+// track (2026-10-31) comes as a vocal mix and an instrumental: "FH Global
+// Partners" plays the vocal, "FHI Global Property" the instrumental — there is
+// no dedicated FHI jingle; swap its src here when one lands.
 type Soundtrack = { key: string; label: string; src: string }
 const SOUNDTRACKS: Soundtrack[] = [
-  { key: "fhi-global", label: "FHI Global Property", src: "/reelssounds/fh-global-partners-jingle.mp3" },
-  { key: "fh-partners", label: "FH Global Partners", src: "/reelssounds/fh-global-partners-jingle.mp3" },
+  { key: "fhi-global", label: "FHI Global Property", src: "/reelssounds/global-partners-instrumental.mp3" },
+  { key: "fh-partners", label: "FH Global Partners", src: "/reelssounds/global-partners.mp3" },
   { key: "homes-ph", label: "Homes PH", src: "/reelssounds/homes-ph-jingle.mp3" },
   { key: "rent-ph", label: "Rent PH", src: "/reelssounds/rent-ph-jingle.mp3" },
   { key: "filipino-homes", label: "Filipino Homes", src: "/reelssounds/filipinohomes-jingle.mp3" },

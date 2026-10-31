@@ -83,7 +83,8 @@ const BRANDS: Brand[] = [
     name: "FH Global Partners",
     logoSrc: "/logos/global_partner.png",
     logoIsWhite: false,
-    jingleSrc: "/reelssounds/fh-global-partners-jingle.mp3",
+    // The Global Partners track, vocal mix (2026-10-31; replaced fh-global-partners-jingle.mp3).
+    jingleSrc: "/reelssounds/global-partners.mp3",
     site: "www.filipinohomes.com",
     primary: "#001f3f",
     accent: "#d6b357",
@@ -97,9 +98,9 @@ const BRANDS: Brand[] = [
     name: "FHI Global Property",
     logoSrc: "/FHI_Branding_White.png",
     logoIsWhite: true,
-    // No dedicated FHI jingle in public/reelssounds yet — reusing the FH
-    // Global Partners track; swap the path here when an FHI jingle lands.
-    jingleSrc: "/reelssounds/fh-global-partners-jingle.mp3",
+    // No dedicated FHI jingle in public/reelssounds yet — the instrumental mix of
+    // the Global Partners track; swap the path here when an FHI jingle lands.
+    jingleSrc: "/reelssounds/global-partners-instrumental.mp3",
     site: "www.fhiglobal.ae",
     primary: "#001f3f",
     accent: "#d6b357",
