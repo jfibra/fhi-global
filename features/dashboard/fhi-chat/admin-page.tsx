@@ -14,4 +14,5 @@ export default function AdminFhiChatPage() {
       pdfReport="/api/admin/reports/company"
       tour={ASSISTANT_TEASER}
     />
+  )
 }
