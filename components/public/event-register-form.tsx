@@ -2,9 +2,24 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Image from "next/image"
-import { CalendarDays, CheckCircle2, Loader2, Mail, MessageCircle, Ticket, User, UserPlus } from "lucide-react"
+import { CalendarDays, CheckCircle2, Facebook, Instagram, Loader2, Mail, MessageCircle, Ticket, User, UserPlus } from "lucide-react"
+import { LeadLink } from "@/components/public/lead-link"
 import type { AnswerValue, RegistrationField } from "@/lib/events/fields"
 import type { PublicDaySeats } from "@/lib/events/pax"
+import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
+
+// Shown under "You're registered!" (boss via Juliecor, 2026-11-04): the moment someone has just said yes
+// to an event is the best moment to ask for a follow. An unpublished ("#") profile is left out.
+const FOLLOW = [
+  { network: "facebook", label: "Facebook", href: SOCIAL_URLS.facebook, Icon: Facebook, tile: "bg-[#1877F2] hover:bg-[#166fe0]" },
+  {
+    network: "instagram",
+    label: "Instagram",
+    href: SOCIAL_URLS.instagram,
+    Icon: Instagram,
+    tile: "bg-[linear-gradient(45deg,#f58529_0%,#dd2a7b_45%,#8134af_75%,#515bd4_100%)] hover:brightness-110",
+  },
+].filter((s) => isExternalSocial(s.href))
 
 /** One day of a multi-day event, as the form lists it ("" while its date isn't set). */
 export type RegisterDay = { day: number; dateLabel: string; time: string }
@@ -199,6 +214,32 @@ export function EventRegisterForm({
           )}
           . We&apos;ll be in touch — see you there!
         </p>
+
+        {FOLLOW.length > 0 && (
+          <div className="mt-7 border-t border-[#eef0f3] pt-6">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#b8913f]">Follow FHI Global</p>
+            <p className="mx-auto mt-1.5 max-w-xs text-[13px] leading-relaxed text-[#6b7280]">
+              Event photos, updates and new projects — follow us so you don&apos;t miss the next one.
+            </p>
+            <div className={`mt-4 grid gap-3 ${FOLLOW.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+              {FOLLOW.map(({ network, label, href, Icon, tile }) => (
+                <LeadLink
+                  key={network}
+                  event="click_social"
+                  params={{ network, location: "event_registered", event_id: eventId }}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Follow FHI Global on ${label}`}
+                  className={`flex flex-col items-center justify-center gap-2 px-3 py-5 text-white transition ${tile}`}
+                >
+                  <Icon className="h-10 w-10" strokeWidth={1.75} aria-hidden="true" />
+                  <span className="text-sm font-bold">{label}</span>
+                </LeadLink>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     )
   }
