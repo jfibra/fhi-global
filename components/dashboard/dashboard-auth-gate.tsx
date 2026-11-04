@@ -7,10 +7,11 @@ import { AuthProvider } from "@/context/auth-context"
 import { DashboardShell } from "@/components/dashboard/shell"
 import { ProfilePhotoGate } from "@/components/dashboard/profile-photo-gate"
 import { PartnerInfoGate } from "@/components/dashboard/partner-info-gate"
+import { AssistantTeaserPopup } from "@/components/dashboard/assistant-teaser-popup"
 import { partnerInfoMetadata } from "@/lib/partner-signup"
 import { PageLoader } from "@/components/ui/PageLoader"
-import { getProfileByUserId, googleAvatarUrl, hasProfilePhoto, isInactiveProfile, type AppProfile, type AppUser } from "@/lib/auth"
-import { isAdminStaffRole, isKnownAppRoleId } from "@/lib/app-roles"
+import { getDashboardRouteByRole, getProfileByUserId, googleAvatarUrl, hasProfilePhoto, isInactiveProfile, type AppProfile, type AppUser } from "@/lib/auth"
+import { ROLES_AGENT_ASSISTANT, isAdminStaffRole, isKnownAppRoleId, roleInList } from "@/lib/app-roles"
 import { readViewAsCookie } from "@/lib/view-as"
 
 /**
@@ -98,6 +99,12 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
   const needsPartnerInfo =
     session.profile.role === "global_partner" && !(typeof meta.residence_country === "string" && meta.residence_country)
 
+  // Everyone with an FHI Assistant — agents, team leaders and admin staff — sees its teaser once per account
+  // (their real role, so it opens their own assistant), after the photo gate.
+  const showsTeaser =
+    (roleInList(session.profile.role, ROLES_AGENT_ASSISTANT) || isAdminStaffRole(session.profile.role)) &&
+    typeof meta.assistant_teaser_seen_at !== "string"
+
   // Admin "view as role": honor the view-as cookie only for a real admin-staff
   // account (mirrors proxy.ts). Everyone else sees their real role.
   const cookieRole = readViewAsCookie()
@@ -133,6 +140,19 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
             setSession((prev) =>
               prev
                 ? { ...prev, profile: { ...prev.profile, metadata: { ...(prev.profile.metadata ?? {}), ...partnerInfoMetadata(info) } } }
+                : prev,
+            )
+          }
+        />
+      )}
+      {!needsPhoto && showsTeaser && (
+        <AssistantTeaserPopup
+          firstName={(session.profile.fname ?? session.profile.fullname ?? "").trim().split(/\s+/)[0] ?? ""}
+          chatHref={`${getDashboardRouteByRole(session.profile.role)}/fhi-chat`}
+          onDone={() =>
+            setSession((prev) =>
+              prev
+                ? { ...prev, profile: { ...prev.profile, metadata: { ...(prev.profile.metadata ?? {}), assistant_teaser_seen_at: new Date().toISOString() } } }
                 : prev,
             )
           }

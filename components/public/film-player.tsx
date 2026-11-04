@@ -32,7 +32,7 @@ export type Film = {
 }
 
 /** Phones, data-saver and slow connections get the 720p file. */
-function pickSource(film: Film): string {
+export function pickSource(film: Film): string {
   const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection
   const slow = conn?.saveData || /(^|-)2g|3g/.test(conn?.effectiveType ?? "")
   return slow || window.matchMedia("(max-width: 767px)").matches ? film.sd : film.hd

@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowDown, ArrowUp, BarChart3, Check, Copy, CornerDownRight, Download, Globe, Loader2, Monitor, PanelLeft, Printer, RefreshCw, Smartphone, Sparkles, Square, SquarePen, Tablet, Trash2, X } from "lucide-react"
+import { ArrowDown, ArrowUp, BarChart3, Check, Copy, CornerDownRight, Download, Globe, Loader2, Monitor, PanelLeft, Play, Printer, RefreshCw, Smartphone, Sparkles, Square, SquarePen, Tablet, Trash2, X } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
+import { FilmTrigger, type Film } from "@/components/public/film-player"
 import { BarsChart, PieChart, StatTiles, type ChartSpec, type ShareRow, type StatSpec, type TrendPoint } from "./charts"
 import {
   DESIGNS as CARD_DESIGNS,
@@ -600,6 +601,8 @@ export type FhiChatPageProps = {
   pdfReport?: string
   /** "Today at a glance" tiles on the welcome screen (app/api/assistant/briefing); null hides them. */
   briefing?: string | null
+  /** A "Watch the 90-second tour" button under the welcome text (the teaser the dashboard pop-up shows once). */
+  tour?: Film
 }
 
 /** History list sections, newest first — "Today", "Yesterday", "Previous 7 days", "Older". */
@@ -638,6 +641,7 @@ export default function FhiChatPage({
   headerLink,
   pdfReport,
   briefing = "/api/assistant/briefing?audience=admin",
+  tour,
 }: FhiChatPageProps = {}) {
   const { profile, role } = useAuth()
   const [messages, setMessages] = useState<Msg[]>([])
@@ -1231,6 +1235,18 @@ export default function FhiChatPage({
                 <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#001f3f] shadow-[0_10px_24px_-10px_rgba(0,31,63,0.6)]"><Sparkles className="h-6 w-6 text-[#d6b357]" /></span>
                 <h1 className="mt-4 font-['Outfit'] text-[28px] font-bold leading-tight text-[#0d1117] sm:text-[32px]">{greeting}</h1>
                 <p className="mx-auto mt-1.5 max-w-lg text-[14.5px] leading-relaxed text-[#6b7280]">{intro.text}</p>
+                {tour && (
+                  <FilmTrigger
+                    film={tour}
+                    ariaLabel={`Watch ${tour.title} (${tour.duration})`}
+                    className="mt-3.5 inline-flex items-center gap-2 rounded-full border border-[#e5e7eb] bg-white py-1.5 pl-1.5 pr-3.5 text-[12.5px] font-semibold text-[#001f3f] transition-colors hover:border-[#d6b357] hover:bg-[#fffdf7]"
+                  >
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#001f3f]">
+                      <Play className="ml-px h-3 w-3 fill-[#d6b357] text-[#d6b357]" />
+                    </span>
+                    Watch the 90-second tour
+                  </FilmTrigger>
+                )}
               </div>
               {briefing && (brief === null || brief.length > 0) && (
                 <div className="mt-7">

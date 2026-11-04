@@ -3,6 +3,7 @@
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { ROLES_ADMIN_STAFF, ROLES_AGENT_ASSISTANT, roleInList } from "@/lib/app-roles"
+import { ASSISTANT_TEASER } from "@/lib/films"
 import FhiChatPage from "./page"
 
 /**
@@ -50,6 +51,7 @@ export default function AgentFhiChatPage() {
       footnote="Covers your own sales, leads, listings, website, events, reviews, recruits, the Top Sales board, projects and news · answers are computed from the live database when you ask."
       quota
       briefing="/api/assistant/briefing?audience=agent"
+      tour={ASSISTANT_TEASER}
     />
   )
 }

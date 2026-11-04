@@ -27,6 +27,14 @@ export function film(base: string, id: string, title: string, duration: string, 
 /** The bucket key behind one of a film's public URLs (for signed downloads). */
 export const filmKey = (url: string) => `${FILM_PREFIX}/${url.split("/").pop() ?? ""}`
 
+/**
+ * The FHI Assistant teaser (boss via Juliecor, 2026-11-04): 90 s, 16:9, the female-voice cut, captions burned in.
+ * The one-time dashboard pop-up for agents, team leaders and admin staff (components/dashboard/assistant-teaser-popup.tsx)
+ * and the "Watch the 90-second tour" button on every FHI Assistant page. Masters (16:9 and 9:16, both voices) in the boss's
+ * "FHI Assistant Teaser" folder; the poster is its FHI-Assistant_Thumbnail_16x9.png.
+ */
+export const ASSISTANT_TEASER = film("fhi-assistant-teaser", "fhi-assistant-teaser", "FHI Assistant — the 90-second tour", "1:30")
+
 /** The company films: the AVP and the Dubai event. */
 export const COMPANY_FILMS = {
   avp: film("fhi-global-avp", "fhi-global-avp", "FHI Global — the film", "3:12"),
