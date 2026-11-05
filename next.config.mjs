@@ -225,6 +225,8 @@ const nextConfig = {
     "/forms/cover/": PDFJS_SERVER_FILES,
     // Company report PDF — shrinks the brand logos with sharp before embedding them.
     "/api/admin/reports/company": SHARP_LINUX_LIBS,
+    // Team performance report PDF — the team logo and brand marks go through sharp (lib/company-report/brand-images.ts).
+    "/api/admin/teams/*/report": SHARP_LINUX_LIBS,
   },
   // Loaded from node_modules at run time instead of bundled: @napi-rs/canvas is
   // a native addon, and pdf.js finds it, and its own data files, relative to

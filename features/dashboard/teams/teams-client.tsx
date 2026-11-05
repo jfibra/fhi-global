@@ -9,7 +9,7 @@ import {
   Building2, Users, Settings, Upload, Pencil, Trash2, ToggleLeft,
   ToggleRight, MoreHorizontal, UserPlus, ArrowRight, UserMinus,
   RefreshCw, Image as ImageIcon, CheckCircle2, XCircle,
-  Loader2, AlertTriangle, EyeOff, Eye, X,
+  Loader2, AlertTriangle, EyeOff, Eye, X, Sparkles,
 } from "lucide-react"
 import {
   type Team,
@@ -31,6 +31,7 @@ import { TeamFormDialog } from "./team-form-dialog"
 import { TeamLogoUpload } from "./team-logo-upload"
 import { AddMemberDialog, TransferMemberDialog } from "./add-member-dialog"
 import { TeamSalesPanel } from "./team-sales-panel"
+import { TeamReportDialog } from "./team-report-dialog"
 import { useAuth } from "@/context/auth-context"
 import { getDashboardRouteByRole } from "@/lib/auth"
 
@@ -82,6 +83,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
   const [editingTeam,     setEditingTeam]       = useState<Team | null>(null)
   const [logoUploadOpen,  setLogoUploadOpen]    = useState(false)
   const [logoTeam,        setLogoTeam]          = useState<Team | null>(null)
+  const [reportTeam,      setReportTeam]        = useState<Team | null>(null)
   const [addMemberOpen,   setAddMemberOpen]     = useState(false)
   const [transferOpen,    setTransferOpen]      = useState(false)
   const [transferMembership, setTransferMembership] = useState<TeamMemberProfile | null>(null)
@@ -389,6 +391,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
                 subteamCount={subteams.length}
                 memberCount={membersTotal}
                 onEdit={() => { setEditingTeam(selectedTeam); setTeamFormOpen(true) }}
+                onReport={() => setReportTeam(selectedTeam)}
                 onUploadLogo={() => { setLogoTeam(selectedTeam); setLogoUploadOpen(true) }}
                 onToggleActive={() => handleToggleTeam(selectedTeam)}
                 onDelete={() => setConfirmDelete({ type: "team", id: selectedTeam.id, label: selectedTeam.name })}
@@ -630,6 +633,14 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
         />
       )}
 
+      {reportTeam && (
+        <TeamReportDialog
+          key={reportTeam.id}
+          team={reportTeam}
+          onClose={() => setReportTeam(null)}
+        />
+      )}
+
       {selectedTeam && (
         <AddMemberDialog
           open={addMemberOpen}
@@ -776,12 +787,13 @@ function TreeNode({
 
 function TeamHeaderCard({
   team, subteamCount, memberCount,
-  onEdit, onUploadLogo, onToggleActive, onDelete,
+  onEdit, onReport, onUploadLogo, onToggleActive, onDelete,
 }: {
   team: Team
   subteamCount: number
   memberCount: number
   onEdit: () => void
+  onReport: () => void
   onUploadLogo: () => void
   onToggleActive: () => void
   onDelete: () => void
@@ -868,6 +880,14 @@ function TeamHeaderCard({
 
         {/* Actions */}
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={onReport}
+            title="Sales, new vs tenured agents, recruits and a plan to double the sales — as a report you can export to PDF"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#d6b357] text-xs font-bold text-[#001f3f] hover:bg-[#c9a449] transition-all"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Performance report
+          </button>
           <button
             onClick={onEdit}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#e8eaed] text-xs font-semibold text-[#374151] hover:bg-[#f4f6f9] transition-all"
