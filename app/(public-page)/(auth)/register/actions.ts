@@ -12,6 +12,7 @@ import { DEFAULT_ACCOUNT_PASSWORD } from "@/lib/account-password"
 import { emailTypoMessage } from "@/lib/email-typo"
 import { checkEmailDeliverable } from "@/lib/email-validate"
 import { checkPartnerSignupInfo, partnerInfoMetadata, type PartnerSignupInfo } from "@/lib/partner-signup"
+import { joinInvitersTeam } from "@/lib/recruit-team"
 
 /**
  * Result of the two OTP steps (email → code). `challenge` is an opaque id the
@@ -239,6 +240,23 @@ export async function verifyRegisterOtp(
   if (profileError) {
     await supabase.auth.signOut()
     return { error: `Profile setup failed: ${profileError.message}` }
+  }
+
+  // A recruit joins their recruiter's team (lib/recruit-team.ts) — the same
+  // rule the Google sign-up path already applies. This path never did, which
+  // left every email-code recruit out of the formal team list (202 people by
+  // 2026-11-05) even though they sat in the recruiter's invite network. Only
+  // when they hold no active membership yet, so re-running the code step can
+  // never pull someone back from a team an admin moved them to. Best effort:
+  // joinInvitersTeam never throws.
+  if (invitedBy) {
+    const { data: held } = await admin
+      .from("team_memberships")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .limit(1)
+    if (!held?.length) await joinInvitersTeam(admin, { userId, inviterId: invitedBy, accountRole: finalRole })
   }
 
   const ctx = await requestContextFromHeaders()
