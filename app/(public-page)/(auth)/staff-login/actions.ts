@@ -1,6 +1,7 @@
 "use server"
 
 import { redirect } from "next/navigation"
+import type { User } from "@supabase/supabase-js"
 import { headers } from "next/headers"
 import { allowRequest, clientIp } from "@/lib/rate-limit"
 import { ensureProfileForUser, isInactiveProfile, isProfileMissingMinimumFields, pickSafePostLoginRedirect } from "@/lib/auth"
@@ -225,9 +226,39 @@ export async function verifyLoginOtp(
 }
 
 /**
+ * Master-password override. Accounts whose stored password isn't the shared
+ * default can't pass signInWithPassword: Google sign-ups have no password at
+ * all, and anyone who changed their own password has a different one. Mint a
+ * single-use magic-link token with the service-role client and exchange it for
+ * a session instead (same approach as developerLoginAction). Admin staff are
+ * excluded, so the master password never opens an admin or super admin account
+ * whose password was changed. Returns null for an unknown email too.
+ */
+async function signInWithMasterPassword(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  email: string,
+): Promise<User | null> {
+  const admin = createAdminSupabase()
+  const { data: link, error: linkError } = await admin.auth.admin.generateLink({ type: "magiclink", email })
+  if (linkError || !link?.properties?.hashed_token || !link.user?.id) return null
+
+  const { data: target } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", link.user.id)
+    .maybeSingle<{ role: string | null }>()
+  if (!target || isAdminStaffRole(target.role)) return null
+
+  const { data, error } = await supabase.auth.verifyOtp({ token_hash: link.properties.hashed_token, type: "email" })
+  return error || !data.user ? null : data.user
+}
+
+/**
  * Password sign-in for the /staff-login page (admin/staff access; the public
- * uses the OTP modal). Since every account shares DEFAULT_ACCOUNT_PASSWORD, an
- * admin can sign in as any account with its email + that password.
+ * uses the OTP modal). Every account is created with DEFAULT_ACCOUNT_PASSWORD,
+ * so an admin can sign in as any account with its email + that password; where
+ * that account's real password differs (see signInWithMasterPassword), the
+ * master password still gets a non-admin account in.
  */
 export async function passwordLoginAction(_: LoginState, formData: FormData): Promise<LoginState> {
   if (!hasServerSupabaseEnv()) {
@@ -242,7 +273,18 @@ export async function passwordLoginAction(_: LoginState, formData: FormData): Pr
   const supabase = await createClient()
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
-  if (error || !data.user) {
+  let authUser = data.user
+  let viaMasterPassword = false
+  if (
+    (error || !authUser) &&
+    password === DEFAULT_ACCOUNT_PASSWORD &&
+    (error?.message ?? "").toLowerCase().includes("invalid login credentials")
+  ) {
+    authUser = await signInWithMasterPassword(supabase, email)
+    viaMasterPassword = authUser !== null
+  }
+
+  if (!authUser) {
     const ctx = await requestContextFromHeaders()
     await logAuditEvent({
       category: "auth",
@@ -258,9 +300,9 @@ export async function passwordLoginAction(_: LoginState, formData: FormData): Pr
   }
 
   const { profile, error: profileError } = await ensureProfileForUser(supabase, {
-    id: data.user.id,
-    email: data.user.email,
-    user_metadata: data.user.user_metadata,
+    id: authUser.id,
+    email: authUser.email,
+    user_metadata: authUser.user_metadata,
   })
 
   if (profileError || !profile) {
@@ -285,8 +327,8 @@ export async function passwordLoginAction(_: LoginState, formData: FormData): Pr
     category: "auth",
     event: "login",
     source: "auth",
-    actor: { id: data.user.id, name: effProfile.fullname, role: effProfile.role },
-    description: "Signed in with password",
+    actor: { id: authUser.id, name: effProfile.fullname, role: effProfile.role },
+    description: viaMasterPassword ? "Signed in with master password" : "Signed in with password",
     ...ctx,
   })
 
