@@ -140,29 +140,32 @@ export type StatSpec = {
 
 /** The headline figures of an answer, big and scannable: label, value, the
  *  change against the previous period as a green/red chip, one hint line.
- *  Two to four tiles per row; a lone tile is not drawn (the text says it). */
-export function StatTiles({ stats }: { stats: StatSpec[] }) {
+ *  Two to four tiles per row; a lone tile is not drawn (the text says it).
+ *  `size="lg"` is the report's reading size (bigger type, darker greys, the
+ *  hint wraps instead of being cut) — the chat keeps the default. */
+export function StatTiles({ stats, size = "md" }: { stats: StatSpec[]; size?: "md" | "lg" }) {
   const rows = stats.filter((s) => s.value && s.value !== "–").slice(0, 8)
   if (rows.length < 2) return null
   const cols = rows.length === 2 ? "sm:grid-cols-2" : rows.length === 3 || rows.length === 6 ? "sm:grid-cols-3" : "sm:grid-cols-4"
   const tone = (t: StatSpec["tone"]) =>
     t === "up" ? "bg-[#e8f5ec] text-[#15803d]" : t === "down" ? "bg-[#fdecec] text-[#b91c1c]" : t === "flat" ? "bg-[#f1f3f6] text-[#6b7280]" : "bg-[#f6f1e3] text-[#8a6d2b]"
   const short = (c: string) => (c.startsWith("n/a") ? "n/a" : c.startsWith("new") ? "new" : c.startsWith("0%") ? "0%" : c)
+  const lg = size === "lg"
   return (
-    <div className={`grid grid-cols-2 gap-2.5 ${cols}`}>
+    <div className={`grid grid-cols-2 ${lg ? "gap-3" : "gap-2.5"} ${cols}`}>
       {rows.map((s) => (
-        <div key={s.label} className="min-w-0 rounded-xl border border-[#eceef1] bg-[#fafbfc] px-3.5 py-3">
-          <p className="truncate text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#9ca3af]">{s.label}</p>
+        <div key={s.label} className={`min-w-0 rounded-xl border border-[#eceef1] bg-[#fafbfc] ${lg ? "px-4 py-3.5" : "px-3.5 py-3"}`}>
+          <p className={lg ? "text-[13px] font-bold uppercase tracking-[0.06em] text-[#4b5563]" : "truncate text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#9ca3af]"}>{s.label}</p>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <p className="font-['Outfit'] text-[22px] font-bold leading-none tracking-tight text-[#001f3f] tabular-nums">{s.value}</p>
+            <p className={`font-['Outfit'] font-bold leading-none tracking-tight text-[#001f3f] tabular-nums ${lg ? "text-[30px]" : "text-[22px]"}`}>{s.value}</p>
             {s.change && (
-              <span className={`rounded-full px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums ${tone(s.tone)}`} title={s.change}>
+              <span className={`rounded-full font-bold tabular-nums ${lg ? "px-2 py-0.5 text-[13px]" : "px-1.5 py-0.5 text-[10.5px]"} ${tone(s.tone)}`} title={s.change}>
                 {s.tone === "up" ? "▲ " : s.tone === "down" ? "▼ " : ""}
                 {short(s.change)}
               </span>
             )}
           </div>
-          {s.hint && <p className="mt-1 truncate text-[11px] text-[#6b7280]">{s.hint}</p>}
+          {s.hint && <p className={lg ? "mt-1.5 text-[13.5px] leading-snug text-[#4b5563]" : "mt-1 truncate text-[11px] text-[#6b7280]"}>{s.hint}</p>}
         </div>
       ))}
     </div>

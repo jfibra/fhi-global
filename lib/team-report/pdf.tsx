@@ -2,19 +2,34 @@ import "server-only"
 
 import { Circle, Document, Image, Page, Svg, Text, View } from "@react-pdf/renderer"
 import { BODY, Chip, Donut, Empty, FAINT, GOLD, GOLD_DEEP, GOLD_SOFT, HBars, INK, LINE, MUTED, NAVY, Rank, Section, StatRow, Strong, SubTitle, Table, Two, VBars, aed, int, s, short } from "@/lib/company-report/pdf-kit"
-import { REQUIREMENT_HINTS, REQUIREMENT_KEYS, REQUIREMENT_LABELS } from "./labels"
+import { REQUIREMENT_HINTS, REQUIREMENT_KEYS, REQUIREMENT_LABELS, REQUIREMENT_NOTE, REQUIREMENT_OWNERS } from "./labels"
 import type { MemberRow, TeamReport } from "./data"
 import type { TeamInsights } from "./insights"
 
 /**
  * The Team Performance Report as an A4 PDF (boss, 2026-11-05): a navy cover
  * with the team, the headline tiles, what it takes to double sales and the
- * takeaways, then numbered sections — sales, new vs tenured agents,
+ * takeaways, then numbered sections — sales, new vs existing agents,
  * recruitment & activation, who sold and who went quiet, the path to 2× over
  * the next three months, the ten strategies and a page of commitments for the
  * team leader to sign. Drawn on the same kit as the company report
  * (lib/company-report/pdf-kit.tsx).
  */
+
+/**
+ * The PDF font (Outfit) has no arrow glyph — "Invite → Team" printed as "Invite 'Team". The screen font
+ * does, so the texts keep their arrows and the document turns them into ">" on the way in. Applied to
+ * the requirement wording and to the whole analysis (the model writes arrows too).
+ */
+const arrows = (t: string) => t.replace(/\s*→\s*/g, " > ")
+const pdfSafeInsights = (i: TeamInsights): TeamInsights => ({
+  ...i,
+  headline: arrows(i.headline),
+  takeaways: i.takeaways.map(arrows),
+  cohortAnalysis: arrows(i.cohortAnalysis),
+  nextQuarter: i.nextQuarter.map((q) => ({ ...q, focus: arrows(q.focus), target: arrows(q.target) })),
+  strategies: i.strategies.map((st) => ({ ...st, title: arrows(st.title), why: arrows(st.why), how: arrows(st.how), metric: arrows(st.metric) })),
+})
 
 export type TeamReportImages = { whiteLogo: Buffer | null; navyLogo: Buffer | null; teamLogo: Buffer | null }
 
@@ -66,11 +81,20 @@ const memberCell = (m: MemberRow) => (
   </View>
 )
 
-const CohortTag = ({ cohort }: { cohort: MemberRow["cohort"] }) => (
-  <Text style={{ fontSize: 7, fontWeight: 700, color: cohort === "new" ? "#ffffff" : NAVY, backgroundColor: cohort === "new" ? NAVY : "#eef1f5", borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 }}>{cohort === "new" ? "NEW" : "TENURED"}</Text>
+/** A recruit with the person who has to approve them: only the direct inviter can press Approve and set the role. */
+const recruitCell = (m: MemberRow) => (
+  <View>
+    <Strong>{m.name}</Strong>
+    <Text style={{ fontSize: 7, color: MUTED }}>{m.invitedBy ? `Invited by ${m.invitedBy.name}${m.invitedBy.onTeam ? "" : " (outside the team)"}` : "Signed up without an invite link"}</Text>
+  </View>
 )
 
-export function TeamReportDocument({ r, insights, images }: { r: TeamReport; insights: TeamInsights; images: TeamReportImages }) {
+const CohortTag = ({ cohort }: { cohort: MemberRow["cohort"] }) => (
+  <Text style={{ fontSize: 7, fontWeight: 700, color: cohort === "new" ? "#ffffff" : NAVY, backgroundColor: cohort === "new" ? NAVY : "#eef1f5", borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 }}>{cohort === "new" ? "NEW" : "EXISTING"}</Text>
+)
+
+export function TeamReportDocument({ r, insights: rawInsights, images }: { r: TeamReport; insights: TeamInsights; images: TeamReportImages }) {
+  const insights = pdfSafeInsights(rawInsights)
   const S = r.sales
   const C = r.cohorts
   const R = r.recruitment
@@ -187,7 +211,7 @@ export function TeamReportDocument({ r, insights, images }: { r: TeamReport; ins
           </View>
 
           <View style={{ flexDirection: "row", marginTop: 10 }}>
-            {["Sales", "New vs tenured", "Recruitment", "Who sold", "Next 3 months", "10 strategies", "Commitments"].map((t, i) => (
+            {["Sales", "New vs existing", "Recruitment", "Who sold", "Next 3 months", "10 strategies", "Commitments"].map((t, i) => (
               <View key={t} style={{ flex: 1, borderTopWidth: 2, borderTopColor: i >= 4 ? GOLD : NAVY, paddingTop: 4, marginRight: i < 6 ? 5 : 0 }}>
                 <Text style={{ fontSize: 9, fontWeight: 700, color: i >= 4 ? GOLD_DEEP : NAVY }}>{String(i + 1).padStart(2, "0")}</Text>
                 <Text style={{ fontSize: 7, color: MUTED }}>{t}</Text>
@@ -242,7 +266,7 @@ export function TeamReportDocument({ r, insights, images }: { r: TeamReport; ins
           </Text>
         </Section>
 
-        <Section n="02" title="New agents vs tenured agents" subtitle="Who is carrying the sales — agents recruited in this period, or the ones who were already here.">
+        <Section n="02" title="New agents vs existing agents" subtitle="Who is carrying the sales — agents recruited in this period, or the ones who were already here.">
           <Two
             left={
               <View style={s.card}>
@@ -252,7 +276,7 @@ export function TeamReportDocument({ r, insights, images }: { r: TeamReport; ins
                   centre={`${pct(C.new.value, S.validated.value)} new`}
                   rows={[
                     { label: `New (${C.new.members})`, value: C.new.value, display: `AED ${short(C.new.value)}` },
-                    { label: `Tenured (${C.tenured.members})`, value: C.tenured.value, display: `AED ${short(C.tenured.value)}` },
+                    { label: `Existing (${C.existing.members})`, value: C.existing.value, display: `AED ${short(C.existing.value)}` },
                   ]}
                 />
               </View>
@@ -267,25 +291,25 @@ export function TeamReportDocument({ r, insights, images }: { r: TeamReport; ins
           <View style={{ marginTop: 10 }} wrap={false}>
             <Table
               rows={[
-                { m: "Members on the team", n: int(C.new.members), t: int(C.tenured.members) },
-                { m: "Active accounts", n: int(C.new.active), t: int(C.tenured.active) },
-                { m: "With a selling role", n: int(C.new.sellingRole), t: int(C.tenured.sellingRole) },
-                { m: "Members who sold", n: int(C.new.sellers), t: int(C.tenured.sellers) },
-                { m: "Validated deals", n: int(C.new.deals), t: int(C.tenured.deals) },
-                { m: "Validated value", n: aed(C.new.value), t: aed(C.tenured.value) },
-                { m: "Share of the team's value", n: pct(C.new.value, S.validated.value), t: pct(C.tenured.value, S.validated.value) },
-                { m: "Value per selling member", n: aed(C.new.perSeller), t: aed(C.tenured.perSeller) },
-                { m: "Value per member", n: aed(C.new.perMember), t: aed(C.tenured.perMember) },
-                { m: "Pending deals", n: C.new.pendingDeals ? `${C.new.pendingDeals} · AED ${short(C.new.pendingValue)}` : "—", t: C.tenured.pendingDeals ? `${C.tenured.pendingDeals} · AED ${short(C.tenured.pendingValue)}` : "—" },
+                { m: "Members on the team", n: int(C.new.members), t: int(C.existing.members) },
+                { m: "Active accounts", n: int(C.new.active), t: int(C.existing.active) },
+                { m: "With a selling role", n: int(C.new.sellingRole), t: int(C.existing.sellingRole) },
+                { m: "Members who sold", n: int(C.new.sellers), t: int(C.existing.sellers) },
+                { m: "Validated deals", n: int(C.new.deals), t: int(C.existing.deals) },
+                { m: "Validated value", n: aed(C.new.value), t: aed(C.existing.value) },
+                { m: "Share of the team's value", n: pct(C.new.value, S.validated.value), t: pct(C.existing.value, S.validated.value) },
+                { m: "Value per selling member", n: aed(C.new.perSeller), t: aed(C.existing.perSeller) },
+                { m: "Value per member", n: aed(C.new.perMember), t: aed(C.existing.perMember) },
+                { m: "Pending deals", n: C.new.pendingDeals ? `${C.new.pendingDeals} · AED ${short(C.new.pendingValue)}` : "—", t: C.existing.pendingDeals ? `${C.existing.pendingDeals} · AED ${short(C.existing.pendingValue)}` : "—" },
               ]}
               cols={[
                 { label: "KPI contribution", width: 40, render: (x) => <Strong>{x.m}</Strong> },
                 { label: "New agents", width: 30, align: "right", render: (x) => <Strong color={NAVY}>{x.n}</Strong> },
-                { label: "Tenured agents", width: 30, align: "right", render: (x) => x.t },
+                { label: "Existing agents", width: 30, align: "right", render: (x) => x.t },
               ]}
             />
           </View>
-          {C.byMonth.length >= 2 && C.byMonth.some((m) => m.newValue + m.tenuredValue > 0) && (
+          {C.byMonth.length >= 2 && C.byMonth.some((m) => m.newValue + m.existingValue > 0) && (
             <View style={{ marginTop: 10 }}>
               <SubTitle>Month by month</SubTitle>
               <Table
@@ -293,7 +317,7 @@ export function TeamReportDocument({ r, insights, images }: { r: TeamReport; ins
                 cols={[
                   { label: "Month", width: 28, render: (m) => <Strong>{monthName(m.month)}</Strong> },
                   { label: "New agents", width: 36, align: "right", render: (m) => (m.newValue ? aed(m.newValue) : "—") },
-                  { label: "Tenured agents", width: 36, align: "right", render: (m) => (m.tenuredValue ? aed(m.tenuredValue) : "—") },
+                  { label: "Existing agents", width: 36, align: "right", render: (m) => (m.existingValue ? aed(m.existingValue) : "—") },
                 ]}
               />
             </View>
@@ -303,11 +327,11 @@ export function TeamReportDocument({ r, insights, images }: { r: TeamReport; ins
             <Text style={{ fontSize: 9.2, color: INK, lineHeight: 1.4, marginTop: 4 }}>{insights.cohortAnalysis}</Text>
           </Callout>
           <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 6 }}>
-            New = the member&apos;s FHI account was created inside {r.period.label}; tenured = created before it. An older account added to the team counts as tenured.
+            New = the member&apos;s FHI account was created inside {r.period.label}; existing = created before it. An older account added to the team counts as existing.
           </Text>
         </Section>
 
-        <Section n="03" title="Recruitment & activation" subtitle="Who joined, and how far each recruit got — a recruit can only record a sale once every requirement below is done.">
+        <Section n="03" title="Recruitment & activation" subtitle="Who joined, and how far each recruit got — a recruit can only record a sale once every requirement below is done, and the recruiter who invited them does two of the four.">
           <StatRow
             items={[
               { label: "New recruits", value: int(R.recruited), change: R.change, hint: `vs ${R.previous} ${r.period.versus}` },
@@ -331,24 +355,44 @@ export function TeamReportDocument({ r, insights, images }: { r: TeamReport; ins
             }
           />
           <Callout>
-            <Text style={{ ...s.eyebrow, color: GOLD_DEEP }}>How we count &quot;finished all the requirements&quot;</Text>
+            <Text style={{ ...s.eyebrow, color: GOLD_DEEP }}>How we count &quot;finished all the requirements&quot; — and who does each one</Text>
             {REQUIREMENT_KEYS.map((k, i) => (
-              <View key={k} style={{ flexDirection: "row", marginTop: 4 }}>
+              <View key={k} style={{ flexDirection: "row", marginTop: 5 }}>
                 <Text style={{ width: 14, fontSize: 8.5, fontWeight: 700, color: GOLD_DEEP }}>{i + 1}</Text>
-                <Text style={{ flex: 1, fontSize: 8.5, color: INK }}>
-                  <Text style={{ fontWeight: 700 }}>{REQUIREMENT_LABELS[k]}</Text> — {REQUIREMENT_HINTS[k]}
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 8.5, color: INK }}>
+                    <Text style={{ fontWeight: 700 }}>{REQUIREMENT_LABELS[k]}</Text> — {REQUIREMENT_HINTS[k]}
+                  </Text>
+                  <Text style={{ fontSize: 7.5, fontWeight: 700, color: REQUIREMENT_OWNERS[k].who === "recruiter" ? NAVY : MUTED, marginTop: 1 }}>
+                    {REQUIREMENT_OWNERS[k].whoLabel} · {arrows(REQUIREMENT_OWNERS[k].where)}
+                  </Text>
+                </View>
               </View>
             ))}
-            <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 5 }}>Account approved and selling role are what the system checks before a sale can be recorded; the profile and photo are what the dashboard asks for first.</Text>
+            <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 5 }}>{arrows(REQUIREMENT_NOTE)}</Text>
           </Callout>
+          {R.recruiters.some((g) => g.waitingApproval + g.waitingRole > 0) && (
+            <View style={{ marginTop: 10 }} wrap={false}>
+              <SubTitle right="Only the recruiter can press Approve and set the role">Who has recruits waiting</SubTitle>
+              <Table
+                rows={R.recruiters.filter((g) => g.waitingApproval + g.waitingRole + g.profileOrPhoto > 0).slice(0, 8)}
+                cols={[
+                  { label: "Recruiter", width: 38, render: (g) => <View><Strong>{g.name}</Strong>{g.onTeam ? null : <Text style={{ fontSize: 7, color: MUTED }}>outside the team</Text>}</View> },
+                  { label: "Recruits", width: 12, align: "right", render: (g) => String(g.recruits) },
+                  { label: "Waiting for Approve", width: 18, align: "right", render: (g) => (g.waitingApproval ? <Strong color={NAVY}>{String(g.waitingApproval)}</Strong> : "—") },
+                  { label: "No selling role", width: 17, align: "right", render: (g) => (g.waitingRole ? <Strong color={NAVY}>{String(g.waitingRole)}</Strong> : "—") },
+                  { label: "Profile / photo", width: 15, align: "right", render: (g) => (g.profileOrPhoto ? String(g.profileOrPhoto) : "—") },
+                ]}
+              />
+            </View>
+          )}
           {R.notReady.length > 0 && (
             <View style={{ marginTop: 10 }}>
               <SubTitle right={R.notReadyTotal > 10 ? `Showing 10 of ${R.notReadyTotal}` : `${R.notReadyTotal} recruit${R.notReadyTotal === 1 ? "" : "s"}`}>Not ready yet — finish these first</SubTitle>
               <Table
                 rows={R.notReady.slice(0, 10)}
                 cols={[
-                  { label: "Recruit", width: 34, render: memberCell },
+                  { label: "Recruit", width: 34, render: recruitCell },
                   { label: "Joined", width: 18, render: (m) => day(m.joined) },
                   { label: "Still missing", width: 48, render: (m) => m.missing.map((k) => REQUIREMENT_LABELS[k]).join(" · ") },
                 ]}
@@ -361,7 +405,7 @@ export function TeamReportDocument({ r, insights, images }: { r: TeamReport; ins
               <Table
                 rows={R.readyNotSelling.slice(0, 8)}
                 cols={[
-                  { label: "Recruit", width: 40, render: memberCell },
+                  { label: "Recruit", width: 40, render: recruitCell },
                   { label: "Joined", width: 20, render: (m) => day(m.joined) },
                   { label: "Account role", width: 40, render: (m) => roleText(m.accountRole) },
                 ]}
@@ -370,7 +414,7 @@ export function TeamReportDocument({ r, insights, images }: { r: TeamReport; ins
           )}
         </Section>
 
-        <Section n="04" title="Who sold, who went quiet" subtitle="Validated sales per member in the period, and the tenured sellers who closed nothing.">
+        <Section n="04" title="Who sold, who went quiet" subtitle="Validated sales per member in the period, and the existing sellers who closed nothing.">
           {A.sellers.length ? (
             <View>
               <SubTitle right={A.sellersTotal > A.sellers.length ? `Top ${A.sellers.length} of ${A.sellersTotal}` : `${A.sellersTotal} member${A.sellersTotal === 1 ? "" : "s"}`}>Members who sold</SubTitle>
@@ -390,7 +434,7 @@ export function TeamReportDocument({ r, insights, images }: { r: TeamReport; ins
             <Empty>Nobody on the team has a validated sale in this period.</Empty>
           )}
           <View style={{ marginTop: 12 }}>
-            <SubTitle right={A.quietTotal > 8 ? `Showing 8 of ${A.quietTotal}` : undefined}>Gone quiet — tenured sellers with no validated deal</SubTitle>
+            <SubTitle right={A.quietTotal > 8 ? `Showing 8 of ${A.quietTotal}` : undefined}>Gone quiet — existing sellers with no validated deal</SubTitle>
             {A.quiet.length ? (
               <Table
                 rows={A.quiet.slice(0, 8)}
@@ -402,7 +446,7 @@ export function TeamReportDocument({ r, insights, images }: { r: TeamReport; ins
                 ]}
               />
             ) : (
-              <Empty>Every active tenured seller closed a deal in this period.</Empty>
+              <Empty>Every active existing seller closed a deal in this period.</Empty>
             )}
             {A.quietTotal > 0 && <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 5 }}>{A.quietTotal} quiet seller{A.quietTotal === 1 ? "" : "s"}, {A.neverSold} of them never sold. Active accounts with a selling role only; members without one are not counted.</Text>}
           </View>

@@ -882,7 +882,7 @@ function TeamHeaderCard({
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onReport}
-            title="Sales, new vs tenured agents, recruits and a plan to double the sales — as a report you can export to PDF"
+            title="Sales, new vs existing agents, recruits and a plan to double the sales — as a report you can export to PDF"
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#d6b357] text-xs font-bold text-[#001f3f] hover:bg-[#c9a449] transition-all"
           >
             <Sparkles className="w-3.5 h-3.5" />

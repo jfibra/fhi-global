@@ -6,13 +6,13 @@ import { hasProfilePhoto, isProfileMissingMinimumFields, type AppProfile } from 
 import type { Bar, Kpi, Share } from "@/lib/company-report/data"
 import { businessDate, fetchAllSales, nameMaps, saleCredits, type SaleRow } from "@/lib/fhi-chat-tools"
 import { titleCaseName } from "@/lib/public-profile"
-import { REQUIREMENT_HINTS, REQUIREMENT_KEYS, REQUIREMENT_LABELS, type Requirement } from "./labels"
+import { REQUIREMENT_HINTS, REQUIREMENT_KEYS, REQUIREMENT_LABELS, REQUIREMENT_NOTE, REQUIREMENT_OWNERS, type Requirement, type RequirementOwner } from "./labels"
 
 /**
  * The Team Performance Report (boss, 2026-11-05): one team, one span of
  * time, everything a team leader needs to double the team's sales — what
  * the team sold, what its NEW agents (joined FHI inside the period) brought
- * against its TENURED agents, how far each recruit got through the
+ * against its EXISTING agents, how far each recruit got through the
  * requirements, who sold and who went quiet, and the figures behind a
  * "path to 2×" for the next three months. FHI Assistant's analysis
  * (lib/team-report/insights.ts) and the PDF (lib/team-report/pdf.tsx) are
@@ -30,10 +30,12 @@ const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
 const DAY_MS = 86_400_000
 const MONTH_DAYS = 30.4375
 const PAGE = 1000
+/** How many names each list carries — the on-screen report shows the top few and offers the rest; the PDF slices its own. */
+const LIST_CAP = 200
 
-export type Cohort = "new" | "tenured"
+export type Cohort = "new" | "existing"
 
-export { REQUIREMENT_HINTS, REQUIREMENT_LABELS, REQUIREMENT_KEYS, type Requirement }
+export { REQUIREMENT_HINTS, REQUIREMENT_LABELS, REQUIREMENT_KEYS, REQUIREMENT_NOTE, REQUIREMENT_OWNERS, type Requirement, type RequirementOwner }
 
 export type CohortStats = {
   members: number
@@ -69,6 +71,30 @@ export type MemberRow = {
   firstRecorded: string | null
   ready: boolean
   missing: Requirement[]
+  /**
+   * Who invited them (metadata.invited_by). Only this person — or an admin — can press Approve on their
+   * Invite page and set their role, so a leader reads it as "who has to act". null = signed up without a link.
+   */
+  invitedBy: { id: string; name: string; photo: string | null; onTeam: boolean } | null
+}
+
+/** One recruiter and how their recruits of the period stand — the table a leader acts on. */
+export type RecruiterRow = {
+  /** The recruiter's profile id, or "direct" for sign-ups without an invite link. */
+  id: string
+  name: string
+  photo: string | null
+  /** False for an inviter outside the team (an admin, the CEO's account) — the team leader cannot press Approve for them. */
+  onTeam: boolean
+  recruits: number
+  ready: number
+  notReady: number
+  /** Recruits still waiting for the recruiter to press Approve. */
+  waitingApproval: number
+  /** Recruits whose role is not a selling role (the Team link registers everyone as Member). */
+  waitingRole: number
+  /** Recruits who still have to finish their profile or add a photo. */
+  profileOrPhoto: number
 }
 
 export type TeamReportPeriod = {
@@ -108,10 +134,12 @@ export type TeamReport = {
     allTime: { deals: number; value: number }
     sharedDeals: number
     byMonth: Bar[]
+    /** The same months with their validated deal counts, for the on-screen bars. */
+    months: Array<{ label: string; value: number; deals: number }>
     topProjects: Array<{ name: string; developer: string | null; deals: number; value: number }>
     topDevelopers: Array<{ name: string; deals: number; value: number }>
   }
-  cohorts: { new: CohortStats; tenured: CohortStats; byMonth: Array<{ month: string; newValue: number; tenuredValue: number }> }
+  cohorts: { new: CohortStats; existing: CohortStats; byMonth: Array<{ month: string; newValue: number; existingValue: number }> }
   recruitment: {
     recruited: number
     viaTeamInvite: number
@@ -124,6 +152,11 @@ export type TeamReport = {
     notReadyTotal: number
     readyNotSelling: MemberRow[]
     readyNotSellingTotal: number
+    /** Recruiters with the most recruits waiting on them first (approval + role). */
+    recruiters: RecruiterRow[]
+    recruitersTotal: number
+    /** The recruits' account roles right now — how many are still Member (cannot sell). */
+    byAccountRole: Share[]
   }
   activity: { sellers: MemberRow[]; sellersTotal: number; quiet: MemberRow[]; quietTotal: number; neverSold: number }
   targets: {
@@ -261,16 +294,16 @@ export async function buildTeamReport(admin: Admin, teamId: string, from: string
   let sharedDeals = 0
   const last90From = addDays(to, -90)
   let last90Value = 0
-  const monthTotals = new Map<string, { value: number; newValue: number; tenuredValue: number }>()
+  const monthTotals = new Map<string, { value: number; newValue: number; existingValue: number; deals: number }>()
   const projT = new Map<string, { name: string; developer: string | null; deals: number; value: number }>()
   const devT = new Map<string, { deals: number; value: number }>()
   const cohortOf = (m: Membership): Cohort => {
     const j = dubaiDay(m.profiles?.joined_at)
-    return j && j >= from ? "new" : "tenured"
+    return j && j >= from ? "new" : "existing"
   }
   const cohortAcc: Record<Cohort, { deals: number; value: number; pendingDeals: number; pendingValue: number; sellers: Set<string> }> = {
     new: { deals: 0, value: 0, pendingDeals: 0, pendingValue: 0, sellers: new Set() },
-    tenured: { deals: 0, value: 0, pendingDeals: 0, pendingValue: 0, sellers: new Set() },
+    existing: { deals: 0, value: 0, pendingDeals: 0, pendingValue: 0, sellers: new Set() },
   }
   const windowSales: SaleRow[] = []
 
@@ -310,11 +343,12 @@ export async function buildTeamReport(admin: Admin, teamId: string, from: string
       if (saleCredits(s).length > 1) sharedDeals++
       for (const cohort of touched) cohortAcc[cohort].deals++
       const mk = d.slice(0, 7)
-      const mt = monthTotals.get(mk) ?? { value: 0, newValue: 0, tenuredValue: 0 }
+      const mt = monthTotals.get(mk) ?? { value: 0, newValue: 0, existingValue: 0, deals: 0 }
       mt.value += teamValue
+      mt.deals++
       for (const c of credits) {
         if (cohortOf(byUser.get(c.agentId)!) === "new") mt.newValue += c.value
-        else mt.tenuredValue += c.value
+        else mt.existingValue += c.value
       }
       monthTotals.set(mk, mt)
       const pk = s.project_id ? `p:${s.project_id}` : "secondary"
@@ -354,16 +388,43 @@ export async function buildTeamReport(admin: Admin, teamId: string, from: string
 
   // Every month in the span, empty ones included.
   const byMonth: Bar[] = []
+  const monthsDetailed: Array<{ label: string; value: number; deals: number }> = []
   const cohortByMonth: TeamReport["cohorts"]["byMonth"] = []
   {
     const cur = new Date(`${from.slice(0, 7)}-01T00:00:00Z`)
     while (cur.toISOString().slice(0, 10) < to && byMonth.length < 40) {
       const key = cur.toISOString().slice(0, 7)
-      const v = monthTotals.get(key) ?? { value: 0, newValue: 0, tenuredValue: 0 }
+      const v = monthTotals.get(key) ?? { value: 0, newValue: 0, existingValue: 0, deals: 0 }
+      const monthLabel = new Date(`${key}-01T00:00:00Z`).toLocaleDateString("en-AE", { month: "short", year: "2-digit", timeZone: "UTC" })
+      monthsDetailed.push({ label: monthLabel, value: r0(v.value), deals: v.deals })
       byMonth.push({ label: new Date(`${key}-01T00:00:00Z`).toLocaleDateString("en-AE", { month: "short", year: "2-digit", timeZone: "UTC" }), value: r0(v.value), inPeriod: true })
-      cohortByMonth.push({ month: key, newValue: r0(v.newValue), tenuredValue: r0(v.tenuredValue) })
+      cohortByMonth.push({ month: key, newValue: r0(v.newValue), existingValue: r0(v.existingValue) })
       cur.setUTCMonth(cur.getUTCMonth() + 1)
     }
+  }
+
+  // Who invited each member. The roster resolves most; the few inviters outside the team (admins, the
+  // CEO's account) come from one small profiles lookup. A failed lookup only costs the name.
+  const inviterOf = (m: Membership): string | null => {
+    const meta = (m.profiles?.metadata ?? {}) as Record<string, unknown>
+    return typeof meta.invited_by === "string" && meta.invited_by && !meta.developer_invite_id ? meta.invited_by : null
+  }
+  const personName = (p: { fullname?: string | null; fname?: string | null; lname?: string | null }) => titleCaseName(p.fullname ?? [p.fname, p.lname].filter(Boolean).join(" ")) || "Unnamed account"
+  const outsideInviters = new Map<string, { name: string; photo: string | null }>()
+  {
+    const ids = [...new Set(roster.map(inviterOf).filter((id): id is string => !!id && !byUser.has(id)))]
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data } = await admin.from("profiles").select("id, fullname, fname, lname, profile_url").in("id", ids.slice(i, i + 100))
+      for (const o of (data ?? []) as Array<{ id: string; fullname: string | null; fname: string | null; lname: string | null; profile_url: string | null }>) outsideInviters.set(o.id, { name: personName(o), photo: o.profile_url || null })
+    }
+  }
+  const invitedByOf = (m: Membership): MemberRow["invitedBy"] => {
+    const id = inviterOf(m)
+    if (!id) return null
+    const inTeam = byUser.get(id)?.profiles
+    if (inTeam) return { id, name: personName(inTeam), photo: inTeam.profile_url || null, onTeam: true }
+    const outside = outsideInviters.get(id)
+    return { id, name: outside?.name ?? "Unknown account", photo: outside?.photo ?? null, onTeam: false }
   }
 
   // Members: cohort, requirements, activity.
@@ -394,6 +455,7 @@ export async function buildTeamReport(admin: Admin, teamId: string, from: string
       firstRecorded: a?.firstRecorded ?? null,
       ready: missing.length === 0,
       missing,
+      invitedBy: invitedByOf(m),
     }
   })
   // Leaders of THIS team (a subteam's leader shows under their own team; unit managers are not leaders).
@@ -401,7 +463,7 @@ export async function buildTeamReport(admin: Admin, teamId: string, from: string
     .filter((m) => m.team_id === teamId && /lead|head/i.test(m.role_in_team ?? ""))
     .map((m) => titleCaseName(m.profiles?.fullname ?? "") || "Unnamed")
   const newRows = rows.filter((r) => r.cohort === "new")
-  const tenuredRows = rows.filter((r) => r.cohort === "tenured")
+  const existingRows = rows.filter((r) => r.cohort === "existing")
 
   const cohortStats = (list: MemberRow[], c: Cohort): CohortStats => {
     const a = cohortAcc[c]
@@ -440,8 +502,8 @@ export async function buildTeamReport(admin: Admin, teamId: string, from: string
   const validatedNew = newRows.filter((r) => r.lastValidated).length
   const funnel = [
     { label: "Recruited", value: newRows.length, hint: `joined FHI in ${period.label}` },
-    { label: "Approved", value: approved, hint: "account activated by admin" },
-    { label: "Ready to sell", value: readyNew, hint: "approved, profile and photo done, selling role" },
+    { label: "Approved", value: approved, hint: "the recruiter pressed Approve" },
+    { label: "Ready to sell", value: readyNew, hint: "approved, profile and photo done, selling role set" },
     { label: "Recorded a sale", value: recordedNew, hint: "any status" },
     { label: "Validated a sale", value: validatedNew, hint: "counts on the leaderboard" },
   ]
@@ -450,9 +512,28 @@ export async function buildTeamReport(admin: Admin, teamId: string, from: string
   const notReady = newRows.filter((r) => !r.ready).sort(byJoinedDesc)
   const readyNotSelling = newRows.filter((r) => r.ready && !r.firstRecorded).sort(byJoinedDesc)
 
+  // Who has recruits waiting: only the direct inviter can press Approve and set the role, so this is the
+  // list of people a leader has to nudge. Recruits of the period; sign-ups without a link have no recruiter.
+  const byRecruiter = new Map<string, RecruiterRow>()
+  for (const r of newRows) {
+    const key = r.invitedBy?.id ?? "direct"
+    let g = byRecruiter.get(key)
+    if (!g) {
+      g = { id: key, name: r.invitedBy?.name ?? "No invite link (signed up directly)", photo: r.invitedBy?.photo ?? null, onTeam: r.invitedBy?.onTeam ?? false, recruits: 0, ready: 0, notReady: 0, waitingApproval: 0, waitingRole: 0, profileOrPhoto: 0 }
+      byRecruiter.set(key, g)
+    }
+    g.recruits++
+    if (r.ready) g.ready++
+    else g.notReady++
+    if (r.missing.includes("approved")) g.waitingApproval++
+    if (r.missing.includes("selling_role")) g.waitingRole++
+    if (r.missing.includes("profile") || r.missing.includes("photo")) g.profileOrPhoto++
+  }
+  const recruiters = [...byRecruiter.values()].sort((a, b) => b.waitingApproval + b.waitingRole - (a.waitingApproval + a.waitingRole) || b.notReady - a.notReady || a.name.localeCompare(b.name))
+
   // Who sold, who went quiet.
   const sellers = rows.filter((r) => r.value > 0 || r.deals > 0).sort((a, b) => b.value - a.value || b.deals - a.deals || a.name.localeCompare(b.name))
-  const quiet = tenuredRows
+  const quiet = existingRows
     .filter((r) => r.status === "active" && isSellingRole(r.accountRole) && r.deals === 0)
     .sort((a, b) => (b.lastValidated ?? "").localeCompare(a.lastValidated ?? "") || a.name.localeCompare(b.name))
 
@@ -474,11 +555,11 @@ export async function buildTeamReport(admin: Admin, teamId: string, from: string
   const dealsNeeded3m = basis === "none" ? Math.max(1, readyNeverSold) : avgDeal ? Math.ceil(target3m / avgDeal) : 0
   const extraDeals3m = Math.max(0, dealsNeeded3m - dealsNow3m)
   const leverOf = (title: string, people: number, detail: string): Lever => ({ title, people, detail, needed: extraDeals3m, share: people ? Math.round((extraDeals3m / people) * 100) / 100 : 0 })
-  // Four groups that never overlap (quiet = tenured without a deal; the recruit groups have no
+  // Four groups that never overlap (quiet = existing without a deal; the recruit groups have no
   // recorded sale; the sellers sold), so each can be read on its own.
   const notReadyNeverSold = notReady.filter((r) => !r.firstRecorded)
   const levers: Lever[] = [
-    leverOf("Wake the quiet sellers", quiet.length, "tenured sellers with no validated deal in the period — one deal each in the next three months"),
+    leverOf("Wake the quiet sellers", quiet.length, "existing sellers with no validated deal in the period — one deal each in the next three months"),
     leverOf("Activate the ready recruits", readyNotSelling.length, "recruits who finished every requirement but have not recorded a sale — a first deal each"),
     leverOf("Finish the recruits' requirements", notReadyNeverSold.length, "recruits still missing a requirement and yet to record a sale — ready, then a first deal each"),
     leverOf("One more deal from every seller", periodSellers.length, "everyone who sold in the period closes one extra deal"),
@@ -498,11 +579,17 @@ export async function buildTeamReport(admin: Admin, teamId: string, from: string
 
   const change = pctChange(validated.value, previous.value)
   const activeMembers = rows.filter((r) => r.status === "active").length
+  // With only a handful of deals a percentage misleads ("+50%" for 2 → 3), so say the difference in deals.
+  const dealsChange = (cur: number, prev: number): string | null => {
+    if (cur >= 5 && prev >= 5) return pctChange(cur, prev)
+    const d = cur - prev
+    return d === 0 ? null : `${d > 0 ? "+" : "-"}${Math.abs(d)} deal${Math.abs(d) === 1 ? "" : "s"}`
+  }
   const kpi = (label: string, value: string, chg: string | null, hint: string | null): Kpi => ({ label, value, change: chg, tone: toneOf(chg), hint })
   const newShare = validated.value ? Math.round((cohortAcc.new.value / validated.value) * 100) : 0
   const kpis: Kpi[] = [
     kpi("Validated sales", `AED ${short(validated.value)}`, change, previous.value ? `vs AED ${short(previous.value)} ${period.versus}` : `nothing ${period.versus}`),
-    kpi("Validated deals", String(validated.deals), pctChange(validated.deals, previous.deals), `avg deal AED ${short(avgDeal)}`),
+    kpi("Validated deals", String(validated.deals), dealsChange(validated.deals, previous.deals), `avg deal AED ${short(avgDeal)}`),
     kpi("Members who sold", `${periodSellers.length} of ${activeMembers}`, null, "active members with a validated deal"),
     kpi("New recruits", String(newRows.length), pctChange(newRows.length, recruitedBefore), `vs ${recruitedBefore} ${period.versus}`),
     kpi("Ready to sell", `${readyNew} of ${newRows.length}`, null, "recruits who finished every requirement"),
@@ -551,10 +638,11 @@ export async function buildTeamReport(admin: Admin, teamId: string, from: string
       allTime: { deals: allTime.deals, value: r0(allTime.value) },
       sharedDeals,
       byMonth,
+      months: monthsDetailed,
       topProjects,
       topDevelopers,
     },
-    cohorts: { new: cohortStats(newRows, "new"), tenured: cohortStats(tenuredRows, "tenured"), byMonth: cohortByMonth },
+    cohorts: { new: cohortStats(newRows, "new"), existing: cohortStats(existingRows, "existing"), byMonth: cohortByMonth },
     recruitment: {
       recruited: newRows.length,
       viaTeamInvite,
@@ -563,15 +651,18 @@ export async function buildTeamReport(admin: Admin, teamId: string, from: string
       byStatus: tally(newRows, (r) => roleLabel(r.status)),
       funnel,
       missing: missingCounts,
-      notReady: notReady.slice(0, 15),
+      notReady: notReady.slice(0, LIST_CAP),
       notReadyTotal: notReady.length,
-      readyNotSelling: readyNotSelling.slice(0, 12),
+      readyNotSelling: readyNotSelling.slice(0, LIST_CAP),
       readyNotSellingTotal: readyNotSelling.length,
+      recruiters: recruiters.slice(0, 60),
+      recruitersTotal: recruiters.length,
+      byAccountRole: tally(newRows, (r) => roleLabel(r.accountRole)),
     },
     activity: {
-      sellers: sellers.slice(0, 15),
+      sellers: sellers.slice(0, LIST_CAP),
       sellersTotal: periodSellers.length,
-      quiet: quiet.slice(0, 12),
+      quiet: quiet.slice(0, LIST_CAP),
       quietTotal: quiet.length,
       neverSold: quiet.filter((r) => !r.lastValidated).length,
     },

@@ -1,10 +1,10 @@
 import "server-only"
 
-import { REQUIREMENT_LABELS, type Lever, type TeamReport } from "./data"
+import { REQUIREMENT_LABELS, type Lever, type Requirement, type TeamReport } from "./data"
 
 /**
  * FHI Assistant's analysis for the Team Performance Report: the headline,
- * the takeaways, the new-vs-tenured reading, a month-by-month plan for the
+ * the takeaways, the new-vs-existing reading, a month-by-month plan for the
  * next quarter and the ten strategies to double the team's sales. The facts
  * are computed here from the report itself (`signals`); the model (the same
  * OpenAI account as FHI Assistant, its advice model) only turns those facts
@@ -71,7 +71,7 @@ export function signals(r: TeamReport): Record<string, unknown> {
     value_per_member_aed: c.perMember,
     pending_deals: c.pendingDeals,
   })
-  const person = (m: TeamReport["activity"]["sellers"][number]) => `${m.name} (${m.cohort === "new" ? "new" : "tenured"}${m.subteam ? `, ${m.subteam}` : ""})`
+  const person = (m: TeamReport["activity"]["sellers"][number]) => `${m.name} (${m.cohort === "new" ? "new" : "existing"}${m.subteam ? `, ${m.subteam}` : ""})`
   return {
     team: {
       name: r.team.name,
@@ -102,10 +102,10 @@ export function signals(r: TeamReport): Record<string, unknown> {
       top_projects: S.topProjects.slice(0, 5).map((p) => `${p.name}${p.developer ? ` (${p.developer})` : ""}: ${plural(p.deals, "deal")}, ${aed(p.value)}`),
       top_developers: S.topDevelopers.slice(0, 3).map((d) => `${d.name}: ${plural(d.deals, "deal")}, ${aed(d.value)}`),
     },
-    new_vs_tenured: {
-      definition: "NEW = FHI account created inside the period; TENURED = created before it",
+    new_vs_existing: {
+      definition: "NEW = FHI account created inside the period; EXISTING = created before it",
       new_agents: cohort(C.new),
-      tenured_agents: cohort(C.tenured),
+      existing_agents: cohort(C.existing),
     },
     recruitment: {
       recruited_in_period: R.recruited,
@@ -116,14 +116,19 @@ export function signals(r: TeamReport): Record<string, unknown> {
       requirements: Object.values(REQUIREMENT_LABELS),
       recruits_missing_each_requirement: Object.fromEntries(R.missing.map((m) => [m.label, m.value])),
       not_ready_total: R.notReadyTotal,
-      not_ready_examples: R.notReady.slice(0, 5).map((m) => `${m.name}: missing ${m.missing.map((k) => REQUIREMENT_LABELS[k].toLowerCase()).join(", ")}`),
+      not_ready_examples: R.notReady.slice(0, 5).map((m) => `${m.name} (invited by ${m.invitedBy?.name ?? "nobody"}): missing ${m.missing.map((k) => REQUIREMENT_LABELS[k].toLowerCase()).join(", ")}`),
+      recruits_by_account_role: Object.fromEntries(R.byAccountRole.map((b) => [b.label, b.value])),
+      recruiters_with_recruits_waiting: R.recruiters
+        .filter((g) => g.waitingApproval + g.waitingRole + g.profileOrPhoto > 0)
+        .slice(0, 5)
+        .map((g) => `${g.name}${g.onTeam ? "" : " (outside the team)"}: ${plural(g.recruits, "recruit")}, ${g.waitingApproval} waiting for Approve, ${g.waitingRole} without a selling role, ${g.profileOrPhoto} missing profile or photo`),
       ready_but_no_sale_total: R.readyNotSellingTotal,
       ready_but_no_sale_examples: R.readyNotSelling.slice(0, 5).map((m) => m.name),
     },
     activity: {
       members_who_sold: A.sellersTotal,
       top_sellers: A.sellers.slice(0, 5).map((m) => `${person(m)}: ${plural(m.deals, "deal")}, ${aed(m.value)}`),
-      quiet_tenured_sellers: A.quietTotal,
+      quiet_existing_sellers: A.quietTotal,
       never_sold: A.neverSold,
       quiet_examples: A.quiet.slice(0, 5).map((m) => `${m.name}: last validated ${m.lastValidated ?? "never"}`),
     },
@@ -172,16 +177,16 @@ export function ruleInsights(r: TeamReport): TeamInsights {
     S.validated.deals
       ? `${plural(S.validated.deals, "validated deal")} worth ${aed(S.validated.value)}, against ${S.previous.deals} (${aed(S.previous.value)}) ${r.period.versus}; average deal ${aed(S.avgDeal)}.`
       : `No validated deals in ${r.period.label}, against ${S.previous.deals} (${aed(S.previous.value)}) ${r.period.versus}.`,
-    `New agents (${C.new.members}) brought ${aed(C.new.value)} — ${pct(C.new.value, S.validated.value)} of the value — from ${plural(C.new.sellers, "seller")}; tenured agents (${C.tenured.members}) brought ${aed(C.tenured.value)} from ${plural(C.tenured.sellers, "seller")}.`,
+    `New agents (${C.new.members}) brought ${aed(C.new.value)} — ${pct(C.new.value, S.validated.value)} of the value — from ${plural(C.new.sellers, "seller")}; existing agents (${C.existing.members}) brought ${aed(C.existing.value)} from ${plural(C.existing.sellers, "seller")}.`,
     `${plural(R.recruited, "recruit")} joined (${R.viaTeamInvite} through the team's invite links; ${R.previous} ${r.period.versus}): ${R.funnel[1].value} approved, ${R.funnel[2].value} finished every requirement, ${R.funnel[3].value} recorded a sale.`,
-    `${A.sellersTotal} of ${r.members.active} active members sold; ${plural(A.quietTotal, "tenured seller")} went quiet (${A.neverSold} have never sold).`,
+    `${A.sellersTotal} of ${r.members.active} active members sold; ${plural(A.quietTotal, "existing seller")} went quiet (${A.neverSold} have never sold).`,
     ...(S.pending.deals ? [`${plural(S.pending.deals, "deal")} worth ${aed(S.pending.value)} are still waiting for validation.`] : []),
   ].slice(0, 5)
 
   const cohortAnalysis = [
-    `New agents are ${pct(C.new.members, r.members.total)} of the team (${C.new.members} of ${r.members.total}) and brought ${pct(C.new.value, S.validated.value)} of the validated value (${aed(C.new.value)} from ${plural(C.new.deals, "deal")}); tenured agents brought ${pct(C.tenured.value, S.validated.value)} (${aed(C.tenured.value)} from ${plural(C.tenured.deals, "deal")}).`,
-    `Each selling new agent averaged ${aed(C.new.perSeller)} against ${aed(C.tenured.perSeller)} for a selling tenured agent; per member the new cohort is worth ${aed(C.new.perMember)} and the tenured cohort ${aed(C.tenured.perMember)}.`,
-    `The gap is activation: ${R.readyNotSellingTotal} recruits are ready but have not recorded a sale and ${R.notReadyTotal} are not yet ready${topMissing && topMissing.value ? ` (most often ${topMissing.label.toLowerCase()}, ${topMissing.value})` : ""}, while ${A.quietTotal} tenured sellers sold nothing in the period.`,
+    `New agents are ${pct(C.new.members, r.members.total)} of the team (${C.new.members} of ${r.members.total}) and brought ${pct(C.new.value, S.validated.value)} of the validated value (${aed(C.new.value)} from ${plural(C.new.deals, "deal")}); existing agents brought ${pct(C.existing.value, S.validated.value)} (${aed(C.existing.value)} from ${plural(C.existing.deals, "deal")}).`,
+    `Each selling new agent averaged ${aed(C.new.perSeller)} against ${aed(C.existing.perSeller)} for a selling existing agent; per member the new cohort is worth ${aed(C.new.perMember)} and the existing cohort ${aed(C.existing.perMember)}.`,
+    `The gap is activation: ${R.readyNotSellingTotal} recruits are ready but have not recorded a sale and ${R.notReadyTotal} are not yet ready${topMissing && topMissing.value ? ` (most often ${topMissing.label.toLowerCase()}, ${topMissing.value})` : ""}, while ${A.quietTotal} existing sellers sold nothing in the period.`,
   ].join(" ")
 
   const target = T.basis === "none" ? plural(Math.max(1, Math.ceil(T.dealsNeeded3m / 3)), "first deal") : aed(T.targetMonthly)
@@ -192,8 +197,8 @@ export function ruleInsights(r: TeamReport): TeamInsights {
   ].filter(Boolean)
   const nextQuarter: MonthPlan[] = [
     { month: months[0], focus: m1.length ? `Activation: ${m1.join(", ")}.` : "Activation: every member with a selling role names a prospect and books a viewing date.", target },
-    { month: months[1], focus: `Momentum: ${A.quietTotal ? `the ${A.quietTotal} quiet tenured sellers back with one named prospect each` : "every seller keeps one live prospect"}${top ? `, and a team push on ${top.name} (${plural(top.deals, "deal")} in the period)` : ""}.`, target },
-    { month: months[2], focus: `Scale: ${A.sellersTotal ? `a second deal from each of the ${A.sellersTotal} sellers` : "the first sellers close a second deal"}, shared deals pairing new and tenured agents, and recruits who finish onboarding within a week of joining.`, target },
+    { month: months[1], focus: `Momentum: ${A.quietTotal ? `the ${A.quietTotal} quiet existing sellers back with one named prospect each` : "every seller keeps one live prospect"}${top ? `, and a team push on ${top.name} (${plural(top.deals, "deal")} in the period)` : ""}.`, target },
+    { month: months[2], focus: `Scale: ${A.sellersTotal ? `a second deal from each of the ${A.sellersTotal} sellers` : "the first sellers close a second deal"}, shared deals pairing new and existing agents, and recruits who finish onboarding within a week of joining.`, target },
   ]
 
   // How much of a group would have to close one deal to cover the gap alone.
@@ -203,26 +208,29 @@ export function ruleInsights(r: TeamReport): TeamInsights {
   const backlog = R.readyNotSellingTotal + R.notReadyTotal
   const lowYield = R.recruited > 0 && backlog > R.recruited / 2
   const wasWere = S.sharedDeals === 1 ? "was" : "were"
+  // Recruits of the period that are missing one requirement; only the recruiter can fix approval and role.
+  const missingN = (k: Requirement) => R.missing.find((m) => m.label === REQUIREMENT_LABELS[k])?.value ?? 0
+  const waiter = R.recruiters.find((g) => g.waitingApproval > 0)
 
   type Candidate = Strategy & { score: number; when: boolean }
   const candidates: Candidate[] = [
     {
       title: "First deals for the ready recruits",
       why: `${plural(R.readyNotSellingTotal, "recruit")} finished every requirement but have not recorded a sale; ${gapLine(L("Activate the ready recruits"))}.`,
-      how: `Pair each ready recruit with a tenured seller for 30 days, hand them three live units${top ? ` in ${top.name}` : ""} to present, and book their first client viewing in week 1.`,
+      how: `Pair each ready recruit with an existing seller for 30 days, hand them three live units${top ? ` in ${top.name}` : ""} to present, and book their first client viewing in week 1.`,
       owner: "Team leader", metric: "First deals recorded per week", impact: "High",
       score: leverScore(L("Activate the ready recruits")), when: R.readyNotSellingTotal > 0,
     },
     {
       title: "Finish the recruits' requirements",
-      why: `${plural(R.notReadyTotal, "recruit")} are not yet ready to sell${topMissing && topMissing.value ? `; the most common gap is ${topMissing.label.toLowerCase()} (${topMissing.value})` : ""}.`,
-      how: "Run a 20-minute onboarding call per recruit this week — approve the account, complete the profile and photo, ask admin to assign the selling role — and chase the rest on WhatsApp every 3 days.",
-      owner: "Admin & operations", metric: "Recruits ready to sell", impact: "Quick win",
+      why: `${plural(R.notReadyTotal, "recruit")} are not yet ready to sell: ${missingN("selling_role")} still have no selling role (the Team invite link registers everyone as Member) and ${missingN("approved")} wait for Approve.`,
+      how: "Send each recruiter their own list: on Invite → Team they set the role dropdown to Agent and press Approve, then chase the profile and photo on WhatsApp every 3 days.",
+      owner: "Recruiters", metric: "Recruits ready to sell", impact: "Quick win",
       score: leverScore(L("Finish the recruits' requirements")) + 5, when: R.notReadyTotal > 0,
     },
     {
       title: "Wake the quiet sellers",
-      why: `${plural(A.quietTotal, "tenured seller")} had no validated deal in ${r.period.label}; ${A.neverSold} have never sold; ${gapLine(L("Wake the quiet sellers"))}.`,
+      why: `${plural(A.quietTotal, "existing seller")} had no validated deal in ${r.period.label}; ${A.neverSold} have never sold; ${gapLine(L("Wake the quiet sellers"))}.`,
       how: "Call every quiet seller this week, agree one named prospect and one project each, and review them in a 15-minute Monday pipeline call.",
       owner: "Team leader", metric: "Quiet sellers with a live prospect", impact: "High",
       score: leverScore(L("Wake the quiet sellers")), when: A.quietTotal > 0,
@@ -250,10 +258,10 @@ export function ruleInsights(r: TeamReport): TeamInsights {
     },
     {
       title: "Clear the approval queue",
-      why: `${plural(r.members.pending, "member")} are still waiting for account approval.`,
-      how: "Approve or decline every pending account within 24 hours so recruits start while they are motivated; check the queue daily in Accounts & Invites.",
-      owner: "Admin & operations", metric: "Accounts waiting more than 24 hours", impact: "Quick win",
-      score: 45, when: r.members.pending > 0,
+      why: `${plural(missingN("approved"), "recruit")} of this period still wait for the recruiter who invited them to press Approve${waiter ? `; ${waiter.name} has the most (${waiter.waitingApproval})` : ""}.`,
+      how: "Every recruiter opens Invite → Team (and Global Partners) and presses Approve on each pending recruit within 24 hours of joining; the leader checks the recruiters table every Monday.",
+      owner: "Recruiters", metric: "Recruits waiting more than 24 hours for Approve", impact: "Quick win",
+      score: 45, when: missingN("approved") > 0,
     },
     {
       title: top ? `Double down on ${top.name}` : "Pick one project to push",
@@ -277,9 +285,9 @@ export function ruleInsights(r: TeamReport): TeamInsights {
       score: 34, when: true,
     },
     {
-      title: "Pair new agents with tenured sellers",
-      why: `${plural(S.sharedDeals, "deal")} ${wasWere} shared in the period; new agents brought ${pct(C.new.value, S.validated.value)} of the value from ${plural(C.new.sellers, "seller")} against ${plural(C.tenured.sellers, "tenured seller")}.`,
-      how: "Give each new agent a tenured mentor, and record joint deals as shared sales with an A2A agreement so both are credited their share.",
+      title: "Pair new agents with existing sellers",
+      why: `${plural(S.sharedDeals, "deal")} ${wasWere} shared in the period; new agents brought ${pct(C.new.value, S.validated.value)} of the value from ${plural(C.new.sellers, "seller")} against ${plural(C.existing.sellers, "existing seller")}.`,
+      how: "Give each new agent an existing agent as a mentor, and record joint deals as shared sales with an A2A agreement so both are credited their share.",
       owner: "Team leader", metric: "Shared deals with a new agent", impact: "Medium",
       score: 30, when: C.new.members > 0,
     },
@@ -351,22 +359,22 @@ export function ruleInsights(r: TeamReport): TeamInsights {
 
 // ─── Model ───────────────────────────────────────────────────────────────────
 
-const SYSTEM = `You are FHI Assistant, writing the analysis section of a Team Performance Report for the TEAM LEADER of one team at FHI Global Property, a Dubai real estate brokerage that sells off-plan and ready property through a large network of agents and Global Partners recruited by referral (members recruit people through invite links; a recruit joins the recruiter's team). The report's purpose is to get the team to DOUBLE its validated sales over the next three months, and its design should make the leader want to act.
+const SYSTEM = `You are FHI Assistant, writing the analysis section of a Team Performance Report for the TEAM LEADER of one team at FHI Global Property, a Dubai real estate brokerage that sells off-plan and ready property through a large network of agents and Global Partners recruited by referral (members recruit people through invite links; a recruit joins the recruiter's team). How a recruit becomes able to sell: they register through the recruiter's invite link (the Team link registers everyone as Member, which cannot sell; the separate Global Partner link registers a Global Partner, which is a selling role), then ONLY the recruiter who invited them presses Approve on their Invite page and changes the role dropdown to Agent, and the recruit completes their own profile and photo. Admins validate sales and can also activate an account, but approving recruits and setting their role is the recruiter's job, so never tell the team leader to ask an admin to approve someone or to give a role. The report's purpose is to get the team to DOUBLE its validated sales over the next three months, and its design should make the leader want to act.
 
 You receive FACTS as JSON. Write, addressed to the team leader:
 1. "headline": one sentence — what the period delivered and what doubling needs (quote the monthly target).
 2. "takeaways": 4 or 5 one-sentence findings about the period, most important first.
-3. "cohort_analysis": 3 or 4 sentences comparing the NEW agents (FHI accounts created in the period) with the TENURED agents — share of validated value, deals, sellers, value per seller — and what that means for the team.
+3. "cohort_analysis": 3 or 4 sentences comparing the NEW agents (FHI accounts created in the period) with the EXISTING agents — share of validated value, deals, sellers, value per seller — and what that means for the team.
 4. "next_quarter": exactly 3 items, one per month in FACTS.path_to_2x.next_months in order, each {"month", "focus": one sentence on what the team concentrates on that month, "target": the money or deals target for that month, from FACTS}.
 5. "strategies": exactly 10 strategies to double the team's sales, ordered by impact, each {"title": max 7 words, "why": the finding — must quote at least one number from FACTS, "how": what to do, who, when and where, starting with a verb, max 35 words, "owner", "metric": what to measure weekly, max 12 words, "impact"}.
 
 Rules:
 - Use ONLY the numbers in FACTS. Every takeaway, the cohort analysis and every "why" must quote at least one number from FACTS exactly as given. Never invent figures, percentages, names, numeric targets or causes — the targets are the ones in FACTS.path_to_2x.
 - FACTS.draft_strategies are rule-based strategies already checked against the data. Use them as your starting point: keep the important ones, merge or sharpen them, order by impact, and add others only when FACTS support them.
-- Never make a "how" vaguer than its draft. Good actions name who does what, how often and where (e.g. "Pair each ready recruit with a tenured seller for 30 days and book their first viewing in week 1"), not generic phrases like "improve training" or "enhance motivation".
-- Be specific and practical for this business: first deals for recruits, finishing the requirements (account approved, profile completed, profile photo, selling role), waking quiet sellers, shared deals pairing a tenured and a new agent (recorded with an A2A agreement), project launches and viewing days, Buyers Link and website leads, FHI events, referral recruiting through invite links, chasing pending sales to validation.
+- Never make a "how" vaguer than its draft. Good actions name who does what, how often and where (e.g. "Pair each ready recruit with an existing seller for 30 days and book their first viewing in week 1"), not generic phrases like "improve training" or "enhance motivation".
+- Be specific and practical for this business: first deals for recruits, getting recruits approved and moved from Member to Agent by their recruiters (FACTS.recruitment.recruiters_with_recruits_waiting says who has recruits waiting; quote those names only from FACTS) and finishing their profile and photo, waking quiet sellers, shared deals pairing an existing and a new agent (recorded with an A2A agreement), project launches and viewing days, Buyers Link and website leads, FHI events, referral recruiting through invite links, chasing pending sales to validation.
 - A zero is a finding (e.g. no recruit has recorded a sale yet), not a reason to stay silent. State it plainly — no filler.
-- "owner" must be one of: ${OWNERS.join(", ")}.
+- "owner" must be one of: ${OWNERS.join(", ")} ("Recruiters" = the members who invited the recruits; "Admin & operations" = validating sales only).
 - "impact" must be one of: ${IMPACTS.join(", ")}.
 - Plain text, no markdown, no emojis. Short sentences. British/UAE business English. Amounts as "AED 1,234,567".
 
