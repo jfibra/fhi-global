@@ -215,6 +215,13 @@ export const ROLES_PUBLIC_AGENTS: readonly AppRoleId[] = ["agent", "team_leader"
  *  news — never the admin toolbox. Daily question limits live in lib/assistant-usage.ts. */
 export const ROLES_AGENT_ASSISTANT: readonly AppRoleId[] = ["agent", "team_leader"]
 
+/**
+ * Who may open the Team Performance Report for their OWN team (app/api/team/report): the same two
+ * ranks as Team Sales, which already shows them every member's production. Agents never — the report
+ * lists each member's sales and who is waiting for approval.
+ */
+export const ROLES_TEAM_REPORT_LEADERS: readonly AppRoleId[] = ["team_leader", "unit_manager"]
+
 export const ROLES_SECRETARY_LIKE: readonly AppRoleId[] = ["secretary", "team_secretary"]
 
 /**

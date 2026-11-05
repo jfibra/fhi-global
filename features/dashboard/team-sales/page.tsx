@@ -6,11 +6,12 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import {
-  TrendingUp, Users, Trophy, Search, ChevronDown, CalendarDays, UserRound, Loader2,
+  TrendingUp, Users, Trophy, Search, ChevronDown, CalendarDays, UserRound, Loader2, Sparkles,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
-import { roleInList } from "@/lib/app-roles"
+import { ROLES_TEAM_REPORT_LEADERS, roleInList } from "@/lib/app-roles"
+import { TeamReportDialog } from "@/features/dashboard/teams/team-report-dialog"
 import { UserAvatar } from "@/components/user-avatar"
 import { ROLE_COLORS, ROLE_OPTIONS } from "@/lib/user-service"
 import type { TeamSalesOverview } from "@/lib/team-sales"
@@ -307,6 +308,7 @@ export default function TeamSalesPage() {
   const [data, setData] = useState<TeamSalesOverview | null>(null)
   const [loadedKey, setLoadedKey] = useState("")
   const [failed, setFailed] = useState(false)
+  const [reporting, setReporting] = useState(false)
 
   const [sortBy, setSortBy] = useState<"value" | "deals">("value")
   const [search, setSearch] = useState("")
@@ -381,7 +383,17 @@ export default function TeamSalesPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {scope === "team" && roleInList(role, ROLES_TEAM_REPORT_LEADERS) && (
+            <button
+              type="button"
+              onClick={() => setReporting(true)}
+              title="See what your team is missing: sales, new vs existing agents, recruits waiting for Approve, quiet sellers and a plan to double the sales"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#d6b357] px-4 py-2 text-sm font-bold text-[#001f3f] shadow-sm transition-colors hover:bg-[#c9a449] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#001f3f]"
+            >
+              <Sparkles className="h-4 w-4" aria-hidden="true" /> Performance report
+            </button>
+          )}
           <PeriodSelect
             ariaLabel="Year"
             icon={<CalendarDays className="w-4 h-4 text-[#9ca3af]" />}
@@ -559,6 +571,9 @@ export default function TeamSalesPage() {
         <div className="flex items-center justify-center gap-2 text-xs text-[#9ca3af]">
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading team sales…
         </div>
+      )}
+      {reporting && scope === "team" && (
+        <TeamReportDialog team={{ id: "mine", name: groupTitle ?? "My team", logo_url: null }} endpoint="/api/team/report" audience="leader" onClose={() => setReporting(false)} />
       )}
     </div>
   )

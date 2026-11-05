@@ -25,11 +25,11 @@ import { useSectionSpy } from "./use-section-spy"
 type ReportEvent =
   | { type: "status"; text: string }
   | { type: "report"; report: TeamReport }
-  | { type: "insights"; insights: TeamInsights }
+  | { type: "insights"; insights: TeamInsights; note?: string | null }
   | { type: "done" }
   | { type: "error"; error: string }
 
-type Run = { key: string; status: string; report: TeamReport | null; insights: TeamInsights | null; error: string | null; done: boolean }
+type Run = { key: string; status: string; report: TeamReport | null; insights: TeamInsights | null; /** Why the standard analysis was used instead of the AI one, when it was. */ note: string | null; error: string | null; done: boolean }
 type Preset = "3m" | "6m" | "ytd" | "12m" | "custom"
 
 const PRESETS: Array<{ key: Preset; label: string }> = [
@@ -69,10 +69,10 @@ function spanFor(preset: Preset, today: Date, customFrom: string, customTo: stri
 async function streamReport(url: string, signal: AbortSignal, onEvent: (e: ReportEvent) => void): Promise<void> {
   const res = await fetch(url, { cache: "no-store", headers: { Accept: "text/event-stream" }, signal })
   if (!res.ok || !res.body || !(res.headers.get("content-type") ?? "").includes("text/event-stream")) {
-    const json = (await res.json().catch(() => ({}))) as { report?: TeamReport; insights?: TeamInsights; error?: string }
+    const json = (await res.json().catch(() => ({}))) as { report?: TeamReport; insights?: TeamInsights; note?: string | null; error?: string }
     if (!res.ok || !json.report) throw new Error(json.error ?? "Couldn't build the report — try again.")
     onEvent({ type: "report", report: json.report })
-    if (json.insights) onEvent({ type: "insights", insights: json.insights })
+    if (json.insights) onEvent({ type: "insights", insights: json.insights, note: json.note })
     onEvent({ type: "done" })
     return
   }
@@ -99,8 +99,8 @@ async function streamReport(url: string, signal: AbortSignal, onEvent: (e: Repor
 }
 
 /** POSTs the analysis shown on screen and saves the PDF under the server's file name. */
-async function exportPdf(teamId: string, body: { from: string; to: string; insights: TeamInsights | null }): Promise<void> {
-  const res = await fetch(`/api/admin/teams/${teamId}/report`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+async function exportPdf(endpoint: string, body: { from: string; to: string; insights: TeamInsights | null }): Promise<void> {
+  const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
   if (!res.ok) {
     const json = (await res.json().catch(() => ({}))) as { error?: string }
     throw new Error(json.error ?? `Request failed (${res.status}).`)
@@ -116,7 +116,21 @@ async function exportPdf(teamId: string, body: { from: string; to: string; insig
 
 // ─── Dialog ──────────────────────────────────────────────────────────────────
 
-export function TeamReportDialog({ team, onClose }: { team: { id: string; name: string; logo_url: string | null }; onClose: () => void }) {
+/**
+ * `endpoint` is the report's door: the admin Teams page uses the default (any team, by id); a team leader's own
+ * pages pass /api/team/report, which resolves THEIR team on the server (the `team.id` is then only a label key).
+ */
+export function TeamReportDialog({
+  team,
+  endpoint = `/api/admin/teams/${team.id}/report`,
+  audience = "admin",
+  onClose,
+}: {
+  team: { id: string; name: string; logo_url: string | null }
+  endpoint?: string
+  audience?: "admin" | "leader"
+  onClose: () => void
+}) {
   // The clock is read once, when the dialog opens (renders stay pure).
   const [today] = useState(() => new Date())
   const [preset, setPreset] = useState<Preset>("3m")
@@ -126,6 +140,8 @@ export function TeamReportDialog({ team, onClose }: { team: { id: string; name: 
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
 
+  // Finished reports by period: flipping back to a period re-opens it at once instead of asking the model again.
+  const cacheRef = useRef(new Map<string, Run>())
   const dialogRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
@@ -139,21 +155,31 @@ export function TeamReportDialog({ team, onClose }: { team: { id: string; name: 
 
   useEffect(() => {
     if (!span) return
+    const hit = cacheRef.current.get(key)
+    if (hit) {
+      void Promise.resolve().then(() => setRun(hit))
+      return
+    }
     const ctrl = new AbortController()
-    const patch = (p: Partial<Run>) => setRun((cur) => ({ ...(cur?.key === key ? cur : { key, status: "", report: null, insights: null, error: null, done: false }), ...p }))
+    let acc: Run = { key, status: "", report: null, insights: null, note: null, error: null, done: false }
+    const patch = (p: Partial<Run>) => {
+      acc = { ...acc, ...p }
+      setRun(acc)
+      if (acc.done && acc.report && !acc.error) cacheRef.current.set(key, acc)
+    }
     const onEvent = (e: ReportEvent) => {
       if (e.type === "status") patch({ status: e.text })
       else if (e.type === "report") {
         patch({ report: e.report })
-        gaEvent("team_report_open", { team_id: team.id, from: span.from, to: span.to })
-      } else if (e.type === "insights") patch({ insights: e.insights })
+        gaEvent("team_report_open", { team_id: team.id, from: span.from, to: span.to, audience })
+      } else if (e.type === "insights") patch({ insights: e.insights, note: e.note ?? null })
       else if (e.type === "done") patch({ done: true })
     }
-    streamReport(`/api/admin/teams/${team.id}/report?from=${span.from}&to=${span.to}&format=json`, ctrl.signal, onEvent).catch((e: unknown) => {
+    streamReport(`${endpoint}?from=${span.from}&to=${span.to}&format=json`, ctrl.signal, onEvent).catch((e: unknown) => {
       if (!ctrl.signal.aborted) patch({ error: e instanceof Error ? e.message : "Couldn't build the report — try again.", done: true })
     })
     return () => ctrl.abort()
-  }, [key, span, team.id])
+  }, [key, span, team.id, endpoint, audience])
 
   // Escape closes; Tab stays inside; the page behind does not scroll; focus goes to the dialog on open
   // and back to the button that opened it on close (it stays mounted on the Teams page).
@@ -214,8 +240,8 @@ export function TeamReportDialog({ team, onClose }: { team: { id: string; name: 
     setExporting(true)
     setExportError(null)
     try {
-      await exportPdf(team.id, { from: span.from, to: span.to, insights: ins })
-      gaEvent("team_report_pdf", { team_id: team.id, from: span.from, to: span.to, source: ins?.source ?? "rules" })
+      await exportPdf(endpoint, { from: span.from, to: span.to, insights: ins })
+      gaEvent("team_report_pdf", { team_id: team.id, from: span.from, to: span.to, source: ins?.source ?? "rules", audience })
     } catch (e) {
       setExportError(e instanceof Error ? e.message : "Couldn't export the PDF.")
     } finally {
@@ -322,7 +348,7 @@ export function TeamReportDialog({ team, onClose }: { team: { id: string; name: 
                 <p className="text-[15px] text-[#4b5563]">Usually ready in a few seconds.</p>
               </div>
             ) : (
-              <TeamReportView r={r} ins={ins} writing={writing} verdicts={verdicts} />
+              <TeamReportView r={r} ins={ins} note={state?.note ?? null} writing={writing} verdicts={verdicts} />
             )}
             {failed && r && <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[16px] text-amber-900">{failed}</p>}
           </div>

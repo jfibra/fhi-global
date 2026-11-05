@@ -12,7 +12,7 @@ import { UserAvatar } from "@/components/user-avatar"
 import type { Requirement, TeamReport } from "@/lib/team-report/data"
 import { REQUIREMENT_HINTS, REQUIREMENT_KEYS, REQUIREMENT_LABELS, REQUIREMENT_NOTE, REQUIREMENT_OWNERS } from "@/lib/team-report/labels"
 import { Funnel, RankedBars, ShowAll } from "./team-report-charts"
-import { Block, Label, People, fmtDay, num, roleText, tile } from "./team-report-ui"
+import { Block, Label, Notice, People, fmtDay, num, roleText, tile } from "./team-report-ui"
 import { SECTIONS, type Verdict } from "./team-report-verdicts"
 
 const section = SECTIONS.find((s) => s.key === "recruits")!
@@ -37,6 +37,22 @@ export function RecruitsSection({ r, verdict }: { r: TeamReport; verdict: Verdic
           tile("Validated a first sale", `${validatedNew} of ${R.recruited}`, "counts on the leaderboard"),
         ]}
       />
+
+      {r.outsideTeam && (
+        <Notice tone="alert" title={`${num(r.outsideTeam.total)} recruit${r.outsideTeam.total === 1 ? " is" : "s are"} not on the team list yet`}>
+          <p>
+            They are in the invite network of {r.outsideTeam.recruiters.join(" & ")} — {num(r.outsideTeam.active)} approved, {num(r.outsideTeam.pending)} waiting for Approve, {num(r.outsideTeam.withoutSellingRole)} without a selling role — but they were never added to the team.
+            Team Sales, the leaderboards and this report do not count them yet, and any sales they make are not included.
+          </p>
+          <p className="mt-2 font-semibold">An admin can add them in Teams &gt; Add member. The ones still waiting need Approve on Invite &gt; Team.</p>
+          {r.outsideTeam.waiting.length > 0 && (
+            <p className="mt-2 text-[14px] text-[#374151]">
+              Waiting for Approve: {r.outsideTeam.waiting.slice(0, 6).map((w) => w.name).join(", ")}
+              {r.outsideTeam.pending > 6 ? ` and ${r.outsideTeam.pending - 6} more` : ""}.
+            </p>
+          )}
+        </Notice>
+      )}
 
       {R.recruited > 0 ? (
         <>

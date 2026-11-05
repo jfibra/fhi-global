@@ -99,6 +99,8 @@ export async function assistantMonthSpend(admin: Admin): Promise<number> {
 }
 
 export type UsageRow = {
+  /** Which budget the row counts against — the agent assistant by default; the team report keeps its own. */
+  audience?: string
   userId: string
   role: string | null
   question: string
@@ -114,7 +116,7 @@ export type UsageRow = {
 export async function recordAssistantUsage(admin: Admin, row: UsageRow): Promise<void> {
   try {
     await admin.from("assistant_usage").insert({
-      audience: ASSISTANT_AUDIENCE,
+      audience: row.audience ?? ASSISTANT_AUDIENCE,
       user_id: row.userId,
       role: row.role,
       question: row.question.slice(0, 500),

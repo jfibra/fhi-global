@@ -129,9 +129,14 @@ export function signals(r: TeamReport): Record<string, unknown> {
       members_who_sold: A.sellersTotal,
       top_sellers: A.sellers.slice(0, 5).map((m) => `${person(m)}: ${plural(m.deals, "deal")}, ${aed(m.value)}`),
       quiet_existing_sellers: A.quietTotal,
+      quiet_means: "no validated deal AND no deal waiting for validation in the period; a partner on a shared deal is credited their share, so partners count as sellers, never as quiet",
+      sellers_with_a_deal_waiting_for_validation: A.waitingValidationTotal,
       never_sold: A.neverSold,
       quiet_examples: A.quiet.slice(0, 5).map((m) => `${m.name}: last validated ${m.lastValidated ?? "never"}`),
     },
+    recruits_not_on_the_team_list: r.outsideTeam
+      ? `${plural(r.outsideTeam.total, "recruit")} of ${r.outsideTeam.recruiters.join(" & ")} are in the invite network but were never added to the team, so Team Sales, the leaderboards and this report do not count them: ${r.outsideTeam.active} approved, ${r.outsideTeam.pending} waiting for Approve, ${r.outsideTeam.withoutSellingRole} without a selling role (an admin can add them to the team)`
+      : "none",
     path_to_2x: {
       basis: T.basis === "period" ? "the period's own pace" : T.basis === "previous" ? "the pace of the period before (no validated sale in the period)" : "no validated sales in either period — first deals are the target",
       monthly_run_rate_aed: T.monthlyRunRate,
@@ -179,7 +184,7 @@ export function ruleInsights(r: TeamReport): TeamInsights {
       : `No validated deals in ${r.period.label}, against ${S.previous.deals} (${aed(S.previous.value)}) ${r.period.versus}.`,
     `New agents (${C.new.members}) brought ${aed(C.new.value)} — ${pct(C.new.value, S.validated.value)} of the value — from ${plural(C.new.sellers, "seller")}; existing agents (${C.existing.members}) brought ${aed(C.existing.value)} from ${plural(C.existing.sellers, "seller")}.`,
     `${plural(R.recruited, "recruit")} joined (${R.viaTeamInvite} through the team's invite links; ${R.previous} ${r.period.versus}): ${R.funnel[1].value} approved, ${R.funnel[2].value} finished every requirement, ${R.funnel[3].value} recorded a sale.`,
-    `${A.sellersTotal} of ${r.members.active} active members sold; ${plural(A.quietTotal, "existing seller")} went quiet (${A.neverSold} have never sold).`,
+    `${A.sellersTotal} of ${r.members.active} active members sold; ${plural(A.quietTotal, "existing seller")} went quiet (${A.neverSold} have never sold)${A.waitingValidationTotal ? `; ${plural(A.waitingValidationTotal, "more member")} ha${A.waitingValidationTotal === 1 ? "s" : "ve"} a deal waiting for validation and ${A.waitingValidationTotal === 1 ? "is" : "are"} not counted as quiet` : ""}.`,
     ...(S.pending.deals ? [`${plural(S.pending.deals, "deal")} worth ${aed(S.pending.value)} are still waiting for validation.`] : []),
   ].slice(0, 5)
 
@@ -227,6 +232,13 @@ export function ruleInsights(r: TeamReport): TeamInsights {
       how: "Send each recruiter their own list: on Invite → Team they set the role dropdown to Agent and press Approve, then chase the profile and photo on WhatsApp every 3 days.",
       owner: "Recruiters", metric: "Recruits ready to sell", impact: "Quick win",
       score: leverScore(L("Finish the recruits' requirements")) + 5, when: R.notReadyTotal > 0,
+    },
+    {
+      title: "Add the missing recruits to the team",
+      why: r.outsideTeam ? `${plural(r.outsideTeam.total, "recruit")} of ${r.outsideTeam.recruiters.join(" & ")} are not on the team list yet (${r.outsideTeam.active} approved, ${r.outsideTeam.pending} waiting for Approve), so Team Sales, the leaderboards and this report do not count them.` : "",
+      how: "Ask an admin to add them in Teams > Add member, and press Approve on the ones still waiting in Invite > Team, so their progress and first sales are counted.",
+      owner: "Admin & operations", metric: "Recruits not on the team list", impact: "High",
+      score: 36, when: !!r.outsideTeam && r.outsideTeam.total > 0,
     },
     {
       title: "Wake the quiet sellers",
@@ -373,6 +385,7 @@ Rules:
 - FACTS.draft_strategies are rule-based strategies already checked against the data. Use them as your starting point: keep the important ones, merge or sharpen them, order by impact, and add others only when FACTS support them.
 - Never make a "how" vaguer than its draft. Good actions name who does what, how often and where (e.g. "Pair each ready recruit with an existing seller for 30 days and book their first viewing in week 1"), not generic phrases like "improve training" or "enhance motivation".
 - Be specific and practical for this business: first deals for recruits, getting recruits approved and moved from Member to Agent by their recruiters (FACTS.recruitment.recruiters_with_recruits_waiting says who has recruits waiting; quote those names only from FACTS) and finishing their profile and photo, waking quiet sellers, shared deals pairing an existing and a new agent (recorded with an A2A agreement), project launches and viewing days, Buyers Link and website leads, FHI events, referral recruiting through invite links, chasing pending sales to validation.
+- FACTS.recruits_not_on_the_team_list, when it is not "none", says some recruits are in the invite network but not on the team list: say so plainly, that those recruits are not counted anywhere yet, and that an admin has to add them — never invent their sales or readiness. FACTS.activity.sellers_with_a_deal_waiting_for_validation are NOT quiet sellers: a deal waiting for validation is a deal, and a partner on a shared deal is credited their share.
 - A zero is a finding (e.g. no recruit has recorded a sale yet), not a reason to stay silent. State it plainly — no filler.
 - "owner" must be one of: ${OWNERS.join(", ")} ("Recruiters" = the members who invited the recruits; "Admin & operations" = validating sales only).
 - "impact" must be one of: ${IMPACTS.join(", ")}.
@@ -430,17 +443,27 @@ export function sanitizeInsights(raw: unknown, rules: TeamInsights): TeamInsight
 }
 
 /** FHI Assistant's analysis, or the rules when the model can't be used. `timeoutMs` bounds the model call. */
-export async function buildTeamInsights(r: TeamReport, opts: { timeoutMs?: number } = {}): Promise<TeamInsights> {
+export type ModelUsage = { model: string; promptTokens: number; completionTokens: number; ok: boolean }
+
+/** `onUsage` hears about every request that reached the model (tokens 0 when none came back) — the leaders' budget counts them. */
+export async function buildTeamInsights(r: TeamReport, opts: { timeoutMs?: number; onUsage?: (u: ModelUsage) => void } = {}): Promise<TeamInsights> {
   const rules = ruleInsights(r)
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) return rules
   const facts = { ...signals(r), draft_strategies: rules.strategies.map(({ title, why, how, owner }) => ({ title, why, how, owner })) }
+  const model = process.env.OPENAI_ADVICE_MODEL?.trim() || "gpt-4.1"
+  let reported = false
+  const report = (u: Omit<ModelUsage, "model">) => {
+    if (reported) return
+    reported = true
+    opts.onUsage?.({ model, ...u })
+  }
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: process.env.OPENAI_ADVICE_MODEL?.trim() || "gpt-4.1",
+        model,
         temperature: 0.3,
         max_tokens: 2400,
         response_format: { type: "json_object" },
@@ -451,14 +474,19 @@ export async function buildTeamInsights(r: TeamReport, opts: { timeoutMs?: numbe
       }),
       signal: AbortSignal.timeout(opts.timeoutMs ?? 35_000),
     })
-    if (!res.ok) return rules
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+    if (!res.ok) {
+      report({ promptTokens: 0, completionTokens: 0, ok: false })
+      return rules
+    }
+    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } }
+    report({ promptTokens: Number(json.usage?.prompt_tokens) || 0, completionTokens: Number(json.usage?.completion_tokens) || 0, ok: true })
     const parsed = JSON.parse(json.choices?.[0]?.message?.content ?? "{}") as Record<string, unknown>
     const out = sanitizeInsights({ ...parsed, source: "ai" }, rules)
     // Strategies the model left out are filled from the rules; a reply without takeaways of its own is not used at all.
     if (!out || out.strategies.length < STRATEGIES || out.takeaways === rules.takeaways) return rules
     return out
   } catch {
+    report({ promptTokens: 0, completionTokens: 0, ok: false })
     return rules
   }
 }

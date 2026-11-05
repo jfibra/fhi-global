@@ -3,6 +3,7 @@ import "server-only"
 import type { createAdminSupabase } from "@/lib/admin-supabase"
 import { ROLES_SALES_PIPELINE, roleInList } from "@/lib/app-roles"
 import { hasProfilePhoto, isProfileMissingMinimumFields, type AppProfile } from "@/lib/auth"
+import { buildGenealogy } from "@/lib/genealogy"
 import type { Bar, Kpi, Share } from "@/lib/company-report/data"
 import { businessDate, fetchAllSales, nameMaps, saleCredits, type SaleRow } from "@/lib/fhi-chat-tools"
 import { titleCaseName } from "@/lib/public-profile"
@@ -158,7 +159,32 @@ export type TeamReport = {
     /** The recruits' account roles right now — how many are still Member (cannot sell). */
     byAccountRole: Share[]
   }
-  activity: { sellers: MemberRow[]; sellersTotal: number; quiet: MemberRow[]; quietTotal: number; neverSold: number }
+  activity: {
+    sellers: MemberRow[]
+    sellersTotal: number
+    /** Existing active sellers with no validated AND no pending deal — a pending deal is a deal, so it is not "quiet". */
+    quiet: MemberRow[]
+    quietTotal: number
+    neverSold: number
+    /** Active sellers whose only deal in the period is still waiting for validation (a shared deal counts for each partner). */
+    waitingValidation: MemberRow[]
+    waitingValidationTotal: number
+  }
+  /**
+   * Recruits of the team's leaders (their invite network — what My Team shows) who are NOT members of the
+   * formal team, so every team figure (Team Sales, leaderboards, this report) leaves them out. Found on
+   * 2026-11-05: sign-ups by email code never run the "join the recruiter's team" step. null = none.
+   */
+  outsideTeam: {
+    recruiters: string[]
+    total: number
+    active: number
+    pending: number
+    withoutSellingRole: number
+    joinedInPeriod: number
+    /** Recruits still waiting for their recruiter to press Approve, newest first. */
+    waiting: Array<{ name: string; joined: string | null }>
+  } | null
   targets: {
     /** Where the baseline pace comes from: the span itself, the span before (no validated sale in the span), or neither (first deals are the target). */
     basis: "period" | "previous" | "none"
@@ -227,7 +253,14 @@ const r0 = (n: number) => Math.round(n)
 
 export type BuildResult = { status: 200; report: TeamReport } | { status: 400 | 404 | 500; error: string }
 
-export async function buildTeamReport(admin: Admin, teamId: string, from: string, to: string): Promise<BuildResult> {
+export async function buildTeamReport(
+  admin: Admin,
+  teamId: string,
+  from: string,
+  to: string,
+  /** Profile ids whose recruit networks are checked for people missing from the team list; default: the team's leaders. */
+  opts: { networkRootIds?: string[] } = {},
+): Promise<BuildResult> {
   if (!ISO_DAY.test(from) || !ISO_DAY.test(to) || from >= to) return { status: 400, error: "Give from and to as YYYY-MM-DD, from before to." }
   const period = teamReportPeriod(from, to)
   if (period.days > 1100) return { status: 400, error: "Pick a span of three years or less." }
@@ -459,9 +492,41 @@ export async function buildTeamReport(admin: Admin, teamId: string, from: string
     }
   })
   // Leaders of THIS team (a subteam's leader shows under their own team; unit managers are not leaders).
-  const leaders = roster
-    .filter((m) => m.team_id === teamId && /lead|head/i.test(m.role_in_team ?? ""))
-    .map((m) => titleCaseName(m.profiles?.fullname ?? "") || "Unnamed")
+  const leaderMembers = roster.filter((m) => m.team_id === teamId && /lead|head/i.test(m.role_in_team ?? ""))
+  const leaders = leaderMembers.map((m) => titleCaseName(m.profiles?.fullname ?? "") || "Unnamed")
+
+  // Recruits in the leaders' invite networks who never became team members.
+  let outsideTeam: TeamReport["outsideTeam"] = null
+  {
+    const roots = opts.networkRootIds ?? leaderMembers.map((m) => m.user_id)
+    const seen = new Set<string>()
+    const outside: Array<{ name: string; role: string | null; status: string; joined: string | null }> = []
+    const recruiters: string[] = []
+    for (const rootId of roots) {
+      const tree = await buildGenealogy(admin, rootId, { name: null, photo: null, role: null }).catch(() => null)
+      if (!tree) continue
+      recruiters.push(tree.root.name)
+      for (const n of tree.nodes) {
+        if (byUser.has(n.id) || seen.has(n.id)) continue
+        const joined = dubaiDay(n.joinedAt)
+        if (joined && joined >= to) continue
+        seen.add(n.id)
+        outside.push({ name: n.name, role: n.role, status: n.status, joined })
+      }
+    }
+    if (outside.length) {
+      const waiting = outside.filter((o) => o.status !== "active").sort((a, b) => (b.joined ?? "").localeCompare(a.joined ?? ""))
+      outsideTeam = {
+        recruiters,
+        total: outside.length,
+        active: outside.filter((o) => o.status === "active").length,
+        pending: waiting.length,
+        withoutSellingRole: outside.filter((o) => !isSellingRole(o.role)).length,
+        joinedInPeriod: outside.filter((o) => o.joined && o.joined >= from).length,
+        waiting: waiting.slice(0, 8).map((o) => ({ name: o.name, joined: o.joined })),
+      }
+    }
+  }
   const newRows = rows.filter((r) => r.cohort === "new")
   const existingRows = rows.filter((r) => r.cohort === "existing")
 
@@ -533,9 +598,13 @@ export async function buildTeamReport(admin: Admin, teamId: string, from: string
 
   // Who sold, who went quiet.
   const sellers = rows.filter((r) => r.value > 0 || r.deals > 0).sort((a, b) => b.value - a.value || b.deals - a.deals || a.name.localeCompare(b.name))
-  const quiet = existingRows
-    .filter((r) => r.status === "active" && isSellingRole(r.accountRole) && r.deals === 0)
+  // A pending deal is a deal: someone whose only sale is waiting for validation (including a share of a
+  // partner split) is not "quiet" — they are listed apart so a leader does not chase them for nothing.
+  const activeSellers = rows.filter((r) => r.status === "active" && isSellingRole(r.accountRole))
+  const quiet = activeSellers
+    .filter((r) => r.cohort === "existing" && r.deals === 0 && r.pendingDeals === 0)
     .sort((a, b) => (b.lastValidated ?? "").localeCompare(a.lastValidated ?? "") || a.name.localeCompare(b.name))
+  const waitingValidation = activeSellers.filter((r) => r.deals === 0 && r.pendingDeals > 0).sort((a, b) => b.pendingValue - a.pendingValue || a.name.localeCompare(b.name))
 
   // The path to 2×: the next three months at double the span's monthly pace. A span with no
   // validated sale borrows the pace of the span before; with neither, first deals are the target.
@@ -665,7 +734,10 @@ export async function buildTeamReport(admin: Admin, teamId: string, from: string
       quiet: quiet.slice(0, LIST_CAP),
       quietTotal: quiet.length,
       neverSold: quiet.filter((r) => !r.lastValidated).length,
+      waitingValidation: waitingValidation.slice(0, LIST_CAP),
+      waitingValidationTotal: waitingValidation.length,
     },
+    outsideTeam,
     targets: {
       basis,
       monthlyRunRate: r0(monthlyRunRate),

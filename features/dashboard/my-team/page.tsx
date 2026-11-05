@@ -17,10 +17,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import type { LucideIcon } from "lucide-react"
-import { Award, BarChart3, Building2, Download, Hourglass, RefreshCw, Search, Share2, Target, TrendingUp, Trophy, UserPlus, Users } from "lucide-react"
+import { Award, BarChart3, Building2, Download, Hourglass, RefreshCw, Search, Share2, Sparkles, Target, TrendingUp, Trophy, UserPlus, Users } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
-import { ROLES_ADMIN_STAFF, invitableRolesFor, roleInList, roleToLabel } from "@/lib/app-roles"
+import { ROLES_ADMIN_STAFF, ROLES_TEAM_REPORT_LEADERS, invitableRolesFor, roleInList, roleToLabel } from "@/lib/app-roles"
+import { TeamReportDialog } from "@/features/dashboard/teams/team-report-dialog"
 import type { MyTeamResponse, TeamMember, TeamSale } from "@/app/api/my-team/route"
 import { AED, Avatar, Level, StatusChip, fmtDate, inRange, short } from "./ui"
 import MemberPanel from "./member-panel"
@@ -150,7 +151,7 @@ export default function MyTeamPage() {
   const { role } = useAuth()
   const allowed = useRequireAllowed(invitableRolesFor(role).length > 0 || roleInList(role, ROLES_ADMIN_STAFF))
   if (!allowed) return null
-  return <MyTeamView endpoint="/api/my-team" shareEndpoint="/api/my-team/share-image" self />
+  return <MyTeamView endpoint="/api/my-team" shareEndpoint="/api/my-team/share-image" self reportButton={roleInList(role, ROLES_TEAM_REPORT_LEADERS)} />
 }
 
 /**
@@ -158,7 +159,11 @@ export default function MyTeamPage() {
  * team ("you", "your network"); the admin Team Performance page renders it for
  * anyone with `self={false}` and admin endpoints.
  */
-export function MyTeamView({ endpoint, shareEndpoint, self = false }: { endpoint: string; shareEndpoint: string; self?: boolean }) {
+/**
+ * `reportButton` (own team only, team leaders and unit managers who are on a formal team) adds the Performance
+ * report: what the team is missing, from /api/team/report — the caller's own team, resolved on the server.
+ */
+export function MyTeamView({ endpoint, shareEndpoint, self = false, reportButton = false }: { endpoint: string; shareEndpoint: string; self?: boolean; reportButton?: boolean }) {
   const [data, setData] = useState<MyTeamResponse | null>(null)
   const [loadedAt, setLoadedAt] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -178,6 +183,8 @@ export function MyTeamView({ endpoint, shareEndpoint, self = false }: { endpoint
   // Member panel: a stack, so Back walks up the people opened from inside it.
   const [panel, setPanel] = useState<string[]>([])
   const [sharing, setSharing] = useState(false)
+  const [reporting, setReporting] = useState(false)
+  const closeReport = useCallback(() => setReporting(false), [])
   const openMember = (id: string) => setPanel([id])
   const closePanel = useCallback(() => setPanel([]), [])
   const closeShare = useCallback(() => setSharing(false), [])
@@ -372,6 +379,14 @@ export function MyTeamView({ endpoint, shareEndpoint, self = false }: { endpoint
                   </>
                 )}
               </p>
+              {self && reportButton && data?.team && <div className="mt-3"><button
+  type="button"
+  onClick={() => setReporting(true)}
+  title="See what your team is missing: sales, new vs existing agents, recruits waiting for Approve, quiet sellers and a plan to double the sales"
+  className="inline-flex items-center gap-2 rounded-full bg-[#d6b357] px-4 py-2 text-[14px] font-bold text-[#001f3f] shadow-sm transition-colors hover:bg-[#e3c46a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+>
+  <Sparkles className="h-4 w-4" aria-hidden="true" /> Performance report
+</button></div>}
             </div>
           </div>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-t border-white/15 pt-5 sm:grid-cols-3 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
@@ -805,6 +820,7 @@ export function MyTeamView({ endpoint, shareEndpoint, self = false }: { endpoint
         />
       )}
       {sharing && <ShareDialog endpoint={shareEndpoint} period={bounds} onClose={closeShare} />}
+      {reporting && data?.team && <TeamReportDialog team={{ id: "mine", name: data.team.name, logo_url: data.team.logo }} endpoint="/api/team/report" audience="leader" onClose={closeReport} />}
     </div>
   )
 }

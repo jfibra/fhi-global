@@ -340,20 +340,30 @@ export function TeamReportDocument({ r, insights: rawInsights, images }: { r: Te
               { label: "Validated a first sale", value: `${validatedNew} of ${R.recruited}`, hint: "counts on the leaderboard" },
             ]}
           />
-          <Two
-            left={
-              <View style={s.card}>
-                <SubTitle>Activation funnel — recruits of this period</SubTitle>
-                {R.recruited ? <Funnel steps={R.funnel} /> : <Empty>No recruits joined in this period.</Empty>}
-              </View>
-            }
-            right={
-              <View style={s.card}>
-                <SubTitle>Recruits still missing…</SubTitle>
-                {R.recruited ? <HBars rows={R.missing} color="#8aa4c2" /> : <Empty>Nothing to show.</Empty>}
-              </View>
-            }
-          />
+          {r.outsideTeam && (
+            <View wrap={false} style={{ backgroundColor: "#fff5f5", borderLeftWidth: 3, borderLeftColor: "#b91c1c", borderRadius: 6, padding: 10, marginBottom: 10 }}>
+              <Text style={{ ...s.eyebrow, color: "#991b1b" }}>Not on the team list yet</Text>
+              <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4, marginTop: 4 }}>
+                <Text style={{ fontWeight: 700 }}>{r.outsideTeam.total} recruit{r.outsideTeam.total === 1 ? "" : "s"}</Text> of {r.outsideTeam.recruiters.join(" & ")} are in the invite network but were never added to the team ({r.outsideTeam.active} approved, {r.outsideTeam.pending} waiting for Approve, {r.outsideTeam.withoutSellingRole} without a selling role). Team Sales, the leaderboards and this report do not count them yet, and any sales they make are not included. An admin can add them in Teams &gt; Add member.
+              </Text>
+            </View>
+          )}
+          <View wrap={false}>
+            <Two
+              left={
+                <View style={s.card}>
+                  <SubTitle>Activation funnel — recruits of this period</SubTitle>
+                  {R.recruited ? <Funnel steps={R.funnel} /> : <Empty>No recruits joined in this period.</Empty>}
+                </View>
+              }
+              right={
+                <View style={s.card}>
+                  <SubTitle>Recruits still missing…</SubTitle>
+                  {R.recruited ? <HBars rows={R.missing} color="#8aa4c2" /> : <Empty>Nothing to show.</Empty>}
+                </View>
+              }
+            />
+          </View>
           <Callout>
             <Text style={{ ...s.eyebrow, color: GOLD_DEEP }}>How we count &quot;finished all the requirements&quot; — and who does each one</Text>
             {REQUIREMENT_KEYS.map((k, i) => (
@@ -449,6 +459,10 @@ export function TeamReportDocument({ r, insights: rawInsights, images }: { r: Te
               <Empty>Every active existing seller closed a deal in this period.</Empty>
             )}
             {A.quietTotal > 0 && <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 5 }}>{A.quietTotal} quiet seller{A.quietTotal === 1 ? "" : "s"}, {A.neverSold} of them never sold. Active accounts with a selling role only; members without one are not counted.</Text>}
+            <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 3 }}>
+              Quiet means no validated deal and no deal waiting for validation in the period. A partner on a shared deal is credited their share, so partners appear under &quot;Members who sold&quot;, never here.
+              {A.waitingValidationTotal > 0 ? ` ${A.waitingValidationTotal} more member${A.waitingValidationTotal === 1 ? " has" : "s have"} a deal still waiting for validation and ${A.waitingValidationTotal === 1 ? "is" : "are"} not counted as quiet.` : ""}
+            </Text>
           </View>
         </Section>
 

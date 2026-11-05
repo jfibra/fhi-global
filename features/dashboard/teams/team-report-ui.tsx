@@ -95,6 +95,21 @@ export function Writing({ label = "FHI Assistant is writing the analysis…" }: 
   )
 }
 
+/** A boxed note: `tone="info"` for context (why the standard analysis), `"alert"` for a gap in the data a leader should know about. */
+export function Notice({ tone = "info", title, children }: { tone?: "info" | "alert"; title?: string; children: ReactNode }) {
+  const alert = tone === "alert"
+  const Icon = alert ? AlertTriangle : Info
+  return (
+    <div role={alert ? "alert" : "note"} className={`flex gap-3 rounded-xl border-l-4 p-4 ${alert ? "border-[#b91c1c] bg-[#fff5f5]" : "border-[#d6b357] bg-[#fffaf0]"}`}>
+      <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${alert ? "text-[#991b1b]" : "text-[#8a6d2a]"}`} aria-hidden />
+      <div className="min-w-0 text-[16px] leading-snug text-[#0d1117]">
+        {title && <p className={`mb-1 text-[17px] font-bold ${alert ? "text-[#991b1b]" : "text-[#6b5320]"}`}>{title}</p>}
+        {children}
+      </div>
+    </div>
+  )
+}
+
 // ─── People ──────────────────────────────────────────────────────────────────
 
 export const CohortChip = ({ cohort }: { cohort: MemberRow["cohort"] }) => (

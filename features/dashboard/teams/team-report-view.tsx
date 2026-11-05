@@ -11,19 +11,20 @@ import type { TeamReport } from "@/lib/team-report/data"
 import type { Strategy, TeamInsights } from "@/lib/team-report/insights"
 import { MonthBars, PaceBullet, RankedBars, ShowAll, SplitBar, StackedMonths } from "./team-report-charts"
 import { RecruitsSection } from "./team-report-recruits"
-import { Block, ImpactChip, Label, People, Skeleton, Writing, aedShort, dealsText, fmtDay, monthName, num, pct, poss, roleLine, tile } from "./team-report-ui"
+import { Block, ImpactChip, Label, Notice, People, Skeleton, Writing, aedShort, dealsText, fmtDay, monthName, num, pct, poss, roleLine, tile } from "./team-report-ui"
 import { SECTIONS, type SectionKey, type Verdict } from "./team-report-verdicts"
 
 const meta = (key: SectionKey) => SECTIONS.find((s) => s.key === key)!
 const NAVY = "#001f3f"
 const GOLD = "#d6b357"
 
-type Props = { r: TeamReport; ins: TeamInsights | null; writing: boolean; verdicts: Record<SectionKey, Verdict> }
+/** `note` = why the standard analysis was used instead of the AI one (a leader over their daily limit or the month's budget). */
+type Props = { r: TeamReport; ins: TeamInsights | null; note: string | null; writing: boolean; verdicts: Record<SectionKey, Verdict> }
 
-export function TeamReportView({ r, ins, writing, verdicts }: Props) {
+export function TeamReportView({ r, ins, note, writing, verdicts }: Props) {
   return (
     <div className="space-y-6">
-      <Overview r={r} ins={ins} writing={writing} />
+      <Overview r={r} ins={ins} note={note} writing={writing} />
       <SalesSection r={r} verdict={verdicts.sales} />
       <CohortsSection r={r} ins={ins} verdict={verdicts.cohorts} />
       <RecruitsSection r={r} verdict={verdicts.recruits} />
@@ -39,7 +40,7 @@ export function TeamReportView({ r, ins, writing, verdicts }: Props) {
 
 // ─── Overview ────────────────────────────────────────────────────────────────
 
-function Overview({ r, ins, writing }: { r: TeamReport; ins: TeamInsights | null; writing: boolean }) {
+function Overview({ r, ins, note, writing }: { r: TeamReport; ins: TeamInsights | null; note: string | null; writing: boolean }) {
   const T = r.targets
   const none = T.basis === "none"
   const pace = [
@@ -69,6 +70,8 @@ function Overview({ r, ins, writing }: { r: TeamReport; ins: TeamInsights | null
       </div>
 
       <StatTiles stats={r.kpis} size="lg" />
+
+      {note && <Notice title="Standard analysis">{note}</Notice>}
 
       <Actions ins={ins} />
 
@@ -308,8 +311,24 @@ function SellersSection({ r, verdict }: { r: TeamReport; verdict: Verdict }) {
         ) : (
           <p className="rounded-xl border border-dashed border-[#c5ccd6] px-4 py-6 text-center text-[16px] text-[#374151]">Every active existing seller closed a deal in this period.</p>
         )}
-        <p className="mt-2 text-[14px] text-[#4b5563]">Active accounts with a selling role only; members without one are not counted.</p>
+        <p className="mt-2 text-[14px] leading-relaxed text-[#4b5563]">
+          Quiet means no validated deal and no deal waiting for validation in {r.period.label}. A partner on a shared deal is credited their share, so partners appear under &ldquo;Members who sold&rdquo;, never here. Active accounts with a selling role only; members without one are not counted.
+        </p>
       </div>
+
+      {A.waitingValidationTotal > 0 && (
+        <div>
+          <Label right={`${num(A.waitingValidationTotal)} member${A.waitingValidationTotal === 1 ? "" : "s"}`}>Deal waiting for validation — not counted as quiet</Label>
+          <ShowAll
+            rows={A.waitingValidation}
+            total={A.waitingValidationTotal}
+            noun="members"
+            render={(rows) => (
+              <People rows={rows} sub={(x) => `${roleLine(x)} · joined ${fmtDay(x.joined)}`} right={(x) => <span className="text-[15px] font-semibold text-[#1f2937]">{dealsText(x.pendingDeals)} · {aedShort(x.pendingValue)} pending</span>} />
+            )}
+          />
+        </div>
+      )}
     </Block>
   )
 }
