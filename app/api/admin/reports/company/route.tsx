@@ -5,6 +5,7 @@ import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { REPORT_PERIOD_KEYS, buildCompanyReport, type ReportPeriodKey } from "@/lib/company-report/data"
 import { buildInsights } from "@/lib/company-report/insights"
 import { CompanyReportDocument, registerReportFonts, type ReportImages } from "@/lib/company-report/pdf"
+import { brandImage } from "@/lib/company-report/brand-images"
 import { sseEvents } from "@/lib/fhi-chat-stream"
 
 /**
@@ -25,33 +26,6 @@ import { sseEvents } from "@/lib/fhi-chat-stream"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
-
-/** The brand marks, shrunk for print (the originals are 2–3k px PNGs), cached per process. */
-const imageCache = new Map<string, Promise<Buffer | null>>()
-function brandImage(origin: string, file: string, width: number): Promise<Buffer | null> {
-  const key = `${origin}/${file}@${width}`
-  let p = imageCache.get(key)
-  if (!p) {
-    p = (async () => {
-      try {
-        const res = await fetch(`${origin}/${file}`)
-        if (!res.ok) return null
-        const buf = Buffer.from(await res.arrayBuffer())
-        try {
-          const { default: sharp } = await import("sharp")
-          return await sharp(buf).resize({ width, withoutEnlargement: true }).png({ compressionLevel: 9 }).toBuffer()
-        } catch {
-          return buf
-        }
-      } catch {
-        return null
-      }
-    })()
-    p.then((b) => { if (!b) imageCache.delete(key) })
-    imageCache.set(key, p)
-  }
-  return p
-}
 
 /** The document element, built outside the handler's try/catch (rendering errors surface from renderToBuffer). */
 const reportDocument = (props: Parameters<typeof CompanyReportDocument>[0]) => <CompanyReportDocument {...props} />
