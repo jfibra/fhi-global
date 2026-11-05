@@ -62,6 +62,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
   const [teams,           setTeams]           = useState<Team[]>([])
   const [teamsLoading,    setTeamsLoading]     = useState(true)
   const [selectedId,      setSelectedId]       = useState<string | null>(null)
+  const detailRef = useRef<HTMLDivElement>(null)
   const [expanded,        setExpanded]         = useState<Set<string>>(new Set())
   const [toasts,          setToasts]           = useState<Toast[]>([])
   const [memberCounts,    setMemberCounts]      = useState<Record<string, number>>({})
@@ -164,6 +165,11 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
     setSelectedId(id)
     setMemberPage(1)
     setMemberSearch("")
+    // On a phone the team list sits above the details, so bring the details into view.
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+      const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      requestAnimationFrame(() => detailRef.current?.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "start" }))
+    }
   }
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────────
@@ -243,10 +249,10 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
   return (
     <div className="flex flex-col gap-0">
       {/* Two-panel layout */}
-      <div className="flex gap-5 min-h-0" style={{ minHeight: "calc(100vh - 140px)" }}>
+      <div className="flex flex-col md:flex-row gap-5 min-h-0" style={{ minHeight: "calc(100vh - 140px)" }}>
 
         {/* ── Left: team management column ─────────────────────────────────── */}
-        <aside className="w-72 xl:w-80 shrink-0 flex flex-col gap-4 min-h-0">
+        <aside className="w-full md:w-72 xl:w-80 md:shrink-0 flex flex-col gap-4 min-h-0">
           {/* Header */}
           <div className="flex items-center gap-3 rounded-2xl bg-white border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] p-4">
             <div className={`w-[46px] h-[46px] rounded-[13px] flex items-center justify-center shrink-0 text-white ${TOOLBAR_GRADIENT}`}>
@@ -358,7 +364,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
         </aside>
 
         {/* ── Main content ──────────────────────────────────────────────────── */}
-        <div className="flex-1 min-w-0 flex flex-col gap-5">
+        <div ref={detailRef} className="flex-1 min-w-0 flex flex-col gap-5 scroll-mt-4">
 
           {!selectedTeam ? (
             /* Empty state */
@@ -879,7 +885,7 @@ function TeamHeaderCard({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 md:shrink-0">
           <button
             onClick={onReport}
             title="Sales, new vs existing agents, recruits and a plan to double the sales — as a report you can export to PDF"

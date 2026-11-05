@@ -439,11 +439,11 @@ function StrategiesSection({ ins, verdict }: { ins: TeamInsights | null; verdict
             ))}
           </ol>
           <div>
-            <Label right="open one to read why and how">The other seven</Label>
+            <Label right="tap a title to fold it away">The other seven</Label>
             <ol className="space-y-2.5">
               {ins.strategies.slice(3).map((st, i) => (
                 <li key={`${st.title}-${i}`}>
-                  <details className="group rounded-xl border border-[#dfe3e9] bg-white">
+                  <details open className="group rounded-xl border border-[#dfe3e9] bg-white">
                     <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#001f3f] [&::-webkit-details-marker]:hidden">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#001f3f] font-['Outfit'] text-[16px] font-bold text-[#f0d89b]">{i + 4}</span>
                       <span className="min-w-0 flex-1 text-[17px] font-bold leading-snug text-[#001f3f]">{st.title}</span>

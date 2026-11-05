@@ -7,7 +7,7 @@
 // hidden, every section is on the page.)
 
 import { useId, type ReactNode, type Ref } from "react"
-import { Target } from "lucide-react"
+import { FileDown, Loader2, Target } from "lucide-react"
 import { TONE, type Verdict } from "./team-report-verdicts"
 
 export type NavSection = { id: string; n: string; title: string; verdict: Verdict | null }
@@ -61,7 +61,9 @@ export function TeamReportNav({ sections, activeId, onJump, footer }: Props & { 
 }
 
 /** Phone and tablet: one select with the section names, stuck to the top of the scroll area. `barRef` lets the shell measure its height. */
-export function TeamReportJumpBar({ sections, activeId, onJump, barRef }: Props & { barRef: Ref<HTMLDivElement> }) {
+export type JumpBarExport = { onExport: () => void; canExport: boolean; exporting: boolean }
+
+export function TeamReportJumpBar({ sections, activeId, onJump, barRef, exportAction }: Props & { barRef: Ref<HTMLDivElement>; exportAction?: JumpBarExport }) {
   const selectId = useId()
   const index = Math.max(0, sections.findIndex((s) => s.id === activeId))
   return (
@@ -69,19 +71,34 @@ export function TeamReportJumpBar({ sections, activeId, onJump, barRef }: Props 
       <label htmlFor={selectId} className="text-[14px] font-semibold text-[#4b5563]">
         Jump to section · {index + 1} of {sections.length}
       </label>
-      <select
-        id={selectId}
-        value={activeId}
-        onChange={(e) => onJump(e.target.value)}
-        className="mt-1 block w-full rounded-xl border border-[#b6bec9] bg-white px-3 py-2.5 text-[16px] font-semibold text-[#001f3f] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#001f3f]"
-      >
-        {sections.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.n ? `${s.n} · ` : ""}
-            {s.title}
-          </option>
-        ))}
-      </select>
+      <div className="mt-1 flex items-stretch gap-2">
+        <select
+          id={selectId}
+          value={activeId}
+          onChange={(e) => onJump(e.target.value)}
+          className="block min-w-0 flex-1 rounded-xl border border-[#b6bec9] bg-white px-3 py-2.5 text-[16px] font-semibold text-[#001f3f] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#001f3f]"
+        >
+          {sections.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.n ? `${s.n} · ` : ""}
+              {s.title}
+            </option>
+          ))}
+        </select>
+        {exportAction && (
+          <button
+            type="button"
+            onClick={exportAction.onExport}
+            disabled={!exportAction.canExport}
+            aria-label="Export PDF"
+            title={exportAction.canExport ? "Download this report as a PDF" : "Available when the report has finished"}
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[#d6b357] px-3.5 text-[16px] font-bold text-[#001f3f] transition-colors hover:bg-[#c9a449] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#001f3f] disabled:cursor-not-allowed disabled:opacity-50 sm:hidden"
+          >
+            {exportAction.exporting ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : <FileDown className="h-5 w-5" aria-hidden />}
+            PDF
+          </button>
+        )}
+      </div>
       <div className="mt-2 h-1.5 rounded-full bg-[#dfe3e9]" aria-hidden>
         <div className="h-1.5 rounded-full bg-[#d6b357] transition-all" style={{ width: `${((index + 1) / sections.length) * 100}%` }} />
       </div>

@@ -12,10 +12,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { AlertTriangle, FileDown, Loader2, Sparkles, X } from "lucide-react"
+import { AlertTriangle, FileDown, Loader2 } from "lucide-react"
 import { gaEvent } from "@/lib/ga"
 import type { TeamReport } from "@/lib/team-report/data"
 import type { TeamInsights } from "@/lib/team-report/insights"
+import { TeamReportHeader, type Preset } from "./team-report-header"
 import { TeamReportJumpBar, TeamReportNav } from "./team-report-nav"
 import { TeamReportView } from "./team-report-view"
 import { fmtDay } from "./team-report-ui"
@@ -30,15 +31,7 @@ type ReportEvent =
   | { type: "error"; error: string }
 
 type Run = { key: string; status: string; report: TeamReport | null; insights: TeamInsights | null; /** Why the standard analysis was used instead of the AI one, when it was. */ note: string | null; error: string | null; done: boolean }
-type Preset = "3m" | "6m" | "ytd" | "12m" | "custom"
 
-const PRESETS: Array<{ key: Preset; label: string }> = [
-  { key: "3m", label: "Last 3 months" },
-  { key: "6m", label: "Last 6 months" },
-  { key: "ytd", label: "This year" },
-  { key: "12m", label: "Last 12 months" },
-  { key: "custom", label: "Custom" },
-]
 const SECTION_IDS = SECTIONS.map((s) => s.key)
 const FOCUSABLE = 'button:not([disabled]), select, input:not([disabled]), summary, a[href], [tabindex]:not([tabindex="-1"])'
 
@@ -249,65 +242,29 @@ export function TeamReportDialog({
     }
   }
 
-  const chip = (on: boolean) => `rounded-full px-4 py-2 text-[15px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d6b357] ${on ? "bg-[#d6b357] text-[#001f3f]" : "bg-white/10 text-white hover:bg-white/20"}`
   const sections = verdicts ? SECTIONS.map((s) => ({ id: s.key, n: s.n, title: s.title, verdict: verdicts[s.key] })) : []
 
   return createPortal(
     <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[200] flex flex-col bg-[#f4f6f9] outline-none" role="dialog" aria-modal="true" aria-label={`Performance report — ${team.name}`}>
-      {/* Top bar */}
-      <header className="shrink-0 bg-[#001f3f] text-white shadow-lg">
-        <div className="mx-auto flex w-full max-w-[1320px] flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10">
-            {team.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={team.logo_url} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <Sparkles className="h-5 w-5 text-[#d6b357]" aria-hidden />
-            )}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-bold uppercase tracking-[0.16em] text-[#f0d89b]">Team Performance Report</p>
-            <h2 className="truncate font-['Outfit'] text-[22px] font-bold leading-tight">{team.name}</h2>
-          </div>
-          <div className="flex shrink-0 items-center gap-2.5">
-            {exportError && <span className="hidden max-w-[240px] truncate text-[14px] text-rose-200 sm:inline" title={exportError}>{exportError}</span>}
-            <button
-              type="button"
-              onClick={doExport}
-              disabled={!canExport}
-              title={canExport ? "Download this report as a PDF" : "Available when the report has finished"}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#d6b357] px-5 py-2.5 text-[16px] font-bold text-[#001f3f] transition-colors hover:bg-[#c9a449] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {exporting ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : <FileDown className="h-5 w-5" aria-hidden />}
-              {exporting ? "Preparing PDF…" : "Export PDF"}
-            </button>
-            <button type="button" onClick={onClose} aria-label="Close report" className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
-              <X className="h-5 w-5" aria-hidden />
-            </button>
-          </div>
-        </div>
-        <div className="border-t border-white/10">
-          <div className="mx-auto flex w-full max-w-[1320px] flex-wrap items-center gap-2 px-4 py-3 sm:px-6">
-            {PRESETS.map((p) => (
-              <button key={p.key} type="button" aria-pressed={preset === p.key} onClick={() => setPreset(p.key)} className={chip(preset === p.key)}>
-                {p.label}
-              </button>
-            ))}
-            {preset === "custom" && (
-              <span className="flex flex-wrap items-center gap-2 text-[15px] text-white/80">
-                <input type="date" aria-label="From" value={customFrom} max={customTo} onChange={(e) => setCustomFrom(e.target.value)} className="rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-[15px] font-semibold text-white [color-scheme:dark]" />
-                to
-                <input type="date" aria-label="To" value={customTo} min={customFrom} onChange={(e) => setCustomTo(e.target.value)} className="rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-[15px] font-semibold text-white [color-scheme:dark]" />
-              </span>
-            )}
-            <span className="ml-auto text-[14px] text-white/75">{span ? `${fmtDay(span.from)} – ${fmtDay(addDay(span.to, -1))}` : "Pick a range of 7 days to 12 months"}</span>
-          </div>
-        </div>
-      </header>
+      <TeamReportHeader
+        team={team}
+        preset={preset}
+        onPreset={setPreset}
+        customFrom={customFrom}
+        customTo={customTo}
+        onCustomFrom={setCustomFrom}
+        onCustomTo={setCustomTo}
+        rangeLabel={span ? `${fmtDay(span.from)} – ${fmtDay(addDay(span.to, -1))}` : "Pick a range of 7 days to 12 months"}
+        canExport={canExport}
+        exporting={exporting}
+        exportError={exportError}
+        onExport={doExport}
+        onClose={onClose}
+      />
 
       {/* Body: the scrolling area holds the jump bar (below lg), the timeline (from lg) and the report */}
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        {r && verdicts && <TeamReportJumpBar sections={sections} activeId={activeId} onJump={jumpTo} barRef={barRef} />}
+        {r && verdicts && <TeamReportJumpBar sections={sections} activeId={activeId} onJump={jumpTo} barRef={barRef} exportAction={{ onExport: doExport, canExport, exporting }} />}
         <div data-spy-content className={r && verdicts ? "mx-auto grid w-full max-w-[1320px] gap-8 px-4 py-6 sm:px-6 lg:grid-cols-[288px_minmax(0,1fr)]" : "mx-auto w-full max-w-4xl px-4 py-6 sm:px-6"}>
           {r && verdicts && (
             <aside className="hidden lg:block">
