@@ -297,7 +297,16 @@ async function ourAgents(args: { search?: string; limit?: number }) {
   if (!agents.length) return { listed_agents: 0, note: "No agents are listed publicly right now — give the company WhatsApp", all_on: `${base()}/agents` }
   const words = (args.search ?? "").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2)
   const matched = words.length ? agents.filter((a) => words.some((w) => [a.name, a.about].some((f) => (f ?? "").toLowerCase().includes(w)))) : agents
-  const shown = (matched.length ? matched : agents).slice(0, limit)
+  // The page reads A to Z; a visitor asking "who can I talk to" should meet the team leaders
+  // first, then the best-reviewed agents, then the rest by name.
+  const pool = [...(matched.length ? matched : agents)].sort((a, b) => {
+    if (a.leader !== b.leader) return a.leader ? -1 : 1
+    const ra = a.rating ? a.rating.average * Math.min(a.rating.count, 5) : 0
+    const rb = b.rating ? b.rating.average * Math.min(b.rating.count, 5) : 0
+    if (ra !== rb) return rb - ra
+    return a.name.localeCompare(b.name)
+  })
+  const shown = pool.slice(0, limit)
   const role = (a: (typeof agents)[number]) => (a.leader ? "Team leader" : "Property advisor")
   const ratingOf = (a: (typeof agents)[number]) => (a.rating ? `${a.rating.average.toFixed(1)}/5 from ${a.rating.count} client review${a.rating.count === 1 ? "" : "s"}` : null)
   const site = (a: (typeof agents)[number]) => (a.website ? `${base()}/website/${a.website}` : null)
