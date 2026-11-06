@@ -11,6 +11,10 @@ export type Team = {
   parent_id: string | null
   team_type: string | null
   is_active: boolean
+  /** The team's leader may edit its members' sales (migration 084; admin-only switch). */
+  leader_can_edit_sales?: boolean
+  /** The team's leader confirms its members' sales before the admin validates them. */
+  leader_confirms_sales?: boolean
   created_at: string
   updated_at: string
 }
@@ -142,6 +146,27 @@ export async function toggleTeamActive(
     .eq("id", team.id)
 
   return { error: error?.message ?? null }
+}
+
+/**
+ * Turn a team's team-leader switches on or off. Admin staff only — a guard
+ * trigger on teams (migration 084) refuses anyone else, because teams has no
+ * row level security.
+ */
+export async function updateTeamLeaderSwitches(
+  id: string,
+  patch: { leader_can_edit_sales?: boolean; leader_confirms_sales?: boolean },
+): Promise<{ data: Team | null; error: string | null }> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("teams")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single()
+
+  if (error) return { data: null, error: error.message }
+  return { data: data as Team, error: null }
 }
 
 export async function deleteTeam(

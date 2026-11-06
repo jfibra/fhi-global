@@ -8,9 +8,14 @@
  * one Lead Agent (the client source), the rest Co-Agents — and share, which
  * must total 100%. The recording agent is always the first row. Under the
  * table the parent asks about the A2A agreement (./partner-a2a-form).
+ *
+ * The search + rows + shares part is PartnerSharesEditor, which the Edit Sale
+ * dialog's Partners tab uses too — an admin or team leader fixing a recorded
+ * split gets the same auto-fill as the agent who recorded it.
  */
 
 import { useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import Image from "next/image"
 import { CheckCircle2, Handshake, Loader2, Search, Star, User, X } from "lucide-react"
 import {
@@ -91,9 +96,11 @@ export function ChoiceCard({
 function PartnerSearch({
   excludeIds,
   onPick,
+  includeSelf = false,
 }: {
   excludeIds: string[]
   onPick: (agent: PartnerAgentOption) => void
+  includeSelf?: boolean
 }) {
   const [q, setQ] = useState("")
   const [results, setResults] = useState<PartnerAgentOption[]>([])
@@ -103,6 +110,37 @@ function PartnerSearch({
   const [highlight, setHighlight] = useState(-1)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const inflight = useRef<AbortController | null>(null)
+  // The suggestions are drawn in a layer of their own, pinned to the search
+  // box: inside the Edit Sale dialog's scrolling body they were clipped to a
+  // name and a half. They open upward when there's no room below.
+  const anchorRef = useRef<HTMLDivElement>(null)
+  const [place, setPlace] = useState<{ top?: number; bottom?: number; left: number; width: number; maxHeight: number } | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const update = () => {
+      const r = anchorRef.current?.getBoundingClientRect()
+      if (!r) return
+      const gap = 6
+      const margin = 12
+      const below = window.innerHeight - r.bottom - gap - margin
+      const above = r.top - gap - margin
+      const up = below < 260 && above > below
+      const maxHeight = Math.max(160, Math.min(400, up ? above : below))
+      setPlace(
+        up
+          ? { bottom: window.innerHeight - r.top + gap, left: r.left, width: r.width, maxHeight }
+          : { top: r.bottom + gap, left: r.left, width: r.width, maxHeight },
+      )
+    }
+    update()
+    window.addEventListener("resize", update)
+    window.addEventListener("scroll", update, true)
+    return () => {
+      window.removeEventListener("resize", update)
+      window.removeEventListener("scroll", update, true)
+    }
+  }, [open])
 
   useEffect(
     () => () => {
@@ -130,7 +168,7 @@ function PartnerSearch({
       const ctrl = new AbortController()
       inflight.current = ctrl
       try {
-        const agents = await searchPartnerAgents(term, ctrl.signal)
+        const agents = await searchPartnerAgents(term, ctrl.signal, { includeSelf })
         if (ctrl.signal.aborted) return
         setResults(agents)
         setSearched(true)
@@ -154,7 +192,7 @@ function PartnerSearch({
   }
 
   return (
-    <div className="relative">
+    <div ref={anchorRef} className="relative">
       <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9ca3af]" />
       <input
         value={q}
@@ -189,68 +227,78 @@ function PartnerSearch({
         className={`${inputCls} pl-11 pr-10`}
       />
       {loading && <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[#9ca3af]" />}
-      {open && (
+      {open && place && typeof document !== "undefined" && createPortal(
         <ul
           id="partner-agent-suggestions"
           role="listbox"
-          className="absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-xl border border-[#e5e7eb] bg-white py-1 shadow-lg"
+          style={{ position: "fixed", top: place.top, bottom: place.bottom, left: place.left, width: place.width, maxHeight: place.maxHeight, zIndex: 200 }}
+          className="overflow-y-auto overscroll-contain rounded-2xl border border-[#e5e7eb] bg-white py-1.5 shadow-2xl"
         >
           {visible.length === 0 ? (
             <li className="px-4 py-3 text-sm text-[#6b7280]">
               {loading ? "Searching…" : <>No active FHI agent matches &ldquo;{q.trim()}&rdquo;.</>}
             </li>
           ) : (
-            visible.map((agent, i) => (
-              <li
-                key={agent.id}
-                role="option"
-                aria-selected={i === highlight}
-                // mousedown (not click) so the pick lands before the input's blur closes the list
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  pick(agent)
-                }}
-                onMouseEnter={() => setHighlight(i)}
-                className={`flex cursor-pointer items-center gap-3 px-3 py-2 text-sm ${
-                  i === highlight ? "bg-[#001f3f]/6 text-[#001f3f]" : "text-[#374151]"
-                }`}
-              >
-                <Avatar name={agent.name} src={agent.avatar} />
-                <span className="min-w-0">
-                  <span className="block truncate font-semibold">{agent.name}</span>
-                  <span className="block truncate text-xs text-[#9ca3af]">{agent.role_label}</span>
-                </span>
+            <>
+              <li role="presentation" className="px-4 pb-1 pt-0.5 text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
+                {visible.length} agent{visible.length === 1 ? "" : "s"} — pick one
               </li>
-            ))
+              {visible.map((agent, i) => (
+                <li
+                  key={agent.id}
+                  role="option"
+                  aria-selected={i === highlight}
+                  // mousedown keeps the focus in the box (no blur, so the list stays);
+                  // the pick itself is the click, so nothing under the list gets it.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => pick(agent)}
+                  onMouseEnter={() => setHighlight(i)}
+                  className={`flex cursor-pointer items-center gap-3 px-4 py-2.5 ${
+                    i === highlight ? "bg-[#001f3f]/[0.06]" : ""
+                  }`}
+                >
+                  <Avatar name={agent.name} src={agent.avatar} />
+                  <span className="min-w-0">
+                    <span className="block break-words text-[15px] font-semibold leading-snug text-[#0d1117]">{agent.name}</span>
+                    <span className="block text-xs text-[#6b7280]">{agent.role_label}</span>
+                  </span>
+                </li>
+              ))}
+            </>
           )}
-        </ul>
+        </ul>,
+        document.body,
       )}
     </div>
   )
 }
 
-export function PartnerStep({
-  hasPartner,
-  onHasPartner,
+/**
+ * Who is on a shared sale and their shares: the partner search, one row per
+ * agent (Lead / Co-Agent, share, BRN) and the total. Typing one share re-splits
+ * what's left among the agents nobody has typed yet. The recording agent's row
+ * can't be removed — the 055 trigger requires them on the sale.
+ */
+export function PartnerSharesEditor({
   agents,
   onAgentsChange,
   info,
   onAgentInfo,
   ownerId,
   errors,
-  children,
+  ownerTag = "you",
+  includeSelfInSearch = false,
 }: {
-  hasPartner: boolean | null
-  onHasPartner: (value: boolean) => void
-  /** Every agent on the deal, the owner first. Empty until "Yes". */
+  /** Every agent on the deal, the owner first. */
   agents: SalePartner[]
   onAgentsChange: (next: SalePartner[]) => void
   info: Record<string, PartnerAgentInfo>
   onAgentInfo: (agentId: string, value: PartnerAgentInfo) => void
   ownerId: string
   errors: Record<string, string>
-  /** The A2A question, shown under the table once a partner is added. */
-  children?: React.ReactNode
+  /** How the recording agent's row is tagged: "you" on Record Your Sale, "recorded this sale" when editing. */
+  ownerTag?: string
+  includeSelfInSearch?: boolean
 }) {
   // Share boxes keep what was typed ("33.") until blur; the number is pushed up
   // on every keystroke so validation always sees the latest value.
@@ -309,6 +357,156 @@ export function PartnerStep({
   }
 
   return (
+    <div className="space-y-5">
+      {partnerCount < MAX_SALE_PARTNERS ? (
+        <Field
+          label={partnerCount === 0 ? "Partner agent" : "Add another partner (optional)"}
+          required={partnerCount === 0}
+          error={errors.partners}
+        >
+          <PartnerSearch excludeIds={agents.map((a) => a.agent_id)} onPick={addPartner} includeSelf={includeSelfInSearch} />
+          <p className="mt-1.5 text-[11px] text-[#9ca3af]">
+            Active FHI agents only — up to {MAX_SALE_PARTNERS} partners on one sale.
+          </p>
+        </Field>
+      ) : (
+        <p className="rounded-xl border border-[#e5e5e5] bg-[#f8fafc] px-4 py-3 text-xs text-[#6b7280]">
+          A sale can have up to {MAX_SALE_PARTNERS} partner agents — remove one to add someone else.
+        </p>
+      )}
+
+      {partnerCount > 0 && (
+        <div>
+          <p className={labelCls}>
+            Agents and work-effort share <span className="text-rose-500">*</span>
+          </p>
+          <p className="-mt-1 mb-2 text-[11px] text-[#9ca3af]">
+            Type one agent&apos;s share and the rest fill in to make 100% — e.g. 50 for the Lead leaves 25 and 25.
+          </p>
+          <div className="space-y-3">
+            {agents.map((a) => {
+              const isOwner = a.agent_id === ownerId
+              const meta = info[a.agent_id]
+              return (
+                <div key={a.agent_id} className="rounded-2xl border border-[#e8eaed] bg-white p-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Avatar name={a.name} src={meta?.avatar ?? null} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-[#0d1117]">
+                        {a.name}
+                        {isOwner && <span className="ml-1.5 font-semibold text-[#9ca3af]">({ownerTag})</span>}
+                      </p>
+                      {meta?.roleLabel && <p className="truncate text-xs text-[#9ca3af]">{meta.roleLabel}</p>}
+                    </div>
+                    {a.role === "lead" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-[#d6b357]/50 bg-[#d6b357]/15 px-3 py-1 text-xs font-bold text-[#8a6d2a]">
+                        <Star className="h-3 w-3 fill-current" />
+                        {SALE_DEAL_ROLE_LABELS.lead}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => makeLead(a.agent_id)}
+                        title="Make this agent the Lead Agent (the client source)"
+                        className="inline-flex items-center gap-1 rounded-full border border-[#e5e5e5] px-3 py-1 text-xs font-semibold text-[#6b7280] transition-colors hover:border-[#d6b357] hover:text-[#8a6d2a]"
+                      >
+                        {SALE_DEAL_ROLE_LABELS.co_agent} · make lead
+                      </button>
+                    )}
+                    {!isOwner && (
+                      <button
+                        type="button"
+                        onClick={() => removePartner(a.agent_id)}
+                        aria-label={`Remove ${a.name}`}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-[#9ca3af] transition-colors hover:bg-rose-50 hover:text-rose-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3 sm:max-w-md">
+                    <div>
+                      <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#9ca3af]">Share (%)</label>
+                      <div className="relative">
+                        <input
+                          className={`${inputCls} pr-9`}
+                          inputMode="decimal"
+                          value={shareDrafts[a.agent_id] ?? (Number.isFinite(a.share) ? String(a.share) : "")}
+                          onChange={(e) => {
+                            const v = e.target.value.replace(/[^0-9.]/g, "")
+                            setShareDrafts((d) => ({ ...d, [a.agent_id]: v }))
+                            setShare(a.agent_id, v === "" ? Number.NaN : Number(v))
+                          }}
+                          onBlur={() =>
+                            setShareDrafts((d) => {
+                              const next = { ...d }
+                              delete next[a.agent_id]
+                              return next
+                            })
+                          }
+                          aria-label={`${a.name} share in percent`}
+                        />
+                        <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-[#9ca3af]">%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#9ca3af]">BRN No. (optional)</label>
+                      <input
+                        className={inputCls}
+                        value={a.brn ?? ""}
+                        onChange={(e) => patch(a.agent_id, { brn: e.target.value.slice(0, 40) })}
+                        placeholder="e.g. 12345"
+                        aria-label={`${a.name} BRN number`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div
+            className={`mt-3 flex items-center justify-between rounded-xl border px-4 py-3 text-sm font-bold ${
+              totalOk ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"
+            }`}
+          >
+            <span>Total share</span>
+            <span>{Number.isFinite(total) ? `${total}%` : "—"} {totalOk ? "✓" : "— must equal 100%"}</span>
+          </div>
+          {errors.partner_lead && <p className="mt-1 text-xs text-rose-600">{errors.partner_lead}</p>}
+          {errors.partner_share && <p className="mt-1 text-xs text-rose-600">{errors.partner_share}</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function PartnerStep({
+  hasPartner,
+  onHasPartner,
+  agents,
+  onAgentsChange,
+  info,
+  onAgentInfo,
+  ownerId,
+  errors,
+  children,
+}: {
+  hasPartner: boolean | null
+  onHasPartner: (value: boolean) => void
+  /** Every agent on the deal, the owner first. Empty until "Yes". */
+  agents: SalePartner[]
+  onAgentsChange: (next: SalePartner[]) => void
+  info: Record<string, PartnerAgentInfo>
+  onAgentInfo: (agentId: string, value: PartnerAgentInfo) => void
+  ownerId: string
+  errors: Record<string, string>
+  /** The A2A question, shown under the table once a partner is added. */
+  children?: React.ReactNode
+}) {
+  const partnerCount = agents.filter((a) => a.agent_id !== ownerId).length
+
+  return (
     <div className="space-y-6">
       <div>
         <h2 className="font-['Outfit'] text-xl font-bold text-[#0d1117]">Do you have a partner with this sale?</h2>
@@ -337,125 +535,14 @@ export function PartnerStep({
 
       {hasPartner && (
         <div className="space-y-5 border-t border-[#f0f2f5] pt-6">
-          {partnerCount < MAX_SALE_PARTNERS ? (
-            <Field
-              label={partnerCount === 0 ? "Partner agent" : "Add another partner (optional)"}
-              required={partnerCount === 0}
-              error={errors.partners}
-            >
-              <PartnerSearch excludeIds={agents.map((a) => a.agent_id)} onPick={addPartner} />
-              <p className="mt-1.5 text-[11px] text-[#9ca3af]">
-                Active FHI agents only — up to {MAX_SALE_PARTNERS} partners on one sale.
-              </p>
-            </Field>
-          ) : (
-            <p className="rounded-xl border border-[#e5e5e5] bg-[#f8fafc] px-4 py-3 text-xs text-[#6b7280]">
-              A sale can have up to {MAX_SALE_PARTNERS} partner agents — remove one to add someone else.
-            </p>
-          )}
-
-          {partnerCount > 0 && (
-            <div>
-              <p className={labelCls}>
-                Agents and work-effort share <span className="text-rose-500">*</span>
-              </p>
-              <p className="-mt-1 mb-2 text-[11px] text-[#9ca3af]">
-                Type one agent&apos;s share and the rest fill in to make 100% — e.g. 50 for the Lead leaves 25 and 25.
-              </p>
-              <div className="space-y-3">
-                {agents.map((a) => {
-                  const isOwner = a.agent_id === ownerId
-                  const meta = info[a.agent_id]
-                  return (
-                    <div key={a.agent_id} className="rounded-2xl border border-[#e8eaed] bg-white p-4">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <Avatar name={a.name} src={meta?.avatar ?? null} />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-bold text-[#0d1117]">
-                            {a.name}
-                            {isOwner && <span className="ml-1.5 font-semibold text-[#9ca3af]">(you)</span>}
-                          </p>
-                          {meta?.roleLabel && <p className="truncate text-xs text-[#9ca3af]">{meta.roleLabel}</p>}
-                        </div>
-                        {a.role === "lead" ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[#d6b357]/50 bg-[#d6b357]/15 px-3 py-1 text-xs font-bold text-[#8a6d2a]">
-                            <Star className="h-3 w-3 fill-current" />
-                            {SALE_DEAL_ROLE_LABELS.lead}
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => makeLead(a.agent_id)}
-                            title="Make this agent the Lead Agent (the client source)"
-                            className="inline-flex items-center gap-1 rounded-full border border-[#e5e5e5] px-3 py-1 text-xs font-semibold text-[#6b7280] transition-colors hover:border-[#d6b357] hover:text-[#8a6d2a]"
-                          >
-                            {SALE_DEAL_ROLE_LABELS.co_agent} · make lead
-                          </button>
-                        )}
-                        {!isOwner && (
-                          <button
-                            type="button"
-                            onClick={() => removePartner(a.agent_id)}
-                            aria-label={`Remove ${a.name}`}
-                            className="flex h-8 w-8 items-center justify-center rounded-full text-[#9ca3af] transition-colors hover:bg-rose-50 hover:text-rose-600"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-3 sm:max-w-md">
-                        <div>
-                          <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#9ca3af]">Share (%)</label>
-                          <div className="relative">
-                            <input
-                              className={`${inputCls} pr-9`}
-                              inputMode="decimal"
-                              value={shareDrafts[a.agent_id] ?? (Number.isFinite(a.share) ? String(a.share) : "")}
-                              onChange={(e) => {
-                                const v = e.target.value.replace(/[^0-9.]/g, "")
-                                setShareDrafts((d) => ({ ...d, [a.agent_id]: v }))
-                                setShare(a.agent_id, v === "" ? Number.NaN : Number(v))
-                              }}
-                              onBlur={() =>
-                                setShareDrafts((d) => {
-                                  const next = { ...d }
-                                  delete next[a.agent_id]
-                                  return next
-                                })
-                              }
-                              aria-label={`${a.name} share in percent`}
-                            />
-                            <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-[#9ca3af]">%</span>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#9ca3af]">BRN No. (optional)</label>
-                          <input
-                            className={inputCls}
-                            value={a.brn ?? ""}
-                            onChange={(e) => patch(a.agent_id, { brn: e.target.value.slice(0, 40) })}
-                            placeholder="e.g. 12345"
-                            aria-label={`${a.name} BRN number`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div
-                className={`mt-3 flex items-center justify-between rounded-xl border px-4 py-3 text-sm font-bold ${
-                  totalOk ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"
-                }`}
-              >
-                <span>Total share</span>
-                <span>{Number.isFinite(total) ? `${total}%` : "—"} {totalOk ? "✓" : "— must equal 100%"}</span>
-              </div>
-              {errors.partner_lead && <p className="mt-1 text-xs text-rose-600">{errors.partner_lead}</p>}
-              {errors.partner_share && <p className="mt-1 text-xs text-rose-600">{errors.partner_share}</p>}
-            </div>
-          )}
+          <PartnerSharesEditor
+            agents={agents}
+            onAgentsChange={onAgentsChange}
+            info={info}
+            onAgentInfo={onAgentInfo}
+            ownerId={ownerId}
+            errors={errors}
+          />
 
           {/* "Do you already have a signed A2A?" — rendered by the parent once a partner is added. */}
           {partnerCount > 0 && children}

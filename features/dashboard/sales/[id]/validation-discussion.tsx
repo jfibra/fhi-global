@@ -2,15 +2,14 @@
 
 import { useEffect, useState } from "react"
 import {
-  fetchSaleActivityLogs,
   fetchValidationComments,
   insertValidationComment,
   notifySaleComment,
-  type SaleActivityLog,
   type SaleValidationComment,
   type ValidationStatus,
 } from "@/lib/sales-service"
 import { UserAvatar } from "@/components/user-avatar"
+import { ActivityHistory } from "./activity-history"
 
 export type DiscussionTab = "discussion" | "activity"
 
@@ -33,19 +32,6 @@ function formatDateTime(value: string) {
   })
 }
 
-function actionLabel(type: string) {
-  const map: Record<string, string> = {
-    sale_created: "Sale Created",
-    sale_updated: "Sale Updated",
-    validation_status_changed: "Validation Status Changed",
-    commission_status_changed: "Commission Status Changed",
-    attachment_uploaded: "Attachment Uploaded",
-    attachment_deleted: "Attachment Deleted",
-    client_information_updated: "Client Information Updated",
-  }
-  return map[type] ?? type.replace(/_/g, " ")
-}
-
 export function ValidationDiscussion({
   saleId,
   currentUserId,
@@ -54,6 +40,7 @@ export function ValidationDiscussion({
   isAdmin,
   initialTab,
   readOnly = false,
+  saleTitle,
 }: {
   saleId: string
   currentUserId: string
@@ -63,12 +50,12 @@ export function ValidationDiscussion({
   initialTab?: DiscussionTab
   /** A partner on a shared sale follows the discussion but doesn't post in it. */
   readOnly?: boolean
+  /** Which sale this is — client · project · unit — so the open panel always says. */
+  saleTitle?: string
 }) {
   const [activeTab, setActiveTab] = useState<DiscussionTab>(initialTab ?? "discussion")
   const [comments, setComments] = useState<SaleValidationComment[]>([])
-  const [logs, setLogs] = useState<SaleActivityLog[]>([])
   const [loadingComments, setLoadingComments] = useState(false)
-  const [loadingLogs, setLoadingLogs] = useState(false)
   const [commentText, setCommentText] = useState("")
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -82,17 +69,6 @@ export function ValidationDiscussion({
       setLoadingComments(false)
     })()
   }, [saleId])
-
-  useEffect(() => {
-    if (!isAdmin || activeTab !== "activity") return
-    void (async () => {
-      setLoadingLogs(true)
-      const { data, error: fetchError } = await fetchSaleActivityLogs(saleId)
-      if (fetchError) setError(fetchError)
-      else setLogs(data ?? [])
-      setLoadingLogs(false)
-    })()
-  }, [saleId, activeTab, isAdmin])
 
   useEffect(() => {
     setActiveTab(initialTab ?? "discussion")
@@ -122,7 +98,10 @@ export function ValidationDiscussion({
   }
 
   return (
-    <div className="bg-white/60 backdrop-blur-xl rounded-[20px] border border-white/60 shadow-sm shadow-black/5 p-6 space-y-4">
+    <div className="bg-white rounded-[20px] border border-white/60 shadow-sm shadow-black/5 p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+      {saleTitle && (
+        <p className="font-['Outfit'] text-base font-bold text-[#0d1117]">{saleTitle}</p>
+      )}
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -226,44 +205,7 @@ export function ValidationDiscussion({
         </div>
       )}
 
-      {activeTab === "activity" && isAdmin && (
-        <div className="space-y-3">
-          {loadingLogs ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((item) => (
-                <div key={item} className="h-14 rounded-2xl bg-[#f3f4f6] animate-pulse" />
-              ))}
-            </div>
-          ) : logs.length === 0 ? (
-            <div className="px-4 py-6 rounded-2xl border border-[#f0f2f5] text-sm text-[#6b7280] text-center">
-              No activity logs yet.
-            </div>
-          ) : (
-            logs.map((entry) => (
-              <div key={entry.id} className="rounded-2xl border border-[#eef2f5] bg-[#fbfdff] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-[#001f3f]">{actionLabel(entry.action_type)}</p>
-                  <span className="text-[11px] text-[#9ca3af]">{formatDateTime(entry.created_at)}</span>
-                </div>
-                <p className="mt-1 text-xs text-[#6b7280]">
-                  {entry.profiles?.fullname ?? entry.performed_role ?? "User"}
-                  {entry.performed_role ? ` Â· ${entry.performed_role}` : ""}
-                </p>
-                {(entry.old_value != null || entry.new_value != null) && (
-                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
-                    <div className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-100 break-all">
-                      Old: {entry.old_value == null ? "—" : JSON.stringify(entry.old_value)}
-                    </div>
-                    <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 break-all">
-                      New: {entry.new_value == null ? "—" : JSON.stringify(entry.new_value)}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      )}
+      {activeTab === "activity" && isAdmin && <ActivityHistory saleId={saleId} />}
     </div>
   )
 }

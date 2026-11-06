@@ -502,7 +502,7 @@ export function AdminDashboardContent({
                 <div key={ticket.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[#f0f2f5] bg-[#f9fafb] px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-[#0d1117] truncate">{ticket.title}</p>
-                    <p className="text-xs text-[#9ca3af]">{titleCaseName(ticket.reportedBy) ?? "—"} Â· {titleCaseName(ticket.assignedTo) ?? "Unassigned"}</p>
+                    <p className="text-xs text-[#9ca3af]">{titleCaseName(ticket.reportedBy) ?? "—"} · {titleCaseName(ticket.assignedTo) ?? "Unassigned"}</p>
                   </div>
                   <StatusPill status={ticket.status} />
                 </div>
@@ -628,7 +628,7 @@ export function AdminDashboardContent({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-[#0d1117] leading-snug">{item.description}</p>
                     <p className="text-xs text-[#9ca3af] mt-0.5">
-                      {item.performedBy} Â· {item.performedRole ? humanize(item.performedRole) : "System"}
+                      {item.performedBy} · {item.performedRole ? humanize(item.performedRole) : "System"}
                     </p>
                   </div>
                   <p className="text-[11px] text-[#9ca3af] shrink-0 pt-0.5">{fmtTime(item.createdAt)}</p>

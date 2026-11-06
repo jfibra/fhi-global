@@ -381,7 +381,7 @@ export function TaxEntityFormDialog({
                 </div>
                 {errors.tax_registration_number
                   ? <p className="text-xs text-rose-500 mt-1 ml-1">{errors.tax_registration_number}</p>
-                  : <p className="text-[11px] text-[#9ca3af] mt-1 ml-1">UAE VAT TRN Â· 15 digits Â· XXX-XXXXXXX-XXXXX</p>
+                  : <p className="text-[11px] text-[#9ca3af] mt-1 ml-1">UAE VAT TRN · 15 digits · XXX-XXXXXXX-XXXXX</p>
                 }
               </div>
 

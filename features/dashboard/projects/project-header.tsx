@@ -170,7 +170,7 @@ export function ProjectHeader({ project, onPublishToggle, onDuplicate, onDelete,
               <span className="text-[#6b7280] text-xs">by {project.developers.name}</span>
             )}
             {project.city && (
-              <span className="text-[#9ca3af] text-xs">Â· {project.city}{project.country ? `, ${project.country}` : ""}</span>
+              <span className="text-[#9ca3af] text-xs">· {project.city}{project.country ? `, ${project.country}` : ""}</span>
             )}
           </div>
         </div>

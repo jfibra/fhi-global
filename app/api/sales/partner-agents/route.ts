@@ -16,7 +16,9 @@ import { titleCaseName } from "@/lib/public-profile"
  * the profile id — a partner is linked to the sale, not just named.
  *
  * Only active FHI sales agents can be partners (the migration 055 trigger
- * enforces the same list), and the caller is never suggested to themselves.
+ * enforces the same list), and the caller is never suggested to themselves —
+ * except with includeSelf=1, sent when a team leader edits a member's sale and
+ * may be the partner who is missing from it.
  * Runs on the caller's own session: profiles is readable by any signed-in user
  * (migration 020), so no service-role client is needed.
  */
@@ -41,7 +43,7 @@ export async function GET(req: NextRequest) {
     .in("role", [...ROLES_SALE_AGENT_PROFILES])
     .eq("status", "active")
     .not("is_deleted", "is", true)
-    .neq("id", session.context.userId)
+  if (req.nextUrl.searchParams.get("includeSelf") !== "1") query = query.neq("id", session.context.userId)
   // Every typed word must appear, so "maria santos" still finds a name stored
   // with a double space or a middle name in between.
   for (const word of q.split(" ")) query = query.ilike("fullname", `%${word}%`)

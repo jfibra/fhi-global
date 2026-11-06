@@ -217,6 +217,14 @@ export function SaleDetails({
                     {" · "}{formatDate(sale.validation_changed_at)}
                   </p>
                 )}
+                {/* The team leader's check before the admin's (migration 084). */}
+                {sale.leader_confirmed_at && (
+                  <p className="mt-1.5 text-[11px] text-emerald-700">
+                    Confirmed by team leader{" "}
+                    <span className="font-semibold">{toTitleCase(sale.leader_confirmed_by_name) || "—"}</span>
+                    {" · "}{formatDate(sale.leader_confirmed_at)}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -231,7 +239,13 @@ export function SaleDetails({
                   </span>
                 } />
                 <DetailRow label="Created" value={formatDate(sale.created_at)} />
-                <DetailRow label="Updated" value={formatDate(sale.updated_at)} />
+                {/* Last change to the details, client or partners — and by whom (084). */}
+                <DetailRow
+                  label="Last edited"
+                  value={sale.edited_at
+                    ? `${formatDate(sale.edited_at)} · ${toTitleCase(sale.edited_by_name) || "—"}`
+                    : "Never — as recorded"}
+                />
               </div>
             </div>
           </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { Eye, MoreHorizontal, Paperclip, Pencil, Trash2 } from "lucide-react"
+import { Eye, MoreHorizontal, Paperclip, Pencil, Trash2, Undo2 } from "lucide-react"
 import { canManageSaleAttachmentsForRole, type SaleRecord } from "@/lib/sales-service"
 import { isAdminStaffRole } from "@/lib/app-roles"
 
@@ -21,6 +21,8 @@ export function SaleActions({
   onEdit,
   onAttachments,
   onDelete,
+  canEdit: canEditProp,
+  onUndoConfirm,
 }: {
   sale: SaleRecord
   currentRole: string
@@ -30,9 +32,13 @@ export function SaleActions({
   onEdit: () => void
   onAttachments: () => void
   onDelete?: () => void
+  /** Edit rights from the caller — a team leader's team sale (migration 084). Admins always edit. */
+  canEdit?: boolean
+  /** The team leader takes back their confirmation, while the admin hasn't decided. */
+  onUndoConfirm?: () => void
 }) {
   const isAdmin = isAdminStaffRole(currentRole)
-  const canEdit = isAdmin
+  const canEdit = isAdmin || Boolean(canEditProp)
   const canDelete = isAdmin && Boolean(onDelete)
   const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, sale, currentUserId)
   const [open, setOpen] = useState(false)
@@ -46,7 +52,7 @@ export function SaleActions({
       if (!triggerRef.current) return
       const rect = triggerRef.current.getBoundingClientRect()
       const menuWidth = 210
-      const itemCount = 1 + (canEdit ? 1 : 0) + (canManageAttachments ? 1 : 0) + (canDelete ? 1 : 0)
+      const itemCount = 1 + (canEdit ? 1 : 0) + (canManageAttachments ? 1 : 0) + (canDelete ? 1 : 0) + (onUndoConfirm ? 1 : 0)
       const estimatedMenuHeight = itemCount * 40 + 24
       const viewportPadding = 8
       const placeBelow = rect.bottom + 8 + estimatedMenuHeight <= window.innerHeight - viewportPadding
@@ -66,7 +72,7 @@ export function SaleActions({
       window.removeEventListener("resize", computePosition)
       window.removeEventListener("scroll", computePosition, true)
     }
-  }, [open, canEdit, canManageAttachments, canDelete])
+  }, [open, canEdit, canManageAttachments, canDelete, onUndoConfirm])
 
   useEffect(() => {
     if (!open) return
@@ -87,6 +93,8 @@ export function SaleActions({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        title="More actions"
+        aria-label="More actions"
         className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#f3f4f6] transition-colors text-[#6b7280]"
       >
         <MoreHorizontal className="w-4 h-4" />
@@ -128,6 +136,17 @@ export function SaleActions({
                   className="w-full flex items-center gap-3 px-4 py-2 text-sm text-[#374151] hover:bg-[#f8fafc] transition-colors"
                 >
                   <Paperclip className="w-4 h-4 text-[#9ca3af]" /> Manage Attachments
+                </button>
+              )}
+
+              {/* Undo the team leader's confirmation */}
+              {onUndoConfirm && (
+                <button
+                  type="button"
+                  onClick={() => act(onUndoConfirm)}
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-[#374151] hover:bg-[#f8fafc] transition-colors"
+                >
+                  <Undo2 className="w-4 h-4 text-[#9ca3af]" /> Undo my confirmation
                 </button>
               )}
 

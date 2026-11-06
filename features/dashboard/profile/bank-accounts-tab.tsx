@@ -39,8 +39,8 @@ function Portal({ children }: { children: React.ReactNode }) {
 
 // ─── Static option lists ───────────────────────────────────────────────────────
 const COUNTRIES = [
-  { label: "ðŸ‡¦ðŸ‡ª United Arab Emirates (AE)", value: "AE" },
-  { label: "ðŸ‡µðŸ‡­ Philippines (PH)",           value: "PH" },
+  { label: "🇦🇪 United Arab Emirates (AE)", value: "AE" },
+  { label: "🇵🇭 Philippines (PH)",           value: "PH" },
 ]
 
 const BANKS_BY_COUNTRY: Record<string, string[]> = {

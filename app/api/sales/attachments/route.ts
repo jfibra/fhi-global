@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { leaderAuthority } from "@/lib/team-sales-review"
 import {
   canAccessSalesReportsArea,
   isAdminStaffRole,
@@ -23,6 +24,9 @@ import {
  *   · admin staff              → always
  *   · sales-pipeline owner      → their own sale, any validation status
  *   · secretary-like            → only while under_review / invalid_sale
+ *   · team leader               → a sale their team recorded, while the team
+ *                                 lets its leader edit sales (migration 084) —
+ *                                 e.g. the signed A2A after adding a partner
  */
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -101,7 +105,8 @@ export async function POST(request: NextRequest) {
     const allowed =
       isAdminStaffRole(role) ||
       (isSalesPipelineRole(role) && isOwner) ||
-      (isSecretaryLikeRole(role) && REVIEW_STATUSES.includes(status))
+      (isSecretaryLikeRole(role) && REVIEW_STATUSES.includes(status)) ||
+      (role === "team_leader" && (await leaderAuthority(admin, user.id, String(sale.agent_id))).canEdit)
 
     if (!allowed) {
       return NextResponse.json(

@@ -5,12 +5,14 @@
 // production, the leader's own numbers, and a monthly trend.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import Link from "next/link"
 import {
-  TrendingUp, Users, Trophy, Search, ChevronDown, CalendarDays, UserRound, Loader2, Sparkles,
+  TrendingUp, Users, Trophy, Search, ChevronDown, CalendarDays, UserRound, Loader2, Sparkles, ArrowRight,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
+import { getDashboardRouteByRole } from "@/lib/auth"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
-import { ROLES_TEAM_REPORT_LEADERS, roleInList } from "@/lib/app-roles"
+import { normalizeAppRole, ROLES_TEAM_REPORT_LEADERS, roleInList } from "@/lib/app-roles"
 import { TeamReportDialog } from "@/features/dashboard/teams/team-report-dialog"
 import { UserAvatar } from "@/components/user-avatar"
 import { ROLE_COLORS, ROLE_OPTIONS } from "@/lib/user-service"
@@ -367,6 +369,12 @@ export default function TeamSalesPage() {
   const hasGroup = scope !== "none"
   const groupNoun = scope === "recruits" ? "recruits" : "members"
   const groupTitle = scope === "recruits" ? "My recruit network" : data?.teamName ?? null
+  // A team leader opens any member's sales in the Sales Report's team view
+  // (migration 084 lets them read their team's sales).
+  const memberSalesHref =
+    scope === "team" && normalizeAppRole(role) === "team_leader"
+      ? `${getDashboardRouteByRole(role)}/sales/project-sale?scope=team&member=`
+      : null
 
   return (
     <div className="max-w-[1200px] space-y-5">
@@ -559,6 +567,15 @@ export default function TeamSalesPage() {
                         <p className="text-[13px] font-bold text-[#0d1117] tabular-nums">{m.value > 0 ? moneyShort(m.value) : "—"}</p>
                         <p className="text-[10px] text-[#9ca3af]">{m.deals} {m.deals === 1 ? "deal" : "deals"} · {Math.round(share * 100)}%</p>
                       </div>
+                      {memberSalesHref && (
+                        <Link
+                          href={`${memberSalesHref}${m.id}`}
+                          title={`See every sale ${titleCase(m.fullname ?? "this member")} recorded`}
+                          className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-[#e5e7eb] px-2.5 py-1 text-[11px] font-semibold text-[#374151] hover:border-[#d6b357] hover:text-[#8a6d2a] transition-colors"
+                        >
+                          See sales <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      )}
                     </div>
                   )
                 })}

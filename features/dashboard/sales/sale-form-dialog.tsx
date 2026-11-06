@@ -5,6 +5,7 @@ import { createPortal } from "react-dom"
 import {
   Building2,
   Calendar,
+  Handshake,
   DollarSign,
   Eye,
   FileText,
@@ -18,14 +19,19 @@ import {
   User,
   X,
   ExternalLink,
+  ArrowLeft,
+  ArrowRight,
 } from "lucide-react"
 import {
   canEditSaleForRole,
   canManageSaleAttachmentsForRole,
   createSale,
   notifySaleEvent,
+  partnersChanged,
   updateSale,
+  updateSaleAsLeader,
   validateSaleFormData,
+  validateSalePartners,
   fetchDevelopersForSale,
   fetchProjectsForDeveloper,
   fetchUnitsForProject,
@@ -39,14 +45,16 @@ import {
   type CommissionStatus,
   type ValidationStatus,
   type SaleAttachment,
+  type SaleAttachmentCategory,
+  type SalePartner,
   fetchSaleAttachments,
-  insertSaleAttachment,
   uploadSaleProofFile,
   deleteSaleAttachment,
 } from "@/lib/sales-service"
 import { isAdminStaffRole } from "@/lib/app-roles"
 import { DeveloperCombobox } from "@/components/developers/developer-combobox"
-import { compressImageForUpload } from "@/lib/upload/compress-image"
+import { ChoiceCard, PartnerSharesEditor, type PartnerAgentInfo } from "./encode/partner-step"
+import { toTitleCase } from "./sale-ui"
 
 // ─── Portal ───────────────────────────────────────────────────────────────────
 
@@ -128,6 +136,8 @@ export function SaleFormDialog({
   onClose,
   onSaved,
   onError,
+  leaderMode = null,
+  performerName = null,
 }: {
   open: boolean
   viewMode: boolean
@@ -137,15 +147,36 @@ export function SaleFormDialog({
   onClose: () => void
   onSaved: (sale: SaleRecord, isEdit: boolean) => void
   onError: (message: string) => void
+  /**
+   * A team leader editing a team sale (migration 084): the save goes through
+   * app/api/team/sales/[id] and keeps the sale's status; `canConfirm` offers to
+   * confirm it for the admin in the same save.
+   */
+  leaderMode?: { canConfirm: boolean } | null
+  /** The editor's display name, for the "Edited by" stamp. */
+  performerName?: string | null
 }) {
   const isEdit = Boolean(editSale)
-  const canEditCurrentSale = canEditSaleForRole(currentRole, editSale)
+  // Primitives, not the object: the populate effect depends on them, and an
+  // inline `leaderMode={{…}}` would otherwise reset the form on every render.
+  const leaderCanEdit = Boolean(leaderMode)
+  const leaderCanConfirm = Boolean(leaderMode?.canConfirm)
+  const canEditCurrentSale = canEditSaleForRole(currentRole, editSale, { leaderCanEdit })
   const canManageAttachments = canManageSaleAttachmentsForRole(currentRole, editSale, currentUserId)
+  // A team leader may add files (the signed A2A after adding a partner) but
+  // never remove them — /api/sales/attachments checks the same on the server.
+  const canUploadAttachments = canManageAttachments || leaderCanEdit
   const disabled = viewMode || (isEdit && !canEditCurrentSale)
   const isAdmin = isAdminStaffRole(currentRole)
+  const confirmable =
+    leaderCanConfirm &&
+    Boolean(editSale) &&
+    editSale!.agent_id !== currentUserId &&
+    !editSale!.leader_confirmed_at &&
+    (editSale!.validation_status === "pending" || editSale!.validation_status === "under_review")
 
   // ─── All state declarations (must precede derived values) ────────────────
-  const [activeTab, setActiveTab] = useState<"property"|"client"|"contract"|"workflow"|"attachments">("property")
+  const [activeTab, setActiveTab] = useState<"property"|"client"|"contract"|"partners"|"workflow"|"attachments">("property")
   const [form, setForm] = useState<SaleFormData>(EMPTY_FORM)
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({})
   const [saving, setSaving] = useState(false)
@@ -164,10 +195,21 @@ export function SaleFormDialog({
   // staged files for CREATE mode (uploaded after sale is saved)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const pendingInputRef = useRef<HTMLInputElement>(null)
+  // What an edit-mode upload is: proof of transaction, or the signed A2A.
+  const [attCategory, setAttCategory] = useState<SaleAttachmentCategory>("proof")
+  // Partnership split (edit only). `partners` is kept while "Solo" is picked,
+  // so switching back restores it.
+  const [shared, setShared] = useState(false)
+  const [partners, setPartners] = useState<SalePartner[]>([])
+  const [partnerInfo, setPartnerInfo] = useState<Record<string, PartnerAgentInfo>>({})
+  const [partnerErrors, setPartnerErrors] = useState<Record<string, string>>({})
+  // A team leader's "also confirm it" box, on by default.
+  const [confirmToo, setConfirmToo] = useState(true)
 
   // ─── Tab configuration (derived after state) ─────────────────────────────
-  type TabId = "property" | "client" | "contract" | "workflow" | "attachments"
+  type TabId = "property" | "client" | "contract" | "partners" | "workflow" | "attachments"
   const tabForErrorKey = (key: string): TabId => {
+    if (key.startsWith("partner")) return "partners"
     if (["developer_id", "project_id", "unit_information"].includes(key)) return "property"
     if (key.startsWith("client.") || key === "client_address") return "client"
     if (["contract_price", "reservation_date", "payment_plan", "payment_terms"].includes(key)) return "contract"
@@ -177,6 +219,7 @@ export function SaleFormDialog({
     { id: "property",    label: "Property" },
     { id: "client",      label: "Client" },
     { id: "contract",    label: "Contract" },
+    ...(isEdit && !viewMode ? [{ id: "partners" as TabId, label: "Partners" }] : []),
     ...(isAdmin ? [{ id: "workflow" as TabId, label: "Workflow" }] : []),
     ...(!viewMode ? [{ id: "attachments" as TabId, label: pendingFiles.length > 0 ? `Attachments (${pendingFiles.length})` : (isEdit ? "Attachments" : "Attachments *") }] : []),
   ]
@@ -191,8 +234,8 @@ export function SaleFormDialog({
   // Populate form on open
   useEffect(() => {
     if (!open) return
-    if (editSale && !canEditSaleForRole(currentRole, editSale)) {
-      onError("You can only edit sales that are Invalid Sale or Under Review")
+    if (editSale && !canEditSaleForRole(currentRole, editSale, { leaderCanEdit })) {
+      onError("You can't edit this sale")
       onClose()
       return
     }
@@ -200,6 +243,12 @@ export function SaleFormDialog({
     setPendingFiles([])
     setAttachments([])
     setAttError(null)
+    setAttCategory("proof")
+    setShared(Boolean(editSale && editSale.partners.length > 0))
+    setPartners(editSale?.partners ?? [])
+    setPartnerInfo({})
+    setPartnerErrors({})
+    setConfirmToo(true)
 
     if (editSale) {
       const client = editSale.clients
@@ -258,7 +307,7 @@ export function SaleFormDialog({
       const firstErrorKey = Object.keys(validateSaleFormData(EMPTY_FORM))[0]
       setActiveTab(firstErrorKey ? tabForErrorKey(firstErrorKey) : "property")
     }
-  }, [open, editSale, currentRole, onClose, onError])
+  }, [open, editSale, currentRole, leaderCanEdit, onClose, onError])
 
   // Load attachments when Attachments tab becomes active (edit mode only)
   useEffect(() => {
@@ -304,29 +353,17 @@ export function SaleFormDialog({
     }
   }
 
+  // Through the service-role route (uploadSaleProofFile), which is the
+  // authority on who may attach what — and records the A2A's category.
   const uploadAttachmentFile = async (file: File, saleId: string) => {
-    if (!canManageAttachments) {
+    if (!canUploadAttachments) {
       setAttError("You can only manage attachments when validation is Invalid Sale or Under Review")
       return
     }
     setAttError(null)
     setAttUploading(true)
     try {
-      const formData = new FormData()
-      const { file: toUpload } = await compressImageForUpload(file)
-      formData.append("file", toUpload, toUpload.name)
-      formData.append("saleId", saleId)
-      const res = await fetch("/api/upload/sale-file", { method: "POST", body: formData })
-      const json = await res.json() as { url?: string; file_name?: string; file_type?: string; error?: string }
-      if (!res.ok || json.error) { setAttError(json.error ?? "Upload failed"); return }
-      const { data, error } = await insertSaleAttachment({
-        sales_report_id: saleId,
-        file_name:       json.file_name ?? file.name,
-        file_url:        json.url!,
-        file_type:       json.file_type ?? null,
-        uploaded_by:     currentUserId,
-        uploaded_role:   currentRole,
-      })
+      const { data, error } = await uploadSaleProofFile(file, saleId, attCategory)
       if (error) { setAttError(error); return }
       setAttachments((prev) => [data!, ...prev])
     } finally {
@@ -378,6 +415,39 @@ export function SaleFormDialog({
     }, 50)
   }
 
+  // ─── Step-by-step: Next through the tabs, Save on the last ─────────────────
+  // Non-technical users missed fields on tabs they never opened; Next walks
+  // them through every tab and checks each one before moving on. The tabs
+  // stay clickable for anyone who wants to jump.
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const tabIndex = Math.max(0, allTabs.findIndex((t) => t.id === activeTab))
+  const isLastTab = tabIndex === allTabs.length - 1
+  const goToTab = (id: TabId) => {
+    setActiveTab(id)
+    bodyRef.current?.scrollTo({ top: 0 })
+  }
+  const goNext = () => {
+    const tabErrors = Object.fromEntries(
+      Object.entries(validate()).filter(([key]) => tabForErrorKey(key) === activeTab),
+    )
+    if (Object.keys(tabErrors).length > 0) {
+      setErrors((prev) => ({ ...prev, ...tabErrors }))
+      focusInvalidField(Object.keys(tabErrors)[0])
+      return
+    }
+    if (activeTab === "partners" && editSale && shared && partnersChanged(editSale.partners, partners)) {
+      const perrs = validateSalePartners(partners, editSale.agent_id, { editing: true })
+      setPartnerErrors(perrs)
+      if (Object.keys(perrs).length > 0) return
+    }
+    const next = allTabs[tabIndex + 1]
+    if (next) goToTab(next.id)
+  }
+  const goBack = () => {
+    const prev = allTabs[tabIndex - 1]
+    if (prev) goToTab(prev.id)
+  }
+
   const handleSubmit = async () => {
     const errs = validate()
     if (Object.keys(errs).length > 0) {
@@ -396,10 +466,29 @@ export function SaleFormDialog({
       return
     }
 
+    // The split, when it changed: [] = back to solo, null = leave it alone.
+    let partnersToSave: SalePartner[] | null = null
+    if (isEdit && editSale) {
+      const next = shared ? partners : []
+      if (partnersChanged(editSale.partners, next)) partnersToSave = next
+      if (partnersToSave && partnersToSave.length > 0) {
+        const perrs = validateSalePartners(partnersToSave, editSale.agent_id, { editing: true })
+        setPartnerErrors(perrs)
+        if (Object.keys(perrs).length > 0) {
+          setActiveTab("partners")
+          return
+        }
+      }
+    }
+
     setSaving(true)
     try {
-      if (isEdit && editSale) {
-        const { data, error } = await updateSale(editSale.id, form, currentUserId, currentRole)
+      if (isEdit && editSale && leaderCanEdit && !isAdmin) {
+        const { data, error } = await updateSaleAsLeader(editSale.id, form, partnersToSave, confirmable && confirmToo)
+        if (error) { onError(error); return }
+        onSaved(data!, true)
+      } else if (isEdit && editSale) {
+        const { data, error } = await updateSale(editSale.id, form, currentUserId, currentRole, partnersToSave, performerName)
         if (error) { onError(error); return }
         // Email the agent about any status an admin changed through the form.
         if (data!.validation_status !== editSale.validation_status) notifySaleEvent(editSale.id, "validation")
@@ -443,51 +532,58 @@ export function SaleFormDialog({
   return (
     <Portal>
       <div className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 pointer-events-none">
+      {/* XL on a desktop; the whole screen on a phone, where a floating card
+          leaves too little room for the form and the keyboard. */}
+      <div className="fixed inset-0 z-[120] flex items-center justify-center p-0 sm:p-4 pointer-events-none">
         <div
-          className="pointer-events-auto w-full max-w-3xl bg-white rounded-[28px] shadow-2xl flex flex-col max-h-[95vh]"
+          className="pointer-events-auto w-full max-w-5xl bg-white sm:rounded-[28px] shadow-2xl flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh]"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="relative shrink-0 px-7 pt-7 pb-5">
+          <div className="relative shrink-0 px-4 pt-5 pb-4 sm:px-7 sm:pt-7 sm:pb-5">
             <div
-              className="absolute top-0 left-0 right-0 h-[3px] rounded-t-[28px]"
+              className="absolute top-0 left-0 right-0 h-[3px] sm:rounded-t-[28px]"
               style={{ background: "linear-gradient(to bottom, #0a3d6b, #001f3f)" }}
             />
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shadow-md">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="w-10 h-10 shrink-0 rounded-2xl bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] flex items-center justify-center shadow-md">
                   {viewMode ? <Eye className="w-5 h-5 text-white" /> : isEdit ? <Pencil className="w-5 h-5 text-white" /> : <DollarSign className="w-5 h-5 text-white" />}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h2 className="font-['Outfit'] text-lg font-bold text-[#0d1117]">{title}</h2>
-                  <p className="text-xs text-[#9ca3af] mt-0.5">
-                    {viewMode ? "View sale details" : isEdit ? "Update transaction record" : "Record a new property sale transaction"}
+                  <p className="text-xs sm:text-sm text-[#9ca3af] mt-0.5">
+                    {viewMode
+                      ? "View sale details"
+                      : isEdit && leaderCanEdit && !isAdmin
+                        ? `Recorded by ${toTitleCase(editSale?.profiles?.fullname) || "your team"} — your changes keep the sale's status and are saved with your name and the date.`
+                        : isEdit ? "Update transaction record" : "Record a new property sale transaction"}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#f3f4f6] text-[#9ca3af] hover:text-[#374151] transition-all"
+                aria-label="Close"
+                className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full hover:bg-[#f3f4f6] text-[#9ca3af] hover:text-[#374151] transition-all"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          <div className="mx-7 h-px bg-[#f0f2f5]" />
+          <div className="mx-4 sm:mx-7 h-px bg-[#f0f2f5]" />
 
-          {/* Tab navigation */}
+          {/* Tab navigation — scrolls sideways on a phone instead of squeezing six labels */}
           {!viewMode && (
-            <div className="shrink-0 px-7 pt-4 pb-0">
-              <div className="flex gap-1 bg-[#f3f4f6] p-1 rounded-2xl">
+            <div className="shrink-0 px-4 sm:px-7 pt-4 pb-0">
+              <div className="flex gap-1 overflow-x-auto bg-[#f3f4f6] p-1 rounded-2xl [scrollbar-width:none]">
                 {allTabs.map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all ${
+                    onClick={() => goToTab(tab.id)}
+                    className={`flex-none sm:flex-1 whitespace-nowrap py-2 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                       activeTab === tab.id
                         ? "bg-white text-[#001f3f] shadow-sm"
                         : "text-[#6b7280] hover:text-[#374151]"
@@ -501,7 +597,7 @@ export function SaleFormDialog({
           )}
 
           {/* Scrollable body */}
-          <div className="flex-1 overflow-y-auto px-7 py-6">
+          <div ref={bodyRef} className="flex-1 overflow-y-auto px-4 py-5 sm:px-7 sm:py-6">
 
             {/* === Property Information === */}
             {(viewMode || activeTab === "property") && (
@@ -925,6 +1021,58 @@ export function SaleFormDialog({
             </div>
             )} {/* end contract tab */}
 
+            {/* === Partnership split — edit only (admin, or the team leader) === */}
+            {isEdit && editSale && activeTab === "partners" && !viewMode && (
+            <div className="space-y-5">
+              <SectionTitle icon={Handshake} title="Partnership" />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <ChoiceCard
+                  selected={!shared}
+                  icon={User}
+                  title="Solo sale"
+                  desc={`Only ${toTitleCase(editSale.profiles?.fullname) || "the recording agent"} — they get 100% of it.`}
+                  onClick={() => { setShared(false); setPartnerErrors({}) }}
+                />
+                <ChoiceCard
+                  selected={shared}
+                  icon={Handshake}
+                  title="Shared sale"
+                  desc="Add the partner agents and each one's share of the deal."
+                  onClick={() => {
+                    setShared(true)
+                    setPartnerErrors({})
+                    // A sale turning shared starts from its recording agent at 100%.
+                    if (partners.length === 0) {
+                      setPartners([{
+                        agent_id: editSale.agent_id,
+                        name: toTitleCase(editSale.profiles?.fullname) || "Agent",
+                        role: "lead",
+                        share: 100,
+                        brn: null,
+                      }])
+                    }
+                  }}
+                />
+              </div>
+              {shared && (
+                <PartnerSharesEditor
+                  agents={partners}
+                  onAgentsChange={(next) => { setPartners(next); setPartnerErrors({}) }}
+                  info={partnerInfo}
+                  onAgentInfo={(agentId, value) => setPartnerInfo((prev) => ({ ...prev, [agentId]: value }))}
+                  ownerId={editSale.agent_id}
+                  ownerTag="recorded this sale"
+                  errors={partnerErrors}
+                  // A team leader editing a member's sale may be the partner who is missing.
+                  includeSelfInSearch={editSale.agent_id !== currentUserId}
+                />
+              )}
+              <p className="text-xs text-[#6b7280]">
+                Each agent&apos;s totals count their share. After adding a partner, attach the signed A2A agreement in the Attachments tab.
+              </p>
+            </div>
+            )} {/* end partners tab */}
+
             {/* === Commission & Validation — Admin only === */}
             {isAdmin && (viewMode || activeTab === "workflow") && (
             <div>
@@ -967,15 +1115,38 @@ export function SaleFormDialog({
                 {isEdit ? (
                   /* ── EDIT MODE: live upload to S3 ── */
                   <>
+                    {canUploadAttachments && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-semibold text-[#6b7280]">This file is:</span>
+                        {([
+                          { value: "proof", label: "Proof of transaction" },
+                          { value: "partnership_agreement", label: "Signed A2A agreement" },
+                        ] as const).map((o) => (
+                          <button
+                            key={o.value}
+                            type="button"
+                            onClick={() => setAttCategory(o.value)}
+                            aria-pressed={attCategory === o.value}
+                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                              attCategory === o.value
+                                ? "border-[#001f3f] bg-[#001f3f] text-white"
+                                : "border-[#e5e5e5] bg-white text-[#374151] hover:border-[#001f3f]/40"
+                            }`}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <div
                       onDragOver={(e) => {
-                        if (!canManageAttachments) return
+                        if (!canUploadAttachments) return
                         e.preventDefault()
                         setAttDragOver(true)
                       }}
                       onDragLeave={() => setAttDragOver(false)}
                       onDrop={async (e) => {
-                        if (!canManageAttachments) return
+                        if (!canUploadAttachments) return
                         e.preventDefault()
                         setAttDragOver(false)
                         const file = e.dataTransfer.files?.[0]
@@ -987,7 +1158,7 @@ export function SaleFormDialog({
                           : "border-[#e5e5e5] hover:border-[#001f3f]/25 hover:bg-[#fafbfc]"
                       }`}
                       onClick={() => {
-                        if (!canManageAttachments) return
+                        if (!canUploadAttachments) return
                         fileInputRef.current?.click()
                       }}
                     >
@@ -1003,10 +1174,10 @@ export function SaleFormDialog({
                           </div>
                           <div className="text-center">
                             <p className="text-sm font-semibold text-[#374151]">
-                              {canManageAttachments ? "Click to upload or drag & drop" : "Attachments are read-only for this validation status"}
+                              {canUploadAttachments ? "Click to upload or drag & drop" : "Attachments are read-only for this validation status"}
                             </p>
                             <p className="text-xs text-[#9ca3af] mt-0.5">
-                              {canManageAttachments ? "PDF, Word, Excel, images — max 25 MB" : "Set validation to Invalid Sale or Under Review to manage files"}
+                              {canUploadAttachments ? "PDF, Word, Excel, images — max 25 MB" : "Set validation to Invalid Sale or Under Review to manage files"}
                             </p>
                           </div>
                         </>
@@ -1067,7 +1238,7 @@ export function SaleFormDialog({
                   /* ── CREATE MODE: stage files locally; uploaded after sale is saved ── */
                   <>
                     <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-100 rounded-2xl text-sm text-amber-800">
-                      <span>ðŸ“Ž</span>
+                      <span>📎</span>
                       <p><strong>Proof of transaction is required.</strong> Files added here upload automatically after the sale is saved.</p>
                     </div>
                     <div
@@ -1120,7 +1291,7 @@ export function SaleFormDialog({
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-semibold text-[#0d1117] truncate">{file.name}</p>
                               <p className="text-xs text-[#9ca3af] mt-0.5">
-                                {file.type || "file"} Â· {(file.size / 1024).toFixed(0)} KB
+                                {file.type || "file"} · {(file.size / 1024).toFixed(0)} KB
                               </p>
                             </div>
                             <button
@@ -1141,33 +1312,70 @@ export function SaleFormDialog({
             )} {/* end attachments tab */}
           </div>
 
-          {/* Footer — always visible in create mode; hidden in edit mode's attachments tab */}
-          {!viewMode && (activeTab !== "attachments" || !isEdit) && (
+          {/* Footer — Next through the tabs; Save only on the last one */}
+          {!viewMode && (
             <>
-              <div className="mx-7 h-px bg-[#f0f2f5]" />
-              <div className="shrink-0 px-7 py-5 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-6 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:bg-[#f3f4f6] transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleSubmit()}
-                  disabled={saving}
-                  className="inline-flex items-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-7 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {saving
-                    ? (pendingFiles.length > 0 && !isEdit ? "Saving & uploading…" : "Saving…")
-                    : isEdit
-                    ? "Save Changes"
-                    : pendingFiles.length > 0
-                    ? `Record Sale + ${pendingFiles.length} file${pendingFiles.length > 1 ? "s" : ""}`
-                    : "Record Sale"
-                  }
-                </button>
+              <div className="mx-4 sm:mx-7 h-px bg-[#f0f2f5]" />
+              <div className="shrink-0 px-4 py-4 sm:px-7 sm:py-5 flex flex-wrap items-center gap-3">
+                {isEdit && confirmable && isLastTab && (
+                  <label className="w-full inline-flex cursor-pointer items-center gap-2 text-sm text-[#374151]">
+                    <input
+                      type="checkbox"
+                      checked={confirmToo}
+                      onChange={(e) => setConfirmToo(e.target.checked)}
+                      className="h-4 w-4 rounded border-[#d1d5db] accent-[#001f3f]"
+                    />
+                    Also confirm this sale for the admin
+                  </label>
+                )}
+                <p className="hidden sm:block text-xs text-[#9ca3af]">
+                  Step {tabIndex + 1} of {allTabs.length} · <span className="font-semibold text-[#6b7280]">{allTabs[tabIndex]?.label}</span>
+                </p>
+                <div className="flex w-full sm:w-auto sm:ml-auto items-center gap-2 sm:gap-3">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex-1 sm:flex-none px-5 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:bg-[#f3f4f6] transition-all"
+                  >
+                    Cancel
+                  </button>
+                  {tabIndex > 0 && (
+                    <button
+                      type="button"
+                      onClick={goBack}
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-2xl border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:bg-[#f3f4f6] transition-all"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      Back
+                    </button>
+                  )}
+                  {isLastTab ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleSubmit()}
+                      disabled={saving}
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-7 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {saving
+                        ? (pendingFiles.length > 0 && !isEdit ? "Saving & uploading…" : "Saving…")
+                        : isEdit
+                        ? "Save Changes"
+                        : pendingFiles.length > 0
+                        ? `Record Sale + ${pendingFiles.length} file${pendingFiles.length > 1 ? "s" : ""}`
+                        : "Record Sale"
+                      }
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={goNext}
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white px-7 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all"
+                    >
+                      Next
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             </>
           )}

@@ -38,11 +38,11 @@ function formatDate(value: string) {
 
 function fileIcon(fileType: string | null) {
   const t = (fileType ?? "").toLowerCase()
-  if (["jpg", "jpeg", "png", "gif", "webp"].includes(t)) return "ðŸ–¼ï¸"
-  if (t === "pdf") return "ðŸ“„"
-  if (["doc", "docx"].includes(t)) return "ðŸ“"
-  if (["xls", "xlsx", "csv"].includes(t)) return "ðŸ“Š"
-  return "ðŸ“Ž"
+  if (["jpg", "jpeg", "png", "gif", "webp"].includes(t)) return "🖼️"
+  if (t === "pdf") return "📄"
+  if (["doc", "docx"].includes(t)) return "📝"
+  if (["xls", "xlsx", "csv"].includes(t)) return "📊"
+  return "📎"
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────

@@ -206,7 +206,7 @@ export default function SaleDetailPage() {
                   {clientName}
                 </h1>
                 <p className="text-sm text-[#6b7280]">
-                  {sale.projects?.name ?? "—"} Â· {sale.developers?.name ?? "—"}
+                  {sale.projects?.name ?? "—"} · {sale.developers?.name ?? "—"}
                 </p>
               </div>
             </div>

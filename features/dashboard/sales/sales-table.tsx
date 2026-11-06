@@ -5,8 +5,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowRight,
   ArrowUpDown,
+  BadgeCheck,
   Building2,
-  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -16,15 +16,18 @@ import {
   FileText,
   Handshake,
   History,
+  Hourglass,
   KeyRound,
   MessageSquare,
   Paperclip,
+  Pencil,
   RefreshCw,
   Search,
   TrendingUp,
+  User,
+  Users,
   Wallet,
   X,
-  XCircle,
   type LucideIcon,
 } from "lucide-react"
 import { formatCurrency, formatDate, partnerLine, StatusBadge, toTitleCase } from "./sale-ui"
@@ -40,7 +43,10 @@ import {
   fetchSalesSummaryFiltered,
   fetchDevelopersForSale,
   fetchAgentsForSale,
+  fetchLeaderReview,
+  fetchTeamSalesAccess,
   notifySaleEvent,
+  setLeaderConfirmation,
   updateSaleValidationStatus,
   deleteSale,
   isAdminRole,
@@ -53,6 +59,7 @@ import {
   type ValidationStatus,
   type DeveloperOption,
   type AgentOption,
+  type TeamSalesAccess,
 } from "@/lib/sales-service"
 import { isSalesPipelineRole, isSecretaryLikeRole } from "@/lib/app-roles"
 import { FilterSelect, type FilterSelectOption } from "@/components/ui/filter-select"
@@ -67,6 +74,7 @@ import {
 } from "./sale-export"
 import { SaleExportButton, type ExportFormat } from "./sale-export-button"
 import { SaleActions } from "./sale-actions"
+import { ReviewMenu } from "./review-menu"
 import { SaleAttachmentsDialog } from "./sale-attachments-dialog"
 import { SaleConfirmDialog } from "./sale-confirm-dialog"
 import { SaleFormDialog } from "./sale-form-dialog"
@@ -106,10 +114,23 @@ const SALE_TYPE_TABS: Array<{ type: SaleType; label: string; desc: string; icon:
 // project-only Developer/Project/Unit columns and show Property Type/Address instead.
 type Col = {
   key: string
-  header: string
+  header: ReactNode
   sortField?: SortField
+  thClassName?: string
   tdClassName?: string
   cell: (s: SaleRecord) => ReactNode
+}
+
+/** Statuses a team leader can still confirm a sale in — before the admin decides. */
+const LEADER_CONFIRMABLE: ValidationStatus[] = ["pending", "under_review"]
+
+/** "Mar 4" for this year's dates, "Mar 4, 2025" otherwise — the Dates column's short form. */
+function shortDate(value: string | null) {
+  if (!value) return "—"
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return "—"
+  const sameYear = d.getFullYear() === new Date().getFullYear()
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) })
 }
 
 const COMMISSION_STATUSES: CommissionStatus[] = ["pending", "processing", "approved", "released", "rejected"]
@@ -159,6 +180,13 @@ function ToastStack({
 // drill-in renders them identically.
 
 const pad2 = (n: number) => String(n).padStart(2, "0")
+
+/** "Belyne Prades · Damac Riverside · DRVVM2A/5/505" — which sale a panel is about. */
+function saleTitle(s: SaleRecord) {
+  const client = s.clients ? toTitleCase(`${s.clients.first_name} ${s.clients.last_name}`) : ""
+  const place = s.sale_type === "project" ? toTitleCase(s.projects?.name) : s.property_type ?? ""
+  return [client, place, s.unit_number].filter(Boolean).join(" · ") || "Sale"
+}
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -225,7 +253,7 @@ function SortableHead({
   dir,
   onToggle,
 }: {
-  label: string
+  label: ReactNode
   field: SortField
   activeField: SortField
   dir: SortDir
@@ -270,7 +298,9 @@ export function SalesTable({
   const [perPage, setPerPage] = useState<10 | 20 | 50>(10)
   const [searchInput, setSearchInput] = useState("")
   const [search, setSearch] = useState("")
-  const [agentFilter, setAgentFilter] = useState("all")
+  // The agent picked in the filter. The filter's value (agentFilter, below)
+  // falls back to ?member= — the Team Sales "See sales" link — until a pick.
+  const [agentPick, setAgentPick] = useState("all")
   const [developerFilter, setDeveloperFilter] = useState("all")
   const [propertyTypeFilter, setPropertyTypeFilter] = useState("all")
   const [commissionFilter, setCommissionFilter] = useState<CommissionStatus | "all">("all")
@@ -289,6 +319,7 @@ export function SalesTable({
   // card badges and the tiles; all three load together so the cards preview counts.
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   // The active type is the route, not a query param: /{role}/sales is the
   // chooser and /{role}/sales/{slug} is that type's report. The base is derived
   // by stripping a type slug off the current path, so this works for every role
@@ -296,16 +327,55 @@ export function SalesTable({
   const salesBase = pathname.replace(TYPE_SLUG_RE, "")
   const activeTab: SaleType | null = saleType ?? null
   const setActiveType = (t: SaleType | null) => {
-    router.push(t ? `${salesBase}/${SALE_TYPE_SLUGS[t]}` : salesBase, { scroll: false })
+    // A team leader's "My own sales" choice follows them between report types.
+    const keep = searchParams.get("scope") === "own" ? "?scope=own" : ""
+    router.push(`${t ? `${salesBase}/${SALE_TYPE_SLUGS[t]}` : salesBase}${keep}`, { scroll: false })
   }
-  const searchParams = useSearchParams()
   const drillParam = searchParams.get("agent")
   const drillId = drillParam && UUID_RE.test(drillParam) ? drillParam : null
+
+  // A team leader always has a "My team" view of the sales their team
+  // recorded (migration 084) — RLS lets them read those; the team's switches
+  // add Edit / Confirm per member. `teamAccess` stays null until it loads, and
+  // for a team leader nothing is fetched before it does, so the report doesn't
+  // flash her own sales and then swap to the team's.
+  const isTeamLeaderRole = currentRole === "team_leader"
+  const [teamAccess, setTeamAccess] = useState<TeamSalesAccess | null>(null)
+  const accessReady = !isTeamLeaderRole || teamAccess !== null
+  const leadsTeam = Boolean(teamAccess?.leads)
+  const scope: "own" | "team" = leadsTeam && searchParams.get("scope") !== "own" ? "team" : "own"
+  const memberParam = searchParams.get("member")
+  const memberPreset = scope === "team" && memberParam && UUID_RE.test(memberParam) ? memberParam : null
+  const agentFilter = agentPick !== "all" ? agentPick : (memberPreset ?? "all")
+  const setAgentFilter = (value: string) => {
+    setAgentPick(value)
+    if (memberParam) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete("member")
+      router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false })
+    }
+  }
+  const setScope = (next: "own" | "team") => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("scope", next)
+    params.delete("member")
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    setAgentPick("all")
+    setPage(1)
+  }
+  const memberFlags = useMemo(
+    () => new Map((teamAccess?.members ?? []).map((m) => [m.id, m])),
+    [teamAccess],
+  )
+  // agent id → the team leader(s) who confirm that agent's sales first.
+  const [leaderReview, setLeaderReview] = useState<Record<string, string>>({})
   const [summaries, setSummaries] = useState<Record<SaleType, SaleTypeSummary>>({
     project:   { dealCount: 0, totalValue: 0, pendingCount: 0 },
     brokerage: { dealCount: 0, totalValue: 0, pendingCount: 0 },
     rental:    { dealCount: 0, totalValue: 0, pendingCount: 0 },
   })
+  // Deal counts per scope for the leader's switch ("My team (35) · My own sales (15)").
+  const [scopeCounts, setScopeCounts] = useState<Record<"own" | "team", Record<SaleType, number>> | null>(null)
   // Totals for the tiles above the table. Separate from `summaries` (which feeds
   // the chooser cards and must stay a whole-type overview) because these follow
   // the filter bar. `data` null = not loaded yet, shown as "—" rather than 0.
@@ -385,12 +455,21 @@ export function SalesTable({
   const optionLabel = (raw: string | null, fallback: string) =>
     toTitleCase(raw).replace(/\s+/g, " ").trim() || fallback
 
-  const agentOptions = useMemo<FilterSelectOption[]>(() => [
-    { label: "All Agents", value: "all" },
-    ...agents
-      .map((a) => ({ label: optionLabel(a.fullname, "Unnamed account"), value: a.id }))
-      .sort((x, y) => x.label.localeCompare(y.label)),
-  ], [agents])
+  const agentOptions = useMemo<FilterSelectOption[]>(() => {
+    if (!isAdminUser && scope === "team") {
+      return [
+        { label: "All team members", value: "all" },
+        ...(teamAccess?.members ?? []).map((m) => ({ label: optionLabel(m.name, "Unnamed account"), value: m.id })),
+      ]
+    }
+    return [
+      { label: "All Agents", value: "all" },
+      ...agents
+        .map((a) => ({ label: optionLabel(a.fullname, "Unnamed account"), value: a.id }))
+        .sort((x, y) => x.label.localeCompare(y.label)),
+    ]
+  }, [agents, isAdminUser, scope, teamAccess])
+  const showAgentFilter = isAdminUser || scope === "team"
 
   const developerOptions = useMemo<FilterSelectOption[]>(() => [
     { label: "All Developers", value: "all" },
@@ -465,7 +544,7 @@ export function SalesTable({
   // Identifies the filter set a totals response belongs to. activeTab is part of
   // it so switching report type can't briefly show the previous type's totals.
   const summaryKey = [
-    activeTab, agentFilter, propertyTypeFilter, developerFilter,
+    activeTab, scope, agentFilter, propertyTypeFilter, developerFilter,
     commissionFilter, validationFilter, effectiveFrom, effectiveTo, search,
   ].join("|")
 
@@ -478,12 +557,17 @@ export function SalesTable({
     if (!agentsRes.error) setAgents(agentsRes.data ?? [])
   }, [])
 
+  const loadTeamAccess = useCallback(async () => {
+    if (!isTeamLeaderRole) return
+    setTeamAccess(await fetchTeamSalesAccess())
+  }, [isTeamLeaderRole])
+
   // Sequenced like the summary: filters can fire several of these in a row, and
   // whichever resolves last would otherwise win — leaving the table showing a
   // superseded filter's rows.
   const salesSeqRef = useRef(0)
   const loadSales = useCallback(async () => {
-    if (!activeTab) return // chooser screen — nothing to load yet
+    if (!activeTab || !accessReady) return // chooser screen, or the leader's access is still loading
     const seq = ++salesSeqRef.current
     setLoading(true)
     try {
@@ -503,6 +587,7 @@ export function SalesTable({
         sortDir,
         currentRole,
         currentUserId,
+        scope,
       })
       if (seq !== salesSeqRef.current) return // superseded by a newer filter set
       if (error) {
@@ -518,22 +603,34 @@ export function SalesTable({
     } finally {
       if (seq === salesSeqRef.current) setLoading(false)
     }
-  }, [page, perPage, search, activeTab, agentFilter, developerFilter, propertyTypeFilter, commissionFilter, validationFilter, effectiveFrom, effectiveTo, sortField, sortDir, currentRole, currentUserId])
+  }, [page, perPage, search, activeTab, accessReady, scope, agentFilter, developerFilter, propertyTypeFilter, commissionFilter, validationFilter, effectiveFrom, effectiveTo, sortField, sortDir, currentRole, currentUserId])
 
   // Per-type summaries for the chooser cards' record counts. Scoped like
   // fetchSales (agents see only their own) but deliberately unfiltered — the
   // cards preview each type as a whole, before any filter exists. The tiles on
   // the report use loadActiveSummary below instead.
   const loadSummaries = useCallback(async () => {
-    const scope = { agentId: agentFilter === "all" ? undefined : agentFilter, currentRole, currentUserId }
-    const [proj, brok, rent] = await Promise.all([
-      fetchSalesSummary({ saleType: "project", ...scope }),
-      fetchSalesSummary({ saleType: "brokerage", ...scope }),
-      fetchSalesSummary({ saleType: "rental", ...scope }),
-    ])
+    if (!accessReady) return
+    const agentId = agentFilter === "all" ? undefined : agentFilter
+    const types: SaleType[] = ["project", "brokerage", "rental"]
     const zero: SaleTypeSummary = { dealCount: 0, totalValue: 0, pendingCount: 0 }
-    setSummaries({ project: proj.data ?? zero, brokerage: brok.data ?? zero, rental: rent.data ?? zero })
-  }, [agentFilter, currentRole, currentUserId])
+    const load = (forScope: "own" | "team", agent?: string) =>
+      Promise.all(types.map((t) => fetchSalesSummary({ saleType: t, agentId: agent, currentRole, currentUserId, scope: forScope })))
+    const [current, other] = await Promise.all([
+      load(scope, agentId),
+      // A leader's switch shows both counts; the other scope is never member-filtered.
+      leadsTeam ? load(scope === "team" ? "own" : "team") : Promise.resolve(null),
+    ])
+    setSummaries({ project: current[0].data ?? zero, brokerage: current[1].data ?? zero, rental: current[2].data ?? zero })
+    if (!leadsTeam || !other) { setScopeCounts(null); return }
+    const counts = (res: typeof current) =>
+      ({ project: res[0].data?.dealCount ?? 0, brokerage: res[1].data?.dealCount ?? 0, rental: res[2].data?.dealCount ?? 0 })
+    // The current scope's count is only "whole" when no member filter narrows it.
+    const currentWhole = agentId ? await load(scope) : current
+    setScopeCounts(scope === "team"
+      ? { team: counts(currentWhole), own: counts(other) }
+      : { own: counts(currentWhole), team: counts(other) })
+  }, [accessReady, leadsTeam, scope, agentFilter, currentRole, currentUserId])
 
   // Totals for the active report's tiles, narrowed by the same filters as the
   // rows. Sequenced because the filter bar can fire several of these in quick
@@ -543,7 +640,7 @@ export function SalesTable({
   // every keystroke in the search box.
   const summarySeqRef = useRef(0)
   const loadActiveSummary = useCallback(async () => {
-    if (!activeTab) return
+    if (!activeTab || !accessReady) return
     const seq = ++summarySeqRef.current
     const key = summaryKey
     const res = await fetchSalesSummaryFiltered({
@@ -551,6 +648,7 @@ export function SalesTable({
       agentId: agentFilter === "all" ? undefined : agentFilter,
       currentRole,
       currentUserId,
+      scope,
       filters: {
         propertyType: propertyTypeFilter === "all" ? undefined : propertyTypeFilter,
         developerId: developerFilter === "all" ? undefined : developerFilter,
@@ -563,9 +661,28 @@ export function SalesTable({
     })
     if (seq !== summarySeqRef.current) return // superseded
     setActiveSummary({ key, data: res.data, filtered: res.filtered })
-  }, [summaryKey, activeTab, agentFilter, propertyTypeFilter, developerFilter, commissionFilter, validationFilter, effectiveFrom, effectiveTo, search, currentRole, currentUserId])
+  }, [summaryKey, activeTab, accessReady, scope, agentFilter, propertyTypeFilter, developerFilter, commissionFilter, validationFilter, effectiveFrom, effectiveTo, search, currentRole, currentUserId])
 
   useEffect(() => { void loadReferenceData() }, [loadReferenceData])
+  useEffect(() => {
+    if (!isTeamLeaderRole) return
+    let active = true
+    void fetchTeamSalesAccess().then((access) => {
+      if (active) setTeamAccess(access)
+    })
+    return () => { active = false }
+  }, [isTeamLeaderRole])
+
+  // "Waiting for team leader" needs to know whose team confirms first — one
+  // small lookup per page of rows.
+  useEffect(() => {
+    if (sales.length === 0) return
+    let active = true
+    void fetchLeaderReview(sales.map((s) => s.agent_id)).then((map) => {
+      if (active) setLeaderReview(map)
+    })
+    return () => { active = false }
+  }, [sales])
   useEffect(() => { void loadSales() }, [loadSales])
   useEffect(() => { void loadSummaries() }, [loadSummaries])
   useEffect(() => { void loadActiveSummary() }, [loadActiveSummary])
@@ -589,9 +706,21 @@ export function SalesTable({
     if (t !== "project") setDeveloperFilter("all") // brokerage/rental have no developer
     else setPropertyTypeFilter("all")              // project sales carry a unit, not a property type
   }
+  // What a team leader may do on a row — from their team's switches, per member
+  // (app/api/team/sales-access). Admins edit through their own path.
+  const leaderCanEdit = (s: SaleRecord) => !isAdminUser && Boolean(memberFlags.get(s.agent_id)?.canEdit)
+  const leaderCanConfirm = (s: SaleRecord) =>
+    !isAdminUser &&
+    Boolean(memberFlags.get(s.agent_id)?.canConfirm) &&
+    s.agent_id !== currentUserId &&
+    LEADER_CONFIRMABLE.includes(s.validation_status)
+  /** Names of the team leader(s) this sale still waits for, or null. */
+  const waitingFor = (s: SaleRecord) =>
+    !s.leader_confirmed_at && LEADER_CONFIRMABLE.includes(s.validation_status) ? leaderReview[s.agent_id] || null : null
+
   const openEdit = (s: SaleRecord) => {
-    if (!canEditSaleForRole(currentRole, s)) {
-      addToast("error", "You can only edit sales that are Invalid Sale or Under Review")
+    if (!canEditSaleForRole(currentRole, s, { leaderCanEdit: leaderCanEdit(s) })) {
+      addToast("error", "You can't edit this sale")
       return
     }
     setSelectedSale(s)
@@ -602,6 +731,22 @@ export function SalesTable({
   const openAttachments = (s: SaleRecord) => {
     setAttachmentSale(s)
     setShowAttachments(true)
+  }
+
+  // The team leader's confirmation — a stamp before the admin's validation.
+  const confirmBusyRef = useRef<Set<string>>(new Set())
+  const handleLeaderConfirm = async (sale: SaleRecord, confirmIt: boolean) => {
+    if (confirmBusyRef.current.has(sale.id)) return
+    confirmBusyRef.current.add(sale.id)
+    try {
+      const { data, error } = await setLeaderConfirmation(sale.id, confirmIt)
+      if (error || !data) { addToast("error", error ?? "Couldn't save the confirmation"); return }
+      setSales((prev) => prev.map((item) => (item.id === sale.id ? data : item)))
+      addToast("success", confirmIt ? "Confirmed — the admin can validate it now" : "Your confirmation was taken back")
+      void loadTeamAccess() // the "waiting for you" count
+    } finally {
+      confirmBusyRef.current.delete(sale.id)
+    }
   }
 
   const openDiscussion = (sale: SaleRecord, tab: DiscussionTab = "discussion") => {
@@ -671,34 +816,48 @@ export function SalesTable({
     }
   }
 
-  // Columns are tab-aware: Project keeps Developer/Project/Unit; Brokerage & Rental
-  // swap those for Property Type/Address. The Agent column shows only for admins
-  // (an agent's own rows would all read the same name). Built once per render.
+  // Five compact columns, so a whole row fits a laptop screen without sideways
+  // scrolling (boss, 2026-11-06: agents on a mouse never found the scrollbar
+  // under the old 12-column table). Related facts share a cell instead of a
+  // column each: project + unit + developer, price + dates, the statuses.
+  // The agent shows under the client wherever rows can be someone else's — the
+  // admin's report and a team leader's team view.
+  const showAgent = isAdminUser || scope === "team"
+  const sortChip = (label: string, field: SortField) => {
+    const active = sortField === field
+    return (
+      <button
+        type="button"
+        onClick={() => toggleSort(field)}
+        title={`Sort by ${label.toLowerCase()}`}
+        className={`inline-flex items-center gap-1 uppercase transition-colors ${active ? "text-[#001f3f]" : "text-[#9ca3af] hover:text-[#6b7280]"}`}
+      >
+        {label}
+        <ArrowUpDown className={`w-3 h-3 ${active ? "opacity-100" : "opacity-50"} ${active && sortDir === "desc" ? "rotate-180" : ""}`} />
+      </button>
+    )
+  }
+
   const columns: Col[] = []
-  if (isAdminUser) {
-    columns.push({ key: "agent", header: "Agent", tdClassName: "font-semibold text-[#0d1117]", cell: (s) => toTitleCase(s.profiles?.fullname) || "—" })
-  }
-  if (activeTab === "project") {
-    columns.push({ key: "developer", header: "Developer", tdClassName: "text-[#374151]", cell: (s) => toTitleCase(s.developers?.name) || "—" })
-    columns.push({ key: "project", header: "Project", tdClassName: "text-[#374151]", cell: (s) => toTitleCase(s.projects?.name) || "—" })
-    columns.push({
-      key: "unit", header: "Unit", tdClassName: "text-xs text-[#6b7280]",
-      cell: (s) => s.unit_number
-        ? `${s.project_units?.unit_type ?? ""} · ${s.unit_number}`
-        : (s.project_units?.unit_type ?? "—"),
-    })
-  } else {
-    columns.push({ key: "ptype", header: "Property Type", tdClassName: "text-[#374151]", cell: (s) => s.property_type ?? "—" })
-    columns.push({ key: "paddr", header: "Property Address", tdClassName: "text-[#374151]", cell: (s) => s.property_address ?? "—" })
-  }
   columns.push({
-    key: "client", header: "Client", tdClassName: "font-semibold text-[#0d1117]",
+    key: "client",
+    header: "Client",
+    thClassName: "min-w-[180px]",
     cell: (s) => {
-      const shared = partnerLine(s, currentUserId)
+      const myShare = s.partners.find((p) => p.agent_id === currentUserId)?.share
+      const open = openSplitId === s.id
       return (
-        <div className="min-w-0">
-          {s.clients ? toTitleCase(`${s.clients.first_name} ${s.clients.last_name}`) : "—"}
-          {shared && (
+        <div className="min-w-0 max-w-[250px]">
+          <p className="font-semibold leading-snug text-[#0d1117]">
+            {s.clients ? toTitleCase(`${s.clients.first_name} ${s.clients.last_name}`) : "—"}
+          </p>
+          {(showAgent || s.agent_id !== currentUserId) && (
+            <p className="mt-0.5 flex items-center gap-1 text-[11px] leading-tight text-[#6b7280]">
+              <User className="w-3 h-3 shrink-0" />
+              <span className="truncate">by {toTitleCase(s.profiles?.fullname) || "—"}</span>
+            </p>
+          )}
+          {s.partners.length > 0 && (
             <button
               type="button"
               // Its own control: the row click (admin drill-in) must not fire too.
@@ -706,116 +865,192 @@ export function SalesTable({
                 e.stopPropagation()
                 setOpenSplitId((cur) => (cur === s.id ? null : s.id))
               }}
-              aria-expanded={openSplitId === s.id}
-              title={openSplitId === s.id ? "Hide the partnership split" : "Show each agent's share and amount"}
-              className="mt-1 flex items-center gap-1 rounded-md text-[10px] font-semibold leading-tight text-[#8a6d2a] whitespace-nowrap hover:underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d6b357]/50"
+              aria-expanded={open}
+              title={partnerLine(s, currentUserId) ?? undefined}
+              className="mt-1 inline-flex items-center gap-1 rounded-full border border-[#d6b357]/40 bg-[#d6b357]/10 px-2 py-0.5 text-[11px] font-semibold leading-tight text-[#8a6d2a] hover:bg-[#d6b357]/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d6b357]/50"
             >
               <Handshake className="w-3 h-3 shrink-0" />
-              {shared}
-              <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${openSplitId === s.id ? "rotate-180" : ""}`} />
+              Shared · {s.partners.length} agents{myShare != null ? ` · your share ${myShare}%` : ""}
+              <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
             </button>
           )}
         </div>
       )
     },
   })
-  columns.push({ key: "price", header: "Contract Price", sortField: "contract_price", tdClassName: "text-right font-mono text-sm font-semibold text-[#0d1117]", cell: (s) => formatCurrency(s.contract_price) })
-  columns.push({ key: "resv", header: "Reservation Date", sortField: "reservation_date", tdClassName: "text-[#374151]", cell: (s) => formatDate(s.reservation_date) })
-  columns.push({ key: "comm", header: "Commission", cell: (s) => <StatusBadge value={s.commission_status} type="commission" /> })
   columns.push({
-    key: "valid",
-    header: "Validation",
-    // The badge answers "what state" — the line under it answers "who decided
-    // that, and when", which is the transparency the audit stamp exists for.
+    key: "property",
+    header: "Property",
+    thClassName: "min-w-[170px]",
+    cell: (s) => {
+      if (activeTab !== "project") {
+        return (
+          <div className="min-w-0 max-w-[240px]">
+            <p className="font-medium leading-snug text-[#0d1117]">{s.property_type ?? "—"}</p>
+            <p className="mt-0.5 text-[11px] leading-snug text-[#6b7280]">{s.property_address ?? "—"}</p>
+          </div>
+        )
+      }
+      const unit = [s.project_units?.unit_type, s.unit_number].filter(Boolean).join(" · ")
+      return (
+        <div className="min-w-0 max-w-[240px]">
+          <p className="font-medium leading-snug text-[#0d1117]">{toTitleCase(s.projects?.name) || "—"}</p>
+          {unit && <p className="mt-0.5 text-[11px] leading-snug text-[#374151]">{unit}</p>}
+          <p className="text-[11px] leading-snug text-[#9ca3af]">{toTitleCase(s.developers?.name) || "—"}</p>
+        </div>
+      )
+    },
+  })
+  columns.push({
+    key: "money",
+    // Price, then the dates under it — the preview the boss picked. One column
+    // instead of two keeps a whole row on a 1440px laptop screen.
+    header: (
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        {sortChip("Price", "contract_price")}
+        {sortChip("Reserved", "reservation_date")}
+        {sortChip("Recorded", "created_at")}
+      </span>
+    ),
+    thClassName: "min-w-[170px] whitespace-normal",
     cell: (s) => (
-      <div className="min-w-0">
-        <StatusBadge value={s.validation_status} type="validation" />
-        {s.validation_changed_at && (
-          <p className="mt-1 text-[10px] leading-tight text-[#9ca3af] whitespace-nowrap">
-            by {toTitleCase(s.validation_changed_by_name) || "—"} · {formatDate(s.validation_changed_at)}
+      <div className="space-y-0.5 text-[12px] leading-snug text-[#374151]">
+        <p className="whitespace-nowrap font-mono text-sm font-semibold text-[#0d1117]">{formatCurrency(s.contract_price)}</p>
+        <p className="whitespace-nowrap"><span className="text-[#9ca3af]">Reserved</span> {formatDate(s.reservation_date)}</p>
+        <p className="whitespace-nowrap"><span className="text-[#9ca3af]">Recorded</span> {formatDate(s.created_at)}</p>
+        {s.edited_at && (
+          <p
+            className="mt-1 inline-flex max-w-[200px] items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800"
+            title={`Last edited ${formatDate(s.edited_at)} by ${toTitleCase(s.edited_by_name) || "—"}`}
+          >
+            <Pencil className="w-3 h-3 shrink-0" />
+            <span className="truncate">Edited {shortDate(s.edited_at)} · {toTitleCase(s.edited_by_name) || "—"}</span>
           </p>
         )}
       </div>
     ),
   })
-  columns.push({ key: "created", header: "Created", sortField: "created_at", tdClassName: "text-[#6b7280]", cell: (s) => formatDate(s.created_at) })
   columns.push({
-    key: "files", header: "Files",
-    cell: (s) => s.attachments_count > 0 ? (
-      <button
-        type="button"
-        onClick={() => openAttachments(s)}
-        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-600 border border-sky-200 hover:bg-sky-100 transition-colors"
-      >
-        <Paperclip className="w-3 h-3" />
-        {s.attachments_count}
-      </button>
-    ) : (
-      <span className="text-[#9ca3af] text-xs">—</span>
+    key: "status",
+    header: "Status",
+    thClassName: "min-w-[180px]",
+    // The badge answers "what state" — the lines under it answer who decided
+    // that and when, whether the team leader has confirmed, and the commission.
+    cell: (s) => (
+      <div className="min-w-0 space-y-1">
+        <div>
+          <StatusBadge value={s.validation_status} type="validation" />
+          {s.validation_changed_at && (
+            <p className="mt-0.5 text-[10px] leading-tight text-[#9ca3af]">
+              by {toTitleCase(s.validation_changed_by_name) || "—"} · {formatDate(s.validation_changed_at)}
+            </p>
+          )}
+        </div>
+        {s.leader_confirmed_at ? (
+          <p className="flex items-center gap-1 text-[11px] font-medium leading-tight text-emerald-700">
+            <BadgeCheck className="w-3.5 h-3.5 shrink-0" />
+            Team leader ✓ {toTitleCase(s.leader_confirmed_by_name) || "—"} · {shortDate(s.leader_confirmed_at)}
+          </p>
+        ) : waitingFor(s) ? (
+          <p
+            className="flex items-center gap-1 text-[11px] font-medium leading-tight text-amber-700"
+            title={`${waitingFor(s)} confirms this team's sales before the admin validates them`}
+          >
+            <Hourglass className="w-3.5 h-3.5 shrink-0" />
+            Waiting for team leader
+          </p>
+        ) : null}
+        <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#9ca3af]">
+          Commission <StatusBadge value={s.commission_status} type="commission" />
+        </p>
+      </div>
     ),
   })
   columns.push({
-    key: "actions", header: "Actions",
-    // One line, never wrapping: with flex-wrap these six controls stacked into
-    // five rows once the column narrowed, stretching every row to ~200px tall.
-    // The three validation shortcuts are icon buttons (labelled via title +
-    // aria-label) so the column stays narrow too.
-    cell: (s) => (
-      <div className="flex items-center gap-1.5 flex-nowrap">
-        {isAdminUser && (
-          <>
-            {([
-              { status: "validated" as const, label: "Validate sale", Icon: CheckCircle2, needsConfirm: true, cls: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" },
-              { status: "invalid_sale" as const, label: "Mark invalid sale", Icon: XCircle, needsConfirm: true, cls: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100" },
-              { status: "under_review" as const, label: "Mark under review", Icon: Clock, needsConfirm: true, cls: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100" },
-            ]).map(({ status, label, Icon, needsConfirm, cls }) => (
-              <button
-                key={status}
-                type="button"
-                onClick={() =>
-                  needsConfirm
-                    ? setConfirm({ kind: "validation", sale: s, nextStatus: status })
-                    : void handleValidationShortcut(s, status)
-                }
-                disabled={s.validation_status === status}
-                title={label}
-                aria-label={label}
-                className={`w-8 h-8 inline-flex items-center justify-center rounded-full border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${cls}`}
-              >
-                <Icon className="w-4 h-4" />
-              </button>
-            ))}
-          </>
-        )}
-        <button
-          type="button"
-          onClick={() => openDiscussion(s)}
-          title="Open validation discussion"
-          className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#6b7280] hover:border-[#001f3f]/80 hover:text-[#001f3f] transition-colors"
-        >
-          <MessageSquare className="w-4 h-4" />
-        </button>
-        {isAdminUser && (
+    key: "actions",
+    header: "Actions",
+    // Pinned to the right edge, so on a narrow screen the buttons stay in
+    // reach while the rest of the row scrolls under them.
+    thClassName: "sticky right-0 z-10 bg-[#fbfcfd]",
+    tdClassName: "sticky right-0 z-[1] whitespace-nowrap bg-white shadow-[-12px_0_12px_-12px_rgba(0,31,63,0.18)] group-hover:bg-[#fcfdff]",
+    cell: (s) => {
+      const canEditRow = leaderCanEdit(s)
+      const canConfirmRow = leaderCanConfirm(s)
+      return (
+        <div className="flex items-center gap-1.5 flex-nowrap">
+          {isAdminUser && (
+            <ReviewMenu
+              current={s.validation_status}
+              onPick={(status) => setConfirm({ kind: "validation", sale: s, nextStatus: status })}
+            />
+          )}
+          {canConfirmRow && !s.leader_confirmed_at && (
+            <button
+              type="button"
+              onClick={() => void handleLeaderConfirm(s, true)}
+              title="Confirm this sale for the admin to validate"
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-emerald-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+            >
+              <BadgeCheck className="h-3.5 w-3.5" />
+              Confirm
+            </button>
+          )}
+          {canEditRow && (
+            <button
+              type="button"
+              onClick={() => openEdit(s)}
+              title="Edit this sale"
+              aria-label="Edit this sale"
+              className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#6b7280] hover:border-[#001f3f]/80 hover:text-[#001f3f] transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          )}
+          {s.attachments_count > 0 && (
+            <button
+              type="button"
+              onClick={() => openAttachments(s)}
+              title={`${s.attachments_count} file${s.attachments_count === 1 ? "" : "s"}`}
+              className="inline-flex h-8 items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 text-xs font-semibold text-sky-600 hover:bg-sky-100 transition-colors"
+            >
+              <Paperclip className="w-3.5 h-3.5" />
+              {s.attachments_count}
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => openDiscussion(s, "activity")}
-            title="View activity history"
+            onClick={() => openDiscussion(s)}
+            title="Open validation discussion"
+            aria-label="Open validation discussion"
             className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#6b7280] hover:border-[#001f3f]/80 hover:text-[#001f3f] transition-colors"
           >
-            <History className="w-4 h-4" />
+            <MessageSquare className="w-4 h-4" />
           </button>
-        )}
-        <SaleActions
-          sale={s}
-          currentRole={currentRole}
-          currentUserId={currentUserId}
-          onView={() => openView(s)}
-          onEdit={() => openEdit(s)}
-          onAttachments={() => openAttachments(s)}
-          onDelete={() => setConfirm({ kind: "delete", sale: s })}
-        />
-      </div>
-    ),
+          {isAdminUser && (
+            <button
+              type="button"
+              onClick={() => openDiscussion(s, "activity")}
+              title="View activity history"
+              aria-label="View activity history"
+              className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#6b7280] hover:border-[#001f3f]/80 hover:text-[#001f3f] transition-colors"
+            >
+              <History className="w-4 h-4" />
+            </button>
+          )}
+          <SaleActions
+            sale={s}
+            currentRole={currentRole}
+            currentUserId={currentUserId}
+            canEdit={canEditRow}
+            onView={() => openView(s)}
+            onEdit={() => openEdit(s)}
+            onAttachments={() => openAttachments(s)}
+            onDelete={() => setConfirm({ kind: "delete", sale: s })}
+            onUndoConfirm={canConfirmRow && s.leader_confirmed_at ? () => void handleLeaderConfirm(s, false) : undefined}
+          />
+        </div>
+      )
+    },
   })
 
   const colCount = columns.length
@@ -834,11 +1069,65 @@ export function SalesTable({
         ? "matching your filters"
         : undefined
   // An agent's value tile credits their share of shared sales (migration 056),
-  // so it can read lower than the rows' full contract prices — say so.
+  // so it can read lower than the rows' full contract prices — say so. A
+  // leader's team view counts each team sale once, in full.
   const valueTileHint =
-    isSalesPipelineRole(currentRole) && sales.some((s) => s.partners.length > 0)
-      ? [tileHint, "shared sales at your share"].filter(Boolean).join(" · ")
-      : tileHint
+    scope === "team"
+      ? [tileHint, agentFilter === "all" ? "your team's sales" : "this member's share"].filter(Boolean).join(" · ")
+      : isSalesPipelineRole(currentRole) && sales.some((s) => s.partners.length > 0)
+        ? [tileHint, "shared sales at your share"].filter(Boolean).join(" · ")
+        : tileHint
+  const waitingForMe = scope === "team" && activeTab && teamAccess?.canConfirm ? teamAccess.waitingToConfirm[activeTab] : 0
+  const pendingTileHint = waitingForMe > 0
+    ? [tileHint, `${waitingForMe} waiting for your confirmation`].filter(Boolean).join(" · ")
+    : tileHint
+
+  // A team leader's "My team | My own sales" switch, with each side's count —
+  // the way into their team's sales (migration 084). Shown on the chooser and
+  // on every report.
+  const scopeCount = (which: "own" | "team") =>
+    scopeCounts ? (activeTab ? scopeCounts[which][activeTab] : Object.values(scopeCounts[which]).reduce((a, b) => a + b, 0)) : null
+  const scopeSwitch = leadsTeam ? (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div role="tablist" aria-label="Whose sales" className="inline-flex rounded-2xl border border-[#e5e7eb] bg-white p-1 shadow-sm">
+        {([
+          { value: "team", label: "My team", Icon: Users },
+          { value: "own", label: "My own sales", Icon: User },
+        ] as const).map(({ value, label, Icon }) => {
+          const active = scope === value
+          const count = scopeCount(value)
+          return (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => { if (!active) setScope(value) }}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                active ? "bg-[#001f3f] text-white shadow" : "text-[#374151] hover:bg-[#f3f4f6]"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+              {count != null && (
+                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${active ? "bg-white/15 text-white" : "bg-[#f3f4f6] text-[#6b7280]"}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      {scope === "team" && teamAccess && (
+        <p className="text-xs text-[#6b7280]">
+          Sales recorded by {teamAccess.teamNames.join(", ") || "your team"} ({teamAccess.members.length} members).{" "}
+          {teamAccess.canEdit || teamAccess.canConfirm
+            ? `You can ${[teamAccess.canEdit && "edit them", teamAccess.canConfirm && "confirm new ones for the admin"].filter(Boolean).join(" and ")}.`
+            : "View only — an admin can let you edit or confirm them."}
+        </p>
+      )}
+    </div>
+  ) : null
 
   // Plain-language description of what's in effect, stamped onto the export so
   // a downloaded file can't be mistaken for the full report.
@@ -846,8 +1135,11 @@ export function SalesTable({
     const out: string[] = []
     if (activeMeta) out.push(`Sale type: ${activeMeta.label}`)
     if (search) out.push(`Search: "${search}"`)
+    if (scope === "team") out.push(`Sales of: ${teamAccess?.teamNames.join(", ") || "your team"}`)
     if (isAdminUser && agentFilter !== "all") {
       out.push(`Agent: ${agents.find((a) => a.id === agentFilter)?.fullname ?? agentFilter}`)
+    } else if (scope === "team" && agentFilter !== "all") {
+      out.push(`Team member: ${memberFlags.get(agentFilter)?.name ?? agentFilter}`)
     }
     if (developerFilter !== "all") {
       out.push(`Developer: ${developers.find((d) => d.id === developerFilter)?.name ?? developerFilter}`)
@@ -881,6 +1173,7 @@ export function SalesTable({
       sortDir,
       currentRole,
       currentUserId,
+      scope,
     })
     if (error) { addToast("error", `Export failed: ${error}`); return }
     if (!data.length) { addToast("error", "Nothing to export — no sales match these filters."); return }
@@ -949,6 +1242,8 @@ export function SalesTable({
                 </p>
               </div>
             </div>
+
+            {scopeSwitch}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {SALE_TYPE_TABS.map((t) => {
@@ -1023,6 +1318,8 @@ export function SalesTable({
               </div>
             </div>
 
+            {scopeSwitch}
+
             {/* Summary tiles for the active tab — these follow the filter bar, so
                 they always describe the same set of sales as the rows below.
                 Falls back to the unfiltered type summary if the filtered totals
@@ -1044,7 +1341,7 @@ export function SalesTable({
                 label="Pending Validation"
                 value={tileSummary ? String(tileSummary.pendingCount) : "—"}
                 icon={Clock}
-                hint={tileHint}
+                hint={pendingTileHint}
               />
             </div>
 
@@ -1069,12 +1366,12 @@ export function SalesTable({
 
               <Filter className="w-3.5 h-3.5 text-[#9ca3af] shrink-0" />
 
-              {isAdminUser && (
+              {showAgentFilter && (
                 <FilterSelect
-                  ariaLabel="Agent"
+                  ariaLabel={isAdminUser ? "Agent" : "Team member"}
                   value={agentFilter}
                   onValueChange={(v) => { setAgentFilter(v); setPage(1) }}
-                  searchPlaceholder="Search agents…"
+                  searchPlaceholder={isAdminUser ? "Search agents…" : "Search your team…"}
                   options={agentOptions}
                 />
               )}
@@ -1184,22 +1481,6 @@ export function SalesTable({
           </div>
         </div>
 
-        {/* Action legend — explains the validation shortcut icons (admins only) */}
-        {isAdminUser && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-xs text-[#6b7280]">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">Action icons</span>
-            <span className="inline-flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Validate sale
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <XCircle className="w-4 h-4 text-rose-600" /> Invalid sale
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-sky-600" /> Under review
-            </span>
-          </div>
-        )}
-
         {/* Table */}
         <div className="bg-white/60 backdrop-blur-xl rounded-[24px] border border-white/60 shadow-sm shadow-black/5 overflow-hidden">
           <div className="overflow-x-auto">
@@ -1219,7 +1500,7 @@ export function SalesTable({
                     ) : (
                       <th
                         key={col.key}
-                        className="text-left text-[11px] font-bold text-[#9ca3af] uppercase tracking-wider px-4 py-3.5 whitespace-nowrap first:pl-6 last:pr-6"
+                        className={`text-left text-[11px] font-bold text-[#9ca3af] uppercase tracking-wider px-3 py-3.5 whitespace-nowrap first:pl-6 last:pr-4 ${col.thClassName ?? ""}`}
                       >
                         {col.header}
                       </th>
@@ -1236,7 +1517,9 @@ export function SalesTable({
                     <td colSpan={colCount} className="px-6 py-14 text-center">
                       <div className="flex flex-col items-center gap-2 text-[#9ca3af]">
                         <TrendingUp className="w-9 h-9 opacity-40" />
-                        <p className="text-sm font-medium text-[#6b7280]">No sales recorded for this type yet.</p>
+                        <p className="text-sm font-medium text-[#6b7280]">
+                          {scope === "team" ? "Your team hasn't recorded a sale of this type yet." : "No sales recorded for this type yet."}
+                        </p>
                         <p className="text-xs">
                           Use the <span className="font-semibold text-[#001f3f]">Record Your Sale</span> button in the sidebar to record one.
                         </p>
@@ -1260,15 +1543,15 @@ export function SalesTable({
                         } : undefined}
                         tabIndex={drillable ? 0 : undefined}
                         title={drillable ? `View all sales by ${sale.profiles?.fullname ?? "this agent"}` : undefined}
-                        className={`hover:bg-[#fcfdff] focus:outline-none focus-visible:bg-[#f3f4f6] transition-colors ${drillable ? "cursor-pointer" : ""}`}
+                        className={`group hover:bg-[#fcfdff] focus:outline-none focus-visible:bg-[#f3f4f6] transition-colors ${drillable ? "cursor-pointer" : ""}`}
                       >
                         {columns.map((col) => (
                           <td
                             key={col.key}
                             // The Actions cell holds its own buttons — a click
                             // there must not also drill into the agent.
-                            onClick={col.key === "actions" || col.key === "files" ? (e) => e.stopPropagation() : undefined}
-                            className={`px-4 py-2.5 whitespace-nowrap align-middle first:pl-6 last:pr-6 ${col.tdClassName ?? "text-[#374151]"}`}
+                            onClick={col.key === "actions" ? (e) => e.stopPropagation() : undefined}
+                            className={`px-3 py-3 align-middle first:pl-6 last:pr-4 ${col.tdClassName ?? "text-[#374151]"}`}
                           >
                             {col.cell(sale)}
                           </td>
@@ -1277,12 +1560,17 @@ export function SalesTable({
                       {openSplitId === sale.id && sale.partners.length > 0 && (
                         <tr className="bg-[#fffdf7]">
                           <td colSpan={colCount} className="px-6 pb-4 pt-1 whitespace-normal">
-                            <SaleSplitBreakdown
-                              partners={sale.partners}
-                              contractPrice={sale.contract_price}
-                              ownerId={sale.agent_id}
-                              highlightId={currentUserId}
-                            />
+                            {/* Sticky, so the split stays in view even when the row is
+                                scrolled sideways on a narrow screen — it used to be
+                                cut off at the left edge. */}
+                            <div className="sticky left-6 w-fit max-w-[min(42rem,calc(100vw-5rem))]">
+                              <SaleSplitBreakdown
+                                partners={sale.partners}
+                                contractPrice={sale.contract_price}
+                                ownerId={sale.agent_id}
+                                highlightId={currentUserId}
+                              />
+                            </div>
                           </td>
                         </tr>
                       )}
@@ -1342,6 +1630,8 @@ export function SalesTable({
         onClose={() => { setShowForm(false); setViewMode(false); setSelectedSale(null) }}
         onSaved={onSaved}
         onError={(msg: string) => addToast("error", msg)}
+        leaderMode={selectedSale && leaderCanEdit(selectedSale) ? { canConfirm: leaderCanConfirm(selectedSale) } : null}
+        performerName={userName}
       />
 
       {showDetails && detailSale && (
@@ -1389,7 +1679,12 @@ export function SalesTable({
                 ? "Mark as Invalid Sale?"
                 : "Move to Under Review?"
           }
-          message={`This sets the validation status to ${STATUS_LABEL[confirm.nextStatus]}. You can change it again later.`}
+          message={
+            `This sets the validation status to ${STATUS_LABEL[confirm.nextStatus]}. You can change it again later.` +
+            (confirm.nextStatus === "validated" && waitingFor(confirm.sale)
+              ? ` ${waitingFor(confirm.sale)} (team leader) hasn't confirmed this sale yet — you can still validate it.`
+              : "")
+          }
           confirmLabel={
             confirm.nextStatus === "validated"
               ? "Validate Sale"
@@ -1425,6 +1720,7 @@ export function SalesTable({
               isAdmin={isAdminUser}
               initialTab={discussionTarget.tab}
               readOnly={discussionTarget.sale.partner_agent_ids.includes(currentUserId)}
+              saleTitle={saleTitle(discussionTarget.sale)}
             />
           </div>
         </div>

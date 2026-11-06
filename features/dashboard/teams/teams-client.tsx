@@ -9,7 +9,7 @@ import {
   Building2, Users, Settings, Upload, Pencil, Trash2, ToggleLeft,
   ToggleRight, MoreHorizontal, UserPlus, ArrowRight, UserMinus,
   RefreshCw, Image as ImageIcon, CheckCircle2, XCircle,
-  Loader2, AlertTriangle, EyeOff, Eye, X, Sparkles,
+  Loader2, AlertTriangle, EyeOff, Eye, X, Sparkles, BadgeCheck,
 } from "lucide-react"
 import {
   type Team,
@@ -21,6 +21,7 @@ import {
   updateTeam,
   deleteTeam,
   toggleTeamActive,
+  updateTeamLeaderSwitches,
   fetchTeamMembers,
   updateMemberRole,
   deactivateMembership,
@@ -193,6 +194,25 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
     if (error) { addToast(error, "error"); return }
     addToast(`Team ${team.is_active ? "deactivated" : "activated"}`, "success")
     await loadTeams()
+  }
+
+  // What the team's leader may do with its members' sales (migration 084).
+  // Optimistic: the switch flips at once and flips back if the save fails.
+  const handleLeaderSwitch = async (team: Team, key: "leader_can_edit_sales" | "leader_confirms_sales") => {
+    const next = !team[key]
+    setTeams((prev) => prev.map((t) => (t.id === team.id ? { ...t, [key]: next } : t)))
+    const { error } = await updateTeamLeaderSwitches(team.id, { [key]: next })
+    if (error) {
+      setTeams((prev) => prev.map((t) => (t.id === team.id ? { ...t, [key]: !next } : t)))
+      addToast(error, "error")
+      return
+    }
+    addToast(
+      key === "leader_can_edit_sales"
+        ? next ? `${team.name}'s team leader can now edit the team's sales` : `${team.name}'s team leader can no longer edit sales`
+        : next ? `${team.name}'s team leader now confirms sales before you validate them` : `${team.name}'s sales go straight to admin validation`,
+      "success",
+    )
   }
 
   const handleDeleteTeam = async (id: string) => {
@@ -401,6 +421,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
                 onUploadLogo={() => { setLogoTeam(selectedTeam); setLogoUploadOpen(true) }}
                 onToggleActive={() => handleToggleTeam(selectedTeam)}
                 onDelete={() => setConfirmDelete({ type: "team", id: selectedTeam.id, label: selectedTeam.name })}
+                onLeaderSwitch={(key) => void handleLeaderSwitch(selectedTeam, key)}
               />
 
               {/* ── Team sales: any span of time, who sold what ──────────── */}
@@ -793,7 +814,7 @@ function TreeNode({
 
 function TeamHeaderCard({
   team, subteamCount, memberCount,
-  onEdit, onReport, onUploadLogo, onToggleActive, onDelete,
+  onEdit, onReport, onUploadLogo, onToggleActive, onDelete, onLeaderSwitch,
 }: {
   team: Team
   subteamCount: number
@@ -803,6 +824,7 @@ function TeamHeaderCard({
   onUploadLogo: () => void
   onToggleActive: () => void
   onDelete: () => void
+  onLeaderSwitch: (key: "leader_can_edit_sales" | "leader_confirms_sales") => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -843,6 +865,33 @@ function TeamHeaderCard({
     </button>
   )
 
+  const switchItem = (
+    key: "leader_can_edit_sales" | "leader_confirms_sales",
+    icon: React.ReactNode,
+    label: string,
+    hint: string,
+  ) => {
+    const on = Boolean(team[key])
+    return (
+      <button
+        key={key}
+        role="menuitemcheckbox"
+        aria-checked={on}
+        onMouseDown={e => { e.stopPropagation(); onLeaderSwitch(key) }}
+        className="w-full flex items-start gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-[#f4f6f9]"
+      >
+        <span className="mt-0.5 text-[#374151]">{icon}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-medium text-[#374151]">{label}</span>
+          <span className="block text-[10px] leading-snug text-[#9ca3af]">{hint}</span>
+        </span>
+        <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${on ? "bg-emerald-500 text-white" : "bg-[#eef0f3] text-[#6b7280]"}`}>
+          {on ? "ON" : "OFF"}
+        </span>
+      </button>
+    )
+  }
+
   return (
     <div className="bg-white rounded-2xl border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] p-6">
       <div className="flex items-start gap-5 flex-wrap">
@@ -881,6 +930,16 @@ function TeamHeaderCard({
             <span className="flex items-center gap-1.5"><Users className="w-3 h-3" />{memberCount} member{memberCount !== 1 ? "s" : ""}</span>
             {!team.parent_id && <span className="flex items-center gap-1.5"><Building2 className="w-3 h-3" />{subteamCount} subteam{subteamCount !== 1 ? "s" : ""}</span>}
             <span>Created {fmtDate(team.created_at)}</span>
+            {team.leader_can_edit_sales && (
+              <span className="flex items-center gap-1 rounded-full border border-[#d6b357]/40 bg-[#d6b357]/10 px-2 py-0.5 font-semibold text-[#8a6d2a]">
+                <Pencil className="w-3 h-3" /> Leader edits sales
+              </span>
+            )}
+            {team.leader_confirms_sales && (
+              <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
+                <BadgeCheck className="w-3 h-3" /> Leader confirms first
+              </span>
+            )}
           </div>
         </div>
 
@@ -916,7 +975,7 @@ function TeamHeaderCard({
         <div
           ref={menuRef}
           style={{ position: "absolute", top: pos.top, right: pos.right, zIndex: 300 }}
-          className="w-52 bg-white rounded-2xl border border-[#e8eaed] shadow-xl py-1 overflow-hidden"
+          className="w-72 bg-white rounded-2xl border border-[#e8eaed] shadow-xl py-1 overflow-hidden"
         >
           {actionItem(<Upload className="w-3.5 h-3.5" />, "Upload Logo", onUploadLogo)}
           {actionItem(
@@ -925,6 +984,23 @@ function TeamHeaderCard({
               : <ToggleRight className="w-3.5 h-3.5" />,
             team.is_active ? "Deactivate Team" : "Activate Team",
             onToggleActive,
+          )}
+          <div className="border-t border-[#f0f2f5] my-1" />
+          <p className="px-4 pt-1.5 text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">Team leader</p>
+          <p className="px-4 pb-1 text-[10px] leading-snug text-[#9ca3af]">
+            For the team&apos;s leader, on every member&apos;s sales — subteams included. The leader always sees them.
+          </p>
+          {switchItem(
+            "leader_can_edit_sales",
+            <Pencil className="w-3.5 h-3.5" />,
+            "Team leader can edit sales",
+            "Fix details, client and partner shares. The sale keeps its status.",
+          )}
+          {switchItem(
+            "leader_confirms_sales",
+            <BadgeCheck className="w-3.5 h-3.5" />,
+            "Team leader confirms sales first",
+            "The leader confirms, then you validate. You're never blocked.",
           )}
           <div className="border-t border-[#f0f2f5] my-1" />
           {actionItem(<Trash2 className="w-3.5 h-3.5" />, "Delete Team", onDelete, true)}
