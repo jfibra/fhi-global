@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     if (!result.ok) return { ok: false as const, status: result.status ?? 500, error: result.error ?? "FHI Assistant couldn't answer — try again.", quota: nextQuota }
     return {
       ok: true as const,
-      payload: { reply: result.reply, used: result.used, cards: result.cards, names: result.names, charts: result.charts, stats: result.stats, printCards: [], quota: nextQuota },
+      payload: { reply: result.reply, used: result.used, cards: result.cards, names: result.names, charts: result.charts, stats: result.stats, printCards: [], downloads: result.downloads, quota: nextQuota },
     }
   }
 

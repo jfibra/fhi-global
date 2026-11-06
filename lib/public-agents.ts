@@ -50,7 +50,7 @@ export type PublicRoster = {
 }
 
 /** Joins a stored country code with its number, tolerating either being blank. */
-function contact(meta: Record<string, unknown> | null, key: "phone" | "whatsapp"): string | null {
+export function profileContact(meta: Record<string, unknown> | null, key: "phone" | "whatsapp"): string | null {
   if (!meta) return null
   const code = typeof meta[`${key}_country_code`] === "string" ? (meta[`${key}_country_code`] as string).trim() : ""
   const num = typeof meta[`${key}_number`] === "string" ? (meta[`${key}_number`] as string).trim() : ""
@@ -63,7 +63,7 @@ function contact(meta: Record<string, unknown> | null, key: "phone" | "whatsapp"
  * Google Sign-In avatars arrive at 96 px ("…=s96-c"), which blurs at card
  * size. Google serves the same picture larger on request.
  */
-function sharpPhoto(url: string): string {
+export function sharpPhoto(url: string): string {
   return /googleusercontent\.com\//.test(url) ? url.replace(/=s\d+(-c)?$/, "=s640-c") : url
 }
 
@@ -119,8 +119,8 @@ export async function fetchPublicAgents(): Promise<PublicRoster> {
         photo: photo ? sharpPhoto(photo) : null,
         uploaded: photo ? isUploaded(photo) : false,
         leader: p.role === "team_leader",
-        phone: contact(meta, "phone"),
-        whatsapp: contact(meta, "whatsapp"),
+        phone: profileContact(meta, "phone"),
+        whatsapp: profileContact(meta, "whatsapp"),
         website: siteOf.get(String(p.id)) ?? null,
         rating: s?.length ? { average: s.reduce((a, b) => a + b, 0) / s.length, count: s.length } : null,
         story: STORY_BY_AGENT[String(p.id)] ?? null,

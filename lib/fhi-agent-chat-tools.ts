@@ -1,6 +1,7 @@
 import "server-only"
 
 import { createAdminSupabase } from "@/lib/admin-supabase"
+import { findBrochureProject } from "@/lib/brochure/data"
 import { ROLES_SALE_AGENT_PROFILES } from "@/lib/app-roles"
 import { SITE_URL } from "@/lib/seo"
 import { eventIsPast, eventWhenLabel } from "@/lib/events/dates"
@@ -56,6 +57,9 @@ import {
 type Admin = ReturnType<typeof createAdminSupabase>
 
 export type AgentChatCaller = { userId: string; name: string | null; role: string | null }
+
+/** A file the chat offers under the answer (a Download button): the agents' project brochure PDF. */
+export type AgentChatDownload = { kind: "pdf"; title: string; subtitle?: string | null; label: string; href: string; image?: string | null }
 
 const mine = (s: SaleRow, userId: string) => saleCredits(s).find((c) => c.agentId === userId)
 
@@ -259,6 +263,26 @@ async function projectDetailsForAgent(admin: Admin, args: { name?: string }) {
     ...rest,
     developer: dev,
     _stats: (_stats ?? []).filter((s) => s.label !== "FHI validated deals"),
+  }
+}
+
+// ─── project_brochure ────────────────────────────────────────────────────────
+
+/** Finds the project and hands the chat a Download button for app/api/fhi-chat/brochure — the PDF itself is built when they tap it. */
+async function projectBrochure(admin: Admin, args: { name?: string }) {
+  const q = (args.name ?? "").trim()
+  if (!q) return { error: "Which project? Give its name." }
+  const p = await findBrochureProject(admin, q)
+  if (!p) return { error: `No published project matching "${q}"` }
+  return {
+    project: p.name,
+    developer: p.developer,
+    page: p.page,
+    ...(p.others.length ? { other_matches: p.others } : {}),
+    brochure: "ready",
+    includes: ["the project's photo", "from price and price range", "every unit type with size and from-price", "the payment plan as steps", "highlights, amenities and what's nearby", "YOUR name, role, WhatsApp, phone, email and website", "a QR code to this project on your website (or your WhatsApp)"],
+    how_to_answer: "Say the brochure is ready — the Download button is under this answer — and what's on it in one or two lines, then suggest sending it on WhatsApp. Never write a link; the button is the link.",
+    _downloads: [{ kind: "pdf" as const, title: `${p.name} — brochure`, subtitle: [p.developer, "with your contact details and QR code"].filter(Boolean).join(" · "), label: "Download PDF", href: `/api/fhi-chat/brochure?project=${p.id}`, image: p.image }],
   }
 }
 
@@ -904,6 +928,15 @@ const PHASE1_TOOLS = [
       parameters: { type: "object", properties: { name: { type: "string", description: "Project name, partial ok" } }, required: ["name"] },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "project_brochure",
+      description:
+        "A BROCHURE FOR A CLIENT: a one-page PDF of ONE project — its photo, from price, units and prices, payment plan, amenities, what's nearby — with the asker's OWN name, WhatsApp, phone, email, website and a QR code. The chat shows a Download button under the answer. Use for 'make me a brochure for Azizi Ruby', 'PDF of Samana Greenfield I can send my client', 'brochure for the cheapest project you just showed'.",
+      parameters: { type: "object", properties: { name: { type: "string", description: "Project name, partial ok" } }, required: ["name"] },
+    },
+  },
   reuse("news_overview"),
 ]
 
@@ -981,7 +1014,7 @@ export async function runAgentChatTool(
   name: string,
   args: Record<string, unknown>,
   caller: AgentChatCaller,
-): Promise<{ forModel: string; cards: FhiChatCard[]; names: string[]; charts: FhiChatChart[]; stats: FhiChatStat[] }> {
+): Promise<{ forModel: string; cards: FhiChatCard[]; names: string[]; charts: FhiChatChart[]; stats: FhiChatStat[]; downloads: AgentChatDownload[] }> {
   const admin = createAdminSupabase()
   try {
     let result: Record<string, unknown>
@@ -999,20 +1032,22 @@ export async function runAgentChatTool(
       case "my_events": result = await myEvents(admin, caller, args as MyEventsArgs); break
       case "my_team": result = await myTeam(admin, caller, args as MyTeamArgs); break
       case "person_sales": result = await personSales(admin, caller, args as PersonSalesArgs); break
-      default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [], stats: [] }
+      case "project_brochure": result = await projectBrochure(admin, args as { name?: string }); break
+      default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [], stats: [], downloads: [] }
     }
-    const { _cards, _names, _charts, _stats, _printCards: _pc, ...rest } = result as {
-      _cards?: FhiChatCard[]; _names?: string[]; _charts?: FhiChatChart[]; _stats?: FhiChatStat[]; _printCards?: unknown
+    const { _cards, _names, _charts, _stats, _printCards: _pc, _downloads, ...rest } = result as {
+      _cards?: FhiChatCard[]; _names?: string[]; _charts?: FhiChatChart[]; _stats?: FhiChatStat[]; _printCards?: unknown; _downloads?: AgentChatDownload[]
     } & Record<string, unknown>
     void _pc
     return {
       forModel: JSON.stringify(rest),
+      downloads: Array.isArray(_downloads) ? _downloads : [],
       cards: Array.isArray(_cards) ? _cards : [],
       names: Array.isArray(_names) ? _names : [],
       charts: Array.isArray(_charts) ? _charts : [],
       stats: Array.isArray(_stats) ? _stats : [],
     }
   } catch (e) {
-    return { forModel: JSON.stringify({ error: e instanceof Error ? e.message : "Query failed" }), cards: [], names: [], charts: [], stats: [] }
+    return { forModel: JSON.stringify({ error: e instanceof Error ? e.message : "Query failed" }), cards: [], names: [], charts: [], stats: [], downloads: [] }
   }
 }

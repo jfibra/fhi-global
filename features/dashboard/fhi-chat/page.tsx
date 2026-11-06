@@ -43,6 +43,8 @@ type PrintCardSpec = {
   member: { name: string; phoneDial: string; phoneLocal: string; email: string; avatarUrl: string | null; initials: string }
   designs: string[]
 }
+/** A file offered under the answer — the agents' project brochure PDF (app/api/fhi-chat/brochure). */
+type DownloadSpec = { kind: "pdf"; title: string; subtitle?: string | null; label: string; href: string; image?: string | null }
 type Msg = {
   role: "user" | "assistant"
   content: string
@@ -52,6 +54,7 @@ type Msg = {
   charts?: ChartSpec[]
   stats?: StatSpec[]
   printCards?: PrintCardSpec[]
+  downloads?: DownloadSpec[]
   /** A company report drawn as a document (report-card.tsx) instead of text. */
   report?: ChatReport
   /** Still arriving from the server (the words stream in). */
@@ -262,6 +265,26 @@ function ShareChart({ chart }: { chart: { title: string; rows: ShareRow[] } }) {
 /** Printable business card faces — drawn in the browser with the SAME canvas
  *  renderer as the Business Card maker (pixel-identical), so front and back of
  *  every design work here, with print-size downloads. */
+/** A file the assistant made — the project brochure: thumbnail, title, one Download button (a real link, so it works on phones). */
+function DownloadCard({ item }: { item: DownloadSpec }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-[#e5e7eb] bg-white p-2.5 pr-3">
+      <div className="h-14 w-[76px] shrink-0 overflow-hidden rounded-lg bg-[#dfe3e8]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {item.image ? <img src={item.image} alt="" loading="lazy" className="h-full w-full object-cover" /> : null}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-bold text-[#0d1117]">{item.title}</p>
+        {item.subtitle && <p className="truncate text-[11.5px] text-[#6b7280]">{item.subtitle}</p>}
+        <p className="mt-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[#9ca3af]">PDF · one page</p>
+      </div>
+      <a href={item.href} download className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#001f3f] px-3 py-2 text-[12.5px] font-bold text-white transition-colors hover:bg-[#00356b]">
+        <Download className="h-3.5 w-3.5" /> {item.label}
+      </a>
+    </div>
+  )
+}
+
 function PrintBusinessCards({ spec }: { spec: PrintCardSpec }) {
   const [faces, setFaces] = useState<Record<string, { front: string; back: string }>>({})
   const designs = spec.designs.filter(isDesignId)
@@ -979,13 +1002,13 @@ export default function FhiChatPage({
         body: JSON.stringify({ messages: next.map(({ role, content }) => ({ role, content })) }),
         signal: controller.signal,
       })
-      type Final = { reply?: string; used?: string[]; cards?: Card[]; names?: string[]; charts?: ChartSpec[]; stats?: StatSpec[]; printCards?: PrintCardSpec[]; error?: string; quota?: Quota }
+      type Final = { reply?: string; used?: string[]; cards?: Card[]; names?: string[]; charts?: ChartSpec[]; stats?: StatSpec[]; printCards?: PrintCardSpec[]; downloads?: DownloadSpec[]; error?: string; quota?: Quota }
       if (!res.ok || !res.body || !(res.headers.get("content-type") ?? "").includes("text/event-stream")) {
         // Refused before streaming (sign-in, the daily limit…) or an old server: one JSON object.
         const data = (await res.json().catch(() => ({}))) as Final
         if (data.quota) setQuota(data.quota)
         if (!res.ok || !data.reply) throw new Error(data.error ?? "FHI Assistant couldn't answer — try again.")
-        patchLive((m) => ({ ...m, content: data.reply ?? "", used: data.used, cards: data.cards, names: data.names, charts: data.charts, stats: data.stats, printCards: data.printCards, streaming: false, status: undefined }))
+        patchLive((m) => ({ ...m, content: data.reply ?? "", used: data.used, cards: data.cards, names: data.names, charts: data.charts, stats: data.stats, printCards: data.printCards, downloads: data.downloads, streaming: false, status: undefined }))
         return
       }
       const reader = res.body.getReader()
@@ -1014,7 +1037,7 @@ export default function FhiChatPage({
           } else if (ev.type === "done") {
             if (flushTimer !== null) window.clearTimeout(flushTimer)
             if (ev.quota) setQuota(ev.quota)
-            patchLive((m) => ({ ...m, content: ev.reply ?? liveText, used: ev.used, cards: ev.cards, names: ev.names, charts: ev.charts, stats: ev.stats, printCards: ev.printCards, streaming: false, status: undefined }))
+            patchLive((m) => ({ ...m, content: ev.reply ?? liveText, used: ev.used, cards: ev.cards, names: ev.names, charts: ev.charts, stats: ev.stats, printCards: ev.printCards, downloads: ev.downloads, streaming: false, status: undefined }))
             finished = true
           } else if (ev.type === "error") {
             if (ev.quota) setQuota(ev.quota)
@@ -1374,6 +1397,13 @@ export default function FhiChatPage({
                               <div className="mt-4 space-y-4">
                                 {m.printCards.map((pc, pi) => (
                                   <PrintBusinessCards key={pi} spec={pc} />
+                                ))}
+                              </div>
+                            )}
+                            {!m.streaming && m.downloads && m.downloads.length > 0 && (
+                              <div className="mt-4 space-y-2">
+                                {m.downloads.map((d, di) => (
+                                  <DownloadCard key={di} item={d} />
                                 ))}
                               </div>
                             )}

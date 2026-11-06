@@ -13,7 +13,7 @@ import "server-only"
 const TTL_MS = 10 * 60_000
 const cache = new Map<string, { at: number; p: Promise<Buffer | null> }>()
 
-async function fetchPng(url: string, width: number): Promise<Buffer | null> {
+async function fetchPng(url: string, width: number, format: "png" | "jpeg"): Promise<Buffer | null> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(8_000) })
     if (!res.ok) return null
@@ -21,7 +21,9 @@ async function fetchPng(url: string, width: number): Promise<Buffer | null> {
     if (!buf.length) return null
     try {
       const { default: sharp } = await import("sharp")
-      return await sharp(buf).resize({ width, withoutEnlargement: true }).png({ compressionLevel: 9 }).toBuffer()
+      const img = sharp(buf).resize({ width, withoutEnlargement: true })
+      // Photos (a project hero, a portrait) as JPEG: a tenth of the PNG's size, which matters for a brochure sent on WhatsApp.
+      return format === "jpeg" ? await img.jpeg({ quality: 82, mozjpeg: true }).toBuffer() : await img.png({ compressionLevel: 9 }).toBuffer()
     } catch {
       // No sharp (local dev without the native build): a PNG/JPEG original still draws as is.
       const type = (res.headers.get("content-type") ?? "").toLowerCase()
@@ -32,14 +34,15 @@ async function fetchPng(url: string, width: number): Promise<Buffer | null> {
   }
 }
 
-/** Any image URL as a PNG buffer no wider than `width`, or null when it can't be drawn. */
-export function pdfImage(url: string | null | undefined, width: number): Promise<Buffer | null> {
+/** Any image URL as a PNG buffer no wider than `width` (a JPEG with `{ photo: true }` — for photographs), or null when it can't be drawn. */
+export function pdfImage(url: string | null | undefined, width: number, opts: { photo?: boolean } = {}): Promise<Buffer | null> {
   const u = (url ?? "").trim()
   if (!/^https?:\/\//i.test(u)) return Promise.resolve(null)
-  const key = `${u}@${width}`
+  const format = opts.photo ? "jpeg" : "png"
+  const key = `${u}@${width}:${format}`
   const hit = cache.get(key)
   if (hit && Date.now() - hit.at < TTL_MS) return hit.p
-  const p = fetchPng(u, width)
+  const p = fetchPng(u, width, format)
   const entry = { at: Date.now(), p }
   cache.set(key, entry)
   // A miss is never kept: the next report tries again.

@@ -1,6 +1,6 @@
 import "server-only"
 
-import { agentChatToolsFor, runAgentChatTool, type AgentChatCaller } from "@/lib/fhi-agent-chat-tools"
+import { agentChatToolsFor, runAgentChatTool, type AgentChatCaller, type AgentChatDownload } from "@/lib/fhi-agent-chat-tools"
 import type { FhiChatCard, FhiChatChart, FhiChatStat } from "@/lib/fhi-chat-tools"
 import { cleanReply, isAdviceQuestion, periodCalendar, periodHint, streamCompletion, type ChatMessage, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
 
@@ -38,6 +38,8 @@ export type AgentChatResult = {
   names: string[]
   charts: FhiChatChart[]
   stats: FhiChatStat[]
+  /** Files offered under the answer (the project brochure PDF). */
+  downloads: AgentChatDownload[]
   model: string
   promptTokens: number
   completionTokens: number
@@ -52,6 +54,7 @@ What you can do, and only this:
 - THE TOP SALES BOARD → top_sales_board: ranks and deal counts for the company, plus their own rank, deals and value. Other agents' amounts are not shown on the board, so never estimate them.
 - PROJECTS → find_projects for a shortlist by area, bedrooms (0 = studio), type, budget ("under 1M" = max_price 1000000), handover year, off-plan/ready; project_details for everything about ONE named project. Quote prices exactly as returned (price_label) and say what they are based on (price_basis). "Most expensive" → sort price_desc; a UNIT question ("cheapest unit", "cheapest 2-bedroom and its size") → per_unit true, naming the unit, size and project (and, when lower_from_prices_without_unit_table is present, that those projects advertise a lower from-price without unit prices). For villas/townhouses, no_price_for_that_type projects have no price for that type on file — say "price on request", never their headline price. Always give the page link for one project.
 - PROPERTY NEWS on the website → news_overview, with links.
+- A BROCHURE FOR A CLIENT ("make me a brochure for Azizi Ruby", "PDF of Samana Greenfield I can send", "brochure for the first one") → project_brochure with the project's name: a one-page PDF with the project's photo, from price, units and prices, payment plan, amenities and THEIR OWN contact details with a QR code. The chat shows a Download button under your answer, so say it's ready below and what's on it in one or two lines; never paste a link.
 - THEIR OWN LEADS → my_leads (briefs from their Buyers Link / Sellers Link, graded; list the newest one per "- " line with name, what they want, WhatsApp and email — they follow up from this). THEIR OWN LISTINGS → my_listings. THEIR WEBSITE and the events on it → my_website. CLIENT REVIEWS about them → my_reviews. THEIR RECRUITS (people who joined through their invite link) → my_recruits — deal counts only, never amounts. THEIR EVENTS (the events they created) → my_events: registrations (total, today, in a period, by day), seats left per day, certificates, page views, QR scans and the registrants with email and WhatsApp (one per "- " line when they ask who registered — they follow up from this). "Registered today" means registrations made today, not the event's date. The UI draws a card per event (banner, date, venue, registrations, seats left, views) — don't repeat those per event in text; give the headline and what the cards don't show (who registered, when asked).
 ${role === "team_leader" ? "- THEIR TEAM (they are a team leader) → my_team, for any period including all time — 'my team', 'the team', 'the whole team', 'our team' all mean THEIR team, never the company, so answer those straight away with my_team instead of asking which they mean: team totals, each member's validated and pending sales, quiet members, deals waiting for validation, new joiners, by project and by month. Team figures include subteams. Lists of names (quiet members, new joiners) are only the first ones — always give the full count from the tool (e.g. 370 members, including: …). Name the members with their figures — the team leader already sees these on Team Sales. ONE member (\"show me Cris's sales\", \"how is Agnes doing\") → my_team with member_name, and give that member's figures and deals. \"My top seller\", \"my best agent\", \"who sells the most\" mean in THEIR TEAM → my_team (members_ranked_by_validated_value, with amounts), not top_sales_board.\n" : ""}
 Rules:
@@ -103,9 +106,10 @@ export async function runAgentChat(caller: AgentChatCaller, history: AgentChatHi
   const entityNames: string[] = []
   const charts: FhiChatChart[] = []
   const stats: FhiChatStat[] = []
+  const downloads: AgentChatDownload[] = []
   let promptTokens = 0
   let completionTokens = 0
-  const base = () => ({ used: [...new Set(used)], cards, names: entityNames, charts, stats, model, promptTokens, completionTokens })
+  const base = () => ({ used: [...new Set(used)], cards, names: entityNames, charts, stats, downloads, model, promptTokens, completionTokens })
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     let streamed = false
@@ -134,6 +138,7 @@ export async function runAgentChat(caller: AgentChatCaller, history: AgentChatHi
         names: [...new Set([...cards.map((c) => c.title), ...entityNames])].slice(0, 60),
         charts: dedupe(charts, (c) => c.title, 6),
         stats: dedupe(stats, (t) => t.label, 8),
+        downloads: dedupe(downloads, (d) => d.href, 4),
       }
     }
 
@@ -159,6 +164,7 @@ export async function runAgentChat(caller: AgentChatCaller, history: AgentChatHi
       entityNames.push(...result.names)
       charts.push(...result.charts)
       stats.push(...result.stats)
+      downloads.push(...result.downloads)
       messages.push({ role: "tool", tool_call_id: call.id, content: result.forModel.slice(0, 16000) })
     }
   }
