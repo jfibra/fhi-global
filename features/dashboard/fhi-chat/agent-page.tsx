@@ -14,7 +14,7 @@ import FhiChatPage from "./page"
  */
 
 const SUGGESTIONS = [
-  { label: "My sales", items: ["How are my sales this year?", "Anything of mine waiting for validation?", "Where do I rank this year?"] },
+  { label: "My sales", items: ["How are my sales this year?", "My performance report for this month", "Anything of mine waiting for validation?", "Where do I rank this year?"] },
   { label: "My leads & clients", items: ["Any priority buyers in my leads?", "Who sent me a brief this week?", "What do clients say about me?"] },
   { label: "My pages & events", items: ["Which of my listings are live?", "Any new registrations for my event today?", "Are my recruits selling?"] },
   { label: "Projects & news", items: ["Cheapest 1-bedroom in JVC?", "Payment plan of Samana Greenfield", "Make me a brochure for Azizi Ruby", "What's the latest property news?"] },

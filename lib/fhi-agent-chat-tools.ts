@@ -2,6 +2,8 @@ import "server-only"
 
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { findBrochureProject } from "@/lib/brochure/data"
+import { buildAgentReport } from "@/lib/agent-report/data"
+import { ruleInsights } from "@/lib/agent-report/insights"
 import { ROLES_SALE_AGENT_PROFILES } from "@/lib/app-roles"
 import { SITE_URL } from "@/lib/seo"
 import { eventIsPast, eventWhenLabel } from "@/lib/events/dates"
@@ -283,6 +285,31 @@ async function projectBrochure(admin: Admin, args: { name?: string }) {
     includes: ["the project's photo", "from price and price range", "every unit type with size and from-price", "the payment plan as steps", "highlights, amenities and what's nearby", "YOUR name, role, WhatsApp, phone, email and website", "a QR code to this project on your website (or your WhatsApp)"],
     how_to_answer: "Say the brochure is ready — the Download button is under this answer — and what's on it in one or two lines, then suggest sending it on WhatsApp. Never write a link; the button is the link.",
     _downloads: [{ kind: "pdf" as const, title: `${p.name} — brochure`, subtitle: [p.developer, "with your contact details and QR code"].filter(Boolean).join(" · "), label: "Download PDF", href: `/api/fhi-chat/brochure?project=${p.id}`, image: p.image }],
+  }
+}
+
+// ─── my_report ───────────────────────────────────────────────────────────────
+
+/** Builds the caller's report for the period (no AI yet — the PDF route does that within the budget) and hands the chat a Download button. */
+async function myReport(admin: Admin, caller: AgentChatCaller, args: { from_date?: string; to_date?: string }) {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" })
+  const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10)
+  const from = args.from_date?.trim() || `${today.slice(0, 7)}-01`
+  const to = args.to_date?.trim() || tomorrow
+  const built = await buildAgentReport(admin, caller, from, to)
+  if (built.status !== 200) return { error: built.error }
+  const r = built.report
+  const rules = ruleInsights(r)
+  const { data: me } = await admin.from("profiles").select("profile_url").eq("id", caller.userId).maybeSingle()
+  return {
+    period: { from, to, label: r.period.label, compared_with: r.period.versus },
+    headline: rules.headline,
+    figures: Object.fromEntries(r.kpis.map((k) => [k.label, `${k.value}${k.change ? ` (${k.change})` : ""}${k.hint ? ` — ${k.hint}` : ""}`])),
+    report: "ready",
+    includes: ["sales and deals with the change vs the period before", "Top Sales rank", "pending deals", "leads by grade and the priority buyers", "listings, website and client reviews", "events and recruits", "coaching for the next 30 days (written by FHI Assistant inside the daily budget)"],
+    how_to_answer: "Say the report is ready — the Download button is under this answer — then give the headline and two or three figures from `figures`. Never write a link; the button is the link.",
+    _stats: r.kpis.slice(0, 4).map((k) => stat(k.label, k.value, k.change, k.hint)),
+    _downloads: [{ kind: "pdf" as const, title: `My Performance Report — ${r.period.label}`, subtitle: "Sales, rank, leads, website, reviews, events, recruits and coaching for the next 30 days", label: "Download PDF", href: `/api/fhi-chat/report?from=${from}&to=${to}`, image: (me?.profile_url as string | null) ?? "/fhi-branding-navy.png" }],
   }
 }
 
@@ -937,6 +964,15 @@ const PHASE1_TOOLS = [
       parameters: { type: "object", properties: { name: { type: "string", description: "Project name, partial ok" } }, required: ["name"] },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "my_report",
+      description:
+        "MY PERFORMANCE REPORT: a two-page PDF of the asker's own period — validated sales and deals with the change vs the period before, Top Sales rank, pending deals, leads by grade with the priority buyers, listings, website, client reviews, events, recruits — and FHI Assistant's coaching for the next 30 days. Returns the headline figures and a Download button. Use for 'my report for this month', 'performance report PDF', 'how did I do last quarter, as a PDF', 'my monthly report'. Pass the period's dates from PERIODS (to_date exclusive); default this month.",
+      parameters: { type: "object", properties: { from_date: { type: "string", description: "YYYY-MM-DD inclusive" }, to_date: { type: "string", description: "YYYY-MM-DD exclusive" } } },
+    },
+  },
   reuse("news_overview"),
 ]
 
@@ -1033,6 +1069,7 @@ export async function runAgentChatTool(
       case "my_team": result = await myTeam(admin, caller, args as MyTeamArgs); break
       case "person_sales": result = await personSales(admin, caller, args as PersonSalesArgs); break
       case "project_brochure": result = await projectBrochure(admin, args as { name?: string }); break
+      case "my_report": result = await myReport(admin, caller, args as { from_date?: string; to_date?: string }); break
       default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [], stats: [], downloads: [] }
     }
     const { _cards, _names, _charts, _stats, _printCards: _pc, _downloads, ...rest } = result as {
