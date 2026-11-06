@@ -4,18 +4,15 @@ import Image from "next/image"
 import { ArrowDown, MessageCircle } from "lucide-react"
 import { AgentsGrid, type PublicAgent } from "./agents-grid"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { ROLES_PUBLIC_AGENTS } from "@/lib/app-roles"
+import { fetchPublicAgents } from "@/lib/public-agents"
 import { createPageMetadata } from "@/lib/seo"
-import { titleCaseName } from "@/lib/public-profile"
 import { breadcrumbList, personListSchema } from "@/lib/structured-data"
-import { agentSiteSignalsFromRow, isAgentSiteComplete } from "@/lib/agent-site"
 import { companyWhatsappHref } from "@/lib/company"
 import { JsonLd } from "@/components/json-ld"
 import { InView } from "@/components/public/in-view"
 import { CountUp } from "@/components/public/count-up"
 import { MagneticLink } from "@/components/public/magnetic-link"
 import { AgentWall, type WallPerson } from "@/components/public/agent-wall"
-import { STORY_BY_AGENT } from "@/lib/films"
 
 export const revalidate = 300
 
@@ -29,27 +26,6 @@ export const metadata: Metadata = createPageMetadata({
 
 const COMPANY_WHATSAPP = companyWhatsappHref()
 
-/** Joins a stored country code with its number, tolerating either being blank. */
-function contact(meta: Record<string, unknown> | null, key: "phone" | "whatsapp"): string | null {
-  if (!meta) return null
-  const code = typeof meta[`${key}_country_code`] === "string" ? (meta[`${key}_country_code`] as string).trim() : ""
-  const num = typeof meta[`${key}_number`] === "string" ? (meta[`${key}_number`] as string).trim() : ""
-  if (!num) return null
-  // Numbers are sometimes stored already carrying the code.
-  return num.startsWith("+") || !code ? num : `${code}${num}`
-}
-
-/**
- * Google Sign-In avatars arrive at 96 px ("…=s96-c"), which blurs at card
- * size. Google serves the same picture larger on request.
- */
-function sharpPhoto(url: string): string {
-  return /googleusercontent\.com\//.test(url) ? url.replace(/=s\d+(-c)?$/, "=s640-c") : url
-}
-
-/** Uploaded to FHI's own storage, i.e. a portrait the agent chose for work (not a Google account picture). */
-const isUploaded = (url: string) => /\.amazonaws\.com\//.test(url)
-
 /** A stable shuffle (same order every render, so no hydration mismatch): the wall shouldn't read A to Z. */
 const mix = (id: string) => [...id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7)
 
@@ -59,77 +35,19 @@ type SchemaPerson = { name: string; image: string | null; path: string | null }
 type Roster = { agents: PublicAgent[]; wall: WallPerson[]; liveProjects: number; people: SchemaPerson[] }
 
 async function fetchRoster(): Promise<Roster> {
-  // Service role, server-side, with an explicit column list — the same pattern
-  // the public business-card page uses. It is NOT laziness about RLS: profiles
-  // only grants SELECT to `authenticated`, and opening it to anon would expose
-  // whole rows (metadata carries licence numbers, internal LR ids and private
-  // contact fields). Row-level security cannot restrict columns; naming them
-  // here can. Only what PublicAgent names ever reaches the browser: name,
-  // photo, role, phone, WhatsApp, and the public pages that already exist for
-  // them (business card, website, approved review score).
+  // Which agents, and which of their details, is decided in lib/public-agents.ts —
+  // one loader shared with the website chat, so the chat never names an agent
+  // this page doesn't. Only the live-project count is this page's own query.
   const admin = createAdminSupabase()
-  const [profiles, sites, reviews, projects] = await Promise.all([
-    admin
-      .from("profiles")
-      .select("id, fullname, fname, lname, role, profile_url, metadata")
-      .in("role", [...ROLES_PUBLIC_AGENTS])
-      .eq("status", "active")
-      .not("is_deleted", "is", true)
-      // Only the agents admin staff picked (Accounts & Invites → Public Agents, migration 077).
-      .eq("show_on_agents_page", true)
-      .order("fullname", { ascending: true }),
-    admin.from("website_builder").select("agent_id, slug, contact, about:about_id(bio, photo)").eq("is_published", true).not("slug", "is", null),
-    admin.from("agent_feedback").select("agent_id, overall_rating").eq("status", "approved"),
+  const [roster, projects] = await Promise.all([
+    fetchPublicAgents().catch((e: unknown) => {
+      console.error("[agents] query failed:", e instanceof Error ? e.message : e)
+      return null
+    }),
     admin.from("projects").select("id", { count: "exact", head: true }).eq("is_active", true).eq("is_published", true).is("deleted_at", null),
   ])
-
-  if (profiles.error) {
-    console.error("[agents] query failed:", profiles.error.message)
-    return { agents: [], wall: [], liveProjects: projects.count ?? 0, people: [] }
-  }
-
-  const siteOf = new Map((sites.data ?? []).map((s) => [String(s.agent_id), String(s.slug)]))
-  // A Person links to their site only when that site is open to search engines — the same
-  // predicate as its robots tag and the sitemap (lib/agent-site.ts), so no structured-data
-  // link points at a noindex page.
-  const listedOf = new Map(
-    (sites.data ?? []).filter((s) => isAgentSiteComplete(agentSiteSignalsFromRow(s))).map((s) => [String(s.agent_id), String(s.slug)]),
-  )
-  const scores = new Map<string, number[]>()
-  for (const r of reviews.data ?? []) {
-    const k = String(r.agent_id)
-    scores.set(k, [...(scores.get(k) ?? []), Number(r.overall_rating)])
-  }
-
-  const agents: PublicAgent[] = (profiles.data ?? [])
-    .map((p) => {
-      const meta = (p.metadata ?? null) as Record<string, unknown> | null
-      const raw = (p.fullname ?? [p.fname, p.lname].filter(Boolean).join(" ") ?? "").trim()
-      const photo = typeof p.profile_url === "string" && p.profile_url.trim() ? p.profile_url.trim() : null
-      const s = scores.get(String(p.id))
-      return {
-        id: String(p.id),
-        name: titleCaseName(raw),
-        photo: photo ? sharpPhoto(photo) : null,
-        uploaded: photo ? isUploaded(photo) : false,
-        leader: p.role === "team_leader",
-        phone: contact(meta, "phone"),
-        whatsapp: contact(meta, "whatsapp"),
-        website: siteOf.get(String(p.id)) ?? null,
-        rating: s?.length ? { average: s.reduce((a, b) => a + b, 0) / s.length, count: s.length } : null,
-        story: STORY_BY_AGENT[String(p.id)] ?? null,
-      }
-    })
-    // An unnamed card helps nobody find anyone.
-    .filter((a) => a.name.length > 0)
-    // Agents with a photo lead. A visitor's first screen decides whether the
-    // team looks real, and a grid opening on logo placeholders undersells it.
-    // Alphabetical within each group, so the ordering is still predictable and
-    // the whole thing self-corrects as agents upload portraits.
-    .sort((a, b) => {
-      if (Boolean(a.photo) !== Boolean(b.photo)) return a.photo ? -1 : 1
-      return a.name.localeCompare(b.name)
-    })
+  if (!roster) return { agents: [], wall: [], liveProjects: projects.count ?? 0, people: [] }
+  const { agents, listedSites: listedOf } = roster
 
   const wall = agents
     .filter((a) => a.photo && a.uploaded)

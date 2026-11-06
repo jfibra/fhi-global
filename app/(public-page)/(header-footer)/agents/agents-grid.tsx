@@ -12,24 +12,11 @@ import Image from "next/image"
 import Link from "next/link"
 import { ArrowUpRight, Globe, MessageCircle, Phone, Play, Search, Star, UserRound, Users } from "lucide-react"
 import { InView } from "@/components/public/in-view"
-import { FilmTrigger, type Film } from "@/components/public/film-player"
+import { FilmTrigger } from "@/components/public/film-player"
 
-export type PublicAgent = {
-  id: string
-  name: string
-  photo: string | null
-  /** The photo was uploaded to FHI (not a Google account picture). */
-  uploaded: boolean
-  leader: boolean
-  phone: string | null
-  whatsapp: string | null
-  /** Published agent website slug (/website/<slug>). */
-  website: string | null
-  /** Approved client reviews only. */
-  rating: { average: number; count: number } | null
-  /** The agent's own story film (FHI Stories), when one was made. */
-  story?: Film | null
-}
+// The roster's shape lives with its loader (lib/public-agents.ts), shared with the website chat.
+import type { PublicAgent } from "@/lib/public-agents"
+export type { PublicAgent }
 
 const initials = (name: string) =>
   name

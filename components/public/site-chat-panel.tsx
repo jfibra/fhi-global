@@ -21,7 +21,7 @@ import { gaEvent } from "@/lib/ga"
 import { COMPANY, companyWhatsappHref } from "@/lib/company"
 import { COUNTRY_CODES } from "@/lib/user-service"
 
-type Card = { title: string; subtitle?: string; image?: string | null; href: string | null; kind: "project" | "listing" | "event" }
+type Card = { title: string; subtitle?: string; image?: string | null; href: string | null; kind: "project" | "listing" | "event" | "agent" }
 type Msg = {
   role: "user" | "assistant"
   content: string

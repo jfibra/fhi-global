@@ -11,6 +11,7 @@ import { isEventRegistrationOpen } from "@/lib/events/registration"
 import { COMPANY, companyAddressLine } from "@/lib/company"
 import { SITE_URL } from "@/lib/seo"
 import { isTestRecord } from "@/lib/listing-publish-checks"
+import { fetchPublicAgents } from "@/lib/public-agents"
 
 /**
  * The website chat's model loop (boss via Juliecor, 2026-11-06): the public
@@ -39,7 +40,7 @@ const MAX_ANSWER_TOKENS = 550
 export type SiteChatHistory = Array<{ role: "user" | "assistant"; content: string }>
 
 /** A card the widget draws under the answer: a project, a listing or an event, with its page. */
-export type SiteChatCard = { title: string; subtitle?: string; image?: string | null; href: string | null; kind: "project" | "listing" | "event" }
+export type SiteChatCard = { title: string; subtitle?: string; image?: string | null; href: string | null; kind: "project" | "listing" | "event" | "agent" }
 
 export type SiteChatResult = {
   ok: boolean
@@ -68,6 +69,7 @@ WHAT YOU CAN DO, only through the tools:
 - find_listings — individual ready homes for sale or for rent listed by FHI's agents (/buy and /rent).
 - upcoming_events — FHI's property events, roadshows and seminars.
 - site_pages — the website's own pages and guides (area guides, off-plan and new-launch pages, buying guides, golden visa, fees, the mortgage calculator, contact, about) — link them.
+- our_agents — FHI's property consultants as listed on the Agents page: name, role, WhatsApp link, phone, personal website, profile card, client rating, a line about them. Use for "who can I talk to", "which agent", "an agent who speaks Tagalog / knows JVC", "contact of <name>".
 
 RULES
 - Every fact about a project, price, unit, payment plan, listing, event or guide comes from a tool called for THIS question. Never invent, estimate or round. If the tools return nothing, say so and offer a consultant.
@@ -78,6 +80,7 @@ RULES
 - Keep it short: 2 to 5 sentences, or up to 6 "- " lines for a shortlist (name — from price — handover — area — the page link). Plain text only: no markdown, no asterisks, no headers, no tables, and NO markdown links — write every link as the full address exactly as the tool returned it (https://fhiglobal.ae/…), never as "here", "details" or "link". Always include the page link when you name a project, listing, event or guide. The chat shows photo cards for projects, listings and events automatically, so don't describe photos.
 - Before answering anything about the buying process, fees, mortgages, visas (golden visa), ownership, areas or neighbourhoods, call site_pages for it and link the guide it returns; if it returns none, say the site has no guide on that and offer a consultant. Never mention a guide or page without the address site_pages gave you.
 - If a project's payment plan, price or handover is not on file, say exactly that and offer a consultant — never describe what developers "typically" offer.
+- WHO TO TALK TO → call our_agents and name two or three agents as "- Name (role) — WhatsApp link — website link"; the company WhatsApp and "Talk to a consultant" also work. Only what the tool returns: never invent an agent, a number, a language they speak or an area they cover. If the tool returns nobody, give the company WhatsApp.
 - After you have really helped (a shortlist, a project's details, a payment plan), offer ONE next step in one short line: a consultant can call them — they can tap "Talk to a consultant" under the chat — or WhatsApp ${COMPANY.phone}. Don't repeat the offer every message; never ask for their number yourself.
 - Today in Dubai is ${dubaiToday()}.`
 
@@ -125,6 +128,21 @@ export const SITE_CHAT_TOOLS = [
       name: "upcoming_events",
       description: "FHI's UPCOMING property events, roadshows and seminars (the /events page): title, dates, venue, whether registration is open, the page. Use for 'any events', 'roadshow in Manila', 'seminar this month'.",
       parameters: { type: "object", properties: { search: { type: "string", description: "A word to match in the title or venue, optional" } } },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "our_agents",
+      description:
+        "WHO TO TALK TO: FHI's property consultants as listed on the public Agents page — name, role (team leader / property advisor), WhatsApp link, phone, personal website, profile card, approved client rating and the line about them from their website. Use for 'who can I talk to', 'which agent should I contact', 'do you have an agent who speaks Tagalog / handles villas / knows JVC', 'contact details of <agent name>'. search matches their name and what their website says about them.",
+      parameters: {
+        type: "object",
+        properties: {
+          search: { type: "string", description: "A name, language, area or speciality to match, optional" },
+          limit: { type: "integer", description: "Default 6, max 12" },
+        },
+      },
     },
   },
   {
@@ -271,6 +289,42 @@ async function upcomingEvents(args: { search?: string }) {
   }
 }
 
+// ─── our_agents: the roster the Agents page shows ────────────────────────────
+
+async function ourAgents(args: { search?: string; limit?: number }) {
+  const limit = Math.min(Math.max(args.limit ?? 6, 1), 12)
+  const { agents } = await fetchPublicAgents()
+  if (!agents.length) return { listed_agents: 0, note: "No agents are listed publicly right now — give the company WhatsApp", all_on: `${base()}/agents` }
+  const words = (args.search ?? "").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2)
+  const matched = words.length ? agents.filter((a) => words.some((w) => [a.name, a.about].some((f) => (f ?? "").toLowerCase().includes(w)))) : agents
+  const shown = (matched.length ? matched : agents).slice(0, limit)
+  const role = (a: (typeof agents)[number]) => (a.leader ? "Team leader" : "Property advisor")
+  const ratingOf = (a: (typeof agents)[number]) => (a.rating ? `${a.rating.average.toFixed(1)}/5 from ${a.rating.count} client review${a.rating.count === 1 ? "" : "s"}` : null)
+  const site = (a: (typeof agents)[number]) => (a.website ? `${base()}/website/${a.website}` : null)
+  const profile = (a: (typeof agents)[number]) => `${base()}/business-card/${a.id}`
+  return {
+    listed_agents: agents.length,
+    ...(words.length ? { matched_search: matched.length, ...(matched.length ? {} : { note: `Nobody's page mentions "${args.search}" — these are the listed agents instead` }) } : {}),
+    shown: shown.length,
+    rule: "Only the agents FHI lists on its Agents page, with the contact details shown there. Never invent an agent, a number, a language or an area",
+    agents: shown.map((a) => ({
+      name: a.name,
+      role: role(a),
+      whatsapp: a.whatsapp ? `https://wa.me/${a.whatsapp.replace(/\D/g, "")}` : null,
+      phone: a.phone,
+      website: site(a),
+      profile_card: profile(a),
+      rating: ratingOf(a),
+      about: a.about ? a.about.slice(0, 220) : null,
+    })),
+    all_on: `${base()}/agents`,
+    _cards: shown
+      .filter((a) => a.photo)
+      .slice(0, 6)
+      .map((a): SiteChatCard => ({ kind: "agent", title: a.name, subtitle: [role(a), a.rating ? `${a.rating.average.toFixed(1)} ★` : null].filter(Boolean).join(" · "), image: a.photo, href: site(a) ?? profile(a) })),
+  }
+}
+
 // ─── site_pages: the guides and fixed pages ──────────────────────────────────
 
 const FIXED_PAGES: Array<{ label: string; path: string; description: string; words: string }> = [
@@ -316,6 +370,7 @@ async function runSiteChatTool(name: string, args: Record<string, unknown>): Pro
       case "find_listings": result = (await findListings(args as ListingsArgs)) as Record<string, unknown>; break
       case "upcoming_events": result = (await upcomingEvents(args as { search?: string })) as Record<string, unknown>; break
       case "site_pages": result = sitePages(args as { topic?: string }) as Record<string, unknown>; break
+      case "our_agents": result = (await ourAgents(args as { search?: string; limit?: number })) as Record<string, unknown>; break
       default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], projects: [] }
     }
     // The admin tools' charts and tiles mean nothing to the widget; their cards carry no link — add the page.
