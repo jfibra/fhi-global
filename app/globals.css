@@ -813,8 +813,8 @@
 /* The WhatsApp float rides above the phone action bar while it is shown. Pure CSS (the bar is in
    the server HTML with data-show="true"), so the float is already clear of it at first paint. */
 @media (max-width: 1023px) {
-  .wa-fab { transition: bottom 420ms var(--wf-ease), transform 200ms; }
-  body:has(.pp-sticky[data-show="true"]) .wa-fab { bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px)); }
+  .wa-fab, .sc-fab { transition: bottom 420ms var(--wf-ease), transform 200ms; }
+  body:has(.pp-sticky[data-show="true"]) .wa-fab, body:has(.pp-sticky[data-show="true"]) .sc-fab { bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -974,6 +974,8 @@ export async function sendLeadInquiryEmail(input: {
     pageUrl?: string | null
     /** The ad/campaign that brought the visitor, e.g. "source=google · medium=cpc". */
     campaign?: string | null
+    /** Website chat leads: the conversation excerpt they came from (multi-line). */
+    message?: string | null
   }
   dashboardUrl: string
 }): Promise<void> {
@@ -981,6 +983,9 @@ export async function sendLeadInquiryEmail(input: {
   const name = greetingName(input.adminName)
   const about = lead.projectName ?? lead.pageLabel ?? null
   const subject = `New lead — ${lead.name}${about ? ` · ${about}` : ""}`
+  const messageHtml = lead.message
+    ? `<tr><td colspan="2" style="padding:12px 0 2px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.6;color:#374151;white-space:pre-wrap;">${esc(lead.message)}</td></tr>`
+    : ""
 
   const detailsHtml = [
     detailRow("Name", lead.name),
@@ -992,6 +997,7 @@ export async function sendLeadInquiryEmail(input: {
     lead.developerName ? detailRow("Developer", lead.developerName) : "",
     lead.pageLabel ? detailRow("Page", lead.pageUrl ? `${lead.pageLabel} (${lead.pageUrl})` : lead.pageLabel) : "",
     lead.campaign ? detailRow("Campaign", lead.campaign) : "",
+    messageHtml,
   ].join("")
 
   const bodyHtml = `
@@ -1027,7 +1033,7 @@ export async function sendLeadInquiryEmail(input: {
     from: fromAddress(),
     to: input.to,
     subject,
-    text: `New lead from ${lead.name}${about ? ` on ${about}` : ""}.\n\nName: ${lead.name}\nEmail: ${lead.email}\nPhone: ${lead.phone}\nLooking for: ${lead.lookingFor}\nCategory: ${lead.propertyCategory}${lead.projectName ? `\nProject: ${lead.projectName}` : ""}${lead.developerName ? `\nDeveloper: ${lead.developerName}` : ""}${lead.pageLabel ? `\nPage: ${lead.pageLabel}${lead.pageUrl ? ` (${lead.pageUrl})` : ""}` : ""}${lead.campaign ? `\nCampaign: ${lead.campaign}` : ""}\n\n${input.dashboardUrl}`,
+    text: `New lead from ${lead.name}${about ? ` on ${about}` : ""}.\n\nName: ${lead.name}\nEmail: ${lead.email}\nPhone: ${lead.phone}\nLooking for: ${lead.lookingFor}\nCategory: ${lead.propertyCategory}${lead.projectName ? `\nProject: ${lead.projectName}` : ""}${lead.developerName ? `\nDeveloper: ${lead.developerName}` : ""}${lead.pageLabel ? `\nPage: ${lead.pageLabel}${lead.pageUrl ? ` (${lead.pageUrl})` : ""}` : ""}${lead.campaign ? `\nCampaign: ${lead.campaign}` : ""}${lead.message ? `\n\n${lead.message}` : ""}\n\n${input.dashboardUrl}`,
     html: eventEmailShell({
       subject,
       preheader: `${lead.name} inquired${about ? ` about ${about}` : ""}.`,

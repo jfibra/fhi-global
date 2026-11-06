@@ -10,6 +10,7 @@ import { COMPANY, companyAddressLine, companyLicenceLine, companyPhoneHref } fro
 import { LinkedInLogo, WhatsAppLogo } from "@/components/brand-icons"
 import { SEO_SEARCH_PAGES, SEO_AREA_GUIDES, SEO_BUYER_GUIDES, SEO_HANDOVER_PAGES } from "@/lib/seo-pages"
 import { WhatsAppFab } from "@/components/public/whatsapp-fab"
+import { SiteChat } from "@/components/public/site-chat"
 import { InView } from "@/components/public/in-view"
 import { MagneticLink } from "@/components/public/magnetic-link"
 
@@ -367,8 +368,10 @@ export function Footer() {
       </div>
 
       {/* Floating WhatsApp — footer renders on every public page, so this
-          reaches all of them without touching the dashboards. */}
+          reaches all of them without touching the dashboards. The website
+          chat (the public FHI Assistant) sits beside it for the same reason. */}
       <WhatsAppFab />
+      <SiteChat />
     </footer>
   )
 }

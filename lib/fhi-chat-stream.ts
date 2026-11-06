@@ -42,6 +42,8 @@ export async function streamCompletion(opts: {
   tools: unknown[]
   toolChoice: "auto" | "none"
   temperature?: number
+  /** A ceiling on the answer's length — the public website chat sets one; the dashboards don't. */
+  maxTokens?: number
   onDelta?: (text: string) => void
 }): Promise<Round> {
   const usage: Usage = { prompt: 0, completion: 0 }
@@ -55,6 +57,7 @@ export async function streamCompletion(opts: {
         tools: opts.tools,
         tool_choice: opts.toolChoice,
         temperature: opts.temperature ?? 0.1,
+        ...(opts.maxTokens ? { max_completion_tokens: opts.maxTokens } : {}),
         stream: true,
         stream_options: { include_usage: true },
       }),

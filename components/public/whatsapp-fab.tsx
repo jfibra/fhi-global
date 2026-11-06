@@ -20,7 +20,8 @@ import { COMPANY as FHI } from "@/lib/company"
  *     prefill a message naming the page, so the consultant knows what the
  *     visitor was looking at. The click reports the page as `context`.
  */
-const AGENT_PAGES = ["/buy-with/", "/sell-with/", "/b/", "/s/"]
+/** Pages that belong to one agent — no company buttons there (the website chat follows the same rule). */
+export const AGENT_PAGES = ["/buy-with/", "/sell-with/", "/b/", "/s/"]
 const COMPANY: FabTarget = { number: FHI.whatsapp, text: "Hi! I'm interested in a property with FHI Global.", label: "Chat with FHI Global on WhatsApp" }
 
 type FabTarget = { number: string; text: string; label: string; /** analytics only: which page the chat starts from, e.g. "project:azizi-emerald" */ context?: string }
@@ -45,6 +46,12 @@ export function WhatsAppFabTarget({ number = COMPANY.number, text, label, contex
     return () => setTarget(null)
   }, [number, text, label, context])
   return null
+}
+
+/** True while the floating button is handed to an agent (an agent's event page): that visitor is theirs, so the website chat steps aside too. */
+export function useFabBelongsToAgent(): boolean {
+  const override = useSyncExternalStore(subscribe, () => target, () => null)
+  return !!override && override.number.replace(/\D/g, "") !== FHI.whatsapp
 }
 
 export function WhatsAppFab() {

@@ -19,7 +19,7 @@ import {
 } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
 import { formatDateTime, relativeTime } from "@/lib/utils"
-import { leadSourceLabel, leadSourcePath } from "@/lib/lead-source"
+import { CHAT_SOURCE, leadSourceLabel, leadSourcePath } from "@/lib/lead-source"
 import {
   type Inquiry,
   type InquiriesSummary,
@@ -1183,8 +1183,8 @@ function ThreadReader({
 
             <div className="px-5 py-4 text-sm text-[#374151] leading-relaxed">
               <p>
-                <strong>{l.name}</strong> submitted the Inquire Now form
-                {l.project_name ? <> for <strong>{l.project_name}</strong></> : null}
+                <strong>{l.name}</strong> {l.source === CHAT_SOURCE ? "asked for a consultant in the website chat" : "submitted the Inquire Now form"}
+                {l.project_name ? <> {l.source === CHAT_SOURCE ? "after asking about" : "for"} <strong>{l.project_name}</strong></> : null}
                 {l.developer_name ? <> {l.project_name ? "by" : "about"} {l.developer_name}</> : null}
                 {!l.project_name && !l.developer_name && leadSourcePath(l.source) ? <> on <strong>{leadSourcePath(l.source)}</strong></> : null}.
               </p>
@@ -1194,6 +1194,14 @@ function ThreadReader({
                 <ThreadFact label="Phone" value={fullPhone} />
                 <ThreadFact label="Email" value={l.email} />
               </div>
+
+              {/* Website chat leads carry the conversation they came from (083) */}
+              {l.message && (
+                <div className="mt-4 border-l-2 border-[#d6b357] bg-[#fbf9f4] px-4 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8a6d1f]">What they asked in the chat</p>
+                  <pre className="mt-1.5 whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-[#374151]">{l.message}</pre>
+                </div>
+              )}
 
               {/* Quick contact actions */}
               <div className="flex items-center gap-2 flex-wrap mt-5">

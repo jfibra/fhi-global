@@ -17,6 +17,8 @@
 
 export const PROJECT_PAGE_SOURCE = "project_page"
 export const WEBSITE_SOURCE = "website"
+/** "Talk to a consultant" in the website chat (app/api/site-chat/lead, migration 083): the chat excerpt is in `inquiries.message`. */
+export const CHAT_SOURCE = "chat"
 
 export type LeadContextKind = "landing" | "developer"
 
@@ -40,6 +42,7 @@ export function leadSourceLabel(source: string | null | undefined): string {
   if (!value) return "Unknown source"
   if (value === PROJECT_PAGE_SOURCE) return "Project page — Inquire Now"
   if (value === WEBSITE_SOURCE) return "Website"
+  if (value === CHAT_SOURCE) return "Website chat"
   const colon = value.indexOf(":")
   if (colon > 0) {
     const kind = value.slice(0, colon)

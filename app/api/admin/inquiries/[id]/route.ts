@@ -13,7 +13,7 @@ import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 export const runtime = "nodejs"
 
 const FULL_COLUMNS =
-  "id, name, email, phone_country_code, phone, looking_for, property_category, project_id, project_name, developer_name, status, source, ip_address, user_agent, created_at, contacted_at, read_at, starred_at, updated_at, deleted_at"
+  "id, name, email, phone_country_code, phone, looking_for, property_category, project_id, project_name, developer_name, status, source, message, ip_address, user_agent, created_at, contacted_at, read_at, starred_at, updated_at, deleted_at"
 // Typed as plain string so the two fallback selects unify to one row shape.
 const EMAIL_COLUMNS: string =
   "id, inquiry_id, to_email, to_name, subject, body_text, sent_by, sent_by_name, status, error, direction, from_email, from_name, attachments, created_at"
@@ -36,8 +36,10 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
   // what migrations 031/032 have actually created.
   const tiers = [
     FULL_COLUMNS,
-    FULL_COLUMNS.replace(", starred_at", ""),
-    FULL_COLUMNS.replace(", read_at", "").replace(", starred_at", ""),
+    // 083 (message — the website chat) not applied yet.
+    FULL_COLUMNS.replace(", message", ""),
+    FULL_COLUMNS.replace(", message", "").replace(", starred_at", ""),
+    FULL_COLUMNS.replace(", message", "").replace(", read_at", "").replace(", starred_at", ""),
   ]
   let result = await admin.from("inquiries").select(tiers[0]).eq("id", id).maybeSingle()
   for (let tier = 1; tier < tiers.length && result.error?.code === "42703"; tier++) {

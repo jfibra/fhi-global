@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Loader2, RefreshCw, Search, Sparkles } from "lucide-react"
+import { ArrowLeft, Loader2, MessageSquareText, RefreshCw, Search, Sparkles } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { isAdminStaffRole, roleToLabel } from "@/lib/app-roles"
@@ -83,6 +83,9 @@ export default function AssistantUsagePage() {
           <p className="mt-1 max-w-3xl text-sm text-[#6b7280]">
             What agents and team leaders ask their FHI Assistant and what it costs. Agents get 20 questions a day, team leaders 40; the agent assistant pauses when the monthly budget is used up.
           </p>
+          <Link href={`${base}/fhi-chat/website`} className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-[#001f3f] underline decoration-[#d6b357] underline-offset-2">
+            <MessageSquareText className="h-3.5 w-3.5" /> Website chat (visitors)
+          </Link>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {WINDOWS.map((w) => (

@@ -20,6 +20,9 @@ export type Inquiry = {
   developer_name: string | null
   status: InquiryStatus
   source: string
+  /** Website chat leads (source "chat", migration 083): the conversation excerpt the lead came from. */
+  message?: string | null
+  chat_session_id?: string | null
   ip_address?: string | null
   user_agent?: string | null
   created_at: string
