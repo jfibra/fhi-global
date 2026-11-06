@@ -171,6 +171,125 @@ export async function updateTeamLogoUrl(
 
 // ─── Members ───────────────────────────────────────────────────────────────────
 
+const MEMBER_SELECT =
+  `id, user_id, team_id, role_in_team, joined_at, left_at, is_active, transfer_reason,
+   profiles!inner(id, fullname, fname, lname, profile_url, role, status, metadata)`
+
+// PostgREST's own row ceiling — a search this wide is not a search any more.
+const MEMBER_SEARCH_CEILING = 1000
+
+// Commas, brackets and quotes are .or() grammar and % / * are ilike wildcards:
+// typing one in the search box must narrow the list, never break the request.
+function sanitizeMemberSearch(raw: string): string {
+  return raw.replace(/[,()"%*\\]/g, " ").replace(/\s+/g, " ").trim()
+}
+
+// The rows each half of a member search brings back: just enough to merge, sort
+// and page the matches before the page itself is fetched in full.
+type MemberSearchKey = {
+  id: string
+  joined_at: string
+  role_in_team: string | null
+  profiles: { fullname: string | null } | { fullname: string | null }[] | null
+}
+
+function memberSearchName(row: MemberSearchKey): string | null {
+  const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+  return profile?.fullname ?? null
+}
+
+// Mirrors how Postgres would have ordered the same rows — nulls last ascending,
+// first descending, ties broken by id so paging never repeats or skips a member.
+function compareMembers(
+  a: MemberSearchKey,
+  b: MemberSearchKey,
+  field: "fullname" | "joined_at" | "role_in_team",
+  ascending: boolean,
+): number {
+  const valueOf = (row: MemberSearchKey) =>
+    field === "fullname"       ? memberSearchName(row)
+    : field === "role_in_team" ? row.role_in_team
+    : row.joined_at
+  const av = valueOf(a)
+  const bv = valueOf(b)
+
+  if (av === null || bv === null) {
+    if (av === bv) return a.id.localeCompare(b.id)
+    return (av === null ? 1 : -1) * (ascending ? 1 : -1)
+  }
+
+  const cmp = field === "joined_at"
+    ? (av < bv ? -1 : av > bv ? 1 : 0)
+    : av.localeCompare(bv, "en", { sensitivity: "base" })
+  return cmp !== 0 ? (ascending ? cmp : -cmp) : a.id.localeCompare(b.id)
+}
+
+// A member search spans two tables: the role typed on the membership row and
+// the person's name on the joined profile. PostgREST's .or() only knows the
+// columns of the row it runs on, so asking for both at once
+// (`role_in_team.ilike.%x%,profiles.fullname.ilike.%x%`) is answered with
+// "failed to parse logic tree" — which is what the Members box threw at every
+// keystroke. So the search runs as two halves, one per table, merged, sorted
+// and paged here. Each half asks only for the sort keys, so the payload follows
+// the number of matches rather than the size of the team, and the full rows are
+// fetched for the single page being shown.
+async function fetchTeamMembersBySearch(params: {
+  supabase:   ReturnType<typeof createClient>
+  teamId:     string
+  term:       string
+  activeOnly: boolean
+  sortField:  "fullname" | "joined_at" | "role_in_team"
+  ascending:  boolean
+  from:       number
+  to:         number
+}): Promise<{ data: TeamMemberProfile[] | null; total: number | null; error: string | null }> {
+  const { supabase, teamId, term, activeOnly, sortField, ascending, from, to } = params
+  const like = `%${term}%`
+
+  const half = () => {
+    let q = supabase
+      .from("team_memberships")
+      .select("id, joined_at, role_in_team, profiles!inner(fullname, fname, lname)")
+      .eq("team_id", teamId)
+    if (activeOnly) q = q.eq("is_active", true)
+    return q
+  }
+
+  const [byRole, byName] = await Promise.all([
+    half().ilike("role_in_team", like).limit(MEMBER_SEARCH_CEILING),
+    half()
+      .or(`fullname.ilike.${like},fname.ilike.${like},lname.ilike.${like}`, { referencedTable: "profiles" })
+      .limit(MEMBER_SEARCH_CEILING),
+  ])
+  const failed = byRole.error ?? byName.error
+  if (failed) return { data: null, total: null, error: failed.message }
+
+  const matches = new Map<string, MemberSearchKey>()
+  for (const row of [...(byRole.data ?? []), ...(byName.data ?? [])] as unknown as MemberSearchKey[]) {
+    matches.set(row.id, row)
+  }
+
+  const ordered = [...matches.values()].sort((a, b) => compareMembers(a, b, sortField, ascending))
+  const total   = ordered.length
+  const pageIds = ordered.slice(from, to + 1).map(row => row.id)
+  if (!pageIds.length) return { data: [], total, error: null }
+
+  const { data, error } = await supabase
+    .from("team_memberships")
+    .select(MEMBER_SELECT)
+    .in("id", pageIds)
+  if (error) return { data: null, total: null, error: error.message }
+
+  // `in` carries no order of its own — put the page back the way it was paged.
+  const fetched = (data ?? []) as unknown as TeamMemberProfile[]
+  const rows = new Map(fetched.map(row => [row.id, row]))
+  return {
+    data:  pageIds.map(id => rows.get(id)).filter(Boolean) as TeamMemberProfile[],
+    total,
+    error: null,
+  }
+}
+
 export async function fetchTeamMembers(params: {
   teamId: string
   page?: number
@@ -180,35 +299,30 @@ export async function fetchTeamMembers(params: {
   sortField?: "fullname" | "joined_at" | "role_in_team"
   sortDir?: "asc" | "desc"
 }): Promise<{ data: TeamMemberProfile[] | null; total: number | null; error: string | null }> {
-  const supabase = createClient()
-  const page      = params.page    ?? 1
-  const perPage   = params.perPage ?? 10
-  const from      = (page - 1) * perPage
-  const to        = from + perPage - 1
+  const supabase   = createClient()
+  const page       = params.page    ?? 1
+  const perPage    = params.perPage ?? 10
+  const from       = (page - 1) * perPage
+  const to         = from + perPage - 1
+  const activeOnly = params.activeOnly !== false
+  const sortField  = params.sortField ?? "joined_at"
+  const ascending  = params.sortDir === "asc"
+  const term       = sanitizeMemberSearch(params.search ?? "")
+
+  if (term) {
+    return fetchTeamMembersBySearch({ supabase, teamId: params.teamId, term, activeOnly, sortField, ascending, from, to })
+  }
 
   let query = supabase
     .from("team_memberships")
-    .select(
-      `id, user_id, team_id, role_in_team, joined_at, left_at, is_active, transfer_reason,
-       profiles!inner(id, fullname, fname, lname, profile_url, role, status, metadata)`,
-      { count: "exact" },
-    )
+    .select(MEMBER_SELECT, { count: "exact" })
     .eq("team_id", params.teamId)
 
-  if (params.activeOnly !== false) {
+  if (activeOnly) {
     query = query.eq("is_active", true)
   }
 
-  if (params.search) {
-    const q = `%${params.search}%`
-    query = query.or(
-      `role_in_team.ilike.${q},profiles.fullname.ilike.${q}`,
-    )
-  }
-
   // Sort
-  const sortField = params.sortField ?? "joined_at"
-  const ascending = params.sortDir === "asc"
   if (sortField === "fullname") {
     query = query.order("profiles(fullname)", { ascending })
   } else {
@@ -347,8 +461,12 @@ export async function searchProfiles(
     .not("is_deleted", "is", true)
     .limit(limit)
 
-  if (query.trim()) {
-    const term = `%${query.trim()}%`
+  // Sanitized for the same reason as the member search: a comma or a bracket
+  // typed into the box is .or() grammar, and PostgREST answers it with "failed
+  // to parse logic tree" instead of a list of people.
+  const typed = sanitizeMemberSearch(query)
+  if (typed) {
+    const term = `%${typed}%`
     q = q.or(`fullname.ilike.${term},fname.ilike.${term},lname.ilike.${term}`)
   }
 
