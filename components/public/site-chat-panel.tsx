@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react"
 import Image from "next/image"
-import { ArrowUp, Loader2, MessageCircle, Sparkles, UserRound, X } from "lucide-react"
+import { ArrowUp, Loader2, MessageCircle, RotateCcw, Sparkles, UserRound, X } from "lucide-react"
 import { gaEvent } from "@/lib/ga"
 import { COMPANY, companyWhatsappHref } from "@/lib/company"
 import { COUNTRY_CODES } from "@/lib/user-service"
@@ -104,7 +104,7 @@ function renderText(text: string): ReactNode {
 
 export function SiteChatPanel({ open, onClose, page }: { open: boolean; onClose: () => void; page: string }) {
   const [store] = useState<Stored>(() => load())
-  const session = store.session
+  const [session, setSession] = useState(store.session)
   const [messages, setMessages] = useState<Msg[]>(() => store.messages.map((m) => ({ ...m })))
   const [leadDone, setLeadDone] = useState(!!store.leadDone)
   const [input, setInput] = useState("")
@@ -224,6 +224,18 @@ export function SiteChatPanel({ open, onClose, page }: { open: boolean; onClose:
     void send(input)
   }
 
+  // Clear: a brand-new conversation (new session id, nothing remembered), like closing the tab.
+  const clear = () => {
+    abortRef.current?.abort()
+    setMessages([])
+    setLeadDone(false)
+    setSession(newSession())
+    setInput("")
+    setView("chat")
+    gaEvent("site_chat_clear", { page })
+    window.setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
   const whatsapp = companyWhatsappHref("Hi! I was chatting on fhiglobal.ae and would like to speak to a consultant.")
   const hasTalked = messages.some((m) => m.role === "assistant" && !m.error && !m.streaming)
 
@@ -243,6 +255,11 @@ export function SiteChatPanel({ open, onClose, page }: { open: boolean; onClose:
           <p className="font-['Outfit'] text-[15px] font-bold leading-tight">FHI Assistant</p>
           <p className="truncate text-[11.5px] text-white/70">Dubai property, answered from fhiglobal.ae</p>
         </div>
+        {messages.length > 0 && (
+          <button type="button" onClick={clear} aria-label="Clear the conversation" className="inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[12px] font-semibold text-white/80 transition-colors hover:bg-white/10 hover:text-white">
+            <RotateCcw className="h-3.5 w-3.5" /> Clear
+          </button>
+        )}
         <button type="button" onClick={onClose} aria-label="Close chat" className="rounded-full p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white">
           <X className="h-5 w-5" />
         </button>
