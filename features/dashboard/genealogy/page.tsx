@@ -97,8 +97,9 @@ export function GenealogyView({ endpoint, self = false, heading = true }: { endp
   const byId = useMemo(() => new Map((data?.nodes ?? []).map((n) => [n.id, n])), [data])
 
   // Search: the matches plus every ancestor, so the branch that holds a match is shown and opened.
+  const q = query.trim().toLowerCase()
+  const isMatch = (n: GenealogyNode) => (!q || n.name.toLowerCase().includes(q)) && (!onlySelling || n.deals > 0)
   const visible = useMemo(() => {
-    const q = query.trim().toLowerCase()
     if (!q && !onlySelling) return null
     const keep = new Set<string>()
     for (const n of data?.nodes ?? []) {
@@ -106,8 +107,22 @@ export function GenealogyView({ endpoint, self = false, heading = true }: { endp
       for (let cur: GenealogyNode | undefined = n; cur; cur = byId.get(cur.parentId)) keep.add(cur.id)
     }
     return keep
-  }, [query, onlySelling, data, byId])
-  const matches = useMemo(() => (visible ? (data?.nodes ?? []).filter((n) => visible.has(n.id) && (!query.trim() || n.name.toLowerCase().includes(query.trim().toLowerCase())) && (!onlySelling || n.deals > 0)).length : 0), [visible, data, query, onlySelling])
+  }, [q, onlySelling, data, byId])
+  // "Selling only" on its own: the sellers and the path to them. It still
+  // applies under a search match (below), where the name search no longer does.
+  const sellingKeep = useMemo(() => {
+    if (!onlySelling) return null
+    const keep = new Set<string>()
+    for (const n of data?.nodes ?? []) {
+      if (n.deals === 0) continue
+      for (let cur: GenealogyNode | undefined = n; cur; cur = byId.get(cur.parentId)) keep.add(cur.id)
+    }
+    return keep
+  }, [onlySelling, data, byId])
+  const matches = useMemo(
+    () => (visible ? (data?.nodes ?? []).filter((n) => visible.has(n.id) && (!q || n.name.toLowerCase().includes(q)) && (!onlySelling || n.deals > 0)).length : 0),
+    [visible, data, q, onlySelling],
+  )
 
   const toggle = (id: string) =>
     setOpen((s) => {
@@ -119,13 +134,21 @@ export function GenealogyView({ endpoint, self = false, heading = true }: { endp
   const expandAll = () => setOpen(new Set([data?.root.id ?? "", ...(data?.nodes ?? []).filter((n) => n.direct > 0).map((n) => n.id)]))
   const collapseAll = () => setOpen(new Set([data?.root.id ?? ""]))
 
-  const Branch = ({ parentId, level }: { parentId: string; level: number }) => {
-    const kids = (childrenOf.get(parentId) ?? []).filter((n) => !visible || visible.has(n.id))
+  // `underMatch`: this branch hangs below someone the search found. The search
+  // narrows the tree only on the way DOWN to a match; past it, expanding the
+  // match shows everyone under them. (It used to keep filtering by the name, so
+  // searching "enri" and opening Enrico Cardoniga showed an empty branch — his
+  // recruit's name doesn't contain "enri".)
+  const Branch = ({ parentId, level, underMatch = false }: { parentId: string; level: number; underMatch?: boolean }) => {
+    const kids = (childrenOf.get(parentId) ?? []).filter((n) =>
+      !visible ? true : underMatch ? !sellingKeep || sellingKeep.has(n.id) : visible.has(n.id),
+    )
     if (!kids.length) return null
     return (
       <ul className={level > 1 ? "ml-5 border-l border-[#e5e7eb] pl-3 sm:ml-7 sm:pl-5" : ""}>
         {kids.map((n) => {
-          const isOpen = open.has(n.id) || Boolean(visible && (childrenOf.get(n.id) ?? []).some((c) => visible.has(c.id)))
+          // On the way down to a match, branches open by themselves; below a match, only by a tap.
+          const isOpen = open.has(n.id) || Boolean(visible && !underMatch && (childrenOf.get(n.id) ?? []).some((c) => visible.has(c.id)))
           const hasKids = n.direct > 0
           return (
             <li key={n.id} className="relative">
@@ -155,7 +178,7 @@ export function GenealogyView({ endpoint, self = false, heading = true }: { endp
                   )}
                 </div>
               </div>
-              {hasKids && isOpen && <Branch parentId={n.id} level={level + 1} />}
+              {hasKids && isOpen && <Branch parentId={n.id} level={level + 1} underMatch={underMatch || Boolean(visible && isMatch(n))} />}
             </li>
           )
         })}
@@ -282,7 +305,7 @@ export function GenealogyView({ endpoint, self = false, heading = true }: { endp
             </div>
             {visible && (
               <p className="mt-3 text-xs font-semibold text-[#6b7280]">
-                {matches} match{matches === 1 ? "" : "es"}{query.trim() ? ` for “${query.trim()}”` : ""}{onlySelling ? " with validated deals" : ""} — their branches are open.
+                {matches} match{matches === 1 ? "" : "es"}{query.trim() ? ` for “${query.trim()}”` : ""}{onlySelling ? " with validated deals" : ""} — tap one to see everyone under them.
               </p>
             )}
             {visible && matches === 0 ? (
