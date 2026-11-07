@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ChevronDown, ChevronsDownUp, ChevronsUpDown, GitBranch, List, Loader2, Network, RefreshCw, Search, TrendingUp, UserPlus, Users } from "lucide-react"
+import { ChevronDown, ChevronsDownUp, ChevronsUpDown, GitBranch, List, Loader2, Network, RefreshCw, Search, TrendingUp, UserPlus, Users, X } from "lucide-react"
 import { TreeChart } from "./tree-chart"
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
@@ -62,6 +62,12 @@ export function GenealogyView({ endpoint, self = false, heading = true }: { endp
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [query, setQuery] = useState("")
+  const searchRef = useRef<HTMLInputElement>(null)
+  // The search box's ✕ (and Esc): empty it and leave the cursor in it for the next name.
+  const clearQuery = () => {
+    setQuery("")
+    searchRef.current?.focus()
+  }
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [onlySelling, setOnlySelling] = useState(false)
   const [mode, setMode] = useState<"chart" | "list">("chart")
@@ -269,11 +275,24 @@ export function GenealogyView({ endpoint, self = false, heading = true }: { endp
           <div className="relative lg:w-80">
             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9ca3af]" />
             <input
+              ref={searchRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape" && query) { e.preventDefault(); clearQuery() } }}
               placeholder={self ? "Find someone in your network…" : "Find someone in this network…"}
-              className="w-full rounded-xl border border-[#e5e5e5] py-2.5 pl-10 pr-4 text-sm text-[#111827] placeholder:text-[#9ca3af] focus:border-[#001f3f] focus:outline-none"
+              className="w-full rounded-xl border border-[#e5e5e5] py-2.5 pl-10 pr-10 text-sm text-[#111827] placeholder:text-[#9ca3af] focus:border-[#001f3f] focus:outline-none"
             />
+            {query && (
+              <button
+                type="button"
+                onClick={clearQuery}
+                aria-label="Clear search"
+                title="Clear search"
+                className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-[#9ca3af] transition-colors hover:bg-[#f3f4f6] hover:text-[#374151]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
           )}
         </div>
