@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { X, Upload, Image as ImageIcon, Loader2 } from "lucide-react"
+import { X, Upload, Loader2 } from "lucide-react"
+import { LogoTile } from "@/components/common/logo-tile"
 import type { Team } from "@/lib/team-service"
 import { updateTeamLogoUrl } from "@/lib/team-service"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
@@ -153,12 +154,8 @@ export function TeamLogoUpload({ open, onClose, onUploaded, team }: Props) {
           {/* Preview */}
           {preview && (
             <div className="rounded-2xl border border-[#e8eaed] bg-[#fafbfc] p-4 flex items-center gap-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={preview}
-                alt="Preview"
-                className="w-16 h-16 rounded-xl object-cover border border-[#e8eaed] shadow-sm"
-              />
+              {/* Whole, as it will show everywhere — never cropped */}
+              <LogoTile src={preview} alt="Preview" className="h-16 w-28 rounded-xl border border-[#e8eaed] p-1.5 shadow-sm" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-[#0d1117] truncate">{file?.name}</p>
                 <p className="text-[11px] text-[#9ca3af] mt-0.5">
@@ -178,9 +175,9 @@ export function TeamLogoUpload({ open, onClose, onUploaded, team }: Props) {
           {/* Current logo notice */}
           {!preview && team.logo_url && (
             <div className="rounded-xl border border-[#f0f2f5] bg-[#fafbfc] p-3 flex items-center gap-3">
-              <ImageIcon className="w-4 h-4 text-[#9ca3af] shrink-0" />
+              <LogoTile src={team.logo_url} alt={`${team.name} logo`} className="h-12 w-20 rounded-lg border border-[#e8eaed] p-1" />
               <p className="text-xs text-[#6b7280]">
-                A logo is already uploaded. Uploading a new one will replace it.
+                This is the logo now. Uploading a new one will replace it.
               </p>
             </div>
           )}

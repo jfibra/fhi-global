@@ -150,8 +150,12 @@ export function TeamReportDocument({ r, insights: rawInsights, images }: { r: Te
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
             {images.teamLogo ? (
-              // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt
-              <Image src={{ data: images.teamLogo, format: "png" }} style={{ width: 54, height: 54, borderRadius: 10, backgroundColor: "#ffffff", marginRight: 12, objectFit: "contain" }} />
+              // The whole logo on a white tile, wider than tall — team logos are often
+              // landscape (CMG's is ~2:1) and a 54pt square left them tiny.
+              <View style={{ width: 100, height: 56, borderRadius: 10, backgroundColor: "#ffffff", padding: 6, marginRight: 12, alignItems: "center", justifyContent: "center" }}>
+                {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt */}
+                <Image src={{ data: images.teamLogo, format: "png" }} style={{ width: 88, height: 44, objectFit: "contain" }} />
+              </View>
             ) : (
               <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: GOLD, alignItems: "center", justifyContent: "center", marginRight: 12 }}>
                 <Text style={{ fontSize: 20, fontWeight: 700, color: NAVY }}>{initials(teamName)}</Text>

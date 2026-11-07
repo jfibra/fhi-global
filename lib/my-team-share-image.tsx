@@ -66,7 +66,7 @@ export async function renderTopSellersImage({ team, from, to, label, amounts, or
     asset(`${origin}/fonts/Outfit-600.woff`),
     asset(`${origin}/fonts/Outfit-700.woff`),
     asset(`${origin}/FHI_Branding_White.png`).then((b) => `data:image/png;base64,${Buffer.from(b).toString("base64")}`).catch(() => null),
-    ogPicture(team.team?.logo, 160, 160, "inside", "#ffffff"),
+    ogPicture(team.team?.logo, 320, 176, "inside", "#ffffff"),
     ...top.map((r, i) => ogPicture(r.member.photo, i === 0 ? 420 : i < 3 ? 340 : 120, i === 0 ? 420 : i < 3 ? 340 : 120)),
   ])
 
@@ -87,9 +87,11 @@ export async function renderTopSellersImage({ team, from, to, label, amounts, or
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "60px 64px 0" }}>
           <div style={{ display: "flex", alignItems: "center" }}>
             {teamLogo ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 108, height: 108, borderRadius: 54, background: "#ffffff", border: `4px solid ${GOLD}` }}>
+              // A wide white tile, not a circle: team logos are often landscape and
+              // a round frame shrank them to fit inside it.
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 188, height: 112, borderRadius: 22, background: "#ffffff", border: `4px solid ${GOLD}` }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={teamLogo} alt="" width={78} height={78} style={{ width: 78, height: 78, objectFit: "contain" }} />
+                <img src={teamLogo} alt="" width={160} height={88} style={{ width: 160, height: 88, objectFit: "contain" }} />
               </div>
             ) : null}
             <div style={{ display: "flex", flexDirection: "column", marginLeft: teamLogo ? 26 : 0 }}>

@@ -28,6 +28,7 @@ import {
   removeMembership,
 } from "@/lib/team-service"
 import { TOOLBAR_GRADIENT } from "@/components/common/header-toolbar"
+import { LogoTile } from "@/components/common/logo-tile"
 import { TeamFormDialog } from "./team-form-dialog"
 import { TeamLogoUpload } from "./team-logo-upload"
 import { AddMemberDialog, TransferMemberDialog } from "./add-member-dialog"
@@ -605,8 +606,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
                           >
                             <div className="flex items-center gap-3 mb-2">
                               {sub.logo_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={sub.logo_url} alt={sub.name} className="w-8 h-8 rounded-lg object-cover" />
+                                <LogoTile src={sub.logo_url} alt={sub.name} className="h-9 w-14 rounded-lg border border-[#e8eaed] p-1" />
                               ) : (
                                 <div className="w-8 h-8 rounded-lg bg-[#001f3f]/8 flex items-center justify-center">
                                   <Building2 className="w-4 h-4 text-[#001f3f]" />
@@ -774,8 +774,7 @@ function TreeNode({
           onClick={() => { onSelect(team.id); if (hasSubs) onToggleExpand(team.id) }}
         >
           {team.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={team.logo_url} alt={team.name} className="w-6 h-6 rounded-lg object-cover shrink-0" />
+            <LogoTile src={team.logo_url} alt={team.name} className="h-7 w-11 rounded-md border border-[#e8eaed] p-0.5" />
           ) : (
             <Building2 className={`w-4 h-4 shrink-0 ${isSelected ? "text-[#001f3f]" : "text-[#9ca3af]"}`} />
           )}
@@ -895,15 +894,14 @@ function TeamHeaderCard({
   return (
     <div className="bg-white rounded-2xl border border-[#e8eaed] shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)] p-6">
       <div className="flex items-start gap-5 flex-wrap">
-        {/* Logo */}
-        <div className="w-16 h-16 rounded-2xl border border-[#e8eaed] bg-[#fafbfc] flex items-center justify-center shrink-0 overflow-hidden">
-          {team.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={team.logo_url} alt={team.name} className="w-full h-full object-cover" />
-          ) : (
+        {/* Logo — whole, on white, like the developer tiles */}
+        {team.logo_url ? (
+          <LogoTile src={team.logo_url} alt={team.name} className="h-20 w-32 rounded-2xl border border-[#e8eaed] p-2.5 sm:h-24 sm:w-40" />
+        ) : (
+          <div className="w-16 h-16 rounded-2xl border border-[#e8eaed] bg-[#fafbfc] flex items-center justify-center shrink-0">
             <Building2 className="w-7 h-7 text-[#9ca3af]" />
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Info */}
         <div className="flex-1 min-w-0">

@@ -157,7 +157,8 @@ function CardRow({ cards }: { cards: Card[] }) {
                 c.kind === "agent"
                   ? "h-10 w-10 shrink-0 rounded-full object-cover border-2 border-[#d6b357]"
                   : c.kind === "developer"
-                    ? "h-10 w-10 shrink-0 object-contain bg-white border border-[#eceef1] p-1"
+                    // Developer and team logos: whole, on white, in a wider tile.
+                    ? "h-10 w-16 shrink-0 object-contain bg-white border border-[#eceef1] p-1"
                     : "h-10 w-14 shrink-0 object-cover"
               }
             />

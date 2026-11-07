@@ -20,6 +20,7 @@ import type { LucideIcon } from "lucide-react"
 import { Award, BarChart3, Building2, Download, Hourglass, RefreshCw, Search, Share2, Sparkles, Target, TrendingUp, Trophy, UserPlus, Users } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
+import { LogoTile } from "@/components/common/logo-tile"
 import { ROLES_ADMIN_STAFF, ROLES_TEAM_REPORT_LEADERS, invitableRolesFor, roleInList, roleToLabel } from "@/lib/app-roles"
 import { TeamReportDialog } from "@/features/dashboard/teams/team-report-dialog"
 import type { MyTeamResponse, TeamMember, TeamSale } from "@/app/api/my-team/route"
@@ -350,10 +351,12 @@ export function MyTeamView({ endpoint, shareEndpoint, self = false, reportButton
               <div className="relative shrink-0">
                 <Avatar name={data.root.name} photo={data.root.photo} size="h-[72px] w-[72px] sm:h-24 sm:w-24" ring="ring-[3px] ring-[#d6b357] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.6)]" />
                 {data.team?.logo && (
-                  <span className="absolute -bottom-2 -right-2 flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2 border-[#001f3f] bg-white shadow sm:h-10 sm:w-10" title={data.team.name}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={data.team.logo} alt={data.team.name} className="h-full w-full object-contain p-1" />
-                  </span>
+                  <LogoTile
+                    src={data.team.logo}
+                    alt={data.team.name}
+                    title={data.team.name}
+                    className="absolute -bottom-2 -right-4 h-9 w-14 rounded-lg border-2 border-[#001f3f] p-1 shadow sm:h-10 sm:w-16"
+                  />
                 )}
               </div>
             ) : (

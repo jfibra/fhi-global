@@ -8,6 +8,7 @@
 // Export PDF button sits here, as before.
 
 import { FileDown, Loader2, Sparkles, X } from "lucide-react"
+import { LogoTile } from "@/components/common/logo-tile"
 
 export type Preset = "3m" | "6m" | "ytd" | "12m" | "custom"
 
@@ -47,14 +48,13 @@ export function TeamReportHeader({
   return (
     <header className="shrink-0 bg-[#001f3f] text-white shadow-lg">
       <div className="mx-auto flex w-full max-w-[1320px] items-center gap-3 px-4 py-3 sm:px-6">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10">
-          {team.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={team.logo_url} alt="" className="h-full w-full object-cover" />
-          ) : (
+        {team.logo_url ? (
+          <LogoTile src={team.logo_url} alt="" className="h-14 w-24 rounded-xl p-1.5 sm:h-16 sm:w-28" />
+        ) : (
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10">
             <Sparkles className="h-5 w-5 text-[#d6b357]" aria-hidden />
-          )}
-        </span>
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-bold uppercase tracking-[0.08em] text-[#f0d89b] sm:tracking-[0.16em]">Team Performance Report</p>
           <h2 className="truncate font-['Outfit'] text-[22px] font-bold leading-tight">{team.name}</h2>
