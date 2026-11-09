@@ -362,6 +362,13 @@ const nextConfig = {
         destination: "/developers-login",
         permanent: false,
       },
+      // Admin's Developers Login page moved inside the Properties & Developers
+      // hub (2026-11-09). Keeps old bookmarks working.
+      {
+        source: "/:role(admin|superadmin)/developer-logins",
+        destination: "/:role/properties/developer-logins",
+        permanent: false,
+      },
     ]
   },
   async headers() {
