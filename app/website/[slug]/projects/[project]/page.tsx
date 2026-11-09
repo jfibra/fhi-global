@@ -8,7 +8,7 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import { createPublicSupabaseClient } from "@/lib/supabase/public"
 import { loadSiteBySlug } from "@/lib/website-builder-service"
 import { loadAgentWebsiteEvents } from "@/lib/events/website-events"
-import { loadAgentWebsiteReviews } from "@/lib/website-reviews"
+import { loadAgentWebsiteReviews, orderWebsiteReviews } from "@/lib/website-reviews"
 import { SITE_URL } from "@/lib/seo"
 import { formatPrice, isHandoverOverdue, parsePaymentPlan, priceFromValue, projectSubtitle, type ProjectSeoInput } from "@/lib/project-seo"
 import { agentProjectPath, loadShareContact, shareCopy, withDialableNumbers } from "@/lib/website-project-share"
@@ -210,7 +210,8 @@ export default async function AgentProjectPage({ params }: Props) {
     getProject(key),
     getContact(slug),
     loadAgentWebsiteEvents(createAdminSupabase(), site.agentId),
-    loadAgentWebsiteReviews(createAdminSupabase(), site.agentId, 1),
+    // The ones the agent picked to show (an empty pick hides the Reviews link).
+    loadAgentWebsiteReviews(createAdminSupabase(), site.agentId).then((r) => orderWebsiteReviews(r, site.data.reviewIds)),
   ])
   if (!project || !contact) notFound()
 

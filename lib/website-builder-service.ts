@@ -34,6 +34,7 @@ import {
   sanitizeAgentCredentials,
 } from "@/lib/agent-site"
 import { isLiveProject, isTestRecord, type ProjectLiveFlags } from "@/lib/listing-publish-checks"
+import { plainHeadline } from "@/lib/headline-highlight"
 
 // ─── Shared card mapping (also used by the picker API routes) ─────────────────
 
@@ -334,7 +335,7 @@ const statsFromDb = (raw: unknown): EditableStat[] =>
 
 /** The title column mirrors the hero headline, flattened to one line. */
 function titleFromHero(data: WebsiteData): string {
-  return `${data.hero.headline.replace(/\s+/g, " ").trim()} ${data.hero.headlineAccent.trim()}`.trim()
+  return plainHeadline(data.hero.headline, data.hero.headlineAccent).replace(/\s+/g, " ").trim()
 }
 
 /**
@@ -448,6 +449,8 @@ export async function saveSite(
         contact: data.agent,
         cta: data.cta,
         theme: data.theme ?? {},
+        // Picked reviews in order (migration 087); null = all approved, newest first.
+        review_ids: Array.isArray(data.reviewIds) ? data.reviewIds : null,
         is_published: true,
         updated_at: now,
       })
@@ -502,6 +505,8 @@ export async function saveSite(
         contact: data.agent,
         cta: data.cta,
         theme: data.theme ?? {},
+        // Picked reviews in order (migration 087); null = all approved, newest first.
+        review_ids: Array.isArray(data.reviewIds) ? data.reviewIds : null,
         hero_id: heroRow.id,
         about_id: aboutRow.id,
         is_published: true,
@@ -608,6 +613,40 @@ export type LoadedSite = {
  * a hard 404 over a live page. Callers that can afford to fail loudly (pages, OG
  * cards) let it propagate; the editor's GET route turns it into a 500.
  */
+/**
+ * An agent's RERA credentials for their website, from their profile: the BRN
+ * saved in profile settings (metadata.license_number — saved only once the
+ * Dubai Land Department register has it), and that broker's office ORN and
+ * brokerage name from the `brokers` table (migration 085, the DLD copy). No
+ * BRN, or "I'm not a broker" → all three blank, so the site shows none.
+ * Needs the service-role client (`brokers` has no read policy). A failed read
+ * throws, like the rest of loadSite (ISR must not cache a site without them).
+ */
+export async function profileBrokerCredentials(
+  admin: SupabaseClient,
+  agentId: string | null | undefined,
+): Promise<{ brn: string; orn: string; brokerage: string }> {
+  const none = { brn: "", orn: "", brokerage: "" }
+  if (!agentId) return none
+  const { data: profile, error } = await admin.from("profiles").select("metadata").eq("id", agentId).maybeSingle()
+  if (error) throw new Error("Failed to load website")
+  const meta = (profile?.metadata ?? {}) as Record<string, unknown>
+  const raw = meta.not_broker === true ? "" : meta.license_number
+  const brn = typeof raw === "number" ? String(raw) : typeof raw === "string" ? raw.trim() : ""
+  if (!/^\d{1,10}$/.test(brn)) return none
+  const { data: broker, error: brokerError } = await admin
+    .from("brokers")
+    .select("real_estate_number, real_estate_en")
+    .eq("broker_number", Number(brn))
+    .maybeSingle()
+  if (brokerError) throw new Error("Failed to load website")
+  return {
+    brn,
+    orn: typeof broker?.real_estate_number === "string" ? broker.real_estate_number.trim() : "",
+    brokerage: typeof broker?.real_estate_en === "string" ? broker.real_estate_en.trim() : "",
+  }
+}
+
 async function loadSite(
   admin: SupabaseClient,
   by: { agentId?: string; slug?: string },
@@ -641,9 +680,14 @@ async function loadSite(
   // checks (the sample's own values stored by older sites, junk like "123")
   // are blanked so no page, share card or editor ever shows them.
   const contact = (site.contact ?? {}) as Partial<WebsiteData["agent"]>
-  data.agent = sanitizeAgentCredentials({ ...BLANK_AGENT, ...contact })
+  // BRN, ORN and brokerage are never the builder's own text: they come from the
+  // agent's profile (the BRN checked with the Dubai Land Department there) and
+  // that BRN's DLD record — see profileBrokerCredentials.
+  const credentials = await profileBrokerCredentials(admin, site.agent_id as string | null)
+  data.agent = sanitizeAgentCredentials({ ...BLANK_AGENT, ...contact, ...credentials })
   const cta = (site.cta ?? {}) as Partial<WebsiteData["cta"]>
   data.cta = { ...data.cta, ...cta }
+  data.reviewIds = Array.isArray(site.review_ids) ? (site.review_ids as unknown[]).filter((v): v is string => typeof v === "string") : null
   const theme = (site.theme ?? {}) as { gold?: unknown; brand?: unknown }
   if (typeof theme.gold === "string" || typeof theme.brand === "string") {
     data.theme = {

@@ -19,13 +19,12 @@ import { SiteFooter } from "../_components/footer"
 import { HeroSection } from "../_components/sections/hero"
 import { AboutSection } from "../_components/sections/about"
 import { FeaturedSection } from "../_components/sections/featured"
-import { StatsBandSection } from "../_components/sections/stats"
 import { ServiceAreasSection } from "../_components/sections/service-areas"
 import { GallerySection } from "../_components/sections/gallery"
 import { TestimonialsSection } from "../_components/sections/what-my-clients-say"
 import { EventsSection } from "../_components/sections/events"
 import { loadAgentWebsiteEvents } from "@/lib/events/website-events"
-import { loadAgentWebsiteReviews } from "@/lib/website-reviews"
+import { loadAgentWebsiteReviews, orderWebsiteReviews } from "@/lib/website-reviews"
 import { loadShareContact, withDialableNumbers } from "@/lib/website-project-share"
 
 // A published agent site from the Website Builder. Cached for five minutes, and
@@ -79,12 +78,14 @@ export default async function AgentWebsitePage({ params }: Props) {
   // The agent's own published events (migration 057) and approved client
   // reviews — each section and its nav link only appear once there is one.
   const admin = createAdminSupabase()
-  const [events, reviews, contact] = await Promise.all([
+  const [events, approvedReviews, contact] = await Promise.all([
     loadAgentWebsiteEvents(admin, site.agentId, 12, { strict: true }),
-    loadAgentWebsiteReviews(admin, site.agentId, 12, { strict: true }),
+    loadAgentWebsiteReviews(admin, site.agentId, 50, { strict: true }),
     loadShareContact(admin, site.agentId, site.data.agent, site.data.about.portrait, { strict: true }),
   ])
   const hasEvents = events.upcoming.length + events.past.length > 0
+  // The reviews the agent picked, in their order (Website Builder → Reviews; all when never picked).
+  const reviews = orderWebsiteReviews(approvedReviews, site.data.reviewIds)
   // Contact Me (header) and the About channels dial the agent's numbers WITH
   // their country code — the site stores them as typed, usually without it.
   const data = withDialableNumbers(site.data, contact)
@@ -118,9 +119,10 @@ export default async function AgentWebsitePage({ params }: Props) {
       <SiteHeader data={data} showEvents={hasEvents} showReviews={reviews.length > 0} />
       <HeroSection data={data} />
       <AboutSection data={data} qrValue={`${SITE_URL}/website/${site.slug}`} />
-      <FeaturedSection data={data} share={{ siteSlug: site.slug, contact }} />
+      {/* Listings and the stats band are off for now (boss, 2026-11-09): projects only, and
+          stats only in the hero. Saved listings / band stats stay in the database. */}
+      <FeaturedSection data={{ ...data, properties: [] }} share={{ siteSlug: site.slug, contact }} />
       <EventsSection siteSlug={site.slug} upcoming={events.upcoming} past={events.past} />
-      <StatsBandSection data={data} />
       <ServiceAreasSection data={data} placeholders={false} />
       <GallerySection data={data} placeholders={false} />
       <TestimonialsSection testimonials={reviews} />

@@ -9,6 +9,7 @@ import type { Testimonial } from "@/app/website/_data"
 // contact details. An agent with no approved reviews gets no section at all.
 
 export type ReviewRow = {
+  id?: string
   client_name: string | null
   did_well: string | null
   overall_rating: number | null
@@ -40,7 +41,19 @@ export function feedbackToTestimonial(row: ReviewRow): Testimonial | null {
     name: reviewerName(row.client_name),
     where: CLIENT_LABELS[row.transaction_type ?? ""] ?? "Client",
     rating: rating >= 1 && rating <= 5 ? rating : undefined,
+    ...(row.id ? { id: row.id } : {}),
   }
+}
+
+/**
+ * The reviews a site shows, in its order: `ids` null/absent = all of them as
+ * loaded (newest first); otherwise only those ids, in that order — an id that
+ * is no longer approved (not in `reviews`) is skipped.
+ */
+export function orderWebsiteReviews(reviews: Testimonial[], ids: string[] | null | undefined): Testimonial[] {
+  if (!Array.isArray(ids)) return reviews
+  const byId = new Map(reviews.filter((r) => r.id).map((r) => [r.id as string, r]))
+  return ids.map((id) => byId.get(id)).filter((r): r is Testimonial => Boolean(r))
 }
 
 /**
@@ -51,13 +64,13 @@ export function feedbackToTestimonial(row: ReviewRow): Testimonial | null {
 export async function loadAgentWebsiteReviews(
   supabase: SupabaseClient,
   agentId: string,
-  limit = 12,
+  limit = 50,
   /** `strict`: a failed read throws instead of returning "no reviews" (an ISR page would cache the empty section). */
   opts: { strict?: boolean } = {},
 ): Promise<Testimonial[]> {
   const { data, error } = await supabase
     .from("agent_feedback")
-    .select("client_name, did_well, overall_rating, transaction_type")
+    .select("id, client_name, did_well, overall_rating, transaction_type")
     .eq("agent_id", agentId)
     .eq("status", "approved")
     .order("created_at", { ascending: false })

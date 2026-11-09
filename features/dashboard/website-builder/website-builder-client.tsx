@@ -10,25 +10,26 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import {
-  ArrowDown, ArrowUp, Check, ExternalLink, ImagePlus, Loader2, Palette, Plus, RotateCcw, Save, Search, Trash2,
+  ArrowDown, ArrowUp, Check, ChevronLeft, ChevronRight, CircleHelp, Film, GripVertical, ImagePlus, Loader2, Plus, RotateCcw, Save, Search, Trash2, Upload, X,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { createClient } from "@/lib/supabase/client"
 import { getDashboardRouteByRole } from "@/lib/auth"
-import { loadAgentWebsiteReviews } from "@/lib/website-reviews"
+import { STORY_BY_AGENT } from "@/lib/films"
+import { decodeHeadline, encodeHeadline, tokenizeHeadline } from "@/lib/headline-highlight"
+import { loadAgentWebsiteReviews, orderWebsiteReviews } from "@/lib/website-reviews"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 import { normalizeSocialUrl, readSocialLinks } from "@/lib/public-profile"
 import {
-  BAND_STAT_ICON_FALLBACK, DEFAULT_THEME, GALLERY_CATEGORIES, HERO_STAT_ICON_FALLBACK, SAMPLE_DATA, STAT_ICONS, TEST_AREAS, TEST_GALLERY_AWARDS, TEST_GALLERY_CERTIFICATES, TEST_GALLERY_EVENTS, themeVars,
-  type GalleryCategory, type Project, type Property, type StatIconKey, type Testimonial, type WebsiteData,
+  DEFAULT_THEME, GALLERY_CATEGORIES, HERO_STAT_ICON_FALLBACK, SAMPLE_DATA, STAT_ICONS, TEST_AREAS, TEST_GALLERY_AWARDS, TEST_GALLERY_CERTIFICATES, TEST_GALLERY_EVENTS, themeVars,
+  type GalleryCategory, type Project, type StatIconKey, type Testimonial, type WebsiteData,
 } from "@/app/website/_data"
 import { SiteHeader } from "@/app/website/_components/header"
 import { SiteFooter } from "@/app/website/_components/footer"
 import { HeroSection } from "@/app/website/_components/sections/hero"
 import { AboutSection } from "@/app/website/_components/sections/about"
 import { FeaturedSection } from "@/app/website/_components/sections/featured"
-import { BLANK_ABOUT, BLANK_AGENT, BLANK_HERO, agentSiteMissing, isPlausibleBrn, isPlausibleOrn, sanitizeAgentCredentials } from "@/lib/agent-site"
-import { StatsBandSection } from "@/app/website/_components/sections/stats"
+import { BLANK_ABOUT, BLANK_AGENT, BLANK_HERO, agentSiteMissing, sanitizeAgentCredentials } from "@/lib/agent-site"
 import { ServiceAreasSection } from "@/app/website/_components/sections/service-areas"
 import { GallerySection } from "@/app/website/_components/sections/gallery"
 import { TestimonialsSection } from "@/app/website/_components/sections/what-my-clients-say"
@@ -40,7 +41,7 @@ import { TestimonialsSection } from "@/app/website/_components/sections/what-my-
 const LEGACY_DRAFT_KEY = "fhi:website-builder:draft:v1"
 const draftKey = (userId: string) => `fhi:website-builder:draft:v2:${userId}`
 const VIRTUAL_WIDTH = 1440
-const MAX_FEATURED = 8
+const MAX_FEATURED = 12
 
 // ─── Draft persistence + profile seeding ─────────────────────────────────────
 
@@ -138,12 +139,24 @@ function useMounted() {
 // ─── Small form primitives ────────────────────────────────────────────────────
 
 function Field({
-  label, action, hint, invalid = false, children,
-}: { label: string; action?: React.ReactNode; hint?: string; invalid?: boolean; children: React.ReactNode }) {
+  label, action, hint, help, helpAlign = "left", invalid = false, children,
+}: {
+  label: React.ReactNode
+  action?: React.ReactNode
+  hint?: string
+  /** Explanation shown in a "?" tooltip after the label (instead of text under the field). */
+  help?: string
+  helpAlign?: "left" | "right"
+  invalid?: boolean
+  children: React.ReactNode
+}) {
   return (
     <label className="block">
       <span className="mb-1 flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-wide text-[#6b7280]">{label}</span>
+        <span className="flex items-center gap-1.5 text-[13.5px] font-bold text-[#0d1117]">
+          {label}
+          {help && <HelpTip text={help} align={helpAlign} />}
+        </span>
         {action}
       </span>
       {children}
@@ -152,22 +165,49 @@ function Field({
   )
 }
 
-/** Labeled swatch that opens the native color picker. */
-function ColorButton({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+/** One review in the builder's Reviews tab: a show/hide tick, the quote and who wrote it, plus `children` (order controls). */
+function ReviewRowCard({
+  review, shown, onToggle, children,
+}: { review: Testimonial; shown: boolean; onToggle: () => void; children?: React.ReactNode }) {
+  return (
+    <div className={`flex items-start gap-2.5 border p-3 ${shown ? "border-[#e2e6ea] bg-white" : "border-dashed border-[#e2e6ea] bg-[#fafbfc] opacity-75"}`}>
+      <input
+        type="checkbox"
+        checked={shown}
+        onChange={onToggle}
+        aria-label={shown ? `Hide ${review.name}'s review` : `Show ${review.name}'s review`}
+        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[#001f3f]"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-3 text-[12.5px] leading-relaxed text-[#374151]">&ldquo;{review.quote}&rdquo;</p>
+        <p className="mt-1.5 text-[11.5px] font-bold text-[#0d1117]">
+          {review.name} <span className="font-medium text-[#9aa0aa]">— {review.where}</span>
+        </p>
+      </div>
+      {children && <div className="flex shrink-0 items-center gap-1">{children}</div>}
+    </div>
+  )
+}
+
+/** A "?" in a circle; hovering (or focusing) it shows `text` in a dark tooltip. */
+function HelpTip({ text, align = "left" }: { text: string; align?: "left" | "right" }) {
   return (
     <span
-      className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 border border-[#e2e6ea] bg-white px-1.5 py-0.5"
-      title="Pick a text color"
+      tabIndex={0}
+      aria-label={text}
+      // Inside a <label>: a click here mustn't move focus to the field.
+      onClick={(e) => e.preventDefault()}
+      className="group relative inline-flex cursor-help rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#001f3f]/30"
     >
-      <Palette className="h-3 w-3 text-[#6b7280]" />
-      <span className="text-[10px] font-bold uppercase tracking-wide text-[#6b7280]">Color</span>
-      <input
-        type="color"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label="Text color"
-        className="h-4 w-6 cursor-pointer appearance-none border border-[#e2e6ea] bg-white p-0"
-      />
+      <CircleHelp className="h-3.5 w-3.5 text-[#9aa0aa] transition-colors group-hover:text-[#001f3f]" aria-hidden />
+      <span
+        role="tooltip"
+        className={`pointer-events-none absolute top-full z-30 mt-2 w-60 rounded-md bg-[#0d1117] px-3 py-2 text-[11.5px] font-medium normal-case leading-snug tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 ${
+          align === "right" ? "right-0" : "-left-2"
+        }`}
+      >
+        {text}
+      </span>
     </span>
   )
 }
@@ -179,12 +219,21 @@ function TInput({ value, onChange, placeholder }: { value: string; onChange: (v:
   return <input type="text" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={INPUT_CLS} />
 }
 
-function TArea({ value, onChange, rows = 3 }: { value: string; onChange: (v: string) => void; rows?: number }) {
-  return <textarea value={value} rows={rows} onChange={(e) => onChange(e.target.value)} className={`${INPUT_CLS} resize-y`} />
+/** A value the builder shows but doesn't edit (it comes from elsewhere). */
+function ReadOnlyValue({ value }: { value: string }) {
+  return (
+    <div className="w-full min-h-[36px] cursor-not-allowed border border-[#e2e6ea] bg-[#f9fafb] px-3 py-2 text-[13px] text-[#4b5563]" aria-readonly="true">
+      {value || <span className="text-[#9ca3af]">—</span>}
+    </div>
+  )
 }
 
-/** Image field: thumbnail + URL input + S3 upload button. */
-function ImageInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function TArea({ value, onChange, rows = 3, placeholder }: { value: string; onChange: (v: string) => void; rows?: number; placeholder?: string }) {
+  return <textarea value={value} rows={rows} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={`${INPUT_CLS} resize-y`} />
+}
+
+/** Image field: thumbnail + URL input + S3 upload button. `middle` replaces the URL input (e.g. Service Areas puts the area name there). */
+function ImageInput({ value, onChange, middle }: { value: string; onChange: (v: string) => void; middle?: React.ReactNode }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -219,20 +268,23 @@ function ImageInput({ value, onChange }: { value: string; onChange: (v: string) 
             <ImagePlus className="h-4 w-4 text-[#9aa0aa]" />
           )}
         </span>
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="Image URL"
-          className={INPUT_CLS}
-        />
+        {middle ?? (
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Image URL"
+            className={INPUT_CLS}
+          />
+        )}
         <button
           type="button"
           disabled={busy}
           onClick={() => fileRef.current?.click()}
-          className="inline-flex h-9 shrink-0 items-center gap-1.5 border border-[#e2e6ea] bg-white px-3 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9] disabled:opacity-60"
+          // Navy, square corners, white upload arrow + bold label (the builder's primary-button look).
+          className="inline-flex h-10 shrink-0 items-center gap-2 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-4 text-[13px] font-bold text-white shadow-sm transition-all hover:brightness-110 disabled:opacity-60 disabled:hover:brightness-100"
         >
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" strokeWidth={2.25} />}
           Upload
         </button>
         <input
@@ -353,6 +405,9 @@ function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
 
 type PickerItem = { sourceId: string; image: string; title: string; sub: string }
 
+/** "Show all projects" lists this many per page. */
+const PICKER_PAGE_SIZE = 20
+
 function FeaturedPicker({
   items,
   loading,
@@ -360,6 +415,8 @@ function FeaturedPicker({
   selectedIds,
   onToggle,
   emptyText,
+  noun = "projects",
+  trailing,
 }: {
   items: PickerItem[]
   loading: boolean
@@ -367,68 +424,160 @@ function FeaturedPicker({
   selectedIds: Set<string>
   onToggle: (id: string) => void
   emptyText: string
+  /** What the list holds, for the search wording ("projects", "areas"). */
+  noun?: string
+  /** A control on the search row, right after the box (Service Areas: "Add area"). */
+  trailing?: React.ReactNode
 }) {
   const [q, setQ] = useState("")
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const [page, setPage] = useState(0)
   const needle = q.trim().toLowerCase()
-  const filtered = needle ? items.filter((i) => `${i.title} ${i.sub}`.toLowerCase().includes(needle)) : items
+  const filtered = needle ? items.filter((i) => `${i.title} ${i.sub}`.toLowerCase().includes(needle)) : []
+  // "Show all": the whole list, PICKER_PAGE_SIZE at a time; hidden by default and while searching.
+  const pages = Math.max(1, Math.ceil(items.length / PICKER_PAGE_SIZE))
+  const current = Math.min(page, pages - 1)
+  const pageItems = items.slice(current * PICKER_PAGE_SIZE, (current + 1) * PICKER_PAGE_SIZE)
+
+  const row = (item: PickerItem, inDropdown = false) => {
+    const selected = selectedIds.has(item.sourceId)
+    return (
+      <button
+        key={item.sourceId}
+        type="button"
+        // In the dropdown: pick on mousedown so the input keeps focus and the list stays open.
+        onMouseDown={inDropdown ? (e) => e.preventDefault() : undefined}
+        onClick={() => onToggle(item.sourceId)}
+        className={`flex w-full items-center gap-2.5 border p-2 text-left transition-colors ${
+          selected ? "border-[#001f3f] bg-[#eef3f9]" : "border-transparent bg-white hover:border-[#d8dde3]"
+        }`}
+      >
+        <span className="flex h-9 w-12 shrink-0 items-center justify-center overflow-hidden bg-[#eceff3]">
+          {item.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.image} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <ImagePlus className="h-3.5 w-3.5 text-[#9aa0aa]" />
+          )}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[12.5px] font-bold text-[#0d1117]">{item.title}</span>
+          <span className="block truncate text-[11px] text-[#9aa0aa]">{item.sub}</span>
+        </span>
+        <span
+          className={`flex h-5 w-5 shrink-0 items-center justify-center border ${
+            selected ? "border-[#001f3f] bg-[#001f3f] text-white" : "border-[#c8ccd2] text-transparent"
+          }`}
+        >
+          <Check className="h-3 w-3" />
+        </span>
+      </button>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center border border-[#e8eaed] bg-[#fafbfc] py-6">
+        <Loader2 className="h-4 w-4 animate-spin text-[#9aa0aa]" />
+      </div>
+    )
+  }
+  if (loadError) {
+    return <p className="border border-[#e8eaed] bg-[#fafbfc] px-2 py-4 text-center text-[12px] font-semibold text-red-600">{loadError}</p>
+  }
+  if (items.length === 0) {
+    return (
+      <div className="space-y-2.5">
+        <p className="border border-[#e8eaed] bg-[#fafbfc] px-2 py-4 text-center text-[12px] text-[#9aa0aa]">{emptyText}</p>
+        {trailing}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-2.5">
-      <div className="relative">
+      {/* Search: results drop down under the box; nothing else is listed while searching. */}
+      <div className="flex items-stretch gap-2">
+      <div className="relative min-w-0 flex-1">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9aa0aa]" />
         <input
           type="text"
           value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search…"
-          className={`${INPUT_CLS} pl-8`}
+          onChange={(e) => { setQ(e.target.value); setSearchOpen(true) }}
+          onFocus={() => setSearchOpen(true)}
+          onBlur={() => setSearchOpen(false)}
+          onKeyDown={(e) => { if (e.key === "Escape") { setQ(""); setSearchOpen(false) } }}
+          placeholder={`Search ${noun}…`}
+          className={`${INPUT_CLS} pl-8 ${q ? "pr-8" : "pr-32"}`}
         />
-      </div>
-      <div className="max-h-72 space-y-1.5 overflow-y-auto border border-[#e8eaed] bg-[#fafbfc] p-1.5">
-        {loading ? (
-          <div className="flex items-center justify-center py-6">
-            <Loader2 className="h-4 w-4 animate-spin text-[#9aa0aa]" />
+        {/* Right side of the box: "Show all" when empty, a clear ✕ while searching. */}
+        {!q && (
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            aria-expanded={showAll}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-[#f4f6f9] px-2 py-1 text-[11px] font-bold text-[#001f3f] transition-colors hover:bg-[#e8ecf1]"
+          >
+            {showAll ? "Hide all" : `Show all (${items.length})`}
+          </button>
+        )}
+        {q && (
+          <button
+            type="button"
+            aria-label="Clear search"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setQ("")}
+            className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center text-[#9aa0aa] hover:text-[#0d1117]"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {needle && searchOpen && (
+          <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 space-y-1.5 overflow-y-auto border border-[#e2e6ea] bg-white p-1.5 shadow-[0_12px_28px_-10px_rgba(15,23,42,0.35)]">
+            {filtered.length === 0 ? (
+              <p className="px-2 py-4 text-center text-[12px] text-[#9aa0aa]">Nothing matches “{q.trim()}”.</p>
+            ) : (
+              filtered.map((item) => row(item, true))
+            )}
           </div>
-        ) : loadError ? (
-          <p className="px-2 py-4 text-center text-[12px] font-semibold text-red-600">{loadError}</p>
-        ) : filtered.length === 0 ? (
-          <p className="px-2 py-4 text-center text-[12px] text-[#9aa0aa]">{emptyText}</p>
-        ) : (
-          filtered.map((item) => {
-            const selected = selectedIds.has(item.sourceId)
-            return (
-              <button
-                key={item.sourceId}
-                type="button"
-                onClick={() => onToggle(item.sourceId)}
-                className={`flex w-full items-center gap-2.5 border p-2 text-left transition-colors ${
-                  selected ? "border-[#001f3f] bg-[#eef3f9]" : "border-transparent bg-white hover:border-[#d8dde3]"
-                }`}
-              >
-                <span className="flex h-9 w-12 shrink-0 items-center justify-center overflow-hidden bg-[#eceff3]">
-                  {item.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.image} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <ImagePlus className="h-3.5 w-3.5 text-[#9aa0aa]" />
-                  )}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12.5px] font-bold text-[#0d1117]">{item.title}</span>
-                  <span className="block truncate text-[11px] text-[#9aa0aa]">{item.sub}</span>
-                </span>
-                <span
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center border ${
-                    selected ? "border-[#001f3f] bg-[#001f3f] text-white" : "border-[#c8ccd2] text-transparent"
-                  }`}
-                >
-                  <Check className="h-3 w-3" />
-                </span>
-              </button>
-            )
-          })
         )}
       </div>
+      {trailing && <div className="flex shrink-0 whitespace-nowrap">{trailing}</div>}
+      </div>
+
+      {!needle && (
+        <>
+          {showAll && (
+            <div className="border border-[#e8eaed] bg-[#fafbfc] p-1.5">
+              <div className="space-y-1.5">{pageItems.map((item) => row(item))}</div>
+              {pages > 1 && (
+                <div className="mt-2 flex items-center justify-between px-1 pb-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setPage(current - 1)}
+                    disabled={current === 0}
+                    className="border border-[#e2e6ea] bg-white px-2.5 py-1 text-[11.5px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-[11.5px] text-[#6b7280]">
+                    {current * PICKER_PAGE_SIZE + 1}–{Math.min(items.length, (current + 1) * PICKER_PAGE_SIZE)} of {items.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage(current + 1)}
+                    disabled={current >= pages - 1}
+                    className="border border-[#e2e6ea] bg-white px-2.5 py-1 text-[11.5px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -521,8 +670,8 @@ function LivePreview({
           <SiteHeader sticky={false} data={data} showReviews={reviews.length > 0} />
           <HeroSection data={data} />
           <AboutSection data={data} />
-          <FeaturedSection data={data} />
-          <StatsBandSection data={data} />
+          {/* Listings and the stats band are off for now — projects only (as on the live site). */}
+          <FeaturedSection data={{ ...data, properties: [] }} />
           <ServiceAreasSection data={data} />
           <GallerySection data={data} />
           <TestimonialsSection testimonials={reviews} />
@@ -535,18 +684,18 @@ function LivePreview({
 
 // ─── Section navigation ───────────────────────────────────────────────────────
 
+// Hero first — the tab the builder opens on (boss, 2026-11-09).
+// Listings and the stats band are off for now (boss, 2026-11-09): projects only,
+// and stats only in the hero. Saved listings / band stats stay in the database.
 const FORM_SECTIONS = [
-  { id: "palette", label: "Palette" },
-  { id: "agent", label: "Agent" },
   { id: "hero", label: "Hero" },
   { id: "about", label: "About" },
   { id: "projects", label: "Projects" },
-  { id: "listings", label: "Listings" },
-  { id: "stats", label: "Stats" },
-  { id: "areas", label: "Service Areas" },
   { id: "gallery", label: "Gallery" },
+  { id: "palette", label: "Palette" },
+  { id: "areas", label: "Service Areas" },
   { id: "reviews", label: "Reviews" },
-  { id: "link", label: "Link Preview" },
+  { id: "agent", label: "Info" },
 ] as const
 
 type FormSectionId = (typeof FORM_SECTIONS)[number]["id"]
@@ -558,12 +707,9 @@ const SECTION_ANCHORS: Record<FormSectionId, string> = {
   hero: "home",
   about: "about",
   projects: "projects",
-  listings: "properties",
-  stats: "stats",
   areas: "areas",
   gallery: "gallery",
   reviews: "reviews",
-  link: "contact",
 }
 
 /** Curated palette suggestions — accent (gold family) + primary (dark family).
@@ -597,8 +743,6 @@ const ANCHOR_TO_SECTION: Record<string, FormSectionId> = {
   home: "hero",
   about: "about",
   projects: "projects",
-  properties: "listings",
-  stats: "stats",
   areas: "areas",
   gallery: "gallery",
   reviews: "reviews",
@@ -640,6 +784,23 @@ export function WebsiteBuilderClient() {
   // state would overwrite the very draft we are about to read.
   const [draftReady, setDraftReady] = useState(false)
   const userId = user?.id ?? null
+  // The agent's own film from fhiglobal.ae/agents ("My story"), if FHI made one.
+  const myStory = userId ? STORY_BY_AGENT[userId] ?? null : null
+
+  // Hero title: the words and which are highlighted (old sites' separate accent included).
+  const titleWords = decodeHeadline(data.hero.headline, data.hero.headlineAccent)
+  const setTitleText = (text: string) => {
+    const tokens = tokenizeHeadline(text)
+    // A word keeps its highlight while it stays the same word in the same place.
+    const kept = new Set([...titleWords.highlighted].filter((i) => tokens[i] === titleWords.tokens[i]))
+    update((d) => { d.hero.headline = encodeHeadline(tokens, kept); d.hero.headlineAccent = "" })
+  }
+  const toggleTitleWord = (i: number) => {
+    const next = new Set(titleWords.highlighted)
+    if (next.has(i)) next.delete(i)
+    else next.add(i)
+    update((d) => { d.hero.headline = encodeHeadline(titleWords.tokens, next); d.hero.headlineAccent = "" })
+  }
   // This account's approved client reviews (lib/website-reviews.ts), shown
   // exactly as the live site shows them; RLS limits the read to own rows.
   const [reviews, setReviews] = useState<Testimonial[]>([])
@@ -649,17 +810,38 @@ export function WebsiteBuilderClient() {
     void loadAgentWebsiteReviews(createClient(), userId).then((r) => { if (live) setReviews(r) })
     return () => { live = false }
   }, [userId])
-  const [activeSection, setActiveSection] = useState<FormSectionId>("agent")
+
+  // Reviews: which approved ones the site shows, in order (data.reviewIds; null = all, newest first).
+  const shownReviews = orderWebsiteReviews(reviews, data.reviewIds)
+  const hiddenReviews = reviews.filter((r) => !shownReviews.includes(r))
+  const shownIds = () => shownReviews.map((r) => r.id).filter((id): id is string => Boolean(id))
+  const toggleReview = (id: string | undefined) => {
+    if (!id) return
+    const ids = shownIds()
+    update((d) => { d.reviewIds = ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id] })
+  }
+  const moveReview = (i: number, dir: -1 | 1) => {
+    const ids = shownIds()
+    const j = i + dir
+    if (j < 0 || j >= ids.length) return
+    ;[ids[i], ids[j]] = [ids[j], ids[i]]
+    update((d) => { d.reviewIds = ids })
+  }
+  const [activeSection, setActiveSection] = useState<FormSectionId>("hero")
   const [activeGalleryCat, setActiveGalleryCat] = useState<GalleryCategory>("Event Photos")
-  // Cache-buster for the link-share (OG) preview image.
-  const [ogBust, setOgBust] = useState(0)
+  // Selected projects: the row being dragged and the row it's over (drag to reorder).
+  const [dragProject, setDragProject] = useState<number | null>(null)
+  const [dropProject, setDropProject] = useState<number | null>(null)
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null)
   // While a tab click smooth-scrolls the preview, the scroll spy would fire on
   // every intermediate section — suppress it until the animation settles.
   const spySuppressed = useRef(false)
 
+  // The form's scroll box: a new tab starts at its top (Prev / Next sit at the bottom).
+  const formScrollRef = useRef<HTMLDivElement>(null)
   const openSection = (id: FormSectionId) => {
     setActiveSection(id)
+    formScrollRef.current?.scrollTo({ top: 0 })
     spySuppressed.current = true
     setPreviewTarget((t) => ({ id: SECTION_ANCHORS[id], n: (t?.n ?? 0) + 1 }))
   }
@@ -700,11 +882,21 @@ export function WebsiteBuilderClient() {
     // This account's unsaved draft on this browser beats the DB copy (it is
     // newer by definition — it only exists between an edit and a Save).
     const draft = loadDraft(draftKey(userId))
+    // RERA BRN / ORN / brokerage: always the profile's (read-only here), applied
+    // over the saved site or the local draft alike.
+    let credentials: Pick<WebsiteData["agent"], "brn" | "orn" | "brokerage"> | null = null
     fetch("/api/website-builder/site")
       .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
       .then(({ ok, j }) => {
         if (!alive || !ok) return
-        const site = j as { exists?: boolean; slug?: string; data?: WebsiteData; complete?: boolean }
+        const site = j as {
+          exists?: boolean
+          slug?: string
+          data?: WebsiteData
+          complete?: boolean
+          credentials?: Pick<WebsiteData["agent"], "brn" | "orn" | "brokerage">
+        }
+        credentials = site.credentials ?? null
         if (!site.exists || !site.slug || !site.data) return
         setSiteSlug(site.slug)
         setSavedComplete(site.complete === true)
@@ -718,6 +910,8 @@ export function WebsiteBuilderClient() {
         // Applied here (async), not synchronously in the effect body, so the
         // draft shows whether or not the DB read succeeded.
         if (draft) setData(seedEmptySocials(draft, seed))
+        const c = credentials
+        if (c) setData((d) => ({ ...d, agent: { ...d.agent, ...c } }))
         setDraftReady(true)
       })
     return () => {
@@ -754,11 +948,9 @@ export function WebsiteBuilderClient() {
     }
   }
 
-  // Picker data — real published projects + the agent's own published listings.
+  // Picker data — real published projects (listings are off for now).
   const [projectOptions, setProjectOptions] = useState<Project[] | null>(null)
   const [projectsError, setProjectsError] = useState<string | null>(null)
-  const [listingOptions, setListingOptions] = useState<Property[] | null>(null)
-  const [listingsError, setListingsError] = useState<string | null>(null)
   // Shared service-area catalog — typing an existing name reuses its row/photo.
   const [areaOptions, setAreaOptions] = useState<{ name: string; photo: string }[]>([])
 
@@ -782,16 +974,6 @@ export function WebsiteBuilderClient() {
       })
       .catch(() => {
         // Catalog unavailable — the field still works as free text.
-      })
-    fetch("/api/website-builder/listings")
-      .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
-      .then(({ ok, j }) => {
-        if (!alive) return
-        if (!ok) throw new Error((j as { error?: string }).error || "Failed to load listings")
-        setListingOptions(((j as { listings?: Property[] }).listings ?? []))
-      })
-      .catch((e) => {
-        if (alive) setListingsError(e instanceof Error ? e.message : "Failed to load listings")
       })
     return () => {
       alive = false
@@ -832,7 +1014,7 @@ export function WebsiteBuilderClient() {
    *  nothing has ever been saved does it fall back to the seeded sample. */
   const [resetting, setResetting] = useState(false)
   const reset = async () => {
-    if (!window.confirm("Discard unsaved edits and reload your saved site?")) return
+    if (!window.confirm("Clear your unsaved edits and go back to your saved site?")) return
     setResetting(true)
     try {
       if (userId) localStorage.removeItem(draftKey(userId))
@@ -854,7 +1036,24 @@ export function WebsiteBuilderClient() {
 
 
   const selectedProjectIds = new Set(data.projects.map((p) => p.sourceId).filter(Boolean) as string[])
-  const selectedListingIds = new Set(data.properties.map((p) => p.sourceId).filter(Boolean) as string[])
+
+  // Service Areas from the catalog: picked by name (the catalog's spelling), case-insensitively.
+  const selectedAreaNames = new Set(
+    areaOptions.filter((o) => data.areas.some((a) => a.label.trim().toLowerCase() === o.name.toLowerCase())).map((o) => o.name),
+  )
+  const toggleArea = (name: string) => {
+    const option = areaOptions.find((o) => o.name === name)
+    update((d) => {
+      const at = d.areas.findIndex((a) => a.label.trim().toLowerCase() === name.toLowerCase())
+      if (at >= 0) d.areas.splice(at, 1)
+      else if (option) {
+        // Fill an empty row first (a fresh "Add area"), otherwise add one.
+        const blank = d.areas.findIndex((a) => !a.label.trim() && !a.image.trim())
+        if (blank >= 0) d.areas[blank] = { label: option.name, image: option.photo }
+        else d.areas.push({ label: option.name, image: option.photo })
+      }
+    })
+  }
 
   const toggleProject = (id: string) => {
     const option = projectOptions?.find((o) => o.sourceId === id)
@@ -862,15 +1061,6 @@ export function WebsiteBuilderClient() {
       const at = d.projects.findIndex((p) => p.sourceId === id)
       if (at >= 0) d.projects.splice(at, 1)
       else if (option && d.projects.length < MAX_FEATURED) d.projects.push(structuredClone(option))
-    })
-  }
-
-  const toggleListing = (id: string) => {
-    const option = listingOptions?.find((o) => o.sourceId === id)
-    update((d) => {
-      const at = d.properties.findIndex((p) => p.sourceId === id)
-      if (at >= 0) d.properties.splice(at, 1)
-      else if (option && d.properties.length < MAX_FEATURED) d.properties.push(structuredClone(option))
     })
   }
 
@@ -886,34 +1076,76 @@ export function WebsiteBuilderClient() {
     <div data-wb-full-bleed className="flex h-full min-h-0">
       {/* ── Form ── */}
       <div className="flex w-[400px] shrink-0 flex-col border-r border-[#e8eaed] bg-white xl:w-[440px]">
-        {/* Section navigation — one section's fields at a time */}
-        <div className="flex flex-wrap gap-1.5 border-b border-[#eef0f3] px-5 py-3">
-          {FORM_SECTIONS.map((s) => {
-            const active = activeSection === s.id
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => openSection(s.id)}
-                className={` px-3 py-1.5 text-[11.5px] font-bold transition-colors ${
-                  active
-                    ? "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white"
-                    : "border border-[#e2e6ea] text-[#5b6472] hover:border-[#9aa0aa]"
-                }`}
-              >
-                {s.label}
-              </button>
-            )
-          })}
+        {/* Section navigation — one section's fields at a time: text tabs, the active one blue and
+            underlined; the row scrolls sideways when the tabs don't fit. */}
+        <div className="shrink-0 overflow-x-auto border-b border-[#dfe3e8] bg-[#eceef3] [scrollbar-width:none]">
+          <div className="flex min-w-max px-2">
+            {FORM_SECTIONS.map((s) => {
+              const active = activeSection === s.id
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => openSection(s.id)}
+                  aria-current={active ? "true" : undefined}
+                  className={`relative whitespace-nowrap px-2 pb-3 pt-3.5 font-['Outfit'] text-[14px] font-semibold transition-colors ${
+                    active ? "text-[#2f5fe0]" : "text-[#6b7280] hover:text-[#374151]"
+                  }`}
+                >
+                  {s.label}
+                  {active && <span className="absolute inset-x-0.5 bottom-0 h-[3px] rounded-t-sm bg-[#2f5fe0]" aria-hidden />}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
+        <div ref={formScrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
           {activeSection === "palette" && (
             <>
-              <p className="text-[12px] leading-relaxed text-[#6b7280]">
-                Your site&apos;s two brand colors. Everything derives from them — the navbar, buttons,
-                stat bands, glass cards, icons, dividers and gradients all update together.
-              </p>
+              {/* Hero text colours first — one line (moved here from the Hero tab). */}
+              <div>
+                <span className="mb-1 flex items-center gap-1.5 text-[13.5px] font-bold text-[#0d1117]">
+                  Hero text
+                  <HelpTip text="Colours of the hero's title, the words you highlight in it, and the description under it." />
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      { key: "headlineColor", label: "Title color", fallback: "#0d1b2e" },
+                      { key: "headlineAccentColor", label: "Highlighted words", fallback: data.theme?.gold ?? DEFAULT_THEME.gold },
+                      { key: "descriptionColor", label: "Description color", fallback: "#3d4451" },
+                    ] as const
+                  ).map(({ key, label, fallback }) => (
+                    <label key={key} className="flex cursor-pointer flex-col gap-1.5 border border-[#e8eaed] bg-[#fafbfc] p-2">
+                      <span className="truncate text-[12px] font-bold text-[#0d1117]">{label}</span>
+                      <input
+                        type="color"
+                        value={data.hero[key] ?? fallback}
+                        onChange={(e) => update((d) => { d.hero[key] = e.target.value })}
+                        aria-label={label}
+                        className="h-8 w-full cursor-pointer appearance-none border border-[#e2e6ea] bg-white p-0.5"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <Field
+                label="Title dark overlay background"
+                help="Darkens the background behind the title so it stays readable on bright photos. 0% = no overlay."
+                action={<span className="text-[10px] font-bold text-[#6b7280]">{data.hero.overlay ?? 0}%</span>}
+              >
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={data.hero.overlay ?? 0}
+                  onChange={(e) => update((d) => { d.hero.overlay = Number(e.target.value) })}
+                  className="w-full cursor-pointer accent-[#001f3f]"
+                  aria-label="Title dark overlay background strength"
+                />
+              </Field>
 
               {/* Suggested palettes */}
               <Field label="Suggestions">
@@ -984,120 +1216,34 @@ export function WebsiteBuilderClient() {
             <>
               <Field label="Full name"><TInput value={data.agent.name} onChange={(v) => update((d) => { d.agent.name = v })} /></Field>
               <Field label="Professional Title"><TInput value={data.agent.title} onChange={(v) => update((d) => { d.agent.title = v })} /></Field>
+              {/* RERA credentials: read-only, from profile settings (the BRN is checked with the Dubai Land
+                  Department there; ORN + brokerage are that BRN's DLD record). The server applies the same. */}
               <div className="grid grid-cols-2 gap-3">
-                <Field
-                  label="RERA BRN"
-                  invalid={data.agent.brn.trim() !== "" && !isPlausibleBrn(data.agent.brn)}
-                  hint={data.agent.brn.trim() !== "" && !isPlausibleBrn(data.agent.brn)
-                    ? "Use the 4–7 digit number on your RERA broker card."
-                    : "Shown on your site only when it is a real BRN."}
-                >
-                  <TInput value={data.agent.brn} onChange={(v) => update((d) => { d.agent.brn = v })} />
-                </Field>
-                <Field
-                  label="RERA ORN"
-                  invalid={data.agent.orn.trim() !== "" && !isPlausibleOrn(data.agent.orn)}
-                  hint={data.agent.orn.trim() !== "" && !isPlausibleOrn(data.agent.orn)
-                    ? "Use the office registration number (2–6 digits)."
-                    : "Leave blank if you do not have one."}
-                >
-                  <TInput value={data.agent.orn} onChange={(v) => update((d) => { d.agent.orn = v })} />
-                </Field>
+                <Field label="RERA BRN"><ReadOnlyValue value={data.agent.brn} /></Field>
+                <Field label="RERA ORN"><ReadOnlyValue value={data.agent.orn} /></Field>
               </div>
-              <Field label="Brokerage"><TInput value={data.agent.brokerage} onChange={(v) => update((d) => { d.agent.brokerage = v })} /></Field>
+              <Field label="Brokerage"><ReadOnlyValue value={data.agent.brokerage} /></Field>
+              <p className="-mt-1 text-[11px] leading-snug text-[#9ca3af]">
+                From your{" "}
+                <a href={`${getDashboardRouteByRole(role)}/profile`} className="font-bold text-[#001f3f] underline">
+                  profile settings
+                </a>{" "}
+                — change your BRN there.
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Phone"><TInput value={data.agent.phone} onChange={(v) => update((d) => { d.agent.phone = v })} /></Field>
                 <Field label="WhatsApp"><TInput value={data.agent.whatsapp} onChange={(v) => update((d) => { d.agent.whatsapp = v })} /></Field>
               </div>
               <Field label="Email"><TInput value={data.agent.email} onChange={(v) => update((d) => { d.agent.email = v })} /></Field>
-              <Field label="Office address"><TInput value={data.agent.office} onChange={(v) => update((d) => { d.agent.office = v })} /></Field>
             </>
           )}
 
           {activeSection === "hero" && (
             <>
-              <Field
-                label="Headline (line breaks kept)"
-                action={<ColorButton value={data.hero.headlineColor ?? "#0d1b2e"} onChange={(v) => update((d) => { d.hero.headlineColor = v })} />}
-              >
-                <TArea rows={2} value={data.hero.headline} onChange={(v) => update((d) => { d.hero.headline = v })} />
-              </Field>
-              <Field
-                label="Headline accent"
-                action={<ColorButton value={data.hero.headlineAccentColor ?? "#c9a24b"} onChange={(v) => update((d) => { d.hero.headlineAccentColor = v })} />}
-              >
-                <TInput value={data.hero.headlineAccent} onChange={(v) => update((d) => { d.hero.headlineAccent = v })} />
-              </Field>
-              <Field
-                label="Description"
-                action={<ColorButton value={data.hero.descriptionColor ?? "#3d4451"} onChange={(v) => update((d) => { d.hero.descriptionColor = v })} />}
-              >
-                <TArea value={data.hero.description} onChange={(v) => update((d) => { d.hero.description = v })} />
-              </Field>
-              <Field label="Featured video link">
-                <TInput
-                  value={data.hero.video ?? ""}
-                  placeholder="YouTube / Vimeo / Facebook / Instagram / TikTok / direct video URL"
-                  onChange={(v) => update((d) => { d.hero.video = v })}
-                />
-                <p className="mt-1 text-[11px] text-[#9aa0aa]">
-                  Shows a &ldquo;Featured Video&rdquo; button in the hero that opens the video in a modal. Facebook, Instagram and TikTok videos must be public. Leave blank to hide the button.
-                </p>
-              </Field>
               <Field label="Banner photo"><ImageInput value={data.hero.image} onChange={(v) => update((d) => { d.hero.image = v })} /></Field>
               <Field
-                label="Left dark overlay"
-                action={<span className="text-[10px] font-bold text-[#6b7280]">{data.hero.overlay ?? 0}%</span>}
-              >
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={5}
-                  value={data.hero.overlay ?? 0}
-                  onChange={(e) => update((d) => { d.hero.overlay = Number(e.target.value) })}
-                  className="w-full cursor-pointer accent-[#001f3f]"
-                  aria-label="Left dark overlay strength"
-                />
-                <p className="mt-1 text-[11px] text-[#9aa0aa]">
-                  Darkens the left side behind the headline so it stays readable on bright photos. 0% = no overlay.
-                </p>
-              </Field>
-              <Field
-                label="Photo position — horizontal"
-                action={<span className="text-[10px] font-bold text-[#6b7280]">{(data.hero.posX ?? 50).toFixed(1)}%</span>}
-              >
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={0.1}
-                  value={data.hero.posX ?? 50}
-                  onChange={(e) => update((d) => { d.hero.posX = Number(e.target.value) })}
-                  className="w-full cursor-pointer accent-[#001f3f]"
-                  aria-label="Banner photo horizontal position"
-                />
-              </Field>
-              <Field
-                label="Photo position — vertical"
-                action={<span className="text-[10px] font-bold text-[#6b7280]">{(data.hero.posY ?? 50).toFixed(1)}%</span>}
-              >
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={0.1}
-                  value={data.hero.posY ?? 50}
-                  onChange={(e) => update((d) => { d.hero.posY = Number(e.target.value) })}
-                  className="w-full cursor-pointer accent-[#001f3f]"
-                  aria-label="Banner photo vertical position"
-                />
-                <p className="mt-1 text-[11px] text-[#9aa0aa]">
-                  Picks which part of an oversized photo shows in the banner crop: 0% = left/top edge, 100% = right/bottom edge.
-                </p>
-              </Field>
-              <Field
                 label="Photo zoom"
+                help="100% = no zoom. Zooming magnifies around the position you set."
                 action={<span className="text-[10px] font-bold text-[#6b7280]">{(data.hero.zoom ?? 100).toFixed(1)}%</span>}
               >
                 <input
@@ -1110,12 +1256,123 @@ export function WebsiteBuilderClient() {
                   className="w-full cursor-pointer accent-[#001f3f]"
                   aria-label="Banner photo zoom"
                 />
-                <p className="mt-1 text-[11px] text-[#9aa0aa]">
-                  100% = no zoom. Zooming magnifies around the position you set above.
-                </p>
               </Field>
-              <Field label="Hero stats">
+              {/* Position X and Y on one line. */}
+              <div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field
+                    label="Position X"
+                    help="Which part of an oversized photo shows in the banner, left to right: 0% = left edge, 100% = right edge."
+                    action={<span className="text-[10px] font-bold text-[#6b7280]">{(data.hero.posX ?? 50).toFixed(1)}%</span>}
+                  >
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={0.1}
+                      value={data.hero.posX ?? 50}
+                      onChange={(e) => update((d) => { d.hero.posX = Number(e.target.value) })}
+                      className="w-full cursor-pointer accent-[#001f3f]"
+                      aria-label="Banner photo horizontal position"
+                    />
+                  </Field>
+                  <Field
+                    label="Position Y"
+                    help="Which part of an oversized photo shows in the banner, top to bottom: 0% = top edge, 100% = bottom edge."
+                    helpAlign="right"
+                    action={<span className="text-[10px] font-bold text-[#6b7280]">{(data.hero.posY ?? 50).toFixed(1)}%</span>}
+                  >
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={0.1}
+                      value={data.hero.posY ?? 50}
+                      onChange={(e) => update((d) => { d.hero.posY = Number(e.target.value) })}
+                      className="w-full cursor-pointer accent-[#001f3f]"
+                      aria-label="Banner photo vertical position"
+                    />
+                  </Field>
+                </div>
+              </div>
+              {/* The whole title in one box; click its words below to highlight them
+                  (stored as **markers** in hero.headline — lib/headline-highlight.ts). */}
+              <Field
+                label={<>Title <span className="font-normal text-[#6b7280]">(line breaks kept)</span></>}
+              >
+                <TArea rows={2} placeholder="Looking for homes?" value={titleWords.tokens.join("")} onChange={setTitleText} />
+              </Field>
+              {titleWords.tokens.some((t) => t.trim()) && (
+                <div>
+                  <span className="mb-1 flex items-center gap-1.5 text-[13.5px] font-bold text-[#0d1117]">
+                    Click words to highlight
+                    <HelpTip text="Highlighted words show in the highlight color on your site (set it in Palette)." />
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 border border-[#e2e6ea] bg-[#f9fafb] p-2">
+                    {titleWords.tokens.map((tok, i) => {
+                      const accentColor = data.hero.headlineAccentColor || data.theme?.gold || DEFAULT_THEME.gold
+                      if (!tok.trim()) return null
+                      const on = titleWords.highlighted.has(i)
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => toggleTitleWord(i)}
+                          // Not highlighted: black text on white, no border, a soft shadow (the title colour may be white
+                          // for a dark photo — unreadable here). Highlighted: the highlight colour, bordered.
+                          className={`border px-2 py-1 text-[13px] font-bold transition-colors ${
+                            on ? "bg-white shadow-sm" : "border-transparent bg-white text-[#0d1117] shadow-[0_1px_3px_rgba(15,23,42,0.12)] hover:shadow-[0_2px_6px_rgba(15,23,42,0.16)]"
+                          }`}
+                          style={on ? { color: accentColor, borderColor: accentColor } : undefined}
+                        >
+                          {tok.toUpperCase()}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              <Field label="Description">
+                <TArea value={data.hero.description} onChange={(v) => update((d) => { d.hero.description = v })} />
+              </Field>
+              <Field
+                label="Featured video link"
+                help="Shows a “Featured Video” button in the hero that opens the video in a pop-up. Facebook, Instagram and TikTok videos must be public. Leave blank to hide the button."
+                action={
+                  <button
+                    type="button"
+                    onClick={() => { if (myStory) update((d) => { d.hero.video = myStory.hd }) }}
+                    // No film yet → shown but disabled, so agents know the option exists.
+                    disabled={!myStory || data.hero.video === myStory.hd}
+                    title={myStory
+                      ? `Use “${myStory.title}” (${myStory.duration}) — the film on fhiglobal.ae/agents`
+                      : "You don't have a My Story film on fhiglobal.ae/agents yet"}
+                    className="inline-flex shrink-0 items-center gap-1 border border-[#e2e6ea] bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#001f3f] transition-colors hover:bg-[#f4f6f9] disabled:cursor-not-allowed disabled:text-[#9aa0aa] disabled:hover:bg-white"
+                  >
+                    <Film className="h-3 w-3" />
+                    {myStory && data.hero.video === myStory.hd ? "My story added" : "Use my story"}
+                  </button>
+                }
+              >
+                <TInput
+                  value={data.hero.video ?? ""}
+                  placeholder="YouTube / Vimeo / Facebook / Instagram / TikTok / direct video URL"
+                  onChange={(v) => update((d) => { d.hero.video = v })}
+                />
+              </Field>
+              {/* A plain heading, not <Field> (a <label>): a click inside must not press Add stat. */}
+              <div>
+                <span className="mb-1 block text-[13.5px] font-bold text-[#0d1117]">Hero stats</span>
                 <div className="space-y-2.5">
+                  {/* Add stat first, full width, label centred. */}
+                  <button
+                    type="button"
+                    onClick={() => update((d) => { d.hero.stats.push({ value: "", label: "" }) })}
+                    className="flex w-full items-center justify-center gap-1.5 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-3 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add stat
+                  </button>
                   {data.hero.stats.map((s, i) => (
                     <ItemCard
                       key={i}
@@ -1134,20 +1391,16 @@ export function WebsiteBuilderClient() {
                       />
                     </ItemCard>
                   ))}
-                  <AddButton label="Add stat" onClick={() => update((d) => { d.hero.stats.push({ value: "", label: "" }) })} />
                 </div>
-              </Field>
+              </div>
             </>
           )}
 
           {activeSection === "about" && (
             <>
-              <Field label="Heading (line breaks kept)"><TArea rows={2} value={data.about.heading} onChange={(v) => update((d) => { d.about.heading = v })} /></Field>
+              <Field label={<>About Me Heading <span className="font-normal text-[#6b7280]">(line breaks kept)</span></>}><TArea rows={2} value={data.about.heading} onChange={(v) => update((d) => { d.about.heading = v })} /></Field>
               <Field label="Bio"><TArea rows={7} value={data.about.bio} onChange={(v) => update((d) => { d.about.bio = v })} /></Field>
-              <Field label="Portrait photo"><ImageInput value={data.about.portrait} onChange={(v) => update((d) => { d.about.portrait = v })} /></Field>
-              <p className="text-[11px] leading-relaxed text-[#9aa0aa]">
-                Views, Listings and Rating aren&apos;t editable — they show &ldquo;-&rdquo; for now and will be automated from real data.
-              </p>
+              <Field label="About Me Portrait photo"><ImageInput value={data.about.portrait} onChange={(v) => update((d) => { d.about.portrait = v })} /></Field>
               <Field label="Facebook URL"><TInput value={data.about.socials.facebook} onChange={(v) => update((d) => { d.about.socials.facebook = v })} /></Field>
               <Field label="Instagram URL"><TInput value={data.about.socials.instagram} onChange={(v) => update((d) => { d.about.socials.instagram = v })} /></Field>
               <Field label="LinkedIn URL"><TInput value={data.about.socials.linkedin} onChange={(v) => update((d) => { d.about.socials.linkedin = v })} /></Field>
@@ -1175,10 +1428,47 @@ export function WebsiteBuilderClient() {
                 emptyText="No published projects found."
               />
               {data.projects.length > 0 && (
-                <Field label="Selected (shown in this order)">
+                // A plain heading, not <Field> (a <label>): a click on a row must not press its first button.
+                <div>
+                  <span className="mb-1 flex items-center gap-1.5 text-[13.5px] font-bold text-[#0d1117]">
+                    Selected <span className="font-normal text-[#6b7280]">(shown in this order)</span>
+                    <HelpTip text="Drag a project by its handle (or use the arrows) to change the order it shows on your site." />
+                  </span>
                   <div className="space-y-1.5">
                     {data.projects.map((p, i) => (
-                      <div key={`${p.sourceId ?? p.title}-${i}`} className="flex items-center gap-2 border border-[#e8eaed] bg-[#fafbfc] px-2.5 py-1.5">
+                      <div
+                        key={`${p.sourceId ?? p.title}-${i}`}
+                        draggable
+                        onDragStart={(e) => {
+                          setDragProject(i)
+                          e.dataTransfer.effectAllowed = "move"
+                          e.dataTransfer.setData("text/plain", String(i))
+                        }}
+                        onDragOver={(e) => {
+                          if (dragProject === null) return
+                          e.preventDefault()
+                          e.dataTransfer.dropEffect = "move"
+                          if (dropProject !== i) setDropProject(i)
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          if (dragProject !== null && dragProject !== i) {
+                            const from = dragProject
+                            update((d) => { const [moved] = d.projects.splice(from, 1); d.projects.splice(i, 0, moved) })
+                          }
+                          setDragProject(null)
+                          setDropProject(null)
+                        }}
+                        onDragEnd={() => { setDragProject(null); setDropProject(null) }}
+                        className={`flex cursor-grab items-center gap-2 border px-2.5 py-1.5 transition-colors active:cursor-grabbing ${
+                          dragProject === i
+                            ? "border-dashed border-[#9aa0aa] bg-white opacity-50"
+                            : dropProject === i && dragProject !== null
+                              ? "border-[#001f3f] bg-[#eef3f9]"
+                              : "border-[#e8eaed] bg-[#fafbfc]"
+                        }`}
+                      >
+                        <GripVertical className="h-3.5 w-3.5 shrink-0 text-[#9aa0aa]" aria-hidden />
                         <span className="text-[11px] font-bold text-[#9aa0aa]">#{i + 1}</span>
                         <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-[#0d1117]">{p.title || "Untitled"}</span>
                         <MoveButtons index={i} count={data.projects.length} onMove={(dir) => update((d) => swap(d.projects, i, dir))} />
@@ -1193,77 +1483,11 @@ export function WebsiteBuilderClient() {
                       </div>
                     ))}
                   </div>
-                </Field>
+                </div>
               )}
             </>
           )}
 
-          {activeSection === "listings" && (
-            <>
-              <p className="text-[12px] leading-relaxed text-[#6b7280]">
-                Pick up to {MAX_FEATURED} of your published listings — the card fills in from the real listing.
-                <span className="ml-1 font-bold text-[#0d1117]">{data.properties.length}/{MAX_FEATURED} selected</span>
-              </p>
-              <FeaturedPicker
-                items={(listingOptions ?? []).map((p) => ({
-                  sourceId: p.sourceId!,
-                  image: p.image,
-                  title: p.title,
-                  sub: [p.badge, p.location, p.price].filter(Boolean).join(" · "),
-                }))}
-                loading={listingOptions === null && !listingsError}
-                loadError={listingsError}
-                selectedIds={selectedListingIds}
-                onToggle={toggleListing}
-                emptyText="No published listings found — publish a listing first."
-              />
-              {data.properties.length > 0 && (
-                <Field label="Selected (shown in this order)">
-                  <div className="space-y-1.5">
-                    {data.properties.map((p, i) => (
-                      <div key={`${p.sourceId ?? p.title}-${i}`} className="flex items-center gap-2 border border-[#e8eaed] bg-[#fafbfc] px-2.5 py-1.5">
-                        <span className="text-[11px] font-bold text-[#9aa0aa]">#{i + 1}</span>
-                        <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-[#0d1117]">{p.title || "Untitled"}</span>
-                        <MoveButtons index={i} count={data.properties.length} onMove={(dir) => update((d) => swap(d.properties, i, dir))} />
-                        <button
-                          type="button"
-                          aria-label="Remove"
-                          onClick={() => update((d) => { d.properties.splice(i, 1) })}
-                          className="flex h-6 w-6 items-center justify-center text-[#9aa0aa] transition-colors hover:bg-red-50 hover:text-red-600"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </Field>
-              )}
-            </>
-          )}
-
-          {activeSection === "stats" && (
-            <>
-              {data.bandStats.map((s, i) => (
-                <ItemCard
-                  key={i}
-                  index={i}
-                  count={data.bandStats.length}
-                  onMove={(dir) => update((d) => swap(d.bandStats, i, dir))}
-                  onRemove={() => update((d) => { d.bandStats.splice(i, 1) })}
-                >
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <TInput value={s.value} placeholder="Value" onChange={(v) => update((d) => { d.bandStats[i].value = v })} />
-                    <TInput value={s.label} placeholder="Label" onChange={(v) => update((d) => { d.bandStats[i].label = v })} />
-                  </div>
-                  <IconPicker
-                    value={s.icon ?? BAND_STAT_ICON_FALLBACK[i % BAND_STAT_ICON_FALLBACK.length]}
-                    onChange={(k) => update((d) => { d.bandStats[i].icon = k })}
-                  />
-                </ItemCard>
-              ))}
-              <AddButton label="Add stat" onClick={() => update((d) => { d.bandStats.push({ value: "", label: "" }) })} />
-            </>
-          )}
 
           {activeSection === "areas" && (
             <>
@@ -1275,6 +1499,17 @@ export function WebsiteBuilderClient() {
                   <option key={a.name} value={a.name} />
                 ))}
               </datalist>
+              {/* Pick from the shared catalog — the same search + Show all as Projects. */}
+              <FeaturedPicker
+                noun="areas"
+                items={areaOptions.map((o) => ({ sourceId: o.name, image: o.photo, title: o.name, sub: "" }))}
+                loading={false}
+                loadError={null}
+                selectedIds={selectedAreaNames}
+                onToggle={toggleArea}
+                emptyText="No areas in the catalog yet — add your own."
+                trailing={<AddButton label="Add area" onClick={() => update((d) => { d.areas.push({ image: "", label: "" }) })} />}
+              />
               {data.areas.map((a, i) => (
                 <ItemCard
                   key={i}
@@ -1283,26 +1518,32 @@ export function WebsiteBuilderClient() {
                   onMove={(dir) => update((d) => swap(d.areas, i, dir))}
                   onRemove={() => update((d) => { d.areas.splice(i, 1) })}
                 >
-                  <input
-                    type="text"
-                    value={a.label}
-                    placeholder="Area name"
-                    list="wb-area-catalog"
-                    onChange={(e) => {
-                      const v = e.target.value
-                      const match = areaOptions.find((o) => o.name.toLowerCase() === v.trim().toLowerCase())
-                      update((d) => {
-                        d.areas[i].label = v
-                        // Choosing an existing area adopts its shared photo.
-                        if (match?.photo) d.areas[i].image = match.photo
-                      })
-                    }}
-                    className={INPUT_CLS}
+                  {/* Photo | area name | Upload — the name sits where the image link was (no link box). */}
+                  <ImageInput
+                    value={a.image}
+                    onChange={(v) => update((d) => { d.areas[i].image = v })}
+                    middle={
+                      <input
+                        type="text"
+                        value={a.label}
+                        placeholder="Area name"
+                        list="wb-area-catalog"
+                        aria-label="Area name"
+                        onChange={(e) => {
+                          const v = e.target.value
+                          const match = areaOptions.find((o) => o.name.toLowerCase() === v.trim().toLowerCase())
+                          update((d) => {
+                            d.areas[i].label = v
+                            // Choosing an existing area adopts its shared photo.
+                            if (match?.photo) d.areas[i].image = match.photo
+                          })
+                        }}
+                        className={INPUT_CLS}
+                      />
+                    }
                   />
-                  <ImageInput value={a.image} onChange={(v) => update((d) => { d.areas[i].image = v })} />
                 </ItemCard>
               ))}
-              <AddButton label="Add area" onClick={() => update((d) => { d.areas.push({ image: "", label: "" }) })} />
               {data.areas.every((a) => a.label.trim() === "" && a.image.trim() === "") && (
                 <div className="space-y-2.5">
                   {TEST_AREAS.map((a, i) => (
@@ -1396,86 +1637,102 @@ export function WebsiteBuilderClient() {
               {reviews.length === 0 ? (
                 <p className="border border-dashed border-[#e2e6ea] bg-[#fafbfc] p-3 text-[12px] text-[#6b7280]">No approved reviews yet.</p>
               ) : (
-                <div className="space-y-2.5">
-                  {reviews.map((t, i) => (
-                    <div key={i} className="border border-[#e2e6ea] bg-[#fafbfc] p-3">
-                      <p className="text-[12.5px] leading-relaxed text-[#374151]">&ldquo;{t.quote}&rdquo;</p>
-                      <p className="mt-1.5 text-[11.5px] font-bold text-[#0d1117]">{t.name} <span className="font-medium text-[#9aa0aa]">— {t.where}</span></p>
+                <>
+                  {/* Shown on the site, in this order — tick to show / hide, arrows to reorder.
+                      Saved as data.reviewIds (migration 087); never picked = all, newest first. */}
+                  {/* Plain headings, not <Field> (a <label>): a click on a review's text must not tick the first checkbox. */}
+                  <div>
+                    <span className="mb-1 flex items-center gap-1.5 text-[13.5px] font-bold text-[#0d1117]">
+                      Shown on your site
+                      <HelpTip text="Untick a review to hide it; use the arrows to change the order. Reviews approved later start hidden — tick them to show." />
+                    </span>
+                    {shownReviews.length === 0 ? (
+                      <p className="border border-dashed border-[#e2e6ea] bg-[#fafbfc] p-3 text-[12px] text-[#6b7280]">
+                        None shown — the Reviews section and its menu link are hidden.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {shownReviews.map((t, i) => (
+                          <ReviewRowCard key={t.id ?? i} review={t} shown onToggle={() => toggleReview(t.id)}>
+                            <span className="text-[11px] font-bold text-[#9aa0aa]">#{i + 1}</span>
+                            <MoveButtons index={i} count={shownReviews.length} onMove={(dir) => moveReview(i, dir)} />
+                          </ReviewRowCard>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {hiddenReviews.length > 0 && (
+                    <div>
+                      <span className="mb-1 block text-[13.5px] font-bold text-[#0d1117]">Hidden</span>
+                      <div className="space-y-2">
+                        {hiddenReviews.map((t, i) => (
+                          <ReviewRowCard key={t.id ?? i} review={t} shown={false} onToggle={() => toggleReview(t.id)} />
+                        ))}
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
             </>
           )}
-
-          {activeSection === "link" && (
-            <>
-              <p className="text-[12px] leading-relaxed text-[#6b7280]">
-                This is the thumbnail shown when your website link is shared (WhatsApp, Facebook,
-                iMessage…) — your hero exactly as the page renders it, plus your contact &amp; RERA
-                card at the lower right. It regenerates from your <span className="font-bold">saved</span> site,
-                so hit Save first, then Refresh.
-              </p>
-              <div className="border border-[#e8eaed] bg-[#fafbfc] p-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  key={ogBust}
-                  src={`${siteSlug ? `/website/${siteSlug}` : "/website/sample"}/opengraph-image?r=${ogBust}`}
-                  alt="Link share preview"
-                  className="w-full border border-[#e2e6ea]"
-                />
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="truncate text-[11px] text-[#9aa0aa]">
-                    {siteSlug ? `fhiglobal.ae/website/${siteSlug}` : "Sample preview — save to generate yours"}
-                  </span>
+        {/* Actions — at the end of the form (not pinned). Every tab but the last steps Prev / Next;
+            the last (Info) holds Save. Clear (drop unsaved edits) is on every tab. */}
+        {(() => {
+          const at = FORM_SECTIONS.findIndex((x) => x.id === activeSection)
+          const prev = at > 0 ? FORM_SECTIONS[at - 1] : null
+          const next = at < FORM_SECTIONS.length - 1 ? FORM_SECTIONS[at + 1] : null
+          // One row: Previous (its tab name cut with "…" when tight) · Clear, which stretches to fill the
+          // space between · Next / Save at their own width.
+          const stepBtn = "inline-flex h-8 min-w-0 shrink items-center gap-1.5 border border-[#e2e6ea] px-3 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
+          // Clear (drop unsaved edits) is on every tab.
+          const clearBtn = (
+            <button
+              type="button"
+              onClick={() => void reset()}
+              disabled={resetting}
+              title="Clear the edits you haven't saved and go back to your saved site"
+              className="inline-flex h-8 min-w-[76px] flex-1 items-center justify-center gap-1.5 whitespace-nowrap border border-[#e2e6ea] px-2.5 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9] disabled:opacity-60"
+            >
+              {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />} Clear
+            </button>
+          )
+          if (next) {
+            return (
+              <div className="mt-2 flex items-center gap-2 border-t border-[#eef0f3] pt-4">
+                {prev && (
+                  <button type="button" onClick={() => openSection(prev.id)} className={stepBtn}>
+                    <ChevronLeft className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Previous: {prev.label}</span>
+                  </button>
+                )}
+                {clearBtn}
                   <button
                     type="button"
-                    onClick={() => setOgBust((n) => n + 1)}
-                    className="inline-flex shrink-0 items-center gap-1.5 border border-[#e2e6ea] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
+                    onClick={() => openSection(next.id)}
+                    className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-3 text-[12px] font-bold text-white transition-opacity hover:opacity-90"
                   >
-                    <RotateCcw className="h-3 w-3" /> Refresh
+                    Next: {next.label} <ChevronRight className="h-3.5 w-3.5" />
                   </button>
-                </div>
               </div>
-              <p className="text-[11px] leading-relaxed text-[#9aa0aa]">
-                Note: messaging apps cache thumbnails — after changing your hero, use e.g. Facebook&apos;s
-                Sharing Debugger to force platforms to re-scrape an already-shared link.
-              </p>
-            </>
-          )}
-        </div>
-
-        {/* Footer — title, publish state and the View/Reset/Save actions */}
-        <div className="shrink-0 border-t border-[#eef0f3] px-5 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex shrink-0 items-center gap-2">
-              <a
-                href={siteSlug ? `/website/${siteSlug}` : "/website/sample"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-8 items-center gap-1.5 border border-[#e2e6ea] px-2.5 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
-              >
-                <ExternalLink className="h-3.5 w-3.5" /> {siteSlug ? "View Site" : "Sample"}
-              </a>
-              <button
-                type="button"
-                onClick={() => void reset()}
-                disabled={resetting}
-                title="Discard unsaved edits and reload your saved site"
-                className="inline-flex h-8 items-center gap-1.5 border border-[#e2e6ea] px-2.5 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9] disabled:opacity-60"
-              >
-                {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />} Reset
+            )
+          }
+          return (
+        <div className="mt-2 border-t border-[#eef0f3] pt-4">
+          <div className="flex items-center gap-2">
+            {prev && (
+              <button type="button" onClick={() => openSection(prev.id)} className={stepBtn}>
+                <ChevronLeft className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Previous: {prev.label}</span>
               </button>
+            )}
+              {clearBtn}
               <button
                 type="button"
                 onClick={() => void save()}
                 disabled={saving}
-                className="inline-flex h-8 items-center gap-1.5 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-3 text-[12px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-3 text-[12px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                 {siteSlug ? "Save" : "Save & Publish"}
               </button>
-            </div>
           </div>
           {saveError && <p className="mt-2 text-[11px] font-semibold text-red-600">{saveError}</p>}
           {/* Search listing: a site is offered to Google only when it is really the agent's (lib/agent-site.ts) */}
@@ -1488,11 +1745,15 @@ export function WebsiteBuilderClient() {
                 : "ready — Save to list your site."}
           </p>
         </div>
+          )
+        })()}
+        </div>
+
       </div>
 
       {/* ── Live preview ── */}
       <div className="min-w-0 flex-1">
-        <LivePreview data={data} reviews={reviews} target={previewTarget} onSectionInView={handleSectionInView} />
+        <LivePreview data={data} reviews={orderWebsiteReviews(reviews, data.reviewIds)} target={previewTarget} onSectionInView={handleSectionInView} />
       </div>
     </div>
   )

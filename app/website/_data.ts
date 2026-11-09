@@ -136,7 +136,7 @@ const LOGO = {
 export const NAV_LINKS: { label: string; href: string }[] = [
   { label: "Home", href: "/" },
   { label: "Overview", href: "#home" },
-  { label: "About Me", href: "#about" },
+  { label: "About", href: "#about" },
   { label: "Featured", href: "#featured" },
   { label: "Service Areas", href: "#areas" },
   { label: "Gallery", href: "#gallery" },
@@ -250,7 +250,7 @@ export const TEST_AREAS: Area[] = [
 ]
 
 /** rating: stars out of 5; absent = 5 (the sample content). */
-export type Testimonial = { quote: string; name: string; where: string; rating?: number }
+export type Testimonial = { quote: string; name: string; where: string; rating?: number; /** agent_feedback id (real reviews only). */ id?: string }
 
 // Sample reviews for the /website/sample design page only. Agent sites show
 // their own approved client feedback instead (lib/website-reviews.ts).
@@ -321,6 +321,8 @@ export type WebsiteData = {
   cta: { heading: string; sub: string }
   /** The agent's palette; absent = the default gold/navy design. */
   theme?: WebsiteTheme
+  /** Which approved reviews the site shows, in order (agent_feedback ids, migration 087); null/absent = all, newest first. */
+  reviewIds?: string[] | null
 }
 
 // ─── Sample content ───────────────────────────────────────────────────────────

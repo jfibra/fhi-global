@@ -7,6 +7,7 @@
 import { useState } from "react"
 import { Building2, Play } from "lucide-react"
 import { VideoModal } from "@/components/public/video-modal"
+import { headlineSegments, plainHeadline } from "@/lib/headline-highlight"
 import { agentDisplayName } from "@/lib/agent-site"
 import { BRAND_GLASS_SOFT, BRAND_GRADIENT, BRAND_TO, BRAND_TO_A0, BRAND_TO_A90, GOLD, GOLD_A50, HERO_STAT_ICON_FALLBACK, INK, NAVY, SAMPLE_DATA, STAT_ICONS, type WebsiteData } from "../../_data"
 
@@ -14,7 +15,7 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
   const { hero } = data
   // A site with no headline of its own used to render an EMPTY <h1> (8 of the 23 live sites):
   // the page's one main heading is then the agent's name and title.
-  const hasHeadline = hero.headline.trim() !== "" || hero.headlineAccent.trim() !== ""
+  const hasHeadline = plainHeadline(hero.headline, hero.headlineAccent).trim() !== ""
   const video = (hero.video ?? "").trim()
   const [videoOpen, setVideoOpen] = useState(false)
   const closeVideo = () => setVideoOpen(false)
@@ -67,11 +68,19 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
         <div className="flex min-h-[420px] items-center gap-8 py-12 lg:min-h-[520px] lg:py-16">
           {/* Left: headline */}
           <div className="w-full max-w-xl">
-            <h1 className="font-serif text-[34px] leading-[1.14] font-bold tracking-tight sm:text-[54px] sm:leading-[1.1]" style={{ color: hero.headlineColor || NAVY }}>
+            <h1 className="font-serif text-[34px] leading-[1.14] font-bold tracking-tight uppercase sm:text-[54px] sm:leading-[1.1]" style={{ color: hero.headlineColor || NAVY }}>
               {hasHeadline ? (
                 <>
-                  <span className="whitespace-pre-line">{hero.headline}</span>{" "}
-                  <span style={{ color: hero.headlineAccentColor || GOLD }}>{hero.headlineAccent}</span>
+                  {/* Highlighted words sit anywhere in the title (lib/headline-highlight.ts). */}
+                  <span className="whitespace-pre-line">
+                    {headlineSegments(hero.headline, hero.headlineAccent).map((seg, i) =>
+                      seg.highlight ? (
+                        <span key={i} style={{ color: hero.headlineAccentColor || GOLD }}>{seg.text}</span>
+                      ) : (
+                        <span key={i}>{seg.text}</span>
+                      ),
+                    )}
+                  </span>
                 </>
               ) : (
                 <>
@@ -84,7 +93,8 @@ export function HeroSection({ data = SAMPLE_DATA }: { data?: WebsiteData }) {
                 </>
               )}
             </h1>
-            <p className="mt-5 max-w-sm text-[14.5px] leading-relaxed" style={{ color: hero.descriptionColor || "#3d4451" }}>
+            {/* The title is always capitals, the description always title case (display only — the text is stored as typed). */}
+            <p className="mt-5 max-w-sm text-[14.5px] leading-relaxed capitalize" style={{ color: hero.descriptionColor || "#3d4451" }}>
               {hero.description}
             </p>
             <div className="mt-8 flex flex-wrap gap-2.5 sm:gap-3">

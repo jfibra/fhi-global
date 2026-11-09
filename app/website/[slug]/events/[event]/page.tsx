@@ -14,7 +14,7 @@ import { titleCaseName } from "@/lib/public-profile"
 import { themeVars } from "../../../_data"
 import { SiteHeader } from "../../../_components/header"
 import { SiteFooter } from "../../../_components/footer"
-import { loadAgentWebsiteReviews } from "@/lib/website-reviews"
+import { loadAgentWebsiteReviews, orderWebsiteReviews } from "@/lib/website-reviews"
 import { loadShareContact, withDialableNumbers } from "@/lib/website-project-share"
 
 // An agent's own event (migration 057) on their website: the site's header,
@@ -104,7 +104,8 @@ export default async function AgentEventPage({ params, searchParams }: Props) {
   // The site's "Reviews" link only exists when it has approved reviews; the
   // header's Contact Me dials the agent's numbers with their country code.
   const [reviews, contact] = await Promise.all([
-    loadAgentWebsiteReviews(createAdminSupabase(), site.agentId, 1),
+    // The ones the agent picked to show (an empty pick hides the Reviews link).
+    loadAgentWebsiteReviews(createAdminSupabase(), site.agentId).then((r) => orderWebsiteReviews(r, site.data.reviewIds)),
     loadShareContact(createAdminSupabase(), site.agentId, site.data.agent, site.data.about.portrait),
   ])
   const hasReviews = reviews.length > 0

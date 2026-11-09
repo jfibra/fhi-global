@@ -4,13 +4,11 @@ import { notFound } from "next/navigation"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { loadSiteBySlug } from "@/lib/website-builder-service"
 import { SITE_URL } from "@/lib/seo"
-import { agentDisplayName } from "@/lib/agent-site"
 import { ogJpeg, ogPicture } from "@/lib/og-picture"
-import { loadOgFonts, OG_SIZE, OgHero } from "../_components/og-hero"
+import { OG_SIZE, OgHero } from "../_components/og-hero"
 
-// Link-share thumbnail for a published agent site — the hero exactly as the
-// site renders it (banner, headline, description, stats, palette) plus the
-// broker contact/RERA card at the bottom right (thumbnail-only).
+// Link-share thumbnail for a published agent site: the banner photo only
+// (boss, 2026-11-09), at the position and zoom set in Website Builder → Hero.
 //
 // The banner goes through ogPicture: Satori can't draw the WebP/AVIF uploads,
 // and one it can't draw takes the whole thumbnail down (500) — 10 sites had no
@@ -44,14 +42,9 @@ async function render({ params }: { params: Promise<{ slug: string }> }) {
   const zoom = Math.min(300, Math.max(100, data.hero.zoom ?? 100)) / 100
   const side = Math.min(2400, Math.round(1300 * zoom))
   const picture = bannerUrl ? await ogPicture(bannerUrl, side, side, "inside") : null
-  // A site with no headline of its own (12 of the 23 had none) gets the agent's name and title, as its page's H1 does —
-  // otherwise the share card carries no headline at all.
-  const hasHeadline = Boolean(data.hero.headline.trim() || data.hero.headlineAccent.trim())
-  const hero = hasHeadline
-    ? data.hero
-    : { ...data.hero, headline: agentDisplayName(data.agent.name), headlineAccent: data.agent.title.trim() }
-  const ogData = { ...data, hero: { ...hero, image: picture ?? "" } }
-  return new ImageResponse(<OgHero data={ogData} base={base} />, { ...OG_SIZE, fonts: await loadOgFonts() })
+  const ogData = { ...data, hero: { ...data.hero, image: picture ?? "" } }
+  // The banner photo only — no text drawn, so no fonts needed.
+  return new ImageResponse(<OgHero data={ogData} base={base} />, OG_SIZE)
 }
 
 /** Out as JPEG — a fraction of the PNG's size, so WhatsApp shows the preview (lib/og-picture.ts). */

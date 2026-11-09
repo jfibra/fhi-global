@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { revalidatePath } from "next/cache"
-import { z } from "zod"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { canUseWebsiteBuilder } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { loadSiteByAgent, saveSite } from "@/lib/website-builder-service"
-import { agentSiteMissing, isPlausibleBrn, isPlausibleBrokerage, isPlausibleOrn } from "@/lib/agent-site"
+import { loadSiteByAgent, profileBrokerCredentials, saveSite } from "@/lib/website-builder-service"
+import { BLANK_AGENT, agentSiteMissing, sanitizeAgentCredentials } from "@/lib/agent-site"
 import { submitToIndexNow } from "@/lib/indexnow"
 import { SITE_URL } from "@/lib/seo"
 import type { WebsiteData } from "@/app/website/_data"
@@ -21,17 +20,16 @@ import type { WebsiteData } from "@/app/website/_data"
 
 export const runtime = "nodejs"
 
-// The only fields validated deeply are the ones a site publishes as a claim
-// about the agent's licence: a made-up BRN/ORN next to a "RERA Licensed
-// Broker" badge is a compliance problem (see lib/agent-site.ts). Blank is
-// allowed — the credential simply is not shown.
-const CredentialsSchema = z.object({
-  agent: z.object({
-    brn: z.string().trim().max(20).default("").refine((v) => v === "" || isPlausibleBrn(v), "RERA BRN must be the 4–7 digit number on your broker card."),
-    orn: z.string().trim().max(20).default("").refine((v) => v === "" || isPlausibleOrn(v), "RERA ORN must be the office registration number (2–6 digits)."),
-    brokerage: z.string().trim().max(120).default("").refine((v) => v === "" || isPlausibleBrokerage(v), "Enter your brokerage's name, or leave it blank."),
-  }),
-})
+// RERA BRN, ORN and brokerage are read-only in the builder: they always come
+// from the agent's profile (the BRN is checked with the Dubai Land Department
+// there; ORN + brokerage are that BRN's DLD record) — never from the request.
+// A made-up BRN/ORN next to a "RERA Licensed Broker" badge is a compliance
+// problem (see lib/agent-site.ts). Blank = the credential is not shown.
+async function siteCredentials(admin: ReturnType<typeof createAdminSupabase>, userId: string) {
+  const c = await profileBrokerCredentials(admin, userId)
+  const { brn, orn, brokerage } = sanitizeAgentCredentials({ ...BLANK_AGENT, ...c })
+  return { brn, orn, brokerage }
+}
 
 export async function GET() {
   const session = await requireActiveSession()
@@ -41,9 +39,13 @@ export async function GET() {
   }
 
   try {
-    const site = await loadSiteByAgent(createAdminSupabase(), session.context.userId)
-    if (!site) return NextResponse.json({ exists: false })
-    return NextResponse.json({ exists: true, slug: site.slug, data: site.data, complete: site.complete, missing: site.missing })
+    const admin = createAdminSupabase()
+    const [site, credentials] = await Promise.all([
+      loadSiteByAgent(admin, session.context.userId),
+      siteCredentials(admin, session.context.userId),
+    ])
+    if (!site) return NextResponse.json({ exists: false, credentials })
+    return NextResponse.json({ exists: true, slug: site.slug, data: site.data, complete: site.complete, missing: site.missing, credentials })
   } catch {
     return NextResponse.json({ error: "Failed to load site" }, { status: 500 })
   }
@@ -65,13 +67,10 @@ export async function PUT(req: NextRequest) {
   if (!data || typeof data !== "object" || !data.hero || !data.about || !data.agent) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
   }
-  const credentials = CredentialsSchema.safeParse(data)
-  if (!credentials.success) {
-    return NextResponse.json({ error: credentials.error.issues[0]?.message ?? "Invalid credentials." }, { status: 400 })
-  }
-
   try {
     const admin = createAdminSupabase()
+    // The profile's credentials, whatever the editor sent.
+    data.agent = { ...data.agent, ...(await siteCredentials(admin, session.context.userId)) }
     // Was the site listed before this save? (A failed lookup counts as "no" — worst case one extra ping.)
     const wasComplete = (await loadSiteByAgent(admin, session.context.userId).catch(() => null))?.complete ?? false
 
