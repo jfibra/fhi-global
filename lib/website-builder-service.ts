@@ -648,6 +648,37 @@ export async function profileBrokerCredentials(
   }
 }
 
+/** The agent's phone + WhatsApp from profile settings — the site always uses these (read-only in the builder). */
+export type ProfileSiteContact = { phone: string; whatsapp: string; phoneCode: string; whatsappCode: string; email: string }
+
+/**
+ * Phone, WhatsApp and email for an agent's website, synced from profile settings (boss, 2026-11-09): the
+ * numbers (metadata.phone_number / whatsapp_number) and their country codes (phone_country_code /
+ * whatsapp_country_code; Canada is stored "+1-CA", shown "+1"). The builder shows them read-only;
+ * loadSite and the save route apply them, so the site never keeps a number of its own. A failed
+ * read throws, like the rest of loadSite.
+ */
+export async function profileSiteContact(admin: SupabaseClient, agentId: string | null | undefined): Promise<ProfileSiteContact> {
+  const none = { phone: "", whatsapp: "", phoneCode: "", whatsappCode: "", email: "" }
+  if (!agentId) return none
+  // The email is the account's sign-in email (changed from the profile sidebar), so it comes from Auth.
+  const [{ data: profile, error }, { data: authUser, error: authError }] = await Promise.all([
+    admin.from("profiles").select("metadata").eq("id", agentId).maybeSingle(),
+    admin.auth.admin.getUserById(agentId),
+  ])
+  if (error || authError) throw new Error("Failed to load website")
+  const meta = (profile?.metadata ?? {}) as Record<string, unknown>
+  const str = (k: string) => (typeof meta[k] === "string" ? (meta[k] as string).trim() : "")
+  const code = (k: string) => str(k).split("-")[0]
+  return {
+    phone: str("phone_number"),
+    whatsapp: str("whatsapp_number"),
+    phoneCode: code("phone_country_code"),
+    whatsappCode: code("whatsapp_country_code") || code("phone_country_code"),
+    email: authUser?.user?.email?.trim() ?? "",
+  }
+}
+
 async function loadSite(
   admin: SupabaseClient,
   by: { agentId?: string; slug?: string },
@@ -684,8 +715,12 @@ async function loadSite(
   // BRN, ORN and brokerage are never the builder's own text: they come from the
   // agent's profile (the BRN checked with the Dubai Land Department there) and
   // that BRN's DLD record — see profileBrokerCredentials.
-  const credentials = await profileBrokerCredentials(admin, site.agent_id as string | null)
-  data.agent = sanitizeAgentCredentials({ ...BLANK_AGENT, ...contact, ...credentials })
+  // Phone + WhatsApp likewise come from profile settings (profileSiteContact).
+  const [credentials, numbers] = await Promise.all([
+    profileBrokerCredentials(admin, site.agent_id as string | null),
+    profileSiteContact(admin, site.agent_id as string | null),
+  ])
+  data.agent = sanitizeAgentCredentials({ ...BLANK_AGENT, ...contact, ...credentials, phone: numbers.phone, whatsapp: numbers.whatsapp, email: numbers.email })
   const cta = (site.cta ?? {}) as Partial<WebsiteData["cta"]>
   data.cta = { ...data.cta, ...cta }
   data.reviewIds = Array.isArray(site.review_ids) ? (site.review_ids as unknown[]).filter((v): v is string => typeof v === "string") : null

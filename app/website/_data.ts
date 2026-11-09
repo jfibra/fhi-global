@@ -138,7 +138,7 @@ export const NAV_LINKS: { label: string; href: string }[] = [
   { label: "Overview", href: "#home" },
   { label: "About", href: "#about" },
   { label: "Featured", href: "#featured" },
-  { label: "Service Areas", href: "#areas" },
+  { label: "Areas", href: "#areas" },
   { label: "Gallery", href: "#gallery" },
   { label: "Reviews", href: "#reviews" },
   { label: "Agent Profile", href: "#about" },
@@ -225,20 +225,15 @@ export type Area = { image: string; label: string }
 // Fixed sample service areas — display-only for now, like TEST_REVIEWS.
 // Fixed sample gallery photos (Event Photos) — shown until the agent adds
 // their own images, like TEST_AREAS.
-export const TEST_GALLERY_EVENTS: string[] = [
-  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcThHa2knR9NMMqi29r53PuQoJjUQgrqFVm3GrdGq-tf2g&s=10",
-  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTPio8UD3aejPHdGm2JQSznpECNMSFJMCGrGkpaR27oUg&s=10",
-  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTA2yGHLYEWWJ1wtF-t-E-FVNAdPaS5By7PJMramaw51w&s=10",
-  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTsMXcVO4U5Xp4gmKV5ou2rCIm2jDB_tCstLhUsM8Ahqw&s=10",
-]
+// One photo from the home page (its hero background) stands in for every sample gallery
+// slot (boss, 2026-11-09) — no hot-linked pictures of other people's events or certificates:
+// 6 in Event Photos, 4 each in Certificates and Awards & Recognition.
+const SAMPLE_GALLERY_PHOTO = IMG.skylineA
+export const TEST_GALLERY_EVENTS: string[] = Array(6).fill(SAMPLE_GALLERY_PHOTO)
 
-export const TEST_GALLERY_CERTIFICATES: string[] = Array(4).fill(
-  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTovOdA0TF3YRa9kTLkC2P6_fpiy9kT7T-irO5pzeDntQ&s=10",
-)
+export const TEST_GALLERY_CERTIFICATES: string[] = Array(4).fill(SAMPLE_GALLERY_PHOTO)
 
-export const TEST_GALLERY_AWARDS: string[] = Array(4).fill(
-  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTJkACJuQkJkb3MHpqh3ManQJrQEAAdhC45MUGM6W01jA&s=10",
-)
+export const TEST_GALLERY_AWARDS: string[] = Array(4).fill(SAMPLE_GALLERY_PHOTO)
 
 export const TEST_AREAS: Area[] = [
   { image: IMG.houseA, label: "Sample 1" },
@@ -383,9 +378,10 @@ export const SAMPLE_DATA: WebsiteData = {
   ],
   areas: TEST_AREAS,
   gallery: {
-    "Event Photos": [IMG.houseA, IMG.skylineC, IMG.houseB, IMG.aptA, IMG.houseC, IMG.aptB, IMG.skylineA, IMG.aptC],
-    Certificates: [IMG.skylineB, IMG.aptA, IMG.houseC, IMG.skylineA],
-    "Awards & Recognition": [IMG.houseB, IMG.skylineC, IMG.aptB, IMG.houseA],
+    // One home-page photo as the placeholder in every slot (boss, 2026-11-09).
+    "Event Photos": TEST_GALLERY_EVENTS,
+    Certificates: TEST_GALLERY_CERTIFICATES,
+    "Awards & Recognition": TEST_GALLERY_AWARDS,
   },
   testimonials: [
     { quote: "Veldora was exceptional from start to finish. His market knowledge and dedication made the entire process seamless.", name: "John D.", where: "Dubai Marina" },

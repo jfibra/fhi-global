@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache"
 import { requireActiveSession } from "@/lib/auth-guard"
 import { canUseWebsiteBuilder } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { loadSiteByAgent, profileBrokerCredentials, saveSite } from "@/lib/website-builder-service"
+import { loadSiteByAgent, profileBrokerCredentials, profileSiteContact, saveSite } from "@/lib/website-builder-service"
 import { BLANK_AGENT, agentSiteMissing, sanitizeAgentCredentials } from "@/lib/agent-site"
 import { submitToIndexNow } from "@/lib/indexnow"
 import { SITE_URL } from "@/lib/seo"
@@ -40,12 +40,14 @@ export async function GET() {
 
   try {
     const admin = createAdminSupabase()
-    const [site, credentials] = await Promise.all([
+    const [site, credentials, contact] = await Promise.all([
       loadSiteByAgent(admin, session.context.userId),
       siteCredentials(admin, session.context.userId),
+      // Phone + WhatsApp (with country codes) from profile settings — read-only in the builder.
+      profileSiteContact(admin, session.context.userId),
     ])
-    if (!site) return NextResponse.json({ exists: false, credentials })
-    return NextResponse.json({ exists: true, slug: site.slug, data: site.data, complete: site.complete, missing: site.missing, credentials })
+    if (!site) return NextResponse.json({ exists: false, credentials, contact })
+    return NextResponse.json({ exists: true, slug: site.slug, data: site.data, complete: site.complete, missing: site.missing, credentials, contact })
   } catch {
     return NextResponse.json({ error: "Failed to load site" }, { status: 500 })
   }
@@ -70,7 +72,8 @@ export async function PUT(req: NextRequest) {
   try {
     const admin = createAdminSupabase()
     // The profile's credentials, whatever the editor sent.
-    data.agent = { ...data.agent, ...(await siteCredentials(admin, session.context.userId)) }
+    const numbers = await profileSiteContact(admin, session.context.userId)
+    data.agent = { ...data.agent, ...(await siteCredentials(admin, session.context.userId)), phone: numbers.phone, whatsapp: numbers.whatsapp, email: numbers.email }
     // Was the site listed before this save? (A failed lookup counts as "no" — worst case one extra ping.)
     const wasComplete = (await loadSiteByAgent(admin, session.context.userId).catch(() => null))?.complete ?? false
 

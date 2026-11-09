@@ -102,6 +102,9 @@ function PhotoCarousel({ category, images, interval = 2500 }: { category: Galler
   )
 }
 
+/** The fewest photos a category shows; fewer repeat to fill it. */
+const MIN_GALLERY_TILES = 4
+
 export function GallerySection({ data: incoming = SAMPLE_DATA, placeholders = true }: { data?: WebsiteData; placeholders?: boolean }) {
   // null = overview (an auto-sliding labeled row per category).
   const [category, setCategory] = useState<GalleryCategory | null>(null)
@@ -109,7 +112,21 @@ export function GallerySection({ data: incoming = SAMPLE_DATA, placeholders = tr
   // only (`placeholders`). A live site with no photos renders nothing: the sample "Certificates" and "Awards"
   // were hot-linked thumbnails of other people's pictures, presented as the agent's credentials.
   const blank = GALLERY_CATEGORIES.every((c) => (incoming.gallery[c] ?? []).filter((src) => src.trim() !== "").length === 0)
-  const data = blank && placeholders ? { ...incoming, gallery: { "Event Photos": TEST_GALLERY_EVENTS, Certificates: TEST_GALLERY_CERTIFICATES, "Awards & Recognition": TEST_GALLERY_AWARDS } } : incoming
+  const chosen = blank && placeholders ? { ...incoming, gallery: { "Event Photos": TEST_GALLERY_EVENTS, Certificates: TEST_GALLERY_CERTIFICATES, "Awards & Recognition": TEST_GALLERY_AWARDS } } : incoming
+  // Each category shows at least MIN_GALLERY_TILES photos (boss, 2026-11-09): with fewer, the agent's own
+  // repeat in order (2 photos → A B A B), like Service Areas, so a row never looks half empty.
+  const data = {
+    ...chosen,
+    gallery: Object.fromEntries(
+      GALLERY_CATEGORIES.map((c) => {
+        const photos = (chosen.gallery[c] ?? []).filter((src) => src.trim() !== "")
+        const filled = photos.length > 0 && photos.length < MIN_GALLERY_TILES
+          ? Array.from({ length: MIN_GALLERY_TILES }, (_, i) => photos[i % photos.length])
+          : photos
+        return [c, filled]
+      }),
+    ) as WebsiteData["gallery"],
+  }
   const withPhotos = GALLERY_CATEGORIES.filter((c) => (data.gallery[c] ?? []).length > 0)
   if (withPhotos.length === 0) return null
 

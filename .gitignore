@@ -35,3 +35,4 @@ next-env.d.ts
 brn-backup-*.json
 # service areas cleared 2026-11-09 (backup)
 service-areas-backup-*.json
+gallery-samples-backup-*.json

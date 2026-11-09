@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react"
 import {
-  ArrowDown, ArrowUp, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Film, GripVertical, ImagePlus, Loader2, Plus, RotateCcw, Save, Search, Trash2, Upload, X,
+  ArrowDown, ArrowUp, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Film, GripVertical, ImagePlus, Loader2, LocateFixed, Plus, RotateCcw, Save, Search, Trash2, Upload, X,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { createClient } from "@/lib/supabase/client"
@@ -21,7 +21,7 @@ import { loadAgentWebsiteReviews, orderWebsiteReviews } from "@/lib/website-revi
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 import { normalizeSocialUrl, readSocialLinks } from "@/lib/public-profile"
 import {
-  DEFAULT_THEME, GALLERY_CATEGORIES, HERO_STAT_ICON_FALLBACK, SAMPLE_DATA, STAT_ICONS, TEST_GALLERY_AWARDS, TEST_GALLERY_CERTIFICATES, TEST_GALLERY_EVENTS, themeVars,
+  DEFAULT_THEME, GALLERY_CATEGORIES, HERO_STAT_ICON_FALLBACK, SAMPLE_DATA, STAT_ICONS, themeVars,
   type GalleryCategory, type Project, type StatIconKey, type Testimonial, type WebsiteData,
 } from "@/app/website/_data"
 import { SiteHeader } from "@/app/website/_components/header"
@@ -219,6 +219,20 @@ const INPUT_CLS =
 
 function TInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   return <input type="text" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={INPUT_CLS} />
+}
+
+/** A phone number the builder shows but doesn't edit: its country code box, then the number. */
+function ReadOnlyPhone({ code, number }: { code: string; number: string }) {
+  return (
+    <div className="flex" aria-readonly="true">
+      <div className="flex min-h-[36px] shrink-0 items-center border border-r-0 border-[#e2e6ea] bg-[#f9fafb] px-2.5 text-[13px] text-[#4b5563]">
+        {code || "+—"}
+      </div>
+      <div className="flex min-h-[36px] min-w-0 flex-1 cursor-not-allowed items-center truncate border border-[#e2e6ea] bg-[#f9fafb] px-3 text-[13px] text-[#4b5563]">
+        {number || <span className="text-[#9ca3af]">—</span>}
+      </div>
+    </div>
+  )
 }
 
 /** A value the builder shows but doesn't edit (it comes from elsewhere). */
@@ -760,7 +774,7 @@ const FORM_SECTIONS = [
   { id: "projects", label: "Projects" },
   { id: "gallery", label: "Gallery" },
   { id: "palette", label: "Palette" },
-  { id: "areas", label: "Service Areas" },
+  { id: "areas", label: "Areas" },
   { id: "reviews", label: "Reviews" },
   { id: "agent", label: "Info" },
 ] as const
@@ -804,17 +818,6 @@ const PALETTE_PRESETS: { name: string; gold: string; brand: string; isDefault?: 
   { name: "Platinum Navy", gold: "#cfd8e3", brand: "#001a33" },
 ]
 
-/** Scroll-spy inverse: which form section a preview anchor selects ("home"
- *  picks Hero — Agent shares the hero and stays reachable by tab). */
-const ANCHOR_TO_SECTION: Record<string, FormSectionId> = {
-  home: "hero",
-  about: "about",
-  projects: "projects",
-  areas: "areas",
-  gallery: "gallery",
-  reviews: "reviews",
-}
-
 // ─── Editor ───────────────────────────────────────────────────────────────────
 
 export function WebsiteBuilderClient() {
@@ -850,6 +853,8 @@ export function WebsiteBuilderClient() {
   // Autosave must not run until that load has happened, or the empty initial
   // state would overwrite the very draft we are about to read.
   const [draftReady, setDraftReady] = useState(false)
+  // Country codes shown before the read-only Phone / WhatsApp (from profile settings).
+  const [contactCodes, setContactCodes] = useState({ phone: "", whatsapp: "" })
   const userId = user?.id ?? null
   // The agent's own film from fhiglobal.ae/agents ("My story"), if FHI made one.
   const myStory = userId ? STORY_BY_AGENT[userId] ?? null : null
@@ -922,10 +927,17 @@ export function WebsiteBuilderClient() {
 
   // The form's scroll box: a new tab starts at its top (Prev / Next sit at the bottom).
   const formScrollRef = useRef<HTMLDivElement>(null)
+  // Which section the live preview shows (kept by handleSectionInView below).
+  const [previewAnchor, setPreviewAnchor] = useState<string | null>("home")
+  // Changing tab only changes the form; the preview stays where it is (boss, 2026-11-09).
   const openSection = (id: FormSectionId) => {
     setActiveSection(id)
     formScrollRef.current?.scrollTo({ top: 0 })
+  }
+  /** The button next to Discard changes: scroll the preview to the section being edited. */
+  const showInPreview = (id: FormSectionId) => {
     spySuppressed.current = true
+    setPreviewAnchor(SECTION_ANCHORS[id])
     setPreviewTarget((t) => ({ id: SECTION_ANCHORS[id], n: (t?.n ?? 0) + 1 }))
   }
 
@@ -939,16 +951,12 @@ export function WebsiteBuilderClient() {
 
   // Scroll spy: scrolling the preview follows along in the form. The agent tab
   // shares the hero anchor, so don't fight the user while they're on it.
+  // Scrolling the preview never switches the form, and switching tabs never moves the preview: the
+  // button next to Discard changes brings the preview to the section being edited. This remembers which
+  // section the preview shows (previewAnchor, above), so that button greys out when it's already there.
   const handleSectionInView = useCallback((anchor: string) => {
     if (spySuppressed.current) return
-    const formId = ANCHOR_TO_SECTION[anchor]
-    if (!formId) return
-    setActiveSection((prev) => {
-      if (prev === formId) return prev
-      // Palette + Agent share the hero anchor — don't kick the user off them.
-      if (formId === "hero" && (prev === "agent" || prev === "palette")) return prev
-      return formId
-    })
+    setPreviewAnchor(anchor)
   }, [])
 
   // Published-site state (migration 035): the slug is minted on first save.
@@ -969,6 +977,7 @@ export function WebsiteBuilderClient() {
     // over the saved site or the local draft alike.
     let credentials: Pick<WebsiteData["agent"], "brn" | "orn" | "brokerage"> | null = null
     let savedAreas: WebsiteData["areas"] | null = null
+    let contact: { phone: string; whatsapp: string; phoneCode: string; whatsappCode: string; email: string } | null = null
     fetch("/api/website-builder/site")
       .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
       .then(({ ok, j }) => {
@@ -981,6 +990,7 @@ export function WebsiteBuilderClient() {
           credentials?: Pick<WebsiteData["agent"], "brn" | "orn" | "brokerage">
         }
         credentials = site.credentials ?? null
+        contact = (j as { contact?: typeof contact }).contact ?? null
         savedAreas = site.data?.areas ?? []
         if (!site.exists || !site.slug || !site.data) return
         setSiteSlug(site.slug)
@@ -1012,6 +1022,12 @@ export function WebsiteBuilderClient() {
         }
         const c = credentials
         if (c) setData((d) => ({ ...d, agent: { ...d.agent, ...c } }))
+        // Phone + WhatsApp from profile settings, over the saved site or the draft alike.
+        const k = contact
+        if (k) {
+          setData((d) => ({ ...d, agent: { ...d.agent, phone: k.phone, whatsapp: k.whatsapp, email: k.email } }))
+          setContactCodes({ phone: k.phoneCode, whatsapp: k.whatsappCode })
+        }
         // No Featured video link yet → fill in the agent's My story film (the site's default anyway).
         const story = STORY_BY_AGENT[userId]
         if (story) setData((d) => ((d.hero.video ?? "").trim() ? d : { ...d, hero: { ...d.hero, video: story.hd } }))
@@ -1243,7 +1259,8 @@ export function WebsiteBuilderClient() {
           </div>
         </div>
 
-        <div ref={formScrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
+        {/* Scrolls up and down only — never sideways (the tab bar above is the one row that does). */}
+        <div ref={formScrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-5 py-5">
           {activeSection === "palette" && (
             <>
               {/* Hero text colours first — one line (moved here from the Hero tab). */}
@@ -1366,8 +1383,6 @@ export function WebsiteBuilderClient() {
 
           {activeSection === "agent" && (
             <>
-              <Field label="Full name"><TInput value={data.agent.name} onChange={(v) => update((d) => { d.agent.name = v })} /></Field>
-              <Field label="Professional Title"><TInput value={data.agent.title} onChange={(v) => update((d) => { d.agent.title = v })} /></Field>
               {/* RERA credentials: read-only, from profile settings (the BRN is checked with the Dubai Land
                   Department there; ORN + brokerage are that BRN's DLD record). The server applies the same. */}
               <div className="grid grid-cols-2 gap-3">
@@ -1375,18 +1390,20 @@ export function WebsiteBuilderClient() {
                 <Field label="RERA ORN"><ReadOnlyValue value={data.agent.orn} /></Field>
               </div>
               <Field label="Brokerage"><ReadOnlyValue value={data.agent.brokerage} /></Field>
-              <p className="-mt-1 text-[11px] leading-snug text-[#9ca3af]">
-                From your{" "}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Phone + WhatsApp: read-only, synced from profile settings (country code + number). */}
+                <Field label="Phone"><ReadOnlyPhone code={contactCodes.phone} number={data.agent.phone} /></Field>
+                <Field label="WhatsApp"><ReadOnlyPhone code={contactCodes.whatsapp} number={data.agent.whatsapp} /></Field>
+              </div>
+              <Field label="Email"><ReadOnlyValue value={data.agent.email} /></Field>
+              {/* One note for every field on this tab: all synced from profile settings. */}
+              <p className="text-[11.5px] leading-snug text-[#6b7280]">
+                Synced from your{" "}
                 <a href={`${getDashboardRouteByRole(role)}/profile`} className="font-bold text-[#001f3f] underline">
                   profile settings
                 </a>{" "}
-                — change your BRN there.
+                — change them there.
               </p>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Phone"><TInput value={data.agent.phone} onChange={(v) => update((d) => { d.agent.phone = v })} /></Field>
-                <Field label="WhatsApp"><TInput value={data.agent.whatsapp} onChange={(v) => update((d) => { d.agent.whatsapp = v })} /></Field>
-              </div>
-              <Field label="Email"><TInput value={data.agent.email} onChange={(v) => update((d) => { d.agent.email = v })} /></Field>
             </>
           )}
 
@@ -1557,9 +1574,11 @@ export function WebsiteBuilderClient() {
 
           {activeSection === "about" && (
             <>
+              <Field label="About Me Portrait photo"><ImageInput value={data.about.portrait} onChange={(v) => update((d) => { d.about.portrait = v })} /></Field>
+              <Field label="Full name"><TInput value={data.agent.name} onChange={(v) => update((d) => { d.agent.name = v })} /></Field>
+              <Field label="Professional Title"><TInput value={data.agent.title} onChange={(v) => update((d) => { d.agent.title = v })} /></Field>
               <Field label={<>About Me Heading <span className="font-normal text-[#6b7280]">(line breaks kept)</span></>}><TArea rows={2} value={data.about.heading} onChange={(v) => update((d) => { d.about.heading = v })} /></Field>
               <Field label="Bio"><TArea rows={7} value={data.about.bio} onChange={(v) => update((d) => { d.about.bio = v })} /></Field>
-              <Field label="About Me Portrait photo"><ImageInput value={data.about.portrait} onChange={(v) => update((d) => { d.about.portrait = v })} /></Field>
               <Field label="Facebook URL"><TInput value={data.about.socials.facebook} onChange={(v) => update((d) => { d.about.socials.facebook = v })} /></Field>
               <Field label="Instagram URL"><TInput value={data.about.socials.instagram} onChange={(v) => update((d) => { d.about.socials.instagram = v })} /></Field>
               <Field label="LinkedIn URL"><TInput value={data.about.socials.linkedin} onChange={(v) => update((d) => { d.about.socials.linkedin = v })} /></Field>
@@ -1675,7 +1694,20 @@ export function WebsiteBuilderClient() {
               {/* New area: the name first, then its photo — the upload adds it to the grid. */}
               {addingArea && (
                 <div className="space-y-2 border border-[#e2e6ea] bg-[#fafbfc] p-3">
-                  <span className="block text-[13.5px] font-bold text-[#0d1117]">New area</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[13.5px] font-bold text-[#0d1117]">New area</span>
+                    {/* Cancel: closes the step and forgets the typed name. */}
+                    <button
+                      type="button"
+                      onClick={() => { setAddingArea(false); setNewAreaName(""); setAreaError(null) }}
+                      disabled={areaUploading}
+                      aria-label="Cancel new area"
+                      title="Cancel"
+                      className="flex h-7 w-7 items-center justify-center text-[#9aa0aa] transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                   <div className="flex items-stretch gap-2">
                     <input
                       type="text"
@@ -1937,23 +1969,6 @@ export function WebsiteBuilderClient() {
                     )}
                   </div>
                 )}
-                {GALLERY_CATEGORIES.every((c) => data.gallery[c].every((src) => src.trim() === "")) && (
-                    <div className="space-y-2.5">
-                      {(activeGalleryCat === "Event Photos"
-                        ? TEST_GALLERY_EVENTS
-                        : activeGalleryCat === "Certificates"
-                          ? TEST_GALLERY_CERTIFICATES
-                          : TEST_GALLERY_AWARDS
-                      ).map((src, i) => (
-                        <div key={i} className="flex items-center gap-3 border border-[#e2e6ea] bg-[#fafbfc] p-2.5 opacity-70">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={src} alt="" className="h-10 w-14 shrink-0 object-cover" />
-                          <span className="truncate text-[11.5px] text-[#5b6472]">{src}</span>
-                          <span className="ml-auto shrink-0 text-[10.5px] font-semibold uppercase tracking-wide text-[#9aa0aa]">Sample</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
               </div>
             </>
           )}
@@ -2016,6 +2031,20 @@ export function WebsiteBuilderClient() {
           // One row: Previous (its tab name cut with "…" when tight) · Clear, which stretches to fill the
           // space between · Next / Save at their own width.
           const stepBtn = "inline-flex h-8 min-w-0 shrink items-center gap-1.5 border border-[#e2e6ea] px-3 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
+          // Show the section being edited in the preview — the preview no longer follows the tabs by itself.
+          const inView = previewAnchor === SECTION_ANCHORS[activeSection]
+          const followBtn = (
+            <button
+              type="button"
+              onClick={() => showInPreview(activeSection)}
+              disabled={inView}
+              title={inView ? "The preview is showing this section" : "Show this section in the preview"}
+              aria-label="Show this section in the preview"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center border border-[#e2e6ea] text-[#0d1117] transition-colors hover:bg-[#f4f6f9] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              <LocateFixed className="h-4 w-4" />
+            </button>
+          )
           // Discard changes (drop unsaved edits, back to the saved site) is on every tab.
           const clearBtn = (
             <button
@@ -2037,6 +2066,7 @@ export function WebsiteBuilderClient() {
                   </button>
                 )}
                 {clearBtn}
+                {followBtn}
                   <button
                     type="button"
                     onClick={() => openSection(next.id)}
@@ -2056,6 +2086,7 @@ export function WebsiteBuilderClient() {
               </button>
             )}
               {clearBtn}
+              {followBtn}
               <button
                 type="button"
                 onClick={() => void save()}
