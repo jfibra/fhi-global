@@ -10,6 +10,10 @@ import type { ValidationStatus } from "@/lib/sales-service"
  * it replaces three bare icons, which needed a legend to be understood and
  * took a third of the row's width. Each choice still goes through the
  * report's confirm dialog.
+ *
+ * The button says where the sale stands: only a pending sale gets the solid
+ * navy "Review" (a to-do); a decided one shows its status in a light outline,
+ * so a validated sale never reads as work still waiting (owner, 2026-11-09).
  */
 
 const CHOICES: Array<{ status: ValidationStatus; label: string; hint: string; Icon: typeof CheckCircle2; cls: string }> = [
@@ -17,6 +21,13 @@ const CHOICES: Array<{ status: ValidationStatus; label: string; hint: string; Ic
   { status: "under_review", label: "Under review", hint: "Needs more papers from the agent", Icon: Clock, cls: "text-sky-600" },
   { status: "invalid_sale", label: "Invalid sale", hint: "Rejected as a sale", Icon: XCircle, cls: "text-rose-600" },
 ]
+
+const BUTTON: Record<ValidationStatus, { label: string; title: string; Icon: typeof CheckCircle2; cls: string }> = {
+  pending: { label: "Review", title: "Validate this sale, or send it back", Icon: ClipboardCheck, cls: "border-[#001f3f]/15 bg-[#001f3f] text-white hover:bg-[#0a3d6b]" },
+  validated: { label: "Validated", title: "Validated — change its status", Icon: CheckCircle2, cls: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" },
+  under_review: { label: "Under review", title: "Under review — change its status", Icon: Clock, cls: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100" },
+  invalid_sale: { label: "Invalid", title: "Invalid sale — change its status", Icon: XCircle, cls: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100" },
+}
 
 const MENU_WIDTH = 240
 
@@ -31,6 +42,7 @@ export function ReviewMenu({
   const [pos, setPos] = useState({ top: 0, left: 0 })
   const btnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const button = BUTTON[current] ?? BUTTON.pending
 
   useEffect(() => {
     if (!open) return
@@ -70,11 +82,11 @@ export function ReviewMenu({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="Validate this sale, or send it back"
-        className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#001f3f]/15 bg-[#001f3f] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#0a3d6b]"
+        title={button.title}
+        className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors ${button.cls}`}
       >
-        <ClipboardCheck className="h-3.5 w-3.5" />
-        Review
+        <button.Icon className="h-3.5 w-3.5" />
+        {button.label}
         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && typeof document !== "undefined" && createPortal(
