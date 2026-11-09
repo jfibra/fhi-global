@@ -858,8 +858,25 @@ export function WebsiteBuilderClient() {
   const userId = user?.id ?? null
   // The agent's own film from fhiglobal.ae/agents ("My story"), if FHI made one.
   const myStory = userId ? STORY_BY_AGENT[userId] ?? null : null
-  // The preview plays what the site will: a blank Featured video link falls back to My story.
-  const previewData = myStory && !(data.hero.video ?? "").trim() ? { ...data, hero: { ...data.hero, video: myStory.hd } } : data
+  // The preview plays what the site will: a blank Featured video link falls back to My story…
+  const withStory = myStory && !(data.hero.video ?? "").trim() ? { ...data, hero: { ...data.hero, video: myStory.hd } } : data
+  // …and its Contact Me links dial the full international number, joining the profile's country code
+  // to the number exactly as the live site does (withDialableNumbers / waDigits).
+  const dial = (code: string, number: string) => {
+    const n = number.trim()
+    if (!n) return ""
+    if (n.startsWith("+")) return n
+    const digits = `${code.replace(/\D/g, "")}${n.replace(/\D/g, "").replace(/^0+/, "")}`
+    return code ? `+${digits}` : n
+  }
+  const previewData = {
+    ...withStory,
+    agent: {
+      ...withStory.agent,
+      phone: dial(contactCodes.phone, withStory.agent.phone),
+      whatsapp: dial(contactCodes.whatsapp || contactCodes.phone, withStory.agent.whatsapp),
+    },
+  }
 
   // Hero title: the words and which are highlighted (old sites' separate accent included).
   const titleWords = decodeHeadline(data.hero.headline, data.hero.headlineAccent)
