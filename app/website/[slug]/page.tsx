@@ -25,6 +25,7 @@ import { TestimonialsSection } from "../_components/sections/what-my-clients-say
 import { EventsSection } from "../_components/sections/events"
 import { loadAgentWebsiteEvents } from "@/lib/events/website-events"
 import { loadAgentWebsiteReviews, orderWebsiteReviews } from "@/lib/website-reviews"
+import { STORY_BY_AGENT } from "@/lib/films"
 import { loadShareContact, withDialableNumbers } from "@/lib/website-project-share"
 
 // A published agent site from the Website Builder. Cached for five minutes, and
@@ -88,7 +89,10 @@ export default async function AgentWebsitePage({ params }: Props) {
   const reviews = orderWebsiteReviews(approvedReviews, site.data.reviewIds)
   // Contact Me (header) and the About channels dial the agent's numbers WITH
   // their country code — the site stores them as typed, usually without it.
-  const data = withDialableNumbers(site.data, contact)
+  // No Featured video link of their own → the agent's "My story" film (fhiglobal.ae/agents), if FHI made one.
+  const story = STORY_BY_AGENT[site.agentId]
+  const withStory = !site.data.hero.video?.trim() && story ? { ...site.data, hero: { ...site.data.hero, video: story.hd } } : site.data
+  const data = withDialableNumbers(withStory, contact)
 
   const path = `/website/${site.slug}`
   const name = agentDisplayName(site.data.agent.name)

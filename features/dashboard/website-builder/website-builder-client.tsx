@@ -8,9 +8,9 @@
 // agent's contact fields seed from their profile. The draft autosaves to
 // localStorage; DB persistence comes later.
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react"
 import {
-  ArrowDown, ArrowUp, Check, ChevronLeft, ChevronRight, CircleHelp, Film, GripVertical, ImagePlus, Loader2, Plus, RotateCcw, Save, Search, Trash2, Upload, X,
+  ArrowDown, ArrowUp, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Film, GripVertical, ImagePlus, Loader2, Plus, RotateCcw, Save, Search, Trash2, Upload, X,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { createClient } from "@/lib/supabase/client"
@@ -21,7 +21,7 @@ import { loadAgentWebsiteReviews, orderWebsiteReviews } from "@/lib/website-revi
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 import { normalizeSocialUrl, readSocialLinks } from "@/lib/public-profile"
 import {
-  DEFAULT_THEME, GALLERY_CATEGORIES, HERO_STAT_ICON_FALLBACK, SAMPLE_DATA, STAT_ICONS, TEST_AREAS, TEST_GALLERY_AWARDS, TEST_GALLERY_CERTIFICATES, TEST_GALLERY_EVENTS, themeVars,
+  DEFAULT_THEME, GALLERY_CATEGORIES, HERO_STAT_ICON_FALLBACK, SAMPLE_DATA, STAT_ICONS, TEST_GALLERY_AWARDS, TEST_GALLERY_CERTIFICATES, TEST_GALLERY_EVENTS, themeVars,
   type GalleryCategory, type Project, type StatIconKey, type Testimonial, type WebsiteData,
 } from "@/app/website/_data"
 import { SiteHeader } from "@/app/website/_components/header"
@@ -232,6 +232,17 @@ function TArea({ value, onChange, rows = 3, placeholder }: { value: string; onCh
   return <textarea value={value} rows={rows} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={`${INPUT_CLS} resize-y`} />
 }
 
+/** Compress one picked image and upload it for the Website Builder; returns its URL. */
+async function uploadBuilderImage(file: File): Promise<string> {
+  const { file: toUpload } = await compressImageForUpload(file)
+  const fd = new FormData()
+  fd.append("file", toUpload)
+  const res = await fetch("/api/upload/website-builder", { method: "POST", body: fd })
+  const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string }
+  if (!res.ok || !json.url) throw new Error(json.error || "Upload failed")
+  return json.url
+}
+
 /** Image field: thumbnail + URL input + S3 upload button. `middle` replaces the URL input (e.g. Service Areas puts the area name there). */
 function ImageInput({ value, onChange, middle }: { value: string; onChange: (v: string) => void; middle?: React.ReactNode }) {
   const [busy, setBusy] = useState(false)
@@ -242,13 +253,7 @@ function ImageInput({ value, onChange, middle }: { value: string; onChange: (v: 
     setBusy(true)
     setError(null)
     try {
-      const { file: toUpload } = await compressImageForUpload(file)
-      const fd = new FormData()
-      fd.append("file", toUpload)
-      const res = await fetch("/api/upload/website-builder", { method: "POST", body: fd })
-      const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string }
-      if (!res.ok || !json.url) throw new Error(json.error || "Upload failed")
-      onChange(json.url)
+      onChange(await uploadBuilderImage(file))
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed")
     } finally {
@@ -362,42 +367,101 @@ function swap<T>(arr: T[], i: number, dir: -1 | 1) {
 }
 
 /** Flat grid of the STAT_ICONS registry — the selected key is navy. */
-function IconPicker({ value, onChange }: { value: StatIconKey; onChange: (k: StatIconKey) => void }) {
+/** The area name's size on its tile: shorter names larger, longer ones smaller (two lines max). */
+function areaNameSize(name: string): number {
+  const n = name.trim().length
+  if (n <= 10) return 13
+  if (n <= 16) return 12
+  if (n <= 22) return 11
+  if (n <= 30) return 10
+  return 9
+}
+
+/**
+ * A Service Areas tile's name: a dark band two lines tall in the middle of the photo, the text
+ * centred across AND down it. A textarea can't centre its text vertically, so it is one line tall
+ * and grows to fit (up to two lines) inside the band, which centres it. Enter adds no line break.
+ */
+function AreaNameBox({ value, label, onChange }: { value: string; label: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  const fontSize = areaNameSize(value)
+  // Fit the textarea to its text after every change (and when the size steps).
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${el.scrollHeight}px`
+  }, [value, fontSize])
   return (
-    <div className="flex flex-wrap gap-1">
-      {(Object.keys(STAT_ICONS) as StatIconKey[]).map((k) => {
-        const Icon = STAT_ICONS[k]
-        const selected = value === k
-        return (
-          <button
-            key={k}
-            type="button"
-            title={k}
-            aria-label={k}
-            onClick={() => onChange(k)}
-            className={`flex h-8 w-8 items-center justify-center border transition-colors ${
-              selected
-                ? "border-[#001f3f] bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white"
-                : "border-[#e2e6ea] bg-white text-[#5b6472] hover:border-[#9aa0aa]"
-            }`}
-          >
-            <Icon className="h-4 w-4" />
-          </button>
-        )
-      })}
+    <div
+      className="absolute left-1.5 right-1.5 top-1/2 flex -translate-y-1/2 items-center border border-white/30 bg-black/45 px-1 focus-within:border-white"
+      style={{ height: Math.round(fontSize * 1.25 * 2 + 10) }}
+    >
+      <textarea
+        ref={ref}
+        rows={1}
+        value={value}
+        placeholder="Area name"
+        aria-label={label}
+        style={{ fontSize }}
+        onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault() }}
+        onChange={(e) => onChange(e.target.value.replace(/\s*\n\s*/g, " "))}
+        className="block max-h-full w-full resize-none overflow-hidden bg-transparent p-0 text-center font-bold leading-tight text-white outline-none placeholder:text-white/60"
+      />
     </div>
   )
 }
 
-function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
+/** One button showing the chosen icon; clicking it drops down every icon to pick from. */
+function IconPicker({ value, onChange }: { value: StatIconKey; onChange: (k: StatIconKey) => void }) {
+  const [open, setOpen] = useState(false)
+  const Current = STAT_ICONS[value]
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex items-center gap-1.5 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-3 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+    <div
+      className="relative shrink-0"
+      // Closes when focus leaves the button and its list.
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false) }}
+      onKeyDown={(e) => { if (e.key === "Escape") setOpen(false) }}
     >
-      <Plus className="h-3.5 w-3.5" /> {label}
-    </button>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`Icon: ${value}`}
+        title={value}
+        className="flex h-full min-h-[36px] items-center gap-1 border border-[#e2e6ea] bg-white px-2 text-[#001f3f] transition-colors hover:border-[#9aa0aa]"
+      >
+        <Current className="h-4 w-4" />
+        <ChevronDown className={`h-3 w-3 text-[#9aa0aa] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div role="listbox" className="absolute left-0 top-full z-30 mt-1 grid w-[232px] grid-cols-6 gap-1 border border-[#e2e6ea] bg-white p-1.5 shadow-[0_12px_28px_-10px_rgba(15,23,42,0.35)]">
+          {(Object.keys(STAT_ICONS) as StatIconKey[]).map((k) => {
+            const Icon = STAT_ICONS[k]
+            const selected = value === k
+            return (
+              <button
+                key={k}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                title={k}
+                aria-label={k}
+                onClick={() => { onChange(k); setOpen(false) }}
+                className={`flex h-8 w-8 items-center justify-center border transition-colors ${
+                  selected
+                    ? "border-[#001f3f] bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white"
+                    : "border-transparent text-[#5b6472] hover:border-[#9aa0aa]"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -786,6 +850,8 @@ export function WebsiteBuilderClient() {
   const userId = user?.id ?? null
   // The agent's own film from fhiglobal.ae/agents ("My story"), if FHI made one.
   const myStory = userId ? STORY_BY_AGENT[userId] ?? null : null
+  // The preview plays what the site will: a blank Featured video link falls back to My story.
+  const previewData = myStory && !(data.hero.video ?? "").trim() ? { ...data, hero: { ...data.hero, video: myStory.hd } } : data
 
   // Hero title: the words and which are highlighted (old sites' separate accent included).
   const titleWords = decodeHeadline(data.hero.headline, data.hero.headlineAccent)
@@ -832,6 +898,20 @@ export function WebsiteBuilderClient() {
   // Selected projects: the row being dragged and the row it's over (drag to reorder).
   const [dragProject, setDragProject] = useState<number | null>(null)
   const [dropProject, setDropProject] = useState<number | null>(null)
+  // Gallery: the picture being dragged / dragged over, and the multi-picture upload.
+  const [dragGallery, setDragGallery] = useState<number | null>(null)
+  const [dropGallery, setDropGallery] = useState<number | null>(null)
+  const galleryFileRef = useRef<HTMLInputElement>(null)
+  // Service Areas: drag to reorder, and "Add area" = upload photos.
+  const [dragArea, setDragArea] = useState<number | null>(null)
+  const [dropArea, setDropArea] = useState<number | null>(null)
+  const areaFileRef = useRef<HTMLInputElement>(null)
+  const [areaUploading, setAreaUploading] = useState(false)
+  const [areaError, setAreaError] = useState<string | null>(null)
+  const [addingArea, setAddingArea] = useState(false)
+  const [newAreaName, setNewAreaName] = useState("")
+  const [galleryUploading, setGalleryUploading] = useState(0)
+  const [galleryError, setGalleryError] = useState<string | null>(null)
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null)
   // While a tab click smooth-scrolls the preview, the scroll spy would fire on
   // every intermediate section — suppress it until the animation settles.
@@ -912,6 +992,9 @@ export function WebsiteBuilderClient() {
         if (draft) setData(seedEmptySocials(draft, seed))
         const c = credentials
         if (c) setData((d) => ({ ...d, agent: { ...d.agent, ...c } }))
+        // No Featured video link yet → fill in the agent's My story film (the site's default anyway).
+        const story = STORY_BY_AGENT[userId]
+        if (story) setData((d) => ((d.hero.video ?? "").trim() ? d : { ...d, hero: { ...d.hero, video: story.hd } }))
         setDraftReady(true)
       })
     return () => {
@@ -1053,6 +1136,46 @@ export function WebsiteBuilderClient() {
         else d.areas.push({ label: option.name, image: option.photo })
       }
     })
+  }
+
+  /** Upload several pictures into one gallery category, adding each to the grid as it finishes. */
+  const uploadGallery = async (cat: GalleryCategory, files: File[]) => {
+    setGalleryError(null)
+    setGalleryUploading(files.length)
+    let failed = 0
+    for (const file of files) {
+      try {
+        const url = await uploadBuilderImage(file)
+        // Drop the empty rows older drafts may hold, then add the new picture.
+        update((d) => { d.gallery[cat] = [...d.gallery[cat].filter((x) => x.trim()), url] })
+      } catch {
+        failed++
+      }
+      setGalleryUploading((n) => n - 1)
+    }
+    if (failed) setGalleryError(`${failed} picture${failed === 1 ? "" : "s"} couldn't be uploaded — try again.`)
+  }
+
+  /** Add area: the typed name + its uploaded photo become one new area (filling an empty row first). */
+  const addAreaWithPhoto = async (name: string, file: File) => {
+    const label = name.trim()
+    if (!label) return
+    setAreaError(null)
+    setAreaUploading(true)
+    try {
+      const url = await uploadBuilderImage(file)
+      update((d) => {
+        const blank = d.areas.findIndex((x) => !x.label.trim() && !x.image.trim())
+        if (blank >= 0) d.areas[blank] = { label, image: url }
+        else d.areas.push({ label, image: url })
+      })
+      setNewAreaName("")
+      setAddingArea(false)
+    } catch (e) {
+      setAreaError(e instanceof Error ? e.message : "The photo couldn't be uploaded — try again.")
+    } finally {
+      setAreaUploading(false)
+    }
   }
 
   const toggleProject = (id: string) => {
@@ -1338,26 +1461,30 @@ export function WebsiteBuilderClient() {
               </Field>
               <Field
                 label="Featured video link"
-                help="Shows a “Featured Video” button in the hero that opens the video in a pop-up. Facebook, Instagram and TikTok videos must be public. Leave blank to hide the button."
+                help={myStory
+                  ? "Shows a “Featured Video” button in the hero that opens the video in a pop-up. Left blank, your My Story film is used. Facebook, Instagram and TikTok videos must be public."
+                  : "Shows a “Featured Video” button in the hero that opens the video in a pop-up. Facebook, Instagram and TikTok videos must be public. Leave blank to hide the button."}
                 action={
                   <button
                     type="button"
                     onClick={() => { if (myStory) update((d) => { d.hero.video = myStory.hd }) }}
                     // No film yet → shown but disabled, so agents know the option exists.
-                    disabled={!myStory || data.hero.video === myStory.hd}
+                    disabled={!myStory || data.hero.video === myStory.hd || !(data.hero.video ?? "").trim()}
                     title={myStory
                       ? `Use “${myStory.title}” (${myStory.duration}) — the film on fhiglobal.ae/agents`
                       : "You don't have a My Story film on fhiglobal.ae/agents yet"}
                     className="inline-flex shrink-0 items-center gap-1 border border-[#e2e6ea] bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#001f3f] transition-colors hover:bg-[#f4f6f9] disabled:cursor-not-allowed disabled:text-[#9aa0aa] disabled:hover:bg-white"
                   >
                     <Film className="h-3 w-3" />
-                    {myStory && data.hero.video === myStory.hd ? "My story added" : "Use my story"}
+                    {myStory && (data.hero.video === myStory.hd || !(data.hero.video ?? "").trim())
+                      ? "Your story is used by default"
+                      : "Use my story"}
                   </button>
                 }
               >
                 <TInput
                   value={data.hero.video ?? ""}
-                  placeholder="YouTube / Vimeo / Facebook / Instagram / TikTok / direct video URL"
+                  placeholder={myStory ? "Blank = your My Story film" : "YouTube / Vimeo / Facebook / Instagram / TikTok / direct video URL"}
                   onChange={(v) => update((d) => { d.hero.video = v })}
                 />
               </Field>
@@ -1381,14 +1508,17 @@ export function WebsiteBuilderClient() {
                       onMove={(dir) => update((d) => swap(d.hero.stats, i, dir))}
                       onRemove={() => update((d) => { d.hero.stats.splice(i, 1) })}
                     >
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <TInput value={s.value} placeholder="Value" onChange={(v) => update((d) => { d.hero.stats[i].value = v })} />
-                        <TInput value={s.label} placeholder="Label" onChange={(v) => update((d) => { d.hero.stats[i].label = v })} />
+                      {/* Icon (a dropdown) first, then value and label, on one line. */}
+                      <div className="flex items-stretch gap-2">
+                        <IconPicker
+                          value={s.icon ?? HERO_STAT_ICON_FALLBACK[i % HERO_STAT_ICON_FALLBACK.length]}
+                          onChange={(k) => update((d) => { d.hero.stats[i].icon = k })}
+                        />
+                        <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
+                          <TInput value={s.value} placeholder="Value" onChange={(v) => update((d) => { d.hero.stats[i].value = v })} />
+                          <TInput value={s.label} placeholder="Label" onChange={(v) => update((d) => { d.hero.stats[i].label = v })} />
+                        </div>
                       </div>
-                      <IconPicker
-                        value={s.icon ?? HERO_STAT_ICON_FALLBACK[i % HERO_STAT_ICON_FALLBACK.length]}
-                        onChange={(k) => update((d) => { d.hero.stats[i].icon = k })}
-                      />
                     </ItemCard>
                   ))}
                 </div>
@@ -1492,13 +1622,8 @@ export function WebsiteBuilderClient() {
           {activeSection === "areas" && (
             <>
               <p className="text-[12px] leading-relaxed text-[#6b7280]">
-                Until you add your own, the site shows Sample 1–6 as placeholders — they disappear as soon as you add an area. Areas are shared across all agent sites: typing an existing name reuses it (and its photo); a new name is added to the catalog when you save.
+                Areas are shared across all agent sites: picking or typing an existing name reuses it (and its photo); a new name is added to the catalog when you save.
               </p>
-              <datalist id="wb-area-catalog">
-                {areaOptions.map((a) => (
-                  <option key={a.name} value={a.name} />
-                ))}
-              </datalist>
               {/* Pick from the shared catalog — the same search + Show all as Projects. */}
               <FeaturedPicker
                 noun="areas"
@@ -1508,61 +1633,165 @@ export function WebsiteBuilderClient() {
                 selectedIds={selectedAreaNames}
                 onToggle={toggleArea}
                 emptyText="No areas in the catalog yet — add your own."
-                trailing={<AddButton label="Add area" onClick={() => update((d) => { d.areas.push({ image: "", label: "" }) })} />}
+                trailing={
+                  // Add area: opens the name + photo step below.
+                  <button
+                    type="button"
+                    onClick={() => { setAddingArea((v) => !v); setAreaError(null) }}
+                    aria-expanded={addingArea}
+                    className="inline-flex items-center gap-1.5 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-3 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add area
+                  </button>
+                }
               />
-              {data.areas.map((a, i) => (
-                <ItemCard
-                  key={i}
-                  index={i}
-                  count={data.areas.length}
-                  onMove={(dir) => update((d) => swap(d.areas, i, dir))}
-                  onRemove={() => update((d) => { d.areas.splice(i, 1) })}
-                >
-                  {/* Photo | area name | Upload — the name sits where the image link was (no link box). */}
-                  <ImageInput
-                    value={a.image}
-                    onChange={(v) => update((d) => { d.areas[i].image = v })}
-                    middle={
-                      <input
-                        type="text"
+              {/* New area: the name first, then its photo — the upload adds it to the grid. */}
+              {addingArea && (
+                <div className="space-y-2 border border-[#e2e6ea] bg-[#fafbfc] p-3">
+                  <span className="block text-[13.5px] font-bold text-[#0d1117]">New area</span>
+                  <div className="flex items-stretch gap-2">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={newAreaName}
+                      placeholder="Area name, e.g. Dubai Marina"
+                      aria-label="New area name"
+                      onChange={(e) => setNewAreaName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newAreaName.trim()) { e.preventDefault(); areaFileRef.current?.click() }
+                        if (e.key === "Escape") setAddingArea(false)
+                      }}
+                      className={`${INPUT_CLS} min-w-0 flex-1`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => areaFileRef.current?.click()}
+                      disabled={!newAreaName.trim() || areaUploading}
+                      title={newAreaName.trim() ? "Upload this area's photo" : "Type the area name first"}
+                      className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-3 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {areaUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                      {areaUploading ? "Uploading…" : "Upload photo"}
+                    </button>
+                  </div>
+                  <input
+                    ref={areaFileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ""
+                      if (file) void addAreaWithPhoto(newAreaName, file)
+                    }}
+                  />
+                  {areaError && <p className="text-[11px] font-semibold text-red-600">{areaError}</p>}
+                </div>
+              )}
+              {/* The areas, 3 per row like the gallery: the photo with its name typed in the centre.
+                  Drag to reorder; on hover (always on touch screens) delete and ‹ ›. */}
+              {data.areas.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {data.areas.map((a, i) => (
+                    <div
+                      key={`${i}-${a.image}`}
+                      draggable
+                      onDragStart={(e) => {
+                        // Typing in the name box must not start a drag.
+                        if (["INPUT", "TEXTAREA"].includes((e.target as HTMLElement).tagName)) { e.preventDefault(); return }
+                        setDragArea(i)
+                        e.dataTransfer.effectAllowed = "move"
+                        e.dataTransfer.setData("text/plain", String(i))
+                      }}
+                      onDragOver={(e) => {
+                        if (dragArea === null) return
+                        e.preventDefault()
+                        if (dropArea !== i) setDropArea(i)
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        if (dragArea !== null && dragArea !== i) {
+                          const from = dragArea
+                          update((d) => { const [moved] = d.areas.splice(from, 1); d.areas.splice(i, 0, moved) })
+                        }
+                        setDragArea(null)
+                        setDropArea(null)
+                      }}
+                      onDragEnd={() => { setDragArea(null); setDropArea(null) }}
+                      className={`group relative aspect-square cursor-grab overflow-hidden border bg-[#1f2937] active:cursor-grabbing ${
+                        dragArea === i
+                          ? "border-dashed border-[#9aa0aa] opacity-50"
+                          : dropArea === i && dragArea !== null
+                            ? "border-2 border-[#001f3f]"
+                            : "border-[#e2e6ea]"
+                      }`}
+                    >
+                      {a.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={a.image} alt="" draggable={false} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center">
+                          <ImagePlus className="h-5 w-5 text-white/40" />
+                        </span>
+                      )}
+                      <span className="pointer-events-none absolute inset-0 bg-black/25" aria-hidden />
+                      <span className="absolute left-1 top-1 min-w-[24px] bg-black/60 px-1.5 py-0.5 text-center text-[13px] font-bold leading-5 text-white">{i + 1}</span>
+                      {/* Area name, in the centre — up to two lines, centred both ways (AreaNameBox). */}
+                      <AreaNameBox
                         value={a.label}
-                        placeholder="Area name"
-                        list="wb-area-catalog"
-                        aria-label="Area name"
-                        onChange={(e) => {
-                          const v = e.target.value
+                        label={`Area ${i + 1} name`}
+                        onChange={(v) => {
                           const match = areaOptions.find((o) => o.name.toLowerCase() === v.trim().toLowerCase())
                           update((d) => {
                             d.areas[i].label = v
-                            // Choosing an existing area adopts its shared photo.
-                            if (match?.photo) d.areas[i].image = match.photo
+                            // Typing an existing area's name adopts its shared photo when this one has none.
+                            if (match?.photo && !d.areas[i].image) d.areas[i].image = match.photo
                           })
                         }}
-                        className={INPUT_CLS}
                       />
-                    }
-                  />
-                </ItemCard>
-              ))}
-              {data.areas.every((a) => a.label.trim() === "" && a.image.trim() === "") && (
-                <div className="space-y-2.5">
-                  {TEST_AREAS.map((a, i) => (
-                    <div key={i} className="flex items-center gap-3 border border-[#e2e6ea] bg-[#fafbfc] p-2.5 opacity-70">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={a.image} alt="" className="h-10 w-14 shrink-0 object-cover" />
-                      <span className="text-[12.5px] font-bold text-[#0d1117]">{a.label}</span>
-                      <span className="ml-auto text-[10.5px] font-semibold uppercase tracking-wide text-[#9aa0aa]">Sample</span>
+                      <button
+                        type="button"
+                        aria-label="Remove area"
+                        onClick={() => update((d) => { d.areas.splice(i, 1) })}
+                        className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center bg-white/90 text-[#b42318] opacity-0 transition-opacity hover:bg-white group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Move earlier"
+                        disabled={i === 0}
+                        onClick={() => update((d) => swap(d.areas, i, -1))}
+                        className="absolute bottom-1 left-1 flex h-6 w-6 items-center justify-center bg-white/90 text-[#0d1117] opacity-0 transition-opacity hover:bg-white group-hover:opacity-100 group-hover:disabled:opacity-30 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 [@media(hover:none)]:disabled:opacity-30"
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Move later"
+                        disabled={i === data.areas.length - 1}
+                        onClick={() => update((d) => swap(d.areas, i, 1))}
+                        className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center bg-white/90 text-[#0d1117] opacity-0 transition-opacity hover:bg-white group-hover:opacity-100 group-hover:disabled:opacity-30 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 [@media(hover:none)]:disabled:opacity-30"
+                      >
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   ))}
                 </div>
+              )}
+              {/* No areas yet: the preview fills the section with Sample 1–6 — say so, don't list them. */}
+              {data.areas.every((a) => a.label.trim() === "" && a.image.trim() === "") && (
+                <p className="border border-dashed border-[#e2e6ea] bg-[#fafbfc] p-3 text-[12px] text-[#6b7280]">
+                  You&apos;re using the sample areas (Sample 1–6) for now — add your own to replace them.
+                </p>
               )}
             </>
           )}
 
           {activeSection === "gallery" && (
             <>
-              {/* Category navbar — only the active category's images below */}
-              <div className="flex flex-wrap gap-1.5">
+              {/* Category navbar — the three share the row; only the active category's images below */}
+              <div className="flex gap-1.5">
                 {GALLERY_CATEGORIES.map((cat) => {
                   const active = activeGalleryCat === cat
                   return (
@@ -1570,7 +1799,7 @@ export function WebsiteBuilderClient() {
                       key={cat}
                       type="button"
                       onClick={() => setActiveGalleryCat(cat)}
-                      className={` px-3 py-1.5 text-[11.5px] font-bold transition-colors ${
+                      className={`min-w-0 flex-auto whitespace-nowrap px-3 py-1.5 text-[11.5px] font-bold transition-colors ${
                         active
                           ? "bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] text-white"
                           : "border border-[#e2e6ea] text-[#5b6472] hover:border-[#9aa0aa]"
@@ -1581,30 +1810,112 @@ export function WebsiteBuilderClient() {
                   )
                 })}
               </div>
+              {/* Upload, for the category picked above — full width, right under the navbar. Picks
+                  several pictures at once; each is compressed and uploaded, then added to the grid. */}
+              <button
+                type="button"
+                onClick={() => galleryFileRef.current?.click()}
+                disabled={galleryUploading > 0}
+                className="flex w-full items-center justify-center gap-1.5 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-3 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {galleryUploading > 0 ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                {galleryUploading > 0
+                  ? `Uploading ${galleryUploading} picture${galleryUploading === 1 ? "" : "s"}…`
+                  : activeGalleryCat === "Event Photos"
+                    ? "Upload event photos"
+                    : activeGalleryCat === "Certificates"
+                      ? "Upload certificates"
+                      : "Upload awards or recognition photos"}
+              </button>
+              <input
+                ref={galleryFileRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? [])
+                  e.target.value = ""
+                  if (files.length) void uploadGallery(activeGalleryCat, files)
+                }}
+              />
+              {galleryError && <p className="text-[11px] font-semibold text-red-600">{galleryError}</p>}
               <div className="space-y-2.5">
-                {data.gallery[activeGalleryCat].map((src, i) => (
-                  <div key={`${activeGalleryCat}-${i}`} className="flex items-start gap-1">
-                    <div className="min-w-0 flex-1">
-                      <ImageInput value={src} onChange={(v) => update((d) => { d.gallery[activeGalleryCat][i] = v })} />
-                    </div>
-                    <div className="mt-2 flex shrink-0 items-center gap-0.5">
-                      <MoveButtons
-                        index={i}
-                        count={data.gallery[activeGalleryCat].length}
-                        onMove={(dir) => update((d) => swap(d.gallery[activeGalleryCat], i, dir))}
-                      />
-                      <button
-                        type="button"
-                        aria-label="Remove image"
-                        onClick={() => update((d) => { d.gallery[activeGalleryCat].splice(i, 1) })}
-                        className="flex h-6 w-6 items-center justify-center text-[#9aa0aa] transition-colors hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                {/* The pictures, 3 per row — drag to reorder, or use the arrows. */}
+                {data.gallery[activeGalleryCat].some((src) => src.trim()) && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {data.gallery[activeGalleryCat].map((src, i) =>
+                      !src.trim() ? null : (
+                        <div
+                          key={`${activeGalleryCat}-${i}-${src}`}
+                          draggable
+                          onDragStart={(e) => {
+                            setDragGallery(i)
+                            e.dataTransfer.effectAllowed = "move"
+                            e.dataTransfer.setData("text/plain", String(i))
+                          }}
+                          onDragOver={(e) => {
+                            if (dragGallery === null) return
+                            e.preventDefault()
+                            if (dropGallery !== i) setDropGallery(i)
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            if (dragGallery !== null && dragGallery !== i) {
+                              const from = dragGallery
+                              update((d) => {
+                                const list = d.gallery[activeGalleryCat]
+                                const [moved] = list.splice(from, 1)
+                                list.splice(i, 0, moved)
+                              })
+                            }
+                            setDragGallery(null)
+                            setDropGallery(null)
+                          }}
+                          onDragEnd={() => { setDragGallery(null); setDropGallery(null) }}
+                          className={`group relative aspect-square cursor-grab overflow-hidden border bg-[#eceff3] active:cursor-grabbing ${
+                            dragGallery === i
+                              ? "border-dashed border-[#9aa0aa] opacity-50"
+                              : dropGallery === i && dragGallery !== null
+                                ? "border-2 border-[#001f3f]"
+                                : "border-[#e2e6ea]"
+                          }`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={src} alt="" draggable={false} className="h-full w-full object-cover" />
+                          {/* Order number top left; on hover (always on touch screens): delete top right, move ‹ › at the bottom left and right. */}
+                          <span className="absolute left-1 top-1 min-w-[24px] bg-black/60 px-1.5 py-0.5 text-center text-[13px] font-bold leading-5 text-white">{i + 1}</span>
+                          <button
+                            type="button"
+                            aria-label="Remove picture"
+                            onClick={() => update((d) => { d.gallery[activeGalleryCat].splice(i, 1) })}
+                            className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center bg-white/90 text-[#b42318] hover:bg-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Move earlier"
+                            disabled={i === 0}
+                            onClick={() => update((d) => swap(d.gallery[activeGalleryCat], i, -1))}
+                            className="absolute bottom-1 left-1 flex h-6 w-6 items-center justify-center bg-white/90 text-[#0d1117] hover:bg-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 group-hover:disabled:opacity-30 [@media(hover:none)]:disabled:opacity-30"
+                          >
+                            <ChevronLeft className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Move later"
+                            disabled={i === data.gallery[activeGalleryCat].length - 1}
+                            onClick={() => update((d) => swap(d.gallery[activeGalleryCat], i, 1))}
+                            className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center bg-white/90 text-[#0d1117] hover:bg-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 group-hover:disabled:opacity-30 [@media(hover:none)]:disabled:opacity-30"
+                          >
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ),
+                    )}
                   </div>
-                ))}
-                <AddButton label="Add image" onClick={() => update((d) => { d.gallery[activeGalleryCat].push("") })} />
+                )}
                 {GALLERY_CATEGORIES.every((c) => data.gallery[c].every((src) => src.trim() === "")) && (
                     <div className="space-y-2.5">
                       {(activeGalleryCat === "Event Photos"
@@ -1753,7 +2064,7 @@ export function WebsiteBuilderClient() {
 
       {/* ── Live preview ── */}
       <div className="min-w-0 flex-1">
-        <LivePreview data={data} reviews={orderWebsiteReviews(reviews, data.reviewIds)} target={previewTarget} onSectionInView={handleSectionInView} />
+        <LivePreview data={previewData} reviews={orderWebsiteReviews(reviews, data.reviewIds)} target={previewTarget} onSectionInView={handleSectionInView} />
       </div>
     </div>
   )

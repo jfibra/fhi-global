@@ -23,5 +23,6 @@ export async function GET() {
   if (error) {
     return NextResponse.json({ error: "Failed to load areas" }, { status: 500 })
   }
-  return NextResponse.json({ areas: data ?? [] })
+  // "Sample 1" … "Sample 6" are the template's placeholders, not places — kept, never offered.
+  return NextResponse.json({ areas: (data ?? []).filter((a) => !/^sample\s*\d+$/i.test(String(a.name ?? "").trim())) })
 }
