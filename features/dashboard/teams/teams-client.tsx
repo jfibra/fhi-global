@@ -928,16 +928,6 @@ function TeamHeaderCard({
             <span className="flex items-center gap-1.5"><Users className="w-3 h-3" />{memberCount} member{memberCount !== 1 ? "s" : ""}</span>
             {!team.parent_id && <span className="flex items-center gap-1.5"><Building2 className="w-3 h-3" />{subteamCount} subteam{subteamCount !== 1 ? "s" : ""}</span>}
             <span>Created {fmtDate(team.created_at)}</span>
-            {team.leader_can_edit_sales && (
-              <span className="flex items-center gap-1 rounded-full border border-[#d6b357]/40 bg-[#d6b357]/10 px-2 py-0.5 font-semibold text-[#8a6d2a]">
-                <Pencil className="w-3 h-3" /> Leader edits sales
-              </span>
-            )}
-            {team.leader_confirms_sales && (
-              <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
-                <BadgeCheck className="w-3 h-3" /> Leader confirms sales
-              </span>
-            )}
           </div>
         </div>
 
