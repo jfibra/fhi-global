@@ -13,7 +13,7 @@ export type Team = {
   is_active: boolean
   /** The team's leader may edit its members' sales (migration 084; admin-only switch). */
   leader_can_edit_sales?: boolean
-  /** The team's leader confirms its members' sales before the admin validates them. */
+  /** The team's leader confirms its members' sales — a second check beside the admin's validation, either order. */
   leader_confirms_sales?: boolean
   created_at: string
   updated_at: string

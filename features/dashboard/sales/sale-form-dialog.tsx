@@ -31,6 +31,7 @@ import {
   updateSale,
   updateSaleAsLeader,
   validateSaleFormData,
+  LEADER_CONFIRMABLE,
   validateSalePartners,
   fetchDevelopersForSale,
   fetchProjectsForDeveloper,
@@ -150,7 +151,7 @@ export function SaleFormDialog({
   /**
    * A team leader editing a team sale (migration 084): the save goes through
    * app/api/team/sales/[id] and keeps the sale's status; `canConfirm` offers to
-   * confirm it for the admin in the same save.
+   * add the leader's confirmation in the same save.
    */
   leaderMode?: { canConfirm: boolean } | null
   /** The editor's display name, for the "Edited by" stamp. */
@@ -173,7 +174,7 @@ export function SaleFormDialog({
     Boolean(editSale) &&
     editSale!.agent_id !== currentUserId &&
     !editSale!.leader_confirmed_at &&
-    (editSale!.validation_status === "pending" || editSale!.validation_status === "under_review")
+    LEADER_CONFIRMABLE.includes(editSale!.validation_status)
 
   // ─── All state declarations (must precede derived values) ────────────────
   const [activeTab, setActiveTab] = useState<"property"|"client"|"contract"|"partners"|"workflow"|"attachments">("property")
@@ -1325,7 +1326,7 @@ export function SaleFormDialog({
                       onChange={(e) => setConfirmToo(e.target.checked)}
                       className="h-4 w-4 rounded border-[#d1d5db] accent-[#001f3f]"
                     />
-                    Also confirm this sale for the admin
+                    Also confirm this sale as team leader
                   </label>
                 )}
                 <p className="hidden sm:block text-xs text-[#9ca3af]">

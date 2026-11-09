@@ -28,6 +28,9 @@ export function formatCurrency(value: number) {
  */
 export function toTitleCase(value: string | null | undefined) {
   if (!value) return ""
+  // A name stamp that is really an email reads "Chymeyap27@gmail.Com" once
+  // title-cased — keep it as typed.
+  if (value.includes("@")) return value.trim().toLowerCase()
   return value
     .replace(/\s+/g, " ") // several profiles store doubled spaces ("Juliecor  Repompo")
     .trim()

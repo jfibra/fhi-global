@@ -4,7 +4,7 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import { normalizeAppRole } from "@/lib/app-roles"
 import { titleCaseName } from "@/lib/public-profile"
 import { leaderScope } from "@/lib/team-sales-review"
-import type { SaleType, TeamSalesAccess } from "@/lib/sales-rules"
+import { LEADER_CONFIRMABLE, type SaleType, type TeamSalesAccess } from "@/lib/sales-rules"
 
 /**
  * What the signed-in team leader may do with their team's sales (migration
@@ -62,8 +62,9 @@ export async function GET() {
       }
     }
 
-    // Sales the leader can still confirm: a member's (never their own) that the
-    // admin hasn't decided on yet, with no confirmation so far.
+    // Sales still waiting for the leader's ✓: a member's (never their own), not
+    // invalid, with no confirmation so far — validated ones too, since the two
+    // checks come in either order.
     const waitingToConfirm = { ...NONE.waitingToConfirm }
     const confirmIds = scope.filter((m) => m.canConfirm && m.memberId !== userId).map((m) => m.memberId)
     const waiting = await Promise.all(
@@ -72,7 +73,7 @@ export async function GET() {
           .from("sales_reports")
           .select("sale_type")
           .in("agent_id", chunk)
-          .in("validation_status", ["pending", "under_review"])
+          .in("validation_status", [...LEADER_CONFIRMABLE])
           .is("leader_confirmed_at", null),
       ),
     )

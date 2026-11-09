@@ -45,6 +45,7 @@ import {
   fetchAgentsForSale,
   fetchLeaderReview,
   fetchTeamSalesAccess,
+  LEADER_CONFIRMABLE,
   notifySaleEvent,
   setLeaderConfirmation,
   updateSaleValidationStatus,
@@ -77,6 +78,7 @@ import { SaleActions } from "./sale-actions"
 import { ReviewMenu } from "./review-menu"
 import { SaleAttachmentsDialog } from "./sale-attachments-dialog"
 import { SaleConfirmDialog } from "./sale-confirm-dialog"
+import { LeaderConfirmDialog } from "./leader-confirm-dialog"
 import { SaleFormDialog } from "./sale-form-dialog"
 import { SaleDetails } from "./sale-details"
 import { SaleSplitBreakdown } from "./sale-split-breakdown"
@@ -120,9 +122,6 @@ type Col = {
   tdClassName?: string
   cell: (s: SaleRecord) => ReactNode
 }
-
-/** Statuses a team leader can still confirm a sale in — before the admin decides. */
-const LEADER_CONFIRMABLE: ValidationStatus[] = ["pending", "under_review"]
 
 /** "Mar 4" for this year's dates, "Mar 4, 2025" otherwise — the Dates column's short form. */
 function shortDate(value: string | null) {
@@ -409,10 +408,12 @@ export function SalesTable({
   const [showTopSeller, setShowTopSeller] = useState(false)
   const [showTopDeveloper, setShowTopDeveloper] = useState(false)
 
-  // Confirmation flow. Validate is a direct click; Invalid Sale / Under Review
-  // ask for a click-confirm; Delete asks for a press-and-hold confirm.
+  // Confirmation flow. The admin's status changes and the team leader's
+  // Confirm / take-back ask for a click-confirm; Delete asks for a
+  // press-and-hold confirm.
   const [confirm, setConfirm] = useState<
     | { kind: "validation"; sale: SaleRecord; nextStatus: ValidationStatus }
+    | { kind: "leader"; sale: SaleRecord; confirmIt: boolean }
     | { kind: "delete"; sale: SaleRecord }
     | null
   >(null)
@@ -673,8 +674,8 @@ export function SalesTable({
     return () => { active = false }
   }, [isTeamLeaderRole])
 
-  // "Waiting for team leader" needs to know whose team confirms first — one
-  // small lookup per page of rows.
+  // "Waiting for team leader" needs to know whose team confirms its sales —
+  // one small lookup per page of rows.
   useEffect(() => {
     if (sales.length === 0) return
     let active = true
@@ -733,7 +734,8 @@ export function SalesTable({
     setShowAttachments(true)
   }
 
-  // The team leader's confirmation — a stamp before the admin's validation.
+  // The team leader's confirmation — a stamp beside the admin's validation,
+  // in either order.
   const confirmBusyRef = useRef<Set<string>>(new Set())
   const handleLeaderConfirm = async (sale: SaleRecord, confirmIt: boolean) => {
     if (confirmBusyRef.current.has(sale.id)) return
@@ -742,7 +744,14 @@ export function SalesTable({
       const { data, error } = await setLeaderConfirmation(sale.id, confirmIt)
       if (error || !data) { addToast("error", error ?? "Couldn't save the confirmation"); return }
       setSales((prev) => prev.map((item) => (item.id === sale.id ? data : item)))
-      addToast("success", confirmIt ? "Confirmed — the admin can validate it now" : "Your confirmation was taken back")
+      addToast(
+        "success",
+        !confirmIt
+          ? "Your confirmation was taken back"
+          : data.validation_status === "validated"
+            ? "Confirmed — this sale has both checks now"
+            : "Confirmed — the admin validates it next",
+      )
       void loadTeamAccess() // the "waiting for you" count
     } finally {
       confirmBusyRef.current.delete(sale.id)
@@ -775,7 +784,8 @@ export function SalesTable({
     }
   }
 
-  // Runs the pending confirmation (Invalid Sale / Under Review, or Delete).
+  // Runs the pending confirmation (a status change, the team leader's
+  // Confirm / take-back, or Delete).
   // Always closes the dialog afterwards — success or failure is surfaced via a
   // toast, and reopening gives a fresh (re-armed) hold-to-confirm button.
   const runConfirm = async () => {
@@ -792,6 +802,8 @@ export function SalesTable({
           void loadSummaries()
           void loadActiveSummary()
         }
+      } else if (confirm.kind === "leader") {
+        await handleLeaderConfirm(confirm.sale, confirm.confirmIt)
       } else {
         await handleValidationShortcut(confirm.sale, confirm.nextStatus)
       }
@@ -935,36 +947,63 @@ export function SalesTable({
     header: "Status",
     thClassName: "min-w-[180px]",
     // The badge answers "what state" — the lines under it answer who decided
-    // that and when, whether the team leader has confirmed, and the commission.
-    cell: (s) => (
-      <div className="min-w-0 space-y-1">
-        <div>
-          <StatusBadge value={s.validation_status} type="validation" />
-          {s.validation_changed_at && (
-            <p className="mt-0.5 text-[10px] leading-tight text-[#9ca3af]">
-              by {toTitleCase(s.validation_changed_by_name) || "—"} · {formatDate(s.validation_changed_at)}
-            </p>
+    // that and when, and the commission. On a team whose leader confirms sales
+    // the sale has two checks, the team leader's and the admin's, listed side
+    // by side whichever came first: each is ✓ with who and when, or waiting.
+    cell: (s) => {
+      const leaderNames = waitingFor(s)
+      const twoChecks = Boolean(s.leader_confirmed_at || leaderNames)
+      const validated = s.validation_status === "validated"
+      const validatedBy = toTitleCase(s.validation_changed_by_name)
+      return (
+        <div className="min-w-0 space-y-1">
+          <div>
+            <StatusBadge value={s.validation_status} type="validation" />
+            {/* With two checks, the admin's line below says who validated. */}
+            {s.validation_changed_at && !(twoChecks && validated) && (
+              <p className="mt-0.5 text-[10px] leading-tight text-[#9ca3af]">
+                by {validatedBy || "—"} · {formatDate(s.validation_changed_at)}
+              </p>
+            )}
+          </div>
+          {twoChecks && (
+            <div className="space-y-0.5 text-[11px] font-medium leading-tight">
+              {s.leader_confirmed_at ? (
+                <p className="flex items-start gap-1 text-emerald-700">
+                  <BadgeCheck className="mt-px w-3.5 h-3.5 shrink-0" />
+                  <span>Team leader · {toTitleCase(s.leader_confirmed_by_name) || "—"} · {shortDate(s.leader_confirmed_at)}</span>
+                </p>
+              ) : (
+                <p
+                  className="flex items-start gap-1 text-amber-700"
+                  title={`${leaderNames} (team leader) confirms this team's sales too — before or after the admin validates`}
+                >
+                  <Hourglass className="mt-px w-3.5 h-3.5 shrink-0" />
+                  <span>{leaderCanConfirm(s) ? "Waiting for your confirmation" : "Waiting for team leader"}</span>
+                </p>
+              )}
+              {validated ? (
+                <p className="flex items-start gap-1 text-emerald-700">
+                  <BadgeCheck className="mt-px w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    Admin{validatedBy ? ` · ${validatedBy}` : ""}
+                    {s.validation_changed_at ? ` · ${shortDate(s.validation_changed_at)}` : ""}
+                  </span>
+                </p>
+              ) : s.validation_status !== "invalid_sale" ? (
+                <p className="flex items-start gap-1 text-[#9ca3af]">
+                  <Hourglass className="mt-px w-3.5 h-3.5 shrink-0" />
+                  <span>Waiting for admin</span>
+                </p>
+              ) : null}
+            </div>
           )}
+          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#9ca3af]">
+            Commission <StatusBadge value={s.commission_status} type="commission" />
+          </p>
         </div>
-        {s.leader_confirmed_at ? (
-          <p className="flex items-center gap-1 text-[11px] font-medium leading-tight text-emerald-700">
-            <BadgeCheck className="w-3.5 h-3.5 shrink-0" />
-            Team leader ✓ {toTitleCase(s.leader_confirmed_by_name) || "—"} · {shortDate(s.leader_confirmed_at)}
-          </p>
-        ) : waitingFor(s) ? (
-          <p
-            className="flex items-center gap-1 text-[11px] font-medium leading-tight text-amber-700"
-            title={`${waitingFor(s)} confirms this team's sales before the admin validates them`}
-          >
-            <Hourglass className="w-3.5 h-3.5 shrink-0" />
-            Waiting for team leader
-          </p>
-        ) : null}
-        <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#9ca3af]">
-          Commission <StatusBadge value={s.commission_status} type="commission" />
-        </p>
-      </div>
-    ),
+      )
+    },
   })
   columns.push({
     key: "actions",
@@ -987,8 +1026,8 @@ export function SalesTable({
           {canConfirmRow && !s.leader_confirmed_at && (
             <button
               type="button"
-              onClick={() => void handleLeaderConfirm(s, true)}
-              title="Confirm this sale for the admin to validate"
+              onClick={() => setConfirm({ kind: "leader", sale: s, confirmIt: true })}
+              title="Confirm this sale as team leader"
               className="inline-flex h-8 items-center gap-1.5 rounded-full bg-emerald-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
             >
               <BadgeCheck className="h-3.5 w-3.5" />
@@ -1046,7 +1085,7 @@ export function SalesTable({
             onEdit={() => openEdit(s)}
             onAttachments={() => openAttachments(s)}
             onDelete={() => setConfirm({ kind: "delete", sale: s })}
-            onUndoConfirm={canConfirmRow && s.leader_confirmed_at ? () => void handleLeaderConfirm(s, false) : undefined}
+            onUndoConfirm={canConfirmRow && s.leader_confirmed_at ? () => setConfirm({ kind: "leader", sale: s, confirmIt: false }) : undefined}
           />
         </div>
       )
@@ -1077,10 +1116,26 @@ export function SalesTable({
       : isSalesPipelineRole(currentRole) && sales.some((s) => s.partners.length > 0)
         ? [tileHint, "shared sales at your share"].filter(Boolean).join(" · ")
         : tileHint
-  const waitingForMe = scope === "team" && activeTab && teamAccess?.canConfirm ? teamAccess.waitingToConfirm[activeTab] : 0
-  const pendingTileHint = waitingForMe > 0
-    ? [tileHint, `${waitingForMe} waiting for your confirmation`].filter(Boolean).join(" · ")
-    : tileHint
+  // Team sales still missing this leader's ✓ — validated ones included, so it
+  // sits under the My team switch rather than on the Pending tile.
+  const waitingForMe = teamAccess?.canConfirm
+    ? activeTab
+      ? teamAccess.waitingToConfirm[activeTab]
+      : Object.values(teamAccess.waitingToConfirm).reduce((a, b) => a + b, 0)
+    : 0
+
+  const emptyState = (
+    <div className="flex flex-col items-center gap-2 text-[#9ca3af]">
+      <TrendingUp className="w-9 h-9 opacity-40" />
+      <p className="text-sm font-medium text-[#6b7280]">
+        {scope === "team" ? "Your team hasn't recorded a sale of this type yet." : "No sales recorded for this type yet."}
+      </p>
+      <p className="text-xs">
+        Use the <span className="font-semibold text-[#001f3f]">Record Your Sale</span> button in the sidebar to record one.
+      </p>
+    </div>
+  )
+  const cellOf = (key: string, sale: SaleRecord) => columns.find((c) => c.key === key)?.cell(sale) ?? null
 
   // A team leader's "My team | My own sales" switch, with each side's count —
   // the way into their team's sales (migration 084). Shown on the chooser and
@@ -1089,7 +1144,7 @@ export function SalesTable({
     scopeCounts ? (activeTab ? scopeCounts[which][activeTab] : Object.values(scopeCounts[which]).reduce((a, b) => a + b, 0)) : null
   const scopeSwitch = leadsTeam ? (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <div role="tablist" aria-label="Whose sales" className="inline-flex rounded-2xl border border-[#e5e7eb] bg-white p-1 shadow-sm">
+      <div role="tablist" aria-label="Whose sales" className="flex w-full rounded-2xl border border-[#e5e7eb] bg-white p-1 shadow-sm sm:inline-flex sm:w-auto">
         {([
           { value: "team", label: "My team", Icon: Users },
           { value: "own", label: "My own sales", Icon: User },
@@ -1103,7 +1158,7 @@ export function SalesTable({
               role="tab"
               aria-selected={active}
               onClick={() => { if (!active) setScope(value) }}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+              className={`inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold transition-colors sm:flex-none sm:px-4 ${
                 active ? "bg-[#001f3f] text-white shadow" : "text-[#374151] hover:bg-[#f3f4f6]"
               }`}
             >
@@ -1122,8 +1177,13 @@ export function SalesTable({
         <p className="text-xs text-[#6b7280]">
           Sales recorded by {teamAccess.teamNames.join(", ") || "your team"} ({teamAccess.members.length} members).{" "}
           {teamAccess.canEdit || teamAccess.canConfirm
-            ? `You can ${[teamAccess.canEdit && "edit them", teamAccess.canConfirm && "confirm new ones for the admin"].filter(Boolean).join(" and ")}.`
+            ? `You can ${[teamAccess.canEdit && "edit them", teamAccess.canConfirm && "confirm them as team leader"].filter(Boolean).join(" and ")}.`
             : "View only — an admin can let you edit or confirm them."}
+          {teamAccess.canConfirm && (
+            <span className={`ml-1 font-semibold ${waitingForMe > 0 ? "text-amber-700" : "text-emerald-700"}`}>
+              {waitingForMe > 0 ? `${waitingForMe} waiting for your confirmation.` : "Nothing waiting for your confirmation."}
+            </span>
+          )}
         </p>
       )}
     </div>
@@ -1341,7 +1401,7 @@ export function SalesTable({
                 label="Pending Validation"
                 value={tileSummary ? String(tileSummary.pendingCount) : "—"}
                 icon={Clock}
-                hint={pendingTileHint}
+                hint={tileHint}
               />
             </div>
 
@@ -1483,7 +1543,67 @@ export function SalesTable({
 
         {/* Table */}
         <div className="bg-white/60 backdrop-blur-xl rounded-[24px] border border-white/60 shadow-sm shadow-black/5 overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Phones and tablets: one card per sale, built from the table's own
+              cells. The table there scrolled sideways under its pinned Actions
+              column, which then covered the client. */}
+          <div className="lg:hidden">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[#f0f2f5] bg-white/40 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">
+              <span>Sort by</span>
+              {columns.find((c) => c.key === "money")?.header}
+            </div>
+            {loading ? (
+              <div className="divide-y divide-[#f0f2f5]">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="animate-pulse space-y-2.5 p-4">
+                    <div className="h-4 w-2/3 rounded bg-[#eef0f3]" />
+                    <div className="h-3 w-1/2 rounded bg-[#eef0f3]" />
+                    <div className="h-3 w-1/3 rounded bg-[#eef0f3]" />
+                  </div>
+                ))}
+              </div>
+            ) : sales.length === 0 ? (
+              <div className="px-6 py-14 text-center">{emptyState}</div>
+            ) : (
+              <div className="divide-y divide-[#f0f2f5]">
+                {sales.map((sale) => {
+                  const drillable = isAdminUser && Boolean(sale.agent_id)
+                  return (
+                    <article
+                      key={sale.id}
+                      onClick={drillable ? () => {
+                        setAgentDrill({ id: sale.agent_id, name: sale.profiles?.fullname ?? null })
+                        router.push(`${pathname}?agent=${sale.agent_id}`, { scroll: false })
+                      } : undefined}
+                      className={`space-y-3 p-4 ${drillable ? "cursor-pointer" : ""}`}
+                    >
+                      {cellOf("client", sale)}
+                      {openSplitId === sale.id && sale.partners.length > 0 && (
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <SaleSplitBreakdown
+                            partners={sale.partners}
+                            contractPrice={sale.contract_price}
+                            ownerId={sale.agent_id}
+                            highlightId={currentUserId}
+                          />
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="min-w-0">{cellOf("property", sale)}</div>
+                        <div className="min-w-0">{cellOf("money", sale)}</div>
+                      </div>
+                      {cellOf("status", sale)}
+                      {/* Its own controls: a tap here must not also drill into the agent. */}
+                      <div className="border-t border-[#f3f4f6] pt-3" onClick={(e) => e.stopPropagation()}>
+                        {cellOf("actions", sale)}
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto lg:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#f0f2f5] bg-white/40">
@@ -1515,15 +1635,7 @@ export function SalesTable({
                 ) : sales.length === 0 ? (
                   <tr>
                     <td colSpan={colCount} className="px-6 py-14 text-center">
-                      <div className="flex flex-col items-center gap-2 text-[#9ca3af]">
-                        <TrendingUp className="w-9 h-9 opacity-40" />
-                        <p className="text-sm font-medium text-[#6b7280]">
-                          {scope === "team" ? "Your team hasn't recorded a sale of this type yet." : "No sales recorded for this type yet."}
-                        </p>
-                        <p className="text-xs">
-                          Use the <span className="font-semibold text-[#001f3f]">Record Your Sale</span> button in the sidebar to record one.
-                        </p>
-                      </div>
+                      {emptyState}
                     </td>
                   </tr>
                 ) : (
@@ -1682,7 +1794,7 @@ export function SalesTable({
           message={
             `This sets the validation status to ${STATUS_LABEL[confirm.nextStatus]}. You can change it again later.` +
             (confirm.nextStatus === "validated" && waitingFor(confirm.sale)
-              ? ` ${waitingFor(confirm.sale)} (team leader) hasn't confirmed this sale yet — you can still validate it.`
+              ? ` ${waitingFor(confirm.sale)} (team leader) hasn't confirmed it yet. You can validate now — the team leader's ✓ can still come afterwards.`
               : "")
           }
           confirmLabel={
@@ -1693,6 +1805,19 @@ export function SalesTable({
                 : "Move to Under Review"
           }
           tone="primary"
+          busy={confirmBusy}
+          onConfirm={() => void runConfirm()}
+          onCancel={() => { if (!confirmBusy) setConfirm(null) }}
+        />
+      )}
+
+      {/* The team leader's Confirm, or taking it back — the sale's facts and
+          the two checks, so the leader knows exactly what they vouch for. */}
+      {confirm?.kind === "leader" && (
+        <LeaderConfirmDialog
+          sale={confirm.sale}
+          confirmIt={confirm.confirmIt}
+          leaderName={userName}
           busy={confirmBusy}
           onConfirm={() => void runConfirm()}
           onCancel={() => { if (!confirmBusy) setConfirm(null) }}

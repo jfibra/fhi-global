@@ -211,7 +211,7 @@ export function TeamsClient({ currentRole: _role }: { currentRole: string; userI
     addToast(
       key === "leader_can_edit_sales"
         ? next ? `${team.name}'s team leader can now edit the team's sales` : `${team.name}'s team leader can no longer edit sales`
-        : next ? `${team.name}'s team leader now confirms sales before you validate them` : `${team.name}'s sales go straight to admin validation`,
+        : next ? `${team.name}'s team leader now confirms sales too — before or after you validate` : `${team.name}'s sales need only your validation`,
       "success",
     )
   }
@@ -935,7 +935,7 @@ function TeamHeaderCard({
             )}
             {team.leader_confirms_sales && (
               <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
-                <BadgeCheck className="w-3 h-3" /> Leader confirms first
+                <BadgeCheck className="w-3 h-3" /> Leader confirms sales
               </span>
             )}
           </div>
@@ -997,8 +997,8 @@ function TeamHeaderCard({
           {switchItem(
             "leader_confirms_sales",
             <BadgeCheck className="w-3.5 h-3.5" />,
-            "Team leader confirms sales first",
-            "The leader confirms, then you validate. You're never blocked.",
+            "Team leader confirms sales",
+            "Each sale gets the leader's ✓ and yours, in either order. You're never blocked.",
           )}
           <div className="border-t border-[#f0f2f5] my-1" />
           {actionItem(<Trash2 className="w-3.5 h-3.5" />, "Delete Team", onDelete, true)}

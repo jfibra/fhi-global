@@ -88,8 +88,7 @@ export async function logLeaderActivity(
   if (error) console.error("[team-sales] activity log failed:", error.message)
 }
 
-/** Statuses a team leader may still confirm (or take a confirmation back) in — before the admin decides. */
-export const LEADER_CONFIRMABLE = ["pending", "under_review"] as const
+export { LEADER_CONFIRMABLE } from "@/lib/sales-rules"
 
 // ─── Request shapes ───────────────────────────────────────────────────────────
 // The edit dialog sends the same SaleFormData the admin's save uses, as

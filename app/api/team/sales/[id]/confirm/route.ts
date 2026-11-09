@@ -12,11 +12,12 @@ import {
 } from "@/lib/team-sales-review"
 
 /**
- * The team leader confirms one of their team's sales for the admin to
- * validate — or takes that back (migration 084). Allowed while the leader's
- * team has "Team leader confirms sales first" on, for a sale someone the team
- * covers recorded, and only until the admin decides (pending / under review).
- * A leader never confirms their own sale: it goes straight to the admin.
+ * The team leader confirms one of their team's sales — or takes that back
+ * (migration 084). Allowed while the leader's team has "Team leader confirms
+ * sales" on, for a sale someone the team covers recorded, in any status but
+ * invalid: before or after the admin validates, so a sale carries both checks
+ * whichever came first (owner, 2026-11-09). A leader never confirms their own
+ * sale: it goes straight to the admin.
  *
  * The confirmation is a stamp, not a status: the admin can validate a sale
  * whether or not it has one — they are told when it doesn't.
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return bad("You can't confirm this sale — it isn't your team's, or your team doesn't ask its leader to confirm sales.", 403)
     }
     if (!(LEADER_CONFIRMABLE as readonly string[]).includes(String(sale.validation_status))) {
-      return bad("The admin has already decided on this sale.", 409)
+      return bad("This sale was marked invalid — there's nothing to confirm.", 409)
     }
 
     const already = Boolean(sale.leader_confirmed_at)

@@ -1582,7 +1582,7 @@ export async function updateSaleAsLeader(
   })
 }
 
-/** The team leader confirms a team sale for the admin to validate, or takes that back. */
+/** The team leader confirms a team sale (before or after the admin validates it), or takes that back. */
 export async function setLeaderConfirmation(
   id: string,
   confirm: boolean,

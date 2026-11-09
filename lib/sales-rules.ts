@@ -152,8 +152,9 @@ export type SaleRecord = {
   edited_at: string | null
   edited_by: string | null
   edited_by_name: string | null
-  // The team leader's confirmation, which comes before the admin's validation
-  // when the team asks for it (teams.leader_confirms_sales). Null = not confirmed.
+  // The team leader's confirmation — a second check beside the admin's
+  // validation, in either order, when the team asks for it
+  // (teams.leader_confirms_sales). Null = not confirmed.
   leader_confirmed_at: string | null
   leader_confirmed_by: string | null
   leader_confirmed_by_name: string | null
@@ -398,6 +399,14 @@ export type TeamSalesAccess = {
   /** Team sales still waiting for this leader's confirmation, per sale type. */
   waitingToConfirm: Record<SaleType, number>
 }
+
+/**
+ * Statuses a team leader may confirm a sale in, or take the confirmation back:
+ * any but an invalid one. The two checks — the leader's confirmation and the
+ * admin's validation — come in either order (owner, 2026-11-09), so a sale the
+ * admin already validated can still get the leader's ✓, and neither waits.
+ */
+export const LEADER_CONFIRMABLE: readonly ValidationStatus[] = ["pending", "under_review", "validated"]
 
 // ─── Save payloads & changes ──────────────────────────────────────────────────
 

@@ -217,7 +217,7 @@ export function SaleDetails({
                     {" · "}{formatDate(sale.validation_changed_at)}
                   </p>
                 )}
-                {/* The team leader's check before the admin's (migration 084). */}
+                {/* The team leader's check, beside the admin's (migration 084). */}
                 {sale.leader_confirmed_at && (
                   <p className="mt-1.5 text-[11px] text-emerald-700">
                     Confirmed by team leader{" "}

@@ -32,8 +32,8 @@ import {
  *
  * The sale keeps its validation and commission status — a leader's edit is
  * stamped (edited_*) and logged field by field instead (the boss's call). With
- * `confirm`, the same save also confirms the sale for the admin, when the team
- * asks for that and the sale is still waiting.
+ * `confirm`, the same save also adds the leader's confirmation, when the team
+ * asks for that and the sale doesn't have it yet (any status but invalid).
  *
  * Runs on the service role: RLS lets a leader read their team's sales, never
  * write them, so this route is the only door.
