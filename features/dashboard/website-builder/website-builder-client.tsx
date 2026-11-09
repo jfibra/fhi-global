@@ -16,7 +16,7 @@ import { useAuth } from "@/context/auth-context"
 import { createClient } from "@/lib/supabase/client"
 import { getDashboardRouteByRole } from "@/lib/auth"
 import { STORY_BY_AGENT } from "@/lib/films"
-import { decodeHeadline, encodeHeadline, tokenizeHeadline } from "@/lib/headline-highlight"
+import { capitalizeWords, decodeHeadline, encodeHeadline, tokenizeHeadline } from "@/lib/headline-highlight"
 import { loadAgentWebsiteReviews, orderWebsiteReviews } from "@/lib/website-reviews"
 import { compressImageForUpload } from "@/lib/upload/compress-image"
 import { normalizeSocialUrl, readSocialLinks } from "@/lib/public-profile"
@@ -40,6 +40,8 @@ import { TestimonialsSection } from "@/app/website/_components/sections/what-my-
 // exactly that; it is removed on first load.
 const LEGACY_DRAFT_KEY = "fhi:website-builder:draft:v1"
 const draftKey = (userId: string) => `fhi:website-builder:draft:v2:${userId}`
+/** Set once a browser's draft has dropped the service areas cleared on 2026-11-09. */
+const AREAS_RESET_KEY = (userId: string) => `fhi:website-builder:areas-reset-2026-11-09:${userId}`
 const VIRTUAL_WIDTH = 1440
 const MAX_FEATURED = 12
 
@@ -405,7 +407,8 @@ function AreaNameBox({ value, label, onChange }: { value: string; label: string;
         aria-label={label}
         style={{ fontSize }}
         onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault() }}
-        onChange={(e) => onChange(e.target.value.replace(/\s*\n\s*/g, " "))}
+        // Title case as typed: each word starts with a capital ("dubai marina" → "Dubai Marina"; "JVC" stays).
+        onChange={(e) => onChange(capitalizeWords(e.target.value.replace(/\s*\n\s*/g, " ")))}
         className="block max-h-full w-full resize-none overflow-hidden bg-transparent p-0 text-center font-bold leading-tight text-white outline-none placeholder:text-white/60"
       />
     </div>
@@ -965,6 +968,7 @@ export function WebsiteBuilderClient() {
     // RERA BRN / ORN / brokerage: always the profile's (read-only here), applied
     // over the saved site or the local draft alike.
     let credentials: Pick<WebsiteData["agent"], "brn" | "orn" | "brokerage"> | null = null
+    let savedAreas: WebsiteData["areas"] | null = null
     fetch("/api/website-builder/site")
       .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
       .then(({ ok, j }) => {
@@ -977,6 +981,7 @@ export function WebsiteBuilderClient() {
           credentials?: Pick<WebsiteData["agent"], "brn" | "orn" | "brokerage">
         }
         credentials = site.credentials ?? null
+        savedAreas = site.data?.areas ?? []
         if (!site.exists || !site.slug || !site.data) return
         setSiteSlug(site.slug)
         setSavedComplete(site.complete === true)
@@ -989,7 +994,22 @@ export function WebsiteBuilderClient() {
         if (!alive) return
         // Applied here (async), not synchronously in the effect body, so the
         // draft shows whether or not the DB read succeeded.
-        if (draft) setData(seedEmptySocials(draft, seed))
+        if (draft) {
+          // Service areas were cleared on 2026-11-09: a draft from before then still holds the
+          // old ones (and saving it would put them back). Once per browser, its areas give way
+          // to the saved site's — or to none when the read failed.
+          let areasReset = true
+          try { areasReset = localStorage.getItem(AREAS_RESET_KEY(userId)) === "1" } catch { /* storage blocked */ }
+          const next = seedEmptySocials(draft, seed)
+          if (!areasReset) {
+            next.areas = savedAreas ?? []
+            try { localStorage.setItem(AREAS_RESET_KEY(userId), "1") } catch { /* storage blocked */ }
+          }
+          setData(next)
+        } else {
+          // No draft to fix: mark it done, so a draft made from here on keeps its areas.
+          try { localStorage.setItem(AREAS_RESET_KEY(userId), "1") } catch { /* storage blocked */ }
+        }
         const c = credentials
         if (c) setData((d) => ({ ...d, agent: { ...d.agent, ...c } }))
         // No Featured video link yet → fill in the agent's My story film (the site's default anyway).
@@ -1097,7 +1117,7 @@ export function WebsiteBuilderClient() {
    *  nothing has ever been saved does it fall back to the seeded sample. */
   const [resetting, setResetting] = useState(false)
   const reset = async () => {
-    if (!window.confirm("Clear your unsaved edits and go back to your saved site?")) return
+    if (!window.confirm("Discard your unsaved changes and go back to your saved site?")) return
     setResetting(true)
     try {
       if (userId) localStorage.removeItem(draftKey(userId))
@@ -1158,7 +1178,7 @@ export function WebsiteBuilderClient() {
 
   /** Add area: the typed name + its uploaded photo become one new area (filling an empty row first). */
   const addAreaWithPhoto = async (name: string, file: File) => {
-    const label = name.trim()
+    const label = capitalizeWords(name.trim())
     if (!label) return
     setAreaError(null)
     setAreaUploading(true)
@@ -1270,6 +1290,44 @@ export function WebsiteBuilderClient() {
                 />
               </Field>
 
+              {/* Brand colours — your own (custom), on one line, right above the suggestions. */}
+              <div>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1.5 text-[13.5px] font-bold text-[#0d1117]">
+                    Brand colors <span className="font-normal text-[#6b7280]">(custom, or choose below)</span>
+                    <HelpTip text="Primary: navbar, primary buttons, stat bands and dark sections. Accent: icons, dividers, eyebrows and the Get in Touch / Book a Consultation buttons." />
+                  </span>
+                  {/* Back to the default palette (Classic Gold). */}
+                  <button
+                    type="button"
+                    onClick={() => update((d) => { delete d.theme })}
+                    disabled={!data.theme}
+                    className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-[#2f5fe0] hover:underline disabled:cursor-default disabled:text-[#9aa0aa] disabled:no-underline"
+                  >
+                    Reset colors
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      { key: "brand", label: "Primary color" },
+                      { key: "gold", label: "Accent color" },
+                    ] as const
+                  ).map(({ key, label }) => (
+                    <label key={key} className="flex cursor-pointer flex-col gap-1.5 border border-[#e8eaed] bg-[#fafbfc] p-2">
+                      <span className="truncate text-[12px] font-bold text-[#0d1117]">{label}</span>
+                      <input
+                        type="color"
+                        value={data.theme?.[key] ?? DEFAULT_THEME[key]}
+                        onChange={(e) => update((d) => { d.theme = { ...(d.theme ?? {}), [key]: e.target.value } })}
+                        aria-label={label}
+                        className="h-8 w-full cursor-pointer appearance-none border border-[#e2e6ea] bg-white p-0.5"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               {/* Suggested palettes */}
               <Field label="Suggestions">
                 <div className="grid grid-cols-2 gap-2">
@@ -1303,35 +1361,6 @@ export function WebsiteBuilderClient() {
                 </div>
               </Field>
 
-              {(
-                [
-                  { key: "gold", label: "Accent (gold)", hint: "Icons, dividers, eyebrows, Get in Touch / Book a Consultation" },
-                  { key: "brand", label: "Primary (navy)", hint: "Navbar, primary buttons, stat bands, dark sections" },
-                ] as const
-              ).map(({ key, label, hint }) => (
-                <div key={key} className="border border-[#e8eaed] bg-[#fafbfc] p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[12.5px] font-bold text-[#0d1117]">{label}</p>
-                      <p className="mt-0.5 text-[11px] leading-relaxed text-[#9aa0aa]">{hint}</p>
-                    </div>
-                    <input
-                      type="color"
-                      value={data.theme?.[key] ?? DEFAULT_THEME[key]}
-                      onChange={(e) => update((d) => { d.theme = { ...(d.theme ?? {}), [key]: e.target.value } })}
-                      aria-label={label}
-                      className="h-10 w-14 shrink-0 cursor-pointer appearance-none border border-[#e2e6ea] bg-white p-1"
-                    />
-                  </div>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => update((d) => { delete d.theme })}
-                className="inline-flex items-center gap-1.5 border border-[#e2e6ea] bg-white px-3 py-2 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
-              >
-                <RotateCcw className="h-3.5 w-3.5" /> Reset to default palette
-              </button>
             </>
           )}
 
@@ -1633,18 +1662,16 @@ export function WebsiteBuilderClient() {
                 selectedIds={selectedAreaNames}
                 onToggle={toggleArea}
                 emptyText="No areas in the catalog yet — add your own."
-                trailing={
-                  // Add area: opens the name + photo step below.
-                  <button
-                    type="button"
-                    onClick={() => { setAddingArea((v) => !v); setAreaError(null) }}
-                    aria-expanded={addingArea}
-                    className="inline-flex items-center gap-1.5 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-3 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Add area
-                  </button>
-                }
               />
+              {/* Add area: full width; opens the name + photo step below. */}
+              <button
+                type="button"
+                onClick={() => { setAddingArea((v) => !v); setAreaError(null) }}
+                aria-expanded={addingArea}
+                className="flex w-full items-center justify-center gap-1.5 bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-3 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add area
+              </button>
               {/* New area: the name first, then its photo — the upload adds it to the grid. */}
               {addingArea && (
                 <div className="space-y-2 border border-[#e2e6ea] bg-[#fafbfc] p-3">
@@ -1656,7 +1683,7 @@ export function WebsiteBuilderClient() {
                       value={newAreaName}
                       placeholder="Area name, e.g. Dubai Marina"
                       aria-label="New area name"
-                      onChange={(e) => setNewAreaName(e.target.value)}
+                      onChange={(e) => setNewAreaName(capitalizeWords(e.target.value))}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && newAreaName.trim()) { e.preventDefault(); areaFileRef.current?.click() }
                         if (e.key === "Escape") setAddingArea(false)
@@ -1778,12 +1805,6 @@ export function WebsiteBuilderClient() {
                     </div>
                   ))}
                 </div>
-              )}
-              {/* No areas yet: the preview fills the section with Sample 1–6 — say so, don't list them. */}
-              {data.areas.every((a) => a.label.trim() === "" && a.image.trim() === "") && (
-                <p className="border border-dashed border-[#e2e6ea] bg-[#fafbfc] p-3 text-[12px] text-[#6b7280]">
-                  You&apos;re using the sample areas (Sample 1–6) for now — add your own to replace them.
-                </p>
               )}
             </>
           )}
@@ -1995,16 +2016,16 @@ export function WebsiteBuilderClient() {
           // One row: Previous (its tab name cut with "…" when tight) · Clear, which stretches to fill the
           // space between · Next / Save at their own width.
           const stepBtn = "inline-flex h-8 min-w-0 shrink items-center gap-1.5 border border-[#e2e6ea] px-3 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9]"
-          // Clear (drop unsaved edits) is on every tab.
+          // Discard changes (drop unsaved edits, back to the saved site) is on every tab.
           const clearBtn = (
             <button
               type="button"
               onClick={() => void reset()}
               disabled={resetting}
-              title="Clear the edits you haven't saved and go back to your saved site"
+              title="Throw away the edits you haven't saved and go back to your saved site"
               className="inline-flex h-8 min-w-[76px] flex-1 items-center justify-center gap-1.5 whitespace-nowrap border border-[#e2e6ea] px-2.5 text-[12px] font-semibold text-[#0d1117] transition-colors hover:bg-[#f4f6f9] disabled:opacity-60"
             >
-              {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />} Clear
+              {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />} Discard changes
             </button>
           )
           if (next) {
@@ -2012,7 +2033,7 @@ export function WebsiteBuilderClient() {
               <div className="mt-2 flex items-center gap-2 border-t border-[#eef0f3] pt-4">
                 {prev && (
                   <button type="button" onClick={() => openSection(prev.id)} className={stepBtn}>
-                    <ChevronLeft className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Previous: {prev.label}</span>
+                    <ChevronLeft className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Previous</span>
                   </button>
                 )}
                 {clearBtn}
@@ -2021,7 +2042,7 @@ export function WebsiteBuilderClient() {
                     onClick={() => openSection(next.id)}
                     className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap bg-gradient-to-b from-[#0a3d6b] to-[#001f3f] px-3 text-[12px] font-bold text-white transition-opacity hover:opacity-90"
                   >
-                    Next: {next.label} <ChevronRight className="h-3.5 w-3.5" />
+                    Next <ChevronRight className="h-3.5 w-3.5" />
                   </button>
               </div>
             )
@@ -2031,7 +2052,7 @@ export function WebsiteBuilderClient() {
           <div className="flex items-center gap-2">
             {prev && (
               <button type="button" onClick={() => openSection(prev.id)} className={stepBtn}>
-                <ChevronLeft className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Previous: {prev.label}</span>
+                <ChevronLeft className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Previous</span>
               </button>
             )}
               {clearBtn}

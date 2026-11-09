@@ -34,7 +34,7 @@ import {
   sanitizeAgentCredentials,
 } from "@/lib/agent-site"
 import { isLiveProject, isTestRecord, type ProjectLiveFlags } from "@/lib/listing-publish-checks"
-import { plainHeadline } from "@/lib/headline-highlight"
+import { capitalizeWords, plainHeadline } from "@/lib/headline-highlight"
 
 // ─── Shared card mapping (also used by the picker API routes) ─────────────────
 
@@ -536,7 +536,8 @@ export async function saveSite(
   // by name (case-insensitive) or insert a new one, then link it to the site.
   await admin.from("service_areas_section").delete().eq("website_id", websiteId)
   const wantedAreas = data.areas
-    .map((a) => ({ name: a.label.trim(), photo: a.image.trim() }))
+    // Area names are title case (boss, 2026-11-09) — the catalog stores them that way too.
+    .map((a) => ({ name: capitalizeWords(a.label.trim()), photo: a.image.trim() }))
     .filter((a) => a.name)
   if (wantedAreas.length) {
     const { data: catalog, error: catalogError } = await admin

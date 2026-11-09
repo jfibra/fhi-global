@@ -4,13 +4,21 @@
 import { IMG, NAVY, SAMPLE_DATA, TEST_AREAS, type WebsiteData } from "../../_data"
 import { FancyEyebrow } from "../ui"
 
+/** The fewest tiles the section shows; fewer areas repeat to fill it. */
+const MIN_AREA_TILES = 4
+
 export function ServiceAreasSection({ data = SAMPLE_DATA, placeholders = true }: { data?: WebsiteData; placeholders?: boolean }) {
   // Agent-added areas take over; until then the fixed samples fill the section — in the editor preview and on
   // /website/sample (`placeholders`), never on a live site, where six tiles labelled "Sample 1…6" under "Areas I
   // Specialize In" are not the agent's. Rows with no name and no photo (a freshly added blank) don't count.
   const real = data.areas.filter((a) => a.label.trim() !== "" || a.image.trim() !== "")
-  const areas = real.length > 0 ? real : placeholders ? TEST_AREAS : []
-  if (areas.length === 0) return null
+  const chosen = real.length > 0 ? real : placeholders ? TEST_AREAS : []
+  if (chosen.length === 0) return null
+  // Always at least MIN_AREA_TILES tiles (boss, 2026-11-09): with fewer areas the agent's own repeat in
+  // order to fill the strip (2 areas → A B A B), so it never looks half empty.
+  const areas = chosen.length >= MIN_AREA_TILES
+    ? chosen
+    : Array.from({ length: MIN_AREA_TILES }, (_, i) => chosen[i % chosen.length])
   return (
     <section id="areas" className="relative scroll-mt-[72px] overflow-hidden">
       {/* Background photo + white wash */}
@@ -35,7 +43,8 @@ export function ServiceAreasSection({ data = SAMPLE_DATA, placeholders = true }:
               <img src={a.image} alt={a.label} className="absolute inset-0 h-full w-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-black/25" />
               <div className="absolute bottom-4 left-5 right-5 text-center">
-                <p className="truncate text-[17px] font-semibold text-white">{a.label}</p>
+                {/* Title case on the site too (names saved before the builder forced it). */}
+                <p className="truncate text-[17px] font-semibold capitalize text-white">{a.label}</p>
               </div>
             </div>
           ))}

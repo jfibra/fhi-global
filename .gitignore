@@ -33,3 +33,5 @@ next-env.d.ts
 
 # scripts/clear-brns.mjs backups (names + BRNs)
 brn-backup-*.json
+# service areas cleared 2026-11-09 (backup)
+service-areas-backup-*.json
