@@ -57,7 +57,6 @@ export default async function CompleteProfilePage() {
     whatsapp_number: str(m.whatsapp_number),
     linkedin: str(m.linkedin),
     facebook: str(m.facebook),
-    license_number: str(m.license_number),
     bio: str(m.bio),
   }
 

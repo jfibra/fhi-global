@@ -1,16 +1,17 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { AuthProvider } from "@/context/auth-context"
 import { DashboardShell } from "@/components/dashboard/shell"
 import { ProfilePhotoGate } from "@/components/dashboard/profile-photo-gate"
 import { PartnerInfoGate } from "@/components/dashboard/partner-info-gate"
+import { BRN_REQUIRED_PARAM, PROFILE_SAVED_EVENT, isProfilePath, needsBrnAnswer, type ProfileSavedDetail } from "@/lib/brn-required"
 import { AssistantTeaserPopup } from "@/components/dashboard/assistant-teaser-popup"
 import { partnerInfoMetadata } from "@/lib/partner-signup"
 import { PageLoader } from "@/components/ui/PageLoader"
-import { getDashboardRouteByRole, getProfileByUserId, googleAvatarUrl, hasProfilePhoto, isInactiveProfile, type AppProfile, type AppUser } from "@/lib/auth"
+import { getDashboardRouteByRole, getProfileByUserId, isInactiveProfile, isUploadedProfilePhoto, type AppProfile, type AppUser } from "@/lib/auth"
 import { ROLES_AGENT_ASSISTANT, isAdminStaffRole, isKnownAppRoleId, roleInList } from "@/lib/app-roles"
 import { readViewAsCookie } from "@/lib/view-as"
 
@@ -30,7 +31,19 @@ import { readViewAsCookie } from "@/lib/view-as"
  */
 export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [session, setSession] = useState<{ user: AppUser; profile: AppProfile } | null>(null)
+
+  // The profile page saves on its own; it tells us what it saved so the BRN
+  // redirect below stops without a reload.
+  useEffect(() => {
+    const onSaved = (e: Event) => {
+      const { metadata } = (e as CustomEvent<ProfileSavedDetail>).detail ?? {}
+      setSession((prev) => (prev ? { ...prev, profile: { ...prev.profile, metadata: metadata ?? {} } } : prev))
+    }
+    window.addEventListener(PROFILE_SAVED_EVENT, onSaved)
+    return () => window.removeEventListener(PROFILE_SAVED_EVENT, onSaved)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -55,25 +68,20 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
         router.replace("/account-inactive")
         return
       }
-      // If there's no saved photo yet but the user signed in with Google, adopt
-      // their Google avatar as the profile photo (persist best-effort so it
-      // displays everywhere and sticks) rather than forcing them to upload one
-      // they effectively already have. Only ever fills an empty profile_url —
-      // never overwrites an existing photo.
-      let resolved = profile
-      if (!hasProfilePhoto(profile.profile_url)) {
-        const gAvatar = googleAvatarUrl(user.user_metadata)
-        if (gAvatar) {
-          resolved = { ...profile, profile_url: gAvatar }
-          void supabase.from("profiles").update({ profile_url: gAvatar }).eq("id", user.id)
-        }
-      }
-      setSession({ user: { id: user.id, email: user.email ?? null }, profile: resolved })
+      setSession({ user: { id: user.id, email: user.email ?? null }, profile })
     })()
     return () => {
       active = false
     }
   }, [router])
+
+  // BRN not answered yet → their own profile page (any role's /…/profile shows
+  // their own profile), with a flag so it scrolls to the BRN field.
+  useEffect(() => {
+    if (!session || isProfilePath(pathname)) return
+    if (!isUploadedProfilePhoto(session.profile.profile_url) || !needsBrnAnswer(session.profile.metadata)) return
+    router.replace(`${getDashboardRouteByRole(session.profile.role)}/profile?${BRN_REQUIRED_PARAM}=required`)
+  }, [session, pathname, router])
 
   if (!session) {
     return <PageLoader />
@@ -86,16 +94,26 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
   //
   // This modal is THE photo enforcement for all roles — /complete-profile
   // handles the written details but deliberately doesn't require the photo. It
-  // is satisfied by ANY saved photo (an uploaded headshot or the Google avatar
-  // adopted above), so it only appears for accounts with no photo at all — e.g.
-  // email/password sign-ups. (isUploadedProfilePhoto, the stricter "real upload"
-  // rule, still governs spots where headshot quality specifically matters.)
-  const needsPhoto = !hasProfilePhoto(session.profile.profile_url)
+  // asks for a photo the person UPLOADED (isUploadedProfilePhoto, stored on S3):
+  // a Google picture doesn't count, because for Google accounts without a real
+  // photo it's a letter avatar ("MS") that can't be told apart by its link, and
+  // the directory / business cards need a real headshot. A Google picture
+  // already on the profile stays there for display until they upload.
+  const needsPhoto = !isUploadedProfilePhoto(session.profile.profile_url)
 
+  const meta = (session.profile.metadata ?? {}) as Record<string, unknown>
+
+  // Next, the RERA BRN (lib/brn-required.ts): until the person saves a BRN the
+  // Dubai Land Department register has, or ticks "I'm not a broker", every
+  // dashboard page sends them to their profile page, where the BRN field is
+  // highlighted. After the photo — the photo pop-up shows over any page.
+  const needsBrn = !needsPhoto && needsBrnAnswer(meta)
+  const afterSetup = !needsPhoto && !needsBrn
+  // Hold the page while the redirect above runs.
+  if (needsBrn && !isProfilePath(pathname)) return <PageLoader />
   // A Global Partner who joined before the invite asked where they live answers
   // it once here (lib/partner-signup.ts) — after the photo, never two at once.
   // Their real role only: an admin viewing as a partner isn't asked.
-  const meta = (session.profile.metadata ?? {}) as Record<string, unknown>
   const needsPartnerInfo =
     session.profile.role === "global_partner" && !(typeof meta.residence_country === "string" && meta.residence_country)
 
@@ -128,7 +146,7 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
           }
         />
       )}
-      {!needsPhoto && needsPartnerInfo && (
+      {afterSetup && needsPartnerInfo && (
         <PartnerInfoGate
           displayName={
             session.profile.fullname
@@ -145,7 +163,7 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
           }
         />
       )}
-      {!needsPhoto && showsTeaser && (
+      {afterSetup && showsTeaser && (
         <AssistantTeaserPopup
           firstName={(session.profile.fname ?? session.profile.fullname ?? "").trim().split(/\s+/)[0] ?? ""}
           chatHref={`${getDashboardRouteByRole(session.profile.role)}/fhi-chat`}

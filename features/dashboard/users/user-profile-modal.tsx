@@ -124,6 +124,7 @@ export function UserProfileModal({
     fname: user.fname ?? "",
     mname: user.mname ?? "",
     lname: user.lname ?? "",
+    suffix: user.suffix ?? "",
     birthday: user.birthday ?? "",
     gender: user.gender ?? "",
     nationality: s(m.nationality),
@@ -190,7 +191,7 @@ export function UserProfileModal({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fname: f.fname, mname: f.mname, lname: f.lname,
+          fname: f.fname, mname: f.mname, lname: f.lname, suffix: f.suffix,
           birthday: f.birthday || null, gender: f.gender || null,
           timezone: f.timezone, role: f.role, status: f.status,
           invited_by: f.invited_by || null,
@@ -256,10 +257,11 @@ export function UserProfileModal({
         <div className="overflow-y-auto max-h-[70vh] px-6 py-6">
           <fieldset disabled={readOnly || busy} className="contents">
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_96px] gap-4">
                 <FloatingInput label="First name" value={f.fname} onChange={(v) => set("fname", v)} />
                 <FloatingInput label="Middle name" value={f.mname} onChange={(v) => set("mname", v)} />
                 <FloatingInput label="Last name" value={f.lname} onChange={(v) => set("lname", v)} />
+                <FloatingInput label="Suffix" value={f.suffix} onChange={(v) => set("suffix", v.slice(0, 10))} />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

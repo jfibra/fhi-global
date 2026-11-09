@@ -1,8 +1,9 @@
 "use client"
 
 import Image from "next/image"
-import { useState } from "react"
-import { CalendarDays, Mail, ShieldCheck, Clock3, BadgeCheck, Camera } from "lucide-react"
+import { useEffect, useState } from "react"
+import { CalendarDays, Mail, ShieldCheck, Clock3, Camera, Users } from "lucide-react"
+import { fetchMyActiveTeam } from "@/lib/team-service"
 import { ProfileAvatarUpload } from "@/components/profile-avatar-upload"
 import { ChangeEmailModal } from "./change-email-modal"
 import { isDeveloperRole } from "@/lib/app-roles"
@@ -53,12 +54,12 @@ export function ProfileSidebar({
     { icon: ShieldCheck, label: roleLabel(profile.role) },
     { icon: CalendarDays, label: `Joined ${formatDate(profile.joined_at)}` },
     { icon: Clock3, label: profile.timezone || "UTC" },
-    { icon: BadgeCheck, label: profile.status || "active" },
   ]
 
   return (
     <>
-    <aside className="bg-white border border-[#e5e7eb] p-6 h-fit xl:sticky xl:top-0">
+    <div className="h-fit space-y-6 xl:sticky xl:top-0">
+    <aside className="bg-white border border-[#e5e7eb] p-6">
       {/* Avatar */}
       <div className="flex flex-col items-center text-center">
         <div className="relative w-28 h-28">
@@ -129,6 +130,9 @@ export function ProfileSidebar({
 
     </aside>
 
+    <TeamCard userId={profile.id} />
+    </div>
+
     <ProfileAvatarUpload
       userId={profile.id}
       displayName={displayName}
@@ -146,5 +150,60 @@ export function ProfileSidebar({
       <ChangeEmailModal currentEmail={email} onClose={() => setEmailModalOpen(false)} />
     )}
     </>
+  )
+}
+
+type MyTeam = { name: string; logoUrl: string | null; roleInTeam: string | null }
+
+/** The team the person is on now — logo left (square tile, logo scaled to fit whole), name right. */
+function TeamCard({ userId }: { userId: string }) {
+  const [team, setTeam] = useState<MyTeam | null | undefined>(undefined)
+
+  useEffect(() => {
+    let active = true
+    void fetchMyActiveTeam(userId).then(({ data }) => { if (active) setTeam(data) })
+    return () => { active = false }
+  }, [userId])
+
+  return (
+    <section className="bg-white border border-[#e5e7eb] p-6">
+      {team === undefined ? (
+        <div className="flex items-center gap-4" aria-hidden>
+          <div className="h-24 w-24 shrink-0 animate-pulse bg-[#f3f4f6]" />
+          <div className="h-4 flex-1 animate-pulse bg-[#f3f4f6]" />
+        </div>
+      ) : team ? (
+        // Logo | Team, 30 / 70: the logo as it is (no tile, border or padding — scaled to
+        // fit its column, never cropped or stretched), a divider, then the team.
+        <div className="flex items-center gap-4">
+          <div className="flex w-[30%] shrink-0 items-center justify-center">
+            {team.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- any uploaded host; next/image would need each in remotePatterns
+              <img
+                src={team.logoUrl}
+                alt={`${team.name} logo`}
+                loading="lazy"
+                className="max-h-16 w-full object-contain"
+              />
+            ) : (
+              <Users className="h-8 w-8 text-[#001f3f]" aria-hidden />
+            )}
+          </div>
+          <span className="w-px self-stretch shrink-0 bg-[#e5e7eb]" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">Team</p>
+            <p className="truncate font-['Outfit'] text-base font-bold text-[#0d1117]" title={team.name}>{team.name}</p>
+            {team.roleInTeam && <p className="truncate text-xs capitalize text-[#6b7280]">{team.roleInTeam}</p>}
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-4">
+          <span className="flex h-24 w-24 shrink-0 items-center justify-center border border-dashed border-[#d1d5db] bg-[#f8fafc]" aria-hidden>
+            <Users className="h-8 w-8 text-[#9ca3af]" />
+          </span>
+          <p className="text-sm text-[#6b7280]">Not on a team yet</p>
+        </div>
+      )}
+    </section>
   )
 }

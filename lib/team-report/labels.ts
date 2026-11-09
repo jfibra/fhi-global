@@ -29,7 +29,7 @@ export const REQUIREMENT_LABELS: Record<Requirement, string> = {
 export const REQUIREMENT_HINTS: Record<Requirement, string> = {
   approved: "the person whose invite link they used has pressed Approve",
   profile: "name, birthday, gender, nationality, phone and WhatsApp saved",
-  photo: "a profile photo is on the account",
+  photo: "a profile photo is uploaded (a Google picture doesn't count)",
   selling_role: "role is Agent, Unit Manager or Team Leader (Global Partners get theirs from the Global Partner link)",
 }
 

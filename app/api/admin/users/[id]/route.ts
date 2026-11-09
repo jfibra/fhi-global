@@ -92,6 +92,7 @@ export async function PATCH(
   if (body.fname      !== undefined) profileUpdate.fname      = body.fname || null
   if (body.mname      !== undefined) profileUpdate.mname      = body.mname || null
   if (body.lname      !== undefined) profileUpdate.lname      = body.lname || null
+  if (body.suffix     !== undefined) profileUpdate.suffix     = (typeof body.suffix === "string" ? body.suffix.trim().slice(0, 10) : "") || null
   if (body.birthday   !== undefined) profileUpdate.birthday   = body.birthday || null
   if (body.gender     !== undefined) profileUpdate.gender     = body.gender || null
   if (body.timezone   !== undefined) profileUpdate.timezone   = body.timezone
@@ -108,12 +109,14 @@ export async function PATCH(
   }
 
   // Rebuild fullname when name parts change
-  if (body.fname !== undefined || body.mname !== undefined || body.lname !== undefined) {
-    const { data: current } = await admin.from("profiles").select("fname,mname,lname").eq("id", id).single()
+  if (body.fname !== undefined || body.mname !== undefined || body.lname !== undefined || body.suffix !== undefined) {
+    const { data: current } = await admin.from("profiles").select("fname,mname,lname,suffix").eq("id", id).single()
     const fname = body.fname ?? current?.fname ?? ""
     const mname = body.mname ?? current?.mname ?? ""
     const lname = body.lname ?? current?.lname ?? ""
-    profileUpdate.fullname = [fname, mname, lname].filter(Boolean).join(" ")
+    const suffix = body.suffix !== undefined ? (profileUpdate.suffix as string | null) ?? "" : current?.suffix ?? ""
+    // Suffix (Jr., Sr., III …) ends the full name, as on the profile page.
+    profileUpdate.fullname = [fname, mname, lname, suffix].filter(Boolean).join(" ")
   }
 
   // Metadata merge for phone/whatsapp + developer link + referrer (invited_by)

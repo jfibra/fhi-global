@@ -18,7 +18,7 @@ export default function DashboardProfilePage() {
     createClient()
       .from("profiles")
       .select(
-        "id, role, fname, mname, lname, fullname, birthday, gender, profile_url, status, timezone, metadata, joined_at, updated_at, is_deleted, deleted_at",
+        "id, role, fname, mname, lname, suffix, fullname, birthday, gender, profile_url, status, timezone, metadata, joined_at, updated_at, is_deleted, deleted_at",
       )
       .eq("id", userId)
       .single()

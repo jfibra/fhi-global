@@ -2,7 +2,7 @@ import "server-only"
 
 import type { createAdminSupabase } from "@/lib/admin-supabase"
 import { ROLES_SALES_PIPELINE, roleInList } from "@/lib/app-roles"
-import { hasProfilePhoto, isProfileMissingMinimumFields, type AppProfile } from "@/lib/auth"
+import { isProfileMissingMinimumFields, isUploadedProfilePhoto, type AppProfile } from "@/lib/auth"
 import { buildGenealogy } from "@/lib/genealogy"
 import type { Bar, Kpi, Share } from "@/lib/company-report/data"
 import { businessDate, fetchAllSales, nameMaps, saleCredits, type SaleRow } from "@/lib/fhi-chat-tools"
@@ -468,7 +468,7 @@ export async function buildTeamReport(
     const missing: Requirement[] = []
     if (st !== "active") missing.push("approved")
     if (isProfileMissingMinimumFields(p)) missing.push("profile")
-    if (!hasProfilePhoto(p.profile_url)) missing.push("photo")
+    if (!isUploadedProfilePhoto(p.profile_url)) missing.push("photo")
     if (!isSellingRole(p.role)) missing.push("selling_role")
     return {
       id: m.user_id,

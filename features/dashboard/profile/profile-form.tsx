@@ -12,6 +12,7 @@ export type DashboardProfile = {
   fname: string | null
   mname: string | null
   lname: string | null
+  suffix: string | null
   fullname: string | null
   birthday: string | null
   gender: string | null

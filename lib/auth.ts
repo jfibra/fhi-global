@@ -233,12 +233,10 @@ export function isUploadedProfilePhoto(url: string | null | undefined): boolean 
 }
 
 /**
- * Any usable profile photo for the dashboard photo gate — an uploaded headshot
- * OR the Google avatar OAuth copies onto the profile. The gate only exists to
- * stop the directory being full of blank initials, and a Google photo already
- * clears that bar, so it should not force an upload on top of one. This is the
- * looser counterpart to isUploadedProfilePhoto, which stays the rule anywhere
- * headshot quality specifically matters (e.g. business-card / top-seller art).
+ * Any photo on the profile at all — an uploaded headshot OR a Google picture.
+ * Only for showing an existing picture (e.g. complete-profile's preview). The
+ * dashboard photo gate and the Team Report use isUploadedProfilePhoto: a Google
+ * picture can be a letter avatar, so everyone uploads a real headshot.
  */
 export function hasProfilePhoto(url: string | null | undefined): boolean {
   return !!(url ?? "").trim()
@@ -260,7 +258,7 @@ export function isProfileMissingMinimumFields(profile: AppProfile) {
     // proxy's redirect to /complete-profile; the photo is instead enforced by
     // the ProfilePhotoGate modal inside the dashboard shell, which covers every
     // role (including admin staff, who are exempt from this gate) and uses the
-    // same isUploadedProfilePhoto rule so a copied Google avatar doesn't count.
+    // isUploadedProfilePhoto rule so a Google picture doesn't count.
     !profile.fname?.trim() ||
     !profile.lname?.trim() ||
     !profile.timezone?.trim() ||

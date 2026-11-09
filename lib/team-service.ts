@@ -501,3 +501,28 @@ export async function searchProfiles(
   if (error) return { data: [], error: error.message }
   return { data: (data ?? []) as ProfileSearchResult[], error: null }
 }
+
+/**
+ * The team a person is on now (their latest active membership — one active
+ * membership per person, `on_team_transfer`), for the profile page's Team
+ * card. Same read as lib/my-team.ts, on the browser client.
+ */
+export async function fetchMyActiveTeam(
+  userId: string,
+): Promise<{ data: { name: string; logoUrl: string | null; roleInTeam: string | null } | null; error: string | null }> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("team_memberships")
+    .select("role_in_team, teams(name, logo_url)")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .order("joined_at", { ascending: false })
+    .limit(1)
+  if (error) return { data: null, error: error.message }
+
+  type TeamRow = { name: string | null; logo_url: string | null }
+  const row = (data?.[0] ?? null) as unknown as { role_in_team: string | null; teams: TeamRow | TeamRow[] | null } | null
+  const team = row ? (Array.isArray(row.teams) ? row.teams[0] ?? null : row.teams) : null
+  if (!team?.name) return { data: null, error: null }
+  return { data: { name: team.name, logoUrl: team.logo_url ?? null, roleInTeam: row?.role_in_team ?? null }, error: null }
+}

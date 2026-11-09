@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("profiles")
     .select(
-      "id, fname, mname, lname, fullname, birthday, gender, profile_url, role, status, timezone, metadata, joined_at, updated_at, is_deleted, deleted_at",
+      "id, fname, mname, lname, suffix, fullname, birthday, gender, profile_url, role, status, timezone, metadata, joined_at, updated_at, is_deleted, deleted_at",
       { count: "exact" },
     )
     .range(from, to)

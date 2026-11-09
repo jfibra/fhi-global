@@ -6,6 +6,7 @@ export type UserRecord = {
   fname: string | null
   mname: string | null
   lname: string | null
+  suffix: string | null
   fullname: string | null
   birthday: string | null
   gender: string | null
@@ -46,6 +47,7 @@ export type UpdateUserPayload = {
   fname?: string
   mname?: string
   lname?: string
+  suffix?: string | null
   birthday?: string | null
   gender?: string | null
   timezone?: string

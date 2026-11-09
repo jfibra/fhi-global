@@ -29,7 +29,7 @@ export type CompleteProfileInitial = {
   birthday: string; gender: string; nationality: string; timezone: string
   phone_country_code: string; phone_number: string
   whatsapp_country_code: string; whatsapp_number: string
-  linkedin: string; facebook: string; license_number: string; bio: string
+  linkedin: string; facebook: string; bio: string
 }
 
 const initialState: CompleteProfileState = {}
@@ -215,7 +215,7 @@ export function CompleteProfileForm({
               <FloatingInput name="linkedin" label="LinkedIn" defaultValue={initial.linkedin} />
               <FloatingInput name="facebook" label="Facebook" defaultValue={initial.facebook} />
             </div>
-            <FloatingInput name="license_number" label="RERA BRN (broker card number)" defaultValue={initial.license_number} />
+            {/* No BRN here: the profile page asks for it and checks it with DLD (lib/brn-required.ts). */}
             <div className="relative">
               <textarea
                 id="bio" name="bio" defaultValue={initial.bio} rows={3} placeholder=" "

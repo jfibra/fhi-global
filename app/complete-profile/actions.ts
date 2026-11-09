@@ -10,7 +10,7 @@ export type CompleteProfileState = { error?: string }
  * Saves the required profile info for an incomplete account, then sends the user
  * to their role dashboard. Required: photo, fname, lname, birthday, gender,
  * nationality, timezone, phone, whatsapp. Optional: mname, linkedin, facebook,
- * license, bio.
+ * bio. (The RERA BRN is asked on the profile page, checked with DLD — lib/brn-required.ts.)
  *
  * The photo arrives as a URL: the form uploads it to /api/upload/avatar (which
  * authenticates and returns the S3 location) and posts the result here. Only an
@@ -43,7 +43,6 @@ export async function completeProfileAction(
   const waNumber = g("whatsapp_number")
   const linkedin = g("linkedin")
   const facebook = g("facebook")
-  const license = g("license_number")
   const bio = g("bio")
   const profileUrl = g("profile_url")
 
@@ -58,13 +57,14 @@ export async function completeProfileAction(
     return { error: "The profile photo didn't upload correctly — please try adding it again." }
   }
 
-  const fullname = [fname, mname, lname].map((p) => p.trim()).filter(Boolean).join(" ")
-
   const { data: existing } = await supabase
     .from("profiles")
-    .select("metadata, role, status, is_deleted")
+    .select("metadata, role, status, is_deleted, suffix")
     .eq("id", user.id)
-    .single<{ metadata: Record<string, unknown> | null; role: string | null; status: string | null; is_deleted: boolean | null }>()
+    .single<{ metadata: Record<string, unknown> | null; role: string | null; status: string | null; is_deleted: boolean | null; suffix: string | null }>()
+
+  // This form has no suffix field — keep one already set (profiles.suffix) at the end of the name.
+  const fullname = [fname, mname, lname, existing?.suffix ?? ""].map((p) => p.trim()).filter(Boolean).join(" ")
 
   const metadata = {
     ...(existing?.metadata ?? {}),
@@ -75,7 +75,6 @@ export async function completeProfileAction(
     nationality,
     linkedin: linkedin || null,
     facebook: facebook || null,
-    license_number: license || null,
     bio: bio || null,
   }
 
