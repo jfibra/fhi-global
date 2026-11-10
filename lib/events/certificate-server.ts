@@ -1,7 +1,13 @@
 import { PDFDocument } from "pdf-lib"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { eventBrand } from "@/lib/events/brands"
-import { certificateNumber, parseCertificateSettings, type CertificateSettings } from "@/lib/events/certificate"
+import {
+  certificateNumber,
+  drawableSettings,
+  drawableText,
+  parseCertificateSettings,
+  type CertificateSettings,
+} from "@/lib/events/certificate"
 import {
   CERT_HEIGHT,
   CERT_WIDTH,
@@ -64,11 +70,13 @@ export async function buildCertificateInput(opts: {
   const { event, registration } = opts
   const brand = eventBrand(event.brand)
   const fonts = await loadCertificateFonts(opts.origin)
+  // Every typed text goes through drawableText: one Arabic word anywhere on
+  // the certificate makes the renderer fail the whole image.
   return {
-    attendeeName: registration ? titleCaseName(registration.full_name) : SAMPLE_ATTENDEE,
-    eventTitle: event.title,
+    attendeeName: registration ? drawableText(titleCaseName(registration.full_name)) : SAMPLE_ATTENDEE,
+    eventTitle: drawableText(event.title),
     dateLabel: certificateDateLabel(event.event_date, event.event_days ?? 1),
-    venue: event.venue,
+    venue: event.venue ? drawableText(event.venue) || null : null,
     brandKey: brand.key,
     // Logo filenames contain spaces; Satori needs a proper URL.
     logoSrc: `${opts.origin}${encodeURI(brand.logo)}`,
@@ -78,7 +86,7 @@ export async function buildCertificateInput(opts: {
     // A number only when the certificate is tied to a real registration; the
     // self-service (typed-name) path and the sample preview print none.
     certificateNo: registration && !registration.id.startsWith("00000000-") ? certificateNumber(registration.id, event.event_date) : null,
-    settings: opts.settingsOverride ?? parseCertificateSettings(event.certificate),
+    settings: drawableSettings(opts.settingsOverride ?? parseCertificateSettings(event.certificate)),
     fonts,
   }
 }

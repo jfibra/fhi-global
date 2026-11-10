@@ -86,6 +86,45 @@ export function parseCertificateSettings(raw: unknown): CertificateSettings {
   }
 }
 
+// Arabic letters, plus the invisible direction / joiner marks that travel with them.
+const ARABIC_RUN = /[\p{Script=Arabic}\u200c-\u200f\u061c]+/gu
+// Two or more separators in a row once a word between them is gone ("7 -  - Bay"),
+// and separators left dangling at either end.
+const SEPARATOR_RUN = /\s*([,\-–·])(?:\s*[,\-–·])+\s*/g
+const EDGE_SEPARATORS = /^[\s,\-–·]+|[\s,\-–·]+$/g
+
+/**
+ * Text the certificate renderer can draw. Satori has no font for Arabic, so it
+ * fetches one whose shaping rules its font parser can't read ("lookupType: 5 -
+ * substFormat: 3 is not yet supported") and the WHOLE certificate fails — a
+ * venue picked from Google Places came back as "… Building 7 - الخليج التجاري -
+ * Bay Square - دبي - United Arab Emirates" and every Send for that event
+ * failed (2026-11-10). Arabic runs are dropped and the separators around them
+ * tidied: "… Building 7 - Bay Square - United Arab Emirates".
+ */
+export function drawableText(text: string): string {
+  if (!/\p{Script=Arabic}/u.test(text)) return text
+  return text
+    .replace(ARABIC_RUN, " ")
+    .replace(SEPARATOR_RUN, (_, first: string) => (first === "," ? ", " : ` ${first} `))
+    .replace(EDGE_SEPARATORS, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+}
+
+/** The certificate's own wording, made drawable (see drawableText). */
+export function drawableSettings(s: CertificateSettings): CertificateSettings {
+  return {
+    ...s,
+    heading: drawableText(s.heading) || CERTIFICATE_DEFAULTS.heading,
+    line: drawableText(s.line) || CERTIFICATE_DEFAULTS.line,
+    note: drawableText(s.note),
+    signatories: s.signatories
+      .map((x) => ({ name: drawableText(x.name), title: drawableText(x.title) }))
+      .filter((x) => x.name),
+  }
+}
+
 /** Short, human-checkable certificate number derived from the registration id. */
 export function certificateNumber(registrationId: string, eventDate: string | null): string {
   const year = eventDate ? new Date(eventDate).getFullYear() : new Date().getFullYear()
