@@ -2,6 +2,7 @@ import "server-only"
 
 import { ImageResponse } from "next/og"
 import { SITE_URL } from "@/lib/seo"
+import { ogPicture } from "@/lib/og-picture"
 import { BIRTHDAY_DESIGNS, NAME_FILL, TEMPLATE_H, TEMPLATE_W } from "@/features/dashboard/poster-maker/birthday-designs"
 
 /**
@@ -55,9 +56,12 @@ export async function renderBirthdayPosterPng(input: {
   const nameColor = NAME_FILL[design.name.style].mid
   const template = await asDataUri(`${SITE_URL}${design.src}`)
   if (!template) return null
-  const photo = input.photoUrl ? await asDataUri(input.photoUrl) : null
   const wellW = WELL.x1 - WELL.x0
   const wellH = WELL.y1 - WELL.y0
+  // Most dashboard-uploaded avatars are WebP, which satori cannot decode (it crashed on 164 of
+  // 392 member photos). ogPicture re-encodes any format to a JPEG sized to the photo well; the
+  // routes drawing this need the sharp tracing keys in next.config.mjs.
+  const photo = await ogPicture(input.photoUrl, wellW, wellH, "cover")
   const name = input.name.trim().replace(/\s+/g, " ")
   // Long names shrink instead of wrapping over the artwork.
   const size = name.length > 18 ? Math.max(38, Math.round((NAME.size * 18) / name.length)) : NAME.size

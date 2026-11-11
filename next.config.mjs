@@ -232,6 +232,9 @@ const nextConfig = {
     // The agents' project brochure PDF (photo + logos re-encoded with sharp, lib/company-report/brand-images.ts).
     "/api/fhi-chat/brochure": SHARP_LINUX_LIBS,
     "/api/fhi-chat/report": SHARP_LINUX_LIBS,
+    // Birthday posters (FHI Assistant on demand + the daily greeting cron) — the member photo is re-encoded with sharp through ogPicture.
+    "/api/admin/birthday-poster": SHARP_LINUX_LIBS,
+    "/api/cron/birthdays": SHARP_LINUX_LIBS,
   },
   // Loaded from node_modules at run time instead of bundled: @napi-rs/canvas is
   // a native addon, and pdf.js finds it, and its own data files, relative to
