@@ -13,6 +13,7 @@ import { SITE_URL } from "@/lib/seo"
 import { isTestRecord } from "@/lib/listing-publish-checks"
 import { fetchPublicAgents } from "@/lib/public-agents"
 import { SITE_CHAT_FAQS } from "@/lib/site-chat-faq"
+import { fetchArticlesList, isIndexableNewsArticle, type NewsArticle } from "@/lib/news-service"
 
 /**
  * The website chat's model loop (boss via Juliecor, 2026-11-06): the public
@@ -27,6 +28,8 @@ import { SITE_CHAT_FAQS } from "@/lib/site-chat-faq"
  *     sales on it);
  *   · find_listings — the ready homes for sale and rent on /buy and /rent;
  *   · upcoming_events — what /events lists;
+ *   · latest_news — the newest articles on /news (the visitor asked "what's
+ *     the latest news in Dubai today?" and was told the bot had no access);
  *   · site_pages — the guides and pages, so it links instead of guessing, and
  *     the ready answers about the website itself (lib/site-chat-faq.ts —
  *     registering, signing in, the office, who FHI is; the route answers the
@@ -44,7 +47,7 @@ const MAX_ANSWER_TOKENS = 550
 export type SiteChatHistory = Array<{ role: "user" | "assistant"; content: string }>
 
 /** A card the widget draws under the answer: a project, a listing or an event, with its page. */
-export type SiteChatCard = { title: string; subtitle?: string; image?: string | null; href: string | null; kind: "project" | "listing" | "event" | "agent" }
+export type SiteChatCard = { title: string; subtitle?: string; image?: string | null; href: string | null; kind: "project" | "listing" | "event" | "agent" | "news" }
 
 export type SiteChatResult = {
   ok: boolean
@@ -72,6 +75,7 @@ WHAT YOU CAN DO, only through the tools:
 - project_details — everything about ONE named project: prices, unit types and sizes, payment plan, handover, amenities, what's nearby, the page link.
 - find_listings — individual ready homes for sale or for rent listed by FHI's agents (/buy and /rent).
 - upcoming_events — FHI's property events, roadshows and seminars.
+- latest_news — the newest Dubai property news articles on fhiglobal.ae/news, with their dates and links.
 - site_pages — the website's own pages and guides (area guides, off-plan and new-launch pages, buying guides, golden visa, fees, the mortgage calculator, contact, about) — link them.
 - our_agents — FHI's property consultants as listed on the Agents page: name, role, WhatsApp link, phone, personal website, profile card, client rating, a line about them. Use for "who can I talk to", "which agent", "an agent who speaks Tagalog / knows JVC", "contact of <name>".
 
@@ -86,6 +90,7 @@ RULES
 - Before answering anything about the buying process, fees, mortgages, visas (golden visa), ownership, areas or neighbourhoods, call site_pages for it and link the guide it returns; if it returns none, say the site has no guide on that and offer a consultant. Never mention a guide or page without the address site_pages gave you.
 - Questions about the WEBSITE or the COMPANY — registering or creating an account, signing in, a pending account, contacting the office, who FHI is, whether we charge, selling or renting out a home through us, joining an event — call site_pages: it returns a ready quick_answer — give it as it is, in the visitor's language.
 - If a project's payment plan, price or handover is not on file, say exactly that and offer a consultant — never describe what developers "typically" offer.
+- NEWS ("latest news", "what's new in Dubai", "any news about <topic>") → call latest_news and list the newest articles as "- title (date) — link", then the page ${base()}/news; say each article's date and never call one "today's" unless it is dated today. Never say you have no access to news.
 - WHO TO TALK TO → call our_agents and name two or three agents as "- Name (role) — WhatsApp link — website link"; the company WhatsApp and "Talk to a consultant" also work. Only what the tool returns: never invent an agent, a number, a language they speak or an area they cover. If the tool returns nobody, give the company WhatsApp.
 - After you have really helped (a shortlist, a project's details, a payment plan), offer ONE next step in one short line: a consultant can call them — they can tap "Talk to a consultant" under the chat — or WhatsApp ${COMPANY.phone}. Don't repeat the offer every message; never ask for their number yourself.
 - Today in Dubai is ${dubaiToday()}.`
@@ -148,6 +153,21 @@ export const SITE_CHAT_TOOLS = [
       name: "upcoming_events",
       description: "FHI's UPCOMING property events, roadshows and seminars (the /events page): title, dates, venue, whether registration is open, the page. Use for 'any events', 'roadshow in Manila', 'seminar this month'.",
       parameters: { type: "object", properties: { search: { type: "string", description: "A word to match in the title or venue, optional" } } },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "latest_news",
+      description:
+        "The LATEST Dubai property news on fhiglobal.ae/news: the newest articles with date, category, a summary line and the page link. Use for 'latest news', 'what's new in Dubai real estate', 'any news about <topic>' (search). Never answer that you have no access to news.",
+      parameters: {
+        type: "object",
+        properties: {
+          search: { type: "string", description: "A topic or word to match in the articles, optional" },
+          limit: { type: "integer", description: "Default 6, max 10" },
+        },
+      },
     },
   },
   {
@@ -374,6 +394,43 @@ async function upcomingEvents(args: { search?: string }) {
   }
 }
 
+// ─── latest_news: the newest articles on /news ───────────────────────────────
+
+async function latestNews(args: { search?: string; limit?: number }) {
+  const limit = Math.min(Math.max(args.limit ?? 6, 1), 10)
+  const search = args.search?.trim() || undefined
+  let list: Awaited<ReturnType<typeof fetchArticlesList>>
+  try {
+    list = await fetchArticlesList({ page: 1, perPage: 40, search })
+  } catch {
+    return { error: "The news is unavailable right now", all_on: `${base()}/news` }
+  }
+  // lastPage 0 with nothing in it is the service's upstream-failure sentinel.
+  if (list.lastPage === 0 && !list.articles.length) return { error: "The news is unavailable right now", all_on: `${base()}/news` }
+  const when = (a: NewsArticle) => a.publishedAt ?? a.date ?? ""
+  const seen = new Set<string>()
+  const articles = list.articles.filter((a) => (seen.has(a.id) ? false : (seen.add(a.id), true))).sort((a, b) => when(b).localeCompare(when(a)))
+  // The feed carries lifestyle pieces too; this chat is about property, so the property
+  // categories lead and the rest only step in when there are too few of them.
+  const property = articles.filter(isIndexableNewsArticle)
+  const shown = (property.length >= 3 ? property : articles).slice(0, limit)
+  if (!shown.length) return { articles: 0, note: search ? "No article matches — offer the news page" : "No articles in the feed right now", all_on: `${base()}/news` }
+  const url = (a: NewsArticle) => `${base()}/news/${a.slug}`
+  return {
+    articles: shown.length,
+    note: "The newest articles on fhiglobal.ae/news. Say each article's date; never call one 'today's' unless its date is today.",
+    latest: shown.map((a) => ({
+      title: a.title,
+      published: when(a).slice(0, 10) || null,
+      category: a.category ?? null,
+      summary: (a.excerpt ?? "").replace(/\s+/g, " ").slice(0, 200) || null,
+      page: url(a),
+    })),
+    _cards: shown.filter((a) => a.img).slice(0, 6).map((a): SiteChatCard => ({ kind: "news", title: a.title, subtitle: [when(a).slice(0, 10), a.category].filter(Boolean).join(" · "), image: a.img, href: url(a) })),
+    all_on: `${base()}/news`,
+  }
+}
+
 // ─── our_agents: the roster the Agents page shows ────────────────────────────
 
 async function ourAgents(args: { search?: string; limit?: number }) {
@@ -472,6 +529,7 @@ async function runSiteChatTool(name: string, args: Record<string, unknown>, ctx:
       case "project_details": result = (await projectDetailsPublic(args as { name?: string })) as Record<string, unknown>; break
       case "find_listings": result = (await findListings(args as ListingsArgs)) as Record<string, unknown>; break
       case "upcoming_events": result = (await upcomingEvents(args as { search?: string })) as Record<string, unknown>; break
+      case "latest_news": result = (await latestNews(args as { search?: string; limit?: number })) as Record<string, unknown>; break
       case "site_pages": result = sitePages(args as { topic?: string }) as Record<string, unknown>; break
       case "our_agents": result = (await ourAgents(args as { search?: string; limit?: number })) as Record<string, unknown>; break
       default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], projects: [] }

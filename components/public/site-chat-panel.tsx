@@ -22,7 +22,7 @@ import { COMPANY, companyWhatsappHref } from "@/lib/company"
 import { SITE_CHAT_FAQ_CHIPS } from "@/lib/site-chat-faq"
 import { COUNTRY_CODES } from "@/lib/user-service"
 
-type Card = { title: string; subtitle?: string; image?: string | null; href: string | null; kind: "project" | "listing" | "event" | "agent" }
+type Card = { title: string; subtitle?: string; image?: string | null; href: string | null; kind: "project" | "listing" | "event" | "agent" | "news" }
 type Msg = {
   role: "user" | "assistant"
   content: string
@@ -37,7 +37,7 @@ type Stored = { session: string; messages: Array<Pick<Msg, "role" | "content" | 
 const STORE_KEY = "fhi-site-chat"
 const MAX_CHARS = 600
 const SUGGESTIONS = ["Cheapest 1-bedroom in JVC", "Projects handing over in 2027", "Villas under AED 3M", "How do payment plans work?"]
-const TOOL_WORDS: Record<string, string> = { find_projects: "projects", project_details: "the project", find_listings: "listings", upcoming_events: "events", site_pages: "our guides" }
+const TOOL_WORDS: Record<string, string> = { find_projects: "projects", project_details: "the project", find_listings: "listings", upcoming_events: "events", latest_news: "the news", our_agents: "our agents", site_pages: "our guides" }
 const WELCOME = "Hi! I'm FHI Assistant. Ask me about any project in Dubai — prices, payment plans, handover — or tell me what you're looking for."
 
 const newSession = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(16).padStart(8, "0").slice(-8)}-0000-4000-8000-${Math.random().toString(16).slice(2, 14).padEnd(12, "0")}`)
