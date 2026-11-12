@@ -5,6 +5,7 @@ import { requestContextFromRequest } from "@/lib/audit-log"
 import { allowRequest } from "@/lib/rate-limit"
 import { companyWhatsappHref } from "@/lib/company"
 import { runSiteChat } from "@/lib/site-chat"
+import { matchSiteChatFaq } from "@/lib/site-chat-faq"
 import { SITE_CHAT_LIMITS, blockMessage, ipHash, recordSiteChat, siteChatGate } from "@/lib/site-chat-usage"
 import { sseResponse, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
 
@@ -22,6 +23,12 @@ import { sseResponse, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
  * The browser keeps the conversation and sends it back; the server trims it
  * (SITE_CHAT_LIMITS) so a long or stuffed history can't inflate the bill, and
  * every message that reaches the model is logged with its cost.
+ *
+ * Questions about the website itself — how to register, how to sign in, how
+ * to reach the office, who FHI is — never reach the model: they are answered
+ * from lib/site-chat-faq.ts right after the per-minute wall (free, instant,
+ * and still answered when the spend caps have closed the chat), and logged
+ * with tools = ["faq"] at no cost.
  */
 
 export const runtime = "nodejs"
@@ -70,13 +77,30 @@ export async function POST(req: NextRequest) {
   if (!last || last.role !== "user") return NextResponse.json({ error: "Type a message first." }, { status: 422 })
   const question = last.content
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
-  if (!apiKey) return NextResponse.json({ error: "The chat is not available right now.", whatsapp: whatsapp() }, { status: 503 })
-
   const admin = createAdminSupabase()
   const hash = ipHash(ctx.ip)
   const country = req.headers.get("cf-ipcountry")?.trim().toUpperCase().slice(0, 2) || null
   const page = body.page ?? null
+  const wantsStream = req.headers.get("accept")?.includes("text/event-stream") ?? false
+
+  // A ready answer (lib/site-chat-faq.ts): nothing to protect, so no gate and no model.
+  const faq = matchSiteChatFaq(question)
+  if (faq) {
+    const payload = { reply: faq.answer, cards: [], used: ["faq"] }
+    const record = () => recordSiteChat(admin, { session: body.session, ipHash: hash, country, page, question, answer: faq.answer, tools: ["faq"], ok: true })
+    if (wantsStream) {
+      // The visitor reads the answer at once; the log is written before the stream closes.
+      return sseResponse(async (send) => {
+        send({ type: "done", ...payload })
+        await record()
+      })
+    }
+    await record()
+    return NextResponse.json(payload)
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  if (!apiKey) return NextResponse.json({ error: "The chat is not available right now.", whatsapp: whatsapp() }, { status: 503 })
 
   let gate
   try {
@@ -111,7 +135,7 @@ export async function POST(req: NextRequest) {
     return { ok: true as const, payload: { reply: result.reply, cards: result.cards, used: result.used } }
   }
 
-  if (req.headers.get("accept")?.includes("text/event-stream")) {
+  if (wantsStream) {
     return sseResponse(async (send) => {
       const out = await run(send)
       send(out.ok ? { type: "done", ...out.payload } : { type: "error", error: out.error, status: out.status })

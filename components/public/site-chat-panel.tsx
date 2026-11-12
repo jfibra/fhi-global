@@ -19,6 +19,7 @@ import Image from "next/image"
 import { ArrowUp, Loader2, MessageCircle, RotateCcw, Sparkles, UserRound, X } from "lucide-react"
 import { gaEvent } from "@/lib/ga"
 import { COMPANY, companyWhatsappHref } from "@/lib/company"
+import { SITE_CHAT_FAQ_CHIPS } from "@/lib/site-chat-faq"
 import { COUNTRY_CODES } from "@/lib/user-service"
 
 type Card = { title: string; subtitle?: string; image?: string | null; href: string | null; kind: "project" | "listing" | "event" | "agent" }
@@ -282,13 +283,24 @@ export function SiteChatPanel({ open, onClose, page }: { open: boolean; onClose:
           <div ref={listRef} className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
             <Bubble role="assistant">{renderText(WELCOME)}</Bubble>
             {messages.length === 0 && (
-              <div className="mb-3 flex flex-wrap gap-1.5 pl-1">
-                {SUGGESTIONS.map((s) => (
-                  <button key={s} type="button" onClick={() => void send(s)} className="rounded-full border border-[#d6b357]/60 bg-[#fbf7ec] px-3 py-1.5 text-[12.5px] font-semibold text-[#5b4a1a] transition-colors hover:bg-[#f3e9cc]">
-                    {s}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="mb-3 flex flex-wrap gap-1.5 pl-1">
+                  {SUGGESTIONS.map((s) => (
+                    <button key={s} type="button" onClick={() => void send(s)} className="rounded-full border border-[#d6b357]/60 bg-[#fbf7ec] px-3 py-1.5 text-[12.5px] font-semibold text-[#5b4a1a] transition-colors hover:bg-[#f3e9cc]">
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                {/* Ready answers about the website itself (lib/site-chat-faq.ts) — answered without the model. */}
+                <p className="mb-1.5 pl-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#9ca3af]">Quick answers</p>
+                <div className="mb-3 flex flex-wrap gap-1.5 pl-1">
+                  {SITE_CHAT_FAQ_CHIPS.map((s) => (
+                    <button key={s} type="button" onClick={() => void send(s)} className="rounded-full border border-[#e5e7eb] bg-white px-3 py-1.5 text-[12.5px] font-semibold text-[#374151] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]">
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
             {messages.map((m, i) =>
               m.error ? (

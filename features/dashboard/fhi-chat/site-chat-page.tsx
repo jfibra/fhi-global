@@ -20,7 +20,7 @@ import { BarsChart, StatTiles } from "./charts"
 const WINDOWS = [7, 30, 90] as const
 const usd = (n: number) => `$${n.toFixed(n < 0.1 ? 4 : 2)}`
 const when = (iso: string) => new Date(iso).toLocaleString("en-AE", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dubai" })
-const TOOL_WORDS: Record<string, string> = { find_projects: "project search", project_details: "project details", find_listings: "ready homes (buy/rent)", upcoming_events: "events", site_pages: "guides and pages" }
+const TOOL_WORDS: Record<string, string> = { find_projects: "project search", project_details: "project details", find_listings: "ready homes (buy/rent)", upcoming_events: "events", site_pages: "guides and pages", our_agents: "our agents", faq: "quick answer (no AI)" }
 const REASON_WORDS: Record<string, string> = {
   ip_minute: "too many per minute (one visitor)",
   ip_hour: "hourly limit (one visitor)",

@@ -12,6 +12,7 @@ import { COMPANY, companyAddressLine } from "@/lib/company"
 import { SITE_URL } from "@/lib/seo"
 import { isTestRecord } from "@/lib/listing-publish-checks"
 import { fetchPublicAgents } from "@/lib/public-agents"
+import { SITE_CHAT_FAQS } from "@/lib/site-chat-faq"
 
 /**
  * The website chat's model loop (boss via Juliecor, 2026-11-06): the public
@@ -26,7 +27,10 @@ import { fetchPublicAgents } from "@/lib/public-agents"
  *     sales on it);
  *   · find_listings — the ready homes for sale and rent on /buy and /rent;
  *   · upcoming_events — what /events lists;
- *   · site_pages — the guides and pages, so it links instead of guessing.
+ *   · site_pages — the guides and pages, so it links instead of guessing, and
+ *     the ready answers about the website itself (lib/site-chat-faq.ts —
+ *     registering, signing in, the office, who FHI is; the route answers the
+ *     plain phrasings from there without the model, this is the fallback).
  * The company facts come from lib/company.ts. Nothing here reads leads,
  * profiles, sales or anything behind a login, and the model's arguments
  * never pick a table — each tool runs one fixed, public query.
@@ -80,6 +84,7 @@ RULES
 - NOTHING FOUND is never the whole answer. When a search returns no exact match, say so in one line and offer what the tool gives as alternatives (the cheapest of that kind above the budget, the other property type within it, other areas, projects with the price on request through a consultant), then ask one question to narrow. A follow-up like "recommend another", "something else", "other options" means SHOW THE NEXT OPTIONS: call find_projects again with exclude_names = every project you have already named in this conversation (and a larger limit, or wider filters: higher budget, the other type, no area) and present only projects not named before — never repeat an earlier answer.
 - Keep it short: 2 to 5 sentences, or up to 6 "- " lines for a shortlist (name — from price — handover — area — the page link). Plain text only: no markdown, no asterisks, no headers, no tables, and NO markdown links — write every link as the full address exactly as the tool returned it (https://fhiglobal.ae/…), never as "here", "details" or "link". Always include the page link when you name a project, listing, event or guide. The chat shows photo cards for projects, listings and events automatically, so don't describe photos.
 - Before answering anything about the buying process, fees, mortgages, visas (golden visa), ownership, areas or neighbourhoods, call site_pages for it and link the guide it returns; if it returns none, say the site has no guide on that and offer a consultant. Never mention a guide or page without the address site_pages gave you.
+- Questions about the WEBSITE or the COMPANY — registering or creating an account, signing in, a pending account, contacting the office, who FHI is, whether we charge, selling or renting out a home through us, joining an event — call site_pages: it returns a ready quick_answer — give it as it is, in the visitor's language.
 - If a project's payment plan, price or handover is not on file, say exactly that and offer a consultant — never describe what developers "typically" offer.
 - WHO TO TALK TO → call our_agents and name two or three agents as "- Name (role) — WhatsApp link — website link"; the company WhatsApp and "Talk to a consultant" also work. Only what the tool returns: never invent an agent, a number, a language they speak or an area they cover. If the tool returns nobody, give the company WhatsApp.
 - After you have really helped (a shortlist, a project's details, a payment plan), offer ONE next step in one short line: a consultant can call them — they can tap "Talk to a consultant" under the chat — or WhatsApp ${COMPANY.phone}. Don't repeat the offer every message; never ask for their number yourself.
@@ -165,7 +170,7 @@ export const SITE_CHAT_TOOLS = [
     function: {
       name: "site_pages",
       description:
-        "The website's own PAGES and GUIDES by topic: area guides (JVC, Dubai Marina, Business Bay…), off-plan and new-launch pages, handover-year pages, buyer guides (how to buy, golden visa, fees, mortgage), the mortgage calculator, buy/rent/projects/developers/events/news/contact/about. Returns up to 6 links with a line each. Use whenever a guide would answer better than you, and to link the right page.",
+        "The website's own PAGES and GUIDES by topic: area guides (JVC, Dubai Marina, Business Bay…), off-plan and new-launch pages, handover-year pages, buyer guides (how to buy, golden visa, fees, mortgage), the mortgage calculator, buy/rent/projects/developers/events/news/contact/about. Returns up to 6 links with a line each, plus quick_answers — the site's own ready answers about the website and the company (how to register or create an account, how to sign in, contacting the office and hours, who FHI Global is, what we charge, selling or renting out a home through us, joining an event) — give a quick_answer as it is. Use whenever a guide would answer better than you, and to link the right page.",
       parameters: { type: "object", properties: { topic: { type: "string", description: "What they want to read about" } }, required: ["topic"] },
     },
   },
@@ -442,8 +447,17 @@ function sitePages(args: { topic?: string }) {
   const fixed = FIXED_PAGES.map((p) => ({ score: score(`${p.label} ${p.description} ${p.words}`) * 2, label: p.label, url: `${base()}${p.path}`, description: p.description }))
   const seo = SEO_PAGES.map((p) => ({ score: score(`${p.label} ${p.title} ${p.description}`) * 2 + score(p.intro.join(" ")), label: p.label, url: `${base()}/${p.slug}`, description: p.description.slice(0, 160) }))
   const hits = [...fixed, ...seo].filter((p) => p.score > 0).sort((a, b) => b.score - a.score).slice(0, 6)
-  if (!hits.length) return { pages: [], note: "No page on the site covers that topic — recommend a consultant" }
-  return { pages: hits.map(({ label, url, description }) => ({ label, url, description })) }
+  // The ready answers about the website itself, for the phrasings the route's matcher let through.
+  const quick = SITE_CHAT_FAQS.filter((f) => f.words && score(f.words) > 0)
+    .map((f) => ({ score: score(f.words), question: f.chip ?? f.id.replace(/_/g, " "), answer: f.answer }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2)
+    .map(({ question, answer }) => ({ question, answer }))
+  if (!hits.length && !quick.length) return { pages: [], note: "No page on the site covers that topic — recommend a consultant" }
+  return {
+    pages: hits.map(({ label, url, description }) => ({ label, url, description })),
+    ...(quick.length ? { quick_answers: quick, rule: "A quick_answer is the site's own wording — give it as it is (translated if the visitor writes in another language), with its links" } : {}),
+  }
 }
 
 // ─── Running a tool ──────────────────────────────────────────────────────────
