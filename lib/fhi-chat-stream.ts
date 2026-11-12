@@ -169,6 +169,8 @@ export const cleanReply = (text: string) =>
     .replace(/\*\*/g, "")
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/`([^`]+)`/g, "$1")
+    // A markdown image ("![Poster](…)") is dropped whole — the card below shows the picture; keeping the alt left a stray "!Title".
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
 
 /** "How do we market the website", "how can I sell more", "what should we do" — both assistants answer these on a stronger model, grounded in the asker's figures. */

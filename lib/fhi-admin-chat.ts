@@ -1,6 +1,23 @@
 import "server-only"
 
-import { FHI_CHAT_TOOLS, runFhiChatTool, type FhiChatCard, type FhiChatChart, type FhiChatForm, type FhiChatPrintCard, type FhiChatSender, type FhiChatStat } from "@/lib/fhi-chat-tools"
+import { FHI_CHAT_TOOLS, emptyMeetingPosterForm, runFhiChatTool, type FhiChatCard, type FhiChatChart, type FhiChatForm, type FhiChatPrintCard, type FhiChatSender, type FhiChatStat } from "@/lib/fhi-chat-tools"
+
+/**
+ * "Make me a meeting poster" must always end in the fields form (boss,
+ * 2026-11-12 — the model kept asking "please provide the venue" instead).
+ * A bare request gets the form straight from here, no model call; a request
+ * that carries details goes to the model so it can pre-fill what it read,
+ * and if it still fails to call the tool, the form is attached anyway.
+ */
+const POSTER_ASK_RE = /\b(meeting|event|seminar|training|rally|webinar|orientation|onboarding|workshop|launch)\b[^.?!]*\bposter\b|\bposter\b[^.?!]*\b(meeting|event|seminar|training|rally|webinar|orientation|onboarding|workshop|launch)\b/i
+const POSTER_DETAILS_RE = /^make the meeting poster with these details:/i
+export function posterIntent(text: string): "blank" | "with_details" | null {
+  const t = text.trim()
+  if (!POSTER_ASK_RE.test(t) || /\bbirthday\b/i.test(t) || POSTER_DETAILS_RE.test(t)) return null
+  // Nothing to read out of "make me a meeting poster": the form asks. A date, a time, a name or a longer sentence → the model pre-fills.
+  return !/\d/.test(t) && t.split(/\s+/).length <= 9 ? "blank" : "with_details"
+}
+const POSTER_FORM_REPLY = "Let's draw it — fill in the details below and press Draw the poster. Title, date, time and venue are needed; speakers are optional, and FHI members named as speakers get their photo automatically."
 import { cleanReply, isAdviceQuestion, periodCalendar, periodHint, streamCompletion, type ChatMessage, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
 
 /**
@@ -186,6 +203,13 @@ export async function runAdminChat(
   apiKey: string,
   emit: (e: ChatStreamEvent) => void,
 ): Promise<AdminChatAnswer> {
+  // A bare "make me a meeting poster": the form, at once and for free.
+  const posterAsk = posterIntent(history[history.length - 1]?.content ?? "")
+  if (posterAsk === "blank") {
+    emit({ type: "delta", text: POSTER_FORM_REPLY })
+    return { ok: true, payload: { reply: POSTER_FORM_REPLY, used: [], cards: [], names: [], charts: [], stats: [], printCards: [], forms: [emptyMeetingPosterForm()] } }
+  }
+
   const messages: ChatMessage[] = [{ role: "system", content: systemPrompt() }, ...history]
   // The period this question names, spelled out next to it (periodHint).
   const asked = history.filter((m) => m.role === "user").map((m) => m.content)
@@ -258,8 +282,9 @@ export async function runAdminChat(
           charts: uniqueCharts,
           stats: uniqueStats,
           printCards: printCards.slice(0, 3),
-          // A form a tool asked for (the meeting poster's fields) — the latest one only.
-          forms: forms.slice(-1),
+          // A form a tool asked for (the meeting poster's fields) — the latest one only. A poster request the
+          // model answered with questions instead of the tool still gets the form, so the admin is never stuck.
+          forms: forms.length ? forms.slice(-1) : posterAsk === "with_details" && !uniqueCards.some((c) => c.kind === "poster") ? [emptyMeetingPosterForm()] : [],
         },
       }
     }

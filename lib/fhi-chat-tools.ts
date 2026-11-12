@@ -1792,6 +1792,13 @@ export type FhiChatForm = {
   designs: Array<{ id: string; label: string; about: string }>
 }
 
+/** The poster form with nothing filled in — what a bare "make me a meeting poster" gets, without the model. */
+export const emptyMeetingPosterForm = (): FhiChatForm => ({
+  kind: "meeting_poster",
+  values: { title: "", subtitle: "", tagline: "", date: "", time: "", venue: "", speakers: "", design: "skyline" },
+  designs: MEETING_POSTER_DESIGNS.map((d) => ({ id: d.id, label: d.label, about: d.about })),
+})
+
 /** Printable business card (front + back) — the chat UI renders it with the
  *  SAME canvas renderer as the Business Card maker, so every design is
  *  pixel-identical and downloads at print size. This tool only gathers the
