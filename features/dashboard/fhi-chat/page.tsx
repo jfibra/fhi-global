@@ -504,6 +504,9 @@ const TOOL_LABELS: Record<string, string> = {
   teams_detail: "Teams",
   news_overview: "Website news",
   client_message: "Client message",
+  project_comparison: "Project comparison",
+  project_brochure: "Project brochure",
+  my_report: "Your report",
   data_health: "Data health",
 }
 

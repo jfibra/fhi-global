@@ -3,6 +3,8 @@ import "server-only"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { findBrochureProject } from "@/lib/brochure/data"
 import { buildClientMessage, type ClientDraft, type ClientMessageArgs } from "@/lib/client-message"
+import { buildComparison, findComparisonProjects, COMPARISON_MAX } from "@/lib/comparison/data"
+import { loadBrochure, type Brochure } from "@/lib/brochure/data"
 import { buildAgentReport } from "@/lib/agent-report/data"
 import { ruleInsights } from "@/lib/agent-report/insights"
 import { ROLES_SALE_AGENT_PROFILES } from "@/lib/app-roles"
@@ -288,6 +290,43 @@ async function projectBrochure(admin: Admin, args: { name?: string }) {
     includes: ["the project's photo", "from price and price range", "every unit type with size and from-price", "the payment plan as steps", "highlights, amenities and what's nearby", "YOUR name, role, WhatsApp, phone, email and website", "a QR code to this project on your website (or your WhatsApp)"],
     how_to_answer: "Say the brochure is ready — the Download button is under this answer — and what's on it in one or two lines, then suggest sending it on WhatsApp. Never write a link; the button is the link.",
     _downloads: [{ kind: "pdf" as const, title: `${p.name} — brochure`, subtitle: [p.developer, "with your contact details and QR code"].filter(Boolean).join(" · "), label: "Download PDF", href: `/api/fhi-chat/brochure?project=${p.id}`, image: p.image }],
+  }
+}
+
+// ─── project_comparison ──────────────────────────────────────────────────────
+
+/** Two or three projects side by side: the facts for the chat, cards, and a Download button for app/api/fhi-chat/comparison. */
+async function projectComparison(admin: Admin, caller: AgentChatCaller, args: { projects?: unknown }) {
+  const names = (Array.isArray(args.projects) ? args.projects : typeof args.projects === "string" ? args.projects.split(/\s*(?:,|\bvs\.?\b|\band\b)\s*/i) : []).map((n) => String(n).trim()).filter(Boolean)
+  if (names.length < 2) return { error: "Name two or three projects to compare." }
+  const { found, missing } = await findComparisonProjects(admin, names)
+  if (found.length < 2) return { error: `Only ${found.length} published project${found.length === 1 ? "" : "s"} matched${missing.length ? ` — nothing for ${missing.join(", ")}` : ""}. Ask for the exact names.` }
+  const brochures = (await Promise.all(found.map((f) => loadBrochure(admin, f.id, { userId: caller.userId, email: null })))).filter((b): b is Brochure => Boolean(b))
+  if (brochures.length < 2) return { error: "One of those projects isn't on the website any more." }
+  const c = buildComparison(brochures)
+  const cell = (label: string, i: number) => c.rows.find((r) => r.label === label)?.cells[i] ?? null
+  return {
+    compared: c.projects.map((p, i) => ({
+      name: p.name,
+      developer: p.developer,
+      area: p.area,
+      status: p.status,
+      handover: p.offPlan ? p.handover : "ready",
+      price_from: p.priceFrom ?? "on request",
+      price_range: p.priceRange,
+      homes: p.mix,
+      payment_plan: cell("Payment plan", i),
+      down_payment: cell("Down payment", i),
+      page: p.page,
+    })),
+    at_a_glance: c.verdicts,
+    ...(missing.length ? { not_found: missing } : {}),
+    ...(found.length > brochures.length ? { note: "One project could not be loaded and was left out" } : {}),
+    comparison: "ready",
+    includes: ["the projects' photos", "from price and range", "homes and sizes, the cheapest unit per bedroom type", "payment plan and down payment", "handover, area, developer, ownership", "amenities, highlights, what's nearby", "YOUR contact card with a QR code"],
+    how_to_answer: "Say the comparison sheet is ready — the Download button is under this answer — then give at_a_glance as '- ' lines and one '- Name: from price, handover, down payment' line per project, leaving out any fact that is null, '—' or 'on request' rather than printing a dash. The cards show the photos. Never write a link; the button is the link.",
+    _cards: found.slice(0, COMPARISON_MAX).map((f): FhiChatCard => ({ kind: "project", title: f.name, subtitle: f.developer ?? undefined, image: f.image, href: f.page })),
+    _downloads: [{ kind: "pdf" as const, title: `${c.projects.map((p) => p.name).join(" vs ")} — comparison`, subtitle: "Side by side, with your contact details and QR code", label: "Download PDF", href: `/api/fhi-chat/comparison?projects=${c.projects.map((p) => p.id).join(",")}`, image: found[0].image }],
   }
 }
 
@@ -970,6 +1009,15 @@ const PHASE1_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "project_comparison",
+      description:
+        "A COMPARISON SHEET FOR A CLIENT: two or three projects side by side on one PDF page — from price and range, homes and sizes, the cheapest unit per bedroom type, payment plan and down payment, handover, area, developer, ownership, amenities — with the asker's OWN contact card and QR code, plus the at-a-glance verdicts (lowest price, earliest handover, smallest first payment). The chat shows a Download button under the answer. Use for 'compare Azizi Ruby and Samana Greenfield', 'Azizi Venice vs Binghatti Twilight for my client', 'which is better, X or Y', 'comparison sheet of the two you just showed'.",
+      parameters: { type: "object", properties: { projects: { type: "array", items: { type: "string" }, description: "Two or three project names, partial ok" } }, required: ["projects"] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "client_message",
       description:
         "A MESSAGE FOR A CLIENT about ONE project, written from the project's own facts (from price, payment plan, handover, units) with the asker's OWN name, WhatsApp and website link — a WhatsApp message by default, or an email with a subject line. The chat shows it in a card with Copy and Send buttons. Use for 'write a WhatsApp message for my client about Azizi Venice', 'follow-up message for Maria about the payment plan of Samana Greenfield', 'email introducing Binghatti Twilight', 'a message in Tagalog / Arabic / Russian about …'. Pass what the message should do in `purpose`.",
@@ -1095,6 +1143,7 @@ export async function runAgentChatTool(
       case "person_sales": result = await personSales(admin, caller, args as PersonSalesArgs); break
       case "project_brochure": result = await projectBrochure(admin, args as { name?: string }); break
       case "my_report": result = await myReport(admin, caller, args as { from_date?: string; to_date?: string }); break
+      case "project_comparison": result = await projectComparison(admin, caller, args as { projects?: unknown }); break
       case "client_message": {
         const out = await buildClientMessage(admin, caller, args as ClientMessageArgs)
         result = out.result

@@ -19,7 +19,7 @@ const SUGGESTIONS = [
   { label: "My pages & events", items: ["Which of my listings are live?", "Any new registrations for my event today?", "Are my recruits selling?"] },
   { label: "Projects & news", items: ["Cheapest 1-bedroom in JVC?", "Payment plan of Samana Greenfield", "What's the latest property news?"] },
   // Things they can send a client (2026-11-06 brochure, 2026-11-12 message drafts).
-  { label: "For my clients", items: ["Make me a brochure for Azizi Ruby", "Write a WhatsApp message for my client about Samana Greenfield", "Follow-up email about the payment plan of Azizi Ruby"] },
+  { label: "For my clients", items: ["Make me a brochure for Azizi Ruby", "Compare Azizi Ruby and Samana Greenfield", "Write a WhatsApp message for my client about Samana Greenfield", "Follow-up email about the payment plan of Azizi Ruby"] },
   // Coaching from their own figures (2026-10-15) — answered on the stronger advice model.
   { label: "Coaching", items: ["How can I sell more?", "How do I get more leads?", "What should I focus on this month?"] },
 ] as const
