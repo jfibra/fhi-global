@@ -1,6 +1,6 @@
 import "server-only"
 
-import { FHI_CHAT_TOOLS, runFhiChatTool, type FhiChatCard, type FhiChatChart, type FhiChatPrintCard, type FhiChatSender, type FhiChatStat } from "@/lib/fhi-chat-tools"
+import { FHI_CHAT_TOOLS, runFhiChatTool, type FhiChatCard, type FhiChatChart, type FhiChatForm, type FhiChatPrintCard, type FhiChatSender, type FhiChatStat } from "@/lib/fhi-chat-tools"
 import { cleanReply, isAdviceQuestion, periodCalendar, periodHint, streamCompletion, type ChatMessage, type ChatStreamEvent } from "@/lib/fhi-chat-stream"
 
 /**
@@ -133,7 +133,7 @@ Insight: one short sentence on the most notable pattern.
 - FHI Assistant CAN send emails — but ONLY when the admin explicitly asks to email something in their current message ("email me this", "send this report to X"). Compose the body from the exact content they asked to send (plain text). "me" = the admin asking. ONE recipient per send; never email anyone the admin didn't name, never send on your own initiative, and never re-send because of a follow-up question. After sending, confirm recipient and subject.
 - To email a poster or card that was just generated ("email this poster to X"): call send_email and echo the ref the generating tool returned (email_attachment_refs / email_attachment_ref / business_card_uid) — the image is embedded in the email. Never claim a poster can't be emailed.
 - NEVER use send_email to reach a GROUP ("email them", "email the top agents", "email the winners") — that is ALWAYS congratulate_top_agents, whose emails are previews to the admin only. send_email to an individual member is for a single, explicitly named person in the admin's own words.
-- FHI Assistant CAN create meeting posters too. For "make a meeting poster": collect title, date, time and venue — if the admin hasn't given them all, ask for the missing ones in ONE friendly question (mention speakers are optional and FHI member speakers get their photos automatically). When you have everything, call meeting_poster. The poster renders under your reply.
+- FHI Assistant CAN create meeting posters too. For "make a meeting poster" call meeting_poster STRAIGHT AWAY with whatever the admin gave (even nothing): when title, date, time or venue are missing, the chat shows a FORM under your reply with every field (title, subtitle, tagline, date, time, venue, speakers, design) for the admin to fill in — so answer in ONE short line ("Fill in the details below and I'll draw it — speakers are optional, FHI members get their photo automatically") and never list the fields yourself or ask questions. When the admin sends "Make the meeting poster with these details: …" call meeting_poster with exactly those values, the design included (skyline or navy). When you have everything, the poster renders under your reply. "The same poster in the navy design" → call it again with the same details and design navy.
 - SEO, Google keywords, website traffic and analytics ARE FHI's own data (search_keywords + website_traffic). For "how is our SEO doing", call search_keywords and summarize total clicks and impressions, the top keywords and their average positions. If a data-source tool errors (e.g. Search Console or Analytics not connected yet), say plainly that the connection is pending — NEVER claim the topic is outside FHI's data and never present a connection problem as "no data".
 - ADVICE — "what should we do", "how do we market the website", "how do we get more leads / sales / recruits", "how to improve our SEO", "what should I focus on" are NOT outside FHI's data: answer them, grounded in the numbers. First call the tools that measure that area for the last 30 days unless a period is named — marketing / website / SEO: website_traffic + search_keywords + leads_overview; sales: sales_summary + sales_pipeline + top_agents; recruiting / activation: new_accounts + sales_pipeline (quiet agents); the whole company: sales_summary + new_accounts + leads_overview + website_traffic. Then answer in exactly this layout:
 
@@ -198,6 +198,7 @@ export async function runAdminChat(
   const charts: FhiChatChart[] = []
   const printCards: FhiChatPrintCard[] = []
   const stats: FhiChatStat[] = []
+  const forms: FhiChatForm[] = []
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     let streamed = false
@@ -257,6 +258,8 @@ export async function runAdminChat(
           charts: uniqueCharts,
           stats: uniqueStats,
           printCards: printCards.slice(0, 3),
+          // A form a tool asked for (the meeting poster's fields) — the latest one only.
+          forms: forms.slice(-1),
         },
       }
     }
@@ -284,6 +287,7 @@ export async function runAdminChat(
       charts.push(...result.charts)
       printCards.push(...result.printCards)
       stats.push(...result.stats)
+      forms.push(...result.forms)
       messages.push({ role: "tool", tool_call_id: call.id, content: result.forModel.slice(0, 24000) })
     }
   }

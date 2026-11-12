@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
     date: s(p.date, 60),
     time: s(p.time, 60),
     venue: s(p.venue, 90),
+    design: s(p.design, 20) === "navy" ? "navy" : "skyline",
     speakers: (Array.isArray(p.speakers) ? p.speakers : []).slice(0, 6).map((sp) => {
       const o = (sp ?? {}) as Record<string, unknown>
       const photo = s(o.photo, 500)

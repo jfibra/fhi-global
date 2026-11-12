@@ -4,6 +4,7 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import { BUYER_LEAD_COLUMNS, leadGrade, type BuyerLead } from "@/lib/buyer-links"
 import { fetchAllSales, inRange, saleCredits, type SaleRow } from "@/lib/fhi-chat-tools"
 import { ownTestBrief, topSalesBoard, type AgentChatCaller } from "@/lib/fhi-agent-chat-tools"
+import { goalHeadline, goalProgress, readGoal } from "@/lib/agent-goal"
 
 /**
  * "Today at a glance" — the tiles on FHI Assistant's welcome screen (boss via
@@ -114,6 +115,37 @@ export async function agentBriefing(caller: AgentChatCaller): Promise<BriefingIt
     }
   })()
 
+  // Leads of the last 30 days not yet marked contacted (migration 088) — the follow-up queue.
+  const followUp = (async (): Promise<BriefingItem> => {
+    const { data, error } = await admin.from("buyer_link_leads").select(BUYER_LEAD_COLUMNS).eq("agent_id", caller.userId).gte("created_at", dubaiMidnight(addDays(today, -30))).is("contacted_at", null)
+    if (error) throw new Error(error.message)
+    const isOwnTest = await ownTestBrief(admin, caller)
+    const n = ((data ?? []) as unknown as BuyerLead[]).filter((b) => !isOwnTest(b)).length
+    return {
+      key: "followup",
+      label: "Leads to follow up",
+      value: String(n),
+      note: n ? "not marked contacted · last 30 days" : "every lead of the last 30 days contacted",
+      tone: n ? "attention" : "good",
+      ask: n ? "Which leads haven't I contacted yet?" : null,
+    }
+  })()
+
+  // Their own goal (lib/agent-goal.ts): progress, or a nudge to set one.
+  const goal = (async (): Promise<BriefingItem> => {
+    const g = await readGoal(admin, caller.userId)
+    if (!g) return { key: "goal", label: "Your goal", value: "–", note: "none set yet — e.g. 5 deals this quarter", tone: "quiet", ask: "Set my goal: 5 deals this quarter" }
+    const p = await goalProgress(admin, caller.userId, g, await sales)
+    return {
+      key: "goal",
+      label: `Goal · ${g.label}`,
+      value: goalHeadline(p),
+      note: p.done ? "reached" : p.over ? "period over" : `${p.percent}% · ${plural(p.days_left, "day")} left${p.pace_deals_per_week != null ? ` · ${p.pace_deals_per_week}/week needed` : ""}`,
+      tone: p.done ? "good" : p.over ? "quiet" : "attention",
+      ask: "How am I doing on my goal?",
+    }
+  })()
+
   const mine = (async (): Promise<BriefingItem> => {
     const n = (await sales).filter((s) => isPending(s) && saleCredits(s).some((c) => c.agentId === caller.userId)).length
     return {
@@ -178,7 +210,7 @@ export async function agentBriefing(caller: AgentChatCaller): Promise<BriefingIt
     return birthdayTile((data ?? []) as Person[], today, null, "among your recruits")
   })()
 
-  return settle([leads, mine, rank, teamPending, joiners, birthdays])
+  return settle([leads, followUp, goal, mine, rank, teamPending, joiners, birthdays])
 }
 
 // ─── Admins ──────────────────────────────────────────────────────────────────

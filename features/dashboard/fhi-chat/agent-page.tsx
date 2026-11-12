@@ -15,7 +15,9 @@ import FhiChatPage from "./page"
 
 const SUGGESTIONS = [
   { label: "My sales", items: ["How are my sales this year?", "My performance report for this month", "Anything of mine waiting for validation?", "Where do I rank this year?"] },
-  { label: "My leads & clients", items: ["Any priority buyers in my leads?", "Who sent me a brief this week?", "What do clients say about me?"] },
+  // Goals (2026-11-12): one goal per person, kept on their profile; progress from their own validated sales.
+  { label: "My goal", items: ["How am I doing on my goal?", "Set my goal: 5 deals this quarter"] },
+  { label: "My leads & clients", items: ["Any priority buyers in my leads?", "Which leads haven't I contacted yet?", "Who sent me a brief this week?", "What do clients say about me?"] },
   { label: "My pages & events", items: ["Which of my listings are live?", "Any new registrations for my event today?", "Are my recruits selling?"] },
   { label: "Projects & news", items: ["Cheapest 1-bedroom in JVC?", "Payment plan of Samana Greenfield", "What's the latest property news?"] },
   // Things they can send a client (2026-11-06 brochure, 2026-11-12 message drafts).
@@ -25,7 +27,7 @@ const SUGGESTIONS = [
 ] as const
 
 const TEAM_LEADER_SUGGESTIONS = [
-  { label: "My team", items: ["How is my team doing this month?", "Who in my team hasn't sold this year?", "How do I activate my recruits?"] },
+  { label: "My team", items: ["How is my team doing this month?", "Who in my team needs help?", "Who in my team hasn't sold this year?", "Write a message to encourage one of my agents", "How do I activate my recruits?"] },
   ...SUGGESTIONS,
 ] as const
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowDown, ArrowUp, BarChart3, Check, Copy, CornerDownRight, Download, Globe, Loader2, Mail, MessageCircle, Monitor, PanelLeft, Play, Printer, RefreshCw, Smartphone, Sparkles, Square, SquarePen, Tablet, Trash2, X } from "lucide-react"
+import { ArrowDown, ArrowUp, BarChart3, Check, Copy, CornerDownRight, Download, Globe, Loader2, Mail, MessageCircle, Mic, Monitor, PanelLeft, Play, Printer, RefreshCw, Smartphone, Sparkles, Square, SquarePen, Tablet, Trash2, X } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { FilmTrigger, type Film } from "@/components/public/film-player"
 import { BarsChart, PieChart, StatTiles, type ChartSpec, type ShareRow, type StatSpec, type TrendPoint } from "./charts"
@@ -45,8 +45,35 @@ type PrintCardSpec = {
 }
 /** A file offered under the answer — the agents' project brochure PDF (app/api/fhi-chat/brochure). */
 type DownloadSpec = { kind: "pdf"; title: string; subtitle?: string | null; label: string; href: string; image?: string | null }
-/** A client message the agents' assistant wrote (lib/client-message.ts) — shown with Copy and Send buttons. */
-type DraftSpec = { kind: "message"; channel: "whatsapp" | "email"; project: string; client: string | null; language: string; subject: string | null; text: string; image?: string | null }
+/** A message the agents' assistant wrote (lib/client-message.ts) — shown with Copy and Send buttons; `to_whatsapp` (a team member's number) prefills the chat. */
+type DraftSpec = { kind: "message"; channel: "whatsapp" | "email"; project: string; client: string | null; language: string; subject: string | null; text: string; image?: string | null; to_whatsapp?: string | null }
+/** A form a tool asked the chat to draw — the meeting poster's fields (lib/fhi-chat-tools meeting_poster). Submitting sends the details as the next message. */
+type FormSpec = {
+  kind: "meeting_poster"
+  values: { title: string; subtitle: string; tagline: string; date: string; time: string; venue: string; speakers: string; design: string }
+  designs: Array<{ id: string; label: string; about: string }>
+}
+
+/**
+ * The browser's own speech recognition (Chrome, Safari, Edge — free, nothing
+ * sent to our server): the mic button fills the box with what was said; the
+ * agent still presses Send. Hidden where the browser has no recognition.
+ */
+type SpeechRecognitionLike = {
+  lang: string
+  interimResults: boolean
+  continuous: boolean
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
+  onend: (() => void) | null
+  onerror: (() => void) | null
+  start: () => void
+  stop: () => void
+}
+function speechRecognition(): (new () => SpeechRecognitionLike) | null {
+  if (typeof window === "undefined") return null
+  const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
+}
 type Msg = {
   role: "user" | "assistant"
   content: string
@@ -58,6 +85,7 @@ type Msg = {
   printCards?: PrintCardSpec[]
   downloads?: DownloadSpec[]
   drafts?: DraftSpec[]
+  forms?: FormSpec[]
   /** A company report drawn as a document (report-card.tsx) instead of text. */
   report?: ChatReport
   /** Still arriving from the server (the words stream in). */
@@ -290,6 +318,89 @@ function DownloadCard({ item }: { item: DownloadSpec }) {
 }
 
 /**
+ * The meeting poster's fields, drawn under the reply when the admin asked for
+ * a poster without giving everything (lib/fhi-chat-tools meeting_poster).
+ * What they already said is pre-filled; "Draw the poster" sends the details
+ * as the next message, and the assistant draws it.
+ */
+function PosterFormCard({ spec, disabled, onSubmit }: { spec: FormSpec; disabled: boolean; onSubmit: (text: string) => void }) {
+  const [v, setV] = useState(spec.values)
+  const set = (k: keyof FormSpec["values"]) => (e: { target: { value: string } }) => setV((cur) => ({ ...cur, [k]: e.target.value }))
+  const ready = v.title.trim() && v.date.trim() && v.time.trim() && v.venue.trim()
+  const submit = () => {
+    if (!ready || disabled) return
+    const designLabel = spec.designs.find((d) => d.id === v.design)?.label ?? v.design
+    const speakers = v.speakers.split("\n").map((s) => s.trim()).filter(Boolean).join("; ")
+    const lines = [
+      "Make the meeting poster with these details:",
+      `Title: ${v.title.trim()}`,
+      v.subtitle.trim() && `Subtitle: ${v.subtitle.trim()}`,
+      v.tagline.trim() && `Tagline: ${v.tagline.trim()}`,
+      `Date: ${v.date.trim()}`,
+      `Time: ${v.time.trim()}`,
+      `Venue: ${v.venue.trim()}`,
+      speakers ? `Speakers: ${speakers}` : "Speakers: none",
+      `Design: ${designLabel} (${v.design})`,
+    ].filter(Boolean)
+    onSubmit(lines.join("\n"))
+  }
+  const field = "w-full rounded-lg border border-[#e3e6ea] bg-white px-3 py-2 text-[13.5px] text-[#0d1117] placeholder:text-[#9ca3af] focus:border-[#001f3f] focus:outline-none disabled:opacity-60"
+  const label = "mb-1 block text-[10.5px] font-bold uppercase tracking-wide text-[#6b7280]"
+  return (
+    <div className="rounded-xl border border-[#e5e7eb] bg-[#fafbfc] p-4">
+      <p className="font-['Outfit'] text-[14px] font-bold text-[#001f3f]">Meeting poster — fill in the details</p>
+      <p className="mt-0.5 text-[12px] text-[#6b7280]">Title, date, time and venue are needed; the rest is optional. FHI members named as speakers get their photo automatically.</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <label className={label}>Title *</label>
+          <input value={v.title} onChange={set("title")} disabled={disabled} placeholder="e.g. Agent Onboarding Seminar" className={field} />
+        </div>
+        <div className="sm:col-span-2">
+          <label className={label}>Subtitle</label>
+          <input value={v.subtitle} onChange={set("subtitle")} disabled={disabled} placeholder="One supporting line, e.g. Your first 90 days at FHI Global" className={field} />
+        </div>
+        <div>
+          <label className={label}>Tagline</label>
+          <input value={v.tagline} onChange={set("tagline")} disabled={disabled} placeholder="You're invited to our" className={field} />
+        </div>
+        <div>
+          <label className={label}>Date *</label>
+          <input value={v.date} onChange={set("date")} disabled={disabled} placeholder="Saturday, 15 November 2026" className={field} />
+        </div>
+        <div>
+          <label className={label}>Time *</label>
+          <input value={v.time} onChange={set("time")} disabled={disabled} placeholder="2:00 PM – 5:00 PM GST" className={field} />
+        </div>
+        <div>
+          <label className={label}>Venue *</label>
+          <input value={v.venue} onChange={set("venue")} disabled={disabled} placeholder="FHI Global Office, Al Rigga, Deira" className={field} />
+        </div>
+        <div className="sm:col-span-2">
+          <label className={label}>Speakers — one per line: Name (role) - topic</label>
+          <textarea value={v.speakers} onChange={set("speakers")} disabled={disabled} rows={3} placeholder={"Michelle Guinto (Team Leader) - Closing your first deal\nCarlos Guinto (Team Leader) - Working your network"} className={`${field} resize-y`} />
+        </div>
+        <div className="sm:col-span-2">
+          <label className={label}>Design</label>
+          <div className="flex flex-wrap gap-2">
+            {spec.designs.map((d) => (
+              <button key={d.id} type="button" disabled={disabled} onClick={() => setV((cur) => ({ ...cur, design: d.id }))} title={d.about} className={`rounded-lg border px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${v.design === d.id ? "border-[#001f3f] bg-[#001f3f] text-white" : "border-[#e3e6ea] bg-white text-[#374151] hover:border-[#d6b357]"}`}>
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <button type="button" onClick={submit} disabled={!ready || disabled} className="inline-flex items-center gap-1.5 rounded-lg bg-[#001f3f] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#00356b] disabled:opacity-40">
+          <Sparkles className="h-3.5 w-3.5" /> Draw the poster
+        </button>
+        {!ready && <span className="text-[11.5px] text-[#9ca3af]">Fill in the fields marked * first.</span>}
+      </div>
+    </div>
+  )
+}
+
+/**
  * A client message the assistant wrote: the text as it will be sent, Copy, and
  * "Send on WhatsApp" (wa.me with the text prefilled — the agent picks the chat)
  * or "Open in Mail" for an email draft.
@@ -307,7 +418,8 @@ function DraftCard({ item }: { item: DraftSpec }) {
     }
   }
   const email = item.channel === "email"
-  const sendHref = email ? `mailto:?subject=${encodeURIComponent(item.subject ?? item.project)}&body=${encodeURIComponent(item.text)}` : `https://wa.me/?text=${encodeURIComponent(item.text)}`
+  // A team member's number opens their chat straight away; a client's is never on file, so WhatsApp asks whom to send to.
+  const sendHref = email ? `mailto:?subject=${encodeURIComponent(item.subject ?? item.project)}&body=${encodeURIComponent(item.text)}` : `https://wa.me/${item.to_whatsapp ?? ""}?text=${encodeURIComponent(item.text)}`
   return (
     <div className="overflow-hidden rounded-xl border border-[#e5e7eb] bg-white">
       <div className="flex items-center gap-2.5 border-b border-[#f0f2f5] bg-[#fafbfc] px-3 py-2">
@@ -504,6 +616,10 @@ const TOOL_LABELS: Record<string, string> = {
   teams_detail: "Teams",
   news_overview: "Website news",
   client_message: "Client message",
+  member_message: "Message to a member",
+  team_attention: "Who needs help",
+  my_goal: "Your goal",
+  mark_lead_contacted: "Lead marked",
   project_comparison: "Project comparison",
   project_brochure: "Project brochure",
   my_report: "Your report",
@@ -731,6 +847,52 @@ export default function FhiChatPage({
   const exhausted = Boolean(quota && quota.limit !== null && quota.used >= quota.limit)
   const [input, setInput] = useState("")
   const [busy, setBusy] = useState(false)
+  // Voice input — the browser's own recognition; the button appears only where it exists (decided after mount, so the server and client render alike).
+  const [canSpeak, setCanSpeak] = useState(false)
+  const [listening, setListening] = useState(false)
+  const recRef = useRef<SpeechRecognitionLike | null>(null)
+  useEffect(() => {
+    const id = window.setTimeout(() => setCanSpeak(Boolean(speechRecognition())), 0)
+    return () => {
+      window.clearTimeout(id)
+      recRef.current?.stop()
+    }
+  }, [])
+  const toggleMic = () => {
+    if (listening) {
+      recRef.current?.stop()
+      return
+    }
+    const Rec = speechRecognition()
+    if (!Rec) return
+    const rec = new Rec()
+    rec.lang = navigator.language || "en-US"
+    rec.interimResults = true
+    rec.continuous = false
+    const before = input.trim()
+    rec.onresult = (e) => {
+      let heard = ""
+      for (let i = 0; i < e.results.length; i++) heard += e.results[i][0]?.transcript ?? ""
+      setInput(before ? `${before} ${heard.trim()}` : heard.trim())
+    }
+    rec.onend = () => {
+      setListening(false)
+      recRef.current = null
+      inputRef.current?.focus()
+    }
+    rec.onerror = () => {
+      setListening(false)
+      recRef.current = null
+    }
+    recRef.current = rec
+    setListening(true)
+    try {
+      rec.start()
+    } catch {
+      setListening(false)
+      recRef.current = null
+    }
+  }
   const [error, setError] = useState<string | null>(null)
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
@@ -1061,13 +1223,13 @@ export default function FhiChatPage({
         body: JSON.stringify({ messages: next.map(({ role, content }) => ({ role, content })) }),
         signal: controller.signal,
       })
-      type Final = { reply?: string; used?: string[]; cards?: Card[]; names?: string[]; charts?: ChartSpec[]; stats?: StatSpec[]; printCards?: PrintCardSpec[]; downloads?: DownloadSpec[]; drafts?: DraftSpec[]; error?: string; quota?: Quota }
+      type Final = { reply?: string; used?: string[]; cards?: Card[]; names?: string[]; charts?: ChartSpec[]; stats?: StatSpec[]; printCards?: PrintCardSpec[]; downloads?: DownloadSpec[]; drafts?: DraftSpec[]; forms?: FormSpec[]; error?: string; quota?: Quota }
       if (!res.ok || !res.body || !(res.headers.get("content-type") ?? "").includes("text/event-stream")) {
         // Refused before streaming (sign-in, the daily limit…) or an old server: one JSON object.
         const data = (await res.json().catch(() => ({}))) as Final
         if (data.quota) setQuota(data.quota)
         if (!res.ok || !data.reply) throw new Error(data.error ?? "FHI Assistant couldn't answer — try again.")
-        patchLive((m) => ({ ...m, content: data.reply ?? "", used: data.used, cards: data.cards, names: data.names, charts: data.charts, stats: data.stats, printCards: data.printCards, downloads: data.downloads, drafts: data.drafts, streaming: false, status: undefined }))
+        patchLive((m) => ({ ...m, content: data.reply ?? "", used: data.used, cards: data.cards, names: data.names, charts: data.charts, stats: data.stats, printCards: data.printCards, downloads: data.downloads, drafts: data.drafts, forms: data.forms, streaming: false, status: undefined }))
         return
       }
       const reader = res.body.getReader()
@@ -1096,7 +1258,7 @@ export default function FhiChatPage({
           } else if (ev.type === "done") {
             if (flushTimer !== null) window.clearTimeout(flushTimer)
             if (ev.quota) setQuota(ev.quota)
-            patchLive((m) => ({ ...m, content: ev.reply ?? liveText, used: ev.used, cards: ev.cards, names: ev.names, charts: ev.charts, stats: ev.stats, printCards: ev.printCards, downloads: ev.downloads, drafts: ev.drafts, streaming: false, status: undefined }))
+            patchLive((m) => ({ ...m, content: ev.reply ?? liveText, used: ev.used, cards: ev.cards, names: ev.names, charts: ev.charts, stats: ev.stats, printCards: ev.printCards, downloads: ev.downloads, drafts: ev.drafts, forms: ev.forms, streaming: false, status: undefined }))
             finished = true
           } else if (ev.type === "error") {
             if (ev.quota) setQuota(ev.quota)
@@ -1255,6 +1417,18 @@ export default function FhiChatPage({
             ))}
             {pdfReport && <PdfReportMenu endpoint={pdfReport} disabled={busy} />}
           </div>
+          {canSpeak && !busy && !exhausted && (
+            <button
+              type="button"
+              onClick={toggleMic}
+              aria-label={listening ? "Stop listening" : "Speak your question"}
+              aria-pressed={listening}
+              title={listening ? "Listening… tap to stop" : "Speak your question"}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${listening ? "animate-pulse bg-[#e11d48] text-white" : "bg-[#f1f3f6] text-[#374151] hover:bg-[#e3e6ea] hover:text-[#001f3f]"}`}
+            >
+              <Mic className="h-4 w-4" />
+            </button>
+          )}
           {busy ? (
             <button type="button" onClick={stop} aria-label="Stop answering" title="Stop" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#001f3f] text-white transition-colors hover:bg-[#0b3a68]">
               <Square className="h-3.5 w-3.5 fill-current" />
@@ -1456,6 +1630,13 @@ export default function FhiChatPage({
                               <div className="mt-4 space-y-4">
                                 {m.printCards.map((pc, pi) => (
                                   <PrintBusinessCards key={pi} spec={pc} />
+                                ))}
+                              </div>
+                            )}
+                            {!m.streaming && m.forms && m.forms.length > 0 && i === messages.length - 1 && (
+                              <div className="mt-4">
+                                {m.forms.map((f, fi) => (
+                                  <PosterFormCard key={fi} spec={f} disabled={busy || exhausted} onSubmit={(text) => void ask(text)} />
                                 ))}
                               </div>
                             )}

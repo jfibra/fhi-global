@@ -78,6 +78,7 @@ const ADMIN_RULES: Record<string, Rule> = {
   activity_feed: () => ["Any new leads today?", "How are our sales this month?"],
   support_tickets: () => ["Which support tickets are unassigned?"],
   upcoming_birthdays: () => ["Make a birthday poster for today's celebrants"],
+  meeting_poster: () => ["Make the same poster in the Navy & gold design", "Make the same poster in the Skyline design"],
   events_overview: () => ["Who registered for our latest event?"],
   event_attendees: () => ["How many seats are left?"],
   data_health: () => ["Which projects have no payment plan?", "Any duplicate listings?"],

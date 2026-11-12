@@ -4,7 +4,8 @@ import { createAdminSupabase } from "@/lib/admin-supabase"
 import { eventIsPast, eventWhenLabel } from "@/lib/events/dates"
 import { gaConfigured, gaRunRealtime, gaRunReport, gscQuery } from "@/lib/ga-data"
 import { DEFAULT_POSTER_DESIGN, posterDesignIds, posterDesignLabel, renderBirthdayPosterPng } from "@/lib/birthday-poster"
-import { renderMeetingPosterPng, type MeetingPosterData } from "@/lib/meeting-poster"
+import { MEETING_POSTER_DESIGNS, renderMeetingPosterPng, type MeetingPosterData, type MeetingPosterDesign } from "@/lib/meeting-poster"
+import { titleCaseName } from "@/lib/public-profile"
 import { SITE_URL } from "@/lib/seo"
 import { DESIGNS as CARD_DESIGNS, isDesignId as isCardDesignId } from "@/features/business-card/card-render"
 import { sendAdminDirectEmail, sendCongratsEmail } from "@/lib/mailer"
@@ -1637,6 +1638,7 @@ async function meetingPoster(
     time?: string
     venue?: string
     speakers?: Array<{ name?: string; role?: string; topic?: string }>
+    design?: string
   },
 ) {
   const required: Record<string, string | undefined> = {
@@ -1645,16 +1647,33 @@ async function meetingPoster(
   const missing = Object.entries(required)
     .filter(([, v]) => !(v ?? "").trim())
     .map(([k]) => k)
+  const design: MeetingPosterDesign = (args.design ?? "").toLowerCase().includes("navy") ? "navy" : "skyline"
   if (missing.length) {
+    // The chat draws a form with every field (what was given already filled in) — the admin completes it there.
+    const speakersText = (args.speakers ?? [])
+      .map((sp) => [sp?.name?.trim(), sp?.role?.trim() ? `(${sp.role.trim()})` : "", sp?.topic?.trim() ? `- ${sp.topic.trim()}` : ""].filter(Boolean).join(" "))
+      .filter(Boolean)
+      .join("\n")
     return {
       need_more_info: true,
       missing_fields: missing,
-      optional_fields: [
-        "subtitle",
-        "tagline (e.g. YOU'RE INVITED)",
-        "speakers — names (FHI members get their photo automatically), each with optional role and topic",
+      note: "A form with every poster field is shown under your reply for the admin to fill in. Answer in ONE short line inviting them to complete it; do not list the fields or ask questions.",
+      _forms: [
+        {
+          kind: "meeting_poster" as const,
+          values: {
+            title: (args.title ?? "").trim(),
+            subtitle: (args.subtitle ?? "").trim(),
+            tagline: (args.tagline ?? "").trim(),
+            date: (args.date ?? "").trim(),
+            time: (args.time ?? "").trim(),
+            venue: (args.venue ?? "").trim(),
+            speakers: speakersText,
+            design,
+          },
+          designs: MEETING_POSTER_DESIGNS.map((d) => ({ id: d.id, label: d.label, about: d.about })),
+        },
       ],
-      note: "Ask the admin for the missing details in ONE friendly question, then call this tool again with everything provided.",
     }
   }
 
@@ -1668,7 +1687,8 @@ async function meetingPoster(
     if (match) {
       const { data } = await admin.from("profiles").select("fullname, profile_url").eq("id", match.id).maybeSingle()
       photo = (data?.profile_url as string | null) ?? null
-      name = data?.fullname?.trim().replace(/\s+/g, " ") || nm
+      // Profiles typed in capitals ("CARLOS GUINTO") read as names on the poster.
+      name = titleCaseName(data?.fullname?.trim().replace(/\s+/g, " ") || nm) || nm
     }
     speakers.push({ name, role: sp?.role?.trim() || undefined, topic: sp?.topic?.trim() || undefined, photo })
   }
@@ -1681,21 +1701,24 @@ async function meetingPoster(
     time: (args.time ?? "").trim(),
     venue: (args.venue ?? "").trim(),
     speakers,
+    design,
   }
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url")
   return {
     poster_ready: true,
     title: payload.title,
+    design: MEETING_POSTER_DESIGNS.find((d) => d.id === design)?.label ?? design,
+    other_design: MEETING_POSTER_DESIGNS.find((d) => d.id !== design)?.label ?? null,
     // To email this poster, echo this ref into send_email.
     email_attachment_ref: { meeting_poster_payload: encoded },
     speakers_on_poster: speakers.map((sp) => `${sp.name}${sp.photo ? "" : " (no photo — shown with initial)"}`),
-    note: "The meeting poster renders below this reply — the admin can click it to open the full-size PNG for download or sharing.",
+    note: "The meeting poster renders below this reply — the admin can click it to open the full-size PNG for download or sharing. Mention the other design exists in a few words.",
     _names: speakers.map((sp) => sp.name),
     _cards: [
       {
         kind: "poster" as const,
         title: payload.title,
-        subtitle: "📋 Meeting poster · click to open full size",
+        subtitle: `📋 Meeting poster · ${MEETING_POSTER_DESIGNS.find((d) => d.id === design)?.label ?? design} · click to open full size`,
         image: `/api/admin/meeting-poster?d=${encoded}`,
       },
     ],
@@ -1759,6 +1782,14 @@ async function businessCard(admin: Admin, args: { names?: string[] | string }) {
 export type FhiChatPrintCard = {
   member: { name: string; phoneDial: string; phoneLocal: string; email: string; avatarUrl: string | null; initials: string }
   designs: string[]
+}
+
+/** A form the chat draws under the reply when a tool needs details typed in (the meeting poster's fields, 2026-11-12). */
+export type FhiChatForm = {
+  kind: "meeting_poster"
+  /** What the admin already gave, pre-filled. */
+  values: { title: string; subtitle: string; tagline: string; date: string; time: string; venue: string; speakers: string; design: string }
+  designs: Array<{ id: string; label: string; about: string }>
 }
 
 /** Printable business card (front + back) — the chat UI renders it with the
@@ -4849,10 +4880,11 @@ export const FHI_CHAT_TOOLS = [
     function: {
       name: "meeting_poster",
       description:
-        "CREATE a meeting/event invite poster (navy & gold FHI design with speaker cards). Use when the admin asks to make a meeting poster. Requires title, date, time and venue — if any are missing, the tool says so: ask the admin ONE friendly question for the missing details, then call again. Speakers are optional; FHI member names get their profile photo automatically. The poster renders in the chat under the reply.",
+        "CREATE a meeting/event invite poster (FHI navy & gold; two designs: skyline = Dubai skyline backdrop (default), navy = deep navy with a gold glow). Call it AS SOON AS the admin asks for a meeting poster, with whatever details they gave — when title, date, time or venue are missing the chat shows a form for the admin to fill in, so never ask for the fields yourself. Speakers are optional; FHI member names get their profile photo automatically. The poster renders in the chat under the reply.",
       parameters: {
         type: "object",
         properties: {
+          design: { type: "string", enum: ["skyline", "navy"], description: "skyline (default) or navy" },
           title: { type: "string", description: "Event title, e.g. Monthly Sales Rally" },
           subtitle: { type: "string", description: "One supporting line (optional)" },
           tagline: { type: "string", description: "Small eyebrow text, default YOU'RE INVITED (optional)" },
@@ -5218,6 +5250,7 @@ export async function runFhiChatTool(
   charts: FhiChatChart[]
   printCards: FhiChatPrintCard[]
   stats: FhiChatStat[]
+  forms: FhiChatForm[]
 }> {
   // Google's figures (Analytics, Search Console) lag a day and take seconds to
   // read, so the same question within GOOGLE_TTL_MS reuses the answer.
@@ -5246,6 +5279,7 @@ async function runFhiChatToolUncached(
   charts: FhiChatChart[]
   printCards: FhiChatPrintCard[]
   stats: FhiChatStat[]
+  forms: FhiChatForm[]
 }> {
   const admin = createAdminSupabase()
   try {
@@ -5292,10 +5326,10 @@ async function runFhiChatToolUncached(
       case "print_business_card": result = await printBusinessCard(admin, args); break
       case "send_email": result = await sendChatEmail(admin, args, sender); break
       case "congratulate_top_agents": result = await congratulateTopAgents(admin, args, sender); break
-      default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [], printCards: [], stats: [] }
+      default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [], printCards: [], stats: [], forms: [] }
     }
-    const { _cards, _names, _charts, _printCards, _stats, ...rest } = result as {
-      _cards?: FhiChatCard[]; _names?: string[]; _charts?: FhiChatChart[]; _printCards?: FhiChatPrintCard[]; _stats?: FhiChatStat[]
+    const { _cards, _names, _charts, _printCards, _stats, _forms, ...rest } = result as {
+      _cards?: FhiChatCard[]; _names?: string[]; _charts?: FhiChatChart[]; _printCards?: FhiChatPrintCard[]; _stats?: FhiChatStat[]; _forms?: FhiChatForm[]
     } & Record<string, unknown>
     return {
       forModel: JSON.stringify(rest),
@@ -5304,11 +5338,12 @@ async function runFhiChatToolUncached(
       charts: Array.isArray(_charts) ? _charts : [],
       printCards: Array.isArray(_printCards) ? _printCards : [],
       stats: Array.isArray(_stats) ? _stats : [],
+      forms: Array.isArray(_forms) ? _forms : [],
     }
   } catch (e) {
     return {
       forModel: JSON.stringify({ error: e instanceof Error ? e.message : "Query failed" }),
-      cards: [], names: [], charts: [], printCards: [], stats: [],
+      cards: [], names: [], charts: [], printCards: [], stats: [], forms: [],
     }
   }
 }

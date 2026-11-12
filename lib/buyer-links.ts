@@ -591,11 +591,13 @@ export type BuyerLead = {
   /** Only from the admin API (/api/admin/buyer-leads): whose link the brief came through. */
   agent?: { id: string; name: string } | null
   created_at: string
+  /** When the agent marked it contacted (migration 088); null = not yet. */
+  contacted_at?: string | null
 }
 
 export const BUYER_LINK_COLUMNS = "id, agent_id, code, slug, is_active, created_at"
 export const BUYER_LEAD_COLUMNS =
-  "id, link_id, agent_id, name, whatsapp_code, whatsapp, email, budget, contact_time, message, kind, profile, created_at"
+  "id, link_id, agent_id, name, whatsapp_code, whatsapp, email, budget, contact_time, message, kind, profile, created_at, contacted_at"
 
 /**
  * The international digits wa.me and tel: need: "+971" + "050 123 4567" →

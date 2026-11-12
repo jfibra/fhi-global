@@ -343,6 +343,22 @@ export default function BuyersLinkPage({ scope = "agent" }: { scope?: "agent" | 
   const [page, setPage] = useState(1)
   const [openId, setOpenId] = useState<string | null>(null)
 
+  // Follow-up tracking (migration 088): the agent marks a brief contacted, or takes the mark off.
+  // Shown at once, saved through the API (service role, the lead's own agent only), put back if the save fails.
+  const setContacted = async (l: BuyerLead, contacted: boolean) => {
+    const prev = l.contacted_at ?? null
+    const patch = (at: string | null) => setLeads((ls) => ls?.map((x) => (x.id === l.id ? { ...x, contacted_at: at } : x)) ?? ls)
+    patch(contacted ? new Date().toISOString() : null)
+    try {
+      const res = await fetch(`/api/buyer-links/leads/${l.id}/contacted`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contacted }) })
+      const data = (await res.json().catch(() => ({}))) as { contacted_at?: string | null }
+      if (!res.ok) throw new Error("save failed")
+      patch(data.contacted_at ?? null)
+    } catch {
+      patch(prev)
+    }
+  }
+
   useEffect(() => {
     if (!allowed || !userId) return
     let live = true
@@ -903,6 +919,18 @@ export default function BuyersLinkPage({ scope = "agent" }: { scope?: "agent" | 
                           <MessageCircle className="h-3.5 w-3.5" />
                           <span className="hidden @md:inline">WhatsApp</span>
                         </a>
+                      )}
+                      {!admin && (
+                        <button
+                          type="button"
+                          onClick={() => void setContacted(l, !l.contacted_at)}
+                          aria-pressed={Boolean(l.contacted_at)}
+                          title={l.contacted_at ? `Marked contacted ${fmtDate(l.contacted_at)} — click to undo` : "Mark as contacted"}
+                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors ${l.contacted_at ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d] hover:bg-[#dcfce7]" : "border-[#e5e7eb] bg-white text-[#6b7280] hover:border-[#001f3f] hover:text-[#001f3f]"}`}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          <span className="hidden @md:inline">{l.contacted_at ? `Contacted ${fmtDate(l.contacted_at)}` : "Mark contacted"}</span>
+                        </button>
                       )}
                       <button
                         type="button"

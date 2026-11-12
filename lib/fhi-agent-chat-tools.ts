@@ -5,6 +5,9 @@ import { findBrochureProject } from "@/lib/brochure/data"
 import { buildClientMessage, type ClientDraft, type ClientMessageArgs } from "@/lib/client-message"
 import { buildComparison, findComparisonProjects, COMPARISON_MAX } from "@/lib/comparison/data"
 import { loadBrochure, type Brochure } from "@/lib/brochure/data"
+import { buildMemberMessage, type MemberFacts } from "@/lib/client-message"
+import { goalHeadline, goalPeriod, goalProgress, readGoal, writeGoal, type AgentGoal } from "@/lib/agent-goal"
+import { profileContact } from "@/lib/public-agents"
 import { buildAgentReport } from "@/lib/agent-report/data"
 import { ruleInsights } from "@/lib/agent-report/insights"
 import { ROLES_SALE_AGENT_PROFILES } from "@/lib/app-roles"
@@ -396,7 +399,27 @@ export async function ownTestBrief(admin: Admin, caller: AgentChatCaller): Promi
   }
 }
 
-type MyLeadsArgs = { from_date?: string; to_date?: string; days?: number; kind?: "buyer" | "seller" | "all"; grade?: string; limit?: number }
+type MyLeadsArgs = { from_date?: string; to_date?: string; days?: number; kind?: "buyer" | "seller" | "all"; grade?: string; contacted?: "yes" | "no" | "all"; limit?: number }
+
+// ─── mark_lead_contacted ─────────────────────────────────────────────────────
+
+/** "Mark Maria as contacted" — one of the caller's own briefs, by name (migration 088). */
+async function markLeadContacted(admin: Admin, caller: AgentChatCaller, args: { name?: string; undo?: boolean }) {
+  const asked = nameWords(args.name)
+  if (!asked.length) return { error: "Which lead? Give their name." }
+  const since = new Date(Date.now() - 365 * 86400e3).toISOString().slice(0, 10)
+  const { data, error } = await admin.from("buyer_link_leads").select(BUYER_LEAD_COLUMNS).eq("agent_id", caller.userId).gte("created_at", since).order("created_at", { ascending: false }).limit(1000)
+  if (error) throw new Error(error.message)
+  const isOwnTest = await ownTestBrief(admin, caller)
+  const hits = ((data ?? []) as BuyerLead[]).filter((b) => !isOwnTest(b) && nameMatches(asked, b.name))
+  if (!hits.length) return { found: false, asked: args.name, note: "No brief of yours in the last year matches that name — say so and offer to show their leads" }
+  if (hits.length > 1) return { found: false, asked: args.name, several_match: hits.slice(0, 8).map((b) => ({ name: b.name, when: b.created_at.slice(0, 10), kind: b.kind === "seller" ? "seller" : "buyer", contacted: b.contacted_at ? b.contacted_at.slice(0, 10) : "not yet" })), note: "Ask which one they mean (by date or kind)" }
+  const lead = hits[0]
+  const contactedAt = args.undo ? null : new Date().toISOString()
+  const { error: upErr } = await admin.from("buyer_link_leads").update({ contacted_at: contactedAt }).eq("id", lead.id).eq("agent_id", caller.userId)
+  if (upErr) throw new Error(upErr.message)
+  return { found: true, name: lead.name, kind: lead.kind === "seller" ? "seller" : "buyer", received: lead.created_at.slice(0, 10), contacted: contactedAt ? contactedAt.slice(0, 10) : "mark removed", note: "Confirm in one line. The Buyers Link page shows the same mark." }
+}
 
 /** The briefs that came through the caller's own Buyers Link / Sellers Link —
  *  exactly the list on their Buyers Link page, graded the same way. */
@@ -417,6 +440,10 @@ async function myLeads(admin: Admin, caller: AgentChatCaller, args: MyLeadsArgs)
     const g = args.grade.trim().toLowerCase()
     rows = rows.filter((b) => (gradeOf(b) ?? "") === g)
   }
+  // Follow-up tracking (migration 088): "which leads haven't I contacted" → contacted = "no".
+  const notContacted = rows.filter((b) => !b.contacted_at).length
+  if (args.contacted === "no") rows = rows.filter((b) => !b.contacted_at)
+  else if (args.contacted === "yes") rows = rows.filter((b) => Boolean(b.contacted_at))
   const prof = (b: BuyerLead) => (b.profile ?? {}) as Record<string, string | string[] | undefined>
   const label = (b: BuyerLead, key: string) => {
     const v = prof(b)[key]
@@ -434,6 +461,8 @@ async function myLeads(admin: Admin, caller: AgentChatCaller, args: MyLeadsArgs)
       : {}),
     buyers: buyers.length,
     sellers: rows.length - buyers.length,
+    not_contacted_yet: notContacted,
+    contacted_note: "`contacted` is the date the agent marked the brief contacted (the Buyers Link page's button, or 'mark <name> as contacted' here); 'not yet' = no mark. Leads not yet contacted are the ones to follow up first.",
     by_grade_buyers_only: count(buyers, (b) => LEAD_GRADES[gradeOf(b)!].label),
     by_budget: count(buyers, (b) => budgetLabel(b.budget)),
     by_goal: count(buyers, (b) => label(b, "goal")),
@@ -441,6 +470,7 @@ async function myLeads(admin: Admin, caller: AgentChatCaller, args: MyLeadsArgs)
       stat("Briefs", rows.length, null, ownTests ? `since ${from} · ${ownTests} own test${ownTests === 1 ? "" : "s"} left out` : `since ${from}`),
       stat("Priority buyers", priority),
       stat("Buyers", buyers.length, null, `${rows.length - buyers.length} seller${rows.length - buyers.length === 1 ? "" : "s"}`),
+      stat("To follow up", notContacted, null, notContacted ? "not marked contacted" : "all contacted"),
     ],
     _charts: [
       ...pieChart("Your buyer briefs by grade", count(buyers, (b) => LEAD_GRADES[gradeOf(b)!].label)),
@@ -451,6 +481,7 @@ async function myLeads(admin: Admin, caller: AgentChatCaller, args: MyLeadsArgs)
       kind: b.kind === "seller" ? "seller" : "buyer",
       grade: gradeOf(b) ? LEAD_GRADES[gradeOf(b)!].label : null,
       name: b.name,
+      contacted: b.contacted_at ? b.contacted_at.slice(0, 10) : "not yet",
       whatsapp: b.whatsapp ? `${b.whatsapp_code ?? ""} ${b.whatsapp}`.trim() : null,
       email: b.email,
       budget: budgetLabel(b.budget),
@@ -772,10 +803,229 @@ async function myEvents(admin: Admin, caller: AgentChatCaller, args: MyEventsArg
   }
 }
 
+// ─── my_goal ─────────────────────────────────────────────────────────────────
+
+type MyGoalArgs = { action?: "get" | "set" | "clear"; deals?: number; value_aed?: number; period?: string; from_date?: string; to_date?: string }
+
+/** The caller's own sales goal (lib/agent-goal.ts): set it, read the progress, or clear it. */
+async function myGoal(admin: Admin, caller: AgentChatCaller, args: MyGoalArgs) {
+  const action = args.action ?? "get"
+  if (action === "clear") {
+    await writeGoal(admin, caller.userId, null)
+    return { cleared: true, note: "Confirm in one line; offer to set a new one." }
+  }
+  let goal: AgentGoal | null
+  if (action === "set") {
+    const period = goalPeriod(args.period, args.from_date, args.to_date)
+    if (!period) return { error: "Which period? Say this month, this quarter, this year, or give the dates." }
+    const deals = typeof args.deals === "number" && args.deals > 0 ? Math.round(args.deals) : null
+    const value = typeof args.value_aed === "number" && args.value_aed > 0 ? Math.round(args.value_aed) : null
+    if (!deals && !value) return { error: "How many deals, or what value in AED? E.g. 5 deals, or AED 3,000,000." }
+    goal = { deals, value, from: period.from, to: period.to, label: period.label, set_at: new Date().toISOString() }
+    await writeGoal(admin, caller.userId, goal)
+  } else {
+    goal = await readGoal(admin, caller.userId)
+    if (!goal) return { has_goal: false, note: "No goal set. Offer to set one — e.g. 'I want 5 deals this quarter' or 'my goal is AED 3M this year'." }
+  }
+  const p = await goalProgress(admin, caller.userId, goal)
+  return {
+    has_goal: true,
+    ...(action === "set" ? { just_set: true } : {}),
+    goal: { target: goal.deals ? `${goal.deals} validated deals` : AED(goal.value ?? 0), period: goal.label, from: goal.from, to: goal.to },
+    progress: {
+      headline: goalHeadline(p),
+      percent: p.percent,
+      validated_deals: p.validated_deals,
+      validated_value: AED(p.validated_value),
+      pending_deals: p.pending_deals,
+      pending_value: AED(p.pending_value),
+      remaining: p.remaining_deals != null ? `${p.remaining_deals} deal${p.remaining_deals === 1 ? "" : "s"}` : AED(p.remaining_value ?? 0),
+      days_left: p.days_left,
+      pace_needed: p.pace_deals_per_week != null ? `${p.pace_deals_per_week} validated deal${p.pace_deals_per_week === 1 ? "" : "s"} a week` : null,
+      status: p.done ? "reached" : p.over ? "period over, not reached" : "in progress",
+    },
+    note: "Validated deals only, the same rule as the leaderboards; pending deals are shown apart. Give the headline, days left and the pace in two or three lines, then one concrete next step for this week; if just_set, confirm the goal first.",
+    _stats: [
+      stat("Goal", goal.deals ? `${goal.deals} deals` : AED(goal.value ?? 0), null, goal.label),
+      stat("Done", goalHeadline(p), null, `${p.percent}%`),
+      stat("Days left", p.days_left, null, p.pending_deals ? `${p.pending_deals} pending could count` : null),
+      ...(p.pace_deals_per_week != null ? [stat("Pace needed", `${p.pace_deals_per_week}/week`, null, "validated deals")] : []),
+    ],
+  }
+}
+
 // ─── Team leaders: my_team ───────────────────────────────────────────────────
 
 type MyTeamArgs = { from_date?: string; to_date?: string; member_name?: string; limit?: number }
 type TeamSalesOk = Extract<Awaited<ReturnType<typeof computeTeamSales>>, { sellers: unknown[] }>
+
+type RosterMember = { user_id: string; team_id: string; role_in_team: string | null; joined_at: string | null; profiles: { fullname: string | null; role: string | null; profile_url: string | null; is_deleted: boolean | null; joined_at: string | null; metadata: Record<string, unknown> | null } | null }
+
+/** The team the caller leads or belongs to — their latest active membership, never taken from the model. */
+async function leaderTeamId(admin: Admin, userId: string): Promise<string | null> {
+  const { data } = await admin.from("team_memberships").select("team_id").eq("user_id", userId).eq("is_active", true).order("joined_at", { ascending: false }).limit(1)
+  return (data?.[0]?.team_id as string | undefined) ?? null
+}
+
+/** Everyone in the team and its subteams (any depth), with the subteam each sits in. */
+async function teamRoster(admin: Admin, teamId: string) {
+  const { data: allTeams } = await admin.from("teams").select("id, name, parent_id").limit(2000)
+  const teamIds = new Set<string>([teamId])
+  for (let grew = true; grew; ) {
+    grew = false
+    for (const t of allTeams ?? []) if (t.parent_id && teamIds.has(t.parent_id) && !teamIds.has(t.id)) { teamIds.add(t.id); grew = true }
+  }
+  const members: RosterMember[] = []
+  for (let page = 0; page < 5; page++) {
+    const { data } = await admin.from("team_memberships").select("user_id, team_id, role_in_team, joined_at, profiles!inner(fullname, role, profile_url, is_deleted, joined_at, metadata)").in("team_id", [...teamIds]).is("left_at", null).range(page * 1000, page * 1000 + 999)
+    members.push(...((data ?? []) as unknown as RosterMember[]))
+    if (!data || data.length < 1000) break
+  }
+  const live = members.filter((m) => m.profiles && m.profiles.is_deleted !== true)
+  const subteamName = (m: RosterMember) => (m.team_id !== teamId ? (allTeams ?? []).find((t) => t.id === m.team_id)?.name ?? null : null)
+  return { allTeams: allTeams ?? [], live, subteamName }
+}
+
+const dubaiTodayIso = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" })
+const daysApart = (from: string, to: string) => Math.max(Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400e3), 0)
+const shiftDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86400e3).toISOString().slice(0, 10)
+
+/** The last 90 days of a team, every member's figures and their last validated sale ever — what team_attention and member_message read. */
+async function teamPicture(admin: Admin, caller: AgentChatCaller) {
+  const teamId = await leaderTeamId(admin, caller.userId)
+  if (!teamId) return null
+  const today = dubaiTodayIso()
+  const tomorrow = shiftDays(today, 1)
+  const from = shiftDays(today, -90)
+  const [team, roster, sales] = await Promise.all([computeTeamSales(admin, teamId, from, tomorrow), teamRoster(admin, teamId), fetchAllSales(admin)])
+  if (team.status !== 200 || !("sellers" in team) || !team.sellers) return null
+  const t = team as TeamSalesOk
+  const sellers = new Map(t.sellers.map((s) => [s.id, s]))
+  const ranked = t.sellers.filter((s) => s.validated_deals > 0)
+  const lastSale = new Map<string, string>()
+  for (const s of sales) {
+    if ((s.validation_status ?? "pending") !== "validated") continue
+    const d = businessDate(s)
+    for (const c of saleCredits(s)) if (!lastSale.has(c.agentId) || (lastSale.get(c.agentId) as string) < d) lastSale.set(c.agentId, d)
+  }
+  const figures = (m: RosterMember) => {
+    const s = sellers.get(m.user_id)
+    const pending = (s?.deals ?? []).filter((d) => d.status === "pending").map((d) => ({ project: d.project, date: d.date, days_waiting: daysApart(d.date, today) }))
+    const last = lastSale.get(m.user_id) ?? null
+    // "New" = registered with FHI recently (profiles.joined_at, as My Team and the Team Report count it) — a team
+    // created or backfilled in bulk (CMG Properties, 2026-10-02 and 11-05) must not make 580 people look new.
+    const joinedFhi = m.profiles?.joined_at?.slice(0, 10) ?? null
+    return {
+      validated_deals: s?.validated_deals ?? 0,
+      validated_value: s?.validated_value ?? 0,
+      pending,
+      last_sale: last,
+      days_since_last_sale: last ? daysApart(last, today) : null,
+      days_with_fhi: joinedFhi ? daysApart(joinedFhi, today) : null,
+      rank: s && s.validated_deals > 0 ? ranked.indexOf(s) + 1 : null,
+    }
+  }
+  return { teamId, teamName: t.team.name, today, from, roster, figures, members: roster.live.filter((m) => m.user_id !== caller.userId) }
+}
+
+// ─── Team leaders: team_attention ────────────────────────────────────────────
+
+/** Who in the team needs the leader's attention this week, and what to say — from the last 90 days. */
+async function teamAttention(admin: Admin, caller: AgentChatCaller, args: { limit?: number }) {
+  if (caller.role !== "team_leader") return { error: "Team figures are for team leaders." }
+  const pic = await teamPicture(admin, caller)
+  if (!pic) return { has_team: false, note: "You are not in a team yet, or the team could not be totalled." }
+  const limit = Math.min(Math.max(args.limit ?? 12, 1), 30)
+  type Row = { name: string; role: string | null; subteam: string | null; whatsapp_on_file: boolean; score: number; signals: string[]; talking_points: string[]; figures: ReturnType<typeof pic.figures> }
+  const rows: Row[] = pic.members.map((m) => {
+    const f = pic.figures(m)
+    const signals: string[] = []
+    const points: string[] = []
+    let score = 0
+    const isNew = f.days_with_fhi != null && f.days_with_fhi <= 60
+    const quiet = f.validated_deals === 0 && f.pending.length === 0
+    if (isNew && quiet) {
+      signals.push(`Joined FHI ${f.days_with_fhi} day${f.days_with_fhi === 1 ? "" : "s"} ago, no first deal yet`)
+      points.push("Pair them with a senior on a viewing this week and agree one project they will pitch")
+      score += 2
+    }
+    for (const p of f.pending.filter((x) => x.days_waiting >= 14)) {
+      signals.push(`Pending deal on ${p.project} waiting ${p.days_waiting} days`)
+      points.push(`Check with the office what the ${p.project} file is missing`)
+      score += 2
+    }
+    if (quiet && !isNew) {
+      signals.push(f.last_sale ? `No sale since ${f.last_sale} (${f.days_since_last_sale} days)` : `No validated sale on record${f.days_with_fhi != null ? ` (with FHI ${f.days_with_fhi} days)` : ""}`)
+      points.push("Ask what is blocking them, offer to join their next client call, and hand them one live launch to work")
+      score += f.days_since_last_sale == null || f.days_since_last_sale > 180 ? 3 : 2
+    }
+    if (f.validated_deals >= 2) {
+      signals.push(`${f.validated_deals} validated deals in the last 90 days (${AED(f.validated_value)})`)
+      points.push("Say thank you and ask them to share what is working with the team")
+      score -= 1
+    }
+    return { name: m.profiles?.fullname ?? "—", role: m.profiles?.role ?? null, subteam: pic.roster.subteamName(m), whatsapp_on_file: Boolean(profileContact(m.profiles?.metadata ?? null, "whatsapp")), score, signals, talking_points: points, figures: f }
+  })
+  const attention = rows.filter((r) => r.score > 0).sort((a, b) => b.score - a.score || (b.figures.days_since_last_sale ?? 9999) - (a.figures.days_since_last_sale ?? 9999))
+  const stars = rows.filter((r) => r.figures.validated_deals > 0).sort((a, b) => b.figures.validated_value - a.figures.validated_value)
+  const counts = {
+    members: pic.members.length,
+    quiet_90_days: rows.filter((r) => r.figures.validated_deals === 0 && r.figures.pending.length === 0).length,
+    new_without_first_deal: rows.filter((r) => r.signals.some((s) => s.startsWith("Joined"))).length,
+    pending_over_14_days: rows.reduce((a, r) => a + r.figures.pending.filter((p) => p.days_waiting >= 14).length, 0),
+    sold_last_90_days: stars.length,
+  }
+  return {
+    team: pic.teamName,
+    window: { from: pic.from, to: pic.today, note: "last 90 days; last_sale is their last validated sale ever" },
+    counts,
+    needs_attention: attention.slice(0, limit).map((r) => ({ name: r.name, role: r.role, subteam: r.subteam, signals: r.signals, what_to_say: r.talking_points, whatsapp_on_file: r.whatsapp_on_file })),
+    not_listed: Math.max(attention.length - limit, 0),
+    doing_well: stars.slice(0, 3).map((r) => ({ name: r.name, validated_deals: r.figures.validated_deals, validated_value: AED(r.figures.validated_value) })),
+    how_to_answer: "Lead with the counts in one line, then the people as '- Name — signal — what to say' (most urgent first, at most the listed ones), then the doing_well names with a thank-you suggestion. End by offering to write the message to any of them (member_message). Never invent a figure.",
+    _stats: [
+      stat("Need attention", attention.length, null, `of ${pic.members.length} members`),
+      stat("Quiet 90 days", counts.quiet_90_days),
+      stat("New, no deal yet", counts.new_without_first_deal),
+      stat("Pending > 14 days", counts.pending_over_14_days),
+    ],
+    _names: rows.map((r) => r.name),
+  }
+}
+
+// ─── Team leaders: member_message ────────────────────────────────────────────
+
+/** A WhatsApp message from the leader to one member, from the member's own figures; opens their chat when their number is on file. */
+async function memberMessage(admin: Admin, caller: AgentChatCaller, args: { member_name?: string; purpose?: string; language?: string }) {
+  if (caller.role !== "team_leader") return { result: { error: "Messages to team members are for team leaders." }, usage: null }
+  const asked = nameWords(args.member_name)
+  if (!asked.length) return { result: { error: "Which member? Give their name." }, usage: null }
+  const pic = await teamPicture(admin, caller)
+  if (!pic) return { result: { has_team: false, note: "You are not in a team yet." }, usage: null }
+  let hits = pic.members.filter((m) => nameMatches(asked, m.profiles?.fullname))
+  // "Cris Gudia" means the one whose name has those exact words, not every Cristina Gudiana who shares the prefixes.
+  if (hits.length > 1) {
+    const exact = hits.filter((m) => asked.every((w) => nameWords(m.profiles?.fullname).includes(w)))
+    if (exact.length === 1) hits = exact
+  }
+  if (!hits.length) return { result: { found: false, asked: args.member_name, note: "Nobody by that name is in your team (subteams included) — say so." }, usage: null }
+  if (hits.length > 1) return { result: { found: false, asked: args.member_name, several_match: hits.slice(0, 10).map((m) => ({ name: m.profiles?.fullname, role: m.profiles?.role, subteam: pic.roster.subteamName(m) })), note: "List these names and ask which one they mean." }, usage: null }
+  const m = hits[0]
+  const f = pic.figures(m)
+  const full = m.profiles?.fullname ?? "your team member"
+  const leader = caller.name ?? "your team leader"
+  const facts: MemberFacts = {
+    member: { first_name: full.split(/\s+/)[0] ?? full, full_name: full, role: m.profiles?.role ?? null, joined_fhi: m.profiles?.joined_at?.slice(0, 10) ?? null, days_with_fhi: f.days_with_fhi },
+    last_90_days: { validated_deals: f.validated_deals, validated_value: AED(f.validated_value), pending_deals: f.pending.length },
+    last_validated_sale: f.last_sale,
+    days_since_last_sale: f.days_since_last_sale,
+    pending_deals: f.pending,
+    rank_in_team_last_90_days: f.rank,
+    leader: { first_name: leader.split(/\s+/)[0] ?? leader, full_name: leader },
+  }
+  const digits = (profileContact(m.profiles?.metadata ?? null, "whatsapp") ?? "").replace(/\D/g, "") || null
+  return buildMemberMessage(facts, args, digits)
+}
 
 /**
  * The caller's team as Team Sales shows it: the team they are in (with its
@@ -799,20 +1049,8 @@ async function myTeam(admin: Admin, caller: AgentChatCaller, args: MyTeamArgs) {
   const team = result as TeamSalesOk
 
   // Roster (incl. subteams) for quiet members and new joiners.
-  const { data: allTeams } = await admin.from("teams").select("id, name, parent_id").limit(2000)
-  const teamIds = new Set<string>([teamId])
-  for (let grew = true; grew; ) {
-    grew = false
-    for (const t of allTeams ?? []) if (t.parent_id && teamIds.has(t.parent_id) && !teamIds.has(t.id)) { teamIds.add(t.id); grew = true }
-  }
-  type M = { user_id: string; team_id: string; role_in_team: string | null; joined_at: string | null; profiles: { fullname: string | null; role: string | null; profile_url: string | null; is_deleted: boolean | null; joined_at: string | null } | null }
-  const members: M[] = []
-  for (let page = 0; page < 5; page++) {
-    const { data } = await admin.from("team_memberships").select("user_id, team_id, role_in_team, joined_at, profiles!inner(fullname, role, profile_url, is_deleted, joined_at)").in("team_id", [...teamIds]).is("left_at", null).range(page * 1000, page * 1000 + 999)
-    members.push(...((data ?? []) as unknown as M[]))
-    if (!data || data.length < 1000) break
-  }
-  const live = members.filter((m) => m.profiles && m.profiles.is_deleted !== true)
+  type M = RosterMember
+  const { allTeams, live } = await teamRoster(admin, teamId)
   const soldIds = new Set(team.sellers.filter((s) => s.validated_deals > 0).map((s) => s.id))
   const quiet = live.filter((m) => !soldIds.has(m.user_id) && m.user_id !== caller.userId)
   // A new joiner registered in the period AND entered the team in it — a team
@@ -821,7 +1059,7 @@ async function myTeam(admin: Admin, caller: AgentChatCaller, args: MyTeamArgs) {
   const joiners = live.filter((m) => inPeriod(m.joined_at) && inPeriod(m.profiles?.joined_at)).sort((a, b) => (b.profiles?.joined_at ?? "").localeCompare(a.profiles?.joined_at ?? ""))
   const pendingDeals = team.sellers.flatMap((s) => s.deals.filter((d) => d.status === "pending").map((d) => ({ agent: s.name, date: d.date, project: d.project, developer: d.developer, price: AED(d.price), ...(d.shared ? { share: `${d.share}%` } : {}) }))).sort((a, b) => a.date.localeCompare(b.date))
   const change = pctChange(team.totals.validated.value, team.previous.validated.value)
-  const subteamName = (m: M) => (m.team_id !== teamId ? (allTeams ?? []).find((t) => t.id === m.team_id)?.name ?? null : null)
+  const subteamName = (m: M) => (m.team_id !== teamId ? allTeams.find((t) => t.id === m.team_id)?.name ?? null : null)
 
   // One member asked about by name ("show me Cris's sales") — a team leader
   // sees their own team's figures, as on Team Sales; nobody outside the team.
@@ -1052,7 +1290,34 @@ const PHASE2_TOOLS = [
     function: {
       name: "my_leads",
       description: "YOUR OWN LEADS: the buyer and seller briefs that came through your Buyers Link / Sellers Link — graded Priority / Qualified / Nurture / Information, with name, WhatsApp, email, budget, goal, timeline and readiness. Default: last 30 days. Use for 'my leads', 'any priority buyers', 'who sent me a brief this week', 'seller leads'.",
-      parameters: { type: "object", properties: { from_date: { type: "string", description: "YYYY-MM-DD inclusive" }, to_date: { type: "string", description: "YYYY-MM-DD exclusive" }, days: { type: "integer", description: "Last N days when from_date is omitted (default 30)" }, kind: { type: "string", enum: ["buyer", "seller", "all"] }, grade: { type: "string", enum: ["priority", "qualified", "nurture", "information"] }, limit: { type: "integer", description: "Default 15, max 60" } } },
+      parameters: { type: "object", properties: { from_date: { type: "string", description: "YYYY-MM-DD inclusive" }, to_date: { type: "string", description: "YYYY-MM-DD exclusive" }, days: { type: "integer", description: "Last N days when from_date is omitted (default 30)" }, kind: { type: "string", enum: ["buyer", "seller", "all"] }, grade: { type: "string", enum: ["priority", "qualified", "nurture", "information"] }, contacted: { type: "string", enum: ["yes", "no", "all"], description: "'no' = only leads not yet marked contacted ('which leads haven't I contacted', 'who do I still need to call'); default all" }, limit: { type: "integer", description: "Default 15, max 60" } } },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "mark_lead_contacted",
+      description: "MARK ONE OF YOUR OWN LEADS AS CONTACTED (or take the mark off with undo): 'mark Maria as contacted', 'I called Ahmed', 'I've messaged the Santos lead', 'unmark Maria'. Finds the brief by name among your own leads of the last year.",
+      parameters: { type: "object", properties: { name: { type: "string", description: "The lead's name, partial ok" }, undo: { type: "boolean", description: "true removes the contacted mark" } }, required: ["name"] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "my_goal",
+      description:
+        "YOUR OWN SALES GOAL: set it ('I want 5 deals this quarter', 'my goal is AED 3M this year', 'target 2 deals this month' → action set with deals or value_aed and the period), read the progress ('how am I doing on my goal', 'am I on track', 'my target' → action get: validated deals and value so far, pending apart, days left, the weekly pace still needed), or clear it ('remove my goal'). One goal per person; periods are this month, this quarter, this year, or from_date/to_date.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: { type: "string", enum: ["get", "set", "clear"], description: "Default get" },
+          deals: { type: "integer", description: "Validated deals wanted in the period" },
+          value_aed: { type: "number", description: "Validated value wanted, in AED (3000000 for AED 3M)" },
+          period: { type: "string", enum: ["this_month", "this_quarter", "this_year", "custom"], description: "The goal's period" },
+          from_date: { type: "string", description: "YYYY-MM-DD inclusive, for custom" },
+          to_date: { type: "string", description: "YYYY-MM-DD exclusive, for custom" },
+        },
+      },
     },
   },
   {
@@ -1107,6 +1372,24 @@ const TEAM_LEADER_TOOLS = [
       parameters: { type: "object", properties: { from_date: { type: "string", description: "YYYY-MM-DD inclusive (default Jan 1 this year)" }, to_date: { type: "string", description: "YYYY-MM-DD exclusive (default Jan 1 next year)" }, member_name: { type: "string", description: "One team member's name, partial ok — returns their rank in the team, figures and every deal in the period" }, limit: { type: "integer", description: "Names per list, default 15" } } },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "team_attention",
+      description:
+        "WHO IN YOUR TEAM NEEDS HELP THIS WEEK, and what to say to each (team leaders): from the last 90 days — new joiners without a first deal, pending deals waiting over 14 days, members with no sale in a long while — plus who is doing well. Each person comes with signals and talking points. Use for 'who in my team needs help', 'who should I call this week', 'who needs attention', 'who is struggling', 'who should I thank'.",
+      parameters: { type: "object", properties: { limit: { type: "integer", description: "People to list, default 12" } } },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "member_message",
+      description:
+        "A WHATSAPP MESSAGE FROM YOU TO ONE MEMBER OF YOUR TEAM (team leaders), written from their own figures — encouragement, a check-in after a quiet spell, a nudge on a pending deal, a welcome to a new joiner, congratulations on a sale. The chat shows it in a card with Copy and Send (Send opens their WhatsApp when their number is on file). Use for 'write a message to Cris', 'encourage Agnes', 'message to welcome the new joiner', 'in Tagalog'.",
+      parameters: { type: "object", properties: { member_name: { type: "string", description: "The member's name EXACTLY as the asker wrote it, every word ('Cris Gudia', not 'Cris') — a first name alone often matches several people" }, purpose: { type: "string", description: "What the message should do, ONLY as the asker said it (encourage, check in, pending deal, welcome, congratulate…)" }, language: { type: "string", description: "Default English" } }, required: ["member_name"] },
+    },
+  },
 ]
 
 /** The toolbox for a caller — team leaders get my_team on top; everyone else never sees it. */
@@ -1144,6 +1427,15 @@ export async function runAgentChatTool(
       case "project_brochure": result = await projectBrochure(admin, args as { name?: string }); break
       case "my_report": result = await myReport(admin, caller, args as { from_date?: string; to_date?: string }); break
       case "project_comparison": result = await projectComparison(admin, caller, args as { projects?: unknown }); break
+      case "my_goal": result = await myGoal(admin, caller, args as MyGoalArgs); break
+      case "mark_lead_contacted": result = await markLeadContacted(admin, caller, args as { name?: string; undo?: boolean }); break
+      case "team_attention": result = await teamAttention(admin, caller, args as { limit?: number }); break
+      case "member_message": {
+        const out = await memberMessage(admin, caller, args as { member_name?: string; purpose?: string; language?: string })
+        result = out.result
+        usage = out.usage
+        break
+      }
       case "client_message": {
         const out = await buildClientMessage(admin, caller, args as ClientMessageArgs)
         result = out.result
