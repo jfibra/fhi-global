@@ -49,6 +49,16 @@ const Body = z.object({
 
 const whatsapp = () => companyWhatsappHref("Hi! I was chatting on fhiglobal.ae and would like to speak to a consultant.")
 
+/** A ready answer typed out like the model's — a word at a time, the whole answer within about two seconds — instead of landing as a block. */
+async function typeOut(text: string, send: (e: ChatStreamEvent) => void) {
+  const pieces = text.match(/\S+\s*/g) ?? [text]
+  const pause = Math.max(12, Math.min(28, Math.round(2200 / pieces.length)))
+  for (const piece of pieces) {
+    send({ type: "delta", text: piece })
+    await new Promise((r) => setTimeout(r, pause))
+  }
+}
+
 export async function POST(req: NextRequest) {
   let raw: unknown
   try {
@@ -89,8 +99,9 @@ export async function POST(req: NextRequest) {
     const payload = { reply: faq.answer, cards: [], used: ["faq"] }
     const record = () => recordSiteChat(admin, { session: body.session, ipHash: hash, country, page, question, answer: faq.answer, tools: ["faq"], ok: true })
     if (wantsStream) {
-      // The visitor reads the answer at once; the log is written before the stream closes.
+      // Typed out like a model answer; the log is written before the stream closes.
       return sseResponse(async (send) => {
+        await typeOut(faq.answer, send)
         send({ type: "done", ...payload })
         await record()
       })

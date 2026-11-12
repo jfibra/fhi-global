@@ -94,7 +94,7 @@ You can also tap "Talk to a consultant" below and a real person will message you
 An account is for agents, partners and developers who work with FHI Global:
 - Go to ${base}/register and enter your email, then type the 6-digit code we send you — or continue with Google.
 - If someone from FHI Global invited you, open their invite link instead, so you join their team.
-- An administrator approves every new account before the first sign-in; once approved, sign in at ${base}/staff-login.
+- An administrator approves every new account before the first sign-in; once approved, use the Agent Login button at the top of the page.
 Developers who want their projects on fhiglobal.ae: email ${COMPANY.email} or WhatsApp ${COMPANY.phone} and the team will set up your developer access.`,
     words: "register registration sign up signup create account join agent partner member careers work with fhi",
   },
@@ -106,7 +106,7 @@ Developers who want their projects on fhiglobal.ae: email ${COMPANY.email} or Wh
       /\b(account|registration) (is |be |was |not |still |yet |been )*(approved|approval|pending|inactive|not active|activated|active|blocked)\b|\b(waiting for|awaiting) (approval|activation)\b|\bapprove my (account|registration)\b|\bwhen will (i|my account) be (approved|activated|active)\b/,
     ],
     unless: [/\b(event|roadshow|seminar|webinar)\b/, PROPERTY_TALK],
-    answer: `Agents and staff sign in at ${base}/staff-login with their email and password. Developer partners sign in at ${base}/developers-login with the username and password FHI Global gave them.
+    answer: `Agents sign in with the Agent Login button at the top of the page, using their email and password. Developer partners sign in with the username and password FHI Global gave them.
 A new account works only after an administrator has approved it — if yours is still pending, the team is on it.
 Forgot your password or can't get in? Email ${COMPANY.email} or WhatsApp ${COMPANY.phone} and the team will reset it for you.`,
     words: "login log in sign in password forgot reset dashboard account pending approved",
