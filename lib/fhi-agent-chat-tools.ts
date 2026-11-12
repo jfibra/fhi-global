@@ -2,6 +2,7 @@ import "server-only"
 
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { findBrochureProject } from "@/lib/brochure/data"
+import { buildClientMessage, type ClientDraft, type ClientMessageArgs } from "@/lib/client-message"
 import { buildAgentReport } from "@/lib/agent-report/data"
 import { ruleInsights } from "@/lib/agent-report/insights"
 import { ROLES_SALE_AGENT_PROFILES } from "@/lib/app-roles"
@@ -62,6 +63,8 @@ export type AgentChatCaller = { userId: string; name: string | null; role: strin
 
 /** A file the chat offers under the answer (a Download button): the agents' project brochure PDF. */
 export type AgentChatDownload = { kind: "pdf"; title: string; subtitle?: string | null; label: string; href: string; image?: string | null }
+/** A client message the assistant wrote (lib/client-message.ts) — shown as a card with Copy and Send buttons. */
+export type AgentChatDraft = ClientDraft
 
 const mine = (s: SaleRow, userId: string) => saleCredits(s).find((c) => c.agentId === userId)
 
@@ -967,6 +970,25 @@ const PHASE1_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "client_message",
+      description:
+        "A MESSAGE FOR A CLIENT about ONE project, written from the project's own facts (from price, payment plan, handover, units) with the asker's OWN name, WhatsApp and website link — a WhatsApp message by default, or an email with a subject line. The chat shows it in a card with Copy and Send buttons. Use for 'write a WhatsApp message for my client about Azizi Venice', 'follow-up message for Maria about the payment plan of Samana Greenfield', 'email introducing Binghatti Twilight', 'a message in Tagalog / Arabic / Russian about …'. Pass what the message should do in `purpose`.",
+      parameters: {
+        type: "object",
+        properties: {
+          project: { type: "string", description: "Project name, partial ok" },
+          purpose: { type: "string", description: "What the message should achieve, ONLY as the asker said it (introduce the project, follow up after a viewing, explain the payment plan, invite to a launch, share a price update…). Leave it out when they did not say — never invent a viewing or a call." },
+          client_name: { type: "string", description: "The client's name, when given" },
+          language: { type: "string", description: "The language to write in (default English)" },
+          channel: { type: "string", enum: ["whatsapp", "email"], description: "whatsapp (default) or email" },
+        },
+        required: ["project"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "my_report",
       description:
         "MY PERFORMANCE REPORT: a two-page PDF of the asker's own period — validated sales and deals with the change vs the period before, Top Sales rank, pending deals, leads by grade with the priority buyers, listings, website, client reviews, events, recruits — and FHI Assistant's coaching for the next 30 days. Returns the headline figures and a Download button. Use for 'my report for this month', 'performance report PDF', 'how did I do last quarter, as a PDF', 'my monthly report'. Pass the period's dates from PERIODS (to_date exclusive); default this month.",
@@ -1050,10 +1072,13 @@ export async function runAgentChatTool(
   name: string,
   args: Record<string, unknown>,
   caller: AgentChatCaller,
-): Promise<{ forModel: string; cards: FhiChatCard[]; names: string[]; charts: FhiChatChart[]; stats: FhiChatStat[]; downloads: AgentChatDownload[] }> {
+): Promise<{ forModel: string; cards: FhiChatCard[]; names: string[]; charts: FhiChatChart[]; stats: FhiChatStat[]; downloads: AgentChatDownload[]; drafts: AgentChatDraft[]; usage: { promptTokens: number; completionTokens: number } | null }> {
   const admin = createAdminSupabase()
+  const empty = { cards: [], names: [], charts: [], stats: [], downloads: [], drafts: [], usage: null }
   try {
     let result: Record<string, unknown>
+    // A tool that calls the model itself (client_message) reports its tokens so the question's cost counts them.
+    let usage: { promptTokens: number; completionTokens: number } | null = null
     switch (name) {
       case "my_sales": result = await mySales(admin, caller, args as MySalesArgs); break
       case "top_sales_board": result = await topSalesBoard(admin, caller, args as BoardArgs); break
@@ -1070,21 +1095,29 @@ export async function runAgentChatTool(
       case "person_sales": result = await personSales(admin, caller, args as PersonSalesArgs); break
       case "project_brochure": result = await projectBrochure(admin, args as { name?: string }); break
       case "my_report": result = await myReport(admin, caller, args as { from_date?: string; to_date?: string }); break
-      default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), cards: [], names: [], charts: [], stats: [], downloads: [] }
+      case "client_message": {
+        const out = await buildClientMessage(admin, caller, args as ClientMessageArgs)
+        result = out.result
+        usage = out.usage
+        break
+      }
+      default: return { forModel: JSON.stringify({ error: `Unknown tool ${name}` }), ...empty }
     }
-    const { _cards, _names, _charts, _stats, _printCards: _pc, _downloads, ...rest } = result as {
-      _cards?: FhiChatCard[]; _names?: string[]; _charts?: FhiChatChart[]; _stats?: FhiChatStat[]; _printCards?: unknown; _downloads?: AgentChatDownload[]
+    const { _cards, _names, _charts, _stats, _printCards: _pc, _downloads, _drafts, ...rest } = result as {
+      _cards?: FhiChatCard[]; _names?: string[]; _charts?: FhiChatChart[]; _stats?: FhiChatStat[]; _printCards?: unknown; _downloads?: AgentChatDownload[]; _drafts?: AgentChatDraft[]
     } & Record<string, unknown>
     void _pc
     return {
       forModel: JSON.stringify(rest),
       downloads: Array.isArray(_downloads) ? _downloads : [],
+      drafts: Array.isArray(_drafts) ? _drafts : [],
       cards: Array.isArray(_cards) ? _cards : [],
       names: Array.isArray(_names) ? _names : [],
       charts: Array.isArray(_charts) ? _charts : [],
       stats: Array.isArray(_stats) ? _stats : [],
+      usage,
     }
   } catch (e) {
-    return { forModel: JSON.stringify({ error: e instanceof Error ? e.message : "Query failed" }), cards: [], names: [], charts: [], stats: [], downloads: [] }
+    return { forModel: JSON.stringify({ error: e instanceof Error ? e.message : "Query failed" }), ...empty }
   }
 }

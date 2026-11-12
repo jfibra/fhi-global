@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowDown, ArrowUp, BarChart3, Check, Copy, CornerDownRight, Download, Globe, Loader2, Monitor, PanelLeft, Play, Printer, RefreshCw, Smartphone, Sparkles, Square, SquarePen, Tablet, Trash2, X } from "lucide-react"
+import { ArrowDown, ArrowUp, BarChart3, Check, Copy, CornerDownRight, Download, Globe, Loader2, Mail, MessageCircle, Monitor, PanelLeft, Play, Printer, RefreshCw, Smartphone, Sparkles, Square, SquarePen, Tablet, Trash2, X } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { FilmTrigger, type Film } from "@/components/public/film-player"
 import { BarsChart, PieChart, StatTiles, type ChartSpec, type ShareRow, type StatSpec, type TrendPoint } from "./charts"
@@ -45,6 +45,8 @@ type PrintCardSpec = {
 }
 /** A file offered under the answer — the agents' project brochure PDF (app/api/fhi-chat/brochure). */
 type DownloadSpec = { kind: "pdf"; title: string; subtitle?: string | null; label: string; href: string; image?: string | null }
+/** A client message the agents' assistant wrote (lib/client-message.ts) — shown with Copy and Send buttons. */
+type DraftSpec = { kind: "message"; channel: "whatsapp" | "email"; project: string; client: string | null; language: string; subject: string | null; text: string; image?: string | null }
 type Msg = {
   role: "user" | "assistant"
   content: string
@@ -55,6 +57,7 @@ type Msg = {
   stats?: StatSpec[]
   printCards?: PrintCardSpec[]
   downloads?: DownloadSpec[]
+  drafts?: DraftSpec[]
   /** A company report drawn as a document (report-card.tsx) instead of text. */
   report?: ChatReport
   /** Still arriving from the server (the words stream in). */
@@ -286,6 +289,57 @@ function DownloadCard({ item }: { item: DownloadSpec }) {
   )
 }
 
+/**
+ * A client message the assistant wrote: the text as it will be sent, Copy, and
+ * "Send on WhatsApp" (wa.me with the text prefilled — the agent picks the chat)
+ * or "Open in Mail" for an email draft.
+ */
+function DraftCard({ item }: { item: DraftSpec }) {
+  const [copied, setCopied] = useState(false)
+  const whole = item.subject ? `${item.subject}\n\n${item.text}` : item.text
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(whole)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // Clipboard can be blocked; the text is selectable.
+    }
+  }
+  const email = item.channel === "email"
+  const sendHref = email ? `mailto:?subject=${encodeURIComponent(item.subject ?? item.project)}&body=${encodeURIComponent(item.text)}` : `https://wa.me/?text=${encodeURIComponent(item.text)}`
+  return (
+    <div className="overflow-hidden rounded-xl border border-[#e5e7eb] bg-white">
+      <div className="flex items-center gap-2.5 border-b border-[#f0f2f5] bg-[#fafbfc] px-3 py-2">
+        {item.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.image} alt="" loading="lazy" className="h-8 w-11 shrink-0 rounded-md object-cover" />
+        ) : (
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#eafaf0] text-[#128c4a]">{email ? <Mail className="h-4 w-4" /> : <MessageCircle className="h-4 w-4" />}</span>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[12.5px] font-bold text-[#0d1117]">
+            {email ? "Email draft" : "WhatsApp message"} · {item.project}
+            {item.client ? ` · for ${item.client}` : ""}
+          </p>
+          <p className="text-[10.5px] font-semibold uppercase tracking-wide text-[#9ca3af]">{item.language} · from the project&apos;s facts and your contact details</p>
+        </div>
+      </div>
+      {item.subject && <p className="px-3.5 pt-3 text-[13px] font-bold text-[#0d1117]">Subject: {item.subject}</p>}
+      <p className="select-text whitespace-pre-wrap px-3.5 py-3 text-[13.5px] leading-relaxed text-[#1f2937]">{item.text}</p>
+      <div className="flex flex-wrap items-center gap-2 border-t border-[#f0f2f5] px-3 py-2">
+        <button type="button" onClick={copy} className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-[12.5px] font-bold text-[#1f2937] transition-colors hover:border-[#001f3f] hover:text-[#001f3f]">
+          {copied ? <Check className="h-3.5 w-3.5 text-[#128c4a]" /> : <Copy className="h-3.5 w-3.5" />} {copied ? "Copied" : "Copy"}
+        </button>
+        <a href={sendHref} target={email ? undefined : "_blank"} rel={email ? undefined : "noopener noreferrer"} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-bold text-white transition-colors ${email ? "bg-[#001f3f] hover:bg-[#00356b]" : "bg-[#25d366] hover:bg-[#1fb857]"}`}>
+          {email ? <Mail className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />} {email ? "Open in Mail" : "Send on WhatsApp"}
+        </a>
+        <span className="text-[11px] text-[#9ca3af]">Read it once before sending — tell me to change the tone, language or angle.</span>
+      </div>
+    </div>
+  )
+}
+
 function PrintBusinessCards({ spec }: { spec: PrintCardSpec }) {
   const [faces, setFaces] = useState<Record<string, { front: string; back: string }>>({})
   const designs = spec.designs.filter(isDesignId)
@@ -449,6 +503,7 @@ const TOOL_LABELS: Record<string, string> = {
   owner_documents: "Owner documents",
   teams_detail: "Teams",
   news_overview: "Website news",
+  client_message: "Client message",
   data_health: "Data health",
 }
 
@@ -1003,13 +1058,13 @@ export default function FhiChatPage({
         body: JSON.stringify({ messages: next.map(({ role, content }) => ({ role, content })) }),
         signal: controller.signal,
       })
-      type Final = { reply?: string; used?: string[]; cards?: Card[]; names?: string[]; charts?: ChartSpec[]; stats?: StatSpec[]; printCards?: PrintCardSpec[]; downloads?: DownloadSpec[]; error?: string; quota?: Quota }
+      type Final = { reply?: string; used?: string[]; cards?: Card[]; names?: string[]; charts?: ChartSpec[]; stats?: StatSpec[]; printCards?: PrintCardSpec[]; downloads?: DownloadSpec[]; drafts?: DraftSpec[]; error?: string; quota?: Quota }
       if (!res.ok || !res.body || !(res.headers.get("content-type") ?? "").includes("text/event-stream")) {
         // Refused before streaming (sign-in, the daily limit…) or an old server: one JSON object.
         const data = (await res.json().catch(() => ({}))) as Final
         if (data.quota) setQuota(data.quota)
         if (!res.ok || !data.reply) throw new Error(data.error ?? "FHI Assistant couldn't answer — try again.")
-        patchLive((m) => ({ ...m, content: data.reply ?? "", used: data.used, cards: data.cards, names: data.names, charts: data.charts, stats: data.stats, printCards: data.printCards, downloads: data.downloads, streaming: false, status: undefined }))
+        patchLive((m) => ({ ...m, content: data.reply ?? "", used: data.used, cards: data.cards, names: data.names, charts: data.charts, stats: data.stats, printCards: data.printCards, downloads: data.downloads, drafts: data.drafts, streaming: false, status: undefined }))
         return
       }
       const reader = res.body.getReader()
@@ -1038,7 +1093,7 @@ export default function FhiChatPage({
           } else if (ev.type === "done") {
             if (flushTimer !== null) window.clearTimeout(flushTimer)
             if (ev.quota) setQuota(ev.quota)
-            patchLive((m) => ({ ...m, content: ev.reply ?? liveText, used: ev.used, cards: ev.cards, names: ev.names, charts: ev.charts, stats: ev.stats, printCards: ev.printCards, downloads: ev.downloads, streaming: false, status: undefined }))
+            patchLive((m) => ({ ...m, content: ev.reply ?? liveText, used: ev.used, cards: ev.cards, names: ev.names, charts: ev.charts, stats: ev.stats, printCards: ev.printCards, downloads: ev.downloads, drafts: ev.drafts, streaming: false, status: undefined }))
             finished = true
           } else if (ev.type === "error") {
             if (ev.quota) setQuota(ev.quota)
@@ -1405,6 +1460,13 @@ export default function FhiChatPage({
                               <div className="mt-4 space-y-2">
                                 {m.downloads.map((d, di) => (
                                   <DownloadCard key={di} item={d} />
+                                ))}
+                              </div>
+                            )}
+                            {!m.streaming && m.drafts && m.drafts.length > 0 && (
+                              <div className="mt-4 space-y-3">
+                                {m.drafts.map((d, di) => (
+                                  <DraftCard key={di} item={d} />
                                 ))}
                               </div>
                             )}
