@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Building2, Layers, Images,
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
-  Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays,
+  Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays, CalendarRange,
   Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library, MonitorPlay,
   Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus, Files, Eye, GitBranch, Link as LinkIcon,
 } from "lucide-react"
@@ -209,6 +209,9 @@ const ADMIN_NAV: RoleNavEntry[] = [
   // (sales pipeline, secretaries) already reaches it in one click.
   SALES_REPORTS,
   EVENTS,
+  // Everything with a date in one place — events, handovers, deals, birthdays,
+  // expiries, company entries (migration 090). Admin staff only ("calendar" in SUB_PATH_ROLES).
+  { icon: CalendarRange, label: "Calendar", to: "calendar" },
   // Dubai Land Department open data (transactions, rents, projects, …), proxied
   // through /api/admin/dld. Admin staff only — see SUB_PATH_ROLES in lib/auth.ts.
   { icon: Database, label: "Open Data (DLD)", to: "real-estate-data" },

@@ -1795,3 +1795,79 @@ export async function sendReminderEmail(input: ReminderEmailInput): Promise<void
   const { subject, text } = reminderEmailCopy(input)
   await deliver("ReminderMailer", { from: fromAddress(), to: input.to, subject, text, html: reminderEmailHtml(input) })
 }
+
+// ─── Company calendar entries — the morning note (migration 090) ─────────────
+//
+// An admin adds a meeting, training or roadshow to the Calendar and ticks
+// "Email them on the morning": the daily cron (app/api/cron/assistant-notes,
+// 09:00 Dubai) sends this to everyone the entry's audience names, once.
+
+export type CalendarEntryEmailInput = {
+  to: string
+  name: string | null
+  title: string
+  kind: string
+  when: string
+  place: string | null
+  link: string | null
+  notes: string | null
+  /** Who else this went to, in words ("all staff", "the CMG Properties team"). */
+  audience: string
+}
+
+export function calendarEntryEmailCopy(input: CalendarEntryEmailInput): { name: string; subject: string; text: string } {
+  const name = greetingName(input.name)
+  const subject = `Today: ${input.title}`
+  const text = [
+    `Good morning, ${name}.`,
+    "",
+    `A reminder from the FHI calendar — ${input.kind.toLowerCase()} today:`,
+    "",
+    input.title,
+    `When: ${input.when}`,
+    ...(input.place ? [`Where: ${input.place}`] : []),
+    ...(input.link ? [`Link: ${input.link}`] : []),
+    ...(input.notes ? ["", input.notes] : []),
+    "",
+    `Sent to ${input.audience}.`,
+  ].join("\n")
+  return { name, subject, text }
+}
+
+export function calendarEntryEmailHtml(input: CalendarEntryEmailInput): string {
+  const { name, subject } = calendarEntryEmailCopy(input)
+  const rows = [
+    detailRow("When", input.when),
+    ...(input.place ? [detailRow("Where", input.place)] : []),
+    ...(input.link ? [`<tr>
+    <td style="padding:9px 0;border-bottom:1px solid #eef0f3;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#9ca3af;vertical-align:top;width:110px;">Link</td>
+    <td style="padding:9px 0 9px 14px;border-bottom:1px solid #eef0f3;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;"><a href="${esc(input.link)}" style="color:${NAVY};">${esc(input.link.replace(/^https?:\/\//, "").slice(0, 60))}</a></td>
+  </tr>`] : []),
+  ].join("")
+  const bodyHtml = `
+        <tr>
+          <td style="padding:34px 40px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">${esc(input.kind)} · today</p>
+            <h1 style="margin:0 0 6px;font-size:22px;line-height:1.3;font-weight:700;color:#0d1117;">${esc(input.title)}</h1>
+            <p style="margin:0;font-size:13.5px;line-height:1.6;color:#6b7280;">Good morning, ${esc(name)}. A reminder from the FHI calendar.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:14px 40px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+          </td>
+        </tr>
+        ${input.notes ? tipBlock("Notes", input.notes) : ""}
+        ${input.link ? `<tr><td align="center" style="padding:4px 40px 0;">${ctaButton(input.link, "Open the link")}</td></tr>` : ""}
+        <tr>
+          <td style="padding:26px 40px 30px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <p style="margin:0;font-size:11.5px;line-height:1.6;color:#9ca3af;">Sent to ${esc(input.audience)} from the company calendar.</p>
+          </td>
+        </tr>`
+  return eventEmailShell({ subject, preheader: [input.when, input.place].filter(Boolean).join(" · ").slice(0, 140), bodyHtml })
+}
+
+export async function sendCalendarEntryEmail(input: CalendarEntryEmailInput): Promise<void> {
+  const { subject, text } = calendarEntryEmailCopy(input)
+  await deliver("CalendarEntryMailer", { from: fromAddress(), to: input.to, subject, text, html: calendarEntryEmailHtml(input) })
+}
