@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import {
   Check,
-  Award, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Eye, ImagePlus, Loader2,
+  AlertCircle, Award, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, ImagePlus, Loader2,
   Globe, MapPin, MoreVertical, Pencil, Plus, QrCode, RefreshCw, ScanLine, Search, Trash2, Trophy, Users, X,
 } from "lucide-react"
 import { EventCertificateModal } from "./event-certificate-modal"
@@ -27,15 +27,15 @@ import { EventExportModal } from "./event-export-modal"
 import { EventFlyerModal } from "./event-flyer-modal"
 import { EventRaffle } from "./event-raffle"
 import { EventsWebsiteGuide, NoWebsiteYet } from "./events-website-guide"
+import { RegistrationFieldsEditor } from "./registration-fields-editor"
+import { EventRegisterForm } from "@/components/public/event-register-form"
 import { EVENT_BRANDS, eventBrand } from "@/lib/events/brands"
 import {
-  FIELD_TYPE_LABELS,
-  FIELD_TYPES,
-  MAX_FIELDS,
-  fieldKeyFromLabel,
+  fieldProblems,
   formatAnswer,
+  parseRegistrationFields,
+  prepareFieldsForSave,
   type AnswerValue,
-  type FieldType,
   type RegistrationField,
 } from "@/lib/events/fields"
 import { CERTIFICATE_DEFAULTS, type CertificateDesign, type CertificateSettings } from "@/lib/events/certificate"
@@ -231,6 +231,15 @@ export function EventsClient({
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  // The keys the event's fields had when the form opened. They never change on
+  // save — collected answers hang off them; any other field is new and gets its
+  // readable key from prepareFieldsForSave.
+  const [savedKeys, setSavedKeys] = useState<ReadonlySet<string>>(() => new Set())
+  // Set by the first Create / Save press: from then on the form marks what
+  // still blocks saving, and the marks clear as each is fixed.
+  const [checked, setChecked] = useState(false)
+  // The registration form as attendees will see it (nothing is sent).
+  const [formPreviewOpen, setFormPreviewOpen] = useState(false)
   // Full-size certificate preview from the form (the event may not be saved yet).
   const [certPreview, setCertPreview] = useState<string | null>(null)
   const [certPreviewLoading, setCertPreviewLoading] = useState(false)
@@ -358,6 +367,8 @@ export function EventsClient({
     setEditing(null)
     // Both places by default; fhiglobal.ae only until they have a website.
     setForm({ ...EMPTY_FORM, placement: own && !website ? "main" : "both" })
+    setSavedKeys(new Set())
+    setChecked(false)
     setFormError(null)
     setModalOpen(true)
   }
@@ -382,6 +393,8 @@ export function EventsClient({
       placement: placementOf(e),
       certificateDesign: e.certificate?.design ?? "classic",
     })
+    setSavedKeys(new Set((e.registrationFields ?? []).map((f) => f.key)))
+    setChecked(false)
     setFormError(null)
     setModalOpen(true)
   }
@@ -408,45 +421,24 @@ export function EventsClient({
     />
   )
 
-  // ── Custom registration fields ─────────────────────────────────────────
-  // Keys address stored answers, so an existing field's key is never changed
-  // when its label is edited — renaming "Company" to "Employer" keeps every
-  // answer already collected attached to it.
-  const addField = () =>
-    setForm((f) =>
-      f.registrationFields.length >= MAX_FIELDS
-        ? f
-        : {
-            ...f,
-            registrationFields: [
-              ...f.registrationFields,
-              { key: `field_${Date.now().toString(36)}`, label: "", type: "text" as FieldType, required: false },
-            ],
-          },
-    )
-  const updateField = (index: number, patch: Partial<RegistrationField>) =>
-    setForm((f) => ({
-      ...f,
-      registrationFields: f.registrationFields.map((fl, i) => {
-        if (i !== index) return fl
-        const next = { ...fl, ...patch }
-        // Give a brand-new field a readable key once it is first labelled.
-        if (patch.label !== undefined && fl.key.startsWith("field_") && patch.label.trim()) {
-          next.key = fieldKeyFromLabel(patch.label, i)
-        }
-        return next
-      }),
+  // ── What still blocks saving — marked once Create / Save has been pressed ──
+  // A field with no name, a dropdown with no choices (fieldProblems), and a
+  // published event with no date (its page and certificates would have none).
+  const fieldIssues = checked ? fieldProblems(form.registrationFields) : {}
+  const dateMissing = checked && form.status === "published" && !form.eventDate
+  const blockers = Object.keys(fieldIssues).length + (dateMissing ? 1 : 0)
+
+  // The days a multi-day sign-up ticks, for the form preview (as event-detail.tsx).
+  const previewDays = (() => {
+    if (form.eventDays <= 1) return []
+    const times = Array.from({ length: form.eventDays }, (_, i) => (i === 0 ? null : form.dayTimes[i] || null))
+    const schedule = form.eventDate ? eventSchedule(fromDubaiInput(form.eventDate), form.eventDays, times) : []
+    return Array.from({ length: form.eventDays }, (_, i) => ({
+      day: i + 1,
+      dateLabel: schedule[i]?.dateLabel ?? "",
+      time: schedule[i]?.time ?? "",
     }))
-  const removeField = (index: number) =>
-    setForm((f) => ({ ...f, registrationFields: f.registrationFields.filter((_, i) => i !== index) }))
-  const moveField = (index: number, dir: -1 | 1) =>
-    setForm((f) => {
-      const to = index + dir
-      if (to < 0 || to >= f.registrationFields.length) return f
-      const next = [...f.registrationFields]
-      ;[next[index], next[to]] = [next[to], next[index]]
-      return { ...f, registrationFields: next }
-    })
+  })()
 
   const handleUpload = async (file: File | null) => {
     if (!file) return
@@ -473,6 +465,15 @@ export function EventsClient({
       setFormError("Title is required")
       return
     }
+    setChecked(true)
+    if (Object.keys(fieldProblems(form.registrationFields)).length > 0 || (form.status === "published" && !form.eventDate)) {
+      setFormError(null)
+      // Bring the first thing to fix into view once its message has rendered.
+      requestAnimationFrame(() =>
+        document.querySelector("[data-form-problem], [data-field-problem]")?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      )
+      return
+    }
     setSaving(true)
     setFormError(null)
     try {
@@ -489,7 +490,7 @@ export function EventsClient({
         venue: form.venue,
         status: form.status,
         registration_open: form.registrationOpen,
-        registration_fields: form.registrationFields,
+        registration_fields: prepareFieldsForSave(form.registrationFields, savedKeys),
         venue_lat: form.venuePin?.lat ?? null,
         venue_lng: form.venuePin?.lng ?? null,
         venue_place_id: form.venuePin?.placeId ?? null,
@@ -536,6 +537,13 @@ export function EventsClient({
   }
 
   const toggleStatus = async (e: AdminEvent) => {
+    // A published event needs its date: open the form at that question instead.
+    if (e.status !== "published" && !e.eventDate) {
+      openEdit(e)
+      setForm((f) => ({ ...f, status: "published" }))
+      setChecked(true)
+      return
+    }
     const status = e.status === "published" ? "draft" : "published"
     const res = await fetch(`/api/admin/events/${e.id}`, {
       method: "PATCH",
@@ -814,6 +822,8 @@ export function EventsClient({
   const inputCls =
     "w-full px-4 py-3 border border-[#e5e5e5] text-sm text-[#111827] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#001f3f] transition-colors"
   const labelCls = "block text-xs font-bold uppercase tracking-wide text-[#6b7280] mb-1.5"
+  // A column heading in the event form ("Event details", "Registration").
+  const sectionCls = "border-b border-[#f0f0f0] pb-2 font-['Outfit'] text-base font-bold text-[#001f3f]"
   // Event-card toolbar controls, all 36px tall: labelled chips for the
   // everyday actions (non-technical staff should never have to guess an
   // icon), a square only for delete, whose red trash is universally read.
@@ -1100,433 +1110,424 @@ export function EventsClient({
         )}
       </div>
 
-      {/* ── Create / edit modal ── */}
+      {/* ── Create / edit modal ──
+          Full screen on a phone; from sm up a dialog that widens with the
+          screen, in two columns from lg. The title bar and the buttons stay put
+          while the form scrolls. The backdrop does not close it — a stray click
+          lost a half-filled form; ✕ and Cancel do. */}
       {modalOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-          <button type="button" className="absolute inset-0 bg-black/45 backdrop-blur-sm" aria-label="Close" onClick={() => setModalOpen(false)} />
-          <div className="relative bg-white border border-[#e8eaed] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
-            <div className="flex items-start justify-between mb-5">
-              <h2 className="font-['Outfit'] text-lg font-bold text-[#001f3f]">
-                {editing ? "Edit event" : "New event"}
-              </h2>
-              <button type="button" onClick={() => setModalOpen(false)} className="p-2 -mr-2 -mt-2 text-[#6b7280] hover:bg-[#f5f5f5]" aria-label="Close">
+        <div className="fixed inset-0 z-[80] flex items-stretch justify-center sm:items-center sm:p-4">
+          <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" aria-hidden="true" />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="event-form-title"
+            className="relative flex h-[100dvh] w-full flex-col bg-white shadow-2xl sm:h-auto sm:max-h-[92dvh] sm:max-w-2xl sm:border sm:border-[#e8eaed] md:max-w-3xl lg:max-w-5xl xl:max-w-6xl"
+          >
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#f0f0f0] px-5 py-4 sm:px-6">
+              <div className="min-w-0">
+                <h2 id="event-form-title" className="font-['Outfit'] text-lg font-bold text-[#001f3f]">
+                  {editing ? "Edit event" : "New event"}
+                </h2>
+                <p className="mt-0.5 text-xs text-[#6b7280]">
+                  {editing ? "Changes show on the event page once you save." : "Fill in the event, then press Create event."}
+                </p>
+              </div>
+              <button type="button" onClick={() => setModalOpen(false)} className="p-2 -mr-2 -mt-1 text-[#6b7280] hover:bg-[#f5f5f5]" aria-label="Close">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-4">
-              {/* Brand picker */}
-              <div>
-                <p className={labelCls}>Brand</p>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                  {EVENT_BRANDS.map((b) => (
-                    <button
-                      key={b.key}
-                      type="button"
-                      onClick={() => setForm((f) => ({ ...f, brand: b.key }))}
-                      className={`border-2 p-2 transition-all ${
-                        form.brand === b.key ? "border-[#001f3f] shadow-md" : "border-[#e5e5e5] hover:border-[#9ca3af]"
-                      }`}
-                      title={b.name}
-                    >
-                      <span
-                        className="h-10 flex items-center justify-center px-1"
-                        style={{ backgroundColor: b.logoIsWhite ? "#001f3f" : "#f6f7f9" }}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={b.logo} alt={b.name} className="max-h-7 max-w-full object-contain" />
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className={labelCls}>Event title *</label>
-                <input className={inputCls} value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="FHI Global Investor Night" maxLength={160} />
-              </div>
-
-              <div>
-                <label className={labelCls}>Description</label>
-                <textarea
-                  ref={descRef}
-                  className={`${inputCls} resize-y overflow-y-auto`}
-                  rows={4}
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="What's happening, who should come, what to expect…"
-                  maxLength={5000}
-                />
-              </div>
-
-              {/* A video LINK, never an upload — uploaded videos are heavy to store and slow to play. */}
-              <div>
-                <label className={labelCls}>Video link (optional)</label>
-                <input
-                  className={inputCls}
-                  type="url"
-                  value={form.videoUrl}
-                  onChange={(e) => setForm((f) => ({ ...f, videoUrl: e.target.value }))}
-                  placeholder="https://www.youtube.com/watch?v=…"
-                  maxLength={1000}
-                />
-                {form.videoUrl.trim() && !isPlayableVideoUrl(form.videoUrl.trim()) ? (
-                  <p className="mt-1.5 text-xs font-semibold text-rose-600">
-                    This link can&apos;t be played. Use a YouTube, Facebook, Instagram, TikTok, Vimeo or Google Drive
-                    video link.
-                  </p>
-                ) : (
-                  <p className="mt-1.5 text-xs text-[#9ca3af]">
-                    Paste a YouTube or Facebook video link straight from the address bar — Instagram, TikTok, Vimeo and
-                    Google Drive (shared &ldquo;Anyone with the link&rdquo;) work too. Visitors get a &ldquo;Watch
-                    video&rdquo; button on the event page.
-                  </p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>{form.eventDays > 1 ? "Starts — date & time (Dubai time, GST)" : "Date & time (Dubai time, GST)"}</label>
-                  <input type="datetime-local" className={inputCls} value={form.eventDate} onChange={(e) => setForm((f) => ({ ...f, eventDate: e.target.value }))} />
-                  <div className="mt-3">
-                    <p className="mb-1.5 text-xs font-semibold text-[#374151]">How many days?</p>
-                    <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="How many days the event runs">
-                      {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+              <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
+                {/* What the event is, when and where */}
+                <section className="space-y-4" aria-labelledby="event-form-details">
+                  <h3 id="event-form-details" className={sectionCls}>Event details</h3>
+                  {/* Brand picker */}
+                  <div>
+                    <p className={labelCls}>Brand</p>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                      {EVENT_BRANDS.map((b) => (
                         <button
-                          key={n}
+                          key={b.key}
                           type="button"
-                          role="radio"
-                          aria-checked={form.eventDays === n}
-                          onClick={() => setForm((f) => ({ ...f, eventDays: n }))}
-                          className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${form.eventDays === n ? "border-[#001f3f] bg-[#001f3f] text-white" : "border-[#e5e7eb] bg-white text-[#374151] hover:border-[#d6b357]"}`}
+                          onClick={() => setForm((f) => ({ ...f, brand: b.key }))}
+                          className={`border-2 p-2 transition-all ${
+                            form.brand === b.key ? "border-[#001f3f] shadow-md" : "border-[#e5e5e5] hover:border-[#9ca3af]"
+                          }`}
+                          title={b.name}
                         >
-                          {n === 1 ? "1 day" : `${n} days`}
+                          <span
+                            className="h-10 flex items-center justify-center px-1"
+                            style={{ backgroundColor: b.logoIsWhite ? "#001f3f" : "#f6f7f9" }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={b.logo} alt={b.name} className="max-h-7 max-w-full object-contain" />
+                          </span>
                         </button>
                       ))}
                     </div>
-                    <p className="mt-1.5 text-[11px] text-[#6b7280]">
-                      {form.eventDate
-                        ? `Runs ${eventDateRangeLabel(fromDubaiInput(form.eventDate), form.eventDays, "short")}${form.eventDays > 1 ? ` — ${form.eventDays} days in a row` : ""}`
-                        : "Pick the first day above; the last day is worked out for you."}
-                    </p>
-                    {form.eventDays > 1 && form.eventDate && (
-                      <div className="mt-3 border border-[#e5e7eb] bg-[#fafbfc]">
-                        <p className="border-b border-[#e5e7eb] px-3 py-2 text-xs font-semibold text-[#374151]">Start time each day <span className="font-normal text-[#9ca3af]">— change a day if it starts later or earlier</span></p>
-                        {eventSchedule(fromDubaiInput(form.eventDate), form.eventDays, Array.from({ length: form.eventDays }, (_, i) => (i === 0 ? null : form.dayTimes[i] || null))).map((d) => (
+                  </div>
+
+                  <div>
+                    <label className={labelCls}>Event title *</label>
+                    <input className={inputCls} value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="FHI Global Investor Night" maxLength={160} />
+                  </div>
+
+                  <div>
+                    <label className={labelCls}>Description</label>
+                    <textarea
+                      ref={descRef}
+                      className={`${inputCls} resize-y overflow-y-auto`}
+                      rows={4}
+                      value={form.description}
+                      onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                      placeholder="What's happening, who should come, what to expect…"
+                      maxLength={5000}
+                    />
+                  </div>
+
+                  {/* A video LINK, never an upload — uploaded videos are heavy to store and slow to play. */}
+                  <div>
+                    <label className={labelCls}>Video link (optional)</label>
+                    <input
+                      className={inputCls}
+                      type="url"
+                      value={form.videoUrl}
+                      onChange={(e) => setForm((f) => ({ ...f, videoUrl: e.target.value }))}
+                      placeholder="https://www.youtube.com/watch?v=…"
+                      maxLength={1000}
+                    />
+                    {form.videoUrl.trim() && !isPlayableVideoUrl(form.videoUrl.trim()) ? (
+                      <p className="mt-1.5 text-xs font-semibold text-rose-600">
+                        This link can&apos;t be played. Use a YouTube, Facebook, Instagram, TikTok, Vimeo or Google Drive
+                        video link.
+                      </p>
+                    ) : (
+                      <p className="mt-1.5 text-xs text-[#9ca3af]">
+                        Paste a YouTube or Facebook video link straight from the address bar — Instagram, TikTok, Vimeo and
+                        Google Drive (shared &ldquo;Anyone with the link&rdquo;) work too. Visitors get a &ldquo;Watch
+                        video&rdquo; button on the event page.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                    <div>
+                      <label className={labelCls}>{form.eventDays > 1 ? "Starts — date & time (Dubai time, GST)" : "Date & time (Dubai time, GST)"}</label>
+                      <input
+                        type="datetime-local"
+                        className={`${inputCls} ${dateMissing ? "border-rose-400" : ""}`}
+                        value={form.eventDate}
+                        onChange={(e) => setForm((f) => ({ ...f, eventDate: e.target.value }))}
+                      />
+                      {dateMissing && (
+                        <p data-form-problem="" className="mt-1.5 flex items-start gap-1.5 text-xs font-semibold text-rose-700">
+                          <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
+                          A published event needs its date — pick it here, or save the event as Draft.
+                        </p>
+                      )}
+                      <div className="mt-3">
+                        <p className="mb-1.5 text-xs font-semibold text-[#374151]">How many days?</p>
+                        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="How many days the event runs">
+                          {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              role="radio"
+                              aria-checked={form.eventDays === n}
+                              onClick={() => setForm((f) => ({ ...f, eventDays: n }))}
+                              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${form.eventDays === n ? "border-[#001f3f] bg-[#001f3f] text-white" : "border-[#e5e7eb] bg-white text-[#374151] hover:border-[#d6b357]"}`}
+                            >
+                              {n === 1 ? "1 day" : `${n} days`}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="mt-1.5 text-[11px] text-[#6b7280]">
+                          {form.eventDate
+                            ? `Runs ${eventDateRangeLabel(fromDubaiInput(form.eventDate), form.eventDays, "short")}${form.eventDays > 1 ? ` — ${form.eventDays} days in a row` : ""}`
+                            : "Pick the first day above; the last day is worked out for you."}
+                        </p>
+                        {form.eventDays > 1 && form.eventDate && (
+                          <div className="mt-3 border border-[#e5e7eb] bg-[#fafbfc]">
+                            <p className="border-b border-[#e5e7eb] px-3 py-2 text-xs font-semibold text-[#374151]">Start time each day <span className="font-normal text-[#9ca3af]">— change a day if it starts later or earlier</span></p>
+                            {eventSchedule(fromDubaiInput(form.eventDate), form.eventDays, Array.from({ length: form.eventDays }, (_, i) => (i === 0 ? null : form.dayTimes[i] || null))).map((d) => (
+                              <div key={d.day} className="flex items-center gap-3 border-b border-[#eef0f3] px-3 py-2 last:border-b-0">
+                                <span className="w-12 shrink-0 text-xs font-bold text-[#001f3f]">Day {d.day}</span>
+                                <span className="min-w-0 flex-1 text-xs text-[#6b7280]">{d.dateLabel}</span>
+                                {d.day === 1 ? (
+                                  <span className="w-[120px] shrink-0 px-2 text-right text-xs font-semibold text-[#374151]" title="Day 1 starts at the time set above">{d.time}</span>
+                                ) : (
+                                  <input
+                                    type="time"
+                                    aria-label={`Day ${d.day} start time`}
+                                    value={form.dayTimes[d.day - 1] || form.eventDate.slice(11, 16)}
+                                    onChange={(e) =>
+                                      setForm((f) => {
+                                        const next = Array.from({ length: f.eventDays }, (_, i) => f.dayTimes[i] ?? "")
+                                        next[d.day - 1] = e.target.value
+                                        return { ...f, dayTimes: next }
+                                      })
+                                    }
+                                    className="w-[120px] shrink-0 border border-[#e5e7eb] bg-white px-2 py-1 text-xs text-[#111827] focus:border-[#001f3f] focus:outline-none"
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Venue</label>
+                      <VenueAutocomplete
+                        inputClassName={inputCls}
+                        value={form.venue}
+                        pin={form.venuePin}
+                        onChange={(venue, venuePin) => setForm((f) => ({ ...f, venue, venuePin }))}
+                        placeholder="Search a hotel, building or address…"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Image */}
+                  <div>
+                    <p className={labelCls}>Event photo</p>
+                    <div className="flex items-center gap-3">
+                      {form.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={form.imageUrl} alt="Event" className="h-20 w-32 object-cover border border-[#e5e5e5]" />
+                      ) : (
+                        <div className="h-20 w-32 border border-dashed border-[#d1d5db] flex items-center justify-center text-[#b8bfc9]">
+                          <ImagePlus className="w-6 h-6" />
+                        </div>
+                      )}
+                      <label className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-colors cursor-pointer">
+                        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+                        {form.imageUrl ? "Replace photo" : "Upload photo"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={uploading}
+                          onChange={(e) => {
+                            void handleUpload(e.target.files?.[0] ?? null)
+                            e.target.value = ""
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Who can sign up, and what the form asks */}
+                <section className="space-y-4 lg:border-l lg:border-[#f0f0f0] lg:pl-8" aria-labelledby="event-form-registration">
+                  <h3 id="event-form-registration" className={sectionCls}>Registration</h3>
+                  <div className="flex flex-wrap gap-6">
+                    <div>
+                      <p className={labelCls}>Status</p>
+                      <div className="inline-flex border border-[#e5e5e5] overflow-hidden">
+                        {["draft", "published"].map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setForm((f) => ({ ...f, status: s }))}
+                            className={`px-4 py-2 text-sm font-bold capitalize transition-colors ${
+                              form.status === s ? "bg-[#001f3f] text-white" : "bg-white text-[#374151] hover:bg-[#f3f4f6]"
+                            }`}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className={labelCls}>Registration</p>
+                      <div className="inline-flex border border-[#e5e5e5] overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setForm((f) => ({ ...f, registrationOpen: true }))}
+                          className={`px-4 py-2 text-sm font-bold transition-colors ${
+                            form.registrationOpen ? "bg-emerald-600 text-white" : "bg-white text-[#374151] hover:bg-[#f3f4f6]"
+                          }`}
+                        >
+                          Open
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm((f) => ({ ...f, registrationOpen: false }))}
+                          className={`px-4 py-2 text-sm font-bold transition-colors ${
+                            !form.registrationOpen ? "bg-rose-600 text-white" : "bg-white text-[#374151] hover:bg-[#f3f4f6]"
+                          }`}
+                        >
+                          Closed
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-[#9ca3af] mt-1.5">
+                        Also closes automatically the day after the event{form.eventDays > 1 ? "’s last day" : ""}.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Pax per date (075): the most people each date takes — blank = no limit.
+                      A full date closes on its own; the other dates stay open. */}
+                  <div>
+                    <p className={labelCls}>{form.eventDays > 1 ? "Pax per date" : "Pax"}</p>
+                    {form.eventDays > 1 ? (
+                      <div className="max-w-md border border-[#e5e7eb] bg-[#fafbfc]">
+                        {(form.eventDate
+                          ? eventSchedule(fromDubaiInput(form.eventDate), form.eventDays, null)
+                          : Array.from({ length: form.eventDays }, (_, i) => ({ day: i + 1, dateLabel: "" }))
+                        ).map((d) => (
                           <div key={d.day} className="flex items-center gap-3 border-b border-[#eef0f3] px-3 py-2 last:border-b-0">
                             <span className="w-12 shrink-0 text-xs font-bold text-[#001f3f]">Day {d.day}</span>
                             <span className="min-w-0 flex-1 text-xs text-[#6b7280]">{d.dateLabel}</span>
-                            {d.day === 1 ? (
-                              <span className="w-[120px] shrink-0 px-2 text-right text-xs font-semibold text-[#374151]" title="Day 1 starts at the time set above">{d.time}</span>
-                            ) : (
-                              <input
-                                type="time"
-                                aria-label={`Day ${d.day} start time`}
-                                value={form.dayTimes[d.day - 1] || form.eventDate.slice(11, 16)}
-                                onChange={(e) =>
-                                  setForm((f) => {
-                                    const next = Array.from({ length: f.eventDays }, (_, i) => f.dayTimes[i] ?? "")
-                                    next[d.day - 1] = e.target.value
-                                    return { ...f, dayTimes: next }
-                                  })
-                                }
-                                className="w-[120px] shrink-0 border border-[#e5e7eb] bg-white px-2 py-1 text-xs text-[#111827] focus:border-[#001f3f] focus:outline-none"
-                              />
-                            )}
+                            {paxInput(d.day)}
                           </div>
                         ))}
                       </div>
+                    ) : (
+                      paxInput(1)
                     )}
+                    <p className="mt-1.5 max-w-md text-[11px] text-[#6b7280]">
+                      {form.eventDays > 1
+                        ? "Each date takes its own sign-ups. A full date closes on the event page and the other dates stay open; someone who picks several dates takes a seat on each."
+                        : "When it’s full, the event page shows “Fully booked”."}{" "}
+                      Blank means no limit. Setting it below who’s already registered only stops new sign-ups.
+                    </p>
                   </div>
-                </div>
-                <div>
-                  <label className={labelCls}>Venue</label>
-                  <VenueAutocomplete
-                    inputClassName={inputCls}
-                    value={form.venue}
-                    pin={form.venuePin}
-                    onChange={(venue, venuePin) => setForm((f) => ({ ...f, venue, venuePin }))}
-                    placeholder="Search a hotel, building or address…"
-                  />
-                </div>
-              </div>
 
-              {/* Image */}
-              <div>
-                <p className={labelCls}>Event photo</p>
-                <div className="flex items-center gap-3">
-                  {form.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={form.imageUrl} alt="Event" className="h-20 w-32 object-cover border border-[#e5e5e5]" />
-                  ) : (
-                    <div className="h-20 w-32 border border-dashed border-[#d1d5db] flex items-center justify-center text-[#b8bfc9]">
-                      <ImagePlus className="w-6 h-6" />
+                  {/* Where an agent's event appears (074) — the agent's choice, never nowhere.
+                      Company events (admins, new or editing one) don't get this: always /events. */}
+                  {(own || editing?.agentId) && (
+                    <div>
+                      <p className={labelCls}>Where should it appear?</p>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Where the event appears">
+                        {(
+                          [
+                            { value: "main", label: "fhiglobal.ae", hint: "The company Events page, fhiglobal.ae/events" },
+                            {
+                              value: "website",
+                              label: own ? "My website" : `${editing?.ownerName ?? "The agent"}'s website`,
+                              hint: own ? "The Events section of your website" : "The Events section of their website",
+                            },
+                            { value: "both", label: "Both", hint: own ? "fhiglobal.ae/events and your website" : "fhiglobal.ae/events and their website" },
+                          ] as const
+                        ).map((p) => {
+                          const on = form.placement === p.value
+                          // Only the agent's own form knows they have no website yet.
+                          const disabled = own && !website && p.value !== "main"
+                          return (
+                            <button
+                              key={p.value}
+                              type="button"
+                              role="radio"
+                              aria-checked={on}
+                              disabled={disabled}
+                              onClick={() => setForm((f) => ({ ...f, placement: p.value }))}
+                              className={`border-2 px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                                on ? "border-[#001f3f] bg-[#001f3f]/[0.04]" : "border-[#e5e5e5] enabled:hover:border-[#9ca3af]"
+                              }`}
+                            >
+                              <span className="flex items-center gap-1.5 text-sm font-bold text-[#0d1117]">
+                                {on && <Check className="h-3.5 w-3.5 text-[#001f3f]" />}
+                                {p.label}
+                              </span>
+                              <span className="mt-0.5 block text-[11px] leading-snug text-[#6b7280]">{p.hint}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {own && !website && (
+                        <p className="mt-1.5 text-[11px] text-[#9ca3af]">
+                          Build your website in the Website Builder to show your events there too.
+                        </p>
+                      )}
                     </div>
                   )}
-                  <label className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:border-[#001f3f] transition-colors cursor-pointer">
-                    {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
-                    {form.imageUrl ? "Replace photo" : "Upload photo"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={uploading}
-                      onChange={(e) => {
-                        void handleUpload(e.target.files?.[0] ?? null)
-                        e.target.value = ""
-                      }}
+
+                  <div className="border-t border-[#f0f0f0] pt-5">
+                    <RegistrationFieldsEditor
+                      fields={form.registrationFields}
+                      onChange={(registrationFields) => setForm((f) => ({ ...f, registrationFields }))}
+                      problems={fieldIssues}
+                      onPreview={() => setFormPreviewOpen(true)}
                     />
-                  </label>
-                </div>
-              </div>
+                  </div>
+                </section>
 
-              <div className="flex flex-wrap gap-6">
-                <div>
-                  <p className={labelCls}>Status</p>
-                  <div className="inline-flex border border-[#e5e5e5] overflow-hidden">
-                    {["draft", "published"].map((s) => (
+                <div className="lg:col-span-2">
+                  {/* Certificate design — one of four looks for this event's certificates */}
+                  <div className="border-t border-[#f0f0f0] pt-4">
+                    <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+                      <div>
+                        <p className={labelCls}>Certificate design</p>
+                        <p className="text-xs text-[#6b7280] -mt-0.5">Attendees&apos; certificates use this look. You can change it later in Certificates.</p>
+                      </div>
                       <button
-                        key={s}
                         type="button"
-                        onClick={() => setForm((f) => ({ ...f, status: s }))}
-                        className={`px-4 py-2 text-sm font-bold capitalize transition-colors ${
-                          form.status === s ? "bg-[#001f3f] text-white" : "bg-white text-[#374151] hover:bg-[#f3f4f6]"
-                        }`}
+                        onClick={openCertPreview}
+                        className="inline-flex items-center gap-1.5 border border-[#e5e5e5] px-3 py-1.5 text-xs font-bold text-[#001f3f] hover:border-[#001f3f]"
                       >
-                        {s}
+                        <Eye className="w-3.5 h-3.5" /> Preview with this event
                       </button>
-                    ))}
+                    </div>
+                    <CertificateDesignPicker value={form.certificateDesign} onChange={(certificateDesign) => setForm((f) => ({ ...f, certificateDesign }))} />
                   </div>
-                </div>
-                <div>
-                  <p className={labelCls}>Registration</p>
-                  <div className="inline-flex border border-[#e5e5e5] overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => setForm((f) => ({ ...f, registrationOpen: true }))}
-                      className={`px-4 py-2 text-sm font-bold transition-colors ${
-                        form.registrationOpen ? "bg-emerald-600 text-white" : "bg-white text-[#374151] hover:bg-[#f3f4f6]"
-                      }`}
-                    >
-                      Open
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setForm((f) => ({ ...f, registrationOpen: false }))}
-                      className={`px-4 py-2 text-sm font-bold transition-colors ${
-                        !form.registrationOpen ? "bg-rose-600 text-white" : "bg-white text-[#374151] hover:bg-[#f3f4f6]"
-                      }`}
-                    >
-                      Closed
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-[#9ca3af] mt-1.5">
-                    Also closes automatically the day after the event{form.eventDays > 1 ? "’s last day" : ""}.
-                  </p>
                 </div>
               </div>
+            </div>
 
-              {/* Pax per date (075): the most people each date takes — blank = no limit.
-                  A full date closes on its own; the other dates stay open. */}
-              <div>
-                <p className={labelCls}>{form.eventDays > 1 ? "Pax per date" : "Pax"}</p>
-                {form.eventDays > 1 ? (
-                  <div className="max-w-md border border-[#e5e7eb] bg-[#fafbfc]">
-                    {(form.eventDate
-                      ? eventSchedule(fromDubaiInput(form.eventDate), form.eventDays, null)
-                      : Array.from({ length: form.eventDays }, (_, i) => ({ day: i + 1, dateLabel: "" }))
-                    ).map((d) => (
-                      <div key={d.day} className="flex items-center gap-3 border-b border-[#eef0f3] px-3 py-2 last:border-b-0">
-                        <span className="w-12 shrink-0 text-xs font-bold text-[#001f3f]">Day {d.day}</span>
-                        <span className="min-w-0 flex-1 text-xs text-[#6b7280]">{d.dateLabel}</span>
-                        {paxInput(d.day)}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  paxInput(1)
-                )}
-                <p className="mt-1.5 max-w-md text-[11px] text-[#6b7280]">
-                  {form.eventDays > 1
-                    ? "Each date takes its own sign-ups. A full date closes on the event page and the other dates stay open; someone who picks several dates takes a seat on each."
-                    : "When it’s full, the event page shows “Fully booked”."}{" "}
-                  Blank means no limit. Setting it below who’s already registered only stops new sign-ups.
+            <div className="shrink-0 border-t border-[#f0f0f0] bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+              {(formError || blockers > 0) && (
+                <p className="mb-3 border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
+                  {formError ?? (blockers === 1 ? "Fix the item marked in red to save." : `Fix the ${blockers} items marked in red to save.`)}
                 </p>
-              </div>
-
-              {/* Where an agent's event appears (074) — the agent's choice, never nowhere.
-                  Company events (admins, new or editing one) don't get this: always /events. */}
-              {(own || editing?.agentId) && (
-                <div>
-                  <p className={labelCls}>Where should it appear?</p>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Where the event appears">
-                    {(
-                      [
-                        { value: "main", label: "fhiglobal.ae", hint: "The company Events page, fhiglobal.ae/events" },
-                        {
-                          value: "website",
-                          label: own ? "My website" : `${editing?.ownerName ?? "The agent"}'s website`,
-                          hint: own ? "The Events section of your website" : "The Events section of their website",
-                        },
-                        { value: "both", label: "Both", hint: own ? "fhiglobal.ae/events and your website" : "fhiglobal.ae/events and their website" },
-                      ] as const
-                    ).map((p) => {
-                      const on = form.placement === p.value
-                      // Only the agent's own form knows they have no website yet.
-                      const disabled = own && !website && p.value !== "main"
-                      return (
-                        <button
-                          key={p.value}
-                          type="button"
-                          role="radio"
-                          aria-checked={on}
-                          disabled={disabled}
-                          onClick={() => setForm((f) => ({ ...f, placement: p.value }))}
-                          className={`border-2 px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
-                            on ? "border-[#001f3f] bg-[#001f3f]/[0.04]" : "border-[#e5e5e5] enabled:hover:border-[#9ca3af]"
-                          }`}
-                        >
-                          <span className="flex items-center gap-1.5 text-sm font-bold text-[#0d1117]">
-                            {on && <Check className="h-3.5 w-3.5 text-[#001f3f]" />}
-                            {p.label}
-                          </span>
-                          <span className="mt-0.5 block text-[11px] leading-snug text-[#6b7280]">{p.hint}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                  {own && !website && (
-                    <p className="mt-1.5 text-[11px] text-[#9ca3af]">
-                      Build your website in the Website Builder to show your events there too.
-                    </p>
-                  )}
-                </div>
               )}
-
-              {/* Extra fields this event's form asks for. Safe to change at any
-                  time: adding one leaves earlier sign-ups blank for it, and
-                  removing one only takes it off the form — answers already
-                  collected stay in the database and in past exports. */}
-              <div className="border-t border-[#f0f0f0] pt-5">
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div>
-                    <p className={labelCls}>Extra fields</p>
-                    <p className="text-[11px] text-[#9ca3af]">
-                      Shown on the registration form after name, email and WhatsApp. Safe to edit once the
-                      event is live — answers already collected are kept.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={addField}
-                    disabled={form.registrationFields.length >= MAX_FIELDS}
-                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 border border-[#e5e5e5] text-xs font-bold text-[#374151] hover:border-[#001f3f] transition-colors disabled:opacity-50"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add field
-                  </button>
-                </div>
-
-                {form.registrationFields.length === 0 ? (
-                  <p className="text-[12px] text-[#9ca3af] border border-dashed border-[#e5e5e5] px-4 py-5 text-center">
-                    No extra fields. The form asks for name, email, WhatsApp and “Invited by”.
-                  </p>
-                ) : (
-                  <div className="space-y-2.5">
-                    {form.registrationFields.map((fl, i) => (
-                      <div key={fl.key} className="border border-[#e5e5e5] bg-[#fafafa] p-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <input
-                            value={fl.label}
-                            onChange={(e) => updateField(i, { label: e.target.value })}
-                            placeholder="Field name (e.g. Gender)"
-                            maxLength={80}
-                            className={`${inputCls} flex-1 min-w-[180px]`}
-                          />
-                          <select
-                            value={fl.type}
-                            onChange={(e) => updateField(i, { type: e.target.value as FieldType })}
-                            className={`${inputCls} w-[136px]`}
-                          >
-                            {FIELD_TYPES.map((t) => (
-                              <option key={t} value={t}>{FIELD_TYPE_LABELS[t]}</option>
-                            ))}
-                          </select>
-                          <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#374151] cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={fl.required}
-                              onChange={(e) => updateField(i, { required: e.target.checked })}
-                              className="h-3.5 w-3.5"
-                            />
-                            Required
-                          </label>
-                          <div className="flex items-center gap-0.5 ml-auto">
-                            <button type="button" onClick={() => moveField(i, -1)} disabled={i === 0}
-                              className="p-1.5 text-[#6b7280] hover:bg-white disabled:opacity-30" aria-label="Move up" title="Move up">
-                              <ChevronUp className="w-4 h-4" />
-                            </button>
-                            <button type="button" onClick={() => moveField(i, 1)} disabled={i === form.registrationFields.length - 1}
-                              className="p-1.5 text-[#6b7280] hover:bg-white disabled:opacity-30" aria-label="Move down" title="Move down">
-                              <ChevronDown className="w-4 h-4" />
-                            </button>
-                            <button type="button" onClick={() => removeField(i)}
-                              className="p-1.5 text-rose-600 hover:bg-rose-50" aria-label="Remove field" title="Remove field">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                        {fl.type === "select" && (
-                          <input
-                            value={(fl.options ?? []).join(", ")}
-                            onChange={(e) =>
-                              updateField(i, { options: e.target.value.split(",").map((o) => o.trim()).filter(Boolean) })
-                            }
-                            placeholder="Choices, separated by commas — e.g. Studio, 1BR, 2BR"
-                            className={`${inputCls} mt-2`}
-                          />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Certificate design — one of four looks for this event's certificates */}
-              <div className="border-t border-[#f0f0f0] pt-4">
-                <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
-                  <div>
-                    <p className={labelCls}>Certificate design</p>
-                    <p className="text-xs text-[#6b7280] -mt-0.5">Attendees&apos; certificates use this look. You can change it later in Certificates.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={openCertPreview}
-                    className="inline-flex items-center gap-1.5 border border-[#e5e5e5] px-3 py-1.5 text-xs font-bold text-[#001f3f] hover:border-[#001f3f]"
-                  >
-                    <Eye className="w-3.5 h-3.5" /> Preview with this event
-                  </button>
-                </div>
-                <CertificateDesignPicker value={form.certificateDesign} onChange={(certificateDesign) => setForm((f) => ({ ...f, certificateDesign }))} />
-              </div>
-
-              {formError && (
-                <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{formError}</p>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#f0f0f0]">
-                <button type="button" onClick={() => setModalOpen(false)} className="px-5 py-2.5 border border-[#e5e5e5] text-sm font-semibold text-[#374151]">
+              <div className="flex gap-2 sm:justify-end">
+                <button type="button" onClick={() => setModalOpen(false)} className="shrink-0 px-5 py-2.5 border border-[#e5e5e5] text-sm font-semibold text-[#374151] hover:bg-[#f5f5f5]">
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={() => void handleSave()}
                   disabled={saving || uploading}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors disabled:opacity-50"
+                  className="inline-flex flex-1 items-center justify-center gap-2 px-6 py-2.5 bg-[#001f3f] text-white text-sm font-bold hover:bg-[#00356b] transition-colors disabled:opacity-50 sm:flex-none"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   {editing ? "Save changes" : "Create event"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── The registration form as attendees will see it (nothing is sent) ── */}
+      {formPreviewOpen && (
+        <div className="fixed inset-0 z-[95] flex items-stretch justify-center sm:items-center sm:p-6">
+          <button type="button" className="absolute inset-0 bg-black/60 backdrop-blur-sm" aria-label="Close preview" onClick={() => setFormPreviewOpen(false)} />
+          <div role="dialog" aria-modal="true" aria-labelledby="event-form-preview-title" className="relative flex h-[100dvh] w-full flex-col bg-white shadow-2xl sm:h-auto sm:max-h-[90dvh] sm:max-w-lg">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#f0f0f0] px-5 py-4">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#b7913a]">Preview · nothing is sent</p>
+                <h3 id="event-form-preview-title" className="mt-0.5 truncate font-['Outfit'] text-lg font-bold text-[#001f3f]">
+                  {form.title.trim() || "Your event"}
+                </h3>
+                <p className="text-xs text-[#6b7280]">The registration form, as attendees will see it.</p>
+              </div>
+              <button type="button" onClick={() => setFormPreviewOpen(false)} className="p-2 -mr-2 -mt-1 text-[#6b7280] hover:bg-[#f5f5f5]" aria-label="Close preview">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+              <EventRegisterForm
+                preview
+                eventId=""
+                eventTitle={form.title.trim() || "this event"}
+                fields={parseRegistrationFields(prepareFieldsForSave(form.registrationFields, savedKeys))}
+                days={previewDays}
+              />
             </div>
           </div>
         </div>

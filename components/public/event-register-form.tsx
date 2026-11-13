@@ -51,6 +51,7 @@ export function EventRegisterForm({
   fields = [],
   days = [],
   limited = false,
+  preview = false,
 }: {
   eventId: string
   eventTitle: string
@@ -60,6 +61,8 @@ export function EventRegisterForm({
   days?: RegisterDay[]
   /** Some day has a pax limit — the seats are worth loading. */
   limited?: boolean
+  /** The organizer's preview from the event form: Register shows the thank-you screen and sends nothing. */
+  preview?: boolean
 }) {
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
@@ -152,6 +155,11 @@ export function EventRegisterForm({
       setError("Please choose the day(s) you'll attend.")
       return
     }
+    if (preview) {
+      setError(null)
+      setStatus("done")
+      return
+    }
     setStatus("sending")
     setError(null)
     try {
@@ -239,6 +247,12 @@ export function EventRegisterForm({
               ))}
             </div>
           </div>
+        )}
+
+        {preview && (
+          <button type="button" onClick={() => setStatus("idle")} className="mt-6 text-sm font-semibold text-[#001f3f] hover:underline">
+            ← Back to the form
+          </button>
         )}
       </div>
     )

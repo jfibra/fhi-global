@@ -106,6 +106,59 @@ export function parseRegistrationFields(raw: unknown): RegistrationField[] {
   return out
 }
 
+/**
+ * What the event form's field builder must fix before saving, keyed by field
+ * key. The server would quietly drop a nameless field and turn a dropdown with
+ * no choices into a short text box — the builder says so instead.
+ */
+export function fieldProblems(fields: RegistrationField[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const f of fields) {
+    if (!f.label.trim()) out[f.key] = "Give this field a name — or remove it"
+    else if (f.type === "select" && !(f.options ?? []).some((o) => o.trim()))
+      out[f.key] = "Add at least one choice — a dropdown with no choices can't be answered"
+  }
+  return out
+}
+
+/**
+ * The builder's fields as they should be saved. A NEW field (key not in
+ * `savedKeys`, the keys the event had when the form opened) gets its readable
+ * key here, from its label — not while it is typed, which remounted the row on
+ * the first letter. It is made unique against every other field, so an
+ * existing field always keeps its key (and its collected answers) even when a
+ * new field with the same name sits above it. Choices are trimmed, emptied
+ * rows dropped, duplicates removed (ignoring case) and capped.
+ */
+export function prepareFieldsForSave(fields: RegistrationField[], savedKeys: ReadonlySet<string>): RegistrationField[] {
+  const taken = new Set(fields.filter((f) => savedKeys.has(f.key)).map((f) => f.key))
+  return fields.map((f, i) => {
+    let key = f.key
+    if (!savedKeys.has(f.key)) {
+      const base = fieldKeyFromLabel(f.label, i)
+      key = base
+      for (let n = 2; taken.has(key); n++) key = `${base}_${n}`
+      taken.add(key)
+    }
+    const { options, ...rest } = f
+    const field = { ...rest, key, label: f.label.trim() }
+    return f.type === "select" ? { ...field, options: uniqueChoices(options ?? []) } : field
+  })
+}
+
+/** Trimmed, non-empty, first spelling of each (ignoring case), at most MAX_OPTIONS. */
+export function uniqueChoices(choices: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of choices) {
+    const c = raw.trim()
+    if (!c || seen.has(c.toLowerCase())) continue
+    seen.add(c.toLowerCase())
+    out.push(c)
+  }
+  return out.slice(0, MAX_OPTIONS)
+}
+
 export type AnswerValue = string | number | boolean
 
 /**
