@@ -18,6 +18,8 @@ const SUGGESTIONS = [
   // Goals (2026-11-12): one goal per person, kept on their profile; progress from their own validated sales.
   { label: "My goal", items: ["How am I doing on my goal?", "Set my goal: 5 deals this quarter"] },
   { label: "My leads & clients", items: ["Any priority buyers in my leads?", "Which leads haven't I contacted yet?", "Who sent me a brief this week?", "What do clients say about me?"] },
+  // Client notes and reminders (2026-11-13): private to the person; reminders are emailed that morning.
+  { label: "My notes & reminders", items: ["What are my reminders?", "Show my client notes", "Which of my deals have been waiting long for validation?"] },
   { label: "My pages & events", items: ["Which of my listings are live?", "Any new registrations for my event today?", "Are my recruits selling?"] },
   { label: "Projects & news", items: ["Cheapest 1-bedroom in JVC?", "Payment plan of Samana Greenfield", "What's the latest property news?"] },
   // Things they can send a client (2026-11-06 brochure, 2026-11-12 message drafts).

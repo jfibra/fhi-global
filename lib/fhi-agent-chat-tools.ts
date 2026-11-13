@@ -16,6 +16,8 @@ import { eventIsPast, eventWhenLabel } from "@/lib/events/dates"
 import { computeTeamSales } from "@/lib/team-sales-period"
 import { RECOMMEND_LABELS, type RecommendValue } from "@/lib/feedback-service"
 import { BUYER_LEAD_COLUMNS, LEAD_GRADES, answerLabel, budgetLabel, leadGrade, sellerAnswerLabel, type BuyerLead, type LeadGrade } from "@/lib/buyer-links"
+import { addNote, addReminder, completeReminder, dueLabel, findNotes, listReminders, moveReminder, type NoteRow, type ReminderScope } from "@/lib/assistant-notes"
+import { STUCK_DAYS, isPendingSale, stuckDeals, waitingDays } from "@/lib/stuck-deals"
 import {
   AED,
   FHI_CHAT_TOOLS,
@@ -130,6 +132,10 @@ async function mySales(admin: Admin, caller: AgentChatCaller, args: MySalesArgs)
   const names = await nameMaps(admin, list)
   const shared = all.some((s) => saleCredits(s).length > 1)
   const seenProj = new Set<number>()
+  // Deal nudges (lib/stuck-deals.ts): pending deals of theirs, any period, that have waited STUCK_DAYS since recorded.
+  const today = dubaiTodayIso()
+  const stuckMine = all.filter((s) => isPendingSale(s) && waitingDays(s, today) >= STUCK_DAYS).sort((a, b) => waitingDays(b, today) - waitingDays(a, today))
+  const stuckNames = stuckMine.length ? await nameMaps(admin, stuckMine.slice(0, 10)) : null
 
   return {
     agent: caller.name,
@@ -140,11 +146,16 @@ async function mySales(admin: Admin, caller: AgentChatCaller, args: MySalesArgs)
     _stats: [
       stat("Validated deals", cur.validated.count, (comparison.change_vs_previous as Record<string, string> | undefined)?.validated_deals, from ? `vs ${(comparison.previous_period as { validated?: { count?: number } } | undefined)?.validated?.count ?? 0} before` : "all time"),
       stat("Validated value", cur.validated.total, (comparison.change_vs_previous as Record<string, string> | undefined)?.validated_value, from ? `vs ${(comparison.previous_period as { validated?: { total?: string } } | undefined)?.validated?.total ?? "AED 0"} before` : "all time"),
-      stat("Pending", cur.pending.count, null, cur.pending.count ? cur.pending.total : "nothing waiting"),
+      stat("Pending", cur.pending.count, null, stuckMine.length ? `${stuckMine.length} waiting over ${STUCK_DAYS} days` : cur.pending.count ? cur.pending.total : "nothing waiting"),
       ...(cur.rejected.count ? [stat("Rejected", cur.rejected.count)] : []),
     ],
     validated: { count: cur.validated.count, total: cur.validated.total },
     pending: { count: cur.pending.count, total: cur.pending.total },
+    waiting_over_14_days: {
+      count: stuckMine.length,
+      note: stuckMine.length ? `Pending deals (any period) that have waited ${STUCK_DAYS}+ days since recorded — suggest asking the office what each file is missing; only a validated deal counts on the boards.` : "none",
+      deals: stuckMine.slice(0, 10).map((s) => ({ project: stuckNames?.proj.get(s.project_id)?.name ?? "?", recorded: s.created_at.slice(0, 10), days_waiting: waitingDays(s, today), contract_price: AED(Number(s.contract_price ?? 0)) })),
+    },
     rejected: { count: cur.rejected.count, total: cur.rejected.total },
     ...comparison,
     ...(months.length >= 2 ? { by_month: byMonth.map((m) => ({ month: m.month, validated_deals: m.validated_deals, validated_value: AED(m.validated_value) })) } : {}),
@@ -158,6 +169,7 @@ async function mySales(admin: Admin, caller: AgentChatCaller, args: MySalesArgs)
         developer: names.dev.get(String(s.developer_id))?.name ?? "?",
         contract_price: AED(Number(s.contract_price ?? 0)),
         status: statusOf(s),
+        ...(statusOf(s) === "pending" ? { days_waiting: waitingDays(s, today) } : {}),
         ...(credits.length > 1
           ? {
               shared: `your ${me?.share ?? 0}% share (${AED(me?.value ?? 0)}) with ${credits
@@ -388,14 +400,102 @@ const nameMatches = (asked: string[], name: string | null | undefined) => {
 
 /** Briefs carrying the agent's own email, or a name made only of their own
  *  names, are them trying the link — not buyers to call back. */
-export async function ownTestBrief(admin: Admin, caller: AgentChatCaller): Promise<(b: { email: string | null; name: string | null }) => boolean> {
-  const { data: authUser } = await admin.auth.admin.getUserById(caller.userId)
-  const ownEmail = authUser?.user?.email?.trim().toLowerCase() || null
-  const ownWords = new Set(nameWords(caller.name))
+export function ownTestMatcher(email: string | null, name: string | null): (b: { email: string | null; name: string | null }) => boolean {
+  const ownEmail = email?.trim().toLowerCase() || null
+  const ownWords = new Set(nameWords(name))
   return (b) => {
     if (ownEmail && (b.email ?? "").trim().toLowerCase() === ownEmail) return true
     const w = nameWords(b.name)
     return w.length >= 2 && w.every((x) => ownWords.has(x))
+  }
+}
+export async function ownTestBrief(admin: Admin, caller: AgentChatCaller): Promise<(b: { email: string | null; name: string | null }) => boolean> {
+  const { data: authUser } = await admin.auth.admin.getUserById(caller.userId)
+  return ownTestMatcher(authUser?.user?.email ?? null, caller.name)
+}
+
+// ─── client_note / reminder (lib/assistant-notes.ts) ─────────────────────────
+
+type ClientNoteArgs = { action?: "add" | "find" | "list"; client_name?: string; text?: string; search?: string; limit?: number }
+type ReminderArgs = { action?: "add" | "list" | "done" | "move"; text?: string; client_name?: string; due_on?: string; scope?: "today" | "open" | "done"; match?: string; all_today?: boolean }
+
+const noteLine = (r: NoteRow, today: string) => ({
+  ...(r.kind === "reminder" ? { reminder: true, due: r.due_on, due_label: r.due_on ? dueLabel(r.due_on, today) : null, done: Boolean(r.done_at) } : {}),
+  about: r.client_name,
+  note: r.body,
+  written: r.created_at.slice(0, 10),
+})
+
+/** "Note: Maria wants a 2-bed in JVC under 1.2M" / "what did Maria want?" — the caller's own notes, nobody else's. */
+async function clientNote(admin: Admin, caller: AgentChatCaller, args: ClientNoteArgs) {
+  const today = dubaiTodayIso()
+  const action = args.action ?? (args.text?.trim() ? "add" : "find")
+  if (action === "add") {
+    const row = await addNote(admin, caller.userId, { client_name: args.client_name, text: args.text })
+    if ("error" in row) return { saved: false, error: row.error }
+    return { saved: true, ...noteLine(row, today), note_to_answer: "Confirm in one line (who it is about and what you kept). Only they can see their notes." }
+  }
+  const { rows, total } = await findNotes(admin, caller.userId, { client_name: args.client_name, search: args.search, limit: args.limit })
+  // The same client's briefs from their Buyers Link — what the client asked for in their own words.
+  let briefs: Array<Record<string, unknown>> = []
+  const asked = nameWords(args.client_name)
+  if (asked.length) {
+    const since = new Date(Date.now() - 365 * 86400e3).toISOString().slice(0, 10)
+    const { data } = await admin.from("buyer_link_leads").select(BUYER_LEAD_COLUMNS).eq("agent_id", caller.userId).gte("created_at", since).order("created_at", { ascending: false }).limit(1000)
+    const isOwnTest = await ownTestBrief(admin, caller)
+    briefs = ((data ?? []) as BuyerLead[])
+      .filter((b) => !isOwnTest(b) && nameMatches(asked, b.name))
+      .slice(0, 3)
+      .map((b) => ({ name: b.name, received: b.created_at.slice(0, 10), kind: b.kind === "seller" ? "seller" : "buyer", budget: budgetLabel(b.budget), whatsapp: b.whatsapp ? `${b.whatsapp_code ?? ""} ${b.whatsapp}`.trim() : null, email: b.email, message: b.message ? b.message.slice(0, 240) : null, contacted: b.contacted_at ? b.contacted_at.slice(0, 10) : "not yet" }))
+  }
+  return {
+    about: args.client_name ?? null,
+    search: args.search ?? null,
+    ...(args.client_name?.trim() ? { _names: [args.client_name.trim()] } : {}),
+    total,
+    notes: rows.map((r) => noteLine(r, today)),
+    ...(briefs.length ? { buyers_link_briefs_from_this_client: briefs } : {}),
+    note_to_answer: total
+      ? "Answer from the notes (newest first), each with its date; a reminder about the client is listed too. Never add anything the notes don't say."
+      : asked.length
+        ? "No note about this client yet — say so and offer to keep one ('note: …'). A brief from their Buyers Link, if listed, is what the client asked for."
+        : "No notes yet — tell them how to keep one: 'note: Maria wants a 2-bed in JVC under 1.2M'.",
+  }
+}
+
+/** "Remind me to call Maria on Friday" / "what are my reminders" / "done: call Maria" — emailed that morning, shown as a tile that day. */
+async function reminder(admin: Admin, caller: AgentChatCaller, args: ReminderArgs) {
+  const today = dubaiTodayIso()
+  const action = args.action ?? (args.text?.trim() ? "add" : args.match?.trim() || args.all_today ? "done" : "list")
+  if (action === "add") {
+    const row = await addReminder(admin, caller.userId, { text: args.text, client_name: args.client_name, due_on: args.due_on }, today)
+    if ("error" in row) return { saved: false, error: row.error, today }
+    return { saved: true, ...noteLine(row, today), note_to_answer: "Confirm in one line with the day as due_label reads. They get an email that morning (9 AM Dubai) and a tile on the welcome screen that day." }
+  }
+  if (action === "move") {
+    const { moved, candidates, error } = await moveReminder(admin, caller.userId, { match: args.match, due_on: args.due_on }, today)
+    if (error) return { moved: false, error, today }
+    if (moved) return { moved: true, ...noteLine(moved, today), note_to_answer: "Confirm in one line with the new day as due_label reads." }
+    if (!candidates.length) return { moved: false, note: "No open reminder matches — say so." }
+    return { moved: false, several_match: candidates.slice(0, 8).map((r) => noteLine(r, today)), note: "Ask which one they mean (quote them)." }
+  }
+  if (action === "done") {
+    const { done, candidates } = await completeReminder(admin, caller.userId, { match: args.match, all_today: args.all_today }, today)
+    if (done.length) return { done: done.map((r) => noteLine(r, today)), note_to_answer: "Confirm in one line what was ticked off." }
+    if (!candidates.length) return { done: [], note: "No open reminder matches — say so." }
+    return { done: [], several_match: candidates.slice(0, 8).map((r) => noteLine(r, today)), note: "Ask which one they mean (quote them)." }
+  }
+  const scope: ReminderScope = args.scope ?? "open"
+  const rows = await listReminders(admin, caller.userId, scope, today, 30)
+  const dueToday = rows.filter((r) => scope !== "done" && (r.due_on ?? "") <= today).length
+  return {
+    today,
+    scope,
+    total: rows.length,
+    due_today_or_overdue: dueToday,
+    reminders: rows.map((r) => noteLine(r, today)),
+    _stats: scope === "done" ? [] : [stat("Reminders", rows.length, null, scope === "today" ? "due today" : "open"), stat("Due today", dueToday, null, dueToday ? "including overdue" : "nothing due")],
+    note_to_answer: rows.length ? "List them as '- due_label: note (about)' soonest first; overdue ones first and marked. Offer 'done: …' to tick one off." : "No reminders — tell them how to set one: 'remind me to call Maria on Friday'.",
   }
 }
 
@@ -862,13 +962,13 @@ type TeamSalesOk = Extract<Awaited<ReturnType<typeof computeTeamSales>>, { selle
 type RosterMember = { user_id: string; team_id: string; role_in_team: string | null; joined_at: string | null; profiles: { fullname: string | null; role: string | null; profile_url: string | null; is_deleted: boolean | null; joined_at: string | null; metadata: Record<string, unknown> | null } | null }
 
 /** The team the caller leads or belongs to — their latest active membership, never taken from the model. */
-async function leaderTeamId(admin: Admin, userId: string): Promise<string | null> {
+export async function leaderTeamId(admin: Admin, userId: string): Promise<string | null> {
   const { data } = await admin.from("team_memberships").select("team_id").eq("user_id", userId).eq("is_active", true).order("joined_at", { ascending: false }).limit(1)
   return (data?.[0]?.team_id as string | undefined) ?? null
 }
 
 /** Everyone in the team and its subteams (any depth), with the subteam each sits in. */
-async function teamRoster(admin: Admin, teamId: string) {
+export async function teamRoster(admin: Admin, teamId: string) {
   const { data: allTeams } = await admin.from("teams").select("id, name, parent_id").limit(2000)
   const teamIds = new Set<string>([teamId])
   for (let grew = true; grew; ) {
@@ -1058,6 +1158,12 @@ async function myTeam(admin: Admin, caller: AgentChatCaller, args: MyTeamArgs) {
   const inPeriod = (d: string | null | undefined) => Boolean(d && d.slice(0, 10) >= from && d.slice(0, 10) < to)
   const joiners = live.filter((m) => inPeriod(m.joined_at) && inPeriod(m.profiles?.joined_at)).sort((a, b) => (b.profiles?.joined_at ?? "").localeCompare(a.profiles?.joined_at ?? ""))
   const pendingDeals = team.sellers.flatMap((s) => s.deals.filter((d) => d.status === "pending").map((d) => ({ agent: s.name, date: d.date, project: d.project, developer: d.developer, price: AED(d.price), ...(d.shared ? { share: `${d.share}%` } : {}) }))).sort((a, b) => a.date.localeCompare(b.date))
+  // Deal nudges (lib/stuck-deals.ts): every pending team deal that has waited STUCK_DAYS since recorded — any period.
+  const today = dubaiTodayIso()
+  const memberIds = new Set(live.map((m) => m.user_id))
+  const stuck = stuckDeals(await fetchAllSales(admin), memberIds, today)
+  const stuckNames = await nameMaps(admin, stuck.slice(0, limit).map((d) => d.sale))
+  const memberName = (id: string) => live.find((m) => m.user_id === id)?.profiles?.fullname ?? stuckNames.agent.get(id)?.name ?? "a member"
   const change = pctChange(team.totals.validated.value, team.previous.validated.value)
   const subteamName = (m: M) => (m.team_id !== teamId ? allTeams.find((t) => t.id === m.team_id)?.name ?? null : null)
 
@@ -1104,12 +1210,17 @@ async function myTeam(admin: Admin, caller: AgentChatCaller, args: MyTeamArgs) {
     quiet_members: { count: quiet.length, note: "No validated sale in the period", names: quiet.slice(0, limit).map((m) => ({ name: m.profiles?.fullname, role: m.profiles?.role, subteam: subteamName(m), joined: m.joined_at?.slice(0, 10) ?? null })) },
     new_joiners: { count: joiners.length, note: "Registered with FHI and joined the team in the period", names: joiners.slice(0, limit).map((m) => ({ name: m.profiles?.fullname, role: m.profiles?.role, joined: m.profiles?.joined_at?.slice(0, 10) ?? null, subteam: subteamName(m) })) },
     waiting_for_validation: { count: pendingDeals.length, oldest_first: pendingDeals.slice(0, limit) },
+    waiting_over_14_days: {
+      count: stuck.length,
+      note: stuck.length ? `Team deals (any period) pending ${STUCK_DAYS}+ days since recorded — the ones to chase with the office, longest first.` : "none",
+      deals: stuck.slice(0, limit).map((d) => ({ member: d.agentIds.map(memberName).join(" & "), project: stuckNames.proj.get(d.sale.project_id)?.name ?? "?", recorded: d.sale.created_at.slice(0, 10), days_waiting: d.days, contract_price: AED(Number(d.sale.contract_price ?? 0)) })),
+    },
     by_project: team.by_project.map((p) => ({ project: p.project, deals: p.deals, value: AED(p.value) })),
     members_ranked_by_validated_value: team.sellers.slice(0, limit).map((s, i) => ({ rank: i + 1, name: s.name, role: s.role, subteam: s.subteam, validated_deals: s.validated_deals, validated_value: AED(s.validated_value), pending_deals: s.pending_deals, pending_value: s.pending_deals ? AED(s.pending_value) : undefined })),
     _stats: [
       stat("Team validated deals", team.totals.validated.deals, pctChange(team.totals.validated.deals, team.previous.validated.deals), `vs ${team.previous.validated.deals} before`),
       stat("Team validated value", AED(team.totals.validated.value), change, `vs ${AED(team.previous.validated.value)} before`),
-      stat("Pending", team.totals.pending.deals, null, team.totals.pending.deals ? AED(team.totals.pending.value) : "nothing waiting"),
+      stat("Pending", team.totals.pending.deals, null, stuck.length ? `${stuck.length} waiting over ${STUCK_DAYS} days` : team.totals.pending.deals ? AED(team.totals.pending.value) : "nothing waiting"),
       stat("Members", live.length, null, `${team.members_who_sold} sold · ${quiet.length} quiet`),
     ],
     _charts: [
@@ -1297,8 +1408,46 @@ const PHASE2_TOOLS = [
     type: "function" as const,
     function: {
       name: "mark_lead_contacted",
-      description: "MARK ONE OF YOUR OWN LEADS AS CONTACTED (or take the mark off with undo): 'mark Maria as contacted', 'I called Ahmed', 'I've messaged the Santos lead', 'unmark Maria'. Finds the brief by name among your own leads of the last year.",
+      description: "MARK ONE OF YOUR OWN BUYERS LINK LEADS AS CONTACTED (or take the mark off with undo): 'mark Maria as contacted', 'I called Ahmed', 'I've messaged the Santos lead', 'unmark Maria'. Finds the brief by name among your own leads of the last year. NOT for reminders — 'done: …', 'tick off …', 'reminder done' go to the reminder tool.",
       parameters: { type: "object", properties: { name: { type: "string", description: "The lead's name, partial ok" }, undo: { type: "boolean", description: "true removes the contacted mark" } }, required: ["name"] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "client_note",
+      description:
+        "YOUR OWN CLIENT NOTES (private to you): add one ('note: Maria wants a 2-bed in JVC under 1.2M', 'remember that Ahmed prefers ready units', 'keep a note about the Santos family: budget 2M, moving in June' → action add with client_name and the text AS THEY SAID IT), or read them ('what did Maria want', 'my notes about Ahmed', 'what do I know about the Santos family', 'did I note anything about a 3-bed' → action find with client_name or search; 'show my notes', 'my client notes' → action list). A find also returns the client's Buyers Link brief when they sent one.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: { type: "string", enum: ["add", "find", "list"] },
+          client_name: { type: "string", description: "Who the note is about, as they said it ('Maria', 'Mr Santos')" },
+          text: { type: "string", description: "add: what to remember, in their words" },
+          search: { type: "string", description: "find: words to look for in the notes' text" },
+          limit: { type: "integer", description: "Default 12" },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "reminder",
+      description:
+        "YOUR OWN REMINDERS (private to you; emailed at 9 AM Dubai on the day and shown on the welcome screen): set one ('remind me to call Maria on Friday', 'remind me tomorrow to send Ahmed the brochure', 'on the 20th remind me about the Santos viewing' → action add with text, client_name and due_on = the day EXACTLY AS THEY SAID IT — the tool works the date out); list them ('what are my reminders', 'anything for today', 'what's due this week' → action list with scope today or open; 'what did I tick off' → scope done); tick one off ('done: call Maria', 'I called Maria, tick it off', 'mark the Santos reminder done' → action done with match = words of the reminder or the client; 'done with today's' → all_today true); move one ('move the Ahmed reminder to Monday', 'remind me again on Friday about Maria', 'not tomorrow, next week' → action move with match and due_on).",
+      parameters: {
+        type: "object",
+        properties: {
+          action: { type: "string", enum: ["add", "list", "done", "move"] },
+          text: { type: "string", description: "add: what to be reminded of, in their words ('call Maria about the 2-bed')" },
+          client_name: { type: "string", description: "Who it is about, when a person is named" },
+          due_on: { type: "string", description: "add: the day as they said it — 'tomorrow', 'Monday', 'next week', 'in 3 days', '20 Nov', 'the 20th' — or YYYY-MM-DD when they gave a date. Never work the date out yourself, and OMIT it when they named no day (the tool then asks which day)." },
+          scope: { type: "string", enum: ["today", "open", "done"], description: "list: today = due today or overdue; open = every one not done (default); done = ticked off" },
+          match: { type: "string", description: "done / move: words of the reminder or the client's name" },
+          all_today: { type: "boolean", description: "done: tick off everything due by today" },
+        },
+      },
     },
   },
   {
@@ -1429,6 +1578,8 @@ export async function runAgentChatTool(
       case "project_comparison": result = await projectComparison(admin, caller, args as { projects?: unknown }); break
       case "my_goal": result = await myGoal(admin, caller, args as MyGoalArgs); break
       case "mark_lead_contacted": result = await markLeadContacted(admin, caller, args as { name?: string; undo?: boolean }); break
+      case "client_note": result = await clientNote(admin, caller, args as ClientNoteArgs); break
+      case "reminder": result = await reminder(admin, caller, args as ReminderArgs); break
       case "team_attention": result = await teamAttention(admin, caller, args as { limit?: number }); break
       case "member_message": {
         const out = await memberMessage(admin, caller, args as { member_name?: string; purpose?: string; language?: string })

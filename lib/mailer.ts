@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer"
 import { eventSchedule, eventWhenLabel, hasCustomDayTimes } from "@/lib/events/dates"
 import type { PeriodicReport } from "@/lib/periodic-report"
+import type { WeeklyNote } from "@/lib/weekly-note"
 import { SITE_URL } from "@/lib/seo"
 import { logAuditEvent } from "@/lib/audit-log"
 import type { DailyReport } from "@/lib/daily-report"
@@ -1637,4 +1638,160 @@ export async function sendPeriodicReportEmail(to: string | string[], report: Per
       ? [{ filename: `fhi-${report.kind}-report-${report.from}.png`, content: picture, cid: "fhi-report-picture", contentType: "image/png" }]
       : undefined,
   })
+}
+
+// ─── Weekly coaching note and reminders (lib/weekly-note.ts, lib/assistant-notes.ts) ───
+
+function ctaButton(href: string, label: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px auto 0;"><tr><td align="center" bgcolor="${NAVY}" style="background:${NAVY};border-radius:10px;border-bottom:3px solid ${GOLD};"><a href="${esc(href)}" style="display:inline-block;padding:13px 26px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;">${esc(label)}</a></td></tr></table>`
+}
+
+function tipBlock(label: string, text: string): string {
+  return `
+        <tr>
+          <td style="padding:22px 40px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fbfaf5;border-left:3px solid ${GOLD};">
+              <tr><td style="padding:14px 18px;">
+                <p style="margin:0 0 4px;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#8a6d2a;">${esc(label)}</p>
+                <p style="margin:0;font-size:15px;line-height:1.65;color:#1f2937;">${esc(text)}</p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>`
+}
+
+type NoteSection = { title: string; rows: Array<[string, string]> }
+
+/** The note's words, shared by the HTML and the plain-text email. */
+export function weeklyNoteCopy(n: WeeklyNote): { subject: string; preheader: string; intro: string; sections: NoteSection[]; text: string } {
+  const plural = (k: number, w: string) => `${k} ${w}${k === 1 ? "" : "s"}`
+  const sections: NoteSection[] = []
+  sections.push({
+    title: "Last week",
+    rows: [
+      ["Validated deals", n.sales.validated ? `${n.sales.validated} · ${moneyLabel(n.sales.validatedValue)}` : "none"],
+      ["Pending", n.sales.pending ? `${n.sales.pending} · ${moneyLabel(n.sales.pendingValue)} waiting for the office` : "none"],
+      ["New leads", n.leads.fresh ? `${n.leads.fresh}${n.leads.priority ? ` · ${n.leads.priority} priority` : ""}` : "none"],
+      ["To follow up", n.leads.toFollowUp ? `${plural(n.leads.toFollowUp, "lead")} of the last 30 days not marked contacted` : "every lead of the last 30 days contacted"],
+    ],
+  })
+  if (n.goal) {
+    sections.push({
+      title: "Your goal",
+      rows: [
+        [n.goal.label, `${n.goal.headline} (${n.goal.percent}%)${n.goal.done ? " · reached" : ""}`],
+        ["Days left", String(n.goal.daysLeft)],
+        ...(n.goal.pacePerWeek && !n.goal.done ? [["Pace needed", `${n.goal.pacePerWeek} validated deal${n.goal.pacePerWeek === 1 ? "" : "s"} a week`] as [string, string]] : []),
+      ],
+    })
+  }
+  if (n.stuck.length) sections.push({ title: "Deals waiting long", rows: n.stuck.map((d) => [d.project, `${plural(d.days, "day")} for validation · ${moneyLabel(d.price)}`]) })
+  if (n.team) {
+    sections.push({
+      title: `Your team · ${n.team.name}`,
+      rows: [
+        ["Validated deals", n.team.validated ? `${n.team.validated} · ${moneyLabel(n.team.validatedValue)}` : "none"],
+        ["Pending", n.team.pending ? String(n.team.pending) : "none"],
+        ["Waiting over 14 days", n.team.stuckTotal ? plural(n.team.stuckTotal, "deal") : "none"],
+        ...n.team.stuck.map((d) => [d.member, `${d.project} · ${plural(d.days, "day")}`] as [string, string]),
+      ],
+    })
+  }
+  if (n.reminders.length) sections.push({ title: "Reminders this week", rows: n.reminders.map((r) => [r.when, r.client && !r.body.toLowerCase().includes(r.client.toLowerCase()) ? `${r.body} (${r.client})` : r.body]) })
+
+  const subject = `Your weekly note from FHI Assistant · ${n.week.label}`
+  const intro = `Here is your week at FHI Global, ${n.week.label}, and the one thing to do this week.`
+  const text = [
+    `Good morning, ${n.name}.`,
+    "",
+    intro,
+    "",
+    `THIS WEEK: ${n.tip.text}`,
+    "",
+    ...sections.flatMap((s) => [s.title.toUpperCase(), ...s.rows.map(([l, v]) => `- ${l}: ${v}`), ""]),
+    `Open FHI Assistant: ${n.links.assistant}`,
+    "",
+    `Sent every Monday by FHI Assistant from your own figures.${n.links.stop ? ` Stop these notes: ${n.links.stop}` : ""}`,
+  ].join("\n")
+  return { subject, preheader: n.tip.text, intro, sections, text }
+}
+
+export function weeklyNoteHtml(n: WeeklyNote): string {
+  const c = weeklyNoteCopy(n)
+  const sectionsHtml = c.sections.map((s) => reportSection(s.title, s.rows.map(([l, v]) => detailRow(l, v)).join(""))).join("")
+  const bodyHtml = `
+        <tr>
+          <td style="padding:34px 40px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">Weekly coaching note</p>
+            <h1 style="margin:0 0 6px;font-size:22px;line-height:1.3;font-weight:700;color:#0d1117;">Good morning, ${esc(n.name)}.</h1>
+            <p style="margin:0;font-size:13.5px;line-height:1.6;color:#6b7280;">${esc(c.intro)}</p>
+          </td>
+        </tr>
+        ${tipBlock("This week", n.tip.text)}
+        ${sectionsHtml}
+        <tr>
+          <td align="center" style="padding:4px 40px 0;">${ctaButton(n.links.assistant, "Open FHI Assistant")}</td>
+        </tr>
+        <tr>
+          <td style="padding:26px 40px 30px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <p style="margin:0;font-size:11.5px;line-height:1.6;color:#9ca3af;">
+              Sent every Monday by FHI Assistant from your own figures — the same ones it gives in the chat. Ask it "which of my deals are waiting long" or "which leads haven't I contacted" for the details.${n.links.stop ? ` <a href="${esc(n.links.stop)}" style="color:#9ca3af;">Stop these notes</a>.` : ""}
+            </p>
+          </td>
+        </tr>`
+  return eventEmailShell({ subject: c.subject, preheader: c.preheader, bodyHtml })
+}
+
+export async function sendWeeklyNoteEmail(n: WeeklyNote): Promise<void> {
+  const c = weeklyNoteCopy(n)
+  await deliver("WeeklyNoteMailer", { from: fromAddress(), to: n.email, subject: c.subject, text: c.text, html: weeklyNoteHtml(n) })
+}
+
+export type ReminderEmailInput = { to: string; name: string | null; reminders: Array<{ body: string; client: string | null; when: string }>; assistantUrl: string }
+
+export function reminderEmailCopy(input: ReminderEmailInput): { name: string; subject: string; text: string } {
+  const name = greetingName(input.name)
+  const one = input.reminders.length === 1 ? input.reminders[0] : null
+  const subject = one ? `Reminder: ${one.body.length > 70 ? `${one.body.slice(0, 67)}…` : one.body}` : `${input.reminders.length} reminders for today`
+  const line = (r: { body: string; client: string | null; when: string }) => `- ${r.body}${r.client && !r.body.toLowerCase().includes(r.client.toLowerCase()) ? ` (${r.client})` : ""}${r.when !== "today" ? ` — ${r.when}` : ""}`
+  const text = [`Good morning, ${name}.`, "", "You asked FHI Assistant to remind you:", "", ...input.reminders.map(line), "", `Open FHI Assistant: ${input.assistantUrl}`, "", 'Tell the assistant "done: …" to tick a reminder off.'].join("\n")
+  return { name, subject, text }
+}
+
+export function reminderEmailHtml(input: ReminderEmailInput): string {
+  const { name, subject } = reminderEmailCopy(input)
+  const rows = input.reminders
+    .map(
+      (r) => `<tr>
+    <td style="padding:10px 0;border-bottom:1px solid #eef0f3;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#1f2937;line-height:1.5;">${esc(r.body)}${r.client && !r.body.toLowerCase().includes(r.client.toLowerCase()) ? ` <span style="font-weight:400;color:#6b7280;">(${esc(r.client)})</span>` : ""}${r.when !== "today" ? ` <span style="font-weight:600;color:#b45309;">· ${esc(r.when)}</span>` : ""}</td>
+  </tr>`,
+    )
+    .join("")
+  const bodyHtml = `
+        <tr>
+          <td style="padding:34px 40px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">Reminder</p>
+            <h1 style="margin:0 0 6px;font-size:22px;line-height:1.3;font-weight:700;color:#0d1117;">Good morning, ${esc(name)}.</h1>
+            <p style="margin:0;font-size:13.5px;line-height:1.6;color:#6b7280;">You asked FHI Assistant to remind you${input.reminders.length === 1 ? "" : ` of these ${input.reminders.length} things`}:</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:14px 40px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:4px 40px 0;">${ctaButton(input.assistantUrl, "Open FHI Assistant")}</td>
+        </tr>
+        <tr>
+          <td style="padding:26px 40px 30px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <p style="margin:0;font-size:11.5px;line-height:1.6;color:#9ca3af;">Tell the assistant "done: …" to tick a reminder off, or "remind me again on Friday" to move it.</p>
+          </td>
+        </tr>`
+  return eventEmailShell({ subject, preheader: input.reminders.map((r) => r.body).join(" · ").slice(0, 140), bodyHtml })
+}
+
+export async function sendReminderEmail(input: ReminderEmailInput): Promise<void> {
+  const { subject, text } = reminderEmailCopy(input)
+  await deliver("ReminderMailer", { from: fromAddress(), to: input.to, subject, text, html: reminderEmailHtml(input) })
 }

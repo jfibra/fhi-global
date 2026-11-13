@@ -50,6 +50,8 @@ const AGENT_RULES: Record<string, Rule> = {
     "Who joined my team this week?",
   ],
   my_leads: () => ["Who should I call first?", "How do I get more leads?"],
+  client_note: (c) => [c.people[0] && `Remind me to call ${c.people[0]} tomorrow`, "What are my reminders?"],
+  reminder: () => ["Show my client notes", "Which leads haven't I contacted yet?"],
   my_listings: () => ["Which of my listings are still drafts?", "How do I get more leads?"],
   my_website: () => ["Which of my listings are live?", "How do I get more leads?"],
   my_reviews: () => ["How do I get more client reviews?"],

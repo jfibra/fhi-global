@@ -5,6 +5,8 @@ import { BUYER_LEAD_COLUMNS, leadGrade, type BuyerLead } from "@/lib/buyer-links
 import { fetchAllSales, inRange, saleCredits, type SaleRow } from "@/lib/fhi-chat-tools"
 import { ownTestBrief, topSalesBoard, type AgentChatCaller } from "@/lib/fhi-agent-chat-tools"
 import { goalHeadline, goalProgress, readGoal } from "@/lib/agent-goal"
+import { dueLabel, listReminders } from "@/lib/assistant-notes"
+import { STUCK_DAYS, stuckDeals } from "@/lib/stuck-deals"
 
 /**
  * "Today at a glance" — the tiles on FHI Assistant's welcome screen (boss via
@@ -146,15 +148,33 @@ export async function agentBriefing(caller: AgentChatCaller): Promise<BriefingIt
     }
   })()
 
+  // Deal nudges (lib/stuck-deals.ts): the pending count, and how many have waited STUCK_DAYS since recorded.
   const mine = (async (): Promise<BriefingItem> => {
     const n = (await sales).filter((s) => isPending(s) && saleCredits(s).some((c) => c.agentId === caller.userId)).length
+    const stuck = stuckDeals(await sales, [caller.userId], today).length
     return {
       key: "pending",
       label: "Waiting for validation",
       value: String(n),
-      note: n ? "the office is checking" : "nothing waiting",
+      note: stuck ? `${stuck} waiting over ${STUCK_DAYS} days` : n ? "the office is checking" : "nothing waiting",
       tone: n ? "attention" : "good",
-      ask: "Anything of mine waiting for validation?",
+      ask: stuck ? "Which of my deals have been waiting long for validation?" : "Anything of mine waiting for validation?",
+    }
+  })()
+
+  // Reminders (lib/assistant-notes.ts): due today or overdue first; the next one otherwise; nothing when they keep none.
+  const reminders = (async (): Promise<BriefingItem | null> => {
+    const open = await listReminders(admin, caller.userId, "open", today, 50)
+    if (!open.length) return null
+    const due = open.filter((r) => (r.due_on ?? "") <= today)
+    const next = open[0]
+    return {
+      key: "reminders",
+      label: due.length ? "Reminders today" : "Next reminder",
+      value: due.length ? String(due.length) : dueLabel(next.due_on ?? today, today),
+      note: due.length ? due[0].body : next.body,
+      tone: due.length ? "attention" : "quiet",
+      ask: due.length ? "What are my reminders for today?" : "What are my reminders?",
     }
   })()
 
@@ -176,13 +196,14 @@ export async function agentBriefing(caller: AgentChatCaller): Promise<BriefingIt
     if (!members) return null
     const ids = new Set(members.map((m) => m.p.id))
     const n = (await sales).filter((s) => isPending(s) && saleCredits(s).some((c) => ids.has(c.agentId))).length
+    const stuck = stuckDeals(await sales, ids, today).length
     return {
       key: "team-pending",
       label: "Team deals waiting",
       value: String(n),
-      note: n ? "for validation" : "nothing waiting",
+      note: stuck ? `${stuck} waiting over ${STUCK_DAYS} days` : n ? "for validation" : "nothing waiting",
       tone: n ? "attention" : "good",
-      ask: "Anything of my team waiting for validation?",
+      ask: stuck ? `Which team deals have waited over ${STUCK_DAYS} days for validation?` : "Anything of my team waiting for validation?",
     }
   })()
 
@@ -210,7 +231,7 @@ export async function agentBriefing(caller: AgentChatCaller): Promise<BriefingIt
     return birthdayTile((data ?? []) as Person[], today, null, "among your recruits")
   })()
 
-  return settle([leads, followUp, goal, mine, rank, teamPending, joiners, birthdays])
+  return settle([leads, followUp, reminders, goal, mine, rank, teamPending, joiners, birthdays])
 }
 
 // ─── Admins ──────────────────────────────────────────────────────────────────

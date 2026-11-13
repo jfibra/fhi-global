@@ -18,6 +18,10 @@
     {
       "path": "/api/cron/monthly-report",
       "schedule": "30 5 1 * *"
+    },
+    {
+      "path": "/api/cron/assistant-notes",
+      "schedule": "0 5 * * *"
     }
   ]
 }

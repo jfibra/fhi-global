@@ -574,6 +574,8 @@ const TOOL_LABELS: Record<string, string> = {
   my_recruits: "Your recruits",
   my_team: "Your team",
   my_events: "Your events",
+  client_note: "Your notes",
+  reminder: "Your reminders",
   person_sales: "Sales lookup",
   top_agents: "Top Sales board",
   top_developers: "Top Developers board",

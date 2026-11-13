@@ -229,7 +229,7 @@ const dubaiToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asi
 
 export function periodCalendar(today = dubaiToday()): string {
   return [
-    `PERIODS — today in Dubai is ${today}. to_date is EXCLUSIVE. Use these exact pairs; never work a period's dates out yourself:`,
+    `PERIODS — today in Dubai is ${new Date(`${today}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" })} ${today}. to_date is EXCLUSIVE. Use these exact pairs; never work a period's dates out yourself:`,
     ...periodsFor(today).map((p) => `- ${p.label}: from_date ${p.from}, to_date ${p.to}`),
     `- Any named month, quarter or year runs from its first day to the first day after it (e.g. May ${today.slice(0, 4)}: from_date ${today.slice(0, 4)}-05-01, to_date ${today.slice(0, 4)}-06-01).`,
   ].join("\n")
