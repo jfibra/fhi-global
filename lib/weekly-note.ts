@@ -3,7 +3,8 @@ import "server-only"
 import { createHmac, timingSafeEqual } from "node:crypto"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { goalHeadline, goalProgress, readGoal } from "@/lib/agent-goal"
-import { ROLE_DASHBOARD_MAP, ROLES_AGENT_ASSISTANT } from "@/lib/app-roles"
+import { ROLES_AGENT_ASSISTANT } from "@/lib/app-roles"
+import { getDashboardRouteByRole } from "@/lib/auth"
 import { dueLabel, listReminders, shiftDay } from "@/lib/assistant-notes"
 import { dubaiMonthStart, recordAssistantUsage } from "@/lib/assistant-usage"
 import { BUYER_LEAD_COLUMNS, leadGrade, type BuyerLead } from "@/lib/buyer-links"
@@ -63,7 +64,8 @@ const firstName = (name: string | null) => {
   return first ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : "there"
 }
 const siteBase = () => SITE_URL.replace(/\/$/, "")
-export const assistantUrlFor = (role: string | null) => `${siteBase()}/dashboard${ROLE_DASHBOARD_MAP[role ?? ""] ?? "/agent"}/fhi-chat`
+/** Their own FHI Assistant page — role-prefixed like the sidebar (/admin/fhi-chat, /agent/fhi-chat, /teamleader/fhi-chat), no /dashboard prefix. */
+export const assistantUrlFor = (role: string | null) => `${siteBase()}${getDashboardRouteByRole(role)}/fhi-chat`
 
 // ─── The stop link ───────────────────────────────────────────────────────────
 
