@@ -131,6 +131,21 @@ export async function weeklyNoteRecipients(admin: Admin, today = dubaiToday()): 
   return { recipients, skipped }
 }
 
+/** The people an admin names with ?only= — any role, active or not: a test to one's own mailbox, or a first send to the boss. */
+export async function namedRecipients(admin: Admin, ids: string[]): Promise<{ recipients: WeeklyNoteRecipient[]; skipped: Record<string, number> }> {
+  const wanted = [...new Set(ids)].slice(0, 50)
+  const { data, error } = await admin.from("profiles").select("id, fullname, role").in("id", wanted)
+  if (error) throw new Error(error.message)
+  const recipients: WeeklyNoteRecipient[] = []
+  const skipped: Record<string, number> = { no_email: 0, unknown: wanted.length - (data?.length ?? 0) }
+  for (const p of (data ?? []) as Array<{ id: string; fullname: string | null; role: string | null }>) {
+    const email = await admin.auth.admin.getUserById(p.id).then((r) => r.data?.user?.email?.trim() || null).catch(() => null)
+    if (!email) skipped.no_email++
+    else recipients.push({ userId: p.id, name: p.fullname, role: p.role ?? "agent", email })
+  }
+  return { recipients, skipped }
+}
+
 // ─── The note ────────────────────────────────────────────────────────────────
 
 export type WeeklyNote = {
@@ -320,16 +335,16 @@ export type WeeklyNoteRun = {
 }
 
 /**
- * Builds and emails every note. `only` limits the run to those user ids (a
- * first send to the boss, a test); `dry` lists who would get one and sends
- * nothing. A failed build or send never stops the others.
+ * Builds and emails every note. `only` sends to exactly those user ids, any
+ * role or activity (a test to one's own mailbox, a first send to the boss);
+ * `dry` lists who would get one and sends nothing. A failed build or send
+ * never stops the others.
  */
 export async function sendWeeklyNotes(opts: { admin?: Admin; today?: string; dry?: boolean; only?: string[] | null }): Promise<WeeklyNoteRun> {
   const admin = opts.admin ?? createAdminSupabase()
   const today = opts.today ?? dubaiToday()
   const week = lastWeek(today)
-  const { recipients: all, skipped } = await weeklyNoteRecipients(admin, today)
-  const recipients = opts.only?.length ? all.filter((r) => opts.only!.includes(r.userId)) : all
+  const { recipients, skipped } = opts.only?.length ? await namedRecipients(admin, opts.only) : await weeklyNoteRecipients(admin, today)
   const run: WeeklyNoteRun = { week: week.label, recipients: recipients.length, skipped, sent: [], failed: [], ai_tips: 0, dry: Boolean(opts.dry) }
   if (opts.dry || !recipients.length) return run
 

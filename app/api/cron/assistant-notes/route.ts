@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { dubaiToday, dueLabel, dueRemindersByPerson, markRemindersSent } from "@/lib/assistant-notes"
 import { hasMailerConfig, reminderEmailHtml, sendReminderEmail, weeklyNoteHtml } from "@/lib/mailer"
-import { assistantUrlFor, isMondayInDubai, previewWeeklyNote, sendWeeklyNotes, weeklyNoteRecipients } from "@/lib/weekly-note"
+import { assistantUrlFor, isMondayInDubai, namedRecipients, previewWeeklyNote, sendWeeklyNotes, weeklyNoteRecipients } from "@/lib/weekly-note"
 
 /**
  * FHI Assistant's morning mail to agents and team leaders — 9:00 AM Dubai
@@ -16,7 +16,8 @@ import { assistantUrlFor, isMondayInDubai, previewWeeklyNote, sendWeeklyNotes, w
  *
  * Checks: ?dry=1 lists who would get what WITHOUT sending (safe in prod);
  * ?weekly=1 sends the weekly note on any day; ?only=<uid>[,<uid>] limits a
- * run to those people (a first send to the boss); ?preview=<uid>&kind=weekly
+ * run to exactly those people, any role (a test to your own mailbox, a first
+ * send to the boss); ?preview=<uid>&kind=weekly
  * or kind=reminder (non-production only) returns that person's email as HTML.
  */
 
@@ -88,8 +89,8 @@ export async function GET(req: NextRequest) {
   const failure = (e: unknown) => ({ error: e instanceof Error ? e.message : String(e) })
 
   if (q.get("dry") === "1") {
-    const [people, due] = await Promise.all([weeklyNoteRecipients(admin, today).catch(failure), dueRemindersByPerson(admin, today).catch(failure)])
-    const chosen = "recipients" in people ? (only.length ? people.recipients.filter((r) => only.includes(r.userId)) : people.recipients) : []
+    const [people, due] = await Promise.all([(only.length ? namedRecipients(admin, only) : weeklyNoteRecipients(admin, today)).catch(failure), dueRemindersByPerson(admin, today).catch(failure)])
+    const chosen = "recipients" in people ? people.recipients : []
     return NextResponse.json({
       ok: true,
       dry_run: true,
