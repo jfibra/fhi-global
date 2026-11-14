@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { dubaiToday, dueLabel, dueRemindersByPerson, markRemindersSent } from "@/lib/assistant-notes"
-import { calendarEntryEmailHtml, hasMailerConfig, reminderEmailHtml, sendCalendarEntryEmail, sendReminderEmail, weeklyNoteHtml } from "@/lib/mailer"
+import { calendarEntryEmailHtml, eventReminderEmailHtml, hasMailerConfig, reminderEmailHtml, sendCalendarEntryEmail, sendEventReminderEmail, sendReminderEmail, weeklyNoteHtml } from "@/lib/mailer"
+import { eventRemindersDue, markReminded, venueMapUrl, type EventReminderBatch, type ReminderRegistration } from "@/lib/events/reminders"
+import { eventPublicPath } from "@/lib/events/paths"
+import { registrationDays } from "@/lib/events/pax"
+import { SITE_URL } from "@/lib/seo"
 import { assistantUrlFor, isMondayInDubai, namedRecipients, previewWeeklyNote, sendWeeklyNotes, weeklyNoteRecipients } from "@/lib/weekly-note"
 import { emailsFor, entriesDueThisMorning, entryAudience, entryTimeLabel, markEntriesNotified } from "@/lib/calendar/entries"
 import { ENTRY_AUDIENCE_LABELS, ENTRY_KIND_LABELS, type CalendarEntry } from "@/lib/calendar/types"
@@ -14,7 +18,10 @@ import { ENTRY_AUDIENCE_LABELS, ENTRY_KIND_LABELS, type CalendarEntry } from "@/
  *  - on Mondays: the weekly coaching note (lib/weekly-note.ts);
  *  - every day: the morning note for company calendar entries starting today
  *    whose admin ticked "Email them on the morning" (lib/calendar/entries.ts),
- *    to everyone the entry's audience names, once (notified_on).
+ *    to everyone the entry's audience names, once (notified_on);
+ *  - every day: "See you tomorrow" to everyone registered for an event that
+ *    starts tomorrow (lib/events/reminders.ts), once per registration
+ *    (migration 091 reminder_sent_at); ?event=<id> limits it to one event.
  *
  * Same guard as the other crons: Vercel sends "Authorization: Bearer
  * $CRON_SECRET"; manual runs can pass ?secret=.
@@ -93,6 +100,41 @@ async function sendEntryMornings(admin: Admin, today: string, only: string[] | n
   return out
 }
 
+const site = SITE_URL.replace(/\/$/, "")
+
+function eventReminderInput(batch: EventReminderBatch, r: ReminderRegistration) {
+  const attending = registrationDays(r.days, batch.event.event_days).filter((d) => d >= batch.day)
+  return {
+    to: r.email,
+    fullName: r.full_name,
+    event: batch.event,
+    attendingDays: attending,
+    day: batch.day,
+    mapUrl: venueMapUrl(batch.event),
+    eventUrl: `${site}${eventPublicPath({ id: batch.event.id, slug: batch.event.slug })}`,
+  }
+}
+
+/** "See you tomorrow" to everyone registered for an event starting tomorrow, once per registration. */
+async function sendEventReminders(admin: Admin, today: string, onlyEvent: string | null): Promise<{ events: number; sent: number; failed: string[] }> {
+  const batches = await eventRemindersDue(admin, today, onlyEvent)
+  const out = { events: batches.length, sent: 0, failed: [] as string[] }
+  for (const batch of batches) {
+    const done: string[] = []
+    for (const r of batch.registrations.slice(0, 1000)) {
+      try {
+        await sendEventReminderEmail(eventReminderInput(batch, r))
+        out.sent++
+        done.push(r.id)
+      } catch {
+        out.failed.push(r.email)
+      }
+    }
+    await markReminded(admin, done).catch(() => undefined)
+  }
+  return out
+}
+
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim()
   const isProd = process.env.NODE_ENV === "production"
@@ -112,6 +154,19 @@ export async function GET(req: NextRequest) {
 
   const preview = q.get("preview")?.trim()
   if (preview && !isProd) {
+    if (q.get("kind") === "event") {
+      // The first event due tomorrow (or ?day=<the day before it>), to the previewing person's name; a sample when none.
+      const [batch] = await eventRemindersDue(admin, q.get("day")?.trim() || today, q.get("event")?.trim() || null).catch(() => [] as EventReminderBatch[])
+      const { data: p } = await admin.from("profiles").select("fullname").eq("id", preview).maybeSingle<{ fullname: string | null }>()
+      const name = p?.fullname ?? "there"
+      const input = batch
+        ? eventReminderInput(batch, { id: "", full_name: name, email: "", days: null })
+        : eventReminderInput(
+            { event: { id: "00000000-0000-4000-8000-000000000000", slug: "sample-event", title: "Investor evening · JLT", venue: "Dusit Thani Dubai, Sheikh Zayed Road", venue_lat: null, venue_lng: null, event_date: `${today}T15:00:00+04:00`, event_days: 1, day_times: [] }, day: 1, registrations: [] },
+            { id: "", full_name: name, email: "", days: null },
+          )
+      return new NextResponse(eventReminderEmailHtml(input).html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } })
+    }
     if (q.get("kind") === "entry") {
       const { data: p } = await admin.from("profiles").select("fullname, role").eq("id", preview).maybeSingle<{ fullname: string | null; role: string | null }>()
       if (!p) return NextResponse.json({ error: "No such profile." }, { status: 404 })
@@ -138,10 +193,11 @@ export async function GET(req: NextRequest) {
   const failure = (e: unknown) => ({ error: e instanceof Error ? e.message : String(e) })
 
   if (q.get("dry") === "1") {
-    const [people, due, entries] = await Promise.all([
+    const [people, due, entries, eventBatches] = await Promise.all([
       (only.length ? namedRecipients(admin, only) : weeklyNoteRecipients(admin, today)).catch(failure),
       dueRemindersByPerson(admin, today).catch(failure),
       entriesDueThisMorning(admin, today).catch(failure),
+      eventRemindersDue(admin, today, q.get("event")?.trim() || null).catch(failure),
     ])
     const chosen = "recipients" in people ? people.recipients : []
     const entryList = Array.isArray(entries) ? await Promise.all(entries.map(async (e) => ({ title: e.title, audience: e.audience, people: (await entryAudience(admin, e).catch(() => [])).length }))) : entries
@@ -152,6 +208,7 @@ export async function GET(req: NextRequest) {
       weekly_note: "recipients" in people ? { would_send: weekly, recipients: chosen.length, skipped: people.skipped, people: chosen.map((r) => r.name) } : people,
       reminders: due instanceof Map ? { people: due.size, reminders: [...due.values()].reduce((a, rows) => a + rows.length, 0) } : due,
       calendar_entries: entryList,
+      event_reminders: Array.isArray(eventBatches) ? eventBatches.map((b) => ({ event: b.event.title, day: b.day, people: b.registrations.length })) : eventBatches,
     })
   }
 
@@ -159,6 +216,8 @@ export async function GET(req: NextRequest) {
 
   const reminders = await sendDueReminders(admin, today, only.length ? only : null).catch(failure)
   const calendarEntries = await sendEntryMornings(admin, today, only.length ? only : null).catch(failure)
+  // Event reminders go to attendees, not accounts, so ?only= does not apply; ?event=<id> narrows a manual run.
+  const eventReminders = only.length ? { skipped: "only= names accounts; event reminders go to attendees" } : await sendEventReminders(admin, today, q.get("event")?.trim() || null).catch(failure)
   const note = weekly ? await sendWeeklyNotes({ admin, today, only: only.length ? only : null }).catch(failure) : null
-  return NextResponse.json({ ok: true, today, reminders, calendar_entries: calendarEntries, weekly_note: note })
+  return NextResponse.json({ ok: true, today, reminders, calendar_entries: calendarEntries, event_reminders: eventReminders, weekly_note: note })
 }

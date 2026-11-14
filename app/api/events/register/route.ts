@@ -123,6 +123,8 @@ export async function POST(req: NextRequest) {
     await sendEventRegistrationEmail({
       to: email,
       fullName: titleCaseName(fullName),
+      eventId,
+      slug: (event.slug as string | null) ?? null,
       eventTitle: (event.title as string) ?? "FHI Global event",
       eventDate: (event.event_date as string | null) ?? null,
       eventDays: (event.event_days as number | null) ?? 1,

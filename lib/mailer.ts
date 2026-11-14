@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer"
-import { eventSchedule, eventWhenLabel, hasCustomDayTimes } from "@/lib/events/dates"
+import { eventSchedule, eventWhenLabel, hasCustomDayTimes, normalizeEventDays } from "@/lib/events/dates"
+import { eventCalendarEntries, eventIcs, googleCalendarUrl, icsFilename, type CalendarSourceEvent, type EventCalendarEntry } from "@/lib/events/calendar"
 import type { PeriodicReport } from "@/lib/periodic-report"
 import type { WeeklyNote } from "@/lib/weekly-note"
 import { SITE_URL } from "@/lib/seo"
@@ -474,6 +475,9 @@ function detailRow(label: string, value: string): string {
 export async function sendEventRegistrationEmail(input: {
   to: string
   fullName: string
+  /** With the id (and slug) the email carries Add-to-calendar buttons and the .ics file (lib/events/calendar.ts). */
+  eventId?: string
+  slug?: string | null
   eventTitle: string
   eventDate: string | null
   /** Consecutive days (071); the email then shows the whole span. */
@@ -490,6 +494,9 @@ export async function sendEventRegistrationEmail(input: {
   const dateLabel = multi ? eventWhenLabel(input.eventDate, input.eventDays, "long") : dubaiDateLabel(input.eventDate)
   const schedule = multi ? eventSchedule(input.eventDate, input.eventDays, input.dayTimes) : []
   const chosen = input.attendingDays?.length ? schedule.filter((d) => input.attendingDays!.includes(d.day)) : null
+  const calendar = input.eventId
+    ? calendarBits({ id: input.eventId, slug: input.slug ?? null, title: input.eventTitle, venue: input.venue, event_date: input.eventDate, event_days: input.eventDays, day_times: input.dayTimes }, input.attendingDays)
+    : null
   const rows = [
     detailRow("Event", input.eventTitle),
     // Ticked only some days → those are what they're registered for.
@@ -526,6 +533,7 @@ export async function sendEventRegistrationEmail(input: {
             </table>
           </td>
         </tr>
+        ${calendar ? calendarBlockHtml(calendar.entries) : ""}
         <tr>
           <td align="center" style="padding:22px 40px 34px;">
             <a href="${esc(input.eventUrl)}"
@@ -539,13 +547,112 @@ export async function sendEventRegistrationEmail(input: {
     from: fromAddress(),
     to: input.to,
     subject,
-    text: `Registration confirmed — ${input.eventTitle}\n\nName: ${input.fullName}\n${dateLabel ? `When: ${dateLabel}\n` : ""}${input.venue ? `Venue: ${input.venue}\n` : ""}\nKeep this email as your confirmation and show it at the entrance.\n\n${input.eventUrl}`,
+    text: `Registration confirmed — ${input.eventTitle}\n\nName: ${input.fullName}\n${dateLabel ? `When: ${dateLabel}\n` : ""}${input.venue ? `Venue: ${input.venue}\n` : ""}\nKeep this email as your confirmation and show it at the entrance.\n\n${input.eventUrl}${calendar ? `\n\n${calendarBlockText(calendar.entries)}` : ""}`,
     html: eventEmailShell({
       subject,
       preheader: `Your registration for ${input.eventTitle} is confirmed.`,
       bodyHtml,
     }),
+    attachments: calendar ? [calendar.attachment] : undefined,
   })
+}
+
+// ─── Add to calendar (lib/events/calendar.ts) ────────────────────────────────
+//
+// The confirmation and the day-before reminder both carry a Google Calendar
+// button per day the person attends and the .ics file attached, so one tap
+// puts the event in their own calendar, which then reminds them itself.
+
+type CalendarBits = { entries: EventCalendarEntry[]; attachment: { filename: string; content: Buffer; contentType: string } }
+
+function calendarBits(event: CalendarSourceEvent, attendingDays: number[] | null | undefined): CalendarBits | null {
+  const entries = eventCalendarEntries(event, attendingDays, SITE_URL)
+  if (!entries.length) return null
+  return { entries, attachment: { filename: icsFilename(event), content: Buffer.from(eventIcs(entries, event.id), "utf8"), contentType: "text/calendar; charset=utf-8; method=PUBLISH" } }
+}
+
+function calendarBlockHtml(entries: EventCalendarEntry[]): string {
+  const multi = entries.length > 1 || entries[0]?.of > 1
+  const buttons = entries
+    .map(
+      (e) => `<tr><td style="padding:5px 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          ${multi ? `<td style="padding-right:12px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;color:#374151;white-space:nowrap;">Day ${e.day} · ${esc(e.dateLabel)} · ${esc(e.time)}</td>` : ""}
+          <td bgcolor="#ffffff" style="background:#ffffff;border:1px solid #cfd6e0;border-radius:10px;"><a href="${esc(googleCalendarUrl(e))}" style="display:inline-block;padding:9px 16px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:${NAVY};text-decoration:none;white-space:nowrap;">Add to Google Calendar</a></td>
+        </tr></table>
+      </td></tr>`,
+    )
+    .join("")
+  return `
+        <tr>
+          <td style="padding:18px 40px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+            <p style="margin:0 0 4px;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#8a6d2a;">Add to your calendar</p>
+            <p style="margin:0 0 8px;font-size:13.5px;line-height:1.6;color:#6b7280;">One tap puts it in your phone's calendar, which will remind you before it starts. On an iPhone or in Outlook, open the calendar file attached to this email.</p>
+            <table role="presentation" cellpadding="0" cellspacing="0">${buttons}</table>
+          </td>
+        </tr>`
+}
+
+function calendarBlockText(entries: EventCalendarEntry[]): string {
+  return ["Add to your calendar:", ...entries.map((e) => `- ${entries.length > 1 || e.of > 1 ? `Day ${e.day} (${e.dateLabel} ${e.time}): ` : ""}${googleCalendarUrl(e)}`), "The calendar file for Apple Calendar and Outlook is attached."].join("\n")
+}
+
+/** "See you tomorrow" — the day-before reminder to a registered attendee (lib/events/reminders.ts, daily cron). */
+export type EventReminderEmailInput = {
+  to: string
+  fullName: string
+  event: CalendarSourceEvent
+  /** The days this person attends from tomorrow on. */
+  attendingDays: number[] | null
+  /** The day number starting tomorrow, for the wording on a multi-day event. */
+  day: number
+  mapUrl: string | null
+  eventUrl: string
+}
+
+export function eventReminderEmailHtml(input: EventReminderEmailInput): { subject: string; html: string; text: string; attachment: CalendarBits["attachment"] | null } {
+  const calendar = calendarBits(input.event, input.attendingDays)
+  const first = calendar?.entries[0] ?? null
+  const multi = normalizeEventDays(input.event.event_days) > 1
+  const subject = `See you tomorrow — ${input.event.title}`
+  const whenLabel = first ? `Tomorrow, ${first.dateLabel} · ${first.time} (GST)` : "Tomorrow"
+  const rows = [
+    detailRow("Event", input.event.title),
+    detailRow("When", whenLabel + (multi ? ` · Day ${input.day}` : "")),
+    input.event.venue ? detailRow("Venue", input.event.venue) : "",
+    detailRow("Name", input.fullName),
+  ].join("")
+  const bodyHtml = `
+        <tr>
+          <td style="padding:36px 40px 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">Tomorrow</p>
+            <h1 style="margin:0 0 12px;font-size:23px;line-height:1.3;font-weight:700;color:#0d1117;">See you tomorrow, ${esc(greetingName(input.fullName))}!</h1>
+            <p style="margin:0;font-size:15px;line-height:1.65;color:#4b5563;">A quick reminder that <strong>${esc(input.event.title)}</strong> is tomorrow. Show this email at the entrance.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px 6px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafd;border:1px solid #e2e8f2;border-radius:14px;">
+              <tr><td style="padding:16px 20px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+        ${calendar ? calendarBlockHtml(calendar.entries) : ""}
+        <tr>
+          <td align="center" style="padding:22px 40px 34px;">
+            ${input.mapUrl ? `<a href="${esc(input.mapUrl)}" style="display:inline-block;margin:0 6px 8px;background:${NAVY};color:#ffffff;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;text-decoration:none;padding:13px 30px;border-radius:12px;border-bottom:3px solid ${GOLD};">Open the map</a>` : ""}
+            <a href="${esc(input.eventUrl)}" style="display:inline-block;margin:0 6px 8px;background:#ffffff;color:${NAVY};font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;text-decoration:none;padding:12px 30px;border-radius:12px;border:1px solid #cfd6e0;">Event details</a>
+          </td>
+        </tr>`
+  const text = [`See you tomorrow — ${input.event.title}`, "", `When: ${whenLabel}`, ...(input.event.venue ? [`Venue: ${input.event.venue}`] : []), ...(input.mapUrl ? [`Map: ${input.mapUrl}`] : []), "", input.eventUrl, ...(calendar ? ["", calendarBlockText(calendar.entries)] : [])].join("\n")
+  return { subject, html: eventEmailShell({ subject, preheader: `${input.event.title} is tomorrow${first ? ` at ${first.time}` : ""}.`, bodyHtml }), text, attachment: calendar?.attachment ?? null }
+}
+
+export async function sendEventReminderEmail(input: EventReminderEmailInput): Promise<void> {
+  const { subject, html, text, attachment } = eventReminderEmailHtml(input)
+  await deliver("EventReminderMailer", { from: fromAddress(), to: input.to, subject, text, html, attachments: attachment ? [attachment] : undefined })
 }
 
 /** Sent to a raffle winner as their proof of winning (triggered by the host). */

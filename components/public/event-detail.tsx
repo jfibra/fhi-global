@@ -339,6 +339,7 @@ export function EventDetail({
                   fields={parseRegistrationFields(event.registration_fields)}
                   days={registerDays}
                   limited={hasPaxLimits(event.day_pax, event.event_days)}
+                  calendar={{ slug: event.slug, eventDate: event.event_date, eventDays: event.event_days, dayTimes: event.day_times, venue: event.venue }}
                 />
                 <EventPageQr />
               </div>

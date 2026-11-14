@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Image from "next/image"
-import { CalendarDays, CheckCircle2, Facebook, Instagram, Loader2, Mail, MessageCircle, Ticket, User, UserPlus } from "lucide-react"
+import { CalendarDays, CalendarPlus, CheckCircle2, Download, Facebook, Instagram, Loader2, Mail, MessageCircle, Ticket, User, UserPlus } from "lucide-react"
 import { LeadLink } from "@/components/public/lead-link"
+import { eventCalendarEntries, eventIcsPath, googleCalendarUrl } from "@/lib/events/calendar"
 import type { AnswerValue, RegistrationField } from "@/lib/events/fields"
 import type { PublicDaySeats } from "@/lib/events/pax"
 import { SOCIAL_URLS, isExternalSocial } from "@/lib/social"
@@ -52,9 +53,12 @@ export function EventRegisterForm({
   days = [],
   limited = false,
   preview = false,
+  calendar = null,
 }: {
   eventId: string
   eventTitle: string
+  /** What the thank-you screen needs for "Add to your calendar" (lib/events/calendar.ts); none = no buttons. */
+  calendar?: { slug: string | null; eventDate: string | null; eventDays?: number | null; dayTimes?: unknown; venue: string | null } | null
   /** Per-event custom questions, in display order (events.registration_fields). */
   fields?: RegistrationField[]
   /** A multi-day event's days (071/072), day 1 first; empty for a one-day event. */
@@ -209,6 +213,14 @@ export function EventRegisterForm({
   const pickedDays = days.filter((d) => picked.has(d.day))
 
   if (status === "done") {
+    // One tap puts the event in their own calendar (Google link, or the .ics for Apple / Outlook), which then reminds them.
+    const calendarEntries = calendar
+      ? eventCalendarEntries(
+          { id: eventId, slug: calendar.slug, title: eventTitle, venue: calendar.venue, event_date: calendar.eventDate, event_days: calendar.eventDays, day_times: calendar.dayTimes },
+          multiDay ? pickedDays.map((d) => d.day) : null,
+          typeof window !== "undefined" ? window.location.origin : undefined,
+        )
+      : []
     return (
       <div className="text-center py-8">
         <div className="w-16 h-16 rounded-full bg-[#d6b357]/15 border-2 border-[#d6b357]/40 flex items-center justify-center mx-auto mb-4">
@@ -222,6 +234,48 @@ export function EventRegisterForm({
           )}
           . We&apos;ll be in touch — see you there!
         </p>
+
+        {calendarEntries.length > 0 && (
+          <div className="mt-7 border-t border-[#eef0f3] pt-6 text-left">
+            <p className="text-center text-[11px] font-bold uppercase tracking-[0.18em] text-[#b8913f]">Add to your calendar</p>
+            <p className="mx-auto mt-1.5 max-w-xs text-center text-[13px] leading-relaxed text-[#6b7280]">
+              One tap puts it in your phone&apos;s calendar, which will remind you before it starts.
+            </p>
+            <div className="mt-4 space-y-3">
+              {calendarEntries.map((e) => (
+                <div key={e.day} className="rounded-xl border border-[#e2e8f2] bg-[#f8fafd] p-3">
+                  {calendarEntries.length > 1 || e.of > 1 ? (
+                    <p className="mb-2 text-[12px] font-semibold text-[#374151]">
+                      Day {e.day} · {e.dateLabel} · {e.time}
+                    </p>
+                  ) : null}
+                  <div className="grid grid-cols-2 gap-2">
+                    <LeadLink
+                      event="click_add_to_calendar"
+                      params={{ provider: "google", event_id: eventId, day: e.day }}
+                      href={googleCalendarUrl(e)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 rounded-lg bg-[#001f3f] px-3 py-2.5 text-[13px] font-bold text-white transition hover:bg-[#002b57]"
+                    >
+                      <CalendarPlus className="h-4 w-4" aria-hidden="true" />
+                      Google Calendar
+                    </LeadLink>
+                    <LeadLink
+                      event="click_add_to_calendar"
+                      params={{ provider: "ics", event_id: eventId, day: e.day }}
+                      href={eventIcsPath(eventId, [e.day])}
+                      className="flex items-center justify-center gap-2 rounded-lg border border-[#cfd6e0] bg-white px-3 py-2.5 text-[13px] font-bold text-[#001f3f] transition hover:bg-[#f4f6f9]"
+                    >
+                      <Download className="h-4 w-4" aria-hidden="true" />
+                      Apple / Outlook
+                    </LeadLink>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {FOLLOW.length > 0 && (
           <div className="mt-7 border-t border-[#eef0f3] pt-6">
