@@ -4,7 +4,7 @@ import {
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays, CalendarRange,
-  Wallet, MessagesSquare, FileText, UploadCloud, Globe, FolderDown, Library, MonitorPlay,
+  Wallet, MessagesSquare, FileText, UploadCloud, Stamp, Globe, FolderDown, Library, MonitorPlay,
   Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus, Files, Eye, GitBranch, Link as LinkIcon,
 } from "lucide-react"
 import {
@@ -264,6 +264,9 @@ const ADMIN_NAV: RoleNavEntry[] = [
   // upload route runs. Admin staff only; safe to remove once that pipeline's
   // behavior is no longer in question.
   { icon: UploadCloud, label: "Upload Test", to: "upload-test" },
+  // Put logos on a photo and download it — all in the browser, nothing uploaded
+  // (features/dashboard/photo-logo). Admin staff only, like Upload Test.
+  { icon: Stamp, label: "Photo Logo", to: "photo-logo" },
 ]
 
 /** Content-only role: developers + projects, no admin powers. */
