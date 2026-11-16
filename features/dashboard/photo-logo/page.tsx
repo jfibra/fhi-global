@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from "react"
 import type { PointerEvent as ReactPointerEvent } from "react"
 import { Copy, Download, ImagePlus, Loader2, Stamp, Trash2, X } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { ROLES_PHOTO_LOGO, resolveAppRoleOrMember } from "@/lib/app-roles"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 
 type Photo = { url: string; name: string; w: number; h: number }
@@ -62,7 +62,7 @@ type Drag =
 
 export default function PhotoLogoPage() {
   const { role } = useAuth()
-  const allowed = useRequireAllowed(isAdminStaffRole(role))
+  const allowed = useRequireAllowed(ROLES_PHOTO_LOGO.includes(resolveAppRoleOrMember(role)))
 
   const [photo, setPhoto] = useState<Photo | null>(null)
   const [logos, setLogos] = useState<Logo[]>([])
@@ -283,7 +283,7 @@ export default function PhotoLogoPage() {
         </p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         {/* Stage */}
         <div className="border border-[#e5e8ec] bg-[#f4f5f7] p-3">
           {photo ? (
@@ -339,8 +339,8 @@ export default function PhotoLogoPage() {
           )}
         </div>
 
-        {/* Controls */}
-        <div className="space-y-5 border border-[#e5e8ec] bg-white p-4">
+        {/* Controls — on the left (first on a phone too) */}
+        <div className="order-first space-y-5 border border-[#e5e8ec] bg-white p-4">
           <div>
             <p className={label}>Photo</p>
             <button

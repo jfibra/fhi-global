@@ -15,6 +15,7 @@ import {
   ROLES_PROJECT_STUDIO_VIEWERS,
   ROLES_INTERNAL_RESOURCES,
   ROLES_WEBSITE_BUILDER,
+  ROLES_PHOTO_LOGO,
   ROLES_DLD_OPEN_DATA,
   ROLES_AGENT_ASSISTANT,
 } from "@/lib/app-roles"
@@ -100,6 +101,8 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   "fhi-chat": [...ROLES_ADMIN_STAFF, ...ROLES_AGENT_ASSISTANT],
   // Their four share links in one place (features/dashboard/links).
   links: ["agent", "team_leader"],
+  // Logos on a photo, in the browser — not for developers or members.
+  "photo-logo": [...ROLES_PHOTO_LOGO],
 }
 
 export function getDashboardRouteByRole(role?: string | null) {

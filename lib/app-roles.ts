@@ -376,6 +376,13 @@ export const ROLES_POSTER_MAKER: readonly AppRoleId[] = ["super_admin", "admin",
  */
 export const ROLES_PROJECT_STUDIO_VIEWERS: readonly AppRoleId[] = ["agent", "global_partner", "team_leader", "unit_manager", "member"]
 
+/**
+ * Photo Logo (put an FHI logo on a photo and download it, all in the browser):
+ * every role except developers (external partners) and members (sign-ups who
+ * don't sell). Derived so a future role is included by default.
+ */
+export const ROLES_PHOTO_LOGO: readonly AppRoleId[] = APP_ROLE_ORDER.filter((r) => r !== "developer" && r !== "member")
+
 /** Who may use the Website Builder (personal agent-site editor): admin staff + the sales pipeline. */
 export const ROLES_WEBSITE_BUILDER: readonly AppRoleId[] = ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager"]
 

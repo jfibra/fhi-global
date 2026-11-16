@@ -147,6 +147,10 @@ const EBOOKS: NavEntry = { icon: Library, label: "Ebooks", to: "ebooks" }
 const VIDEOS: NavEntry = { icon: MonitorPlay, label: "Videos", to: "videos" }
 // Owner document intake (NOC / Trakheesi) — sales pipeline + admin. Access is
 // gated by SUB_PATH_ROLES["owner-documents"] in lib/auth.ts.
+// Put an FHI logo on a photo and download it — all in the browser, nothing
+// uploaded (features/dashboard/photo-logo). Every role but developer and
+// member (ROLES_PHOTO_LOGO, SUB_PATH_ROLES["photo-logo"]); always the last row.
+const PHOTO_LOGO: NavEntry = { icon: Stamp, label: "Photo Logo", to: "photo-logo" }
 const OWNER_DOCUMENTS: NavEntry = { icon: FileSignature, label: "Owner Documents", to: "owner-documents" }
 
 // ─── Per-role lists ───────────────────────────────────────────────────────────
@@ -264,9 +268,7 @@ const ADMIN_NAV: RoleNavEntry[] = [
   // upload route runs. Admin staff only; safe to remove once that pipeline's
   // behavior is no longer in question.
   { icon: UploadCloud, label: "Upload Test", to: "upload-test" },
-  // Put logos on a photo and download it — all in the browser, nothing uploaded
-  // (features/dashboard/photo-logo). Admin staff only, like Upload Test.
-  { icon: Stamp, label: "Photo Logo", to: "photo-logo" },
+  PHOTO_LOGO,
 ]
 
 /** Content-only role: developers + projects, no admin powers. */
@@ -277,6 +279,7 @@ const EDITOR_NAV: RoleNavEntry[] = [
   MATERIALS,
   EBOOKS,
   VIDEOS,
+  PHOTO_LOGO,
 ]
 
 /** External developer partners — their own company and projects only. */
@@ -362,6 +365,7 @@ const salesPipelineNav = ({ projects = false, teamSales = false, invite = true, 
       ...(documents ? [{ ...DOCUMENTS, description: "DLD forms, agreements and company templates — fill in and download.", preview: "documents" }] : []),
     ],
   },
+  PHOTO_LOGO,
 ]
 
 /** secretary + team_secretary — paperwork support, no listings of their own. */
@@ -374,6 +378,7 @@ const SECRETARY_NAV: RoleNavEntry[] = [
   MATERIALS,
   EBOOKS,
   VIDEOS,
+  PHOTO_LOGO,
 ]
 
 /** Signed-up public users: browse, plus the self-serve tools. */
