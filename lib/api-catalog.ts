@@ -53,6 +53,46 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     notes: ["sales[].agent.id and sales[].credits[].id are agents[].id on the Accounts endpoint."],
   },
   {
+    key: "sales-top",
+    name: "Top sellers",
+    path: "/api/external/sales/top",
+    summary: "The leaderboards exactly as the dashboards show them: top agents, developers, projects or teams.",
+    returns:
+      "A ranked list for the period: rank, id, name, picture, deals and value in AED. Validated sales only; a shared deal credits each agent their share; a developer or project counts every sale once in full; a team is its members plus its subteams, with subteams listed apart.",
+    params: [
+      { name: "by", meaning: "agents (default), developers, projects or teams." },
+      { name: "from, to", meaning: "YYYY-MM-DD, inclusive, by business date. Leave both out for all time." },
+      { name: "developer", meaning: "A developer id or slug; narrows the agents or projects board." },
+      { name: "project", meaning: "A project id or slug; narrows the agents board." },
+      { name: "limit", meaning: "How many rows, up to 100. Default 10." },
+    ],
+    examples: [
+      { label: "Top agents this year", query: "by=agents&from=2026-01-01&to=2026-12-31" },
+      { label: "Top developers, all time", query: "by=developers&limit=10" },
+      { label: "Top teams this year", query: "by=teams&from=2026-01-01&to=2026-12-31" },
+    ],
+    notes: ["Same rules as FHI's Top Sales board and the FHI Assistant, so every surface quotes the same numbers."],
+  },
+  {
+    key: "sales-summary",
+    name: "Sales summary",
+    path: "/api/external/sales/summary",
+    summary: "The period figures the boss's reports give: validated and pending, the period before, and the month-by-month picture.",
+    returns:
+      "For the period: validated deals and value, pending deals and value, other statuses, the equal-length period just before with the percentage change, and a breakdown by month, quarter or year. Company figures count every sale once in full; an agent's figures count their share.",
+    params: [
+      { name: "from, to", meaning: "YYYY-MM-DD, inclusive, by business date. Leave both out for all time (the breakdown then shows the last 12 months)." },
+      { name: "group", meaning: "month (default), quarter or year for the breakdown." },
+      { name: "developer, project", meaning: "A developer or project id or slug; narrows the figures." },
+      { name: "agent", meaning: "A profile id or email; that agent's figures, at their share of each deal." },
+    ],
+    examples: [
+      { label: "This year by month", query: "from=2026-01-01&to=2026-12-31&group=month" },
+      { label: "Last 12 months, all time view", query: "group=month" },
+      { label: "One developer this year", query: "from=2026-01-01&to=2026-12-31&developer=azizi-developments" },
+    ],
+  },
+  {
     key: "agents",
     name: "Accounts",
     path: "/api/external/agents",
@@ -73,5 +113,89 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
       { label: "First 100 selling accounts", query: "limit=100&page=1" },
     ],
     notes: ["Email is the key to match a person across the other company sites."],
+  },
+  {
+    key: "projects",
+    name: "Projects",
+    path: "/api/external/projects",
+    summary: "The live projects, with their developer, prices, dates and unit types. Same rules as the public site.",
+    returns:
+      "Each project: name, public page, stage, developer, where it is (community, location, city, coordinates), the honest starting price plus the launch price range, payment plan, dates (launch, construction start, expected completion, handover and its quarter), size (buildings, units, floors), expected ROI and rental yield, ownership, every unit type with bedrooms, size and price range, photo and video.",
+    params: [
+      { name: "developer", meaning: "A developer id or slug." },
+      { name: "stage", meaning: "pre_launch, launch, under_construction or completed." },
+      { name: "area", meaning: "Words to match in the community, sub-community, location or city." },
+      { name: "handover", meaning: "A year; projects handing over that year." },
+      { name: "q", meaning: "Words to match in the name." },
+      { name: "id, slug", meaning: "One project." },
+      { name: "since", meaning: "An ISO timestamp; only rows changed since then, for syncing." },
+      { name: "page, limit", meaning: "Paging. limit up to 100, default 50. Sorted by name." },
+    ],
+    examples: [
+      { label: "Handing over in 2027", query: "handover=2027&limit=20" },
+      { label: "Everything by one developer", query: "developer=binghatti-developers" },
+      { label: "Projects in JVC", query: "area=jumeirah%20village%20circle" },
+    ],
+    notes: ["price.from is the floor the site itself shows: the headline price unless the unit table proves it is a placeholder.", "Test projects and unpublished ones are never returned."],
+  },
+  {
+    key: "developers",
+    name: "Developers",
+    path: "/api/external/developers",
+    summary: "The developers FHI works with, and how many live projects each has.",
+    returns: "Each developer: name, slug, public page, logo, description, website and business contact, verified flag, rating, and the count of live projects.",
+    params: [
+      { name: "q", meaning: "Words to match in the name." },
+      { name: "id, slug", meaning: "One developer." },
+      { name: "page, limit", meaning: "Paging. limit up to 100, default 50. Sorted by name." },
+    ],
+    examples: [
+      { label: "All developers", query: "limit=100" },
+      { label: "Search by name", query: "q=emaar" },
+    ],
+    notes: ["developers[].id matches projects[].developer.id and sales[].developer.id."],
+  },
+  {
+    key: "teams",
+    name: "Teams",
+    path: "/api/external/teams",
+    summary: "Each team with its leader, members, subteams and validated sales.",
+    returns:
+      "Each team: name, logo, type, parent and subteams, the leader, member counts (own and with subteams), validated deals and value for the period, and with include=members the full member list with role, role in team and when they joined.",
+    params: [
+      { name: "q, id, slug", meaning: "Find a team by name words, id or slug." },
+      { name: "status", meaning: "active (default) or all." },
+      { name: "from, to", meaning: "YYYY-MM-DD, inclusive; the period for the sales figures. Omit for all time." },
+      { name: "include", meaning: "members — adds the member list (up to 1000, subteams included)." },
+      { name: "page, limit", meaning: "Paging. limit up to 100, default 50. By name." },
+    ],
+    examples: [
+      { label: "All teams with this year's sales", query: "from=2026-01-01&to=2026-12-31" },
+      { label: "One team with its members", query: "q=mcg&include=members" },
+    ],
+    notes: ["A team's sales include its subteams at any depth, counted once per team, like the Teams page and the top-teams board."],
+  },
+  {
+    key: "events",
+    name: "Events",
+    path: "/api/external/events",
+    summary: "Company events and agents' events: dates, venue, host, where they are shown, and registrations.",
+    returns:
+      "Each event: title, public link, status, whether registration is open, every day with its date and start time, venue with coordinates, the host (FHI or the agent), where it is shown (fhiglobal.ae and/or the agent's website), total registrations, views and QR scans, photo and description. With include=days, each day's seat limit, taken and left.",
+    params: [
+      { name: "when", meaning: "upcoming (default), past or all. An event is past once its last day has started." },
+      { name: "from, to", meaning: "YYYY-MM-DD; by the first day." },
+      { name: "status", meaning: "published (default), draft or all." },
+      { name: "host", meaning: "company, agents or all (default)." },
+      { name: "agent", meaning: "A profile id; that agent's events." },
+      { name: "q, id, slug", meaning: "Find an event by title words, id or slug." },
+      { name: "include", meaning: "days — adds per-day seats (50 events at most)." },
+      { name: "page, limit", meaning: "Paging. limit up to 100, default 50." },
+    ],
+    examples: [
+      { label: "Upcoming events with seats", query: "when=upcoming&include=days" },
+      { label: "Past events, latest first", query: "when=past&limit=10" },
+      { label: "Company events only", query: "host=company&when=all" },
+    ],
   },
 ]
