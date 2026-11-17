@@ -361,7 +361,7 @@ export function DashboardShell({
 
   // Prop override wins, else the role's own list from sidebar-config.
   const resolvedItems: NavItem[] =
-    navItems ?? getSidebarNavItems(effectiveRole, { hasMailbox: Boolean(profile?.mailbox_address) })
+    navItems ?? getSidebarNavItems(effectiveRole, { hasMailbox: Boolean(profile?.mailbox_address), userId: user?.id ?? null })
 
   return (
     // The :has() classes are the full-bleed editor gate: when the page below

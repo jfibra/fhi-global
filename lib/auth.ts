@@ -61,6 +61,8 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   events: ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager"],
   // The admin Calendar (features/dashboard/calendar) — every dated thing on one page.
   calendar: ["super_admin", "admin"],
+  // The external API page (features/dashboard/api): admin path, and the page itself keeps it to API_PAGE_OWNERS.
+  api: ["super_admin", "admin"],
   // Their own Website Builder site's link (the sidebar's "My Website").
   "my-website": ["agent", "global_partner", "team_leader", "unit_manager"],
   "tax-entities": ["super_admin", "admin"],

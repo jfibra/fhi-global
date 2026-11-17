@@ -5,8 +5,9 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays, CalendarRange,
   Wallet, MessagesSquare, FileText, UploadCloud, Stamp, Globe, FolderDown, Library, MonitorPlay,
-  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus, Files, Eye, GitBranch, Link as LinkIcon,
+  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus, Files, Eye, GitBranch, Link as LinkIcon, Webhook,
 } from "lucide-react"
+import { API_PAGE_OWNERS } from "@/lib/api-catalog"
 import {
   ROLE_DASHBOARD_MAP,
   getRoleSidebarHex,
@@ -65,6 +66,8 @@ export interface NavEntry {
   badge?: number
   /** Row only renders when the signed-in profile has a personal mailbox. */
   requiresMailbox?: boolean
+  /** Row only renders for these profile ids (one person's workbench, like the API page). */
+  onlyUsers?: readonly string[]
   /** One-liner under the label on the hub tile. Only used inside a group. */
   description?: string
   /** Which format mockup the hub tile shows (see hub-tile-mockups.tsx). */
@@ -262,6 +265,9 @@ const ADMIN_NAV: RoleNavEntry[] = [
     ],
   },
   { icon: ScrollText, label: "Activity Logs", to: "system-logs" },
+  // The keyed external API's links and key, for the one account building the
+  // group's AI chat against them (lib/api-catalog.ts API_PAGE_OWNERS).
+  { icon: Webhook, label: "API", to: "api", onlyUsers: API_PAGE_OWNERS },
   // Dev-only test bench for the upload-compression pipeline
   // (lib/upload/compress-image.ts) — not a real business feature, just a way
   // to throw arbitrary images at the exact same server-side compression every
@@ -458,12 +464,13 @@ function listFor(role: string | null | undefined): RoleNavEntry[] {
 /** The sidebar rows for a role. Groups collapse to one row each. */
 export function getSidebarNavItems(
   role: string | null | undefined,
-  opts: { hasMailbox?: boolean } = {},
+  opts: { hasMailbox?: boolean; userId?: string | null } = {},
 ): NavItem[] {
   const base = baseFor(role)
 
   return listFor(role)
     .filter((entry) => isGroup(entry) || !entry.requiresMailbox || opts.hasMailbox)
+    .filter((entry) => isGroup(entry) || !entry.onlyUsers || (!!opts.userId && entry.onlyUsers.includes(opts.userId)))
     .map((entry) => {
     if (!isGroup(entry)) {
       return { icon: entry.icon, label: entry.label, href: hrefFor(base, entry.to), badge: entry.badge }
