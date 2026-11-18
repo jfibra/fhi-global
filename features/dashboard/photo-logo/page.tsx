@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import type { PointerEvent as ReactPointerEvent } from "react"
-import { Copy, Download, ImagePlus, Loader2, Stamp, Trash2, X } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight, Download, GalleryHorizontal, ImagePlus, LayoutGrid, Loader2, Trash2, X } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { ROLES_PHOTO_LOGO, resolveAppRoleOrMember } from "@/lib/app-roles"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
@@ -23,6 +23,8 @@ type Photo = { url: string; name: string; w: number; h: number }
 
 type Logo = {
   id: string
+  /** Which logo this is (its file, or "permit") — each can be on the photo only once. */
+  key: string
   src: string
   name: string
   /** width / height of the logo image */
@@ -32,13 +34,86 @@ type Logo = {
   y: number
   /** width as a fraction of the photo's width */
   w: number
+  /** The ad permit line only: its shadow strength, 0–200 (the image is redrawn when it changes). */
+  shadow?: number
 }
 
 const PRESET_LOGOS = [
   { src: "/logos/FHI_Branding Set_PNG Copies-02.png", name: "FHI Global (dark)" },
   { src: "/logos/FHI_Branding_White.png", name: "FHI Global (light)", dark: true },
   { src: "/logos/global_partner.png", name: "Global Partners" },
+  { src: "/logos/photo-logo/filipinohomes-dark.png", name: "Filipinohomes (dark)" },
+  { src: "/logos/photo-logo/filipinohomes-light.png", name: "Filipinohomes (light)", dark: true },
+  { src: "/logos/photo-logo/rent-ph.png", name: "Rent.ph" },
+  { src: "/logos/photo-logo/homes-ph.png", name: "Homes.ph" },
+  { src: "/logos/photo-logo/homes-ph-light.png", name: "Homes.ph (light)", dark: true },
+  { src: "/logos/photo-logo/rentsouq-ae.png", name: "Rentsouq.ae" },
 ]
+
+/** The company's ad permit line — fixed, not editable — drawn as white text with a shadow. */
+const PERMIT_TEXT = "FHI Global Ad Permit No. 145225"
+const DEFAULT_SHADOW = 100
+const PERMIT_KEY = "permit"
+
+/**
+ * The permit line drawn at high resolution into a transparent PNG, so it
+ * moves, resizes and downloads exactly like a logo. `shadow` 0–100 sets the
+ * shadow's darkness and spread; 100–200 keeps that shadow and stacks up to two
+ * more of the same on top, so it only gets denser. The canvas size doesn't
+ * depend on it, so the line keeps its size and place when the shadow changes.
+ */
+async function textImage(text: string, shadow: number): Promise<string> {
+  const family = getComputedStyle(document.body).fontFamily || "Arial, Helvetica, sans-serif"
+  const size = 160
+  const font = `600 ${size}px ${family}`
+  await document.fonts?.load(font).catch(() => undefined)
+  const pad = Math.round(size * 0.5)
+  const t = clamp(shadow, 0, 100) / 100
+  const extra = clamp(shadow - 100, 0, 100) / 100
+  const measure = document.createElement("canvas").getContext("2d")
+  if (!measure) throw new Error("Your browser couldn't draw the text.")
+  measure.font = font
+  const canvas = document.createElement("canvas")
+  canvas.width = Math.ceil(measure.measureText(text).width) + pad * 2
+  canvas.height = Math.ceil(size * 1.3) + pad * 2
+  const ctx = canvas.getContext("2d")
+  if (!ctx) throw new Error("Your browser couldn't draw the text.")
+  ctx.font = font
+  ctx.textBaseline = "middle"
+  ctx.fillStyle = "#ffffff"
+  const y = canvas.height / 2
+  // Shadows first, drawn alone (the text far off the canvas, its shadow shifted
+  // back in), so a stacked shadow never greys the white text; the text goes on last.
+  const shadowPass = (alpha: number) => {
+    const away = canvas.width + 1000
+    ctx.shadowColor = `rgba(0, 0, 0, ${alpha})`
+    ctx.shadowBlur = size * 0.36 * t
+    ctx.shadowOffsetX = away
+    ctx.shadowOffsetY = size * 0.06 * t
+    ctx.fillText(text, pad - away, y)
+  }
+  if (t > 0) {
+    shadowPass(Math.min(1, 1.3 * t))
+    if (extra > 0) {
+      shadowPass(extra)
+      shadowPass(extra)
+    }
+  }
+  ctx.shadowColor = "transparent"
+  ctx.shadowBlur = 0
+  ctx.shadowOffsetX = 0
+  ctx.shadowOffsetY = 0
+  ctx.fillText(text, pad, y)
+  return canvas.toDataURL("image/png")
+}
+
+// Preview zoom limits (the slider runs 50%–400%; 100% = the whole photo fits).
+const ZOOM_MIN = 0.5
+const ZOOM_MAX = 4
+// Screen height NOT available to the photo at 100% zoom: the dashboard header
+// (~73), the page padding (48) and the panel's padding + border (26) — so the
+// whole photo shows without scrolling the page.
+const FIT_OFFSET = 150
 
 const MARGIN = 0.04 // of the photo's width, for the quick positions
 // iOS Safari refuses canvases over ~16.7 MP; bigger photos are scaled down to fit on download.
@@ -68,10 +143,15 @@ export default function PhotoLogoPage() {
   const [logos, setLogos] = useState<Logo[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Preview zoom: 1 = the whole photo fits the panel; above it the panel scrolls.
+  const [zoom, setZoom] = useState(1)
+  // The logo picker: the whole grid (default) or one sliding row.
+  const [logoView, setLogoView] = useState<"slide" | "grid">("grid")
   const [error, setError] = useState<string | null>(null)
 
   const stageRef = useRef<HTMLDivElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
+  const logoStrip = useRef<HTMLDivElement>(null)
   const drag = useRef<Drag | null>(null)
   // Everything this page made with createObjectURL, revoked on leaving.
   const urls = useRef<Set<string>>(new Set())
@@ -124,6 +204,7 @@ export default function PhotoLogoPage() {
     try {
       const img = await loadImage(url)
       if (photo) dropUrl(photo.url)
+      setZoom(1)
       setPhoto({ url, name: f.name.replace(/\.[^.]+$/, "") || "photo", w: img.naturalWidth, h: img.naturalHeight })
     } catch (e) {
       dropUrl(url)
@@ -131,21 +212,30 @@ export default function PhotoLogoPage() {
     }
   }
 
-  const addLogo = async (src: string, name: string) => {
+  const isOnPhoto = (key: string) => logos.some((l) => l.key === key)
+
+  const addLogo = async (key: string, src: string, name: string, w = 0.25, extra: Partial<Logo> = {}, at: "top-left" | "bottom-center" = "top-left") => {
+    if (isOnPhoto(key)) return
     setError(null)
     try {
       const img = await loadImage(src)
       const aspect = img.naturalWidth / Math.max(1, img.naturalHeight)
       const ph = photo ? photo.w / photo.h : 16 / 9
-      const w = 0.25
       const h = (w / aspect) * ph // height as a fraction of the photo's height
       const id = newId()
-      // New logos land top-left, each next one a little lower so they don't stack.
+      // New logos land top-left, each next one a little lower so they don't stack; the ad permit lands bottom-centre.
       const n = logos.length
-      setLogos((ls) => [
-        ...ls,
-        { id, src, name, aspect, w, x: MARGIN + w / 2, y: clamp(MARGIN * ph + h / 2 + n * 0.06, 0, 1 - h / 2) },
-      ])
+      // Checked again here so a quick double-click can't add it twice.
+      setLogos((ls) =>
+        ls.some((l) => l.key === key)
+          ? ls
+          : [
+              ...ls,
+              at === "bottom-center"
+                ? { ...extra, key, id, src, name, aspect, w, x: 0.5, y: 1 - MARGIN * ph - h / 2 }
+                : { ...extra, key, id, src, name, aspect, w, x: MARGIN + w / 2, y: clamp(MARGIN * ph + h / 2 + n * 0.06, 0, 1 - h / 2) },
+            ],
+      )
       setSelected(id)
     } catch {
       setError(`Could not read ${name}.`)
@@ -159,10 +249,17 @@ export default function PhotoLogoPage() {
 
   const update = (id: string, patch: Partial<Logo>) => setLogos((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)))
 
-  const duplicate = (l: Logo) => {
-    const id = newId()
-    setLogos((ls) => [...ls, { ...l, id, x: clamp(l.x - 0.04, 0, 1), y: clamp(l.y - 0.04, 0, 1) }])
-    setSelected(id)
+  const addPermit = () =>
+    textImage(PERMIT_TEXT, DEFAULT_SHADOW)
+      .then((src) => addLogo(PERMIT_KEY, src, "Ad permit", 0.5, { shadow: DEFAULT_SHADOW }, "bottom-center"))
+      .catch((e) => setError(e instanceof Error ? e.message : "Could not add the permit."))
+
+  /** Redraw the permit with a new shadow; a slower redraw never overwrites a newer value. */
+  const setShadow = (id: string, shadow: number) => {
+    update(id, { shadow })
+    textImage(PERMIT_TEXT, shadow)
+      .then((src) => setLogos((ls) => ls.map((l) => (l.id === id && l.shadow === shadow ? { ...l, src } : l))))
+      .catch(() => undefined)
   }
 
   /** Snap to one of six spots (top or bottom row), keeping the margin from the edges. */
@@ -265,15 +362,6 @@ export default function PhotoLogoPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-bold text-[#001f3f]">
-          <Stamp className="h-5 w-5" /> Photo Logo
-        </h1>
-        <p className="mt-1 text-sm text-[#6b7280]">
-          Add logos to a photo and download it. Everything stays on this device — nothing is uploaded or saved.
-        </p>
-      </div>
-
       <input ref={photoInput} type="file" accept="image/*" className="hidden" onChange={(e) => { void pickPhoto(e.target.files?.[0]); e.target.value = "" }} />
 
       {error && (
@@ -283,13 +371,21 @@ export default function PhotoLogoPage() {
         </p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-        {/* Stage */}
-        <div className="border border-[#e5e8ec] bg-[#f4f5f7] p-3">
+      <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
+        {/* Stage — stays in view while the controls scroll (lg and up) */}
+        <div className="border border-[#e5e8ec] bg-[#f4f5f7] p-3 lg:sticky lg:top-0">
           {photo ? (
+            <>
+            {/* The fit size: as wide as the panel, as tall as the screen allows — whichever
+                is smaller (cqw = the panel's width). Zoom scales it; past the fit, it scrolls. */}
+            <div className="@container">
             <div
-              className="relative mx-auto touch-none select-none"
-              style={{ aspectRatio: `${photo.w} / ${photo.h}`, maxHeight: "72vh", maxWidth: `calc(72vh * ${photo.w / photo.h})` }}
+              className="flex overflow-auto"
+              style={{ height: `calc(min(100cqw, (100dvh - ${FIT_OFFSET}px) * ${photo.w / photo.h}) / ${photo.w / photo.h})` }}
+            >
+            <div
+              className="relative m-auto shrink-0 touch-none select-none"
+              style={{ aspectRatio: `${photo.w} / ${photo.h}`, width: `calc(min(100cqw, (100dvh - ${FIT_OFFSET}px) * ${photo.w / photo.h}) * ${zoom})` }}
               ref={stageRef}
               onPointerDown={() => setSelected(null)}
               onPointerMove={onPointerMove}
@@ -326,6 +422,9 @@ export default function PhotoLogoPage() {
                 )
               })}
             </div>
+            </div>
+            </div>
+            </>
           ) : (
             <button
               type="button"
@@ -342,7 +441,11 @@ export default function PhotoLogoPage() {
         {/* Controls — on the left (first on a phone too) */}
         <div className="order-first space-y-5 border border-[#e5e8ec] bg-white p-4">
           <div>
-            <p className={label}>Photo</p>
+            {photo && (
+              <div className="mb-3">
+                <Slider label="Photo zoom" value={Math.round(zoom * 100)} min={ZOOM_MIN * 100} max={ZOOM_MAX * 100} unit="%" onChange={(v) => setZoom(v / 100)} />
+              </div>
+            )}
             <button
               type="button"
               onClick={() => photoInput.current?.click()}
@@ -350,25 +453,96 @@ export default function PhotoLogoPage() {
             >
               <ImagePlus className="h-4 w-4" /> {photo ? "Change photo" : "Choose photo"}
             </button>
-            {photo && <p className="mt-1 text-xs text-[#6b7280]">{photo.w} × {photo.h} px</p>}
           </div>
 
           <div>
-            <p className={label}>Add a logo</p>
-            <div className="grid grid-cols-3 gap-2">
-              {PRESET_LOGOS.map((p) => (
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-bold text-[#0d1117]">Add a logo</p>
+              <div className="flex" role="group" aria-label="How to show the logos">
+                {([
+                  { v: "slide", Icon: GalleryHorizontal, title: "Slide" },
+                  { v: "grid", Icon: LayoutGrid, title: "Grid" },
+                ] as const).map(({ v, Icon, title }) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setLogoView(v)}
+                    aria-pressed={logoView === v}
+                    title={title}
+                    aria-label={title}
+                    className={`flex h-7 w-8 items-center justify-center border ${logoView === v ? "border-[#001f3f] bg-[#001f3f] text-white" : "border-[#e5e8ec] text-[#6b7280] hover:border-[#001f3f]"}`}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className={logoView === "slide" ? "relative" : ""}>
+            {logoView === "slide" && (
+              <>
                 <button
-                  key={p.src}
                   type="button"
-                  disabled={!photo}
-                  onClick={() => void addLogo(p.src, p.name)}
-                  title={p.name}
-                  className={`flex h-14 items-center justify-center border border-[#e5e8ec] p-1.5 transition-colors hover:border-[#001f3f] disabled:cursor-not-allowed disabled:opacity-40 ${p.dark ? "bg-[#001f3f]" : "bg-white"}`}
+                  onClick={() => logoStrip.current?.scrollBy({ left: -(logoStrip.current.clientWidth), behavior: "smooth" })}
+                  aria-label="Previous logos"
+                  className="absolute inset-y-0 left-0 z-10 flex w-9 items-center justify-start bg-gradient-to-r from-white via-white/80 to-transparent text-[#001f3f] hover:text-[#d6b357]"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.src} alt={p.name} className="max-h-full max-w-full object-contain" />
+                  <ChevronLeft className="h-5 w-5" strokeWidth={2.5} />
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => logoStrip.current?.scrollBy({ left: logoStrip.current.clientWidth, behavior: "smooth" })}
+                  aria-label="Next logos"
+                  className="absolute inset-y-0 right-0 z-10 flex w-9 items-center justify-end bg-gradient-to-l from-white via-white/80 to-transparent text-[#001f3f] hover:text-[#d6b357]"
+                >
+                  <ChevronRight className="h-5 w-5" strokeWidth={2.5} />
+                </button>
+              </>
+            )}
+            <div
+              ref={logoStrip}
+              className={logoView === "slide"
+                ? "flex snap-x snap-mandatory gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>button]:w-[calc((100%-1rem)/3)] [&>button]:shrink-0 [&>button]:snap-start"
+                : "grid grid-cols-3 gap-2"}
+            >
+              {PRESET_LOGOS.map((p) => {
+                const added = isOnPhoto(p.src)
+                return (
+                  <button
+                    key={p.src}
+                    type="button"
+                    disabled={!photo || added}
+                    onClick={() => void addLogo(p.src, p.src, p.name)}
+                    title={added ? `${p.name} — already on the photo` : p.name}
+                    className={`relative flex h-14 items-center justify-center border border-[#e5e8ec] p-1.5 transition-colors hover:border-[#001f3f] disabled:cursor-not-allowed disabled:opacity-40 ${p.dark ? "bg-[#001f3f]" : "bg-white"}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.src} alt={p.name} className="max-h-full max-w-full object-contain" />
+                    {added && (
+                      <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center bg-[#d6b357]">
+                        <Check className="h-3 w-3 text-[#001f3f]" />
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            </div>
+          </div>
+
+          <div>
+            <p className={label}>Add the ad permit</p>
+            <div className="flex gap-2">
+              <span className="flex h-10 min-w-0 flex-1 items-center truncate border border-[#e5e8ec] bg-[#f4f5f7] px-2 text-sm text-[#374151]">
+                {PERMIT_TEXT}
+              </span>
+              <button
+                type="button"
+                disabled={!photo || isOnPhoto(PERMIT_KEY)}
+                onClick={() => void addPermit()}
+                className="h-10 shrink-0 bg-[#001f3f] px-4 text-sm font-bold text-white hover:bg-[#0a3d6b] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isOnPhoto(PERMIT_KEY) ? "Added" : "Add"}
+              </button>
             </div>
           </div>
 
@@ -388,9 +562,6 @@ export default function PhotoLogoPage() {
                       </span>
                       <span className="truncate text-sm text-[#0d1117]">{l.name}</span>
                     </button>
-                    <button type="button" onClick={() => duplicate(l)} aria-label="Duplicate" title="Duplicate" className="text-[#6b7280] hover:text-[#001f3f]">
-                      <Copy className="h-4 w-4" />
-                    </button>
                     <button type="button" onClick={() => removeLogo(l.id)} aria-label="Remove" title="Remove" className="text-[#6b7280] hover:text-red-600">
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -403,26 +574,32 @@ export default function PhotoLogoPage() {
           {sel && (
             <div className="space-y-3 border-t border-[#e5e8ec] pt-4">
               <p className="text-sm font-bold text-[#0d1117]">Adjust · <span className="font-normal text-[#6b7280]">{sel.name}</span></p>
-              <div>
-                <p className="mb-1 text-xs font-bold text-[#374151]">Position</p>
-                <div className="grid w-[108px] grid-cols-3 gap-1">
-                  {([0, 2] as const).flatMap((row) =>
-                    ([0, 1, 2] as const).map((col) => (
-                      <button
-                        key={`${row}${col}`}
-                        type="button"
-                        onClick={() => placeAt(sel, col, row)}
-                        aria-label={`Move to ${["top", "middle", "bottom"][row]} ${["left", "centre", "right"][col]}`}
-                        className="flex h-8 items-center justify-center border border-[#e5e8ec] hover:border-[#001f3f]"
-                      >
-                        <span className="h-2 w-2 bg-[#001f3f]" />
-                      </button>
-                    )),
+              <div className="flex gap-4">
+                <div className="shrink-0">
+                  <p className="mb-1 text-xs font-bold text-[#374151]">Position</p>
+                  <div className="grid w-[108px] grid-cols-3 gap-1">
+                    {([0, 2] as const).flatMap((row) =>
+                      ([0, 1, 2] as const).map((col) => (
+                        <button
+                          key={`${row}${col}`}
+                          type="button"
+                          onClick={() => placeAt(sel, col, row)}
+                          aria-label={`Move to ${["top", "middle", "bottom"][row]} ${["left", "centre", "right"][col]}`}
+                          className="flex h-8 items-center justify-center border border-[#e5e8ec] hover:border-[#001f3f]"
+                        >
+                          <span className="h-2 w-2 bg-[#001f3f]" />
+                        </button>
+                      )),
+                    )}
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1 space-y-3">
+                  <Slider label="Size" value={Math.round(sel.w * 100)} min={3} max={100} unit="%" onChange={(v) => update(sel.id, { w: v / 100 })} />
+                  {sel.shadow !== undefined && (
+                    <Slider label="Shadow" value={sel.shadow} min={0} max={200} unit="%" onChange={(v) => setShadow(sel.id, v)} />
                   )}
                 </div>
-                <p className="mt-1 text-xs text-[#6b7280]">Or drag it on the photo · arrow keys nudge it.</p>
               </div>
-              <Slider label="Size" value={Math.round(sel.w * 100)} min={3} max={100} unit="%" onChange={(v) => update(sel.id, { w: v / 100 })} />
             </div>
           )}
 
@@ -435,7 +612,6 @@ export default function PhotoLogoPage() {
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download
             </button>
-            <p className="text-xs text-[#6b7280]">Saved as a JPG at the photo&apos;s full size, exactly as shown.</p>
           </div>
         </div>
       </div>
