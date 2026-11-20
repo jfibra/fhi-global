@@ -83,8 +83,13 @@ export const MERCHANT_PITCH: ReadonlyArray<{ title: string; text: string }> = [
   { title: "Free promotion", text: "Twice a month, rentsouq.ae features the merchant on its website and social media. Never promise income." },
 ]
 
-/** The short path the QR opens on fhiglobal.ae; it counts the scan and forwards to rentsouq.ae. */
-export const merchantQrPath = (code: string) => `/m/${encodeURIComponent(code)}`
+/**
+ * The short path the QR opens on fhiglobal.ae; it counts the scan and forwards
+ * to rentsouq.ae. Lowercase: the live site redirects uppercase paths to
+ * lowercase (one extra hop a phone would otherwise take on every scan), and
+ * app/m/[code] uppercases the code again before looking it up.
+ */
+export const merchantQrPath = (code: string) => `/m/${encodeURIComponent(code.toLowerCase())}`
 
 /** The merchant's code as the pages print it: "M-4K7Q". */
 export const MERCHANT_CODE_RE = /^M-[A-HJ-NP-Z2-9]{4,6}$/
